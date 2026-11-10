@@ -5,8 +5,12 @@ plugins {
 
 dependencies {
 
-	implementation 'org.ow2.asm:asm:9.7'
-	implementation 'org.ow2.asm:asm-util:9.7'
+	// ASM 9.11.1: class file major 72(Java 28)까지 읽음. 9.7은 Java 23(major 67)까지라 JDK 24+로 컴파일된 람다를 읽지 못함.
+	// LambdaPredicateVisitor 등이 ASM 타입(MethodVisitor)을 공개 API로 노출하므로 api 로 선언.
+	// 새 JDK 릴리스(6개월 주기)마다 최신 ASM으로 갱신 필요.
+	api 'org.ow2.asm:asm:9.11.1'
+	implementation 'org.ow2.asm:asm-tree:9.11.1'
+	implementation 'org.ow2.asm:asm-util:9.11.1'
 
 
 	implementation 'org.springframework.boot:spring-boot-starter-jdbc'

@@ -2,7 +2,7 @@ package org.lambdaql.analyzer;
 
 import org.lambdaql.query.SelectQuery.Where;
 import jakarta.persistence.EntityManager;
-import org.objectweb.asm.*;
+import org.objectweb.asm.ClassReader;
 
 import java.io.IOException;
 import java.lang.invoke.SerializedLambda;
@@ -20,49 +20,39 @@ public class LambdaWhereAnalyzer {
     }
 
     public <T> ConditionExpression analyze(Where<T> whereClause) {
+        Class<?> lambdaClass = whereClause.getClass();
+        Method method;
+        Object serialized;
         try {
-            Method method = whereClause.getClass().getDeclaredMethod("writeReplace");
+            method = lambdaClass.getDeclaredMethod("writeReplace");
             method.setAccessible(true);
-            Object serialized = method.invoke(whereClause);
-
-            if (serialized instanceof SerializedLambda sl) {
-                ClassReader reader = new ClassReader(sl.getImplClass().replace('/', '.'));
-                LambdaMethodVisitor visitor = new LambdaMethodVisitor(method, sl, entityClass, entityManager.getMetamodel());
-                reader.accept(visitor, ClassReader.SKIP_FRAMES | ClassReader.SKIP_DEBUG);
-                return visitor.getConditionExpr();
-            }
-        } catch (Exception e) {
-            try {
-                String name = whereClause.getClass().getCanonicalName();
-                if(name == null)
-                    name = whereClause.getClass().getName();
-                ClassReader reader = new ClassReader(name);
-                reader.accept(new ClassVisitor(Opcodes.ASM9) {
-                    @Override
-                    public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-                        if (name.equals("clause")) {
-                            System.out.println("Analyzing method: " + name + " " + descriptor);
-                            return new MethodVisitor(Opcodes.ASM9) {
-                                @Override
-                                public void visitInsn(int opcode) {
-                                    System.out.println("Instruction: ");
-                                }
-
-                                @Override
-                                public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
-                                    System.out.printf("Method call: %s -> %s.%s%s\n", "opcode", owner, name, descriptor);
-                                }
-                            };
-                        }
-                        return null;
-                    }
-                }, 0);
-            } catch (IOException ex) {
-                throw new RuntimeException(ex);
-            }
-            e.printStackTrace();
+            serialized = method.invoke(whereClause);
+        } catch (NoSuchMethodException e) {
+            // 익명 클래스 등 Serializable 람다가 아닌 구현체
+            throw new LambdaAnalysisException(
+                    "Serializable 람다만 분석할 수 있습니다 (writeReplace 없음): " + lambdaClass.getName(), e);
+        } catch (ReflectiveOperationException e) {
+            throw new LambdaAnalysisException("SerializedLambda 획득 실패: " + lambdaClass.getName(), e);
         }
-        throw new UnsupportedOperationException("Lambda parsing failed");
+
+        if (!(serialized instanceof SerializedLambda sl)) {
+            throw new LambdaAnalysisException(
+                    "writeReplace 결과가 SerializedLambda가 아닙니다: " + lambdaClass.getName()
+                            + " -> " + (serialized == null ? "null" : serialized.getClass().getName()));
+        }
+
+        String implTarget = sl.getImplClass() + "." + sl.getImplMethodName() + sl.getImplMethodSignature();
+        try {
+            ClassReader reader = new ClassReader(sl.getImplClass().replace('/', '.'));
+            LambdaMethodVisitor visitor = new LambdaMethodVisitor(method, sl, entityClass, entityManager.getMetamodel());
+            reader.accept(visitor, ClassReader.SKIP_FRAMES | ClassReader.SKIP_DEBUG);
+            return visitor.getConditionExpr();
+        } catch (IOException e) {
+            throw new LambdaAnalysisException("람다 구현 클래스 바이트코드를 읽을 수 없습니다: " + implTarget, e);
+        } catch (RuntimeException e) {
+            // 이전에는 fallback ClassReader 가 IOException("Class not found")을 던져 이 원인을 가렸음
+            throw new LambdaAnalysisException("람다 바이트코드 분석 실패: " + implTarget, e);
+        }
     }
 
 
