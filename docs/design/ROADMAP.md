@@ -6,7 +6,7 @@
 |---|---|
 | 작성일 | 2026-11-09 |
 | 기준 커밋 | `70c5c01` (메서드 체이닝 구조 추가, 2025-04-25) |
-| 인계 노트 | 작업을 이어받을 때는 저장소 루트의 [`DEVNOTE.md`](../DEVNOTE.md)부터 읽습니다(현재 상태, 환경, 확정 설계 요약, 다음 작업, 검증 재현 방법) |
+| 인계 노트 | 작업을 이어받을 때는 저장소 루트의 [`DEVNOTE.md`](../../DEVNOTE.md)부터 읽습니다(현재 상태, 환경, 확정 설계 요약, 다음 작업, 검증 재현 방법) |
 | 대상 모듈 | `query` (Java 21, ASM 9.11.1 — 2026-11-09 9.7에서 상향(2.6절), Spring Boot 3.4 / Hibernate 테스트 환경) |
 | 검증 DB | H2 2.3.230(인메모리), MariaDB 10.11.18(docker `mariadb`, 전용 스키마 `lql_verify`), Oracle AI Database 26ai Free 23.26.3(docker `lql-oracle`, 스키마 `LQL`), Hibernate ORM 6.6.5(`H2Dialect`/`MariaDBDialect`/`OracleDialect`) |
 | 근거 자료 | lambdaql 소스 직접 확인, 전체 및 개별 테스트 실행 로그, ExTree/FluentJPA/Jinq 소스 정적 분석, ExTree 2.8.4 실측 probe(`/tmp/lql-probe`), 이전 로드맵 초안과 critic 보고서 |
@@ -583,6 +583,11 @@ lambdaql은 현재 캐시가 없으므로, 호출할 때마다 클래스 파일�
 | D29 | Java 컬렉션 IN (`ids.contains(o.getId())`) | v0.1 / v0.2 | **v0.1 확정(2026-11-10 작성자 결정)**. 수신자는 캡처한 `Collection`·`List`·`Set`(`invokeinterface …contains`), 인자는 엔티티 경로. 의미는 Kotlin R19와 같음: `x in (:p)`와 부정 `(x is null or x not in (:p))`, null 원소가 있으면 바인딩 시 예외, 빈 컬렉션은 FALSE/부정은 TRUE. 세 DB 실측: 빈 목록을 Hibernate가 `1=0`/`1=1`로 렌더링, 1,500개 목록은 나누지 않은 한 문장으로 세 DB 모두 성공(Oracle 23ai. 22 이하의 1,000개 제한 ORA-01795는 미실측), `delete … where id in (1,500개)` 성공. 수신자가 엔티티 컬렉션 경로(`o.getItems().contains(x)`)면 오류(D20) | 확정 |
 | D30 | 스토어드 프로시저 호출 표기 (M11) | S1 스텁 인터페이스 + 람다 `qb.call(Procs.class, p -> p.calc(id, rate)).execute()`(void는 `qb.exec`) / S2 메서드 참조 `qb.call(Procs::calc, id, rate)` / S6 문자열 빌더 `qb.procedure("X").arg(…)` / S7 프록시 직접 호출 `qb.procs(Procs.class).calc(…)` | **S1 확정(2026-11-10 작성자 결정)**: 람다 하나·정적 헬퍼 없음, 컴파일러 타입 검사, Java·Kotlin 같은 바이트코드(`invokeinterface` 하나), 다른 진입점과 같은 `qb.…(…).execute()` 모양. 선언은 `@SqlProcedure`/`@SqlFunction`(필수). OUT 여러 개·INOUT은 반환 record, 결과 집합은 `List<T>`(Oracle REF CURSOR 같은 표기). 인자는 위치 바인딩 + 메타데이터 대조(PR2, 같은 타입 순서 바뀜은 이름이 있을 때만 검출). 세 DB 실측·적대적 검토 반영 | 확정 |
 | D31 | 쿼리 안 DB 함수 표기 (M11) | 문맥 객체 `sub.fn(Fns.class).discount(…)` / **사용자 선언 함수 + `@SqlFunction`**(인터페이스 static, 클래스 static, Kotlin object·최상위 함수, default + 싱글톤, 함수형 인터페이스 상수) | **인터페이스 static 메서드로 확정(2026-11-10 작성자 결정)**: Java `interface OrderFns { @SqlFunction("FN_DISCOUNT") static Double discount(Double p) { throw …; } }` → `where(o -> OrderFns.discount(o.getPrice()) > 10)`, Kotlin은 인터페이스 companion `@JvmStatic`. 어느 람다에서나 같은 표기, 문맥 인자 불필요, `invokestatic` 한 줄이라 판별이 단순. 함수형 인터페이스 상수는 애너테이션 위치가 제각각이고 지역 변수 캡처 시 판별 불가라 거부. 렌더링은 항상 `function('키' as T, …)`, 부팅 시 선택 등록(ServiceLoader, 설정한 클래스 목록). 규칙 FN1~FN11 | 확정 |
+| D33 | 메시지 다국어(i18n)·로깅 (3.10) | 기본 언어: 영어 고정 / JVM 로케일 따름 / 영어만. 로깅: SLF4J API / System.Logger. 구조: 오류 코드 + 메시지 번들 / 문구만 | **2026-11-10 작성자 결정**: 모든 메시지에 코드 `[LQL-xxxx]`, **영어(root)·일본어·중국어(간체)·한국어 4개 언어 기본 제공**(2026-11-10 추가 결정), 언어는 **설정 → `-Dlambdaql.locale` → JVM 기본 로케일**(ja·zh·ko면 해당 언어, 그 외 영어), 로깅은 **SLF4J API**(Spring starter는 compileOnly로 옮겨 logback 전이 제거), `MessageFormat` 대신 자체 `{n}` 치환, 예외 생성 시 메시지 확정. 실측: ResourceBundle fallback 함정, named module의 Control 금지, MessageFormat 작은따옴표·숫자 서식 함정 | 확정 |
+| D34 | Spring Data JPA 연동·모듈 구성 (M12) | 모듈: core + spring-data-jpa 분리 / + starter / 하나로 통합. 실행기 API: `query()` + 편의 메서드 / `QueryBuilder`만 노출. 범위: Boot 3.4+ / Boot 3.0+ | **2026-11-10 작성자 결정**: **`lambdaql-core`(Spring 의존 0) + `lambdaql-spring-data-jpa`(fragment + spring.factories + Boot 자동 구성 compileOnly)**, 실행기 `LambdaQlExecutor<T>`는 **`query()`·`from()`·`findAll/findOne/count/exists(Where)`·`updateQuery()/deleteQuery()/insertQuery()`**, 지원은 **Spring Boot 3.4+ / Spring Data 3.4+ 와 Boot 4**, 기존 `org.lambdaql.jpa` 패키지는 **삭제하지 않고 재검토**(2026-11-11 작성자 지적, M12 SD9). 근거: Spring Data가 default 메서드를 직접 호출하므로 가로챌 필요가 없음, spring.factories fragment가 공식 확장 방법이고 사용자 커스텀 구현과 공존(실측), Kotlin 2.2+ 동작(실측) | 확정 |
+| D35 | 정렬의 NULL 위치·실행 시점 방향 (3.7) | `by.by(key, Direction)` / `asc`·`desc`에 boolean 인자 / `Nulls` enum 인자 | **2026-11-12 작성자 결정: `by.asc(key, boolean nullsFirst)`, `by.desc(key, boolean nullsFirst)`**. 인자 없는 `asc(key)`·`desc(key)`는 D16 기본 NULL 정책. 실행 시점에 방향을 정할 때(캡처한 `Direction`)는 **`by.sort(key, Direction)`**. `by.by`는 폐기. 참고: Kotlin도 Java 메서드에는 이름 있는 인자를 못 써서 두 언어 모두 `by.desc(x, false)` 형태 | 확정 |
+| D36 | where의 연관 경로 조인 (R24 개정) | 항상 LEFT JOIN / 쓰임에 따라 자동 / 항상 INNER JOIN | **2026-11-12 작성자 결정: where 조건의 연관 경로는 항상 INNER JOIN**(`o.getCustomer().getName()` → `join o.customer j1 … j1.name`). 연관이 없는 행은 연관 자체를 비교해 찾는다: `o.getCustomer() == null` → `o.customer is null`(FK 검사, 조인 없음). FK id 경로(`o.getCustomer().getId()`)는 조인 없음. **정렬·select에만 쓰인 경로는 행을 잃지 않도록 LEFT JOIN 유지**(S8, J1). 같은 경로를 where와 정렬·select가 함께 쓰면 INNER(where가 이미 행을 거름). DML where(U9)는 INNER와 같은 의미가 되는 상관 `EXISTS`로 렌더링. 주의: Kotlin `it.customer?.name == null`은 고객 없는 주문을 포함하지 않음(포함하려면 `it.customer == null \|\| it.customer?.name == null`). 구현·세 DB 확인(`SelectQueryTest`) | 확정 |
+| D37 | 값 렌더링: 리터럴과 바인딩 | 정수만 리터럴 / 출처 기준 / 모두 바인딩 | **2026-11-12 작성자 결정: 출처 기준.** 람다 코드에 적힌 상수(숫자·문자열·boolean·`null`·enum 상수·컴파일 시점 상수 `static final`)는 **리터럴**(`o.price > 100.0`, `o.description = 'O''Brien'`, `o.kind = pkg.Order$Kind.RUSH`), 캡처 값과 계산 값은 **항상 바인딩**(`:p1`). 상수는 호출마다 같아 SQL 문장 수가 늘지 않고 옵티마이저가 값을 볼 수 있음. 문자열 리터럴은 작은따옴표를 `''`로 escape(컴파일된 상수라 SQL 주입 위험 없음). NaN·무한대는 바인딩. `new BigDecimal("1.5")`처럼 객체를 만드는 식은 계산 값이라 바인딩. 구현·세 DB 확인 | 확정 |
 | D8 | 라이선스와 특허 | (A/A'일 때) LGPL 의존 허용 여부. ExTree `LICENSE`(2.1)와 `pom.xml:30-35`(3.0) 불일치. FluentJPA `pom.xml:31-34`는 LGPL-3.0만 선언해 `LICENSE`(AGPL-3.0 소스 / LGPL-3.0 바이너리)와 불일치. FluentJPA `README.md:1`의 'Patent Pending' 표기는 (B) clean-room이라도 특허 여부 확인 필요 | 법무 확인 | D1과 함께 |
 
 ### 2.6 바이트코드 읽기 계층: ASM, `java.lang.classfile`, Babylon Code Reflection
@@ -1021,6 +1026,49 @@ qb.from(Order.class).leftJoin(Customer.class, (o, c) -> o.getCustomer().getId() 
 
 ---
 
+### 3.10 메시지 다국어(i18n)와 로깅 **(2026-11-10 작성자 결정, D33)**
+
+근거: 코드 조사(`/tmp/lql-i18n/a`), 라이브러리 사례 조사(`/tmp/lql-i18n/b`), 프로토타입 실측(`/tmp/lql-i18n/c/final`).
+
+**대상**: 사용자에게 보이는 예외 메시지와 경고 로그. Javadoc·주석은 대상이 아니다(쉬운 영어 고정). 새 엔진에는 현재 예외 메시지 37개가 있고 로그 호출은 0개다. 메시지 문구를 검사하는 테스트는 없다(실측). 구 코드(`analyzer`, `query` 일부, `function`, `jpa`)는 M2~M7에서 삭제·교체되므로 옮기지 않는다.
+
+**구조**
+
+```java
+public enum LqlMessage {                      // 키 + 안정 코드 + 인자 개수
+    LAMBDA_NOT_SERIALIZABLE("LQL-1002", 1),
+    LOOP_NOT_SUPPORTED("LQL-2004", 0),
+    NON_SARGABLE("LQL-5001", 2);
+    public String code();
+    public String format(Object... args);                 // 현재 lambdaQL 로케일
+    public String format(Locale locale, Object... args);  // "[LQL-2004] ..."
+}
+public final class LqlMessages {
+    public static void setLocale(Locale locale);   // null이면 -Dlambdaql.locale, 그다음 JVM 기본 로케일
+    public static Locale locale();
+}
+public class LambdaQLException extends RuntimeException {   // 모든 lambdaQL 예외의 부모
+    public String code();  public LqlMessage key();  public List<Object> args();
+    public String getMessage(Locale locale);                // 예: 영어 로그가 필요할 때 Locale.ROOT
+}
+// LambdaAnalysisException(진입), UnsupportedLambdaShapeException(형태), TranslationException(의미)은 이것을 상속
+```
+
+| # | 규칙 |
+|---|---|
+| I1 | **모든 메시지 앞에 언어와 무관한 코드 `[LQL-xxxx]`**. 범위: 1xxx 입력·람다, 2xxx 디코드, 3xxx 의미·Host 평가, 4xxx 실행·렌더링, 5xxx 경고. 릴리스 후에는 코드를 재사용하지 않는다. 테스트는 문구가 아니라 `code()`로 검사한다 |
+| I2 | **기본 제공 언어는 영어·일본어·중국어·한국어 4개**(작성자 결정 2026-11-10). **언어 선택**: `LqlMessages.setLocale(…)` → 시스템 속성 `-Dlambdaql.locale` → **JVM 기본 로케일**(작성자 결정). 로케일의 언어가 `ja`면 일본어, `zh`면 중국어(간체, `zh_CN`·`zh_TW` 모두), `ko`면 한국어, 그 밖은 영어(root). `ResourceBundle` 기본 fallback은 JVM이 ko일 때 ja·fr·en 요청에도 한국어를 돌려주고(실측), `Control.getNoFallbackControl`은 named·automatic module에서 `UnsupportedOperationException`이 나므로(실측) **lambdaQL이 로케일을 직접 고른다**(`ja` → `Locale.JAPANESE`, `zh` → `Locale.CHINESE`, `ko` → `Locale.KOREAN`, 그 외 → `Locale.ROOT`). 번체 중국어(`zh_TW`/`zh_Hant`) 번들은 요청이 있으면 추가 |
+| I3 | 번들 경로는 **`org/lambdaql/i18n/LqlMessages.properties`(영어, root)**, `LqlMessages_ja.properties`, `LqlMessages_zh.properties`, `LqlMessages_ko.properties`. 루트에 `messages.properties`를 두면 Spring Boot `MessageSource` 자동 구성에 섞일 수 있다. 파일은 UTF-8(JDK 9+는 `ResourceBundle`이 UTF-8을 그대로 읽음, 실측). `Properties.load`로 읽으면 깨지므로 쓰지 않는다 |
+| I4 | **`MessageFormat`을 쓰지 않는다.** `{0}`, `{1}`만 바꾸는 자체 치환기를 쓴다. `MessageFormat`은 `can't`의 작은따옴표에서 인자까지 사라지고, 줄 번호 1234567을 `1,234,567`로 찍는다(실측). 속도도 자체 치환이 약 5배 빠르다(약 90 ns, 실측) |
+| I5 | 메시지는 **예외를 만들 때 확정**한다(eager). 나중에 다른 언어가 필요하면 `getMessage(Locale)`. 역직렬화 뒤에도 쓸 수 있게 인자는 문자열 사본도 보관한다(`transient` 인자만 두면 NPE, 실측) |
+| I6 | 메시지 본문에 내부 계획 표기(`v0.2`, `M8`)를 넣지 않는다. 람다 위치(구현 메서드, 줄 번호)는 예외 필드로 두고 메시지 끝에 고정 형식으로 붙인다. 결정 그래프 덤프 같은 여러 줄 진단은 번역하지 않는다 |
+| I7 | 단위 테스트: 모든 키가 **네 번들 모두**에 있는지, `{n}` 개수가 인자 개수와 맞는지, `ja`·`zh`·`ko`·그 밖(`fr` 등) 로케일이 각각 맞는 번들을 고르는지 검사한다. 일본어·중국어 문구는 처음에 작성자 측이 만든 번역이므로 원어민 검토를 받을 때까지 README에 "번역 개선 기여 환영"을 적는다. 새 메시지는 네 언어를 함께 추가해야 빌드가 통과한다 |
+| I8 | **로깅은 SLF4J API**(작성자 결정). `slf4j-api`만 의존하고 구현체는 사용자가 고른다. 지금 `implementation 'spring-boot-starter-jdbc'`를 통해 `logback-classic`이 사용자에게 전이되므로 Spring starter들은 `compileOnly`/테스트 의존으로 옮긴다. 경고는 `LOG.warn("{}", LqlMessage.X.format(…))` 형태로, 레벨이 꺼져 있으면 메시지를 만들지 않도록 `isWarnEnabled()`로 감싼다 |
+| I9 | 문자열 처리(`toLowerCase` 등)는 항상 `Locale.ROOT`(터키어 I 문제) |
+| I10 | GraalVM native-image 지원 시 `META-INF/native-image/…`에 번들 메타데이터를 넣는다(v0.2) |
+
+비용(실측): 첫 번들 로드 약 14 ms(1회), 캐시된 조회 약 25 ns, 메시지 생성 약 90 ns, 예외 생성 약 400 ns. 오류 경로에서만 쓰므로 무시할 수준.
+
 ## 4. 단계별 로드맵
 
 각 마일스톤은 독립적으로 머지할 수 있습니다. **D1(엔진 선택)은 M1 착수 전에 결정**해야 합니다. 아래는 (B)를 가정한 계획이며, (A)를 고르면 M2와 M3이 "ExTree 어댑터와 정규화기"로 바뀝니다.
@@ -1122,6 +1170,8 @@ qb.from(Order.class).leftJoin(Customer.class, (o, c) -> o.getCustomer().getId() 
   - **golden 동치 그룹**: `/tmp/lql-notlogic/javac`의 G01~G41 코퍼스(람다 109개)에서 같은 그룹은 같은 정규 트리가 나옵니다. G12~G16·G41은 소스 연산자를 복원하고, G28/G29 상수 형태는 TRUE/FALSE 또는 원자 하나로 축약되며, G40은 정의된 예외를 던집니다. JDK 21과 최신 JDK 모두 통과합니다.
   - `B&&false`, `B||true`, `B||false`가 예외 없이 축약되고, `c?x:false`·`c?true:x`·`c?false:true`가 각각 AND·OR·NOT이 되며, 일반 `c?x:y`는 예외를 던집니다.
 - **관련 파일**: `LPV`, `A/ShortCircuitReducer.java`(신규), `A/BranchEvent.java`(신규), `CSM`(삭제), `A/LogicalCondition.java`, `A/UnaryCondition.java`(`Not`으로 대체), `A/BinaryCondition.java`(`Compare`로 대체), `A/BinaryOperator.java`
+
+> **구현 현황 (2026-11-12)**: M1~M3(로딩·디코딩·조건 복원), M4의 기본 의미 해석(`Normalizer`: getter 경로, Host 값, equals·Objects.equals·areEqual, compareTo, 캡처 컬렉션 IN, enum 상수), M5의 기본 렌더링·실행(`HqlRenderer`, `SelectQuery.where/toHql/toList`, D36 INNER JOIN, D37 리터럴 규칙)이 구현됨. `SelectQueryTest` 13개가 H2·MariaDB·Oracle에서 통과(`-Dlql.db=mariadb\|oracle`, 테스트 테이블은 `SQ_` 접두). 남은 것: M4의 나머지(문자열 함수 등 v0.2 항목 제외), Kotlin 패턴 테스트, M5.5 이후 전부.
 
 ### Milestone 4. 의미 해석: JPQL 경로, host 평가, String/boolean (2~3일)
 
@@ -1794,6 +1844,70 @@ D32(DDL 지원 여부)는 2026-11-10 작성자 결정으로 **폐기**했다. DD
 - M5(실행·바인딩) 뒤. 쿼리 안 함수(PR7)는 M4·M5 값 식 분석에 `Func` 노드 추가. 결과 DTO 생성은 M9 J2·J5(record·data class) 재사용.
 - 완료 기준: 11.2 예제가 MariaDB·Oracle에서 기대 값을 반환. PR2 인자 수·모드·타입 불일치가 첫 호출에서 오류로 잡히고, 이름을 얻을 수 있을 때는 같은 타입 순서 바뀜도 잡힘(이름이 없으면 WARN). PR6 함수 단독 호출이 세 DB에서 동작(Oracle DML 함수 포함). PR8 경고가 결정성·함수 기반 인덱스 유무에 따라 정확히 나옴.
 - 검토 근거: 적대적 검토 실측 `/tmp/lql-proc/review/{meta,meta2,probe,kt}`(getProcedureColumns 동작, EXPLAIN, ORA-14551, Kotlin 이름 있는 인자 바이트코드).
+
+### Milestone 12. Spring Data JPA 연동 (D34) **(2026-11-10 작성자 결정)**
+
+근거: 기존 코드 분석(`/tmp/lql-spring/a`), 사례 조사(`/tmp/lql-spring/b`), Spring Boot 3.4.2 + Spring Data JPA 3.4.2 + H2 프로토타입(`/tmp/lql-spring/c`, 결과 `final.log`).
+
+#### 12.1 모듈 구성
+
+| 모듈(아티팩트) | 내용 | 의존 |
+|---|---|---|
+| `lambdaql-core` | 분석 엔진, `QueryBuilder`, 조회·DML·프로시저, i18n 메시지 | `jakarta.persistence-api`, ASM(`asm`, `asm-tree`는 공개 API에 노출되므로 `api`), `slf4j-api`. **Spring 의존 0**. Hibernate 6.6+는 실행 시 사용자가 제공 |
+| `lambdaql-spring-data-jpa` | `LambdaQlExecutor<T>` repository fragment와 구현, `META-INF/spring.factories`, Boot 자동 구성(`QueryBuilder` 빈, 메타데이터 노출) | core + Spring Data JPA, Spring Boot는 `compileOnly`(Boot 없이도 fragment는 동작) |
+| (나중) `lambdaql-spring-boot-starter` | 의존성만 묶은 빈 모듈 | 필요해지면 추가 |
+
+현재 `query` 모듈은 `lambdaql-core`가 된다. 정리할 것(실측): `implementation 'spring-boot-starter-jdbc'`·`-validation`(logback·Hikari·hibernate-validator가 사용자에게 전이), `compileOnly` MyBatis, Lombok 의존 제거. 엔진이 import하는 `jakarta.persistence.metamodel`은 지금 선언 없이 `compileOnly data-jpa`로만 컴파일되므로 명시한다. 루트 프로젝트 이름 `lambadaql`(오타)도 이때 `lambdaql`로 고친다.
+
+#### 12.2 실행기 API
+
+```java
+public interface LambdaQlExecutor<T> {      // @NoRepositoryBean을 붙이면 fragment로 인식되지 않음(실측)
+    SelectQuery<T> query();                 // qb.from(이 repository의 엔티티)
+    <E> SelectQuery<E> from(Class<E> type);
+    List<T> findAll(Where<T> where);
+    Optional<T> findOne(Where<T> where);
+    long count(Where<T> where);
+    boolean exists(Where<T> where);
+    UpdateQuery<T> updateQuery();           // JpaRepository의 delete(T) 등과 이름이 겹치지 않게
+    DeleteQuery<T> deleteQuery();
+    InsertQuery<T> insertQuery();
+}
+
+interface OrderRepository extends JpaRepository<Order, Long>, LambdaQlExecutor<Order> {
+    default List<Order> active(int status) {
+        return findAll(o -> o.getStatus() == status && o.isActive());
+    }
+    default List<Order> recent() {
+        return query().where(o -> o.isActive()).orderBy((o, by) -> by.desc(o.getUpdateAt())).limit(20).toList();
+    }
+}
+```
+```kotlin
+interface OrderRepository : JpaRepository<Order, Long>, LambdaQlExecutor<Order> {
+    fun active(status: Int): List<Order> = findAll { it.status == status && it.active }
+}
+```
+
+#### 12.3 규칙
+
+| # | 규칙 |
+|---|---|
+| SD1 | **repository의 default 메서드는 Spring Data가 직접 호출한다**(`DefaultMethodInvokingMethodInterceptor`). Spring Data 3.4는 default 메서드를 쿼리 메서드 후보에서 뺀다(`RepositoryInformationSupport`의 `!method.isDefault()`, 실측). lambdaQL은 default 메서드를 가로채지 않고, 그 안에서 부를 실행기만 제공한다 |
+| SD2 | **fragment 등록은 Spring Data 3.4+의 `META-INF/spring.factories`**(`org.lambdaql.spring.LambdaQlExecutor=org.lambdaql.spring.LambdaQlExecutorImpl`). Boot 자동 repository 스캔과 `@EnableJpaRepositories` 명시 설정 모두 동작하고, 사용자의 `OrderRepositoryImpl`과도 함께 쓸 수 있다(실측). 구현 클래스는 **생성자가 하나**여야 한다(둘이면 `No default constructor found`, 실측). repository가 `LambdaQlExecutor`를 **직접** 상속해야 한다 |
+| SD3 | 쓰지 않는 방식: Kotlin JDSL 같은 BeanPostProcessor + `setCustomImplementation`(사용자 커스텀 구현을 덮어써 기동 실패, 실측), 자동 구성 빈만 등록(fragment로 인식되지 않음, 실측), FactoryBean 교체(다른 라이브러리와 충돌, 설정 누락) |
+| SD4 | 구현은 Spring이 넘겨주는 **트랜잭션 공유 EntityManager**를 `QueryBuilder`에 넘긴다. `@Transactional` 안의 미반영 변경이 보이고, 롤백·`readOnly`가 그대로 전파된다(실측). 트랜잭션 밖에서는 트랜잭션이 없으므로(실측) 조회 메서드는 구현에 `@Transactional(readOnly = true)`, DML(`execute()`)은 호출자의 트랜잭션이 필요하다 |
+| SD5 | repository의 엔티티 타입: 람다가 있으면 `SerializedLambda.getInstantiatedMethodType()`에서, 람다가 없는 `query()`는 `RepositoryMethodContext`(자동 구성이 `setExposeMetadata(true)`를 건다, 실측)에서 얻는다. fragment 빈은 모든 repository가 공유한다 |
+| SD6 | Java default 메서드 안의 람다는 repository interface의 private static `lambda$…`로 컴파일된다. `BytecodeLoader`가 interface 클래스 파일을 읽는지 M12 테스트로 확인한다(미실측) |
+| SD7 | **Kotlin**: 2.2 이상은 몸체가 있는 interface 메서드가 Java default 메서드로 컴파일되어 동작(kotlinc 2.3.21 실측). 2.2 미만은 `-Xjvm-default=all`이 필요(없으면 `No property … found` 기동 실패, `-jvm-default=disable` 실측). Spring Data Kotlin 지원에는 `kotlin-reflect`가 필요(`ClassNotFoundException: ReflectJvmMapping`, 실측). 문서화 |
+| SD8 | 지원 범위: **Spring Boot 3.4+ / Spring Data JPA 3.4+**와 Boot 4(Spring Data 4는 `RepositoryFragmentsContributor`가 생겼지만 spring.factories 방식도 문서에 남아 있음 — Boot 4 실측은 M12에서). 3.3 이하는 지원하지 않는다 |
+| SD9 | **재검토 중(2026-11-11, 작성자 지적: 사용 중인 코드)**. 기존 `org.lambdaql.jpa`(`DefaultMethodSupportJpaRepositoryFactoryBean` 등)의 의도는 "Impl 클래스 대신 interface default 메서드로 커스텀 구현". 실측(Boot 3.4.2): lambdaQL 코드 없이도 Java default 메서드는 Spring Data가 직접 실행하고(`PLAIN CALL -> hi bob count=0 byName=0`), FactoryBean을 지정해도 교체한 `QueryLookupStrategy`에는 default 메서드가 오지 않음(`RESOLVED [findByName]`). `DefaultMethodQuery.execute` 직접 실행은 `ClassCastException`/`WrongMethodTypeException`, `JpaConfiguration` 자동 교체는 `isAssignableFrom` 방향이 반대라 0건. **삭제하지 않고 `lambdaql-spring-data-jpa`로 옮긴다.** 작성자 확인 후: (a) Java 목적이면 Spring Data 기본 동작으로 문서화하고 정리, (b) Kotlin 2.2 미만(`DefaultImpls`) 목적이면 탐색 전략 + 인터셉터로 `DefaultImpls` 본문을 호출하도록 고쳐 살림(프로토타입 필요). 어느 쪽이든 실행 버그 2건 수정 |
+| SD10 | `@DataJpaTest`에서는 자동 구성을 import하는 방법을 문서화한다 |
+
+#### 12.4 의존 관계와 완료 기준
+
+- M5(조회 실행) 뒤. 모듈 분리(12.1)는 M5 전에 해도 된다(core 의존성 정리가 D33 I8과 같은 작업).
+- **완료 기준**: Boot 3.4와 Boot 4 샘플에서 12.2의 Java·Kotlin repository가 H2·MariaDB·Oracle에서 동작. 사용자 커스텀 구현과 함께 쓸 때 기동 성공. 트랜잭션 전파(SD4) 테스트. Kotlin 2.2 미만 + `-Xjvm-default=all` 안내가 매뉴얼에 있음.
 
 ### v0.2 백로그
 

@@ -14,10 +14,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * {@link EntityModel} that reads the JPA {@link Metamodel}. Only standard JPA API is used
  * (no Hibernate internal classes). Results are cached.
  *
- * <p>Example:
- * <pre>{@code
- * EntityModel model = new JpaEntityModel(entityManagerFactory.getMetamodel());
- * }</pre>
+ * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java">JpaEntityModelTest</a>):
+ * {@snippet class="org.lambdaql.engine.sem.JpaEntityModelTest" region="entity-model"}
  */
 public final class JpaEntityModel implements EntityModel {
 
@@ -25,6 +23,8 @@ public final class JpaEntityModel implements EntityModel {
     private final Map<String, Optional<Property>> cache = new ConcurrentHashMap<>();
 
     /**
+     * Creates a model that reads the given metamodel.
+     *
      * @param metamodel the JPA metamodel, from {@code EntityManagerFactory.getMetamodel()}
      */
     public JpaEntityModel(Metamodel metamodel) {

@@ -35,13 +35,8 @@ import java.util.Map;
  * Not supported (an error is thrown): loops, {@code switch}, {@code throw}, string {@code +},
  * lambdas inside the lambda, and calls that return nothing.
  *
- * <p>Example:
- * <pre>{@code
- * LambdaRef ref = SerializedLambdaExtractor.extract((Where<Order>) o -> o.getStatus() == 1 && o.isActive());
- * Node graph = Decoder.decodePredicate(ref, BytecodeLoader.load(ref));
- * Pred where = ConditionReducer.reduce(graph, ref.describe());
- * // where: (param0.getStatus[] = 1 && truth(param0.isActive[]))
- * }</pre>
+ * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+ * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="decode-pipeline"}
  */
 public final class Decoder implements Opcodes {
 
@@ -68,12 +63,13 @@ public final class Decoder implements Opcodes {
     /**
      * Decodes a condition lambda (one that returns {@code boolean}).
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="decode-pipeline"}
+     *
      * @param ref    the lambda
      * @param method the body method of the lambda
      * @return the decision graph; every end is {@link Node.Leaf#TRUE} or {@link Node.Leaf#FALSE}
      * @throws LambdaAnalysisException if the body uses something that is not supported
-     *
-     * <p>Example: {@code Decoder.decodePredicate(ref, BytecodeLoader.load(ref))}
      */
     public static Node decodePredicate(LambdaRef ref, MethodNode method) {
         return new Decoder(ref, method, true).run();
@@ -82,12 +78,13 @@ public final class Decoder implements Opcodes {
     /**
      * Decodes a value lambda (select, orderBy key and so on).
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="value-lambda"}
+     *
      * @param ref    the lambda
      * @param method the body method of the lambda
      * @return the decision graph; a lambda without branches gives one {@link Node.Value}
      * @throws LambdaAnalysisException if the body uses something that is not supported
-     *
-     * <p>Example: for {@code o -> o.getPrice()} the result is {@code Value(param0.getPrice[])}.
      */
     public static Node decodeValue(LambdaRef ref, MethodNode method) {
         return new Decoder(ref, method, false).run();
@@ -374,6 +371,7 @@ public final class Decoder implements Opcodes {
      * @return the next instruction index to run, or {@code null} if this is not one of the patterns
      *
      * <p>Example (Kotlin): {@code it.customer?.name == "Kim"} reads as {@code customer.name == "Kim"}.
+     * (Kotlin decode tests are planned; the bytecode patterns are listed in docs/design/KOTLIN.md.)
      */
     private Integer kotlinNullPattern(int jumpAt, JumpInsnNode j, List<Object> stack, List<Expr> locals) {
         int op = j.getOpcode();
@@ -433,13 +431,14 @@ public final class Decoder implements Opcodes {
     /**
      * Makes the "jump is taken" condition and pops its operands.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="simple-compare"}
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="boolean-getter"}
+     *
      * @param op    the jump opcode
      * @param stack current stack
      * @param line  source line
      * @return the condition
-     *
-     * <p>Example: {@code if_icmpne} on {@code (status, 1)} gives {@code Cmp(NE, status, 1)};
-     * {@code ifeq} on a boolean getter gives {@code Not(Truth(active))}.
      */
     private Pred jumpAtom(int op, List<Object> stack, int line) {
         switch (op) {

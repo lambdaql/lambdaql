@@ -3,7 +3,6 @@ package org.lambdaql.engine.ir;
 import org.objectweb.asm.Type;
 
 import java.util.List;
-import java.util.Objects;
 
 /**
  * A value expression made from lambda bytecode.
@@ -19,16 +18,8 @@ import java.util.Objects;
  * </ul>
  * The HQL renderer only accepts {@link Column}, {@link Host}, {@link Const}, {@link Arith}, {@link Neg} and {@link Coalesce}.
  *
- * <p>Example: the lambda {@code o -> o.getPrice() > base * 2} becomes
- * <pre>{@code
- * Cmp(GT,
- *     Invoke(Param(0), Order.getPrice()),
- *     Arith(MUL, Captured(0), Const(2)))
- * }</pre>
- * and after the semantic step
- * <pre>{@code
- * Cmp(GT, Column(o.price), Host(Arith(MUL, Captured(0), Const(2))))
- * }</pre>
+ * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+ * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="arith"}
  */
 public sealed interface Expr permits
         Expr.Param, Expr.Captured, Expr.Const, Expr.Invoke, Expr.GetField, Expr.Arith, Expr.Neg,
@@ -46,10 +37,11 @@ public sealed interface Expr permits
      * A lambda parameter, such as the entity {@code o} in {@code o -> ...}.
      * Captured values are not counted.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="simple-compare"}
+     *
      * @param index position in the lambda parameter list (0 = first parameter)
      * @param type  JVM type of the parameter
-     *
-     * <p>Example: in {@code (o, c) -> ...}, {@code o} is {@code Param(0)} and {@code c} is {@code Param(1)}.
      */
     record Param(int index, Type type) implements Expr {
         @Override public String toString() { return "param" + index; }
@@ -58,15 +50,12 @@ public sealed interface Expr permits
     /**
      * A captured value: a local variable or field that the lambda uses from outside.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="captured"}
+     *
      * @param index position in {@code SerializedLambda.getCapturedArg(index)};
      *              when the lambda body is an instance method, index 0 is {@code this}
      * @param type  JVM type of the value
-     *
-     * <p>Example:
-     * <pre>{@code
-     * long minId = 10;
-     * where(o -> o.getId() > minId)   // minId is Captured(0)
-     * }</pre>
      */
     record Captured(int index, Type type) implements Expr {
         @Override public String toString() { return "captured" + index; }
@@ -78,10 +67,13 @@ public sealed interface Expr permits
      * {@code boolean}, {@code char}, {@code short} and {@code byte} constants come as {@link Integer},
      * because the JVM uses int for them.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="const-null"}
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="simple-compare"}
+     *
      * @param value the value; {@code null} for the {@code null} literal; an ASM {@link Type} for a class literal
      * @param type  JVM type of the value
-     *
-     * <p>Example: {@code o.getStatus() == 10} gives {@code Const(10, int)}.
      */
     record Const(Object value, Type type) implements Expr {
         /** Type used for the {@code null} literal. */
@@ -107,12 +99,12 @@ public sealed interface Expr permits
     /**
      * A method call.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="value-lambda"}
+     *
      * @param receiver the object the method is called on; {@code null} for a static method
      * @param method   the called method
      * @param args     the arguments, in order
-     *
-     * <p>Example: {@code o.getCustomer().getName()} is
-     * {@code Invoke(Invoke(Param(0), getCustomer), getName)}.
      */
     record Invoke(Expr receiver, MethodRef method, List<Expr> args) implements Expr {
         /** Makes an unmodifiable copy of the argument list. */
@@ -129,12 +121,13 @@ public sealed interface Expr permits
     /**
      * A field read.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="captured-field"}
+     *
      * @param receiver the object; {@code null} for a static field
      * @param owner    internal name of the class that declares the field (for example {@code com/acme/Order})
      * @param name     field name
      * @param type     JVM type of the field
-     *
-     * <p>Example: {@code this.limit} inside a lambda is {@code GetField(Captured(0), "Repo", "limit")}.
      */
     record GetField(Expr receiver, String owner, String name, Type type) implements Expr {
         @Override public String toString() {
@@ -145,12 +138,13 @@ public sealed interface Expr permits
     /**
      * A math operation with two values.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="arith"}
+     *
      * @param op    the operation ({@code +}, {@code -}, {@code *}, {@code /}, {@code %})
      * @param left  left value
      * @param right right value
      * @param type  JVM type of the result
-     *
-     * <p>Example: {@code o.getPrice() * 1.1} is {@code Arith(MUL, price, Const(1.1))}.
      */
     record Arith(ArithOp op, Expr left, Expr right, Type type) implements Expr {
         @Override public String toString() { return "(" + left + " " + op.symbol() + " " + right + ")"; }
@@ -159,10 +153,11 @@ public sealed interface Expr permits
     /**
      * Unary minus.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="neg"}
+     *
      * @param operand the value
      * @param type    JVM type of the result
-     *
-     * <p>Example: {@code -o.getPrice()} is {@code Neg(price)}.
      */
     record Neg(Expr operand, Type type) implements Expr {
         @Override public String toString() { return "-" + operand; }
@@ -172,10 +167,11 @@ public sealed interface Expr permits
      * A type change: a primitive conversion ({@code I2L} and so on) or a {@code CHECKCAST}.
      * It does not change the value, so later steps usually look through it.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="convert"}
+     *
      * @param operand the value
      * @param type    the new type
-     *
-     * <p>Example: {@code (long) o.getStatus()} is {@code Convert(status, long)}.
      */
     record Convert(Expr operand, Type type) implements Expr {
         @Override public String toString() { return operand.toString(); }
@@ -185,12 +181,12 @@ public sealed interface Expr permits
      * The result (-1, 0 or 1) of {@code LCMP}, {@code FCMPL}, {@code FCMPG}, {@code DCMPL} or {@code DCMPG}.
      * The next {@code IFxx} jump turns it into a {@link Pred.Cmp}.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="double-compare"}
+     *
      * @param left       left value
      * @param right      right value
      * @param nanGreater {@code true} for the "G" opcodes (NaN gives 1); kept so the source operator can be found
-     *
-     * <p>Example: {@code o.getPrice() > 10.0} compiles to {@code dcmpl; ifle},
-     * which becomes {@code CmpResult(price, 10.0)} and then {@code Cmp(LE, price, 10.0)} on the jump.
      */
     record CmpResult(Expr left, Expr right, boolean nanGreater) implements Expr {
         @Override public Type type() { return Type.INT_TYPE; }
@@ -199,11 +195,12 @@ public sealed interface Expr permits
     /**
      * A new object: {@code NEW}, {@code DUP}, arguments, then {@code INVOKESPECIAL <init>}.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="new-object"}
+     *
      * @param type        the class of the new object
      * @param constructor the called constructor
      * @param args        constructor arguments, in order
-     *
-     * <p>Example: {@code new OrderView(o.getId(), o.getPrice())} in a select lambda.
      */
     record NewObject(Type type, MethodRef constructor, List<Expr> args) implements Expr {
         /** Makes an unmodifiable copy of the argument list. */
@@ -215,9 +212,10 @@ public sealed interface Expr permits
     /**
      * The length of an array ({@code ARRAYLENGTH}).
      *
-     * @param array the array value
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="array-length"}
      *
-     * <p>Example: {@code o.getImage().length}.
+     * @param array the array value
      */
     record ArrayLength(Expr array) implements Expr {
         @Override public Type type() { return Type.INT_TYPE; }
@@ -226,11 +224,12 @@ public sealed interface Expr permits
     /**
      * {@code coalesce(first, second)}: {@code first} if it is not null, else {@code second}.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="coalesce"}
+     *
      * @param first  the value to try first
      * @param second the fallback value
      * @param type   JVM type of the result
-     *
-     * <p>Example (Kotlin): {@code it.price ?: 0.0} becomes {@code Coalesce(price, 0.0)}.
      */
     record Coalesce(Expr first, Expr second, Type type) implements Expr {
         @Override public String toString() { return "coalesce(" + first + ", " + second + ")"; }
@@ -238,6 +237,9 @@ public sealed interface Expr permits
 
     /**
      * Meaning node: an entity column path.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="column"}
      *
      * @param root        which FROM entity the path starts at (0 = main entity)
      * @param path        property names from the root (for example {@code ["customer", "name"]})
@@ -247,9 +249,6 @@ public sealed interface Expr permits
      * @param nonNull     {@code true} if the column can never be NULL (id, primitive, {@code nullable = false})
      * @param idPath      {@code true} if the path ends at the id of an association (a foreign key column,
      *                    so no join is needed)
-     *
-     * <p>Example: {@code o.getCustomer().getName()} becomes
-     * {@code Column(0, ["customer", "name"], [true, false], String.class, false, false)}.
      */
     record Column(int root, List<String> path, List<Boolean> association, Class<?> javaType,
                   boolean nonNull, boolean idPath) implements Expr {
@@ -266,13 +265,13 @@ public sealed interface Expr permits
      * Meaning node: a value that does not depend on any entity.
      * lambdaQL computes it in Java when the query runs and binds it as a parameter.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="host"}
+     *
      * @param expr            the expression to compute (uses only captured values and constants)
      * @param javaType        Java type to bind (numbers are converted to this type)
      * @param nonNullRequired {@code true} if a null value must be an error, because Java would throw
      *                        {@code NullPointerException} (for example the receiver of {@code p.equals(...)})
-     *
-     * <p>Example: {@code o.getName().equals(user.getName().trim())} — the right side
-     * {@code user.getName().trim()} becomes a {@code Host} and is bound as {@code :p1}.
      */
     record Host(Expr expr, Class<?> javaType, boolean nonNullRequired) implements Expr {
         @Override public Type type() { return Type.getType(javaType); }
@@ -282,23 +281,13 @@ public sealed interface Expr permits
     /**
      * Checks if a JVM type takes two stack slots.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="expr-wide"}
+     *
      * @param t the type
      * @return {@code true} for {@code long} and {@code double}
-     *
-     * <p>Example: {@code isWide(Type.LONG_TYPE)} is {@code true}; {@code isWide(Type.INT_TYPE)} is {@code false}.
      */
     static boolean isWide(Type t) {
         return t.getSort() == Type.LONG || t.getSort() == Type.DOUBLE;
-    }
-
-    /**
-     * Checks if two expressions are the same tree.
-     *
-     * @param a first expression (may be null)
-     * @param b second expression (may be null)
-     * @return {@code true} if both trees are equal
-     */
-    static boolean sameValue(Expr a, Expr b) {
-        return Objects.equals(a, b);
     }
 }

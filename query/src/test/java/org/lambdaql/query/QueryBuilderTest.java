@@ -25,6 +25,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest( classes = { QueryBuilderTest.TestContext.class })
 @TestPropertySource(properties = "spring.jta.enabled=false")
@@ -247,10 +248,10 @@ class QueryBuilderTest {
 
         QueryBuilder queryBuilder = new QueryBuilder(entityManagerFactory);
         SelectQuery<Order> query = queryBuilder.from(Order.class);
-        SelectQuery<Order> where1 = query.where(obj -> this.bool());
-        query.where(JpqlFunction::isNull);
-//
-        System.out.println(where1);
+        // a condition without the entity is computed in Java when the query runs
+        assertEquals("select e0 from Order e0 where 1=0", query.where(obj -> this.bool()).toHql().hql());
+        // method references are planned for M7: rejected with a clear error for now
+        assertThrows(LambdaAnalysisException.class, () -> queryBuilder.from(Order.class).where(JpqlFunction::isNull));
     }
 
     @Disabled("M2 대상: LDC 문자열 인자를 raw String 으로 push → IOperand 캐스트 ClassCastException")
@@ -276,7 +277,7 @@ class QueryBuilderTest {
                 return JpqlFunction.isNull(obj);
             }
         }));
-        assertInstanceOf(NoSuchMethodException.class, e.getCause());
+        assertTrue(e.getMessage().contains("QueryBuilderTest$1"), e.getMessage());   // the message names the anonymous class
     }
 
     @Disabled("Jinq 2.0.2 비교용 테스트: Jinq 가 캡처한 엔티티 접근(customer.getId())을 거부함 (complex query parameters)")

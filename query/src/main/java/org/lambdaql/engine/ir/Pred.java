@@ -11,15 +11,16 @@ import java.util.stream.Collectors;
  * The {@code ConditionReducer} joins them back into {@link And}, {@link Or} and {@link Not},
  * so you get the same logic you wrote in the source code.
  *
- * <p>Example: {@code o -> o.getStatus() == 1 || o.isActive()} becomes
- * <pre>{@code
- * Or[ Cmp(EQ, status, 1), Truth(active) ]
- * }</pre>
+ * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+ * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="and-or"}
  */
 public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In, Pred.And, Pred.Or, Pred.Not, Pred.Bool {
 
     /**
      * A compare: {@code left op right}.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="null-safe"}
      *
      * @param op       the operator
      * @param left     left value
@@ -27,8 +28,6 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
      * @param nullSafe {@code true} for a value compare that must treat NULL like a normal value
      *                 (reference {@code ==} on objects, {@code equals}, {@code Objects.equals}; see ROADMAP D12).
      *                 For example {@code o.getCode() == p} with {@code p = null} must find rows where code IS NULL.
-     *
-     * <p>Example: {@code o.getId() == id} with {@code Long} values is {@code Cmp(EQ, id, captured0, nullSafe=true)}.
      */
     record Cmp(CmpOp op, Expr left, Expr right, boolean nullSafe) implements Pred {
         @Override public String toString() {
@@ -39,9 +38,10 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
     /**
      * {@code operand IS NULL}.
      *
-     * @param operand the value to test
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="is-null"}
      *
-     * <p>Example: {@code o.getDescription() == null}.
+     * @param operand the value to test
      */
     record IsNull(Expr operand) implements Pred {
         @Override public String toString() { return operand + " is null"; }
@@ -50,9 +50,10 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
     /**
      * A boolean value used as a condition.
      *
-     * @param operand a value of type {@code boolean} (or a call that returns boolean, like {@code equals})
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="boolean-getter"}
      *
-     * <p>Example: {@code o -> o.isActive()} is {@code Truth(active)}.
+     * @param operand a value of type {@code boolean} (or a call that returns boolean, like {@code equals})
      */
     record Truth(Expr operand) implements Pred {
         @Override public String toString() { return "truth(" + operand + ")"; }
@@ -62,10 +63,11 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
      * {@code value IN (values)}, made from {@code ids.contains(o.getId())} (Java) or {@code it.id in ids} (Kotlin).
      * The list comes from a captured collection and is bound as one parameter (ROADMAP D29).
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="pred-in"}
+     *
      * @param value  the tested value (usually a {@link Expr.Column})
      * @param values the collection (a {@link Expr.Host} after the semantic step)
-     *
-     * <p>Example: {@code o -> ids.contains(o.getId())} is {@code In(id, captured0)}.
      */
     record In(Expr value, Expr values) implements Pred {
         @Override public String toString() { return value + " in " + values; }
@@ -74,9 +76,10 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
     /**
      * All items must be true.
      *
-     * @param items the conditions (two or more)
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="pred-and"}
      *
-     * <p>Example: {@code a && b && c} is {@code And[a, b, c]}.
+     * @param items the conditions (two or more)
      */
     record And(List<Pred> items) implements Pred {
         /** Makes an unmodifiable copy of the items. */
@@ -91,9 +94,10 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
     /**
      * At least one item must be true.
      *
-     * @param items the conditions (two or more)
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="pred-or"}
      *
-     * <p>Example: {@code a || b} is {@code Or[a, b]}.
+     * @param items the conditions (two or more)
      */
     record Or(List<Pred> items) implements Pred {
         /** Makes an unmodifiable copy of the items. */
@@ -108,9 +112,10 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
     /**
      * Logical NOT.
      *
-     * @param operand the condition to negate
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="not-composite"}
      *
-     * <p>Example: {@code !(a && b)} is {@code Not(And[a, b])}.
+     * @param operand the condition to negate
      */
     record Not(Pred operand) implements Pred {
         @Override public String toString() { return "!" + operand; }
@@ -119,9 +124,10 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
     /**
      * A condition that is always true or always false.
      *
-     * @param value the constant value
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="constants"}
      *
-     * <p>Example: {@code o -> true} is {@code Bool.TRUE}.
+     * @param value the constant value
      */
     record Bool(boolean value) implements Pred {
         /** Always true. */
@@ -134,11 +140,12 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
     /**
      * Makes {@code a AND b}. Nested ANDs are made flat, and constants are folded.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="pred-and"}
+     *
      * @param a first condition
      * @param b second condition
      * @return the joined condition
-     *
-     * <p>Example: {@code and(And[x, y], z)} is {@code And[x, y, z]}; {@code and(TRUE, z)} is {@code z}.
      */
     static Pred and(Pred a, Pred b) {
         if (a instanceof Bool x) return x.value() ? b : Bool.FALSE;
@@ -152,11 +159,12 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
     /**
      * Makes {@code a OR b}. Nested ORs are made flat, and constants are folded.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="pred-or"}
+     *
      * @param a first condition
      * @param b second condition
      * @return the joined condition
-     *
-     * <p>Example: {@code or(x, Or[y, z])} is {@code Or[x, y, z]}; {@code or(FALSE, z)} is {@code z}.
      */
     static Pred or(Pred a, Pred b) {
         if (a instanceof Bool x) return x.value() ? Bool.TRUE : b;
@@ -172,11 +180,11 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
      * Flipping the operator is safe with NULL values: {@code NOT (a < b)} and {@code a >= b}
      * are both UNKNOWN when a value is NULL, and a null-safe compare never gives UNKNOWN.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="pred-not"}
+     *
      * @param p the condition
      * @return the negated condition
-     *
-     * <p>Example: {@code not(Not(x))} is {@code x}; {@code not(TRUE)} is {@code FALSE};
-     * {@code not(Cmp(NE, a, b))} is {@code Cmp(EQ, a, b)}.
      */
     static Pred not(Pred p) {
         if (p instanceof Not n) return n.operand();

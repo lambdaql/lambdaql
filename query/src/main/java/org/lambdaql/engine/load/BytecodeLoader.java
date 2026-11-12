@@ -16,11 +16,8 @@ import java.io.InputStream;
  * Only the wanted method becomes a {@link MethodNode}; other methods are skipped (no full class tree,
  * see ROADMAP 2.6.1). Line numbers are kept, so error messages can show the source line.
  *
- * <p>Example:
- * <pre>{@code
- * MethodNode body = BytecodeLoader.load(SerializedLambdaExtractor.extract(where));
- * body.instructions.size();
- * }</pre>
+ * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
+ * {@snippet class="org.lambdaql.engine.load.LoadExamplesTest" region="load-body"}
  */
 public final class BytecodeLoader {
 
@@ -30,18 +27,15 @@ public final class BytecodeLoader {
     /**
      * Reads one method.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
+     * {@snippet class="org.lambdaql.engine.load.LoadExamplesTest" region="load-missing"}
+     *
      * @param loader            class loader that can see the class file
      * @param internalClassName internal class name, for example {@code com/acme/OrderRepo}
      * @param methodName        method name, for example {@code lambda$find$0}
      * @param descriptor        JVM method descriptor, for example {@code (Lcom/acme/Order;)Z}
      * @return the method with its instructions
      * @throws LambdaAnalysisException if the class file or the method is not found, or cannot be read
-     *
-     * <p>Example:
-     * <pre>{@code
-     * MethodNode m = BytecodeLoader.load(getClass().getClassLoader(),
-     *         "com/acme/OrderRepo", "lambda$find$0", "(Lcom/acme/Order;)Z");
-     * }</pre>
      */
     public static MethodNode load(ClassLoader loader, String internalClassName, String methodName, String descriptor) {
         String resource = internalClassName + ".class";
@@ -74,11 +68,12 @@ public final class BytecodeLoader {
     /**
      * Reads the body method of a lambda.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
+     * {@snippet class="org.lambdaql.engine.load.LoadExamplesTest" region="load-body"}
+     *
      * @param ref the lambda
      * @return the body method
      * @throws LambdaAnalysisException if the body cannot be read
-     *
-     * <p>Example: {@code BytecodeLoader.load(SerializedLambdaExtractor.extract(where))}
      */
     public static MethodNode load(LambdaRef ref) {
         return load(ref.classLoader(), ref.implClass(), ref.implMethodName(), ref.implMethodDescriptor());

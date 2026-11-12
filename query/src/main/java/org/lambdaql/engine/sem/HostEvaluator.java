@@ -19,17 +19,16 @@ import java.math.BigInteger;
  * A host expression only uses captured values, constants, fields and method calls that do not touch
  * the entity. The result is bound as a query parameter.
  *
- * <p>Example:
- * <pre>{@code
- * // where(o -> o.getName().equals(user.getName().trim()))
- * Object value = new HostEvaluator(loader).eval(hostExpr, new Object[]{user});   // "Kim"
- * }</pre>
+ * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/HostEvaluatorTest.java">HostEvaluatorTest</a>):
+ * {@snippet class="org.lambdaql.engine.sem.HostEvaluatorTest" region="eval-call"}
  */
 public final class HostEvaluator {
 
     private final ClassLoader loader;
 
     /**
+     * Creates an evaluator.
+     *
      * @param loader class loader used to find classes named in the bytecode
      */
     public HostEvaluator(ClassLoader loader) {
@@ -39,12 +38,14 @@ public final class HostEvaluator {
     /**
      * Computes the value of an expression.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/HostEvaluatorTest.java">HostEvaluatorTest</a>):
+     * {@snippet class="org.lambdaql.engine.sem.HostEvaluatorTest" region="eval-arith"}
+     * {@snippet class="org.lambdaql.engine.sem.HostEvaluatorTest" region="eval-null-receiver"}
+     *
      * @param e        the expression (no entity parts)
      * @param captured captured values of the lambda, in order
      * @return the value (boxed for primitives), may be {@code null}
      * @throws LambdaAnalysisException if a method or field cannot be found, or a called method throws
-     *
-     * <p>Example: {@code eval(Arith(MUL, Captured(0), Const(2)), new Object[]{21})} returns {@code 42}.
      */
     public Object eval(Expr e, Object[] captured) {
         return switch (e) {
@@ -70,11 +71,12 @@ public final class HostEvaluator {
     /**
      * Converts a number to the wanted wrapper type, so Hibernate gets the type it expects.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/HostEvaluatorTest.java">HostEvaluatorTest</a>):
+     * {@snippet class="org.lambdaql.engine.sem.HostEvaluatorTest" region="convert"}
+     *
      * @param value  the value (may be null)
      * @param target the wanted type, for example {@code Short.class}
      * @return the converted value, or {@code value} unchanged if no conversion is needed
-     *
-     * <p>Example: {@code convert(10, Short.class)} returns {@code (short) 10}.
      */
     public static Object convert(Object value, Class<?> target) {
         if (!(value instanceof Number n) || target == null || target.isInstance(value)) return value;

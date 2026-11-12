@@ -4,8 +4,8 @@
 >
 > 이 문서는 **다른 에이전트/개발자가 작업을 바로 이어받기 위한 요약**입니다. 설계의 근거와 상세는 다음 문서에 있습니다.
 >
-> - [`docs/ROADMAP.md`](docs/ROADMAP.md): 현재 상태, 방식 비교, 핵심 설계, 결정 사항(D1~D25), 마일스톤 M0~M8, 지원 범위, 리스크
-> - [`docs/KOTLIN.md`](docs/KOTLIN.md): Kotlin 지원 설계(바이트코드 패턴, 지원 매트릭스, 제약 KC1~KC21)
+> - [`docs/design/ROADMAP.md`](docs/design/ROADMAP.md): 현재 상태, 방식 비교, 핵심 설계, 결정 사항(D1~D25), 마일스톤 M0~M8, 지원 범위, 리스크
+> - [`docs/design/KOTLIN.md`](docs/design/KOTLIN.md): Kotlin 지원 설계(바이트코드 패턴, 지원 매트릭스, 제약 KC1~KC21)
 >
 > 문서와 코드가 다르면 **문서의 결정 사항이 우선**입니다(코드는 아직 M0 수준).
 
@@ -42,6 +42,8 @@ qb.from(Order::class.java)
   - 메서드 체이닝(`MethodStack.beforeStack`) 오류, 상수 인자 CCE
 - SQL 렌더링(`Renderer.toSql`), 실행(`toList`), Update/Delete/Join은 스텁입니다.
 - **빌드**: `./gradlew clean build` → BUILD SUCCESSFUL. 테스트 15개 중 **통과 5, `@Disabled` 10, 실패 0**. `@Disabled`마다 실제 원인과 담당 마일스톤이 적혀 있습니다(`QueryBuilderTest.java`).
+
+> **2026-11-12 구현 현황**: 조회 `qb.from(X).where(…).toList()`가 동작한다(`SelectQuery`, `QueryContext`, `engine.sem.Normalizer`, `engine.render.HqlRenderer`). `SelectQueryTest`가 H2·MariaDB·Oracle에서 통과한다. 다른 DB로 돌리려면 `export LQL_DB_PASSWORD=…`(docker inspect로 읽기) 후 `./gradlew :query:test --tests '*SelectQueryTest' -Dlql.db=mariadb|oracle --rerun`을 실행한다. 이때 테이블은 `SqPrefixNamingStrategy`로 `SQ_` 접두가 붙고 create-drop된다. Oracle은 끝나면 `purge recyclebin`. 결정 D35(정렬 `asc/desc(key, boolean nullsFirst)`, `by.sort(key, Direction)`), D36(where 연관 경로는 INNER JOIN, 정렬·select 전용 경로는 LEFT), D37(람다에 적힌 상수는 리터럴, 캡처·계산 값은 바인딩)이 반영됐다. 메서드 레퍼런스는 M7까지 명확한 오류로 거부한다. 다음 순서: M5.5 정렬 → M8 서브쿼리 → M9 select·집계 → M10 DML → M11 프로시저·함수 → D33 i18n 메시지 → M12 Spring 모듈.
 
 ## 3. 빌드·개발 환경
 
@@ -95,7 +97,7 @@ qb.from(Order::class.java)
 - 연관 경로 정렬은 정렬 전용 `left join`, 페이징 시 유일 키가 없으면 `@Id asc` 자동 추가(Oracle은 동순위 순서가 임의).
 - 서브쿼리 정렬: `limit` 없으면 제거 + WARN, MariaDB `IN (… limit)`는 파생 테이블로 자동 래핑, MariaDB `lateral`은 `row_number()`로 재작성(S14).
 
-### 4.5 Kotlin (D17, 상세 `docs/KOTLIN.md`)
+### 4.5 Kotlin (D17, 상세 `docs/design/KOTLIN.md`)
 - Java와 **같은 엔진으로 동시 지원**. kotlinc 1.7.22~2.3.21 모두 Java `Serializable` SAM에 리터럴 람다를 넘기면 indy로 컴파일되어 `SerializedLambda` 사용 가능.
 - Kotlin impl 메서드는 `main$lambda$0` 형식, **synthetic 아님**, `private static final`(진입부 판별에 주의).
 - 범위 `in a..b`, `until`, `when`(Int/String/enum) 모두 v0.1 지원(D21).
@@ -115,6 +117,8 @@ H2 2.3.230, MariaDB 10.11.18, Oracle Free 23.26.3. DB별 차이 표는 ROADMAP 2
 7. **M10 UPDATE·INSERT·DELETE**: 진입점 이름은 확정: `qb.from(X)`(조회, 코드에서 `selectFrom`을 `from`으로 바꿈) / `update` / `insert` / `delete`. DML 문법 확정(2026-11-10): 대입 표기는 setter 방식과 `by.set(열, 값)` 방식 둘 다(setter 없는 엔티티용, 타입은 분석 시점에 Metamodel로 검사 — U20), 전체 행은 `all()` 필수(U5). `set()`은 한 람다 안 여러 대입과 여러 번 호출을 모두 허용(U14). 대입은 setter 호출 람다(`update(Order.class).set(o -> { o.setStatus(st); o.setPrice(o.getPrice() * 1.1); }).where(…)`), Kotlin은 `set { it.status = st }`(같은 setter 바이트코드). 꼭 지킬 규칙: (1) 앞에서 대입한 열을 뒤에서 읽으면 거부(MariaDB는 SET을 순서대로 적용, U3) (2) **DML의 비FK 연관 경로는 상관 스칼라 서브쿼리 `(select c.x from C c where c.id = o.fk)`로 렌더링**(Hibernate에 경로를 넘기면 inner join이 되어 연관 없는 행이 빠지고, EXISTS는 `is null`·NOT에서 조회와 결과가 달라짐 — 세 DB 실측 `/tmp/lql-dml/sem`, U9) (3) 캡처 값은 위치마다 별도 파라미터(enum STRING/ORDINAL 공유 시 조용히 잘못된 값 저장, U7) (4) `where`/`all()` 없는 `execute()`는 타입으로 금지(U5) (5) 다중 행 values는 바인드 수 기준으로 나눔(Oracle 65,535 한계, U13) (6) DELETE 자기 참조 서브쿼리는 파생 테이블로 감쌈(MariaDB 1093, U17). 실측: `/tmp/lql-dml/{a,b,hib,wf-base,wf-gapcompile,wf-db,sem}`.
 8. **D29 확정**: Java `ids.contains(o.getId())`(캡처한 컬렉션 IN)는 v0.1. 의미는 Kotlin R19와 같음(부정은 `(x is null or x not in (:p))`, null 원소는 바인딩 예외, 빈 목록 FALSE). M4·M5 범위에 넣는다.
 9. **M11 프로시저·DB 함수**: D30·D31 확정(2026-11-10). D32(DDL)는 폐기 — DDL은 범위 밖. 프로시저는 `interface Procs { @SqlProcedure("SQ_CALC") Double calc(Long id, Double rate); }` + `qb.call(Procs.class, p -> p.calc(id, rate)).execute()`(void는 `qb.exec`). **DB 함수는 인터페이스 static 메서드** `interface OrderFns { @SqlFunction("FN_DISCOUNT") static Double discount(Double p) { throw new DbOnlyException(); } }` → `where(o -> OrderFns.discount(o.getPrice()) > 10)`, 단독 호출 `qb.call(() -> OrderFns.discount(p))`, Kotlin은 인터페이스 companion `@JvmStatic`. 렌더링은 항상 `function('키' as T, …)`(T 허용 목록 8종), 부팅 시 선택 등록(ServiceLoader + 설정 `lambdaql.functions.classes`). 함정(실측): Hibernate는 이름 등록도 위치 바인딩이라 순서가 바뀌면 MariaDB·H2에서 조용한 오답, ProcedureCall은 호출 전 flush 안 함, record 결과 클래스 불가(JDBC 직접 매핑), Oracle DML 함수는 HQL select에서 ORA-14551, 내장 함수 이름(COALESCE 등)으로 등록하면 조용히 무시됨, H2는 OUT·INOUT·여러 결과 집합 불가. 실측: `/tmp/lql-proc/{probe,syntax,review}`, `/tmp/lql-fn/{forms,hib,review2,f2}`.
+10. **i18n·로깅(D33, ROADMAP 3.10)**: 엔진 예외 메시지 37개를 `LqlMessage` enum(코드 `[LQL-xxxx]`) + 번들 `org/lambdaql/i18n/LqlMessages(_ja|_zh|_ko).properties`로 옮긴다(영어·일본어·중국어 간체·한국어 기본 제공). 언어는 설정 → `-Dlambdaql.locale` → JVM 기본 로케일(ja·zh·ko면 해당 언어, 그 외 영어). 새 메시지는 네 언어를 함께 추가(키 누락 테스트). `MessageFormat` 금지(자체 `{n}` 치환). 예외 부모 `LambdaQLException`(`code()`, `key()`, `args()`)을 엔진 공개 패키지에 두고 `LambdaAnalysisException`을 analyzer 패키지에서 옮긴다. 로깅은 SLF4J API, Spring starter는 compileOnly로. 테스트는 `code()`로 검사. 프로토타입: `/tmp/lql-i18n/c/final`.
+11. **M12 Spring Data JPA 연동(D34)**: 모듈을 `lambdaql-core`(Spring 의존 0, 지금의 `query` 모듈)와 `lambdaql-spring-data-jpa`로 나눈다. repository는 `LambdaQlExecutor<T>`를 상속하고 default 메서드 안에서 `findAll(o -> …)`·`query().where(…)` 등을 부른다(default 메서드는 Spring Data가 직접 호출). 등록은 Spring Data 3.4+ `META-INF/spring.factories` fragment(구현 생성자는 하나, `@NoRepositoryBean` 금지). 트랜잭션 공유 EntityManager 사용. Kotlin은 2.2+ 또는 `-Xjvm-default=all`, `kotlin-reflect` 필요. 기존 `org.lambdaql.jpa` 패키지(default 메서드로 Impl 대체)는 작성자가 사용 중인 코드라 삭제하지 않고 재검토 중(ROADMAP M12 SD9). 루트 프로젝트 이름 `lambadaql` 오타도 모듈 분리 때 고친다. 실측: `/tmp/lql-spring/{a,b,c}`.
 
 ## 6. 검증 환경과 재현 방법
 
@@ -167,14 +171,16 @@ $JH/bin/java -cp "$(cat /tmp/lql-kt-cp.txt)" org.jetbrains.kotlin.cli.jvm.K2JVMC
 | `LambdaFieldExtractor.java` | AspectJ 셰이딩 ASM(`aj.org.objectweb.asm`) import → `org.objectweb.asm` |
 | `QueryBuilderTest.java`, `application-test.yaml`, `table.sql`(삭제) | `ddl-auto: create-drop`, 반복 DDL 제거, 미해결 테스트 `@Disabled`(사유 포함), 익명 클래스 테스트는 `assertThrows`로 |
 | `gradle/gradle-daemon-jvm.properties` (신규) | 데몬 JVM 21 고정 |
-| `docs/ROADMAP.md`, `docs/KOTLIN.md`, `DEVNOTE.md` (신규) | 설계 문서 |
+| `docs/design/ROADMAP.md`, `docs/design/KOTLIN.md`, `DEVNOTE.md` (신규) | 설계 문서 |
 
 ## 8. 작업 규칙과 함정
 
 - Oracle 검증 하네스는 테이블을 `drop`만 하므로 LQL 스키마 휴지통(recyclebin)에 객체가 쌓인다. 끝나면 LQL 계정으로 `purge recyclebin`(자기 스키마만 영향).
 
+- **예시는 테스트 코드에서 가져온다(작성자 규칙, 2026-11-10).** Javadoc 예시는 `{@snippet class="org.lambdaql…Test" region="이름"}`으로 테스트 파일의 구간을 넣고, 테스트 파일 GitHub 링크(`https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/…`)를 붙인다. 테스트에서는 `// @start region="이름"` … `// @end`로 구간을 표시한다. `query/build.gradle`의 `javadoc`이 `--snippet-path src/test/java`를 넘기므로, 구간이 없으면 javadoc 빌드가 실패한다. 테스트 클래스 주석에 `// @start` 같은 표시 문자열을 그대로 쓰면 snippet 처리기가 잘못 읽는다(spurious markup 경고). 매뉴얼 예시도 기능이 구현되면 테스트 구간에서 가져오고 테스트 파일로 링크한다(그 전까지는 설계 예시로 표시).
+- **매뉴얼은 Java와 Kotlin을 분리한다**: `docs/manual/<언어>/java/`, `docs/manual/<언어>/kotlin/`(장 번호·파일 이름 같음), 공통 페이지는 `docs/manual/<언어>/`. 영어(`en`)가 원본이고 `ko`·`ja`·`zh`는 번역.
 - **커밋·푸시는 작성자 요청이 있을 때만.** 결정이 필요한 사항(D 항목)은 작성자에게 확인 후 ROADMAP 결정 표에 "확정(날짜, 작성자 결정)"으로 기록합니다.
-- 문서·주석·커뮤니케이션은 **한국어**, 식별자·기술 용어는 영어.
+- 설계 문서(`docs/`, 이 파일)와 작성자와의 대화는 **한국어**. **코드 주석과 Javadoc은 쉬운 영어**로, 모든 클래스·메서드·필드에 설명, `@param`, `@return`, `@throws`, Example 코드를 단다(작성자 규칙, 2026-11-10). 식별자·기술 용어는 영어.
 - **라이선스**: ExTree(LGPL)·FluentJPA(AGPL/LGPL) 코드는 **복사 금지**, 개념만 참고(clean-room). Jinq(BSD-2) 구조를 차용하면 고지.
 - 외부에서 받은 저장소(`/tmp/lql-research`) 안에서 Maven/Gradle을 실행하지 않습니다.
 - 검증용 DB 작업은 지정 스키마(`lql_verify`, `LQL`)에서만, 임시 테이블은 끝나면 삭제.

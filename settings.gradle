@@ -6,7 +6,7 @@ pluginManagement {
     }
 }
 
-rootProject.name = 'lambadaql'
+rootProject.name = 'lambdaql'
 
 include 'query'
 

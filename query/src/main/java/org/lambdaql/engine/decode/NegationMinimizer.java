@@ -19,10 +19,8 @@ import java.util.List;
  * When both forms have the same number of NOTs, the form with the outer NOT is kept,
  * because that is closer to code like {@code !(a && b)}.
  *
- * <p>Example:
- * <pre>{@code
- * Pred p = NegationMinimizer.minimize(Pred.not(new Pred.And(List.of(x, y))));
- * }</pre>
+ * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/NegationMinimizerTest.java">NegationMinimizerTest</a>):
+ * {@snippet class="org.lambdaql.engine.decode.NegationMinimizerTest" region="de-morgan"}
  */
 public final class NegationMinimizer {
 
@@ -50,10 +48,12 @@ public final class NegationMinimizer {
     /**
      * Returns the same logic with the fewest NOTs.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/NegationMinimizerTest.java">NegationMinimizerTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.NegationMinimizerTest" region="de-morgan"}
+     * {@snippet class="org.lambdaql.engine.decode.NegationMinimizerTest" region="keep-outer-not"}
+     *
      * @param p the condition
      * @return the rewritten condition
-     *
-     * <p>Example: {@code minimize(!(a <> 1 && !truth(b)))} is {@code (a = 1 || truth(b))}.
      */
     public static Pred minimize(Pred p) {
         return best(p).pos().pred();

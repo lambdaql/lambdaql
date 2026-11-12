@@ -9,12 +9,15 @@ import org.lambdaql.engine.ir.Pred;
  * Short-circuit code ({@code &&}, {@code ||}) jumps to shared places, so the same node can have many parents.
  * The graph has no loops. {@link ConditionReducer} turns it back into a condition tree.
  *
- * <p>Example: {@code a || b} gives
+ * <p>Diagram: {@code a || b} gives
  * <pre>{@code
  * Test(a) --true--> TRUE
  *         --false-> Test(b) --true--> TRUE
  *                           --false-> FALSE
  * }</pre>
+ *
+ * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+ * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="or-chain"}
  */
 public sealed interface Node permits Node.Leaf, Node.Test, Node.Value {
 
@@ -76,9 +79,10 @@ public sealed interface Node permits Node.Leaf, Node.Test, Node.Value {
     /**
      * An end of the graph for a value lambda (select, orderBy key and so on).
      *
-     * @param value the returned value
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="value-lambda"}
      *
-     * <p>Example: {@code o -> o.getPrice()} gives {@code Value(Invoke(param0, getPrice))}.
+     * @param value the returned value
      */
     record Value(Expr value) implements Node {
     }

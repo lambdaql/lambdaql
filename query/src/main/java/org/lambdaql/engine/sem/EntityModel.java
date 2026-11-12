@@ -8,11 +8,8 @@ import java.util.Optional;
  * The main version is {@link JpaEntityModel} (it reads the JPA Metamodel).
  * Tests can use a small fake version.
  *
- * <p>Example:
- * <pre>{@code
- * EntityModel model = new JpaEntityModel(emf.getMetamodel());
- * model.property(Order.class, "customer").get().kind();   // Kind.ASSOCIATION
- * }</pre>
+ * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java">JpaEntityModelTest</a>):
+ * {@snippet class="org.lambdaql.engine.sem.JpaEntityModelTest" region="entity-model"}
  */
 public interface EntityModel {
 
@@ -33,13 +30,15 @@ public interface EntityModel {
     /**
      * One property of an entity or embeddable.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java">JpaEntityModelTest</a>):
+     * {@snippet class="org.lambdaql.engine.sem.JpaEntityModelTest" region="entity-model"}
+     * {@snippet class="org.lambdaql.engine.sem.JpaEntityModelTest" region="entity-model-id"}
+     *
      * @param name     property name in HQL, for example {@code customer}
      * @param javaType Java type of the value (boxed for primitives); for associations the target entity class
      * @param kind     the kind of property
      * @param id       {@code true} if this is the {@code @Id}
      * @param nonNull  {@code true} if the column can never be NULL (id, primitive type, {@code optional = false})
-     *
-     * <p>Example: {@code Property("price", Double.class, BASIC, false, true)} for {@code private double price;}
      */
     record Property(String name, Class<?> javaType, Kind kind, boolean id, boolean nonNull) {
     }
@@ -47,10 +46,11 @@ public interface EntityModel {
     /**
      * Checks if a class is a managed entity.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java">JpaEntityModelTest</a>):
+     * {@snippet class="org.lambdaql.engine.sem.JpaEntityModelTest" region="entity-model"}
+     *
      * @param type a class
      * @return {@code true} if it is an {@code @Entity}
-     *
-     * <p>Example: {@code model.isEntity(Order.class)} is {@code true}; {@code model.isEntity(String.class)} is {@code false}.
      */
     boolean isEntity(Class<?> type);
 
@@ -66,11 +66,12 @@ public interface EntityModel {
     /**
      * Finds a property of an entity or embeddable class.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java">JpaEntityModelTest</a>):
+     * {@snippet class="org.lambdaql.engine.sem.JpaEntityModelTest" region="entity-model"}
+     *
      * @param owner the entity or embeddable class
      * @param name  property name, for example {@code price}
      * @return the property, or empty if there is no such property
-     *
-     * <p>Example: {@code model.property(Order.class, "price")}
      */
     Optional<Property> property(Class<?> owner, String name);
 }

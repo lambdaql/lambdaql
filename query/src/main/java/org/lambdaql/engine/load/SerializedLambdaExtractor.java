@@ -16,11 +16,8 @@ import java.lang.invoke.SerializedLambda;
  * and passes the result to {@link ObjectOutputStream#replaceObject}. We catch the {@code SerializedLambda}
  * there and stop. Because we stop early, the captured values do not need to be serializable.
  *
- * <p>Example:
- * <pre>{@code
- * SelectQuery.Where<Order> w = o -> o.getStatus() == 1;
- * LambdaRef ref = SerializedLambdaExtractor.extract(w);
- * }</pre>
+ * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
+ * {@snippet class="org.lambdaql.engine.load.LoadExamplesTest" region="extract"}
  */
 public final class SerializedLambdaExtractor {
 
@@ -30,16 +27,14 @@ public final class SerializedLambdaExtractor {
     /**
      * Gets the lambda information.
      *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
+     * {@snippet class="org.lambdaql.engine.load.LoadExamplesTest" region="extract"}
+     * {@snippet class="org.lambdaql.engine.load.LoadExamplesTest" region="not-serializable"}
+     *
      * @param lambda a lambda whose functional interface extends {@link Serializable}
      * @return the body location and captured values
      * @throws LambdaAnalysisException if {@code lambda} is null, not serializable, or not a lambda
      *                                 (for example an anonymous class)
-     *
-     * <p>Example:
-     * <pre>{@code
-     * LambdaRef ref = SerializedLambdaExtractor.extract((Where<Order>) o -> o.isActive());
-     * ref.capturedCount();  // 0
-     * }</pre>
      */
     public static LambdaRef extract(Object lambda) {
         if (lambda == null) {

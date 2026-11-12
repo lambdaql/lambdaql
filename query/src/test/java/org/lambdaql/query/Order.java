@@ -39,6 +39,12 @@ public class Order implements Serializable {
 
     private Date createAt;
 
+    @Enumerated(EnumType.STRING)
+    private Kind kind;
+
+    /** Order kind (a nested enum, to test enum literals). */
+    public enum Kind { NORMAL, RUSH }
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "customer_id")
     private Customer customer;
