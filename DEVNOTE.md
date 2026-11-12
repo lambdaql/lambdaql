@@ -43,7 +43,7 @@ qb.from(Order::class.java)
 - SQL 렌더링(`Renderer.toSql`), 실행(`toList`), Update/Delete/Join은 스텁입니다.
 - **빌드**: `./gradlew clean build` → BUILD SUCCESSFUL. 테스트 15개 중 **통과 5, `@Disabled` 10, 실패 0**. `@Disabled`마다 실제 원인과 담당 마일스톤이 적혀 있습니다(`QueryBuilderTest.java`).
 
-> **2026-11-12 구현 현황**: 조회 `qb.from(X).where(…).toList()`가 동작한다(`SelectQuery`, `QueryContext`, `engine.sem.Normalizer`, `engine.render.HqlRenderer`). `SelectQueryTest`가 H2·MariaDB·Oracle에서 통과한다. 다른 DB로 돌리려면 `export LQL_DB_PASSWORD=…`(docker inspect로 읽기) 후 `./gradlew :query:test --tests '*SelectQueryTest' -Dlql.db=mariadb|oracle --rerun`을 실행한다. 이때 테이블은 `SqPrefixNamingStrategy`로 `SQ_` 접두가 붙고 create-drop된다. Oracle은 끝나면 `purge recyclebin`. 결정 D35(정렬 `asc/desc(key, boolean nullsFirst)`, `by.sort(key, Direction)`), D36(where 연관 경로는 INNER JOIN, 정렬·select 전용 경로는 LEFT), D37(람다에 적힌 상수는 리터럴, 캡처·계산 값은 바인딩)이 반영됐다. 메서드 레퍼런스는 M7까지 명확한 오류로 거부한다. 다음 순서: M5.5 정렬 → M8 서브쿼리 → M9 select·집계 → M10 DML → M11 프로시저·함수 → D33 i18n 메시지 → M12 Spring 모듈.
+> **2026-11-12 구현 현황**: 조회 `qb.from(X).where(…).toList()`가 동작한다(`SelectQuery`, `QueryContext`, `engine.sem.Normalizer`, `engine.render.HqlRenderer`). 정렬(`orderBy`, `limit/offset`)도 동작한다(`SortReader`, `OrderedSelectQuery`, `JoinPlanner`). 캡처 값만 쓰는 조건 부분(`min == null || …`)은 렌더링 직전에 Java 순서로 결정한다(`HqlRenderer.fold`). `SelectQueryTest`·`SortQueryTest`가 H2·MariaDB·Oracle에서 통과한다. 다른 DB로 돌리려면 `export LQL_DB_PASSWORD=…`(docker inspect로 읽기) 후 `./gradlew :query:test --tests '*SelectQueryTest' --tests '*SortQueryTest' --tests '*DatabaseSelectionTest' -Dlql.db=mariadb|oracle --rerun`을 실행한다. `-Dlql.db`는 `application-test.yaml`이 `lql-db-<이름>.yaml`을 `spring.config.import`로 읽게 한다(`spring.profiles.include`는 `test` 프로필에 밀려 H2로 연결됐음 — 2026-11-12 발견·수정). `DatabaseSelectionTest`가 실제 연결 DB가 다르면 실패한다. 매뉴얼의 DB별 SQL은 `SqlByDatabaseTest`(구현된 예제)·`PlannedSqlTest`(계획 HQL을 Hibernate에 직접 넣은 결과)가 만든 `query/src/test/resources/expected-sql/{h2,mariadb,oracle}.sql`, `planned-<db>.sql`에서 옮긴다. 테스트는 이 파일과 비교하므로 SQL이 바뀌면 실패한다. 바뀐 SQL을 확인한 뒤 `-Dlql.sql.update=true`(DB마다 `-Dlql.db=…`)로 다시 쓰고 매뉴얼도 고친다. 이때 테이블은 `SqPrefixNamingStrategy`로 `SQ_` 접두가 붙고 create-drop된다. Oracle은 끝나면 `purge recyclebin`. 결정 D35(정렬 `asc/desc(key, boolean nullsFirst)`, `by.sort(key, Direction)`), D36(where 연관 경로는 INNER JOIN, 단 null guard로 연관 없는 행이 남을 수 있으면 LEFT, 정렬·select 전용 경로는 LEFT), D37(람다에 적힌 상수는 리터럴, 캡처·계산 값은 바인딩)이 반영됐다. 메서드 레퍼런스는 M7까지 명확한 오류로 거부한다. 다음 순서: M5.5 나머지(SortSpec·SortWhitelist) → M8 서브쿼리 → M9 select·집계 → M10 DML → M11 프로시저·함수 → D33 i18n 메시지 → M12 Spring 모듈.
 
 ## 3. 빌드·개발 환경
 
@@ -88,7 +88,8 @@ qb.from(Order::class.java)
 ### 4.4 정렬 (D15, ROADMAP 3.7)
 ```java
 .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getCustomer().getName()).asc(o.getId()))
-.orderBy((o, by) -> by.by(o.getDescription(), Direction.DESC_NULLS_LAST))
+.orderBy((o, by) -> by.desc(o.getDescription(), false))   // NULL 위치: false = 나중(D35)
+.orderBy((o, by) -> by.sort(o.getPrice(), dir))            // 실행 시점 방향(캡처한 Direction)
 .orderBy(o -> o.getPrice())                      // by 생략형(키 1개)
 .orderBy((o, c, by) -> by.asc(c.getName()))      // 조인(D18)
 ```

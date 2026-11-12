@@ -10,6 +10,8 @@ import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -54,6 +56,7 @@ class JpaEntityModelTest {
         EntityModel.Property id = model.property(Order.class, "id").orElseThrow();
         assertTrue(id.id());
         assertTrue(id.nonNull());                       // an id is never NULL
+        assertEquals(Optional.of("id"), model.idName(Order.class));
         // @end
     }
 

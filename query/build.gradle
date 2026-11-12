@@ -47,8 +47,11 @@ dependencies {
 
 test{
 	useJUnitPlatform()
-	// -Dlql.db=mariadb|oracle adds the Spring profile with that database (see src/test/resources/application-*.yaml)
-	systemProperty 'spring.profiles.include', System.getProperty('lql.db', '')
+	// -Dlql.db=mariadb|oracle makes application-test.yaml import src/test/resources/lql-db-<name>.yaml
+	// (DatabaseSelectionTest fails if the connected database is not the chosen one)
+	systemProperty 'lql.db', System.getProperty('lql.db', 'h2')
+	// -Dlql.sql.update=true makes SqlByDatabaseTest write src/test/resources/expected-sql/<db>.sql again
+	systemProperty 'lql.sql.update', System.getProperty('lql.sql.update', 'false')
 
 	testLogging {
 		events "passed", "skipped", "failed"

@@ -74,4 +74,16 @@ public interface EntityModel {
      * @return the property, or empty if there is no such property
      */
     Optional<Property> property(Class<?> owner, String name);
+
+    /**
+     * Returns the name of the {@code @Id} property of an entity.
+     * Used to add a tie-breaker key when a sorted query is paged (ROADMAP S9).
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java">JpaEntityModelTest</a>):
+     * {@snippet class="org.lambdaql.engine.sem.JpaEntityModelTest" region="entity-model-id"}
+     *
+     * @param entity an entity class
+     * @return the id property name, for example {@code id}; empty for a composite id ({@code @IdClass})
+     */
+    Optional<String> idName(Class<?> entity);
 }

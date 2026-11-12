@@ -1,0 +1,356 @@
+# 9. Java 说明
+
+> [!NOTE]
+> **状态**
+> - **已实现（分析核心）：** 加载可序列化 Lambda、捕获 `this` 的 Lambda、识别方法引用、拒绝不是 `Serializable` 的 Lambda。参见 [9.13](#913-what-you-can-check-today) 中的测试。
+> - **已实现：** 单个排序键的排序中的 getter 方法引用，例如 `orderBy(Order::getPrice)`（见 [9.9](#99-method-references)）。
+> - **已设计，尚未实现：** 本页的其他所有内容（`==` 的含义、装箱规则、`String` 规则、查询中的方法引用等）。
+
+[Java 路线](README.md) | [手册首页](../README.md) | 上一章：[8. 存储过程与数据库函数](08-procedures-functions.md) | 下一章：[10. 规则与限制](10-rules-and-limits.md) | [本页的 Kotlin 版本](../kotlin/09-kotlin-notes.md)
+
+公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
+
+---
+
+本页汇总了 lambdaQL Lambda 中 **Java** 代码的特殊之处。
+核心思想始终不变：**lambdaQL 的 Lambda 是查询，而不是代码。**
+lambdaQL 读取你写的内容，但不执行它。因此 Java 的一些运行时规则在这里并不适用。
+
+## 目录
+
+- [9.1 Lambda 必须是可序列化 Lambda](#91-lambdas-must-be-serializable-lambdas)
+- [9.2 装箱与拆箱](#92-boxing-and-unboxing)
+- [9.3 装箱值的相等比较](#93-equality-of-boxed-values)
+- [9.4 字符串](#94-strings)
+- [9.5 null 安全的辅助方法](#95-null-safe-helpers)
+- [9.6 小类型：char、short、byte 和 boolean](#96-small-types-char-short-byte-and-boolean)
+- [9.7 float、double 和 BigDecimal](#97-float-double-and-bigdecimal)
+- [9.8 实例方法中的 Lambda 会捕获 this](#98-lambdas-in-instance-methods-capture-this)
+- [9.9 方法引用](#99-method-references)
+- [9.10 不要期待的静态辅助方法](#910-static-helpers-you-should-not-expect)
+- [9.11 其他 Java 写法](#911-other-java-forms)
+- [9.12 编译器与构建](#912-compiler-and-build)
+- [9.13 目前可以验证的内容](#913-what-you-can-check-today)
+
+---
+
+<a id="91-lambdas-must-be-serializable-lambdas"></a>
+## 9.1 Lambda 必须是可序列化 Lambda
+
+lambdaQL 通过 Java 序列化（`SerializedLambda`）找到 Lambda 的主体。
+它不使用 `setAccessible`，也不会真正序列化你捕获的值。
+
+| 你传入的内容 | 结果 |
+|---|---|
+| 直接写在调用中的 Lambda：`where(o -> o.isActive())` | 可以。`where` 的参数类型是 `Serializable` 函数式接口 |
+| 方法引用：`where(Order::isActive)` | 可以（见 [9.9](#99-method-references)） |
+| 保存在 lambdaQL 参数类型变量中的 Lambda | 可以 |
+| `java.util.function.Predicate`（不是 `Serializable`） | **拒绝**（`LambdaAnalysisException`） |
+| 匿名类：`new Where<Order>() { ... }` | **拒绝** |
+
+说明：
+
+- 捕获值（以及捕获的 `this`）**不需要**是 `Serializable`。lambdaQL 只读取它们，不序列化它们。
+- 子查询的内部 Lambda（`sub.from(Item.class).where(i -> ...)`）本身不需要是 `Serializable`。lambdaQL 会在外层 Lambda 的字节码中找到它们。
+- lambdaQL 函数式接口的名称尚未最终确定。能直接传入 Lambda 时，请直接传入。
+
+<a id="92-boxing-and-unboxing"></a>
+## 9.2 装箱与拆箱
+
+示例实体使用装箱类型：`Long id`、`Double price`、`Integer status`。
+当你把装箱值与基本类型值比较时，javac 会添加一个**拆箱**调用（`intValue()`、`doubleValue()`）。
+
+```java
+.where(o -> o.getStatus() == 1)     // javac：o.getStatus().intValue() == 1
+// HQL: e0.status = 1
+```
+
+lambdaQL **忽略**装箱和拆箱调用（`valueOf`、`intValue`、`doubleValue` 等），只保留其含义。
+
+这对 NULL 意味着：
+
+| Java 写法 | 在 Java 中（如果执行） | 在 lambdaQL 中 |
+|---|---|---|
+| `o.getStatus() == 1`，status 为 NULL | NullPointerException | SQL 含义：UNKNOWN，不返回该行（规则 R1） |
+| `o.getPrice() > 100`，price 为 NULL | NullPointerException | 不返回该行（R1） |
+| `!o.getActive()`（`Boolean`），active 为 NULL | NullPointerException | 不返回该行 |
+| `o.getPrice() > p`，捕获的 `Double p` 为 `null` | NullPointerException | 查询执行时**抛出异常** |
+| `i.getQty() == q`，`qty` 是 `int`，捕获的 `Integer q` 为 `null` | NullPointerException | 查询执行时**抛出异常** |
+
+也就是说：实体值为 NULL 时遵循 SQL 规则。处于拆箱位置的捕获值为 `null` 时是错误，因为 Java 对此没有结果。
+
+如果你需要 NULL 行，请自己写出检查：
+
+```java
+.where(o -> o.getStatus() == null || o.getStatus() != 1)
+// HQL: e0.status is null or e0.status <> 1
+```
+
+<a id="93-equality-of-boxed-values"></a>
+## 9.3 装箱值的相等比较
+
+在 Java 中，两个**对象**之间的 `==` 检查的是同一性（内存中是否为同一个对象）。
+在 lambdaQL 中，两个对象之间的 `==` 是 **null 安全的值比较**（决策 D12）。
+装箱缓存（-128 到 127 的 `Integer` 和 `Long`）以及 `new String(...)` 都不影响结果。
+
+适用哪条规则，取决于两侧的 **Java 类型**：
+
+| 左侧 | 右侧 | javac 生成 | lambdaQL 规则 | HQL |
+|---|---|---|---|---|
+| `Integer` 列 | `int` 常量或变量 | 拆箱，数值比较 | R1，SQL 含义 | `e0.status = 1` |
+| `Integer` 列 | `Integer` 变量 | 对象比较 | R2，null 安全 | `e0.status is not distinct from :p1` |
+| `Long` `@Id` 列 | `Long` 变量 | 对象比较 | R2，但一侧永远不为 NULL | `e0.id = :p1` |
+| `Long` 列 | `long` 变量 | 拆箱 | R1 | `e0.id = :p1` |
+| `String` | `String` | 对象比较 | R2，null 安全 | `e0.description is not distinct from :p1` |
+| 枚举 | 枚举 | 对象比较 | R2，null 安全 | `x is not distinct from :p1` |
+| `Boolean` 列 | `Boolean.TRUE` | 对象比较 | null 安全 | `e0.active is not distinct from true` |
+| `Boolean` 列 | `true` | 拆箱 | R1 | `e0.active = true` |
+| 任意 | `null` | null 检查 | R3 | `x is null` |
+| 实体 | 实体（`o.getCustomer() == c`） | 对象比较 | **v0.1 不支持** | –（请改为比较 id） |
+
+null 安全的含义：
+
+| 列 | 捕获值 | 结果 |
+|---|---|---|
+| 3 | 3 | true |
+| NULL | `null` | **true** |
+| NULL | 3 | false |
+| 3 | `null` | false |
+
+```java
+Integer wanted = request.getStatus();        // 可能为 null
+qb.from(Order.class).where(o -> o.getStatus() == wanted).toList();
+// wanted = 3    -> status 为 3 的行
+// wanted = null -> status 为 NULL 的行
+```
+
+当一侧永远不可能为 NULL 时（`@Id`、`nullable = false` 的列、基本类型的列，或不为 null 的捕获值），lambdaQL 会写成普通的 `=`。结果相同，而且数据库可以使用索引。
+
+对象之间的 `!=` 则相反：`is distinct from`（当一侧永远不为 NULL 时为 `(a <> b or a is null)`）。
+
+<a id="94-strings"></a>
+## 9.4 字符串
+
+| Java 写法 | HQL | 列为 NULL | `p` 为 `null` |
+|---|---|---|---|
+| `o.getDescription() == p` | `e0.description is not distinct from :p1` | 仅在 `p == null` 时匹配 | 允许 |
+| `o.getDescription().equals(p)` | `e0.description = :p1` | 不返回该行 | **抛出异常** |
+| `p.equals(o.getDescription())` | `e0.description = :p1` | 不返回该行 | **抛出异常** |
+| `"abc".equals(o.getDescription())`（常量接收者） | `e0.description = 'abc'`（常量永远不为 NULL，所以是普通的 `=`） | 不返回该行 | – |
+| `Objects.equals(o.getDescription(), p)` | `e0.description is not distinct from :p1` | 仅在 `p == null` 时匹配 | 允许 |
+| `o.getDescription().compareTo(p) < 0` | `e0.description < :p1` | 不返回该行 | **抛出异常** |
+| `o.getDescription() == null` | `e0.description is null` | 返回 | – |
+
+需要记住的要点：
+
+- 在普通 Java 中，对字符串使用 `==` 是 bug。在 lambdaQL Lambda 中，它是合法的值比较。
+- `equals` 和 `==` 只在 NULL 上表现不同。请根据你想要的 NULL 行为来选择。
+- 比较遵循**数据库排序规则（collation）**，而不是 Java。MariaDB 的 `_ci` 排序规则忽略大小写和尾部空格。Oracle 把 `''` 存储为 NULL。
+- 写在 Lambda 中的字符串常量是 HQL 字面量；引号会被转义（`'O''Brien'`）。捕获的字符串始终是绑定参数（见 [3.3](03-where.md#33-basic-form)）。
+- 列上的字符串方法（`startsWith`、`contains`、`trim`、`toUpperCase`）已在计划中，v0.1 不支持。
+- v0.1 会拒绝字符串 `+`，即使只用到捕获值也一样（javac 用 `invokedynamic` 编译 `+`）。请在 Lambda 之前构建字符串：
+
+```java
+String code = "A" + suffix;                                  // 外部：普通 Java
+qb.from(Order.class).where(o -> o.getDescription() == code).toList();
+```
+
+<a id="95-null-safe-helpers"></a>
+## 9.5 null 安全的辅助方法
+
+这些 Java 辅助方法对 `null` 有明确的结果。lambdaQL 保留该结果（规则 R5）：
+
+| Java | HQL | 说明 |
+|---|---|---|
+| `Objects.equals(o.getStatus(), s)` | `e0.status is not distinct from :p1` | |
+| `!Objects.equals(o.getStatus(), 1)` | `e0.status is distinct from 1` | 与 Java 一样，**会返回** NULL 行 |
+| `Objects.equals(o.getDescription(), o.getCustomer().getName())` | `e0.description is not distinct from j1.name` | 两列比较 |
+| `Boolean.TRUE.equals(o.getActive())` | `e0.active is not distinct from true` | |
+| `!Boolean.TRUE.equals(o.getActive())` | `e0.active is distinct from true` | 在三种数据库上都可用 |
+| `"x".equals(o.getDescription())` | `e0.description = 'x'` | 常量接收者：永远不为 NULL，所以是普通的 `=` |
+| `set` 值中的 `Objects.requireNonNullElse(o.getPrice(), 0.0)` | `coalesce(o.price, 0.0)` | 见 [7. 更新、插入、删除](07-dml.md) |
+
+与 `!=` 比较：
+
+```java
+.where(o -> o.getStatus() != 1)                 // e0.status <> 1           （不返回 NULL 行）
+.where(o -> !Objects.equals(o.getStatus(), 1))  // e0.status is distinct from 1 （返回 NULL 行）
+```
+
+<a id="96-small-types-char-short-byte-and-boolean"></a>
+## 9.6 小类型：char、short、byte 和 boolean
+
+JVM 没有专门针对 `char`、`short`、`byte` 和 `boolean` 的比较指令。javac 把它们按 `int` 编译。
+lambdaQL 知道这一点：
+
+- 支持 `long`、`int`、`short`、`byte`、`char`、`float` 和 `double` 值的比较（规则 R1）。
+- 常量会被转换为其所在列的类型。例如，对于 `short` 列，`int` 常量 `10` 会变成 `short` 值。
+- 单独的 `boolean` getter 就是一个条件：`o.isActive()` 变成 `e0.active = true`。
+- 支持 `o.isActive() == (o.getStatus() > s)`（两个布尔表达式）。它会变成 `AND`/`OR`（见 [3.7](03-where.md#37-boolean-columns)）。
+- 基本类型属性（`boolean active`、`int qty`）与 `@Id` 或 `nullable = false` 列一样，被视为"永远不为 NULL"。这样 lambdaQL 就可以写成普通的 `=`，而不是 `is not distinct from`（[9.3](#93-equality-of-boxed-values)）。
+
+<a id="97-float-double-and-bigdecimal"></a>
+## 9.7 float、double 和 BigDecimal
+
+| 主题 | 规则 |
+|---|---|
+| `float` / `double` 常量（`100.0`、`1.5f`） | 与 Lambda 中的其他常量一样，作为字面量写进 HQL（`100.0`、`1.5F`）（D37）。在 Lambda 中创建的 `BigDecimal`（`new BigDecimal("1.5")`）是计算出的值，因此是绑定参数 |
+| 逐位精确的结果 | **不保证**。各数据库存储和比较 `float`、`double` 的方式不同。lambdaQL 不会添加 `CAST`。请自行选择列映射（例如 Oracle 的 `binary_float` / `binary_double`） |
+| 捕获的 `NaN`、`Infinity` | 查询执行时**抛出异常** |
+| 存储在数据库中的 `NaN` | 遵循数据库（H2 把它当作最大值排序；MariaDB 无法存储它） |
+| `BigDecimal` 的相等比较 | Java 的 `equals` 会比较标度（`1.0` 不等于 `1.00`）。lambdaQL 比较的是**值** |
+| 整数 `/` | 各数据库不一致（MariaDB 中 `5/2 = 2.5`）。最终规则尚未确定，请避免使用 |
+
+<a id="98-lambdas-in-instance-methods-capture-this"></a>
+## 9.8 实例方法中的 Lambda 会捕获 this
+
+当实例方法中的 Lambda 使用了字段时，javac 会把 Lambda 主体编译成**实例方法**并捕获 `this`。
+
+```java
+@Service
+public class OrderService {
+
+    private final QueryBuilder qb;
+    private int defaultStatus = 1;
+
+    public OrderService(QueryBuilder qb) {
+        this.qb = qb;
+    }
+
+    public List<Order> defaults() {
+        return qb.from(Order.class)
+                 .where(o -> o.getStatus() == defaultStatus)   // 即 this.defaultStatus
+                 .toList();
+        // HQL: select e0 from Order e0 where e0.status = :p1
+    }
+}
+```
+
+**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
+
+**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `this-capture`：
+
+```sql
+-- H2, MariaDB, Oracle (same)
+select …
+from orders o1_0
+where o1_0.status=?
+```
+
+lambdaQL 的处理方式：
+
+- 它知道第一个捕获值是 `this`。（这部分已实现并经过测试。）
+- `this.defaultStatus` 没有用到实体，因此在 Java 中计算，并作为参数绑定。
+- 该字段在**每次执行查询时**读取。分析结果按 Lambda 缓存，而不是按对象缓存。
+- 你的类不需要是 `Serializable`。
+- 对 `this` 的方法调用如果不使用实体（`this.minPrice()`），同样在每次执行查询时在 Java 中计算。请保证它们没有副作用。
+
+局部变量则不同：Java 在创建 Lambda 时复制它。Java 要求它是 effectively final 的。
+
+```java
+int st = defaultStatus;                                   // 此时复制
+qb.from(Order.class).where(o -> o.getStatus() == st).toList();
+```
+
+两种写法生成相同的 HQL。
+
+<a id="99-method-references"></a>
+## 9.9 方法引用
+
+| 方法引用 | 等同于 | 状态 |
+|---|---|---|
+| `where(Order::isActive)` | `where(o -> o.isActive())` | 已设计（识别部分已实现） |
+| `orderBy(Order::getPrice)` | `orderBy(o -> o.getPrice())` | 已实现，已测试 |
+| `by` 排序写法 `orderBy((o, by) -> ...)` 中的方法引用 | – | **不允许**。请使用 Lambda（规则 S13） |
+| 连接排序 Lambda 中的方法引用 | – | **不允许**。请使用 Lambda（规则 S13） |
+
+lambdaQL 在加载时识别方法引用。它不读取被引用方法的主体，而是自己构建调用 `o.isActive()`。
+
+有些方法引用可以编译，但含义是错误的。lambdaQL 会在分析时拒绝它们（规则 S13）：
+
+- 把单参数实例方法用作双参数 Lambda（第二个参数会变成方法的实参），
+- 把双参数静态方法用作双参数 Lambda。
+
+在 `orderBy` 中，只允许实体的 getter。静态方法、带参数的方法，或者绑定到某个对象的引用会被拒绝。
+
+凡是不是简单 getter 的情况，请使用 Lambda。
+
+<a id="910-static-helpers-you-should-not-expect"></a>
+## 9.10 不要期待的静态辅助方法
+
+lambdaQL **没有静态 DSL**。除了可选的 `Agg` 导入之外，使用 lambdaQL 不需要 `import static`。
+辅助对象以 **Lambda 参数**的形式提供（`by`、`sub`），或者你直接写普通 Java。
+
+| 你可能期待的写法 | lambdaQL 的写法 |
+|---|---|
+| `orderBy(asc(...), desc(...))` | `orderBy((o, by) -> by.asc(...).desc(...))`（[4](04-order-paging.md)） |
+| `exists(...)`、`in(...)`、`notIn(...)` | `(o, sub) -> sub.from(X.class).where(...).exists()` / `.select(...).contains(x)`（[5](05-subquery.md)） |
+| `set(path, value)` | `set(o -> o.setX(v))` 或 `set((o, by) -> by.set(o.getX(), v))`（[7](07-dml.md)） |
+| Q 类、`Order_.price` | getter：`o.getPrice()` |
+| `count()`、`sum(...)` 等 | `Agg.count()`、`Agg.sum(...)`：**唯一的静态辅助类**（[6](06-select-group.md)） |
+| `coalesce(a, b)` | 在 `set` 值中使用 `Objects.requireNonNullElse(a, b)` |
+| `like(...)`、`lower(...)`、`upper(...)` | 已在计划中（列上的字符串函数） |
+| `currentTimestamp()` | `LocalDateTime.now()`。它在应用程序中计算并绑定 |
+| 作用于实体值的自定义静态工具方法 | **拒绝**，除非该方法是带有 `@SqlFunction` 的数据库函数（[8](08-procedures-functions.md)） |
+
+**只使用捕获值**的静态方法没有问题。它们在每次执行查询时在 Java 中运行：
+
+```java
+.where(o -> o.getUpdateAt().isAfter(LocalDateTime.of(2026, 1, 1, 0, 0)))   // 可以：在 Java 中计算
+.where(o -> MyUtil.normalize(o.getDescription()) == text)                   // 拒绝：使用了实体
+```
+
+> [!NOTE]
+> 仓库中仍保留着旧的原型代码（例如 `JpqlFunction` 类）。
+> 它不属于新设计，请不要在查询中使用。
+
+<a id="911-other-java-forms"></a>
+## 9.11 其他 Java 写法
+
+| Java 写法 | 在 lambdaQL Lambda 中 |
+|---|---|
+| 单个表达式 `o -> ...` | 标准写法 |
+| 带局部变量的块 Lambda `o -> { ...; return ...; }` | 在 `where`、`orderBy`、`select` 中被拒绝 |
+| 只包含 setter 调用的块 Lambda | 在 `set`、`values`、`insert ... select` 中允许（[7](07-dml.md)） |
+| `if`、`for`、`while`、`switch`（语句或表达式）、`try` | 拒绝 |
+| 三元表达式 `c ? x : y` | 只允许 `c ? x : false`、`c ? true : x`、`c ? false : true`（[3.5](03-where.md#35-and-or-not)） |
+| 布尔值上的 `&`、`\|`、`^` | 拒绝。请使用 `&&`、`\|\|` |
+| Stream、嵌套 Lambda（`sub` 子查询除外） | 拒绝 |
+| Lambda 内部的 `List.of(...)` | 拒绝，作为 `groupBy` 键时除外 |
+| `compareTo(...) < 0`、`isBefore`、`isAfter` | 变为 `<`、`>` |
+| `captured.length`（捕获值数组的长度） | 在 Java 中计算 |
+| Record | 作为结果类型（`select`），以及派生表和 CTE 的行类型（用 `r.total()` 读取） |
+| `var` | 用于构建器变量；构建器的类型名尚未最终确定 |
+| 泛型 `by.set(o.getStatus(), "abc")` | 在 Java 中可以编译；lambdaQL 在分析时检查类型 |
+| 嵌套 Lambda 中使用相同的参数名 | Java 不允许。请使用 `sub2`、`i`、`x` |
+
+<a id="912-compiler-and-build"></a>
+## 9.12 编译器与构建
+
+| 主题 | 需要了解的内容 |
+|---|---|
+| 编译器 | lambdaQL 使用 **javac** 进行测试。不保证支持由 **ECJ**（Eclipse 编译器）编译的 Lambda。Eclipse IDE 以及其他基于 Eclipse JDT 的工具使用 ECJ。请用 Gradle 或 Maven（javac）运行测试 |
+| JDK 版本 | Java 21 |
+| ASM | lambdaQL 使用 ASM 9.11.1 读取类文件（最高支持 Java 28 类文件）。如果使用更新的 JDK 编译，请升级 ASM。lambdaQL 没有对 ASM 做 shade，因此你可以自行升级 |
+| `-parameters` | 推荐。它使 lambdaQL 能够检查存储过程的参数名（[8.4](08-procedures-functions.md#84-warning-argument-order)） |
+| 调试信息 | 保留行号（javac 默认）。lambdaQL 会把源代码行号写进错误消息 |
+| IntelliJ 的 "Number objects compared using `==`" | 在 lambdaQL Lambda 中是有意为之。可以使用 `@SuppressWarnings("NumberEquality")` |
+| IntelliJ 对字符串 `==` 的警告 | 在 lambdaQL Lambda 中同样是有意为之 |
+
+<a id="913-what-you-can-check-today"></a>
+## 9.13 目前可以验证的内容
+
+分析核心已经实现。下列测试大多使用的是内部类而非用户 API，但它们展示了本页所述的 Java 行为：
+
+| 测试 | 展示的内容 |
+|---|---|
+| [`LoadExamplesTest.java`](../../../../query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java) `instanceLambda` | 使用字段的 Lambda 把 `this` 作为第一个捕获值（[9.8](#98-lambdas-in-instance-methods-capture-this)） |
+| [`LoadExamplesTest.java`](../../../../query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java) `methodReference` | `Order::isActive` 被识别为方法引用（[9.9](#99-method-references)） |
+| [`LoadExamplesTest.java`](../../../../query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java) `notSerializable` | `java.util.function.Predicate` 被拒绝（[9.1](#91-lambdas-must-be-serializable-lambdas)） |
+| [`ConditionDecodeTest.java`](../../../../query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java) | 比较中的拆箱（`o.getId() > minId`）、`&&`、`\|\|`、`!` |
+| [`SortQueryTest.java`](../../../../query/src/test/java/org/lambdaql/query/SortQueryTest.java) region `sort-key` | `Order::getPrice` 可以作为单个排序键的排序使用，与 `o -> o.getPrice()` 相同（[9.9](#99-method-references)） |
+| [`HostEvaluatorTest.java`](../../../../query/src/test/java/org/lambdaql/engine/sem/HostEvaluatorTest.java) `convertNumbers` | 数字被转换为列的类型（例如 `int` 转为 `short`）（[9.6](#96-small-types-char-short-byte-and-boolean)） |
+
+---
+
+[Java 路线](README.md) | 上一章：[8. 存储过程与数据库函数](08-procedures-functions.md) | 下一章：[10. 规则与限制](10-rules-and-limits.md) | [本页的 Kotlin 版本](../kotlin/09-kotlin-notes.md)

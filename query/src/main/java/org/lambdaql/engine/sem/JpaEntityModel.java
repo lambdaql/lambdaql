@@ -54,6 +54,17 @@ public final class JpaEntityModel implements EntityModel {
         return cache.computeIfAbsent(owner.getName() + "#" + name, k -> lookup(owner, name));
     }
 
+    /** {@inheritDoc} */
+    @Override
+    public Optional<String> idName(Class<?> entity) {
+        EntityType<?> type = metamodel.entity(entity);
+        if (!type.hasSingleIdAttribute()) return Optional.empty();
+        return type.getSingularAttributes().stream()
+                .filter(SingularAttribute::isId)
+                .map(Attribute::getName)
+                .findFirst();
+    }
+
     private Optional<Property> lookup(Class<?> owner, String name) {
         ManagedType<?> type;
         try {

@@ -1,4 +1,4 @@
-# Run the tests on the local Oracle verification schema:  ./gradlew :query:test -Dlql.db=oracle
+# Imported by application-test.yaml when the tests run with -Dlql.db=oracle (local Oracle verification schema).
 # The password is read from the environment variable LQL_DB_PASSWORD (never written to a file).
 spring:
   datasource:

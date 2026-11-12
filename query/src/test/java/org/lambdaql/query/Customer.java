@@ -16,6 +16,9 @@ public class Customer implements Serializable {
 
     private String name;
 
+    /** The customer grade, for example 1 to 5. Can be NULL (used by the planned subquery examples). */
+    private Integer grade;
+
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Order> orders;
 
@@ -37,5 +40,23 @@ public class Customer implements Serializable {
 
     public List<Order> getOrders() {
         return orders;
+    }
+
+    /**
+     * Returns the grade.
+     *
+     * @return the grade, or {@code null}
+     */
+    public Integer getGrade() {
+        return grade;
+    }
+
+    /**
+     * Sets the grade.
+     *
+     * @param grade the grade, or {@code null}
+     */
+    public void setGrade(Integer grade) {
+        this.grade = grade;
     }
 }

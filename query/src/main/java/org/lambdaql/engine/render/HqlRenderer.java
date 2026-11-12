@@ -5,8 +5,10 @@ import org.lambdaql.engine.ir.ArithOp;
 import org.lambdaql.engine.ir.CmpOp;
 import org.lambdaql.engine.ir.Expr;
 import org.lambdaql.engine.ir.Pred;
+import org.lambdaql.engine.ir.SortItem;
 import org.lambdaql.engine.sem.EntityModel;
 import org.lambdaql.engine.sem.HostEvaluator;
+import org.lambdaql.query.Direction;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -18,14 +20,25 @@ import java.util.Objects;
 /**
  * Builds HQL text from normalized conditions (ROADMAP 3.6 and 3.9).
  * <ul>
- *   <li>Association paths in a condition become {@code JOIN}s (inner join, author decision 2026-11-12).
+ *   <li>Association paths in a condition become {@code JOIN}s (inner join, author decision 2026-11-12, D36).
  *       A path that ends at the id of an association uses the foreign key column without a join.
- *       To find rows without the association, compare the association itself: {@code o.getCustomer() == null}.</li>
+ *       To find rows without the association, compare the association itself: {@code o.getCustomer() == null}.
+ *       When the condition can be true for a row without the association (a null guard such as
+ *       {@code o.getCustomer() == null || o.getCustomer().getName().equals(x)}), that path is a
+ *       {@code LEFT JOIN} instead, so the result is the same as in Java ({@link JoinPlanner}).</li>
  *   <li>Constants written in the lambda code (numbers, strings, {@code true}/{@code false}, {@code null}) are written
  *       into the HQL as literals. Captured and computed values are always bind parameters.
  *       So the value source decides, not the value type (author decision 2026-11-12).</li>
  *   <li>A null-safe compare with a parameter becomes {@code x = :p} or {@code x is null}, depending on the value.
  *       The column is never wrapped in a function, so an index can be used (SARGable, 3.9).</li>
+ *   <li>Association paths used only for sorting become {@code LEFT JOIN}s, so rows without the association
+ *       are not lost (S8, D36). If a condition already joined the same path, that inner join is reused.</li>
+ *   <li>Sort keys get an explicit {@code nulls first}/{@code nulls last} unless the key can never be NULL.
+ *       {@code asc} puts NULL first and {@code desc} puts NULL last (D16, the same as Java
+ *       {@code Comparator.nullsFirst}). Hibernate drops the clause when it is the database default (H2, MariaDB)
+ *       and emulates it when the database has no such syntax (MariaDB), so the order is the same everywhere.</li>
+ *   <li>A paged query gets {@code <id> asc} as the last key when the keys do not contain the id (S9),
+ *       so rows do not move between pages.</li>
  * </ul>
  * One renderer instance renders one query; it collects joins and parameters.
  *
@@ -36,9 +49,20 @@ public final class HqlRenderer {
 
     private final EntityModel model;
     private final HostEvaluator evaluator;
-    private final Map<String, String> joins = new LinkedHashMap<>();
+    private final Map<String, Join> joins = new LinkedHashMap<>();
     private final Map<String, Object> params = new LinkedHashMap<>();
     private Object[] captured = new Object[0];
+    private boolean leftJoins;
+    private java.util.Set<String> whereLeftJoins = java.util.Set.of();
+
+    /**
+     * A join made for a path.
+     *
+     * @param alias the alias, for example {@code j1}
+     * @param left  {@code true} for {@code left join} (sort-only path), {@code false} for {@code join}
+     */
+    private record Join(String alias, boolean left) {
+    }
 
     /**
      * Creates a renderer for one query.
@@ -61,7 +85,16 @@ public final class HqlRenderer {
     }
 
     /**
-     * Renders {@code select e0 from Entity e0 [left join ...] [where ...]}.
+     * The sort keys with the captured values of their lambda.
+     *
+     * @param items    the keys in order
+     * @param captured the captured values of the sort lambda (used to read run-time directions)
+     */
+    public record SortBound(List<SortItem> items, Object[] captured) {
+    }
+
+    /**
+     * Renders {@code select e0 from Entity e0 [join ...] [where ...]}.
      *
      * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SelectQueryTest" region="to-hql"}
@@ -72,16 +105,186 @@ public final class HqlRenderer {
      * @throws LambdaAnalysisException if a host value cannot be computed or is not allowed (for example a null receiver)
      */
     public RenderedQuery select(Class<?> root, List<Bound> wheres) {
-        List<String> parts = new ArrayList<>();
+        return select(root, wheres, null, false);
+    }
+
+    /**
+     * Renders {@code select e0 from Entity e0 [join ...] [where ...] [order by ...]}.
+     * Paging values are not part of the HQL; the caller passes them to Hibernate.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-path"}
+     *
+     * @param root   the main entity class
+     * @param wheres the conditions; they are joined with AND
+     * @param sort   the sort keys, or {@code null}
+     * @param paged  {@code true} if the query uses {@code limit} or {@code offset}; then the id is added as the last key
+     *               when the keys do not contain it (S9)
+     * @return the HQL and its parameters
+     * @throws LambdaAnalysisException if a host value cannot be computed, or a run-time direction is null
+     */
+    public RenderedQuery select(Class<?> root, List<Bound> wheres, SortBound sort, boolean paged) {
+        List<Pred> folded = new ArrayList<>();
+        Pred all = Pred.Bool.TRUE;
         for (Bound b : wheres) {
             captured = b.captured();
-            String s = pred(b.pred());
-            if (!s.equals("1=1")) parts.add(wheres.size() > 1 && isComposite(b.pred()) ? "(" + s + ")" : s);
+            Pred f = fold(b.pred());
+            folded.add(f);
+            all = Pred.and(all, f);
         }
+        whereLeftJoins = JoinPlanner.leftJoins(all);
+        List<String> parts = new ArrayList<>();
+        if (all instanceof Pred.Bool b) {
+            if (!b.value()) parts.add("1=0");
+        } else {
+            for (int i = 0; i < wheres.size(); i++) {
+                captured = wheres.get(i).captured();
+                Pred f = folded.get(i);
+                if (f instanceof Pred.Bool) continue;                  // TRUE here (a FALSE makes "all" FALSE)
+                String s = pred(f);
+                parts.add(wheres.size() > 1 && isComposite(f) ? "(" + s + ")" : s);
+            }
+        }
+        List<String> orders = orderBy(root, sort, paged);
         StringBuilder hql = new StringBuilder("select e0 from ").append(model.entityName(root)).append(" e0");
-        joins.forEach((path, alias) -> hql.append(" join ").append(path).append(' ').append(alias));
+        joins.forEach((path, j) -> hql.append(j.left() ? " left join " : " join ").append(path).append(' ').append(j.alias()));
         if (!parts.isEmpty()) hql.append(" where ").append(String.join(" and ", parts));
+        if (!orders.isEmpty()) hql.append(" order by ").append(String.join(", ", orders));
         return new RenderedQuery(hql.toString(), new LinkedHashMap<>(params));
+    }
+
+    // ------------------------------------------------------------------ order by
+
+    private List<String> orderBy(Class<?> root, SortBound sort, boolean paged) {
+        List<String> out = new ArrayList<>();
+        String id = paged ? model.idName(root).orElse(null) : null;
+        boolean hasId = false;
+        if (sort != null) {
+            captured = sort.captured();
+            leftJoins = true;
+            for (SortItem item : sort.items()) {
+                Direction d = direction(item);
+                String key = value(item.key(), null);
+                String nulls = sortNonNull(item.key()) ? "" : d.nullsFirst() ? " nulls first" : " nulls last";
+                out.add(key + (d.ascending() ? " asc" : " desc") + nulls);
+                if (id != null && item.key() instanceof Expr.Column c && c.root() == 0 && c.path().equals(List.of(id))) {
+                    hasId = true;
+                }
+            }
+            leftJoins = false;
+        }
+        if (id != null && !hasId) out.add("e0." + id + " asc");
+        return out;
+    }
+
+    /**
+     * Finds the direction of one key. Run-time values are read now (S10).
+     *
+     * @param item the key
+     * @return the direction with the NULL position
+     */
+    private Direction direction(SortItem item) {
+        if (item.kind() == SortItem.Kind.SORT) {
+            if (eval(item.arg()) instanceof Direction d) return d;
+            throw new LambdaAnalysisException("정렬 방향(Direction)이 null입니다: " + item);
+        }
+        boolean asc = item.kind() == SortItem.Kind.ASC;
+        if (item.arg() == null) return asc ? Direction.ASC : Direction.DESC;
+        Object v = eval(item.arg());
+        boolean first = switch (v) {
+            case Boolean b -> b;
+            case Number n -> n.intValue() != 0;
+            case null, default -> throw new LambdaAnalysisException("nullsFirst 값이 null입니다: " + item);
+        };
+        if (asc) return first ? Direction.ASC_NULLS_FIRST : Direction.ASC_NULLS_LAST;
+        return first ? Direction.DESC_NULLS_FIRST : Direction.DESC_NULLS_LAST;
+    }
+
+    /**
+     * Checks if a sort key can never be NULL, so it needs no {@code nulls} clause.
+     * A column reached through an association can be NULL (left join), even if the column itself is not.
+     *
+     * @param e the key
+     * @return {@code true} if the key is never NULL
+     */
+    private static boolean sortNonNull(Expr e) {
+        return switch (e) {
+            case Expr.Column c -> c.nonNull() && !c.association().contains(true);
+            case Expr.Const c -> !c.isNull();
+            case Expr.Arith a -> sortNonNull(a.left()) && sortNonNull(a.right()) && a.op() != ArithOp.DIV && a.op() != ArithOp.REM;
+            case Expr.Neg n -> sortNonNull(n.operand());
+            default -> false;
+        };
+    }
+
+    // ------------------------------------------------------------------ folding
+
+    /**
+     * Decides the parts that use only captured values and constants, the way Java does: left to right,
+     * and an {@code &&} / {@code ||} stops at the first part that decides it.
+     * So {@code min == null || o.getPrice() > min} with {@code min == null} gives TRUE, and the compare
+     * with the null value is never rendered (Java never runs it either).
+     * The parts before the deciding part are still checked, because Java runs them first
+     * (for example {@code o.getPrice() > min || min == null} throws, like Java).
+     *
+     * @param p a normalized condition
+     * @return the condition without captured-only parts, or a {@link Pred.Bool}
+     */
+    private Pred fold(Pred p) {
+        return switch (p) {
+            case Pred.Cmp c when isHostLike(c.left()) && isHostLike(c.right()) ->
+                    bool(javaCompare(c.op(), eval(c.left()), eval(c.right()), c.nullSafe()));
+            case Pred.IsNull n when isHostLike(n.operand()) -> bool(eval(n.operand()) == null);
+            case Pred.Truth t when isHostLike(t.operand()) -> bool(truthValue(eval(t.operand()), t));
+            case Pred.Not n -> {
+                Pred x = fold(n.operand());
+                yield x instanceof Pred.Bool b ? bool(!b.value()) : x == n.operand() ? n : new Pred.Not(x);
+            }
+            case Pred.And a -> junction(a.items(), true);
+            case Pred.Or o -> junction(o.items(), false);
+            default -> p;
+        };
+    }
+
+    private Pred junction(List<Pred> items, boolean and) {
+        List<Pred> kept = new ArrayList<>();
+        for (Pred item : items) {
+            Pred f = fold(item);
+            if (f instanceof Pred.Bool b) {
+                if (b.value() == and) continue;         // TRUE in AND, FALSE in OR: no effect
+                checkRunnable(kept);                    // Java ran the parts before this one
+                return b;                               // FALSE in AND, TRUE in OR: decides
+            }
+            kept.add(f);
+        }
+        if (kept.isEmpty()) return bool(and);
+        if (kept.size() == 1) return kept.get(0);
+        return and ? new Pred.And(kept) : new Pred.Or(kept);
+    }
+
+    /**
+     * Renders parts only to find errors (for example a null value in {@code >}), then removes
+     * the parameters and joins that this made.
+     *
+     * @param parts the parts Java runs before a deciding part
+     */
+    private void checkRunnable(List<Pred> parts) {
+        if (parts.isEmpty()) return;
+        int paramCount = params.size();
+        java.util.Set<String> joinKeys = new java.util.HashSet<>(joins.keySet());
+        for (Pred part : parts) pred(part);
+        new ArrayList<>(params.keySet()).subList(paramCount, params.size()).forEach(params::remove);
+        joins.keySet().retainAll(joinKeys);
+    }
+
+    private static Pred bool(boolean v) {
+        return v ? Pred.Bool.TRUE : Pred.Bool.FALSE;
+    }
+
+    private static boolean truthValue(Object v, Pred where) {
+        if (v instanceof Boolean b) return b;
+        if (v instanceof Number n) return n.intValue() != 0;
+        throw new LambdaAnalysisException("null Boolean 값을 조건으로 씁니다(Java에서는 NullPointerException): " + where);
     }
 
     // ------------------------------------------------------------------ conditions
@@ -149,9 +352,7 @@ public final class HqlRenderer {
 
     private String truth(Expr e, boolean positive) {
         if (isHostLike(e)) {
-            Object v = eval(e);
-            boolean t = v instanceof Boolean b ? b : v instanceof Number n && n.intValue() != 0;
-            return t == positive ? "1=1" : "1=0";
+            return truthValue(eval(e), new Pred.Truth(e)) == positive ? "1=1" : "1=0";
         }
         String x = value(e, null);
         if (positive) return x + " = true";
@@ -238,7 +439,8 @@ public final class HqlRenderer {
             boolean fkOnly = c.idPath() && i == names.size() - 2;
             if (!last && c.association().get(i) && !fkOnly) {
                 String key = expr + "." + names.get(i);
-                expr = joins.computeIfAbsent(key, k -> "j" + (joins.size() + 1));
+                boolean left = leftJoins || whereLeftJoins.contains(JoinPlanner.key(c.root(), names.subList(0, i + 1)));
+                expr = joins.computeIfAbsent(key, k -> new Join("j" + (joins.size() + 1), left)).alias();
             } else {
                 expr = expr + "." + names.get(i);
             }

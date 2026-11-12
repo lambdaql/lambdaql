@@ -1,14 +1,17 @@
 package org.lambdaql.query;
 
-import jakarta.persistence.TypedQuery;
+import org.lambdaql.engine.ir.Expr;
 import org.lambdaql.engine.ir.Pred;
+import org.lambdaql.engine.ir.SortItem;
 import org.lambdaql.engine.load.LambdaRef;
 import org.lambdaql.engine.render.HqlRenderer;
 import org.lambdaql.engine.render.RenderedQuery;
+import org.objectweb.asm.Type;
 
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * A select query on one entity: {@code qb.from(Order.class).where(...).toList()}.
@@ -129,12 +132,91 @@ public class SelectQuery<T> {
      * @return the matching entities
      */
     public List<T> toList() {
-        RenderedQuery rq = toHql();
-        return context.withEntityManager(em -> {
-            TypedQuery<T> q = em.createQuery(rq.hql(), entityClass);
-            rq.parameters().forEach(q::setParameter);
-            return q.getResultList();
-        });
+        return context.resultList(entityClass, toHql(), 0, null);
+    }
+
+    /**
+     * Sorts with the builder: {@code (o, by) -> by.desc(o.getPrice()).asc(o.getId())}.
+     * The lambda must be one straight chain of {@code by} calls (S4).
+     * Association paths used only here become {@code LEFT JOIN}s, so rows without the association stay (S8).
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-basic"}
+     *
+     * @param spec the sort lambda
+     * @return the sorted query (only paging and running are left)
+     * @throws org.lambdaql.analyzer.LambdaAnalysisException if the lambda is not a chain of {@code by} calls,
+     *                                                       or a key cannot become SQL
+     */
+    public OrderedSelectQuery<T> orderBy(SortBy<T> spec) {
+        LambdaRef ref = QueryContext.read(spec);
+        List<SortItem> items = context.analyzeSortBy(ref, List.of(entityClass));
+        return new OrderedSelectQuery<>(entityClass, context, wheres, new HqlRenderer.SortBound(items, ref.capturedArgs()));
+    }
+
+    /**
+     * Sorts ascending by one key: {@code o -> o.getPrice()} or {@code Order::getPrice}. NULL comes first (D16).
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-key"}
+     *
+     * @param key the key lambda or a getter reference
+     * @return the sorted query
+     * @throws org.lambdaql.analyzer.LambdaAnalysisException if the key cannot become SQL
+     */
+    public OrderedSelectQuery<T> orderBy(SortKey<T> key) {
+        return orderBy(key, Direction.ASC);
+    }
+
+    /**
+     * Sorts by one key with a direction: {@code orderBy(o -> o.getPrice(), Direction.DESC)}.
+     * The direction can be a value known only at run time.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-key"}
+     *
+     * @param key       the key lambda or a getter reference
+     * @param direction the direction (and NULL position)
+     * @return the sorted query
+     * @throws NullPointerException                          if {@code direction} is null
+     * @throws org.lambdaql.analyzer.LambdaAnalysisException if the key cannot become SQL
+     */
+    public OrderedSelectQuery<T> orderBy(SortKey<T> key, Direction direction) {
+        Objects.requireNonNull(direction, "direction");
+        LambdaRef ref = QueryContext.read(key);
+        Expr k = context.analyzeSortKey(ref, entityClass);
+        SortItem item = new SortItem(k, SortItem.Kind.SORT, new Expr.Const(direction, Type.getType(Direction.class)));
+        return new OrderedSelectQuery<>(entityClass, context, wheres, new HqlRenderer.SortBound(List.of(item), ref.capturedArgs()));
+    }
+
+    /**
+     * Returns at most {@code count} rows, without your own sort.
+     * The rows are sorted by the id, so pages are stable (S9).
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.SortQueryTest" region="page-only"}
+     *
+     * @param count the most rows to return (0 or more)
+     * @return the paged query
+     * @throws IllegalArgumentException if {@code count} is negative
+     */
+    public OrderedSelectQuery<T> limit(int count) {
+        return new OrderedSelectQuery<>(entityClass, context, wheres, null).limit(count);
+    }
+
+    /**
+     * Skips the first {@code count} rows, without your own sort.
+     * The rows are sorted by the id, so pages are stable (S9).
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.SortQueryTest" region="page-only"}
+     *
+     * @param count rows to skip (0 or more)
+     * @return the paged query
+     * @throws IllegalArgumentException if {@code count} is negative
+     */
+    public OrderedSelectQuery<T> offset(int count) {
+        return new OrderedSelectQuery<>(entityClass, context, wheres, null).offset(count);
     }
 
     /**

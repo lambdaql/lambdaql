@@ -586,7 +586,7 @@ lambdaql은 현재 캐시가 없으므로, 호출할 때마다 클래스 파일�
 | D33 | 메시지 다국어(i18n)·로깅 (3.10) | 기본 언어: 영어 고정 / JVM 로케일 따름 / 영어만. 로깅: SLF4J API / System.Logger. 구조: 오류 코드 + 메시지 번들 / 문구만 | **2026-11-10 작성자 결정**: 모든 메시지에 코드 `[LQL-xxxx]`, **영어(root)·일본어·중국어(간체)·한국어 4개 언어 기본 제공**(2026-11-10 추가 결정), 언어는 **설정 → `-Dlambdaql.locale` → JVM 기본 로케일**(ja·zh·ko면 해당 언어, 그 외 영어), 로깅은 **SLF4J API**(Spring starter는 compileOnly로 옮겨 logback 전이 제거), `MessageFormat` 대신 자체 `{n}` 치환, 예외 생성 시 메시지 확정. 실측: ResourceBundle fallback 함정, named module의 Control 금지, MessageFormat 작은따옴표·숫자 서식 함정 | 확정 |
 | D34 | Spring Data JPA 연동·모듈 구성 (M12) | 모듈: core + spring-data-jpa 분리 / + starter / 하나로 통합. 실행기 API: `query()` + 편의 메서드 / `QueryBuilder`만 노출. 범위: Boot 3.4+ / Boot 3.0+ | **2026-11-10 작성자 결정**: **`lambdaql-core`(Spring 의존 0) + `lambdaql-spring-data-jpa`(fragment + spring.factories + Boot 자동 구성 compileOnly)**, 실행기 `LambdaQlExecutor<T>`는 **`query()`·`from()`·`findAll/findOne/count/exists(Where)`·`updateQuery()/deleteQuery()/insertQuery()`**, 지원은 **Spring Boot 3.4+ / Spring Data 3.4+ 와 Boot 4**, 기존 `org.lambdaql.jpa` 패키지는 **삭제하지 않고 재검토**(2026-11-11 작성자 지적, M12 SD9). 근거: Spring Data가 default 메서드를 직접 호출하므로 가로챌 필요가 없음, spring.factories fragment가 공식 확장 방법이고 사용자 커스텀 구현과 공존(실측), Kotlin 2.2+ 동작(실측) | 확정 |
 | D35 | 정렬의 NULL 위치·실행 시점 방향 (3.7) | `by.by(key, Direction)` / `asc`·`desc`에 boolean 인자 / `Nulls` enum 인자 | **2026-11-12 작성자 결정: `by.asc(key, boolean nullsFirst)`, `by.desc(key, boolean nullsFirst)`**. 인자 없는 `asc(key)`·`desc(key)`는 D16 기본 NULL 정책. 실행 시점에 방향을 정할 때(캡처한 `Direction`)는 **`by.sort(key, Direction)`**. `by.by`는 폐기. 참고: Kotlin도 Java 메서드에는 이름 있는 인자를 못 써서 두 언어 모두 `by.desc(x, false)` 형태 | 확정 |
-| D36 | where의 연관 경로 조인 (R24 개정) | 항상 LEFT JOIN / 쓰임에 따라 자동 / 항상 INNER JOIN | **2026-11-12 작성자 결정: where 조건의 연관 경로는 항상 INNER JOIN**(`o.getCustomer().getName()` → `join o.customer j1 … j1.name`). 연관이 없는 행은 연관 자체를 비교해 찾는다: `o.getCustomer() == null` → `o.customer is null`(FK 검사, 조인 없음). FK id 경로(`o.getCustomer().getId()`)는 조인 없음. **정렬·select에만 쓰인 경로는 행을 잃지 않도록 LEFT JOIN 유지**(S8, J1). 같은 경로를 where와 정렬·select가 함께 쓰면 INNER(where가 이미 행을 거름). DML where(U9)는 INNER와 같은 의미가 되는 상관 `EXISTS`로 렌더링. 주의: Kotlin `it.customer?.name == null`은 고객 없는 주문을 포함하지 않음(포함하려면 `it.customer == null \|\| it.customer?.name == null`). 구현·세 DB 확인(`SelectQueryTest`) | 확정 |
+| D36 | where의 연관 경로 조인 (R24 개정) | 항상 LEFT JOIN / 쓰임에 따라 자동 / 항상 INNER JOIN | **2026-11-12 작성자 결정: where 조건의 연관 경로는 항상 INNER JOIN**(`o.getCustomer().getName()` → `join o.customer j1 … j1.name`). 연관이 없는 행은 연관 자체를 비교해 찾는다: `o.getCustomer() == null` → `o.customer is null`(FK 검사, 조인 없음). FK id 경로(`o.getCustomer().getId()`)는 조인 없음. **정렬·select에만 쓰인 경로는 행을 잃지 않도록 LEFT JOIN 유지**(S8, J1). 같은 경로를 where와 정렬·select가 함께 쓰면 INNER(where가 이미 행을 거름). DML where(U9)는 INNER와 같은 의미가 되는 상관 `EXISTS`로 렌더링. 주의: Kotlin `it.customer?.name == null`은 고객 없는 주문을 포함하지 않음(포함하려면 `it.customer == null \|\| it.customer?.name == null`). **보완(2026-11-12, 구현 중 발견)**: 조건이 연관 없는 행을 참으로 남길 수 있으면(null guard, 예: `o.getCustomer() == null \|\| o.getCustomer().getName().equals(x)`) 그 경로만 LEFT JOIN. 항상 INNER면 Java가 남기는 행이 빠지는 오답이 됨. 판정은 3값 논리: 연관이 없을 때 연관 null 검사는 참, 연관 뒤 컬럼 조건은 unknown, 나머지 조건은 자유 변수로 두고 참이 될 수 있으면 LEFT(`JoinPlanner`). 구현·세 DB 확인(`SelectQueryTest` region `null-guard`) | 확정 |
 | D37 | 값 렌더링: 리터럴과 바인딩 | 정수만 리터럴 / 출처 기준 / 모두 바인딩 | **2026-11-12 작성자 결정: 출처 기준.** 람다 코드에 적힌 상수(숫자·문자열·boolean·`null`·enum 상수·컴파일 시점 상수 `static final`)는 **리터럴**(`o.price > 100.0`, `o.description = 'O''Brien'`, `o.kind = pkg.Order$Kind.RUSH`), 캡처 값과 계산 값은 **항상 바인딩**(`:p1`). 상수는 호출마다 같아 SQL 문장 수가 늘지 않고 옵티마이저가 값을 볼 수 있음. 문자열 리터럴은 작은따옴표를 `''`로 escape(컴파일된 상수라 SQL 주입 위험 없음). NaN·무한대는 바인딩. `new BigDecimal("1.5")`처럼 객체를 만드는 식은 계산 값이라 바인딩. 구현·세 DB 확인 | 확정 |
 | D8 | 라이선스와 특허 | (A/A'일 때) LGPL 의존 허용 여부. ExTree `LICENSE`(2.1)와 `pom.xml:30-35`(3.0) 불일치. FluentJPA `pom.xml:31-34`는 LGPL-3.0만 선언해 `LICENSE`(AGPL-3.0 소스 / LGPL-3.0 바이너리)와 불일치. FluentJPA `README.md:1`의 'Patent Pending' 표기는 (B) clean-room이라도 특허 여부 확인 필요 | 법무 확인 | D1과 함께 |
 
@@ -901,10 +901,12 @@ C# Expression Tree에 해당하는 기능이 OpenJDK **Project Babylon**의 **Co
 public enum Direction { ASC, DESC, ASC_NULLS_FIRST, ASC_NULLS_LAST, DESC_NULLS_FIRST, DESC_NULLS_LAST;
     public static Direction parse(String s); public Direction reversed(); }
 
-public interface By {                         // 정렬 빌더 (람다 인자로만 받음)
-    By asc(Comparable<?> key);
-    By desc(Comparable<?> key);
-    By by(Comparable<?> key, Direction dir);  // 방향·NULL 위치를 값으로 지정(동적 정렬)
+public interface By {                         // 정렬 빌더 (람다 인자로만 받음, D35)
+    By asc(Comparable<?> key);                     // NULL 먼저(D16)
+    By desc(Comparable<?> key);                    // NULL 나중(D16)
+    By asc(Comparable<?> key, boolean nullsFirst); // NULL 위치 지정
+    By desc(Comparable<?> key, boolean nullsFirst);
+    By sort(Comparable<?> key, Direction dir);     // 실행 시점 방향(캡처 값)
 }
 @FunctionalInterface interface SortBy<T>  extends Serializable { By sort(T entity, By by); }     // 일반형
 @FunctionalInterface interface SortKey<T> extends Serializable { Comparable<?> key(T entity); }  // by 생략형(키 1개)
@@ -921,11 +923,11 @@ OrderedSelectQuery<T> orderBy(SortSpec<T> spec);                // 재사용·�
 qb.from(Order.class).where(o -> o.isActive())
   .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getCustomer().getName()).asc(o.getId()))
   .limit(20).offset(40).toList();
-// → select o from Order o left join o.customer s1 where o.active = true
-//   order by o.price desc, s1.name asc, o.id asc
+// → select e0 from Order e0 left join e0.customer j1 where e0.active = true
+//   order by e0.price desc, j1.name asc nulls first, e0.id asc
 
-.orderBy((o, by) -> by.by(o.getDescription(), Direction.DESC_NULLS_LAST).asc(o.getId()))  // NULL 위치
-.orderBy((o, by) -> by.by(o.getPrice(), dir).asc(o.getId()))     // dir은 캡처한 값(실행 시점)
+.orderBy((o, by) -> by.desc(o.getDescription(), false).asc(o.getId()))  // NULL 위치: desc nulls last
+.orderBy((o, by) -> by.sort(o.getPrice(), dir).asc(o.getId()))   // dir은 캡처한 값(실행 시점)
 .orderBy(o -> o.getPrice())                                       // by 생략: 키 1개, ASC
 .orderBy(o -> o.getUpdateAt(), Direction.DESC)                    // by 생략: 키 1개 + 방향
 .orderBy(Order::getPrice)                                         // 메서드 레퍼런스(키 1개)
@@ -943,7 +945,7 @@ qb.from(Order::class.java).where { it.active }
 ```java
 // 조인: 엔티티 인자들 뒤 마지막에 by
 qb.from(Order.class).leftJoin(Customer.class, (o, c) -> o.getCustomer().getId() == c.getId())
-  .orderBy((o, c, by) -> by.by(c.getName(), Direction.DESC_NULLS_LAST).asc(o.getId()));
+  .orderBy((o, c, by) -> by.desc(c.getName(), false).asc(o.getId()));
 ```
 
 실측(JDK 21, kotlinc 2.3.21): `/tmp/lql-sort/one/{One.java,K.kt}`, `/tmp/lql-sort/omit/{Om.java,Om.kt}`.
@@ -957,14 +959,14 @@ qb.from(Order.class).leftJoin(Customer.class, (o, c) -> o.getCustomer().getId() 
 |---|---|---|
 | S1 | 정렬은 람다 하나. 일반형 `(o, by) -> by…`, 조인형 `(o, c, by) -> by…`(엔티티 인자 뒤 마지막이 `by`). 키 1개는 `by` 생략형 `o -> key`(+ 선택적 `Direction` 인자) | 컴파일 타임(인자 개수로 오버로드 구분, 실측) |
 | S2 | 키 타입은 `Comparable<?>`(Kotlin nullable 키 허용). 엔티티 자체는 `Comparable`이 아니므로 키가 될 수 없음 | 컴파일 타임(두 언어 실측) |
-| S3 | 방향은 메서드(`asc`/`desc`) 또는 `by(key, Direction)`. `ASC`/`DESC`(NULL 위치 미지정)는 D16 기본 정책, `*_NULLS_FIRST/LAST`는 그대로 렌더링 | 렌더러 |
+| S3 | 방향은 메서드 `asc`/`desc`(+ 선택적 `boolean nullsFirst`) 또는 `sort(key, Direction)`(D35). NULL 위치를 안 정하면 D16 기본 정책. 렌더러는 NULL이 될 수 있는 키에 `nulls first/last`를 항상 적고, Hibernate가 DB 기본값과 같으면 생략(H2·MariaDB), 문법이 없으면 CASE로 에뮬레이션(MariaDB)함(세 DB 실측) | 렌더러 |
 | S4 | 람다 본문은 **`by` 호출이 일렬로 이어진 형태만** 허용(각 호출의 receiver가 `by` 인자이거나 직전 호출 결과, 마지막에 그 결과를 반환). `if (x) by.asc(…)` 같은 조건부 키·반복문은 v0.1 거부 | 분석 시점 |
 | S5 | `orderBy`는 쿼리당 한 번. 정렬 뒤 `where`, `limit` 뒤 정렬 불가 | 단계별 반환 타입(컴파일 타임) |
 | S6 | 재사용·조립형은 `SortSpec`: `SortSpec.of(Order.class, (o, by) -> by.desc(o.getUpdateAt()).asc(o.getId()))`, `then()`, `reversed()`. 외부 문자열(요청 파라미터, Spring `Sort`)은 `SortWhitelist<T>`로만 변환 | 컴파일 타임 + 런타임 |
 | S7 | 키 식은 컬럼, to-one 경로, `+ - *`, 넓히는 변환까지(값 분기 없음). Kotlin `?.`는 경로로 해석 | 분석 시점 |
 | S8 | 연관 경로는 정렬 전용 `left join`(암묵 경로는 세 DB 모두 inner join으로 NULL 행 탈락). 조인 쿼리의 키 안 경로도 이미 조인된 alias 또는 정렬 전용 `left join` | 렌더러 |
 | S9 | 페이징 시 키 집합에 유일 키가 없으면 루트 `@Id asc`를 마지막에 자동 추가(to-many 조인이면 조인 엔티티 `@Id`도). collection fetch join + `limit/offset`은 거부 | 렌더러 |
-| S10 | 분석 캐시는 람다 하나 단위. `by(key, dir)`의 `dir`이 캡처 값이면 실행할 때마다 읽는 바인딩 값으로 취급(구조는 캐시) | 캐시 |
+| S10 | 분석 캐시는 람다 하나 단위. `sort(key, dir)`의 `dir`(또는 `nullsFirst`)이 캡처 값이면 실행할 때마다 읽는 바인딩 값으로 취급(구조는 캐시) | 캐시 |
 | S11 | Spring `Sort.Order`(direction + `NullHandling`)는 `Direction` 6개 값과 1:1(v0.2 모듈). `SortWhitelist.parse("price,desc_nulls_last")` 지원 | 런타임 |
 | S12 | 조인 쿼리도 같은 형태(`(o, c, by)`, `(o, c, i, by)`). 쿼리 종류마다 `orderBy` 오버로드 몇 개만 필요(키 개수별 오버로드 없음) | 컴파일 타임 |
 | S13 | `by` 생략형에 메서드 레퍼런스를 쓸 수 있지만, 조인형에는 람다만. 컴파일은 되지만 의미가 틀린 메서드 레퍼런스(1-인자 인스턴스 메서드, 2-인자 static 메서드)는 분석기가 거부 | 분석 시점 |
@@ -1171,7 +1173,7 @@ public class LambdaQLException extends RuntimeException {   // 모든 lambdaQL �
   - `B&&false`, `B||true`, `B||false`가 예외 없이 축약되고, `c?x:false`·`c?true:x`·`c?false:true`가 각각 AND·OR·NOT이 되며, 일반 `c?x:y`는 예외를 던집니다.
 - **관련 파일**: `LPV`, `A/ShortCircuitReducer.java`(신규), `A/BranchEvent.java`(신규), `CSM`(삭제), `A/LogicalCondition.java`, `A/UnaryCondition.java`(`Not`으로 대체), `A/BinaryCondition.java`(`Compare`로 대체), `A/BinaryOperator.java`
 
-> **구현 현황 (2026-11-12)**: M1~M3(로딩·디코딩·조건 복원), M4의 기본 의미 해석(`Normalizer`: getter 경로, Host 값, equals·Objects.equals·areEqual, compareTo, 캡처 컬렉션 IN, enum 상수), M5의 기본 렌더링·실행(`HqlRenderer`, `SelectQuery.where/toHql/toList`, D36 INNER JOIN, D37 리터럴 규칙)이 구현됨. `SelectQueryTest` 13개가 H2·MariaDB·Oracle에서 통과(`-Dlql.db=mariadb\|oracle`, 테스트 테이블은 `SQ_` 접두). 남은 것: M4의 나머지(문자열 함수 등 v0.2 항목 제외), Kotlin 패턴 테스트, M5.5 이후 전부.
+> **구현 현황 (2026-11-12)**: M1~M3(로딩·디코딩·조건 복원), M4의 기본 의미 해석(`Normalizer`: getter 경로, Host 값, equals·Objects.equals·areEqual, compareTo, 캡처 컬렉션 IN, enum 상수), M5의 기본 렌더링·실행(`HqlRenderer`, `SelectQuery.where/toHql/toList`, D36 INNER JOIN, D37 리터럴 규칙)이 구현됨. M5.5 정렬의 핵심(`Direction`, `By`, `SortBy`, `SortKey`, getter 메서드 레퍼런스, `OrderedSelectQuery.limit/offset`, 정렬 전용 LEFT JOIN, D16 NULL 정책, S9 tie-breaker)과 D36 null guard LEFT JOIN 보완이 구현됨. 캡처 값·상수만 쓰는 부분(`min == null` 등)은 실행할 때 Java 순서(왼쪽부터, `&&`/`||` 단락 평가)로 결정해 HQL에서 지움: `min == null || o.getPrice() > min`은 `min`이 null이면 조건 없음, 아니면 `e0.price > :p1`(분석 캐시는 그대로, HQL 문장만 값에 따라 다름). 결정하는 부분보다 앞의 부분은 Java가 먼저 실행하므로 오류 검사를 함(`o.getPrice() > min \|\| min == null`은 Java처럼 예외). `SelectQueryTest` 15개, `SortQueryTest` 9개가 H2·MariaDB 10.11·Oracle 23.26에서 통과(`-Dlql.db=mariadb\|oracle`, 테스트 테이블은 `SQ_` 접두, `DatabaseSelectionTest`가 실제 연결 DB를 확인). 정정: 이전 기록의 "세 DB 통과"는 `spring.profiles.include` 방식이라 실제로는 H2에 연결됐을 수 있음 → `spring.config.import` 방식으로 바꾸고 다시 확인함. 남은 것: M4의 나머지(문자열 함수 등 v0.2 항목 제외), Kotlin 패턴 테스트, M5.5의 `SortSpec`·`SortWhitelist`·조인형 `SortBy2/3`·컴파일 실패 테스트, M8 이후 전부.
 
 ### Milestone 4. 의미 해석: JPQL 경로, host 평가, String/boolean (2~3일)
 
@@ -1412,7 +1414,7 @@ qb.from(Order::class.java).groupBy { listOf(it.customer?.id, it.status) }       
 | J3 | 집계가 있으면 `select`·`having`의 비집계 식은 모두 `groupBy` 키여야 한다(SQL 규칙) — 분석 시점 검사, 위반은 `TranslationException` |
 | J4 | 집계 결과의 NULL: `sum`/`avg`/`min`/`max`는 대상 행이 없거나 모두 NULL이면 NULL, `count`는 0(SQL 의미). Kotlin non-null 생성자 인자에 NULL이 들어가면 생성 시 NPE이므로 README에 nullable 타입 권장 명시 |
 | J5 | 파생 테이블·CTE의 행 타입은 **Java record와 Kotlin data class만**(v0.1): 열 별칭은 record 구성 요소 순서 / data class `componentN` 순서로 정함. 일반 DTO 클래스는 생성자 인자 이름을 알 수 없어 파생 테이블 행 타입으로는 거부(단순 `select`에는 사용 가능) |
-| J6 | CTE는 `var t = qb.with(sub -> …)`로 만든 핸들을 `qb.from(t)`·조인에 재사용할 때 `with t (...) as (...)`로 렌더링. HQL은 바깥에서 **별칭이 필수**(`from t x`; 별칭 없이 `t.cid`는 `SemanticException` — 실측) |
+| J6 | CTE는 `var t = qb.with(sub -> …)`로 만든 핸들을 `qb.from(t)`·조인에 재사용할 때 `with t as (select … as customerId, … as cnt …)`로 렌더링(열 이름은 select 별칭으로, J5 record 구성요소 이름). **HQL은 `with t (열 목록) as (...)`를 받지 않음**(세 DB 모두 `SyntaxException`, 2026-11-12 `PlannedSqlTest` 실측). 열 목록은 Hibernate가 SQL에서 만듦(MariaDB·Oracle `with t (customerId,cnt,total) as (…)`, H2는 파생 테이블로 바꿈). HQL은 바깥에서 **별칭이 필수**(`from t x`; 별칭 없이 `t.cid`는 `SemanticException` — 실측) |
 | J7 | `distinct()`는 `select distinct`. 정렬과 함께 쓰면 정렬 키가 select 목록에 있어야 하는 DB 규칙을 분석 시점에 검사 |
 | J8 | 정렬(3.7)·페이징·서브쿼리(M8)와 조합 가능. 집계 결과 기준 정렬(`orderBy((s, by) -> by.desc(s.total()))`)은 v0.2 후보(별칭 정렬) |
 

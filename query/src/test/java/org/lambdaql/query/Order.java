@@ -49,6 +49,21 @@ public class Order implements Serializable {
     @JoinColumn(name = "customer_id")
     private Customer customer;
 
+    // ---- fields for the planned update examples (manual chapter 7). All can be NULL.
+
+    /** Sum of the item prices. */
+    private Double total;
+
+    /** A counter. */
+    private Integer cnt;
+
+    /** A copy of the customer name. */
+    private String custName;
+
+    /** The address (embedded: {@code city}, {@code zip}). */
+    @Embedded
+    private Address address;
+
     public Order() {}
 
     public Order(Customer customer, String product) {

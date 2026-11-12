@@ -1,4 +1,4 @@
-# Run the tests on the local MariaDB verification schema:  ./gradlew :query:test -Dlql.db=mariadb
+# Imported by application-test.yaml when the tests run with -Dlql.db=mariadb (local MariaDB verification schema).
 # The password is read from the environment variable LQL_DB_PASSWORD (never written to a file).
 spring:
   datasource:

@@ -1,8 +1,14 @@
 spring:
+  config:
+    # -Dlql.db=mariadb|oracle: the imported file wins over this file, so its datasource replaces H2.
+    # (A profile added with spring.profiles.include loses to the "test" profile, so it cannot replace H2.)
+    import: optional:classpath:lql-db-${lql.db:h2}.yaml
   jpa:
     show-sql: true
     properties:
       hibernate.format_sql: true
+      # records the SQL for SqlByDatabaseTest (expected SQL per database in the manual)
+      hibernate.session_factory.statement_inspector: org.lambdaql.query.SqlCapture
     hibernate:
       # 엔티티 기준으로 스키마를 생성/삭제한다. (table.sql 수동 DDL은 엔티티 컬럼과 맞지 않고,
       # @BeforeEach 에서 반복 실행되어 두 번째 테스트부터 "Table already exists"로 실패했음)

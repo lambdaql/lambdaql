@@ -4,13 +4,18 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.lambdaql.engine.decode.ConditionReducer;
 import org.lambdaql.engine.decode.Decoder;
+import org.lambdaql.engine.ir.Expr;
 import org.lambdaql.engine.ir.Pred;
+import org.lambdaql.engine.ir.SortItem;
 import org.lambdaql.engine.load.BytecodeLoader;
 import org.lambdaql.engine.load.LambdaRef;
 import org.lambdaql.engine.load.SerializedLambdaExtractor;
 import org.lambdaql.engine.sem.EntityModel;
 import org.lambdaql.engine.sem.JpaEntityModel;
 import org.lambdaql.engine.sem.Normalizer;
+import org.lambdaql.engine.sem.SortReader;
+import org.lambdaql.engine.render.RenderedQuery;
+import jakarta.persistence.TypedQuery;
 
 import java.util.List;
 import java.util.Map;
@@ -33,6 +38,8 @@ public final class QueryContext {
     private final EntityManager sharedEntityManager;
     private final EntityModel model;
     private final Map<Class<?>, Pred> whereCache = new ConcurrentHashMap<>();
+    private final Map<Class<?>, List<SortItem>> sortCache = new ConcurrentHashMap<>();
+    private final Map<Class<?>, Expr> sortKeyCache = new ConcurrentHashMap<>();
 
     /**
      * Creates a context.
@@ -71,6 +78,50 @@ public final class QueryContext {
             var graph = Decoder.decodePredicate(ref, BytecodeLoader.load(ref));
             Pred pred = ConditionReducer.reduce(graph, ref.describe());
             return Normalizer.normalize(pred, roots, model, ref.classLoader(), ref.describe());
+        });
+    }
+
+    /**
+     * Analyzes a sort lambda with the builder (cached per lambda class).
+     * Run-time directions stay as expressions and are read on every run (S10).
+     *
+     * @param ref   the lambda {@code (o, by) -> by...}
+     * @param roots entity class of each entity parameter
+     * @return the sort keys
+     */
+    List<SortItem> analyzeSortBy(LambdaRef ref, List<Class<?>> roots) {
+        return sortCache.computeIfAbsent(ref.lambdaClass(), k -> SortReader.readSortBy(ref, roots, model));
+    }
+
+    /**
+     * Analyzes a one-key sort lambda or getter reference (cached per lambda class).
+     *
+     * @param ref  the lambda {@code o -> o.getPrice()} or {@code Order::getPrice}
+     * @param root the entity class
+     * @return the normalized key
+     */
+    Expr analyzeSortKey(LambdaRef ref, Class<?> root) {
+        return sortKeyCache.computeIfAbsent(ref.lambdaClass(), k -> SortReader.readSortKey(ref, root, model));
+    }
+
+    /**
+     * Runs a rendered select query.
+     *
+     * @param type   the entity class
+     * @param query  the HQL and parameters
+     * @param offset rows to skip (0 = none)
+     * @param limit  most rows to return, or {@code null} for no limit
+     * @param <T>    the entity type
+     * @return the rows
+     */
+    <T> List<T> resultList(Class<T> type, RenderedQuery query, int offset, Integer limit) {
+        if (limit != null && limit == 0) return List.of();
+        return withEntityManager(em -> {
+            TypedQuery<T> q = em.createQuery(query.hql(), type);
+            query.parameters().forEach(q::setParameter);
+            if (offset > 0) q.setFirstResult(offset);
+            if (limit != null) q.setMaxResults(limit);
+            return q.getResultList();
         });
     }
 

@@ -12,6 +12,7 @@ import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -158,6 +159,82 @@ class SelectQueryTest {
         // @end
         assertEquals(javaIds(o -> o.getCustomer() != null && name.equals(o.getCustomer().getName())),
                 ids(qb.from(Order.class).where(o -> o.getCustomer().getName().equals(name)).toList()));
+    }
+
+    @Test
+    void nullGuardKeepsRowsWithoutAssociation() {
+        // @start region="null-guard"
+        String name = "Kim";
+        // Java keeps orders without a customer here, so the path becomes a LEFT JOIN
+        RenderedQuery q = qb.from(Order.class)
+                .where(o -> o.getCustomer() == null || o.getCustomer().getName().equals(name))
+                .toHql();
+        assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1", q.hql());
+
+        // the guard removes those orders, so an inner join is right
+        RenderedQuery q2 = qb.from(Order.class)
+                .where(o -> o.getCustomer() != null && o.getCustomer().getName().equals(name))
+                .toHql();
+        assertEquals("select e0 from Order e0 join e0.customer j1 where e0.customer is not null and j1.name = :p1", q2.hql());
+        // @end
+        assertEquals(javaIds(o -> o.getCustomer() == null || name.equals(o.getCustomer().getName())),
+                ids(qb.from(Order.class).where(o -> o.getCustomer() == null || o.getCustomer().getName().equals(name)).toList()));
+        assertEquals(javaIds(o -> o.getCustomer() != null && name.equals(o.getCustomer().getName())),
+                ids(qb.from(Order.class).where(o -> o.getCustomer() != null && o.getCustomer().getName().equals(name)).toList()));
+        // a guard in one where call and a plain path in another: the AND drops the missing rows, so inner join
+        assertEquals("select e0 from Order e0 join e0.customer j1 where (e0.customer is null or j1.name = :p1) and j1.name is not null",
+                qb.from(Order.class)
+                        .where(o -> o.getCustomer() == null || o.getCustomer().getName().equals(name))
+                        .where(o -> o.getCustomer().getName() != null)
+                        .toHql().hql());
+        // status decides with the guard: orders without a customer and status 3 stay
+        assertEquals(javaIds(o -> (o.getCustomer() == null && o.getStatus() == 1) || (o.getCustomer() != null && name.equals(o.getCustomer().getName()))),
+                ids(qb.from(Order.class)
+                        .where(o -> (o.getCustomer() == null && o.getStatus() == 1) || o.getCustomer().getName().equals(name))
+                        .toList()));
+    }
+
+    @Test
+    void capturedNullGuard() {
+        // @start region="captured-null-guard"
+        Double min = null;                                       // for example an empty search field
+        RenderedQuery q = qb.from(Order.class).where(o -> min == null || o.getPrice() > min).toHql();
+        // the guard is decided in Java when the query runs: no filter at all
+        assertEquals("select e0 from Order e0", q.hql());
+
+        Double min2 = 100.0;
+        RenderedQuery q2 = qb.from(Order.class).where(o -> min2 == null || o.getPrice() > min2).toHql();
+        assertEquals("select e0 from Order e0 where e0.price > :p1", q2.hql());
+        assertEquals(Map.of("p1", 100.0), q2.parameters());
+        // @end
+        assertEquals(javaIds(o -> true), ids(qb.from(Order.class).where(o -> min == null || o.getPrice() > min).toList()));
+        assertEquals(javaIds(o -> o.getPrice() > min2),
+                ids(qb.from(Order.class).where(o -> min2 == null || o.getPrice() > min2).toList()));
+        // without the guard first, Java throws NullPointerException, so lambdaQL throws too
+        assertThrows(LambdaAnalysisException.class,
+                () -> qb.from(Order.class).where(o -> o.getPrice() > min || min == null).toHql());
+        // the guard with AND: no rows, and the compare is never rendered
+        assertEquals("select e0 from Order e0 where 1=0",
+                qb.from(Order.class).where(o -> min != null && o.getPrice() > min).toHql().hql());
+    }
+
+    @Test
+    void notInWithCapturedList() {
+        // @start region="not-in"
+        List<Long> ids = List.of(1L, 2L);
+        // the id can never be NULL: a plain NOT IN
+        assertEquals("select e0 from Order e0 where e0.id not in (:p1)",
+                qb.from(Order.class).where(o -> !ids.contains(o.getId())).toHql().hql());
+        // a column that can be NULL: Java keeps the rows with NULL (the list has no null), so "is null" is added
+        // (List.of(...).contains(null) would throw NullPointerException in Java; Arrays.asList returns false)
+        List<String> descs = Arrays.asList("a", "b");
+        assertEquals("select e0 from Order e0 where (e0.description is null or e0.description not in (:p1))",
+                qb.from(Order.class).where(o -> !descs.contains(o.getDescription())).toHql().hql());
+        // @end
+        assertEquals(javaIds(o -> !ids.contains(o.getId())),
+                ids(qb.from(Order.class).where(o -> !ids.contains(o.getId())).toList()));
+        assertEquals(javaIds(o -> !descs.contains(o.getDescription())),
+                ids(qb.from(Order.class).where(o -> !descs.contains(o.getDescription())).toList()));
     }
 
     @Test
