@@ -4,9 +4,12 @@
 > [!NOTE]
 > **状況:** 現在、lambdaQL をソースからビルドし、テストを実行できます。
 > `where` の条件と `toList()` は最初から最後まで動きます。H2、MariaDB、Oracle で **Java** のラムダを使ってテスト済みです。Kotlin のラムダはまだテストしていません。
-> ソートとページング（`orderBy`、`limit`、`offset`）の中核部分も動きます（これも Java のラムダでのみテスト済み）。
-> サブクエリ、`select`、update/insert/delete、プロシージャ、Spring モジュールは **設計済みで、まだ実装されていません**。
-> 成果物（アーティファクト）はまだ公開していません。下のアーティファクト名は一時的なものです。
+> 結果の関数 `first()`、`one()`、`count()`、`exists()`、`toSet()` も動きます（[結果を受け取る](#getting-the-result) を参照。これも Java のラムダでのみテスト済み）。
+> ソートとページング（`orderBy`、`limit`、`offset`、`SortSpec`）の中核部分も動きます（これも Java のラムダでのみテスト済み）。
+> Spring Data JPA モジュール（リポジトリ用の実行器と Spring Boot の自動構成）も動きます（[12. Spring Data JPA](12-spring-data-jpa.md) を参照。Java のリポジトリでのみテスト済み）。
+> 更新、挿入、削除、upsert も動きます（[7. 更新、挿入、削除](07-dml.md) を参照。これも Java のラムダでのみテスト済み）。
+> サブクエリ、`select`、プロシージャは **設計済みで、まだ実装されていません**。
+> 成果物（アーティファクト）はまだ Maven Central に公開していません。下のとおりソースからビルドしてください。
 
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [1. 概要](../01-overview.md) | 次: [3. 条件](03-where.md) | [このページの Java 版](../java/02-getting-started.md)
 
@@ -34,12 +37,13 @@
 ```bash
 git clone https://github.com/codebit0/lambdaql.git
 cd lambdaql
-./gradlew :query:build
+./gradlew build
 ```
 
 - Gradle ラッパー（8.10）は **JDK 23 以下** でしか動きません。JDK 21 を使ってください。
 - リポジトリには `gradle/gradle-daemon-jvm.properties` があるので、Gradle デーモンは Java 21 を使います。
 - IntelliJ IDEA では、**Settings > Build Tools > Gradle > Gradle JVM** を Java 21 の JDK に設定してください。
+- ビルドには 3 つのモジュールがあります。`query`（アーティファクト `lambdaql-core`）、`spring-data-jpa`（`lambdaql-spring-data-jpa`）、`spring-boot-starter`（`lambdaql-spring-boot-starter`）です。Spring のモジュールは [12. Spring Data JPA](12-spring-data-jpa.md) で説明します。
 
 ユニットテストを実行します。
 
@@ -52,13 +56,13 @@ cd lambdaql
 <a id="use-the-local-build-in-your-project"></a>
 ### ローカルビルドを自分のプロジェクトで使う
 
-jar をローカルの Maven リポジトリに公開します。
+3 つのモジュールの jar をローカルの Maven リポジトリに公開します。
 
 ```bash
-./gradlew :query:publishToMavenLocal
+./gradlew publishToMavenLocal
 ```
 
-それから、自分のプロジェクトに追加します（Gradle Kotlin DSL）。
+それから、`lambdaql-core` を自分のプロジェクトに追加します（Gradle Kotlin DSL）。
 
 ```kotlin
 repositories {
@@ -67,7 +71,7 @@ repositories {
 }
 
 dependencies {
-    implementation("org.lambdaql:lambadaql-query:1.0.0")
+    implementation("org.lambdaql:lambdaql-core:1.0.0")
 }
 ```
 
@@ -76,15 +80,16 @@ Maven:
 ```xml
 <dependency>
   <groupId>org.lambdaql</groupId>
-  <artifactId>lambadaql-query</artifactId>
+  <artifactId>lambdaql-core</artifactId>
   <version>1.0.0</version>
 </dependency>
 ```
 
+Spring Data JPA や Spring Boot を使う場合は、代わりに `lambdaql-spring-boot-starter` か `lambdaql-spring-data-jpa` を使ってください。どちらも `lambdaql-core` を持ち込みます（[12.2](12-spring-data-jpa.md#122-modules) を参照）。
+
 > [!WARNING]
-> この座標は **一時的** なものです。
-> `lambadaql` という名前にはタイプミスがあり、最初のリリースまでに直します。
-> グループ、名前、バージョンは変わることがあります。lambdaQL が公開されたら、このページをもう一度確認してください。
+> アーティファクトは **まだ Maven Central に公開していません**。
+> バージョン `1.0.0` はリポジトリの `gradle.properties` から来ています。最初のリリースまでに変わることがあります。lambdaQL が公開されたら、このページをもう一度確認してください。
 
 <a id="kotlin-compiler-settings"></a>
 ## Kotlin コンパイラーの設定
@@ -166,7 +171,7 @@ class Item(
 <a id="create-a-querybuilder"></a>
 ## QueryBuilder を作る
 
-`QueryBuilder` が入り口です。JPA の `EntityManagerFactory` が必要です。
+`QueryBuilder` が入り口です。JPA の `EntityManagerFactory` か `EntityManager` が必要です。
 
 ```kotlin
 val qb = QueryBuilder(entityManagerFactory)
@@ -185,14 +190,16 @@ val qb = QueryBuilder(emf)
 <a id="with-spring-boot"></a>
 ### Spring Boot で
 
-Spring Boot はすでに `EntityManagerFactory` を作っています。それを注入して、`QueryBuilder` の Bean を作ります。
+`lambdaql-spring-boot-starter` を使うと、Spring Boot が `QueryBuilder` の Bean を作ります（[12.8](12-spring-data-jpa.md#128-the-querybuilder-bean) を参照）。
+スターターを使わない場合は、Bean を自分で作ります。自動構成と同じように、Spring の共有 `EntityManager` を使ってください。
 
 ```kotlin
 @Configuration
 class LambdaQlConfig {
 
     @Bean
-    fun queryBuilder(entityManagerFactory: EntityManagerFactory) = QueryBuilder(entityManagerFactory)
+    fun queryBuilder(entityManagerFactory: EntityManagerFactory) =
+        QueryBuilder(SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory))
 }
 ```
 
@@ -210,8 +217,8 @@ class OrderService(private val qb: QueryBuilder) {
 }
 ```
 
-- モジュール `lambdaql-spring-data-jpa` がリリースされるまでは、Bean は自分で作ります。リリース後は、そのモジュールが Bean を作ります。
-- Spring のトランザクションの中では、lambdaQL はそのトランザクションの共有 `EntityManager` を使います。
+- 共有 `EntityManager` は現在のトランザクションに結び付いています。`@Transactional` の中では、lambdaQL は同じトランザクションで実行されます。
+- Spring のアプリケーションでは、`EntityManagerFactory` を受け取るコンストラクターを使わないでください。そのビルダーはクエリごとに自分の `EntityManager` を開くので、Spring のトランザクションの外で実行されます。
 - Spring Data のリポジトリの中で lambdaQL のクエリを書く方法は、[12. Spring Data JPA](12-spring-data-jpa.md) を参照してください。
 
 <a id="your-first-query"></a>
@@ -238,7 +245,7 @@ where o1_0.status=1 and o1_0.price>100.0
 - `qb.from(Order::class.java)` で `Order` に対するクエリを始めます。
 - `where { ... }` は条件のラムダを 1 つ受け取ります。末尾ラムダと `it` を使います。
 - `toList()` はクエリを実行し、`List<Order>` を返します。
-- 今決まっている結果メソッドは `toList()` だけです。他の結果メソッドは予定です。
+- `toList()` はすべての行を返します。他の結果の関数（`first()`、`one()`、`count()`、`exists()`、`toSet()`）は [結果を受け取る](#getting-the-result) にあります。
 
 なぜ `!!` なのでしょうか。`price` は `Double?` で、Kotlin は nullable な値に対する `it.price > 100.0` をコンパイルしません。`!!` を付けるとコンパイルできます。lambdaQL は `!!` を **無視** します。`price` が NULL の行は単に返されません（SQL の意味）。
 
@@ -333,6 +340,187 @@ where c1_0.name=?
 customer のない注文を探すには、関連を比較してください。`it.customer == null` は `e0.customer is null` になります（結合なし）。
 `it.customer?.name == null` ではそれらの注文は **含まれません**。
 null ガードが customer のない注文を残す場合（`it.customer == null || ...`）、lambdaQL は `left join` を使います。[3.10](03-where.md#310-association-paths) を参照してください。
+
+<a id="getting-the-result"></a>
+## 結果を受け取る
+
+`toList()` だけがクエリを実行する方法ではありません。lambdaQL には結果を得る関数が 6 つあります（決定 D38、D42）。
+
+| 関数 | 戻り値 | 呼べる場所 | 何をするか |
+|---|---|---|---|
+| `toList()` | `List<T>` | `where` の後、および `orderBy` / `limit` / `offset` の後 | すべての行（または 1 ページ分）を返します。 |
+| `first()` | `Optional<T>` | `where` の後、および `orderBy` / `limit` / `offset` の後 | 最初の行を返します。読むのは 1 行だけです。 |
+| `one()` | `Optional<T>` | `where` の後だけ | ただ 1 つの行を返します。2 行以上が合うと `NonUniqueResultException` を投げます。読むのは最大 2 行です。 |
+| `count()` | `Long` | `where` の後だけ | 条件に合う行の数を返します。 |
+| `exists()` | `Boolean` | `where` の後だけ | 合う行があれば `true` を返します。読むのは 1 行だけで、エンティティは読み込みません。 |
+| `toSet()` | `SequencedSet<T>` | `where` の後、および `orderBy` / `limit` / `offset` の後 | すべての行（または 1 ページ分）を、行の順序を保つ Set として返します。Set が行数より小さいと `IllegalStateException` を投げます。 |
+
+「`where` の後」とは、`qb.from(...)` と `where { }` で得られるクエリ（型は `SelectQuery`）のことです。このマニュアルではこれを **where 段階** と呼びます。`where` なしで、`qb.from(...)` のすぐ後に呼ぶこともできます。
+
+`orderBy`、`limit`、`offset` の後、クエリの型は `OrderedSelectQuery` になります。そこで使える結果の関数は `toList()`、`toSet()`、`first()` だけです。`one()`、`count()`、`exists()` はそこではコンパイルできません。
+これは意図的です（決定 D38）。`limit(10).count()` は「すべての行」とも「最大 10 行」とも読めるので、lambdaQL はこれを許しません。
+
+`first()` と `one()` は Java の `Optional` を返します。Kotlin では `.orElse(null)` で nullable な値（`Order?`）にできます。
+
+結果の関数についての Kotlin のテストはまだありません。同じ呼び出しを Java で書いたものは [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java) でテストしています（H2、MariaDB、Oracle）。テスト済みの例は [このページの Java 版](../java/02-getting-started.md#getting-the-result) を参照してください。
+
+<a id="first"></a>
+### `first()`
+
+`orderBy` がない場合、「最初」とは id が最も小さい行のことです（ルール S9）。だから、いつも同じ行が返ります。
+順序を選ぶには、先に `orderBy { }` を呼びます。すると `first()` はその順序で最初の行を返します。`offset` はそのまま使われます。`orderBy { ... }.offset(1).first()` は 2 番目の行を返します。
+合う行がなければ、結果は `Optional.empty()` です。
+
+```kotlin
+val cheapest: Order? = qb.from(Order::class.java)
+    .orderBy { o, by -> by.asc(o.price) }
+    .first()
+    .orElse(null)
+// HQL: select e0 from Order e0 order by e0.price asc nulls first, e0.id asc
+
+// without orderBy, "first" is the row with the smallest id
+val firstActive = qb.from(Order::class.java).where { it.active }.first()
+// HQL: select e0 from Order e0 where e0.active = true order by e0.id asc
+```
+
+**データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `first#2`（`firstActive`）:
+
+```sql
+-- H2
+select …
+from orders o1_0
+where o1_0.active=true
+order by o1_0.id
+fetch first ? rows only
+
+-- MariaDB
+select …
+from orders o1_0
+where o1_0.active=1
+order by o1_0.id
+limit ?
+
+-- Oracle
+select …
+from orders o1_0
+where o1_0.active=1
+order by o1_0.id
+fetch first ? rows only
+```
+
+`first()` は 1 行だけを読むので、ページングしたクエリになります。lambdaQL は最後のソートキーとして `id` を追加し（[4.8](04-order-paging.md#tie-breaker-automatic-id) を参照）、Hibernate はデータベースごとにページングを書きます。H2 と Oracle では `fetch first ? rows only`、MariaDB では `limit ?` です。`?` は 1 です。
+`cheapest` のテストでは、NULL にならない `price` を使っているので、その HQL には `nulls` の部分がありません。ここでは `price` が `Double?` なので、HQL が少し違います（Java のページの例 `first` を参照）。
+
+<a id="one"></a>
+### `one()`
+
+条件に合う行が多くても 1 つしかないとき（たとえばユニークキー）に `one()` を使います。
+行がなければ `Optional.empty()` になります。2 行以上が合うと `jakarta.persistence.NonUniqueResultException` を投げます。合う行ならどれでもよいときは `first()` を使ってください。
+
+```kotlin
+fun find(id: Long): Order? =
+    qb.from(Order::class.java).where { it.id == id }.one().orElse(null)
+// HQL: select e0 from Order e0 where e0.id = :p1
+
+// two or more rows: an exception (use first() if any row is fine)
+assertThrows<NonUniqueResultException> { qb.from(Order::class.java).where { it.active }.one() }
+```
+
+**データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `one`:
+
+```sql
+-- H2, Oracle
+select …
+from orders o1_0
+where o1_0.id=?
+fetch first ? rows only
+
+-- MariaDB
+select …
+from orders o1_0
+where o1_0.id=?
+limit ?
+```
+
+`one()` はデータベースに最大 2 行を求めます。2 行目があるかどうかを知るにはそれで十分です。そのため SQL には `fetch first ? rows only`（H2、Oracle）または `limit ?`（MariaDB）が付き、`?` は 2 です。ここでは順序は関係ないので、`order by` はありません。
+
+<a id="count-and-a-paged-screen"></a>
+### `count()` とページ付きの画面
+
+`count()` は条件に合う行の数を返します。where 段階にしかないので、`limit` と `offset` が結果を変えることはありません。
+
+ページ付きの画面では、where 段階のクエリを値に入れておきます。合計を得るにはそれに `count()` を呼びます。次に、ページを得るには同じ値に `orderBy { }.limit(...).toList()` を呼びます。
+
+```kotlin
+val active = qb.from(Order::class.java).where { it.active }
+val total: Long = active.count()                       // every matching row
+val page = active.orderBy { o, by -> by.desc(o.price) }.limit(20).toList()
+// count HQL: select count(e0) from Order e0 where e0.active = true
+```
+
+**データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `count`:
+
+```sql
+-- H2
+select count(o1_0.id)
+from orders o1_0
+where o1_0.active=true
+
+-- MariaDB, Oracle
+select count(o1_0.id)
+from orders o1_0
+where o1_0.active=1
+```
+
+Hibernate は `count(e0)` を `select count(o1_0.id)` に変えます。つまり id の列を数えます。件数のクエリにはページングはありません。
+
+<a id="exists"></a>
+### `exists()`
+
+`exists()` は、合う行が 1 つ以上あれば `true` を返します。`select 1` を実行し、読むのは最大 1 行です。エンティティは読み込みません。
+
+```kotlin
+val anyHighStatus: Boolean = qb.from(Order::class.java).where { it.status == 3 }.exists()
+// HQL: select 1 from Order e0 where e0.status = 3
+```
+
+テスト済みの例（Java のテストの `exists`）は、Kotlin の例のエンティティにはない enum のプロパティを使っています。その SQL も同じ形です。H2 と Oracle では `select 1 from orders o1_0 where … fetch first ? rows only`、MariaDB では `… limit ?` です。`?` は 1 です。[このページの Java 版](../java/02-getting-started.md#exists) を参照してください。
+
+<a id="toset"></a>
+### `toSet()`
+
+`toSet()` は `toList()` と同じようにクエリを実行し、`SequencedSet<T>` を返します（決定 D42）。
+これは `LinkedHashSet` なので、要素は行の順序を保ちます。`orderBy { }` があれば、ソートの順序です。
+
+```kotlin
+val byPrice: SequencedSet<Order> = qb.from(Order::class.java)
+    .orderBy { o, by -> by.desc(o.price) }
+    .toSet()
+```
+
+SQL は `toList()` と同じです。lambdaQL は `distinct` を **付けません**:
+
+- エンティティの行には主キーがあります。そのため、1 つのテーブルだけのクエリでも同じ行が 2 回返ることはありません。
+- lambdaQL が結合するのは to-one の関連だけです。コレクションは `exists` サブクエリになります。そのため、結合で行が繰り返されることはありません。
+- したがって `distinct` は結果を変えず、コストを増やすだけです。（データベースの制限が理由ではありません。Oracle 23.26 は LOB の列でも `distinct` を受け付けます。これは実測です。）
+
+値を返すクエリ（`select`）の `distinct` はマイルストーン M9 で扱います。
+
+**サイズのチェック。** Set が行数より小さいと、`toSet()` は `IllegalStateException` を投げます。これは次の場合に起きます:
+
+- エンティティの `equals` / `hashCode` が、違う 2 つの行を等しいと判断する
+- `@Id` が一意でない（たとえばビューにマッピングしたエンティティ）
+
+このチェックがないと、行が何の兆候もなく失われます。このような場合は `toList()` を使ってください。
+Kotlin の `data class` は、プライマリコンストラクターのプロパティだけを比べます。`@Id` がその中にないと、違う 2 つの行が等しくなることがあります。
+
+```kotlin
+// Tag.equals compares only the name: two different rows would become one element, so toSet() refuses
+assertThrows<IllegalStateException> { qb.from(Tag::class.java).toSet() }
+val tags: List<Tag> = qb.from(Tag::class.java).toList()   // use toList() instead
+```
+
+`toSet()` についての Kotlin のテストはまだありません。同じ呼び出しを Java で書いたものは [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java) でテストしています（リージョン `to-set` と `to-set-check`、H2、MariaDB、Oracle）。[このページの Java 版](../java/02-getting-started.md#toset) を参照してください。
 
 <a id="things-to-know"></a>
 ## 知っておくこと

@@ -4,9 +4,10 @@
 
 > [!IMPORTANT]
 > **Status:** lambdaQL is in early development.
-> The **analysis core**, **`where` + `toList()`** and the core of **sorting and paging** (`orderBy`, `limit`, `offset`) are implemented: lambdaQL loads a lambda, decodes it, writes the HQL and runs it. This is tested on H2, MariaDB and Oracle, but the tests use **Java** lambdas. Kotlin lambdas are not tested yet.
-> Kotlin support is **designed**: the Kotlin bytecode of the forms in this track was compiled and checked with prototypes (kotlinc 1.7.22 to 2.3.21). Subqueries, `select`, update/insert/delete, procedures and the Spring module are designed only, in Kotlin and in Java.
-> No artifact is published yet. To try it, [build from source](02-getting-started.md#build-from-source).
+> The **analysis core**, **`where` with the result functions** (`toList()`, `toSet()`, `first()`, `one()`, `count()`, `exists()`) and the core of **sorting and paging** (`orderBy`, `limit`, `offset`, `SortSpec`) are implemented: lambdaQL loads a lambda, decodes it, writes the HQL and runs it. This is tested on H2, MariaDB and Oracle, but the tests use **Java** lambdas. Kotlin lambdas are not tested yet.
+> Kotlin support is **designed**: the Kotlin bytecode of the forms in this track was compiled and checked with prototypes (kotlinc 1.7.22 to 2.3.21). Subqueries, `select` and procedures are designed only, in Kotlin and in Java. **Update, insert, delete and upsert** (with `limit` and the one-row protection `executeOne()`) are implemented and tested with Java lambdas.
+> The **Spring Data JPA module** (`LambdaQlExecutor<T>`, Spring `Sort` and `Pageable`, the DML shortcuts such as `deleteAll { }` and `updateOne({ }) { }`, the update, delete, insert and upsert builders, the Spring Boot auto-configuration) is implemented and tested with Java repositories (Spring Boot 3.4.2). DML needs the caller's transaction. Kotlin repositories are not tested yet.
+> No artifact is published to Maven Central yet. To try it, [build from source](02-getting-started.md#build-from-source).
 
 [Manual home](../README.md) | [Java track](../java/README.md) | Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
 
@@ -62,17 +63,18 @@ fetch first ? rows only
 | # | Page | What you learn | Status |
 |---|---|---|---|
 | 1 | [Overview](../01-overview.md) (common) | What lambdaQL is, why, and how it works | – |
-| 2 | [Getting started](02-getting-started.md) | Requirements, Gradle setup, Kotlin entities, first query | Build from source works. `where` and `toList()`: implemented, tested on H2, MariaDB, Oracle (Java tests; Kotlin not tested yet) |
+| 2 | [Getting started](02-getting-started.md) | Requirements, Gradle setup, Kotlin entities, first query | Build from source works. `where`, `toList()` and the result functions `first()`, `one()`, `count()`, `exists()`, `toSet()`: implemented, tested on H2, MariaDB, Oracle (Java tests; Kotlin not tested yet) |
 | 3 | [Conditions (`where`)](03-where.md) | Operators, null rules, `?.` `?:` `!!`, ranges, `when`, captured values | Mapping getters to JPA attributes, HQL rendering and running queries (`where`, `toList()`): implemented, tested on H2, MariaDB, Oracle (Java tests). Kotlin-only forms: designed |
-| 4 | [Sorting and paging](04-order-paging.md) | `orderBy`, `Direction`, `limit`, `offset` | Core implemented, tested on H2, MariaDB, Oracle (Java tests; Kotlin not tested yet). Property references, `SortSpec`, `SortWhitelist`, join sorts: designed |
+| 4 | [Sorting and paging](04-order-paging.md) | `orderBy`, `Direction`, `limit`, `offset` | Core implemented, tested on H2, MariaDB, Oracle (Java tests; Kotlin not tested yet), including `SortSpec`. Property references, `SortWhitelist`, join sorts (also the join form of `SortSpec`): designed |
 | 5 | [Subqueries](05-subquery.md) | `exists()`, `x in sub...`, scalar and correlated subqueries | Designed |
 | 6 | [Select, aggregates and group by](06-select-group.md) | `select`, data classes, `Pair`, `groupBy`, `having`, `Agg`, derived tables, CTE | Designed |
-| 7 | [Update, insert, delete](07-dml.md) | Property assignment, `by[column] = value`, `all()`, `execute()` | Designed |
+| 7 | [Update, insert, delete](07-dml.md) | Property assignment, `by.set`, `values`, `all()`, `execute()`, `limit`, `executeOne()` | Implemented, tested on H2, MariaDB, Oracle (Java tests; Kotlin not tested yet), including `limit` and `executeOne()`. Subqueries (`sub`) in DML and aggregates in `insert ... select`: designed |
+| 7.6 | [Upsert](07-6-upsert.md) | `upsert`, `onConflict { ... }.update { ... }`, `onConflict { ... }.ignore()`, row counts per database | Implemented, tested on H2, MariaDB, Oracle (Java tests; Kotlin not tested yet) |
 | 8 | [Procedures and DB functions](08-procedures-functions.md) | `@SqlProcedure`, `@SqlFunction` in a `companion object`, `qb.call`, `qb.exec` | Designed |
 | 9 | [Kotlin notes](09-kotlin-notes.md) | What is special in Kotlin: `?.` `?:` `!!`, `==`, `in`, `when`, operators, limits KC1 to KC21 | Designed |
 | 10 | [Rules and limits](10-rules-and-limits.md) | All rule tables in one place | Designed |
 | 11 | [Errors and languages](../11-errors-and-languages.md) (common) | Error codes, exceptions, message language, logging | Designed |
-| 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`, repository methods with a body, modules, transactions, Kotlin 2.2 / `-Xjvm-default=all` | Designed |
+| 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`, repository methods with a body, DML shortcuts (`deleteAll`, `updateOne`, ...), Spring `Sort` and `Pageable`, modules, transactions, Kotlin 2.2 / `-Xjvm-default=all` | Implemented, tested on H2, MariaDB, Oracle with Spring Boot 3.4.2, including the DML shortcuts and the update, delete, insert and upsert builders (Java tests; Kotlin repositories not tested yet) |
 
 What the words mean:
 
@@ -120,6 +122,7 @@ Details: [9. Kotlin notes](09-kotlin-notes.md).
 | Java (JVM) | 21 |
 | Hibernate ORM | 6.6 (the design was verified with 6.6.5) |
 | Databases verified in the design | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
+| Spring Boot (optional) | 3.4 (tested with 3.4.2, Java tests). Spring Boot 4 is not verified yet |
 
 ## Other languages
 

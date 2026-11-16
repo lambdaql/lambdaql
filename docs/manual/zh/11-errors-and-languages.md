@@ -302,7 +302,7 @@ WARN  [LQL-5001] ...the condition on column "price" cannot use an index...
 计划提供一种把这些警告变为错误的"严格模式"。
 
 > [!NOTE]
-> 目前 `query` 模块仍然把一些 Spring Boot starter 作为普通依赖，因此它们（以及 Logback）会随 lambdaQL 一起进入你的项目。设计中会把它们改为 `compileOnly`。修改之后，lambdaQL 只会带入 `slf4j-api`。
+> `lambdaql-core` 不依赖 Spring。在日志方面它只带入 `slf4j-api`，因此日志后端由你选择。Spring 模块（`lambdaql-spring-data-jpa`、`lambdaql-spring-boot-starter`）会带入 Spring Data JPA，starter 还会带入 `spring-boot-starter-data-jpa` 以及 Logback。
 
 ## 总结
 

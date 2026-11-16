@@ -1,5 +1,6 @@
 package org.lambdaql.query;
 
+import jakarta.persistence.NonUniqueResultException;
 import org.lambdaql.engine.ir.Expr;
 import org.lambdaql.engine.ir.Pred;
 import org.lambdaql.engine.ir.SortItem;
@@ -12,6 +13,9 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.LinkedHashSet;
+import java.util.Optional;
+import java.util.SequencedSet;
 
 /**
  * A select query on one entity: {@code qb.from(Order.class).where(...).toList()}.
@@ -136,6 +140,80 @@ public class SelectQuery<T> {
     }
 
     /**
+     * Returns the first row, or empty if there is no row.
+     * Without {@code orderBy}, "first" means the row with the smallest id (S9), so the result is always the same.
+     * To choose the order, use {@code orderBy(...).first()}.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.ResultQueryTest" region="first"}
+     *
+     * @return the first row, or {@link Optional#empty()}
+     */
+    public Optional<T> first() {
+        return limit(1).first();
+    }
+
+    /**
+     * Returns the only row, or empty if there is no row.
+     * Use it when the condition can match at most one row, for example a unique key.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.ResultQueryTest" region="one"}
+     *
+     * @return the row, or {@link Optional#empty()}
+     * @throws NonUniqueResultException if two or more rows match
+     */
+    public Optional<T> one() {
+        List<T> rows = context.resultList(entityClass, toHql(), 0, 2);
+        if (rows.size() > 1) {
+            throw new NonUniqueResultException("one()의 조건에 맞는 행이 2개 이상입니다. 조건을 좁히거나 first()를 쓰세요: " + toHql().hql());
+        }
+        return rows.stream().findFirst();
+    }
+
+    /**
+     * Counts the rows that match. For a paged screen, count with this query, then add {@code orderBy} and paging.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.ResultQueryTest" region="count"}
+     *
+     * @return the number of rows
+     */
+    public long count() {
+        return context.resultList(Long.class, countHql(), 0, null).get(0);
+    }
+
+    /**
+     * Checks if at least one row matches. Only one row is read, and no entity is loaded.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.ResultQueryTest" region="exists"}
+     *
+     * @return {@code true} if a row matches
+     */
+    public boolean exists() {
+        return !context.resultList(Integer.class, existsHql(), 0, 1).isEmpty();
+    }
+
+    /**
+     * Builds the HQL used by {@link #count()}.
+     *
+     * @return {@code select count(e0) from ...}
+     */
+    RenderedQuery countHql() {
+        return new HqlRenderer(context.model(), entityClass.getClassLoader()).count(entityClass, wheres);
+    }
+
+    /**
+     * Builds the HQL used by {@link #exists()}.
+     *
+     * @return {@code select 1 from ...}
+     */
+    RenderedQuery existsHql() {
+        return new HqlRenderer(context.model(), entityClass.getClassLoader()).exists(entityClass, wheres);
+    }
+
+    /**
      * Sorts with the builder: {@code (o, by) -> by.desc(o.getPrice()).asc(o.getId())}.
      * The lambda must be one straight chain of {@code by} calls (S4).
      * Association paths used only here become {@code LEFT JOIN}s, so rows without the association stay (S8).
@@ -151,7 +229,27 @@ public class SelectQuery<T> {
     public OrderedSelectQuery<T> orderBy(SortBy<T> spec) {
         LambdaRef ref = QueryContext.read(spec);
         List<SortItem> items = context.analyzeSortBy(ref, List.of(entityClass));
-        return new OrderedSelectQuery<>(entityClass, context, wheres, new HqlRenderer.SortBound(items, ref.capturedArgs()));
+        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of(new HqlRenderer.SortBound(items, ref.capturedArgs())));
+    }
+
+    /**
+     * Sorts with a reusable {@link SortSpec}.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-spec"}
+     *
+     * @param spec the spec
+     * @return the sorted query
+     * @throws IllegalArgumentException                      if the spec is for another entity class,
+     *                                                       or a path part ({@link SortSpec#ofPath}) is not a property
+     * @throws org.lambdaql.analyzer.LambdaAnalysisException if a lambda of the spec cannot become SQL
+     */
+    public OrderedSelectQuery<T> orderBy(SortSpec<T> spec) {
+        Objects.requireNonNull(spec, "spec");
+        if (!spec.type().isAssignableFrom(entityClass)) {
+            throw new IllegalArgumentException("SortSpec is for " + spec.type().getName() + ", not " + entityClass.getName());
+        }
+        return new OrderedSelectQuery<>(entityClass, context, wheres, spec.bind(context, entityClass));
     }
 
     /**
@@ -186,7 +284,7 @@ public class SelectQuery<T> {
         LambdaRef ref = QueryContext.read(key);
         Expr k = context.analyzeSortKey(ref, entityClass);
         SortItem item = new SortItem(k, SortItem.Kind.SORT, new Expr.Const(direction, Type.getType(Direction.class)));
-        return new OrderedSelectQuery<>(entityClass, context, wheres, new HqlRenderer.SortBound(List.of(item), ref.capturedArgs()));
+        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of(new HqlRenderer.SortBound(List.of(item), ref.capturedArgs())));
     }
 
     /**
@@ -201,7 +299,7 @@ public class SelectQuery<T> {
      * @throws IllegalArgumentException if {@code count} is negative
      */
     public OrderedSelectQuery<T> limit(int count) {
-        return new OrderedSelectQuery<>(entityClass, context, wheres, null).limit(count);
+        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of()).limit(count);
     }
 
     /**
@@ -216,7 +314,7 @@ public class SelectQuery<T> {
      * @throws IllegalArgumentException if {@code count} is negative
      */
     public OrderedSelectQuery<T> offset(int count) {
-        return new OrderedSelectQuery<>(entityClass, context, wheres, null).offset(count);
+        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of()).offset(count);
     }
 
     /**
@@ -242,5 +340,22 @@ public class SelectQuery<T> {
     @Deprecated
     public <U> SelectJoinQuery<T, U> leftJoin(Class<U> entityClass, JoinOn<T, U> onCondition) {
         return new SelectJoinQuery<>();
+    }
+
+    /**
+     * Runs the query and returns the rows as a set that keeps the row order ({@link LinkedHashSet}).
+     * Entity rows never repeat (lambdaQL joins only to-one associations), so the set has the same rows as
+     * {@link #toList()}.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.ResultQueryTest" region="to-set"}
+     *
+     * @return the rows in order
+     * @throws IllegalStateException if the set is smaller than the number of rows: then the entity's
+     *                               {@code equals}/{@code hashCode} treat different rows as equal, or its {@code @Id} is
+     *                               not unique (for example a view), and rows would be lost without a sign
+     */
+    public SequencedSet<T> toSet() {
+        return DmlParts.toSet(toList());
     }
 }

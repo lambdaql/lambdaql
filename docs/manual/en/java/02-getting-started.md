@@ -3,9 +3,12 @@
 > [!NOTE]
 > **Status:** You can build lambdaQL from source and run its tests today.
 > `where` conditions and `toList()` work end to end. They are tested on H2, MariaDB and Oracle.
-> The core of sorting and paging (`orderBy`, `limit`, `offset`) works too.
-> Subqueries, `select`, update/insert/delete, procedures and the Spring module are **designed, not implemented yet**.
-> No artifact is published yet. The artifact name below is temporary.
+> The result functions `first()`, `one()`, `count()`, `exists()` and `toSet()` work too (see [Getting the result](#getting-the-result)).
+> The core of sorting and paging (`orderBy`, `limit`, `offset`, `SortSpec`) works too.
+> The Spring Data JPA module (repository executor and Spring Boot auto-configuration) works too (see [12. Spring Data JPA](12-spring-data-jpa.md)).
+> Update, insert, delete and upsert work too (see [7. Update, insert, delete](07-dml.md)).
+> Subqueries, `select` and procedures are **designed, not implemented yet**.
+> No artifact is published to Maven Central yet. Build from source as shown below.
 
 [Java track](README.md) | [Manual home](../README.md) | Previous: [1. Overview](../01-overview.md) | Next: [3. Conditions](03-where.md) | [Kotlin version of this page](../kotlin/02-getting-started.md)
 
@@ -29,12 +32,13 @@ Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../
 ```bash
 git clone https://github.com/codebit0/lambdaql.git
 cd lambdaql
-./gradlew :query:build
+./gradlew build
 ```
 
 - The Gradle wrapper (8.10) runs only on **JDK 23 or lower**. Use JDK 21.
 - The repository has `gradle/gradle-daemon-jvm.properties`, so the Gradle daemon uses Java 21.
 - In IntelliJ IDEA, set **Settings > Build Tools > Gradle > Gradle JVM** to a Java 21 JDK.
+- The build has three modules: `query` (artifact `lambdaql-core`), `spring-data-jpa` (`lambdaql-spring-data-jpa`) and `spring-boot-starter` (`lambdaql-spring-boot-starter`). The Spring modules are explained in [12. Spring Data JPA](12-spring-data-jpa.md).
 
 Run the unit tests:
 
@@ -56,13 +60,13 @@ For example, `ConditionDecodeTest` checks that `o -> o.getStatus() == 1 || o.get
 
 ### Use the local build in your project
 
-Publish the jar to your local Maven repository:
+Publish the jars of the three modules to your local Maven repository:
 
 ```bash
-./gradlew :query:publishToMavenLocal
+./gradlew publishToMavenLocal
 ```
 
-Then add it to your project.
+Then add `lambdaql-core` to your project.
 
 Gradle (Groovy DSL):
 
@@ -73,7 +77,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.lambdaql:lambadaql-query:1.0.0'
+    implementation 'org.lambdaql:lambdaql-core:1.0.0'
 }
 ```
 
@@ -82,15 +86,16 @@ Maven:
 ```xml
 <dependency>
   <groupId>org.lambdaql</groupId>
-  <artifactId>lambadaql-query</artifactId>
+  <artifactId>lambdaql-core</artifactId>
   <version>1.0.0</version>
 </dependency>
 ```
 
+With Spring Data JPA or Spring Boot, use `lambdaql-spring-boot-starter` or `lambdaql-spring-data-jpa` instead. They bring `lambdaql-core` (see [12.2](12-spring-data-jpa.md#122-modules)).
+
 > [!WARNING]
-> These coordinates are **temporary**.
-> The name `lambadaql` has a typo that will be fixed before the first release.
-> The group, name and version can change. Check this page again when lambdaQL is published.
+> The artifacts are **not published to Maven Central yet**.
+> The version `1.0.0` comes from `gradle.properties` of the repository. It can change before the first release. Check this page again when lambdaQL is published.
 
 ### Recommended compiler option: `-parameters`
 
@@ -166,7 +171,7 @@ Rules for entities:
 
 ## Create a QueryBuilder
 
-`QueryBuilder` is the entry point. It needs a JPA `EntityManagerFactory`.
+`QueryBuilder` is the entry point. It needs a JPA `EntityManagerFactory` or an `EntityManager`.
 
 ```java
 QueryBuilder qb = new QueryBuilder(entityManagerFactory);
@@ -183,7 +188,8 @@ QueryBuilder qb = new QueryBuilder(emf);
 
 ### With Spring Boot
 
-Spring Boot already creates an `EntityManagerFactory`. Inject it and make a `QueryBuilder` bean.
+With `lambdaql-spring-boot-starter`, Spring Boot makes the `QueryBuilder` bean for you (see [12.8](12-spring-data-jpa.md#128-the-querybuilder-bean)).
+Without it, make the bean yourself. Use Spring's shared `EntityManager`, as the auto-configuration does.
 
 ```java
 @Configuration
@@ -191,7 +197,7 @@ public class LambdaQlConfig {
 
     @Bean
     public QueryBuilder queryBuilder(EntityManagerFactory entityManagerFactory) {
-        return new QueryBuilder(entityManagerFactory);
+        return new QueryBuilder(SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory));
     }
 }
 ```
@@ -217,8 +223,8 @@ public class OrderService {
 }
 ```
 
-- Until the module `lambdaql-spring-data-jpa` is released, you create the bean yourself. That module will create it for you.
-- Inside a Spring transaction, lambdaQL uses the transaction's shared `EntityManager`.
+- The shared `EntityManager` is bound to the current transaction. Inside `@Transactional`, lambdaQL runs in the same transaction.
+- Do not use the `EntityManagerFactory` constructor in a Spring application. That builder opens its own `EntityManager` for each query, outside the Spring transaction.
 - To write lambdaQL queries inside Spring Data repositories, see [12. Spring Data JPA](12-spring-data-jpa.md).
 
 ## Your first query
@@ -244,7 +250,7 @@ where o1_0.status=1 and o1_0.price>100.0
 - `qb.from(Order.class)` starts a query on `Order`.
 - `where(...)` takes one condition lambda.
 - `toList()` runs the query and returns a `List<Order>`.
-- `toList()` is the only result method that is decided now. Other result methods are planned.
+- `toList()` returns all rows. The other result functions (`first()`, `one()`, `count()`, `exists()`, `toSet()`) are in [Getting the result](#getting-the-result).
 
 Why are `1` and `100.0` written into the HQL, not bind parameters?
 They are **constants written in the lambda**. lambdaQL writes constants (numbers, strings, booleans, `null`, enum constants) into the HQL as literals.
@@ -338,6 +344,217 @@ where c1_0.name=?
 To find orders without a customer, compare the association: `o.getCustomer() == null` gives `e0.customer is null` (no join).
 If a null guard keeps orders without a customer (`o.getCustomer() == null || ...`), lambdaQL uses a `left join`.
 See [3.10](03-where.md#310-association-paths).
+
+## Getting the result
+
+`toList()` is not the only way to run a query. lambdaQL has six result functions (decisions D38 and D42):
+
+| Function | Returns | Where you can call it | What it does |
+|---|---|---|---|
+| `toList()` | `List<T>` | after `where`, and after `orderBy` / `limit` / `offset` | Returns all rows (or one page). |
+| `first()` | `Optional<T>` | after `where`, and after `orderBy` / `limit` / `offset` | Returns the first row. Reads only one row. |
+| `one()` | `Optional<T>` | after `where` only | Returns the only row. Throws `NonUniqueResultException` if 2 or more rows match. Reads at most 2 rows. |
+| `count()` | `long` | after `where` only | Returns the number of matching rows. |
+| `exists()` | `boolean` | after `where` only | Returns `true` if a row matches. Reads one row and loads no entity. |
+| `toSet()` | `SequencedSet<T>` | after `where`, and after `orderBy` / `limit` / `offset` | Returns all rows (or one page) as a set that keeps the row order. Throws `IllegalStateException` if the set is smaller than the number of rows. |
+
+"After `where`" means the query you get from `qb.from(...)` and `where(...)` (the type `SelectQuery`). In this manual it is called the **where stage**. You can also call the functions right after `qb.from(...)`, with no `where`.
+
+After `orderBy`, `limit` or `offset`, the query has the type `OrderedSelectQuery`. Its only result functions are `toList()`, `toSet()` and `first()`. `one()`, `count()` and `exists()` do not compile there.
+This is on purpose (decision D38): `limit(10).count()` could mean "all rows" or "at most 10 rows", so lambdaQL does not allow it.
+
+The examples below are copied from [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java). The test runs them on H2, MariaDB and Oracle and compares the result with the same answer computed in Java.
+It uses the test entity from [3.3](03-where.md#33-basic-form): `price` is `double`, so its sort has no `nulls` part, and `Order` has an enum `kind`.
+
+### `first()`
+
+Without `orderBy`, "first" means the row with the smallest id (rule S9). So you always get the same row.
+To choose the order, call `orderBy(...)` first. Then `first()` returns the first row in that order. An `offset` is kept: `orderBy(...).offset(1).first()` returns the second row.
+If no row matches, the result is `Optional.empty()`.
+
+**(tested)** [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java), region `first`:
+
+```java
+Optional<Order> cheapest = qb.from(Order.class)
+        .orderBy((o, by) -> by.asc(o.getPrice()))
+        .first();
+// without orderBy, "first" is the row with the smallest id
+Optional<Order> firstActive = qb.from(Order.class).where(o -> o.isActive()).first();
+Optional<Order> none = qb.from(Order.class).where(o -> o.getStatus() == 9).first();
+```
+
+**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `first` (`cheapest`):
+
+```sql
+-- H2, Oracle
+select …
+from orders o1_0
+order by o1_0.price,o1_0.id
+fetch first ? rows only
+
+-- MariaDB
+select …
+from orders o1_0
+order by o1_0.price,o1_0.id
+limit ?
+```
+
+**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `first#2` (`firstActive`):
+
+```sql
+-- H2
+select …
+from orders o1_0
+where o1_0.active=true
+order by o1_0.id
+fetch first ? rows only
+
+-- MariaDB
+select …
+from orders o1_0
+where o1_0.active=1
+order by o1_0.id
+limit ?
+
+-- Oracle
+select …
+from orders o1_0
+where o1_0.active=1
+order by o1_0.id
+fetch first ? rows only
+```
+
+`first()` reads one row, so it is a paged query. lambdaQL adds `id` as the last sort key (see [4.8](04-order-paging.md#tie-breaker-automatic-id)), and Hibernate writes the paging for each database: `fetch first ? rows only` on H2 and Oracle, `limit ?` on MariaDB. The `?` is 1.
+
+### `one()`
+
+Use `one()` when the condition can match at most one row, for example a unique key.
+No row gives `Optional.empty()`. Two or more rows throw `jakarta.persistence.NonUniqueResultException`. If any matching row is fine, use `first()`.
+
+**(tested)** [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java), region `one`:
+
+```java
+long id = knownId;
+Optional<Order> order = qb.from(Order.class).where(o -> o.getId() == id).one();
+Optional<Order> missing = qb.from(Order.class).where(o -> o.getId() == -1L).one();
+// two or more rows: an exception (use first() if any row is fine)
+assertThrows(NonUniqueResultException.class, () -> qb.from(Order.class).where(o -> o.isActive()).one());
+```
+
+**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `one`:
+
+```sql
+-- H2, Oracle
+select …
+from orders o1_0
+where o1_0.id=?
+fetch first ? rows only
+
+-- MariaDB
+select …
+from orders o1_0
+where o1_0.id=?
+limit ?
+```
+
+`one()` asks the database for at most 2 rows. That is enough to see a second row. So the SQL has `fetch first ? rows only` (H2, Oracle) or `limit ?` (MariaDB), and the `?` is 2. There is no `order by`, because the order does not matter here.
+
+### `count()` and a paged screen
+
+`count()` returns the number of matching rows. It is only on the where stage, so `limit` and `offset` can never change it.
+
+For a paged screen, keep the where-stage query in a variable. Call `count()` on it for the total. Then call `orderBy(...).limit(...).toList()` on the same variable for the page.
+
+**(tested)** [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java), region `count`:
+
+```java
+SelectQuery<Order> active = qb.from(Order.class).where(o -> o.isActive());
+long total = active.count();                                   // every matching row
+List<Order> page = active.orderBy((o, by) -> by.desc(o.getPrice())).limit(2).toList();
+```
+
+**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `count`:
+
+```sql
+-- H2
+select count(o1_0.id)
+from orders o1_0
+where o1_0.active=true
+
+-- MariaDB, Oracle
+select count(o1_0.id)
+from orders o1_0
+where o1_0.active=1
+```
+
+The HQL is `select count(e0) from Order e0 where e0.active = true`. Hibernate turns `count(e0)` into `select count(o1_0.id)`: it counts the id column. The count query has no paging.
+
+### `exists()`
+
+`exists()` returns `true` if at least one row matches. It runs `select 1` and reads at most one row. No entity is loaded.
+
+**(tested)** [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java), region `exists`:
+
+```java
+boolean anyRush = qb.from(Order.class).where(o -> o.getKind() == Order.Kind.RUSH).exists();
+boolean anyStatus9 = qb.from(Order.class).where(o -> o.getStatus() == 9).exists();
+```
+
+**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `exists` (`anyRush`):
+
+```sql
+-- H2, Oracle
+select 1
+from orders o1_0
+where o1_0.kind='RUSH'
+fetch first ? rows only
+
+-- MariaDB
+select 1
+from orders o1_0
+where o1_0.kind='RUSH'
+limit ?
+```
+
+The HQL is `select 1 from Order e0 where e0.kind = org.lambdaql.query.Order$Kind.RUSH`. The SQL selects only the constant `1`, so no column is read, and the paging (`?` is 1) stops after the first row.
+
+### `toSet()`
+
+`toSet()` runs the query like `toList()`, but returns a `SequencedSet<T>` (decision D42).
+It is a `LinkedHashSet`, so the elements keep the row order. With `orderBy`, this is the sort order.
+
+**(tested)** [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java), region `to-set`:
+
+```java
+java.util.SequencedSet<Order> byPrice = qb.from(Order.class)
+        .orderBy((o, by) -> by.desc(o.getPrice()))
+        .toSet();
+```
+
+The SQL is the same as for `toList()`. lambdaQL does **not** add `distinct`:
+
+- Each entity row has a primary key. So even a query on one table never returns the same row twice.
+- lambdaQL joins only to-one associations. A collection becomes an `exists` subquery. So a join never repeats a row.
+- So `distinct` would not change the result. It would only add cost. (This is not about a database limit: Oracle 23.26 accepts `distinct` on LOB columns too. This was measured.)
+
+`distinct` for value results (`select`) comes with milestone M9.
+
+**Size check.** If the set is smaller than the number of rows, `toSet()` throws `IllegalStateException`. This happens when:
+
+- the entity's `equals` / `hashCode` treats two different rows as equal, or
+- its `@Id` is not unique (for example, an entity mapped to a view).
+
+Without the check, rows would be lost without any sign. In these cases, use `toList()`.
+
+In the next test, `Tag.equals` compares only the name, and the table has two rows with the same name.
+
+**(tested)** [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java), region `to-set-check`:
+
+```java
+// Tag.equals compares only the name: two different rows would become one element, so toSet() refuses
+assertThrows(IllegalStateException.class, () -> qb.from(Tag.class).toSet());
+assertEquals(2, qb.from(Tag.class).toList().size());
+```
 
 ## Things to know
 

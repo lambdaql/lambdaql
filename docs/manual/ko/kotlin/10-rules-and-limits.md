@@ -6,8 +6,8 @@
 > 이 장은 Kotlin용 lambdaQL 설계의 규칙을 모은 것입니다. 람다가 SQL이 되는 방법, NULL이 동작하는 방법,
 > Kotlin과 SQL이 다른 점, 데이터베이스마다 다른 점, 지원하지 않는 것을 다룹니다.
 > 규칙은 H2 2.3, MariaDB 10.11, Oracle 23ai(Hibernate 6.6.5)에서 프로토타입으로 확인했고, Kotlin 바이트코드는 kotlinc 1.7.22 ~ 2.3.21로 확인했습니다.
-> 현재는 분석 코어, `where` + `toList()`, 정렬과 페이징의 핵심 기능이 동작합니다(H2, MariaDB, Oracle에서 Java 람다로 테스트함).
-> 아래의 서브쿼리, `select`, update/insert/delete, 프로시저 규칙은 **아직 구현되지 않았습니다**. 정렬 규칙 중에도 아직 구현되지 않은 것이 있습니다([4.12](04-order-paging.md#412-rules-summary-s1-to-s14) 참고).
+> 현재는 분석 코어, `where`, 결과 함수(`toList()`, `toSet()`, `first()`, `one()`, `count()`, `exists()`), 정렬과 페이징의 핵심 기능, `SortSpec`, update/insert/delete/upsert([7](07-dml.md)), Spring Data JPA 모듈([12](12-spring-data-jpa.md))이 동작합니다(H2, MariaDB, Oracle에서 Java 람다로 테스트함).
+> 아래의 서브쿼리, `select`, 프로시저 규칙과 DML 안의 서브쿼리·집계는 **아직 구현되지 않았습니다**. 정렬 규칙 중에도 아직 구현되지 않은 것이 있습니다([4.12](04-order-paging.md#412-rules-summary-s1-to-s14) 참고).
 > 전체 상태는 [트랙 README](README.md)를 참고하십시오.
 
 [Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [9. Kotlin 노트](09-kotlin-notes.md) | 다음: [11. 오류와 언어](../11-errors-and-languages.md) | [이 페이지의 Java 버전](../java/10-rules-and-limits.md)
@@ -156,6 +156,7 @@ lambdaQL은 **WARN**을 기록합니다(엄격 모드: 오류). 예외: Oracle�
 | `it.status != q`(둘 다 nullable) | `is distinct from`, 또는 `(a <> b or a is null)` | `q`가 null이 아니면 NULL 행이 반환됨(Kotlin의 의미) |
 | `it.description.equals(text)`(`String?`) | `==`와 같음 | null-safe |
 | `x == null`, `x != null` | `is null`, `is not null` | 2값 |
+| `it.id == id`(`it.id`는 `Long?`, `id`는 캡처한 `Long`), `it.id == null`: NULL이 될 수 없는 컬럼(id, 기본형, `nullable = false`, 경로에 연관 단계 없음) | `not (e0.id is null or e0.id <> :p1)` 대신 `e0.id = :p1`. `it.id == null`은 `1=0`(Java로 테스트함) | 컬럼에 NULL이 없음. 연관을 거치는 경로(`it.customer?.id`)는 검사 유지 |
 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL 3값 논리 |
 | `it.flag == true` / `it.flag != true` | `is not distinct from true` / `is distinct from true` | Kotlin과 같음. 세 DB 모두에서 동작 |
 | `it.flag ?: false`(조건) | `(e0.flag is not null and e0.flag = true)` | NULL은 false로 취급 |
@@ -260,6 +261,7 @@ Java 전용 규칙 R4(엔티티 값에 대한 `equals`)와 R5(Java null-safe 헬
 | nullable `when` / 범위 대상 | `else`로 감. `!in`은 true | 반환 안 됨. `NOT` 아래에서도 마찬가지 | SQL 의미(D22) |
 | non-null 타입 `String` | 절대 null이 아님 | 컬럼은 NULL일 수 있음 | lambdaQL은 JPA 메타데이터를 사용 |
 | 람다 안의 `LocalDateTime.now()` | 애플리케이션 시간 | – | **애플리케이션 시간**으로 바인딩. DB 시간(`current_timestamp`)은 지원하지 않음 |
+| `Set`의 같은 요소 | `equals` / `hashCode`가 결정(`data class`는 주 생성자의 속성) | 기본 키로 행을 구분 | Set의 크기가 행 수보다 작으면 `toSet()`과 `findSet()`이 `IllegalStateException`을 던짐(엔티티의 `equals` / `hashCode`가 서로 다른 행을 같다고 판단하거나 `@Id`가 유일하지 않은 경우, 예: 뷰). `toList()` 사용(D42, Java로 테스트함) |
 
 <a id="106-database-differences"></a>
 ## 10.6 데이터베이스별 차이
@@ -313,11 +315,12 @@ lambdaQL은 NULL이 될 수 있는 모든 키에 대해 HQL에 `nulls first` / `
 | 항목 | 일어나는 일 | lambdaQL |
 |---|---|---|
 | `SET a = ..., b = a + 1`(설정한 뒤에 그 컬럼을 읽음) | MariaDB는 **새** 값을, H2와 Oracle은 이전 값을 읽음 | 분석할 때 오류(U3) |
-| DML 안의 연관 경로(`it.customer?.name`) | Hibernate가 DB마다 다른 조인을 만들고 고객이 없는 **행을 놓침** | lambdaQL은 상관 `exists`(`where`)나 상관 스칼라 서브쿼리(SET)를 써서 DML이 쿼리와 같은 행에 적용되게 함(U9) |
-| 같은 테이블에 대한 서브쿼리가 있는 `DELETE` | MariaDB 오류 1093 | 파생 테이블로 감쌈(U17) |
+| DML 안의 연관 경로(`it.customer?.name`) | Hibernate가 DB마다 다른 조인을 만들고 고객이 없는 **행을 놓침** | lambdaQL은 상관 스칼라 서브쿼리를 씀(`where`와 SET). `where`에서 조회라면 inner join할 경로에는 `customer.id is not null`도 더함. 그래서 DML이 쿼리와 같은 행에 적용됨(U9, 테스트함) |
+| 같은 테이블에 대한 서브쿼리가 있는 `DELETE` | MariaDB 오류 1093 | 파생 테이블로 감쌈(U17. 서브쿼리와 함께 구현 예정, 마일스톤 M8) |
 | 같은 enum 값을 STRING 컬럼과 ORDINAL 컬럼에 한 번만 바인딩 | H2와 MariaDB가 **오류 없이 잘못된 값**을 저장 | 위치마다 파라미터 하나. 절대 공유하지 않음(U7) |
-| `values(list) { }`의 많은 행 | Oracle: 바인드 65,535개의 절대 제한(ORA-01745), 그 훨씬 전부터 매우 느림 | 트랜잭션 안에서 바인드 수(기본 1,000개)로 나눔(U13) |
-| `on conflict` / upsert | DB마다 다름 | v0.1에는 없음 |
+| `values(list) { }`의 많은 행 | Oracle: 바인드 65,535개의 절대 제한(ORA-01745), 그 훨씬 전부터 매우 느림 | 문장당 값 500개 이하로 나누고, 모든 문장을 한 트랜잭션에서 실행(U13) |
+| `order by ... limit`이 있는 `update` / `delete` | MariaDB는 `in` 서브쿼리의 `limit`(오류 1235)과 대상 테이블을 읽는 서브쿼리(오류 1093)를 거부 | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: 파생 테이블 `t`로 세 데이터베이스 모두에서 동작. 안쪽 select가 조회의 조인(D36)을 사용하므로 조회와 같은 행을 대상으로 함(Java로 테스트함) |
+| `on conflict` / upsert | H2와 Oracle은 `merge`. MariaDB는 `insert ... on duplicate key update`이고, 수정된 행을 2로 셈. Hibernate의 `do nothing`은 H2와 Oracle에서 실패 | `upsert`와 `onConflict(...).update(...)`는 Hibernate의 형태를 사용. `ignore()`는 `insert ... select ... where not exists`로 씀. 행 수는 그대로 반환(D40, 테스트함) |
 
 <a id="procedures-and-functions"></a>
 ### 프로시저와 함수
@@ -397,8 +400,9 @@ lambdaQL은 이 목록의 모든 형태에 대해 명확한 오류를 던집니�
 | 정렬 키로 쓴 엔티티(`by.desc(o.customer)`) | 컬럼: `by.desc(o.customer?.name)`(컴파일되지 않음) |
 | 조인 정렬 람다 안의 속성 참조 | 람다 |
 | `orderBy`의 속성 참조(`orderBy(Order::price)`, 아직 구현되지 않음) | 람다: `orderBy { it.price }` |
-| `SortSpec`, `SortWhitelist`(아직 구현되지 않음) | `val dir = Direction.parse(text)`와 `by.sort(key, dir)` |
+| `SortWhitelist`(아직 구현되지 않음) | `val dir = Direction.parse(text)`와 `by.sort(key, dir)` |
 | `limit` / `offset`과 함께 쓴 컬렉션 fetch join | 먼저 페이징하고, 그다음 컬렉션을 로드 |
+| Spring `Sort`의 `ignoreCase()`([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)), 아직 지원하지 않음 | `ignoreCase()` 없는 정렬 |
 | 함수 키(`lower(name)`) | 계획 중 |
 | 집계 별칭으로 정렬(`by.desc(s.total)`) | 계획 중 |
 | 정렬 키로 쓴 boolean 엘비스(KC21) | 키 `o.flag`에 NULL 위치를 지정: `by.asc(o.flag, false)`(NULL이 마지막) |
@@ -432,15 +436,22 @@ lambdaQL은 이 목록의 모든 형태에 대해 명확한 오류를 던집니�
 | 조건부 값(`if (c) a else b`, `when`, 값으로 쓴 토글 `!it.active`) | 계획 중(`CASE WHEN`). `where`가 다른 update 두 개를 사용 |
 | 설정할 컬럼을 고르기 위한 `set` 람다 안의 `if` | `set()`을 여러 번 호출 |
 | `set` 안의 `++`, `--`, `apply`, `with`, `also` | `it.cnt += 1`, 직접 대입 |
-| `by[o.cnt] += 1` | `by[o.cnt] = o.cnt + 1`(`+=` 형태는 컴파일되지 않음) |
+| `by[o.cnt] += 1` | `by[o.cnt] = o.cnt + 1` 또는 `by.set(o.cnt, o.cnt + 1)` |
 | 대입 람다 안의 지역 `val` | 각 위치에 식을 작성 |
 | 연관의 `@Id`가 아닌 속성을 설정(`it.customer?.name = x`) | `Customer`를 직접 수정 |
 | 선택적이지 않은 컬럼(`@Id`, `nullable = false`, 기본형)에 `null` | – |
 | `@Version` 속성을 직접 쓰기 | lambdaQL이 대신 `update versioned`를 사용 |
 | 값 안의 문자열 템플릿 | 계획 중 |
 | 명시적 조인이 있는 `insert ... select` | 계획 중. v0.1에서는 다대일 경로를 사용 |
-| Upsert(`on conflict`) | 계획 중 |
-| `order by ... limit`이 있는 DML | 먼저 id를 조회한 다음 `delete ... where { it.id in ids }` |
+| 동시 삽입에서 원자적인 `onConflict { ... }.ignore()` | 키 중복 오류를 처리(`ignore()`는 `not exists`를 사용. [7.6](07-6-upsert.md) 참고) |
+| `insert ... select`로 하는 업서트 | `values(list) { ... }`로 행마다 업서트 |
+| `limit(n)` 없이 update나 delete에 `orderBy { ... }` 지정 | `limit(n)`을 추가하거나 `orderBy`를 제거(그 외에는 `IllegalStateException`) |
+| 한 행만 변경해야 하는 update나 delete를 `execute() == 1`과 롤백으로 검사 | `executeOne()`: id를 먼저 최대 2개 읽음. 2개이면 아무것도 변경하지 않고 `NonUniqueResultException`. 1개이면 `id = :p and (조건)`으로 그 행을 변경. 2행 이상을 변경하지 않음(D41, Java로 테스트함) |
+| `executeOne()`과 `orderBy` 또는 `limit`을 함께 사용 | 둘 중 하나만 사용(그 외에는 `IllegalStateException`) |
+| update나 delete의 `offset` | 계획 없음(D42). DML에는 `limit(n)`만 있음. `where { }`, `orderBy { }`, `limit(n)`으로 대상 행을 지정 |
+| 복합 키 엔티티의 `limit` 또는 `executeOne()` | 아직 지원하지 않음. 먼저 id를 조회한 뒤 `delete ... where { it.id in ids }` |
+| Spring 공유 `EntityManager`로 트랜잭션 없이 DML 실행(lambdaQL에는 `@Transactional`이 없음, D41) | `@Transactional` 또는 `TransactionTemplate` 안에서 호출 |
+| 리포지토리 메서드 `deleteAll { ... }`(벌크 삭제)에서 cascade나 `@PreRemove` 기대 | Spring Data의 `deleteAll(Iterable)` 또는 `delete(entity)` 사용([12.4](12-spring-data-jpa.md#deleteallwhere-is-not-spring-datas-deleteall) 참고) |
 | `returning` | DML 후에 다시 조회 |
 | DB 시간(`current_timestamp`) | 애플리케이션 시간을 전달(`LocalDateTime.now()`는 값으로 바인딩됨) |
 | `TABLE` id 생성기를 사용하는 `insert ... select` | `values { }` 또는 IDENTITY / SEQUENCE 사용 |
@@ -449,6 +460,7 @@ lambdaQL은 이 목록의 모든 형태에 대해 명확한 오류를 던집니�
 DML에 대해 하나 더 알아 둘 점: 벌크 DML은 영속성 컨텍스트를 거치지 않습니다. Hibernate가 먼저 flush하지만,
 같은 세션의 관리 엔티티는 그 뒤에도 이전 값을 유지합니다. `clear()`(또는 `refresh`)를 호출하십시오.
 JPA cascade와 `orphanRemoval`은 적용되지 않습니다.
+DML 문장에는 트랜잭션이 필요합니다. `QueryBuilder(EntityManagerFactory)`는 자체 트랜잭션을 엽니다. `EntityManager`를 쓰는 빌더(Spring의 공유 `EntityManager` 포함)는 호출자의 트랜잭션을 사용하며, 트랜잭션이 없으면 SQL을 보내기 전에 실패합니다.
 
 <a id="procedures"></a>
 ### 프로시저
@@ -515,6 +527,7 @@ val list = if (flag) {
 | Java (JVM) | 21 |
 | Hibernate | 6.6 (설계는 6.6.5로 확인). HQL 확장(예: `is distinct from`)을 사용하므로 다른 JPA 구현체는 보장하지 않음 |
 | 데이터베이스 | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
+| Spring | Spring Boot 3.4.2, Spring Data JPA 3.4.2(Spring 모듈, [12](12-spring-data-jpa.md); Java 리포지토리만). Spring Boot 4는 아직 검증하지 않음 |
 | Kotlin 행 단위 확인 | 지금까지는 H2만. Kotlin 사례의 MariaDB와 Oracle 실행은 계획 중 |
 | 테스트하지 않음 | 2.3보다 새로운 Kotlin, Kotlin Multiplatform, PostgreSQL, SQL Server, Oracle 19c 이하(예: PL/SQL `BOOLEAN` 파라미터) |
 

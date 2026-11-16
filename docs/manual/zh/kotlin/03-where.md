@@ -3,7 +3,7 @@
 > [!NOTE]
 > **状态**
 > - **已实现，并在 H2、MariaDB 和 Oracle 上测试：** `where` 条件和 `toList()`（映射到列、HQL 输出、执行查询）。这些测试使用的是 **Java** Lambda。**Kotlin Lambda 尚未测试。**
-> - **已设计，尚未实现：** 本章中 Kotlin 特有的写法（`?.`、`?:`、`!!`、区间、`when`、`in`）。它们的字节码已经编译，并用原型检查过（kotlinc 1.7.22 到 2.3.21），许多条件已在 H2 上逐行检查。子查询、`select`、update/insert/delete、存储过程和 Spring 模块也都只是设计。排序与分页的核心部分已经实现（[4. 排序与分页](04-order-paging.md)）。
+> - **已设计，尚未实现：** 本章中 Kotlin 特有的写法（`?.`、`?:`、`!!`、区间、`when`、`in`）。它们的字节码已经编译，并用原型检查过（kotlinc 1.7.22 到 2.3.21），许多条件已在 H2 上逐行检查。子查询、`select` 和存储过程也都只是设计。排序与分页的核心部分（[4. 排序与分页](04-order-paging.md)）、update/insert/delete/upsert（[7. 更新、插入、删除](07-dml.md)）和 Spring Data JPA 模块（[12. Spring Data JPA](12-spring-data-jpa.md)）已经实现。
 > - 本章中的 HQL 是**计划**的输出。一些小细节（例如 `e0`、`j1` 这样的别名）仍可能变化。
 
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[2. 入门](02-getting-started.md) | 下一章：[4. 排序与分页](04-order-paging.md) | [本页的 Java 版本](../java/03-where.md)
@@ -191,6 +191,7 @@ Kotlin 编译器会在字节码中添加**隐藏的** null 检查（例如 `stat
 | R17 | `===`、`!==` | 与 `==`、`!=` 相同 | 值比较，而不是对象同一性 |
 | R9 | 捕获的值 | 绑定参数 | 见 [3.6.4](#364-captured-null-values) |
 
+<a id="362--compares-values"></a>
 ### 3.6.2 `==` 比较的是值
 
 Kotlin 的 `==` 本来就比较值。在 lambdaQL 中，`===` 也比较**值**（规则 R17）。
@@ -221,6 +222,23 @@ Hibernate 针对各数据库生成 `is not distinct from` 的写法（已验证�
 .where { it.description != text }
 // HQL: (e0.description <> :p1 or e0.description is null)
 ```
+
+**永远不会是 NULL 的列：`it.id == id`。** 在示例实体中，`id` 是 `Long?`。Kotlin 把 `it.id == id`（捕获的 `id: Long`）编译为一个 null 检查加一个比较。
+直接翻译会得到 `not (e0.id is null or e0.id <> :p1)`。这个形式是正确的，但数据库难以很好地使用索引。
+id 永远不会是 NULL，因此对它的 `is null` 总是假。lambdaQL 把它折叠掉，写成 `e0.id = :p1`。
+
+同样的规则也适用于基本类型属性和 `nullable = false` 的列，但只在路径**没有关联步骤**时适用。`it.customer?.id` 可能是 NULL，因为订单可以没有客户，所以它的 null 检查会保留。
+
+```kotlin
+.where { it.id == id }              // id: Long (captured)
+// HQL: e0.id = :p1
+.where { it.id == null }
+// HQL: 1=0
+.where { it.customer?.id == null }
+// HQL: e0.customer.id is null
+```
+
+相同的 HQL 用 Java Lambda 在 [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java) 中测试（region `never-null`，见[本页的 Java 版本](../java/03-where.md#362--on-objects-compares-values)）。Java 测试写的条件正是 Kotlin 的 `it.id == id` 编译后的形式。
 
 > [!WARNING]
 > **Kotlin 的非空类型不能作为证明。** 属性 `var code: String` 仍然可能从数据库中得到 NULL，

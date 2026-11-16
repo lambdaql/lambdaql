@@ -108,6 +108,54 @@ public final class SortReader {
         return new Expr.Invoke(new Expr.Param(0, Type.getObjectType(ref.implClass())), m, List.of());
     }
 
+    /**
+     * Turns a property path text ({@code "customer.name"}) into a column, for sorts that come from outside
+     * the code (for example Spring {@code Sort}). Every part must be a real persistent property:
+     * the parts before the last one must be to-one associations or embedded values, and the last part a basic value.
+     * So the text can never become HQL that is not a column.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/SortReaderTest.java">SortReaderTest</a>):
+     * {@snippet class="org.lambdaql.engine.sem.SortReaderTest" region="read-path"}
+     *
+     * @param path  property names joined with {@code .}, for example {@code customer.name}
+     * @param root  the entity class
+     * @param model entity information
+     * @return the column
+     * @throws IllegalArgumentException if a part is not a property, or the path does not end at a basic value
+     */
+    public static Expr.Column readPath(String path, Class<?> root, EntityModel model) {
+        if (path == null || path.isBlank()) throw new IllegalArgumentException("sort path is empty");
+        String[] parts = path.split("\\.", -1);
+        List<String> names = new ArrayList<>();
+        List<Boolean> assoc = new ArrayList<>();
+        Class<?> owner = root;
+        boolean parentIsAssociation = false;
+        for (int i = 0; i < parts.length; i++) {
+            String name = parts[i];
+            String ownerName = owner.getSimpleName();
+            EntityModel.Property prop = model.property(owner, name).orElseThrow(() -> new IllegalArgumentException(
+                    "정렬 경로에 없는 속성이 있습니다: " + ownerName + "." + name + " (경로 " + path + ")"));
+            names.add(prop.name());
+            boolean last = i == parts.length - 1;
+            if (last) {
+                if (prop.kind() != EntityModel.Kind.BASIC) {
+                    throw new IllegalArgumentException("정렬 경로는 값 속성으로 끝나야 합니다: " + path);
+                }
+                assoc.add(false);
+                return new Expr.Column(0, names, assoc, prop.javaType(), prop.nonNull(), prop.id() && parentIsAssociation);
+            }
+            switch (prop.kind()) {
+                case ASSOCIATION -> assoc.add(true);
+                case EMBEDDED -> assoc.add(false);
+                default -> throw new IllegalArgumentException(
+                        "정렬 경로의 중간은 to-one 연관이나 값 객체여야 합니다: " + name + " (경로 " + path + ")");
+            }
+            parentIsAssociation = prop.kind() == EntityModel.Kind.ASSOCIATION;
+            owner = prop.javaType();
+        }
+        throw new IllegalArgumentException("sort path is empty");
+    }
+
     // ------------------------------------------------------------------ chain
 
     private static Expr body(LambdaRef ref) {

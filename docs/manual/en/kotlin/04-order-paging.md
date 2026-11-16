@@ -2,8 +2,8 @@
 
 > [!NOTE]
 > **Status**
-> - **Core implemented** and tested on H2, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5): `orderBy { o, by -> ... }` with `by.asc`, `by.desc` and `by.sort`, the one-key forms `orderBy { it.key }` and `orderBy({ it.key }, Direction)`, `Direction.parse` / `reversed`, and `limit` / `offset`. The tests use **Java** lambdas. **Kotlin lambdas are not tested yet.**
-> - **Not implemented yet:** Kotlin property references (`orderBy(Order::price)`), `SortSpec`, `SortWhitelist`, the join forms `{ o, c, by -> }`, sorting inside subqueries, and the Spring `Sort` / `Pageable` module.
+> - **Core implemented** and tested on H2, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5): `orderBy { o, by -> ... }` with `by.asc`, `by.desc` and `by.sort`, the one-key forms `orderBy { it.key }` and `orderBy({ it.key }, Direction)`, `Direction.parse` / `reversed`, `limit` / `offset`, `first()` after `orderBy`, and the reusable sort `SortSpec` (`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`). Spring `Sort` and `Pageable` work in the Spring Data JPA module ([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)). The tests use **Java** lambdas. **Kotlin lambdas are not tested yet.**
+> - **Not implemented yet:** Kotlin property references (`orderBy(Order::price)`), `SortWhitelist`, the join forms `{ o, c, by -> }` (also for `SortSpec`) and sorting inside subqueries.
 > - The Kotlin syntax compiles (checked with prototypes, kotlinc 2.3.21). Nullable keys, `?.` keys and property references compile; an entity key does not.
 > - The HQL in this chapter follows the rules of the library, but it is not tested with Kotlin lambdas.
 
@@ -257,7 +257,7 @@ The builder types control the order. Wrong order does not compile:
 | `where { }` after `orderBy { }` | no (compile error) |
 | `orderBy { }` after `limit(...)` | no (compile error) |
 
-After `orderBy`, `limit` or `offset`, the query has the type `OrderedSelectQuery`. It has only `limit`, `offset`, `toHql()` and `toList()`.
+After `orderBy`, `limit` or `offset`, the query has the type `OrderedSelectQuery`. It has only `limit`, `offset`, `toHql()`, `toList()`, `toSet()` and `first()`. `one()`, `count()` and `exists()` are only before `orderBy`, `limit` and `offset` (see [Getting the result](02-getting-started.md#getting-the-result)).
 
 ## 4.8 Paging
 
@@ -349,6 +349,13 @@ fetch first ? rows only
 
 Paging SQL is different on each database: H2 and Oracle get `fetch first ? rows only`, and MariaDB gets `limit ?`. With an offset, H2 and Oracle add `offset ? rows`, and MariaDB writes `limit ?,?`.
 
+**The first row and the total count.**
+
+- `orderBy { ... }.first()` returns the first row in that order, as an `Optional`. It reads only one row. An `offset` is kept: `orderBy { ... }.offset(1).first()` returns the second row.
+- `count()` is only on the where stage (before `orderBy`, `limit` and `offset`), so it always counts all matching rows. For a paged screen, keep the where-stage query in a value. Call `count()` on it for the total, then call `orderBy { ... }.limit(...).toList()` on it for the page.
+
+See [Getting the result](02-getting-started.md#getting-the-result).
+
 ### Tie-breaker (automatic `id`)
 
 Look at the HQL above: lambdaQL added `e0.id asc` at the end. Why?
@@ -370,13 +377,109 @@ Rule: **when you use paging and the sort keys do not contain the id, lambdaQL ad
 
 ## 4.10 Reusable and external sorts
 
-**Not implemented yet.** The design also has:
+**`SortSpec`: a sort you can keep.** A `SortSpec` is a sort that you keep in a value and use in many queries.
+Make it with `SortSpec.of(Order::class.java) { o, by -> ... }`. The lambda is the same as in `orderBy { o, by -> ... }`, so the same rules apply (see [4.6](#46-rules-for-the-lambda-body)).
+Then pass it to `orderBy(spec)`.
 
-- `SortSpec` for a reusable sort: `SortSpec.of(Order::class.java) { o, by -> by.desc(o.updateAt).asc(o.id) }`, with `then()` and `reversed()`, passed to `orderBy(spec)`.
-- `SortWhitelist<T>` to turn an outside string (a request parameter like `"price,desc_nulls_last"`) into a sort. Outside strings are only accepted through a whitelist.
-- **Planned:** a Spring `Sort` / `Pageable` module (each Spring `Sort.Order` maps to one `Direction` value), joins with `{ o, c, by -> ... }`, keyset paging.
+```kotlin
+// for example at the top level or in a companion object
+val NEWEST: SortSpec<Order> = SortSpec.of(Order::class.java) { o, by -> by.desc(o.updateAt).asc(o.id) }
 
-Until then, `Direction.parse` and `by.sort(key, dir)` give you a run-time direction (see [4.3](#43-direction)). Choose the key in normal Kotlin code.
+qb.from(Order::class.java).where { it.active }.orderBy(NEWEST).limit(20).toList()
+// HQL: select e0 from Order e0 where e0.active = true order by e0.updateAt desc nulls last, e0.id asc
+```
+
+- A `SortSpec` cannot be changed. `then()` and `reversed()` return a new spec. So one spec is safe to share between many queries and threads, for example as a top-level `val`.
+- lambdaQL checks the lambda when the spec is used in `orderBy`. Each lambda is analyzed only once.
+- Captured values are the values at the moment the lambda was made. A spec in a top-level `val` keeps them forever. If the direction must change at run time, use `orderBy { o, by -> by.sort(key, dir) }` (see [4.3](#43-direction)).
+- After `orderBy(spec)` you can page as usual: `limit`, `offset`, `toList()`, `first()`.
+
+There are no Kotlin tests for `SortSpec` yet. The same specs written in Java are tested in [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/04-order-paging.md#410-reusable-and-external-sorts) for the tested examples.
+
+```kotlin
+val byDescription = SortSpec.of(Order::class.java) { o, by -> by.desc(o.description).asc(o.id) }
+qb.from(Order::class.java).where { it.active }.orderBy(byDescription).toList()
+// HQL: select e0 from Order e0 where e0.active = true order by e0.description desc nulls last, e0.id asc
+```
+
+**SQL by database (from the Java test run; Kotlin gives the same HQL)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-spec`:
+
+```sql
+-- H2
+select …
+from orders o1_0
+where o1_0.active=true
+order by o1_0.description desc,o1_0.id
+
+-- MariaDB
+select …
+from orders o1_0
+where o1_0.active=1
+order by o1_0.description desc,o1_0.id
+
+-- Oracle
+select …
+from orders o1_0
+where o1_0.active=1
+order by o1_0.description desc nulls last,o1_0.id
+```
+
+The SQL is the same as for the same sort written in `orderBy { o, by -> ... }`. Oracle adds `nulls last`, because its own default for `desc` is the opposite (see [4.4](#44-null-ordering-is-the-same-on-every-database)).
+
+**`then()`: more keys after the existing ones.** `a.then(b)` sorts by the keys of `a` first. For rows that are equal, it then sorts by the keys of `b`.
+`then()` takes another `SortSpec` or a sort lambda.
+
+```kotlin
+val byStatus = SortSpec.of(Order::class.java) { o, by -> by.asc(o.status) }
+val byPrice = SortSpec.of(Order::class.java) { o, by -> by.desc(o.price) }
+qb.from(Order::class.java).orderBy(byStatus.then(byPrice)).toList()
+// HQL: select e0 from Order e0 order by e0.status asc nulls first, e0.price desc nulls last
+qb.from(Order::class.java).orderBy(byStatus.then { o, by -> by.desc(o.id) }).toList()
+// HQL: select e0 from Order e0 order by e0.status asc nulls first, e0.id desc
+```
+
+Here `status` and `price` can be NULL (`Int?`, `Double?`), so the HQL has a `nulls` part. In the Java test entity they can never be NULL, so the tested HQL and SQL (example `sort-spec-then`) have no `nulls` part. See [the Java version of this page](../java/04-order-paging.md#410-reusable-and-external-sorts).
+
+**`reversed()`: every key the other way.** `spec.reversed()` flips every key. The NULL position flips too: `asc` (NULLs first) becomes `desc` (NULLs last). So the whole row order is exactly backwards.
+This is the same as `Direction.reversed()` (see [4.3](#43-direction)). `spec.reversed().reversed()` gives the first order again.
+
+```kotlin
+val spec = SortSpec.of(Order::class.java) { o, by -> by.asc(o.description).asc(o.id) }
+qb.from(Order::class.java).orderBy(spec.reversed()).toList()
+// HQL: select e0 from Order e0 order by e0.description desc nulls last, e0.id desc
+```
+
+**SQL by database (from the Java test run; Kotlin gives the same HQL)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-spec-reversed`:
+
+```sql
+-- H2, MariaDB
+select …
+from orders o1_0
+order by o1_0.description desc,o1_0.id desc
+
+-- Oracle
+select …
+from orders o1_0
+order by o1_0.description desc nulls last,o1_0.id desc
+```
+
+H2 and MariaDB already put NULLs last for `desc`, so they write no extra clause. Oracle adds `nulls last`.
+
+**`SortSpec.ofPath`: a sort from a property name.** `SortSpec.ofPath(Order::class.java, "customer.name", Direction.DESC)` makes a spec from a property path, for sort keys that come as text from outside the code (the Spring module uses it for Spring `Sort`, see [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)).
+Every part of the path must be a persistent property, and the last part a basic value. Anything else is an error, but any persistent property is accepted, so check text from users against your own list first.
+There is no lambda here, so Kotlin works the same as Java. The Java test is in [the Java version of this page](../java/04-order-paging.md#410-reusable-and-external-sorts) (region `sort-spec-path`).
+
+```kotlin
+val byName = SortSpec.ofPath(Order::class.java, "customer.name", Direction.DESC)
+    .then(SortSpec.ofPath(Order::class.java, "id", Direction.ASC))
+qb.from(Order::class.java).orderBy(byName).toList()
+// HQL: select e0 from Order e0 left join e0.customer j1 order by j1.name desc nulls last, e0.id asc
+```
+
+**Not implemented yet:**
+
+- `SortWhitelist<T>` to turn an outside string (a request parameter like `"price,desc_nulls_last"`) into a sort. It accepts only the names on its list. Until then, `Direction.parse` and `by.sort(key, dir)` give you a run-time direction (see [4.3](#43-direction)). Choose the key in normal Kotlin code, or check the text against your own list and use `SortSpec.ofPath`.
+- **Planned:** joins with `{ o, c, by -> ... }` (also in `SortSpec`), keyset paging.
 
 ## 4.11 Sorting inside subqueries
 
@@ -395,12 +498,12 @@ See [5. Subqueries](05-subquery.md#59-sorting-inside-a-subquery).
 | S3 | Direction comes from `asc` / `desc` or `sort(key, Direction)`. `asc(key)`/`desc(key)` (`ASC`/`DESC`) use the NULL policy; `asc(key, nullsFirst)`, `desc(key, nullsFirst)` and `*_NULLS_*` are used as written | Implemented |
 | S4 | The body is only a straight chain of `by` calls. No `if`, `when` or loop | Implemented |
 | S5 | `orderBy` once per query. No `where` after `orderBy`. No `orderBy` after `limit` (compile error) | Implemented |
-| S6 | Reuse with `SortSpec`. Outside strings only through `SortWhitelist` | Not implemented yet |
+| S6 | Reuse with `SortSpec` (`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`). Outside strings only through `SortWhitelist` | `SortSpec` implemented (tested with Java lambdas). `SortWhitelist` and the join form are not implemented yet |
 | S7 | Keys: columns, to-one paths, `+ - *`, widening. No value branches. Kotlin `?.` is read as a path | Implemented (not tested with Kotlin lambdas) |
 | S8 | Association paths that are used only in `orderBy` use a `left join`, so rows without the association are kept. If `where` uses the same path, the sort uses the `where` join | Implemented |
 | S9 | With paging, the root `@Id asc` is added if the keys do not contain it. Collection fetch join + paging is rejected | Implemented for the root id. The join parts are not implemented yet |
 | S10 | The analysis is cached per lambda. A captured `Direction` is read on every call | Implemented |
-| S11 | Spring `Sort.Order` maps 1:1 to `Direction` (planned module). `SortWhitelist.parse("price,desc_nulls_last")` | Not implemented yet |
+| S11 | Spring `Sort.Order` maps 1:1 to `Direction` (Spring module, see [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)). `SortWhitelist.parse("price,desc_nulls_last")` | Spring `Sort` implemented and tested with Java (`ignoreCase` not supported yet). `SortWhitelist` not implemented yet |
 | S12 | Join queries use the same shape: `{ o, c, by -> }`, `{ o, c, i, by -> }` | Not implemented yet |
 | S13 | Property references only in the one-key short form (`orderBy(Order::price)`). A reference that compiles but has the wrong meaning is rejected | Not implemented yet (Kotlin property references) |
 | S14 | Subquery sorts: kept with `limit`, removed with a warning without `limit`. Database differences are handled for you (see chapter 5) | Not implemented yet |

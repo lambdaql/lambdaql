@@ -2,61 +2,92 @@
 # 7.5 Insert (Java)
 
 > [!NOTE]
-> **Status: designed, not implemented yet.**
-> This chapter is a decided design (decision D28, milestone M10).
-> The syntax compiles in Java, and the SQL was checked on H2, MariaDB and Oracle with Hibernate 6.6.5.
-> It does **not** run in lambdaQL today. Today only the analysis core and `where` + `toList()` work
-> (tested on H2, MariaDB and Oracle). See the [Java track README](README.md#status) for the full status.
+> **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10).
+> **Not implemented yet:** aggregates in `insert ... select` (milestone M9) and the `by.set` form of `insert ... select`.
+> Examples marked **(tested)** are copied from [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java). The other examples follow the design and are not covered by a test yet.
+> See the [Java track README](README.md#status) for the full status.
 
-[7. Update, insert, delete (Java)](07-dml.md) | [7.2 Update](07-2-update.md) | [7.4 Delete](07-4-delete.md) | **7.5 Insert** | [Kotlin](../kotlin/07-5-insert.md)
+[7. Update, insert, delete (Java)](07-dml.md) | [7.2 Update](07-2-update.md) | [7.4 Delete](07-4-delete.md) | **7.5 Insert** | [7.6 Upsert](07-6-upsert.md) | [Kotlin](../kotlin/07-5-insert.md)
 
 ---
 
 
 ## One row
 
+**(tested)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `insert`:
+
 ```java
-qb.insert(Order.class).values(o -> { o.setId(id); o.setPrice(p); o.setStatus(1); }).execute();
+ExecutableInsert<Archive> i = qb.insert(Archive.class)
+        .values(a -> { a.setId(100L); a.setPrice(9.5); a.setCustomerName("Kim"); });
+assertEquals("insert into Archive (id, price, customerName) values (100L, 9.5, 'Kim')", i.toHql().get(0).hql());
+int inserted = i.execute();
+// a generated id (IDENTITY) can be left out
+int generated = qb.insert(IdOrder.class).values(o -> { o.setPrice(1.0); o.setStatus(1); }).execute();
+```
+
+**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 6.6.5, and it fails if Hibernate's SQL changes. Blocks marked **(planned)** come from [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) instead. It gives the planned HQL to Hibernate directly, because lambdaQL does not make these statements yet.
+
+**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `insert`:
+
+```sql
+-- H2, MariaDB, Oracle (same)
+insert into archive(id,price,customer_name)
+values (100,9.5,'Kim')
+```
+
+The constants in the lambda stay literals (decision D37). A value cannot read the new row: `a.setPrice(a.getPrice())` is an error.
+
+The `by.set` form works for one row too:
+
+```java
+qb.insert(Order.class).values((o, by) -> by.set(o.getId(), id).set(o.getStatus(), 1)).execute();
 ```
 
 ## Many rows from a list
 
 One row for each element of the list. The second lambda argument is the element.
 
+**(tested)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `insert-list`:
+
 ```java
-qb.insert(Order.class)
-  .values(lines, (o, l) -> { o.setId(l.id()); o.setPrice(l.price()); o.setStatus(1); })
-  .execute();
+List<Line> lines = List.of(new Line(201, 1.0), new Line(202, 2.0));
+ExecutableInsert<Archive> i = qb.insert(Archive.class).values(lines, (a, l) -> { a.setId(l.id()); a.setPrice(l.price()); });
+assertEquals("insert into Archive (id, price) values (:p1, :p2), (:p3, :p4)", i.toHql().get(0).hql());
 ```
 
-lambdaQL writes one statement with many VALUES rows. If the list is large, it splits the work by the **number of bind values** (see [7.7](07-dml.md#batching-for-many-rows)).
+**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `insert-list`:
+
+```sql
+-- H2, MariaDB, Oracle (same)
+insert into archive(id,price)
+values (?,?), (?,?)
+```
+
+lambdaQL reads the getters of the element in Java, so every value is a bind parameter.
+It writes one statement with many VALUES rows. A long list is split so that one statement has at most 500 values (see [7.8](07-dml.md#batching-for-many-rows)). An empty list runs no SQL and returns 0.
 
 ## Generated id
 
-If the id uses IDENTITY or SEQUENCE, you can leave out the id (rule U12):
-
-```java
-qb.insert(IdOrder.class).values(o -> { o.setPrice(p); o.setStatus(1); }).execute();
-```
+If the id uses IDENTITY or SEQUENCE, you can leave out the id (rule U12).
+The `IdOrder` line in the first example does this: `IdOrder` has an IDENTITY id.
 
 ## Insert ... select
 
 Copy rows from another entity. The `select` lambda gets the target (`a`) and the source (`o`).
 
+**(tested)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `insert-select`:
+
 ```java
-qb.insert(Archive.class).from(Order.class).where(o -> o.getStatus() == 9)
-  .select((a, o) -> { a.setId(o.getId()); a.setPrice(o.getPrice()); a.setCustomerName(o.getCustomer().getName()); })
-  .execute();
+ExecutableInsert<Archive> i = qb.insert(Archive.class)
+        .from(Order.class)
+        .where(o -> o.getStatus() == 1)
+        .select((a, o) -> { a.setId(o.getId()); a.setPrice(o.getPrice()); a.setCustomerName(o.getCustomer().getName()); });
+// a path in the select list: left join, so orders without a customer stay (U10)
+assertEquals("insert into Archive (id, price, customerName) select e0.id, e0.price, j1.name"
+        + " from Order e0 left join e0.customer j1 where e0.status = 1", i.toHql().get(0).hql());
 ```
 
-```sql
-insert into Archive (id, price, customerName)
-select o.id, o.price, c.name from Order o left join o.customer c where o.status = 9
-```
-
-**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) gives the HQL of this page to Hibernate directly and records the SQL on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5). lambdaQL does not make these queries yet. The test fails if Hibernate's SQL changes.
-
-**SQL by database (planned)** — Hibernate's translation of the planned HQL, recorded by `PlannedSqlTest`; lambdaQL does not make this query yet. From `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql), example `07-insert-select`:
+**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `insert-select`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -64,12 +95,12 @@ insert into archive(id,price,customer_name)
 select o1_0.id,o1_0.price,c1_0.name
 from orders o1_0
 left join customers c1_0 on c1_0.id=o1_0.customer_id
-where o1_0.status=9
+where o1_0.status=1
 ```
 
-lambdaQL uses an explicit `left join` for source paths, so orders without a customer are not lost (rule U10).
+lambdaQL uses an explicit `left join` for source paths, so orders without a customer are not lost (rule U10). The SQL is the same on all three databases.
 
-With `by.set`, the context object is the third argument:
+The design also has a `by.set` form, with the context object as the third argument. It is **not implemented yet**:
 
 ```java
 qb.insert(Archive.class).from(Order.class).where(o -> o.getStatus() == 9)
@@ -79,7 +110,8 @@ qb.insert(Archive.class).from(Order.class).where(o -> o.getStatus() == 9)
 
 ## Insert ... select with aggregates
 
-Use `groupBy` and the `Agg` functions from [6. Select, aggregates and group by](06-select-group.md):
+Use `groupBy` and the `Agg` functions from [6. Select, aggregates and group by](06-select-group.md).
+This form is **not implemented yet** (milestone M9):
 
 ```java
 qb.insert(Summary.class).from(Order.class).groupBy(o -> o.getCustomer().getId())
@@ -87,8 +119,18 @@ qb.insert(Summary.class).from(Order.class).groupBy(o -> o.getCustomer().getId())
   .execute();
 ```
 
----
+**SQL by database (planned)** — Hibernate's translation of the planned HQL, recorded by `PlannedSqlTest`; lambdaQL does not make this query yet. From `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql), example `07-insert-group`:
+
+```sql
+-- H2, MariaDB, Oracle (same)
+insert into summary(customer_id,total,cnt)
+select o1_0.customer_id,sum(o1_0.price),count(*)
+from orders o1_0
+group by o1_0.customer_id
+```
 
 ---
 
-[7. Update, insert, delete (Java)](07-dml.md) | [7.2 Update](07-2-update.md) | [7.4 Delete](07-4-delete.md) | **7.5 Insert** | [Kotlin](../kotlin/07-5-insert.md)
+---
+
+[7. Update, insert, delete (Java)](07-dml.md) | [7.2 Update](07-2-update.md) | [7.4 Delete](07-4-delete.md) | **7.5 Insert** | [7.6 Upsert](07-6-upsert.md) | [Kotlin](../kotlin/07-5-insert.md)

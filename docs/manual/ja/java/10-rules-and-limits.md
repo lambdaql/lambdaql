@@ -6,8 +6,8 @@
 > この章には lambdaQL の設計のルールをまとめています。ラムダがどのように SQL になるか、NULL がどう扱われるか、
 > Java と SQL がどこで違うか、データベースごとにどこが違うか、何がサポートされないか、です。
 > ルールは H2 2.3、MariaDB 10.11、Oracle 23ai（Hibernate 6.6.5）でプロトタイプを使って確認しました。
-> 現在動くのは解析コア、`where` + `toList()`、そしてソートとページングの中核部分です（H2、MariaDB、Oracle でテスト済み）。
-> 以下のサブクエリ、`select`、update/insert/delete、プロシージャのルールは **まだ実装されていません**。ソートのルールにも、まだ実装されていないものがあります（[4.12](04-order-paging.md#412-rules-summary-s1-to-s14) を参照）。
+> 現在動くのは解析コア、`where`、結果の関数（`toList()`、`toSet()`、`first()`、`one()`、`count()`、`exists()`）、ソートとページングの中核部分、`SortSpec`、update/insert/delete/upsert（[7](07-dml.md)）、そして Spring Data JPA モジュール（[12](12-spring-data-jpa.md)）です（H2、MariaDB、Oracle でテスト済み）。
+> 以下のサブクエリ、`select`、プロシージャのルールは **まだ実装されていません**。DML の中のサブクエリと集計もまだです。ソートのルールにも、まだ実装されていないものがあります（[4.12](04-order-paging.md#412-rules-summary-s1-to-s14) を参照）。
 > 全体の状況は [Java トラックの README](README.md#status) を参照してください。
 
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [9. Java の注意点](09-java-notes.md) | 次: [11. エラーと言語](../11-errors-and-languages.md) | [このページの Kotlin 版](../kotlin/10-rules-and-limits.md)
@@ -149,6 +149,7 @@ lambdaQL は **WARN** をログに出します（strict モード: エラー）�
 | `Objects.equals(o.getDescription(), p)`、`"x".equals(o.getDescription())`、`Boolean.TRUE.equals(o.getActive())` | null-safe | Java と同じ |
 | `!Boolean.TRUE.equals(o.getActive())` | `e0.active is distinct from true` | Java と同じ。3 つの DB すべてで動く |
 | `x == null`、`x != null` | `is null`、`is not null` | 2 値 |
+| NULL になれないカラム（id、プリミティブ、`nullable = false`、パスに関連のステップがない）での `o.getId() == null` | `1=0`。比較と並ぶとチェックは取り除かれる: `o.getId() != null && o.getId() == id` は `e0.id = :p1`（テスト済み） | カラムに NULL はない。関連を通るパス（`o.getCustomer().getId()`）ではチェックが残る |
 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR` | SQL の 3 値論理 |
 | `where` の中の `o.getCustomer().getName()` | `j1.name` + `join e0.customer j1`（デフォルトで内部結合） | customer がない: 注文は選ばれない |
 | `o.getCustomer() == null \|\| o.getCustomer().getName().equals(p)` | `e0.customer is null or j1.name = :p1` + `left join e0.customer j1` | customer がない: Java と同じく選ばれる |
@@ -239,6 +240,7 @@ lambdaQL は **WARN** をログに出します（strict モード: エラー）�
 | 文字列の長さ | UTF-16 の単位 | H2 は UTF-16 の単位、MariaDB はコードポイント | ドキュメントに記載 |
 | NULL との文字列の連結 | `"null"` というテキスト | NULL（Oracle: `NULL \|\| 'x'` は `'x'`） | 文字列の連結は予定で、v0.1 にはない |
 | ラムダの中の `LocalDateTime.now()` | アプリの時刻 | – | **アプリの時刻** としてバインドする。DB の時刻（`current_timestamp`）はサポートしない |
+| `Set` の中の等しい要素 | `equals` / `hashCode` が決める | 主キーで行を区別する | Set が行数より小さいと、`toSet()` と `findSet()` は `IllegalStateException` を投げる（エンティティの `equals` / `hashCode` が違う行を等しいと判断する場合や、`@Id` が一意でない場合。たとえばビュー）。`toList()` を使う（D42、テスト済み） |
 
 <a id="106-database-differences"></a>
 ## 10.6 データベースごとの違い
@@ -292,11 +294,12 @@ lambdaQL は、NULL になりうるすべてのキーについて HQL に `nulls
 | 項目 | 何が起こるか | lambdaQL |
 |---|---|---|
 | `SET a = ..., b = a + 1`（設定した後にカラムを読む） | MariaDB は **新しい** 値を読み、H2 と Oracle は古い値を読む | 解析時にエラー（U3） |
-| DML での関連のパス（`o.getCustomer().getName()`） | Hibernate は DB ごとに違う結合を作り、customer がない行が **失われる** | lambdaQL は相関 `exists`（`where` の中）か相関スカラーサブクエリ（SET の中）を書くので、DML はクエリと同じ行に当たる（U9） |
-| 同じテーブルへのサブクエリを使う `DELETE` | MariaDB のエラー 1093 | 派生テーブルで包む（U17） |
+| DML での関連のパス（`o.getCustomer().getName()`） | Hibernate は DB ごとに違う結合を作り、customer がない行が **失われる** | lambdaQL は相関スカラーサブクエリ（`where` の中と SET の中）を書く。`where` では、選択が内部結合するパスに `customer.id is not null` も加えるので、DML はクエリと同じ行に当たる（U9、テスト済み） |
+| 同じテーブルへのサブクエリを使う `DELETE` | MariaDB のエラー 1093 | 派生テーブルで包む（U17。サブクエリとともに実装、マイルストーン M8） |
 | 同じ enum 値を STRING と ORDINAL のカラムに 1 回だけバインドする | H2 と MariaDB は **エラーを出さずに間違った値** を保存する | 場所ごとに 1 つのパラメーターを使い、共有しない（U7） |
-| `values(list, ...)` の多数の行 | Oracle: バインド数の上限 65,535（ORA-01745）。それよりずっと前からとても遅い | トランザクションの中でバインド数ごとに分割する（デフォルトは 1,000 バインド）（U13） |
-| `on conflict` / upsert | DB ごとに違う | v0.1 にはない |
+| `values(list, ...)` の多数の行 | Oracle: バインド数の上限 65,535（ORA-01745）。それよりずっと前からとても遅い | 分割する: 1 文あたり最大 500 個の値、すべて 1 つのトランザクションで実行（U13） |
+| `order by ... limit` を使う `update` / `delete` | MariaDB は `in` サブクエリの中の `limit`（エラー 1235）と、対象テーブルへのサブクエリ（エラー 1093）を拒否する | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: 派生テーブル `t` は 3 つのデータベースすべてで動く。内側の select は select の結合を使う（D36）ので、行は select と同じ（テスト済み） |
+| `on conflict` / upsert | H2 と Oracle: `merge`。MariaDB: `insert ... on duplicate key update` で、更新した行は 2 と数える。Hibernate の `do nothing` は H2 と Oracle で失敗する | `upsert` と `onConflict(...).update(...)` は Hibernate の形を使う。`ignore()` は `insert ... select ... where not exists` として書く。行数はそのまま返す（D40、テスト済み） |
 
 <a id="procedures-and-functions"></a>
 ### プロシージャと関数
@@ -370,8 +373,9 @@ H2 には OUT パラメーターがないので、プロシージャの機能は
 | `orderBy` を 2 回、`orderBy` の後の `where`、`limit` の後の `orderBy` | すべてのキーを持つ 1 つの `orderBy`（これらはコンパイルできません） |
 | ソートキーとしてのエンティティ（`by.desc(o.getCustomer())`） | カラム: `by.desc(o.getCustomer().getName())`（コンパイルできません） |
 | 結合のソートのラムダでのメソッド参照 | ラムダ |
-| `SortSpec`、`SortWhitelist`（まだ実装されていない） | `Direction dir = Direction.parse(text)` と `by.sort(key, dir)` |
+| `SortWhitelist`（まだ実装されていない） | `Direction dir = Direction.parse(text)` と `by.sort(key, dir)` |
 | `limit` / `offset` を使うコレクションのフェッチ結合 | 先にページングし、その後でコレクションを読み込む |
+| Spring の `Sort` の `ignoreCase()`（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）、まだサポートしていない | `ignoreCase()` を使わないソート |
 | 関数のキー（`lower(name)`） | 予定 |
 | 集約のエイリアスでのソート（`by.desc(s.total())`） | 予定 |
 
@@ -407,8 +411,15 @@ H2 には OUT パラメーターがないので、プロシージャの機能は
 | `@Version` のプロパティを自分で書く | lambdaQL が代わりに `update versioned` を使う |
 | 値での文字列の連結 | 予定 |
 | 明示的な結合を使う `insert ... select` | 予定。v0.1 では many-to-one のパスを使う |
-| upsert（`on conflict`） | 予定 |
-| `order by ... limit` を使う DML | 先に id を取得し、その後 `delete ... where ids.contains(id)` |
+| 同時の挿入に対してアトミックな `onConflict(...).ignore()` | キー重複のエラーを捕捉する（`ignore()` は `not exists` を使う。[7.6](07-6-upsert.md) を参照） |
+| `insert ... select` からの upsert | `values(list, ...)` で 1 行ずつ upsert する |
+| `limit(n)` のない update や delete での `orderBy(...)` | `limit(n)` を加えるか、`orderBy` を取り除く（そうしないと `IllegalStateException`） |
+| 1 行だけを変更すべき update や delete を、`execute() == 1` とロールバックで確認する | `executeOne()`: 先に id を読む（最大 2 つ）。2 つなら何も変更せずに `NonUniqueResultException` を投げる。1 つならその行を `id = :p and (条件)` で変更する。2 行以上を変更することはない（D41、テスト済み） |
+| `executeOne()` を `orderBy` や `limit` と一緒に使う | どちらか一方を使う（そうしないと `IllegalStateException`） |
+| update や delete での `offset` | 予定なし（D42）。DML にあるのは `limit(n)` だけ。`where`、`orderBy(...)`、`limit(n)` で対象の行を選ぶ |
+| 複合キーのエンティティでの `limit` や `executeOne()` | まだ対応していない。先に id を取得し、その後 `delete ... where ids.contains(id)` |
+| トランザクションなしで Spring の共有 `EntityManager` を使う DML（lambdaQL は `@Transactional` を付けない、D41） | `@Transactional` か `TransactionTemplate` の中で呼ぶ |
+| リポジトリのメソッド `deleteAll(where)`（一括削除）での cascade や `@PreRemove` | Spring Data の `deleteAll(Iterable)` か `delete(entity)`（[12.4](12-spring-data-jpa.md#deleteallwhere-is-not-spring-datas-deleteall) を参照） |
 | `returning` | DML の後にもう一度クエリを実行する |
 | DB の時刻（`current_timestamp`） | アプリの時刻を渡す（`LocalDateTime.now()` は値としてバインドされる） |
 | `TABLE` の ID ジェネレーターを使う `insert ... select` | `values(...)`、または IDENTITY / SEQUENCE を使う |
@@ -417,6 +428,7 @@ H2 には OUT パラメーターがないので、プロシージャの機能は
 DML についての注意: 一括 DML は永続化コンテキストを通りません。Hibernate は先にフラッシュしますが、
 同じセッションの管理されたエンティティは、その後も古い値を持ったままです。`clear()`（または `refresh`）を呼んでください。
 JPA のカスケードと `orphanRemoval` は適用されません。
+DML の文にはトランザクションが必要です。`QueryBuilder(EntityManagerFactory)` は自分でトランザクションを開きます。`EntityManager` を使うビルダー（Spring の共有のものも含む）では呼び出し側のトランザクションが必要で、それがなければ SQL を送る前に失敗します。
 
 <a id="procedures"></a>
 ### プロシージャ
@@ -474,6 +486,7 @@ List<Order> list = flag
 | Java | 21（javac）。ECJ は保証しない |
 | Hibernate | 6.6（設計は 6.6.5 で確認）。HQL の拡張（たとえば `is distinct from`）を使う。他の JPA プロバイダーは保証しない |
 | データベース | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
+| Spring | Spring Boot 3.4.2 と Spring Data JPA 3.4.2（Spring モジュール、[12](12-spring-data-jpa.md)）。Spring Boot 4 はまだ検証していません |
 | テストしていない | PostgreSQL、SQL Server、Oracle 19c 以前（たとえば PL/SQL の `BOOLEAN` パラメーター） |
 
 ---

@@ -4,6 +4,9 @@ import org.lambdaql.engine.render.HqlRenderer;
 import org.lambdaql.engine.render.RenderedQuery;
 
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Optional;
+import java.util.SequencedSet;
 
 /**
  * A select query after {@code orderBy}, {@code limit} or {@code offset}.
@@ -24,7 +27,7 @@ public class OrderedSelectQuery<T> {
     private final Class<T> entityClass;
     private final QueryContext context;
     private final List<HqlRenderer.Bound> wheres;
-    private final HqlRenderer.SortBound sort;
+    private final List<HqlRenderer.SortBound> sorts;
     private Integer limit;
     private int offset;
 
@@ -34,13 +37,14 @@ public class OrderedSelectQuery<T> {
      * @param entityClass the entity class
      * @param context     the builder context
      * @param wheres      the conditions so far
-     * @param sort        the sort keys, or {@code null} (paging only)
+     * @param sorts       the sort keys, one entry per sort lambda (empty for paging only)
      */
-    OrderedSelectQuery(Class<T> entityClass, QueryContext context, List<HqlRenderer.Bound> wheres, HqlRenderer.SortBound sort) {
+    OrderedSelectQuery(Class<T> entityClass, QueryContext context, List<HqlRenderer.Bound> wheres,
+                       List<HqlRenderer.SortBound> sorts) {
         this.entityClass = entityClass;
         this.context = context;
         this.wheres = List.copyOf(wheres);
-        this.sort = sort;
+        this.sorts = List.copyOf(sorts);
     }
 
     /**
@@ -85,7 +89,7 @@ public class OrderedSelectQuery<T> {
      */
     public RenderedQuery toHql() {
         return new HqlRenderer(context.model(), entityClass.getClassLoader())
-                .select(entityClass, wheres, sort, isPaged());
+                .select(entityClass, wheres, sorts, isPaged());
     }
 
     /**
@@ -100,7 +104,40 @@ public class OrderedSelectQuery<T> {
         return context.resultList(entityClass, toHql(), offset, limit);
     }
 
+    /**
+     * Returns the first row in this order (after {@code offset}), or empty if there is no row.
+     * Only one row is read.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.ResultQueryTest" region="first"}
+     *
+     * @return the first row, or {@link Optional#empty()}
+     */
+    public Optional<T> first() {
+        if (limit != null && limit == 0) return Optional.empty();
+        RenderedQuery q = new HqlRenderer(context.model(), entityClass.getClassLoader())
+                .select(entityClass, wheres, sorts, true);
+        return context.resultList(entityClass, q, offset, 1).stream().findFirst();
+    }
+
     private boolean isPaged() {
         return limit != null || offset > 0;
+    }
+
+    /**
+     * Runs the query and returns the rows as a set that keeps the row order ({@link LinkedHashSet}).
+     * Entity rows never repeat (lambdaQL joins only to-one associations), so the set has the same rows as
+     * {@link #toList()}.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.ResultQueryTest" region="to-set"}
+     *
+     * @return the rows in order
+     * @throws IllegalStateException if the set is smaller than the number of rows: then the entity's
+     *                               {@code equals}/{@code hashCode} treat different rows as equal, or its {@code @Id} is
+     *                               not unique (for example a view), and rows would be lost without a sign
+     */
+    public SequencedSet<T> toSet() {
+        return DmlParts.toSet(toList());
     }
 }

@@ -4,9 +4,11 @@
 [매뉴얼 홈](README.md) | 트랙: [Java](java/README.md) | [Kotlin](kotlin/README.md) | 다음: 2. 시작하기 ([Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md))
 
 > [!NOTE]
-> **상태:** 분석 코어(람다 로딩과 조건 디코딩)와 `where` + `toList()`(HQL 렌더링과 쿼리 실행)가 구현되어 있습니다. H2, MariaDB, Oracle에서 Java 람다로 테스트했습니다.
-> 정렬과 페이징(`orderBy`, `limit`, `offset`)의 핵심 기능도 구현되어 테스트했습니다.
-> 서브쿼리, `select`, update/insert/delete, 프로시저, Spring 모듈은 설계되었지만 **아직 구현되지 않았습니다**.
+> **상태:** 분석 코어(람다 로딩과 조건 디코딩)와 결과 함수 `toList()`, `toSet()`, `first()`, `one()`, `count()`, `exists()`를 포함한 `where`(HQL 렌더링과 쿼리 실행)가 구현되어 있습니다. H2, MariaDB, Oracle에서 Java 람다로 테스트했습니다.
+> 정렬과 페이징(`orderBy`, `limit`, `offset`, `SortSpec`)의 핵심 기능도 구현되어 테스트했습니다.
+> Spring Data JPA 모듈(`LambdaQlExecutor<T>`와 Spring Boot 자동 구성)도 구현되어 Spring Boot 3.4.2에서 테스트했습니다.
+> 수정, 삽입, 삭제, 업서트도 `limit`과 1행 보호 `executeOne()`을 포함해 구현되어 테스트했으며, Spring Data JPA 모듈에서도 사용할 수 있습니다(단축 메서드 `deleteAll`, `updateOne` 등). Spring Data JPA 모듈에서는 호출자의 트랜잭션이 필요합니다.
+> 서브쿼리, `select`, 프로시저는 설계되었지만 **아직 구현되지 않았습니다**.
 > 이 페이지의 HQL은 설계가 정의한 출력입니다. 예제는 설계 예제입니다.
 
 이 페이지는 두 언어 모두를 위한 것입니다. 코드는 **Java**와 **Kotlin** 섹션으로 나누어 보여 줍니다.
@@ -100,7 +102,7 @@ where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 | 2. 바이트코드 읽기 | lambdaQL은 ASM으로 그 메서드 하나만 읽습니다. 클래스 파일을 읽을 뿐 코드를 실행하지 않습니다. | 구현됨 |
 | 3. 조건 다시 만들기 | Java와 Kotlin은 `&&`, `\|\|`, `!`를 점프로 컴파일합니다. lambdaQL은 이 점프로부터 원래의 논리 트리를 다시 만듭니다. | Java 람다는 구현됨. Kotlin 전용 형태는 설계됨. |
 | 4. HQL 만들기 | getter와 속성은 JPA 속성 경로가 됩니다(`o.getPrice()` 또는 `it.price` → `e0.price`). 람다 안의 상수는 리터럴이 되고, 캡처 값은 파라미터(`:p1`)가 됩니다. | `where`와 `orderBy`에 대해 구현됨, H2·MariaDB·Oracle에서 테스트함 |
-| 5. 실행 | lambdaQL은 파라미터를 바인딩하고 Hibernate로 HQL을 실행합니다. 각 람다의 분석 결과는 캐시되므로 바이트코드는 한 번만 읽습니다. | `toList()`에 대해 구현됨(`limit` / `offset` 포함) |
+| 5. 실행 | lambdaQL은 파라미터를 바인딩하고 Hibernate로 HQL을 실행합니다. 각 람다의 분석 결과는 캐시되므로 바이트코드는 한 번만 읽습니다. | `toList()`와 `toSet()`(`limit` / `offset` 포함), `first()`, `one()`, `count()`, `exists()`에 대해 구현됨 |
 
 람다 하나를 읽는 데는 몇 마이크로초가 걸립니다. 캐시 덕분에 lambdaQL은 람다의 바이트코드를 한 번만 읽습니다.
 
@@ -208,6 +210,7 @@ lambdaQL은 인덱스를 사용할 수 있는("SARGable") SQL을 만듭니다.
 | `o.customer?.id !in sub.from(Customer::class.java).where { c -> c.grade!! > 3 }.select { c -> c.id }` | `o.customer.id not in (select ...)` | `not exists (select 1 ...)` |
 | `(it.description ?: "") == "x"` | `coalesce(e0.description, '') = 'x'` | `e0.description = 'x'` |
 | `it.description.isNullOrEmpty()` | `(e0.description is null or length(e0.description) = 0)` | `(e0.description is null or e0.description = :p1)` |
+| `it.id == id`(`it.id`는 `Long?`) | `not (e0.id is null or e0.id <> :p1)` | `e0.id = :p1`(id는 NULL이 될 수 없음) |
 
 <a id="java-and-kotlin"></a>
 ### Java와 Kotlin

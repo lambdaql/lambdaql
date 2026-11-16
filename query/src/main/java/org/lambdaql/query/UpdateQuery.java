@@ -1,57 +1,55 @@
 package org.lambdaql.query;
 
-import org.lambdaql.analyzer.Condition;
-import org.lambdaql.analyzer.EntityColumnResolver;
-import org.lambdaql.analyzer.SerializableConsumer;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
-
+/**
+ * The start of an UPDATE: {@code qb.update(Order.class).set(...).where(...).execute()} (ROADMAP D28, M10).
+ * Only {@code set} is available here, so an UPDATE without assignments cannot be written (rule U5).
+ *
+ * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+ * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update"}
+ *
+ * @param <T> the entity type
+ */
 public class UpdateQuery<T> {
+
     private final Class<T> entityClass;
-    private final EntityColumnResolver columnResolver;
-    private final List<SetClause> sets = new ArrayList<>();
-    private final List<Condition> whereConditions = new ArrayList<>();
+    private final QueryContext context;
 
-    public UpdateQuery(Class<T> entityClass, EntityColumnResolver columnResolver) {
+    /**
+     * Creates the query. Use {@link QueryBuilder#update(Class)}.
+     *
+     * @param entityClass the entity class
+     * @param context     the builder context
+     */
+    UpdateQuery(Class<T> entityClass, QueryContext context) {
         this.entityClass = entityClass;
-        this.columnResolver = columnResolver;
+        this.context = context;
     }
 
-    public UpdateQuery<T> set(SerializableConsumer<T> lambda) {
-        //this.updates.putAll(LambdaFieldExtractor.extractFields(entityType, setter));
-        return this;
+    /**
+     * Adds assignments written with setters: {@code o -> { o.setStatus(2); }}.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update"}
+     *
+     * @param assign the assignment lambda
+     * @return the next step: more {@code set}, then {@code where} or {@code all}
+     * @throws org.lambdaql.analyzer.LambdaAnalysisException if the lambda breaks a rule (U1, U3, U4, U6)
+     */
+    public UpdateSet<T> set(Assign<T> assign) {
+        return new UpdateSet<>(entityClass, context).set(assign);
     }
 
-    public UpdateQuery<T> where(Predicate<T> lambda) {
-        // 람다 파싱해서 whereConditions 리스트에 추가
-        return this;
-    }
-
-    public void execute() {
-        StringBuilder sql = new StringBuilder("UPDATE ");
-        sql.append(entityClass.getSimpleName()).append(" SET ");
-
-        sql.append(sets.stream()
-                .map(s -> columnResolver.resolveColumnName(entityClass, s.getField())
-                        + " = " + formatValue(s.getValue()))
-                .collect(Collectors.joining(", ")));
-
-        if (!whereConditions.isEmpty()) {
-            sql.append(" WHERE ");
-            /*sql.append(whereConditions.stream()
-                    .map(c -> (c.getLogical() != null ? c.getLogical() + " " : "") +
-                            columnResolver.resolveColumnName(entityClass, c.getField()) +
-                            " " + c.getOperator() + " " + formatValue(c.getValue()))
-                    .collect(Collectors.joining(" ")));*/
-        }
-
-        System.out.println("Executing SQL: " + sql);
-    }
-
-    private String formatValue(Object value) {
-        return value instanceof String ? "'" + value + "'" : String.valueOf(value);
+    /**
+     * Adds assignments written with the builder: {@code (o, by) -> by.set(o.getStatus(), 2)}.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update-by"}
+     *
+     * @param assign the assignment lambda
+     * @return the next step
+     * @throws org.lambdaql.analyzer.LambdaAnalysisException if the lambda breaks a rule
+     */
+    public UpdateSet<T> set(AssignBy<T> assign) {
+        return new UpdateSet<>(entityClass, context).set(assign);
     }
 }

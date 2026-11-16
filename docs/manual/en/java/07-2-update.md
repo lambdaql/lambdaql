@@ -2,51 +2,50 @@
 # 7.2 Update (Java)
 
 > [!NOTE]
-> **Status: designed, not implemented yet.**
-> This chapter is a decided design (decision D28, milestone M10).
-> The syntax compiles in Java, and the SQL was checked on H2, MariaDB and Oracle with Hibernate 6.6.5.
-> It does **not** run in lambdaQL today. Today only the analysis core and `where` + `toList()` work
-> (tested on H2, MariaDB and Oracle). See the [Java track README](README.md#status) for the full status.
+> **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10), including `limit` and `executeOne()` (decision D41).
+> **Not implemented yet:** `sub` subqueries in `set` and `where` (milestone M8), and `limit` / `executeOne()` on entities with a composite key.
+> Examples marked **(tested)** are copied from [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java). The other examples follow the design and are not covered by a test yet.
+> See the [Java track README](README.md#status) for the full status.
 
-[7. Update, insert, delete (Java)](07-dml.md) | **7.2 Update** | [7.4 Delete](07-4-delete.md) | [7.5 Insert](07-5-insert.md) | [Kotlin](../kotlin/07-2-update.md)
+[7. Update, insert, delete (Java)](07-dml.md) | **7.2 Update** | [7.4 Delete](07-4-delete.md) | [7.5 Insert](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Kotlin](../kotlin/07-2-update.md)
 
 ---
 
 
 ## Basic form
 
+**(tested)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `update`:
+
 ```java
-int n = qb.update(Order.class)
-    .set(o -> { o.setStatus(st); o.setPrice(o.getPrice() * 1.1); })
-    .where(o -> o.getStatus() == 1)
-    .execute();                    // number of updated rows
+short st = 5;
+ExecutableUpdate<Order> u = qb.update(Order.class)
+        .set(o -> { o.setStatus(st); o.setPrice(o.getPrice() * 2); })
+        .where(o -> o.getStatus() == 1);
+// the price on the right is the value before the change
+assertEquals("update Order e0 set e0.status = :p1, e0.price = (e0.price * 2.0) where e0.status = 1", u.toHql().hql());
+int changed = u.execute();
 ```
 
-HQL:
+`st` is a captured variable, so it is a bind parameter (`:p1`). The constant `2` is written in the lambda, so it stays a literal (`2.0`, decision D37).
+`toHql()` gives the HQL and the parameters without running the statement. `execute()` runs it and returns the number of changed rows.
 
-```sql
-update Order o set o.status = :p1, o.price = o.price * 1.1 where o.status = 1
-```
+**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 6.6.5, and it fails if Hibernate's SQL changes. Blocks marked **(planned)** come from [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) instead. It gives the planned HQL to Hibernate directly, because lambdaQL does not make these statements yet.
 
-**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) gives the HQL of this page to Hibernate directly and records the SQL on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5). lambdaQL does not make these queries yet. The test fails if Hibernate's SQL changes.
-
-**SQL by database (planned)** — Hibernate's translation of the planned HQL, recorded by `PlannedSqlTest`; lambdaQL does not make this query yet. From `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql), example `07-update`:
+**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `update`:
 
 ```sql
 -- H2, MariaDB
 update orders o1_0
-set status=?,price=(o1_0.price*1.1)
+set status=?,price=(o1_0.price*2.0)
 where o1_0.status=1
 
 -- Oracle
 update orders o1_0
-set o1_0.status=?,o1_0.price=(o1_0.price*1.1)
+set o1_0.status=?,o1_0.price=(o1_0.price*2.0)
 where o1_0.status=1
 ```
 
 Oracle writes the alias in `set` (`set o1_0.status=?`); H2 and MariaDB do not.
-
-`st` is a captured variable. lambdaQL sends it as a bind parameter.
 
 ## Values: null, date, boolean
 
@@ -71,18 +70,6 @@ qb.update(Order.class)
 // → set o.price = coalesce(o.price, 0.0) + 1
 ```
 
-**SQL by database (planned)** — Hibernate's translation of the planned HQL, recorded by `PlannedSqlTest`; lambdaQL does not make this query yet. From `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql), example `07-update-coalesce`:
-
-```sql
--- H2, MariaDB
-update orders o1_0
-set price=(coalesce(o1_0.price,0.0)+1)
-
--- Oracle
-update orders o1_0
-set o1_0.price=(coalesce(o1_0.price,0.0)+1)
-```
-
 ## Embedded fields
 
 ```java
@@ -91,20 +78,6 @@ qb.update(Order.class).set(o -> o.getAddress().setCity(city)).where(o -> o.getId
 
 qb.update(Order.class).set(o -> o.setAddress(addr)).where(o -> o.getId() == id).execute();
 // → sets all columns of the embedded value (city, zip)
-```
-
-**SQL by database (planned)** — Hibernate's translation of the planned HQL, recorded by `PlannedSqlTest`; lambdaQL does not make this query yet. From `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql), example `07-update-embedded`:
-
-```sql
--- H2, MariaDB
-update orders o1_0
-set city=?
-where o1_0.id=?
-
--- Oracle
-update orders o1_0
-set o1_0.city=?
-where o1_0.id=?
 ```
 
 ## Change an association (foreign key)
@@ -120,51 +93,43 @@ qb.update(Order.class).set(o -> o.setCustomer(customer)).where(o -> o.getId() ==
 // → binds the @Id of the captured customer (rule U11)
 ```
 
-**SQL by database (planned)** — Hibernate's translation of the planned HQL, recorded by `PlannedSqlTest`; lambdaQL does not make this query yet. From `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql), example `07-update-fk`:
-
-```sql
--- H2, MariaDB
-update orders o1_0
-set customer_id=?
-where o1_0.id=?
-
--- Oracle
-update orders o1_0
-set o1_0.customer_id=?
-where o1_0.id=?
-```
-
-**SQL by database (planned)** — Hibernate's translation of the planned HQL, recorded by `PlannedSqlTest`; lambdaQL does not make this query yet. From `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql), example `07-update-fk-null`:
-
-```sql
--- H2, MariaDB
-update orders o1_0
-set customer_id=null
-where o1_0.id=?
-
--- Oracle
-update orders o1_0
-set o1_0.customer_id=null
-where o1_0.id=?
-```
-
 You can only set the `@Id` of an associated entity (the FK).
-`o.getCustomer().setName(x)` is an error: it would change another table.
+`o.getCustomer().setName(x)` is an error: it would change another table (rule U6, tested in [7.8](07-dml.md#rules-checked-at-analysis-time)).
 
 ## A value from another table
 
 Read the value through the association path. lambdaQL renders it as a **correlated scalar subquery** (rule U9).
+A path in `where` becomes the same kind of subquery.
+
+**(tested)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `update-path`:
 
 ```java
-qb.update(Order.class).set(o -> o.setCustName(o.getCustomer().getName())).all().execute();
+// a path in the condition: a subquery, plus "customer exists" (the same rows as the select, D36, U9)
+ExecutableUpdate<Order> u = qb.update(Order.class)
+        .set(o -> o.setCustName("K"))
+        .where(o -> o.getCustomer().getName().equals("Kim"));
+assertEquals("update Order e0 set e0.custName = 'K' where (select s1.name from Customer s1 where s1.id = e0.customer.id) = 'Kim'"
+        + " and e0.customer.id is not null", u.toHql().hql());
+// a path in a value: a subquery; NULL when there is no customer
+ExecutableUpdate<Order> copy = qb.update(Order.class).set(o -> o.setCustName(o.getCustomer().getName())).all();
+assertEquals("update Order e0 set e0.custName = (select s1.name from Customer s1 where s1.id = e0.customer.id)", copy.toHql().hql());
 ```
+
+**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `update-path`:
 
 ```sql
-update Order o
-set o.custName = (select c.name from Customer c where c.id = o.customer.id)
+-- H2, MariaDB
+update orders o1_0
+set cust_name='K'
+where (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)='Kim' and o1_0.customer_id is not null
+
+-- Oracle
+update orders o1_0
+set o1_0.cust_name='K'
+where (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)='Kim' and o1_0.customer_id is not null
 ```
 
-**SQL by database (planned)** — Hibernate's translation of the planned HQL, recorded by `PlannedSqlTest`; lambdaQL does not make this query yet. From `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql), example `07-update-other-table`:
+**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `update-path#2`:
 
 ```sql
 -- H2, MariaDB
@@ -177,11 +142,13 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 ```
 
 If an order has no customer, `custName` becomes NULL.
+In `where`, lambdaQL adds `e0.customer.id is not null`, so the update changes the same rows as `qb.from(Order.class).where(same lambda)` (decision D36). The test checks this.
 
 ## An aggregate from a subquery
 
 Use a two-argument lambda. The second argument is the context object (`sub`).
 `Agg` is not needed here; the subquery has `sum`, `avg`, ... as in [5. Subqueries](05-subquery.md).
+This form is **not implemented yet** (milestone M8).
 
 ```java
 qb.update(Order.class)
@@ -189,6 +156,20 @@ qb.update(Order.class)
       sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).sum(i -> i.getPrice())))
   .where(o -> o.getStatus() == 1)
   .execute();
+```
+
+**SQL by database (planned)** — Hibernate's translation of the planned HQL, recorded by `PlannedSqlTest`; lambdaQL does not make this query yet. From `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql), example `07-update-sum`:
+
+```sql
+-- H2, MariaDB
+update orders o1_0
+set total=(select sum(i1_0.price) from items i1_0 where i1_0.order_id=o1_0.id)
+where o1_0.status=1
+
+-- Oracle
+update orders o1_0
+set o1_0.total=(select sum(i1_0.price) from items i1_0 where i1_0.order_id=o1_0.id)
+where o1_0.status=1
 ```
 
 If an order has no items, `total` becomes NULL. This is SQL behavior.
@@ -205,9 +186,50 @@ qb.update(Order.class).set(o -> o.setStatus(9))
   .execute();
 ```
 
+The first example works today: the path becomes a scalar subquery, as in the tested example above.
+The second one needs `sub` (not implemented yet, milestone M8).
+
+**SQL by database (planned)** — Hibernate's translation of the planned HQL, recorded by `PlannedSqlTest`; lambdaQL does not make this query yet. From `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql), example `07-update-not-exists`:
+
+```sql
+-- H2, MariaDB
+update orders o1_0
+set status=9
+where not exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id)
+
+-- Oracle
+update orders o1_0
+set o1_0.status=9
+where not exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id)
+```
+
 ## Optimistic locking (`@Version`)
 
 If the entity has a `@Version` field, lambdaQL renders `update versioned`. The database adds 1 to the version.
+
+**(tested)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `update-versioned`:
+
+```java
+// an entity with a version field (Version annotation): the version goes up too
+ExecutableUpdate<VOrder> u = qb.update(VOrder.class).set(v -> v.setStatus(2)).where(v -> v.getId() == 1L);
+assertEquals("update versioned VOrder e0 set e0.status = 2 where e0.id = 1L", u.toHql().hql());
+```
+
+**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `update-versioned`:
+
+```sql
+-- H2, MariaDB
+update v_orders v1_0
+set status=2,version=(v1_0.version+1)
+where v1_0.id=1
+
+-- Oracle
+update v_orders v1_0
+set v1_0.status=2,v1_0.version=(v1_0.version+1)
+where v1_0.id=1
+```
+
+Hibernate adds `version=(v1_0.version+1)` to the SET list. To use the version as an optimistic lock, put it in `where` and check the result:
 
 ```java
 int n = qb.update(VOrder.class)
@@ -217,19 +239,32 @@ int n = qb.update(VOrder.class)
 if (n == 0) throw new OptimisticLockException();   // checking the result is your job
 ```
 
-Do not assign the `@Version` field yourself. That is an error (rule U15).
+Do not assign the `@Version` field yourself (rule U15).
 
 ## Many `set()` calls (PATCH)
 
 You can call `set()` many times. All assignments join into one SET list, in call order (rule U14).
+Rules U3 and U4 also apply across `set()` calls.
+
+**(tested)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `update-patch`:
 
 ```java
-var u = qb.update(Order.class).set(o -> o.setStatus(dto.status()));
-if (dto.description() != null) {
-    u = u.set(o -> o.setDescription(dto.description()));
-}
-u.where(o -> o.getId() == id).execute();
+// PATCH: assign only the fields that have a value; every set() adds assignments
+String memo = "checked";
+Short newStatus = null;
+UpdateSet<Order> u = qb.update(Order.class).set(o -> o.setDescription(memo));
+if (newStatus != null) u = u.set(o -> o.setStatus(newStatus));
+int changed = u.where(o -> o.getId() == id).execute();
+
+// reading a column that an earlier assignment wrote is an error (U3): the databases disagree on its value
+assertThrows(LambdaAnalysisException.class,
+        () -> qb.update(Order.class).set(o -> { o.setPrice(1); o.setTex((float) o.getPrice()); }));
+// the same column twice is an error (U4), also across set() calls
+assertThrows(LambdaAnalysisException.class,
+        () -> qb.update(Order.class).set(o -> o.setStatus((short) 1)).set(o -> o.setStatus((short) 2)));
 ```
+
+`set()` returns an `UpdateSet`. It has `set`, `where` and `all`, but no `execute()`.
 
 ## Update all rows: `all()`
 
@@ -240,8 +275,63 @@ qb.update(Order.class).set(o -> o.setStatus(0)).all().execute();       // OK
 qb.update(Order.class).set(o -> o.setStatus(0)).execute();             // compile error: no execute()
 ```
 
----
+An update needs a transaction (see [7.8](07-dml.md#transactions)).
+
+## Update the first rows: `limit`
+
+`orderBy(...)` and `limit(n)` after `where(...)` or `all()` change at most `n` rows: the first `n` rows of `qb.from(X.class).where(same).orderBy(same)`.
+The rules are the same as for delete (see [7.4](07-4-delete.md#delete-the-first-rows-limit)): the order is by the id without `orderBy`, the id is always the last sort key, and `orderBy` without `limit` is an error.
+
+**(tested)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `update-limit`:
+
+```java
+// a path in the condition: the nested select joins, so the rows are the same as the select
+ExecutableUpdate<Order> u = qb.update(Order.class)
+        .set(o -> o.setDescription("top"))
+        .where(o -> o.getCustomer().getName().equals("Kim"))
+        .orderBy((o, by) -> by.desc(o.getPrice()))
+        .limit(1);
+assertEquals("update Order e0 set e0.description = 'top' where e0.id in (select t.id from (select x0.id as id from Order x0"
+        + " join x0.customer k1 where k1.name = 'Kim' order by x0.price desc, x0.id asc limit 1) t)", u.toHql().hql());
+```
+
+**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `update-limit`:
+
+```sql
+-- H2
+update orders o1_0
+set description='top'
+where o1_0.id in (select t1_0.id from (select o2_0.id from orders o2_0 join customers c1_0 on c1_0.id=o2_0.customer_id where c1_0.name='Kim' order by o2_0.price desc,o2_0.id fetch first 1 rows only) t1_0(id))
+
+-- MariaDB
+update orders o1_0
+set description='top'
+where o1_0.id in (select t1_0.id from (select o2_0.id id from orders o2_0 join customers c1_0 on c1_0.id=o2_0.customer_id where c1_0.name='Kim' order by o2_0.price desc,o2_0.id limit 1) t1_0)
+
+-- Oracle
+update orders o1_0
+set o1_0.description='top'
+where o1_0.id in (select t1_0.id from (select o2_0.id id from orders o2_0 join customers c1_0 on c1_0.id=o2_0.customer_id where c1_0.name='Kim' order by o2_0.price desc,o2_0.id fetch first 1 rows only) t1_0)
+```
+
+The path `o.getCustomer().getName()` is a join in the inner select, as in a select (decision D36). The update itself reads no other table.
+
+## Update exactly one row: `executeOne()`
+
+`executeOne()` runs the update with the one-row protection. It reads the matching ids (at most 2). With 2 ids it changes nothing and throws `NonUniqueResultException`. With 1 id it changes that row with `id = :p and (your condition)`. The steps are the same as for delete (see [7.4](07-4-delete.md#delete-exactly-one-row-executeone)).
+
+```java
+int one = qb.update(Order.class)
+        .set(o -> o.setDescription("checked"))
+        .where(o -> o.getId() == id)
+        .executeOne();                             // 0 or 1; 2 or more rows: NonUniqueResultException
+```
+
+The test method of the `execute-one` region (`executeOneProtects` in `DmlQueryTest`) also checks `executeOne()` on an update: with 2 or more rows nothing changes.
+In a Spring repository, `updateOne(where, set)` does the same (see [12.4](12-spring-data-jpa.md#one-row-protection-deleteone-and-updateone)).
 
 ---
 
-[7. Update, insert, delete (Java)](07-dml.md) | **7.2 Update** | [7.4 Delete](07-4-delete.md) | [7.5 Insert](07-5-insert.md) | [Kotlin](../kotlin/07-2-update.md)
+---
+
+[7. Update, insert, delete (Java)](07-dml.md) | **7.2 Update** | [7.4 Delete](07-4-delete.md) | [7.5 Insert](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Kotlin](../kotlin/07-2-update.md)

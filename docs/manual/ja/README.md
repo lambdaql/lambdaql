@@ -5,9 +5,11 @@
 
 > [!IMPORTANT]
 > **状況: lambdaQL は開発の初期段階です。**
-> 現在実装されているのは **解析コア**、**`where` + `toList()`**、そして **ソートとページング**（`orderBy`、`limit`、`offset`）の中核部分です。lambdaQL はラムダを読み込み、それをデコードし、HQL を書いて実行します。これは H2、MariaDB、Oracle で（Java のラムダで）テスト済みです。
-> このマニュアルのそれ以外の内容（サブクエリ、`select`、update/insert/delete、プロシージャ、Spring モジュール）は **設計済み** です。構文とルールは決まっていて、H2、MariaDB、Oracle でプロトタイプによる確認もしましたが、コードはまだライブラリに入っていません。
-> 成果物（アーティファクト）はまだ公開していません。試すには、ソースからビルドしてください（[Java](java/02-getting-started.md#build-from-source) | [Kotlin](kotlin/02-getting-started.md#build-from-source)）。
+> 現在実装されているのは **解析コア**、**結果の関数付きの `where`**（`toList()`、`toSet()`、`first()`、`one()`、`count()`、`exists()`）、そして **ソートとページング**（`orderBy`、`limit`、`offset`、`SortSpec`）の中核部分です。lambdaQL はラムダを読み込み、それをデコードし、HQL を書いて実行します。これは H2、MariaDB、Oracle で（Java のラムダで）テスト済みです。
+> **更新、挿入、削除、upsert** も実装済みで、`limit` と 1 行保護 `executeOne()` も使えます（H2、MariaDB、Oracle で Java のラムダを使ってテスト済み）。
+> **Spring Data JPA モジュール** も実装済みです。リポジトリ用の実行器 `LambdaQlExecutor<T>`（Spring の `Sort`、`Pageable`、`deleteAll(where)` や `updateOne(where, set)` のような DML の短縮メソッド、および更新、削除、挿入、upsert のビルダーに対応）と Spring Boot の自動構成です（Spring Boot 3.4.2 でテスト済み）。DML には呼び出し側のトランザクションが必要です。
+> このマニュアルのそれ以外の内容（サブクエリ、`select`、プロシージャ、および更新と挿入の中のサブクエリと集計）は **設計済み** です。構文とルールは決まっていて、H2、MariaDB、Oracle でプロトタイプによる確認もしましたが、コードはまだライブラリに入っていません。
+> 成果物（アーティファクト）はまだ Maven Central に公開していません。試すには、ソースからビルドしてください（[Java](java/02-getting-started.md#build-from-source) | [Kotlin](kotlin/02-getting-started.md#build-from-source)）。
 
 lambdaQL は Java と Kotlin のためのクエリライブラリです。
 普通のラムダを書くと、lambdaQL がそのラムダのバイトコードを読み、Hibernate 6.6 の HQL クエリを組み立てます。
@@ -111,12 +113,13 @@ fetch first ? rows only
 | 4 | ソートとページング: `orderBy`、`Direction`、`limit`、`offset` | [Java](java/04-order-paging.md) | [Kotlin](kotlin/04-order-paging.md) |
 | 5 | サブクエリ: `exists`、`contains`、スカラーサブクエリと相関サブクエリ | [Java](java/05-subquery.md) | [Kotlin](kotlin/05-subquery.md) |
 | 6 | 選択、集計、グループ化: `select`、`groupBy`、`having`、`Agg` | [Java](java/06-select-group.md) | [Kotlin](kotlin/06-select-group.md) |
-| 7 | 更新、挿入、削除: `set`、`values`、`all()`、`execute()` | [Java](java/07-dml.md) | [Kotlin](kotlin/07-dml.md) |
+| 7 | 更新、挿入、削除: `set`、`values`、`all()`、`execute()`、`limit`、`executeOne()` | [Java](java/07-dml.md) | [Kotlin](kotlin/07-dml.md) |
+| 7.6 | Upsert: `upsert`、`onConflict(...).update(...)`、`onConflict(...).ignore()` | [Java](java/07-6-upsert.md) | [Kotlin](kotlin/07-6-upsert.md) |
 | 8 | プロシージャと DB 関数: `@SqlProcedure`、`@SqlFunction`、`qb.call`、`qb.exec` | [Java](java/08-procedures-functions.md) | [Kotlin](kotlin/08-procedures-functions.md) |
 | 9 | 言語ごとの注意点 | [Java の注意点](java/09-java-notes.md) | [Kotlin の注意点](kotlin/09-kotlin-notes.md) |
 | 10 | ルールと制限: ルール表の全体 | [Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md) |
 | 11 | エラーと言語（共通） | [11-errors-and-languages.md](11-errors-and-languages.md) | [11-errors-and-languages.md](11-errors-and-languages.md) |
-| 12 | Spring Data JPA: `LambdaQlExecutor<T>`、リポジトリのメソッド、モジュール、トランザクション | [Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md) |
+| 12 | Spring Data JPA: `LambdaQlExecutor<T>`、DML の短縮メソッド、Spring の `Sort` と `Pageable`、モジュール、トランザクション、`QueryBuilder` の Bean | [Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md) |
 
 <a id="status"></a>
 ## 状況
@@ -127,15 +130,16 @@ fetch first ? rows only
 | 条件のデコード（`&&`、`\|\|`、`!`、比較、キャプチャした値） | 実装済み、ユニットテストあり（Java のラムダ） | [03](java/03-where.md) | [03](kotlin/03-where.md) |
 | getter から JPA 属性へのマッピング、キャプチャした値の評価 | 実装済み、H2・MariaDB・Oracle でテスト済み | [03](java/03-where.md) | [03](kotlin/03-where.md) |
 | HQL の生成とクエリの実行（`where`、`toList()`） | 実装済み、H2・MariaDB・Oracle でテスト済み | [03](java/03-where.md) | [03](kotlin/03-where.md) |
-| ソートとページング（`orderBy`、`limit`、`offset`） | 中核部分は実装済み、H2・MariaDB・Oracle でテスト済み（Java のラムダ）。`SortSpec`、`SortWhitelist`、結合のソート: 設計済み | [04](java/04-order-paging.md) | [04](kotlin/04-order-paging.md) |
+| 結果の関数（`first()`、`one()`、`count()`、`exists()`、`toSet()`） | 実装済み、H2・MariaDB・Oracle でテスト済み（Java のラムダ） | [02](java/02-getting-started.md#getting-the-result) | [02](kotlin/02-getting-started.md#getting-the-result) |
+| ソートとページング（`orderBy`、`limit`、`offset`） | 中核部分は実装済み、H2・MariaDB・Oracle でテスト済み（Java のラムダ）。`SortSpec` も含みます。`SortWhitelist`、結合のソート（`SortSpec` の結合の書き方も）: 設計済み | [04](java/04-order-paging.md) | [04](kotlin/04-order-paging.md) |
 | サブクエリ（`exists`、`contains`、スカラー、相関） | 設計済み | [05](java/05-subquery.md) | [05](kotlin/05-subquery.md) |
 | 射影、`groupBy`、`having`、集計（`Agg`） | 設計済み | [06](java/06-select-group.md) | [06](kotlin/06-select-group.md) |
 | 派生テーブルと CTE | 設計済み | [06](java/06-select-group.md) | [06](kotlin/06-select-group.md) |
-| `update`、`insert`、`delete` | 設計済み | [07](java/07-dml.md) | [07](kotlin/07-dml.md) |
+| `update`、`insert`、`delete`、upsert | 実装済み、H2・MariaDB・Oracle でテスト済み（Java のラムダ）。`limit` と `executeOne()` も含みます。DML の中のサブクエリ（`sub`）と `insert ... select` の集計: 設計済み | [07](java/07-dml.md) | [07](kotlin/07-dml.md) |
 | ストアドプロシージャと DB 関数 | 設計済み | [08](java/08-procedures-functions.md) | [08](kotlin/08-procedures-functions.md) |
 | Kotlin の書き方（`?.`、`?:`、`!!`、範囲、`when`、`in`） | 設計済み（デコーダーの一部は完成） | – | [09](kotlin/09-kotlin-notes.md) |
 | 4 言語のエラーコードとメッセージ | 設計済み | [11](11-errors-and-languages.md) | [11](11-errors-and-languages.md) |
-| Spring Data JPA（`LambdaQlExecutor<T>`） | 設計済み | [12](java/12-spring-data-jpa.md) | [12](kotlin/12-spring-data-jpa.md) |
+| Spring Data JPA（`LambdaQlExecutor<T>`、Spring の `Sort` / `Pageable`、Spring Boot の自動構成） | 実装済み、Spring Boot 3.4.2 で H2・MariaDB・Oracle でテスト済み（Java）。DML の短縮メソッド（`deleteAll`、`updateOne` など）と、更新、削除、挿入、upsert のビルダーも含みます。Spring Boot 4: まだ検証していません | [12](java/12-spring-data-jpa.md) | [12](kotlin/12-spring-data-jpa.md) |
 
 用語の意味:
 
@@ -146,23 +150,27 @@ fetch first ? rows only
 | 設計済み | 構文とルールは決まっています。プロトタイプでテストしました。ライブラリにはまだコードがありません。 |
 | 予定 | アイデアはありますが、詳細は決まっていません。 |
 
-テストは次のとおりです。`SelectQueryTest` と `SortQueryTest` はユーザー向け API を使い、その他のテストは内部クラスをチェックします。
+テストは次のとおりです。`SelectQueryTest`、`SortQueryTest`、`DmlQueryTest`、`ExecutorTest`、`AutoConfigurationTest` はユーザー向け API を使い、その他のテストは内部クラスをチェックします。
 
 | テスト | 確認すること |
 |---|---|
 | [SelectQueryTest.java](../../../query/src/test/java/org/lambdaql/query/SelectQueryTest.java) | `qb.from(...).where(...)`: H2、MariaDB、Oracle での HQL、パラメーター、行 |
 | [SortQueryTest.java](../../../query/src/test/java/org/lambdaql/query/SortQueryTest.java) | `orderBy`、`limit`、`offset`: H2、MariaDB、Oracle での HQL と行の順序 |
+| [DmlQueryTest.java](../../../query/src/test/java/org/lambdaql/query/DmlQueryTest.java) | `update`、`delete`、`insert`、upsert: H2、MariaDB、Oracle での HQL と実行後の行。同じ条件の選択と比べます |
+| [ExecutorTest.java](../../../spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java) | Spring Boot アプリケーションの中の `LambdaQlExecutor<T>`: リポジトリのメソッド、Spring の `Sort` と `Pageable`、トランザクション |
+| [AutoConfigurationTest.java](../../../spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java) | Spring Boot の自動構成が作る `QueryBuilder` の Bean |
 | [LoadExamplesTest.java](../../../query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java) | ラムダ本体を見つける、キャプチャした値を読む、シリアライズ可能でないラムダを拒否する |
 | [ConditionDecodeTest.java](../../../query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java) | バイトコードから `&&`、`\|\|`、`!` と比較を組み立て直す、値の三項演算子を拒否する |
 | [IrExamplesTest.java](../../../query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java) | 内部の条件ツリー（比較演算子、AND、OR、NOT） |
 | [NegationMinimizerTest.java](../../../query/src/test/java/org/lambdaql/engine/decode/NegationMinimizerTest.java) | 結果を変えずに `!` を比較の中へ押し込む（ド・モルガン） |
 | [HostEvaluatorTest.java](../../../query/src/test/java/org/lambdaql/engine/sem/HostEvaluatorTest.java) | バインドの前に、キャプチャした変数から Java 側で値を計算する |
 | [JpaEntityModelTest.java](../../../query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java) | JPA Metamodel からエンティティのプロパティを読む（getter マッピングの最初のコード） |
+| [AssignmentReaderTest.java](../../../query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java) | 代入のラムダ（setter と `by.set`）をカラムと値の組に読み、ルール違反（U1、U3、U6）を拒否する |
 
 <a id="about-the-examples"></a>
 ## 例について
 
-例は設計上の例です。機能が実装されると、その例はテストスイートから取ったコードに置き換えられ、テストファイルへのリンクが付きます。3. 条件と 4. ソートとページング（Java）では、それらの例に **(テスト済み)** と書いてあります。
+例は設計上の例です。機能が実装されると、その例はテストスイートから取ったコードに置き換えられ、テストファイルへのリンクが付きます。3. 条件、4. ソートとページング、7. 更新、挿入、削除、12. Spring Data JPA（Java）では、それらの例に **(テスト済み)** と書いてあります。
 
 <a id="example-entities"></a>
 ## 例で使うエンティティ
@@ -186,6 +194,7 @@ fetch first ? rows only
 | Kotlin | 2.x |
 | Hibernate ORM | 6.6（設計は 6.6.5 で検証） |
 | 検証したデータベース | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
+| Spring Boot（任意） | 3.4（3.4.2 でテスト済み）。Spring Boot 4 はまだ検証していません |
 
 <a id="folder-layout"></a>
 ## フォルダー構成

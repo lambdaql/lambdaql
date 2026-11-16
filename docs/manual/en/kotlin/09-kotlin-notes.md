@@ -29,7 +29,7 @@ This chapter collects what is special in Kotlin, in one place.
 - [9.9 Property references and scope functions](#99-property-references-and-scope-functions)
 - [9.10 Kotlin operators](#910-kotlin-operators)
 - [9.11 Results: data classes, `Pair` and `Triple`](#911-results-data-classes-pair-and-triple)
-- [9.12 Update, insert, delete: property assignment and `by[column] = value`](#912-update-insert-delete-property-assignment-and-bycolumn--value)
+- [9.12 Update, insert, delete: property assignment and `by.set`](#912-update-insert-delete-property-assignment-and-byset)
 - [9.13 Procedures and DB functions](#913-procedures-and-db-functions)
 - [9.14 Kotlin limits (KC1 to KC21)](#914-kotlin-limits-kc1-to-kc21)
 - [9.15 Where lambdaQL differs from running Kotlin code](#915-where-lambdaql-differs-from-running-kotlin-code)
@@ -460,7 +460,7 @@ These are supported in conditions. The compiler puts the body inline, so lambdaQ
 | Your own non-inline extension function or property | no (KC11). Make it `inline`, or write the condition directly |
 | `takeIf { }` | no (KC6) |
 
-In update and insert lambdas, `apply`, `with` and `also` are not supported in v0.1 (see [9.12](#912-update-insert-delete-property-assignment-and-bycolumn--value)).
+In update and insert lambdas, `apply`, `with` and `also` are not supported in v0.1 (see [9.12](#912-update-insert-delete-property-assignment-and-byset)).
 
 ## 9.10 Kotlin operators
 
@@ -496,7 +496,7 @@ lambdaQL has **no Kotlin-only operator API** (decided). The normal Java method n
 
 | Kotlin form | Why it works | Status |
 |---|---|---|
-| `by[o.status] = st` in DML | Kotlin turns `a[i] = b` into `a.set(i, b)`, and the context object has `set(column, value)` | kept |
+| `by[o.status] = st` in DML | Kotlin turns `a[i] = b` into `a.set(i, b)`, and the assignment lambda returns nothing | kept (kotlinc 2.3.21 checked) |
 | `x in sub.from(...).select { ... }` | Kotlin turns `x in v` into `v.contains(x)` | kept |
 | `Agg.sum(x)!! + 1 > 3` | normal arithmetic on the placeholder value | kept |
 | sort operators (`by + key`, `-key`) | would add strange methods for Java users and need Kotlin-only extensions | rejected |
@@ -534,7 +534,7 @@ qb.from(Order::class.java).groupBy { it.customer?.id to it.status }         // P
 
 Details: [6. Select, aggregates and group by](06-select-group.md).
 
-## 9.12 Update, insert, delete: property assignment and `by[column] = value`
+## 9.12 Update, insert, delete: property assignment and `by.set`
 
 A Kotlin property assignment compiles to the same setter call as Java, so the rules are the same.
 
@@ -552,8 +552,8 @@ qb.insert(Order::class.java).values(lines) { o, l -> o.id = l.id; o.price = l.pr
 
 | Kotlin form | Meaning |
 |---|---|
-| `by[o.status] = 1` | the Kotlin index operator for `by.set(o.status, 1)`. Use it for entities with `val` properties (no setter) |
-| `by[o.cnt] += 1` | does not compile (on purpose). Write `by[o.cnt] = o.cnt + 1` |
+| `by[o.status] = 1` | the Kotlin index operator for `by.set(o.status, 1)`. Use it for entities with `val` properties (no setter). Checked with kotlinc 2.3.21 (not yet a test in the build) |
+| `by[o.cnt] += 1` | does not compile (on purpose: `by` has no `get`). Write `by[o.cnt] = o.cnt + 1` |
 | `it.cnt += 1` | supported |
 | `it.cnt++`, `--` | not in v0.1. Write `it.cnt += 1` |
 | `apply { }`, `with(it) { }`, `also { }` in `set` | not in v0.1. Write direct assignments |

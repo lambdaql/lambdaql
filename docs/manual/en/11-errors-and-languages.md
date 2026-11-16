@@ -302,7 +302,7 @@ You see warnings like this, for example, when:
 A "strict mode" that turns these warnings into errors is planned.
 
 > [!NOTE]
-> Today the `query` module still has some Spring Boot starters as normal dependencies, so they (and Logback) come into your project with lambdaQL. The design moves them to `compileOnly`. After that change, lambdaQL will bring only `slf4j-api`.
+> `lambdaql-core` has no Spring dependency. For logging it brings only `slf4j-api`, so you choose the logging backend. The Spring modules (`lambdaql-spring-data-jpa`, `lambdaql-spring-boot-starter`) bring Spring Data JPA, and the starter also brings `spring-boot-starter-data-jpa` with Logback.
 
 ## Summary
 

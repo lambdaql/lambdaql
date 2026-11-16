@@ -65,6 +65,12 @@ public final class JpaEntityModel implements EntityModel {
                 .findFirst();
     }
 
+    /** {@inheritDoc} */
+    @Override
+    public boolean versioned(Class<?> entity) {
+        return metamodel.entity(entity).hasVersionAttribute();
+    }
+
     private Optional<Property> lookup(Class<?> owner, String name) {
         ManagedType<?> type;
         try {

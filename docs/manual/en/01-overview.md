@@ -3,9 +3,11 @@
 [Manual home](README.md) | Tracks: [Java](java/README.md) | [Kotlin](kotlin/README.md) | Next: 2. Getting started ([Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md))
 
 > [!NOTE]
-> **Status:** The analysis core (lambda loading and condition decoding) and `where` + `toList()` (HQL rendering and running the query) are implemented. They are tested on H2, MariaDB and Oracle with Java lambdas.
-> The core of sorting and paging (`orderBy`, `limit`, `offset`) is also implemented and tested.
-> Subqueries, `select`, update/insert/delete, procedures and the Spring module are designed but **not implemented yet**.
+> **Status:** The analysis core (lambda loading and condition decoding) and `where` with the result functions `toList()`, `toSet()`, `first()`, `one()`, `count()` and `exists()` (HQL rendering and running the query) are implemented. They are tested on H2, MariaDB and Oracle with Java lambdas.
+> The core of sorting and paging (`orderBy`, `limit`, `offset`, `SortSpec`) is also implemented and tested.
+> The Spring Data JPA module (`LambdaQlExecutor<T>` and the Spring Boot auto-configuration) is implemented and tested with Spring Boot 3.4.2.
+> Update, insert, delete and upsert are implemented and tested too, with `limit` and the one-row protection `executeOne()`, also in the Spring Data JPA module (the shortcuts `deleteAll`, `updateOne` and so on). They need the caller's transaction there.
+> Subqueries, `select` and procedures are designed but **not implemented yet**.
 > The HQL shown on this page is the output that the design defines. The examples are design examples.
 
 This page is for both languages. Code is shown in separate **Java** and **Kotlin** sections.
@@ -95,7 +97,7 @@ But they are a **query language** written with Java or Kotlin syntax.
 | 2. Read the bytecode | lambdaQL reads only that one method with ASM. It reads the class file. It does not run the code. | Implemented |
 | 3. Rebuild the condition | Java and Kotlin compile `&&`, `\|\|` and `!` into jumps. lambdaQL rebuilds the original logic tree from these jumps. | Implemented for Java lambdas. Kotlin-only forms are designed. |
 | 4. Build HQL | Getters and properties become JPA attribute paths (`o.getPrice()` or `it.price` → `e0.price`). Constants in the lambda become literals; captured values become parameters (`:p1`). | Implemented for `where` and `orderBy`, tested on H2, MariaDB, Oracle |
-| 5. Run | lambdaQL binds the parameters and runs the HQL with Hibernate. The analysis result of each lambda is cached, so the bytecode is read only once. | Implemented for `toList()` (also with `limit` / `offset`) |
+| 5. Run | lambdaQL binds the parameters and runs the HQL with Hibernate. The analysis result of each lambda is cached, so the bytecode is read only once. | Implemented for `toList()` and `toSet()` (also with `limit` / `offset`), `first()`, `one()`, `count()` and `exists()` |
 
 Reading one lambda takes a few microseconds. With the cache, lambdaQL reads the bytecode of a lambda only once.
 
@@ -199,6 +201,7 @@ lambdaQL writes SQL that can use indexes ("SARGable").
 | `o.customer?.id !in sub.from(Customer::class.java).where { c -> c.grade!! > 3 }.select { c -> c.id }` | `o.customer.id not in (select ...)` | `not exists (select 1 ...)` |
 | `(it.description ?: "") == "x"` | `coalesce(e0.description, '') = 'x'` | `e0.description = 'x'` |
 | `it.description.isNullOrEmpty()` | `(e0.description is null or length(e0.description) = 0)` | `(e0.description is null or e0.description = :p1)` |
+| `it.id == id` (`it.id` is a `Long?`) | `not (e0.id is null or e0.id <> :p1)` | `e0.id = :p1` (the id can never be NULL) |
 
 ### Java and Kotlin
 

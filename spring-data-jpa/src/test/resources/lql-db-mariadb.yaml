@@ -1,0 +1,11 @@
+# Imported by application-test.yaml when the tests run with -Dlql.db=mariadb (local MariaDB verification schema).
+# The password is read from the environment variable LQL_DB_PASSWORD (never written to a file).
+spring:
+  datasource:
+    url: ${LQL_MARIADB_URL:jdbc:mariadb://localhost:3306/lql_verify}
+    username: ${LQL_MARIADB_USER:root}
+    password: ${LQL_DB_PASSWORD:}
+    driver-class-name: org.mariadb.jdbc.Driver
+  jpa:
+    properties:
+      hibernate.physical_naming_strategy: org.lambdaql.spring.sample.SqPrefixNamingStrategy

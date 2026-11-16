@@ -3,8 +3,8 @@
 > [!NOTE]
 > **Status**
 > - **Implemented and tested on H2, MariaDB and Oracle:** `where` conditions and `toList()`. lambdaQL maps getters to columns, writes the HQL and runs it.
-> - **Also implemented:** the core of sorting and paging ([4. Sorting and paging](04-order-paging.md)).
-> - **Designed, not implemented yet:** subqueries, `select`, update/insert/delete, procedures and the Spring module (chapters 5 to 8 and 12).
+> - **Also implemented:** the core of sorting and paging ([4. Sorting and paging](04-order-paging.md)), update/insert/delete/upsert ([7. Update, insert, delete](07-dml.md)) and the Spring Data JPA module ([12. Spring Data JPA](12-spring-data-jpa.md)).
+> - **Designed, not implemented yet:** subqueries, `select` and procedures (chapters 5, 6 and 8).
 > - Examples marked **(tested)** are copied from the test suite. The other HQL in this chapter is the **planned** output from the design. It can still change in small details (for example alias names like `e0`, `j1`).
 
 [Java track](README.md) | [Manual home](../README.md) | Previous: [2. Getting started](02-getting-started.md) | Next: [4. Sorting and paging](04-order-paging.md) | [Kotlin version of this page](../kotlin/03-where.md)
@@ -301,6 +301,27 @@ where o1_0.description=?
 > [!TIP]
 > **IDE warning.** IntelliJ shows "Number objects compared using `==`" for this form.
 > Inside a lambdaQL lambda this is intended. You can use `@SuppressWarnings("NumberEquality")`.
+
+**A column that can never be NULL.** Some columns can never be NULL: the id, a primitive column, and a `nullable = false` column.
+For such a column, `is null` is always false, so lambdaQL folds it away:
+
+- `o.getId() == null` becomes `1=0` (no row).
+- `o.getId() != null && o.getId() == id` becomes `e0.id = :p1`. The null check is gone, and the database can use the index.
+
+This is also the bytecode of Kotlin's `it.id == id` with a `Long?` id, so the Kotlin form gets the plain `e0.id = :p1` too.
+The rule applies only when the path has **no association step**. `o.getCustomer().getId()` can be NULL, because an order can have no customer, so its null check stays.
+
+**(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `never-null`:
+
+```java
+// the id can never be NULL, so the null check is dropped (this is what Kotlin's it.id == id compiles to)
+assertEquals("select e0 from Order e0 where e0.id = :p1",
+        qb.from(Order.class).where(o -> o.getId() != null && o.getId() == id).toHql().hql());
+assertEquals("select e0 from Order e0 where 1=0", qb.from(Order.class).where(o -> o.getId() == null).toHql().hql());
+// through an association the row may have no customer, so the check stays
+assertEquals("select e0 from Order e0 where e0.customer.id is null",
+        qb.from(Order.class).where(o -> Objects.equals(o.getCustomer().getId(), null)).toHql().hql());
+```
 
 ### 3.6.3 Write your null checks yourself
 

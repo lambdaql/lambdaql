@@ -588,6 +588,11 @@ lambdaql은 현재 캐시가 없으므로, 호출할 때마다 클래스 파일�
 | D35 | 정렬의 NULL 위치·실행 시점 방향 (3.7) | `by.by(key, Direction)` / `asc`·`desc`에 boolean 인자 / `Nulls` enum 인자 | **2026-11-12 작성자 결정: `by.asc(key, boolean nullsFirst)`, `by.desc(key, boolean nullsFirst)`**. 인자 없는 `asc(key)`·`desc(key)`는 D16 기본 NULL 정책. 실행 시점에 방향을 정할 때(캡처한 `Direction`)는 **`by.sort(key, Direction)`**. `by.by`는 폐기. 참고: Kotlin도 Java 메서드에는 이름 있는 인자를 못 써서 두 언어 모두 `by.desc(x, false)` 형태 | 확정 |
 | D36 | where의 연관 경로 조인 (R24 개정) | 항상 LEFT JOIN / 쓰임에 따라 자동 / 항상 INNER JOIN | **2026-11-12 작성자 결정: where 조건의 연관 경로는 항상 INNER JOIN**(`o.getCustomer().getName()` → `join o.customer j1 … j1.name`). 연관이 없는 행은 연관 자체를 비교해 찾는다: `o.getCustomer() == null` → `o.customer is null`(FK 검사, 조인 없음). FK id 경로(`o.getCustomer().getId()`)는 조인 없음. **정렬·select에만 쓰인 경로는 행을 잃지 않도록 LEFT JOIN 유지**(S8, J1). 같은 경로를 where와 정렬·select가 함께 쓰면 INNER(where가 이미 행을 거름). DML where(U9)는 INNER와 같은 의미가 되는 상관 `EXISTS`로 렌더링. 주의: Kotlin `it.customer?.name == null`은 고객 없는 주문을 포함하지 않음(포함하려면 `it.customer == null \|\| it.customer?.name == null`). **보완(2026-11-12, 구현 중 발견)**: 조건이 연관 없는 행을 참으로 남길 수 있으면(null guard, 예: `o.getCustomer() == null \|\| o.getCustomer().getName().equals(x)`) 그 경로만 LEFT JOIN. 항상 INNER면 Java가 남기는 행이 빠지는 오답이 됨. 판정은 3값 논리: 연관이 없을 때 연관 null 검사는 참, 연관 뒤 컬럼 조건은 unknown, 나머지 조건은 자유 변수로 두고 참이 될 수 있으면 LEFT(`JoinPlanner`). 구현·세 DB 확인(`SelectQueryTest` region `null-guard`) | 확정 |
 | D37 | 값 렌더링: 리터럴과 바인딩 | 정수만 리터럴 / 출처 기준 / 모두 바인딩 | **2026-11-12 작성자 결정: 출처 기준.** 람다 코드에 적힌 상수(숫자·문자열·boolean·`null`·enum 상수·컴파일 시점 상수 `static final`)는 **리터럴**(`o.price > 100.0`, `o.description = 'O''Brien'`, `o.kind = pkg.Order$Kind.RUSH`), 캡처 값과 계산 값은 **항상 바인딩**(`:p1`). 상수는 호출마다 같아 SQL 문장 수가 늘지 않고 옵티마이저가 값을 볼 수 있음. 문자열 리터럴은 작은따옴표를 `''`로 escape(컴파일된 상수라 SQL 주입 위험 없음). NaN·무한대는 바인딩. `new BigDecimal("1.5")`처럼 객체를 만드는 식은 계산 값이라 바인딩. 구현·세 DB 확인 | 확정 |
+| D38 | 조회 결과 함수 | `first/one/count/exists` / `fetchFirst/fetchOne…`(null 반환) / `toFirst/toOne…` · `count()` 위치: where 단계만 / 정렬·페이징 뒤에도 | **2026-11-12 작성자 결정: `first()`·`one()`은 `Optional<T>`, `count()`는 `long`, `exists()`는 `boolean`**(서브쿼리 API의 `exists()`·`count()`·`first()`와 같은 이름). `first()`는 where 단계(정렬 없으면 id가 가장 작은 행, S9)와 `orderBy` 뒤(정렬 순서, `offset` 유지) 모두에 있음. `one()`은 where 단계만, 2행 이상이면 `jakarta.persistence.NonUniqueResultException`(최대 2행만 읽음). **`count()`·`exists()`는 where 단계에만** 둠(정렬·페이징 뒤 `limit(10).count()`가 10을 넘는 혼란 방지). 페이징 화면은 where 단계 쿼리로 `count()` 후 `orderBy().limit()`. HQL: `select count(e0) …`, `exists()`는 `select 1 … ` + 최대 1행. 구현·세 DB 확인(`ResultQueryTest`) | 확정 |
+| D39 | Spring 연동 범위 (M12, D34 보완) | `org.lambdaql.jpa` 유지 / 삭제 · starter 나중 / v0.1 · 실행기 메서드 범위 | **2026-11-16 작성자 결정**: ① `org.lambdaql.jpa` 4개 클래스(`DefaultMethodSupportJpaRepositoryFactoryBean` 등) **삭제**. repository default 메서드는 Spring Data가 직접 실행한다(SD1, SD9 정리). ② **`lambdaql-spring-boot-starter`를 v0.1에 포함**(코드 없는 의존성 묶음). ③ 실행기에 `findAll(Where)`·`findAll(Where, SortSpec)`·`findAll(Where, Sort)`·`findAll(Where, Pageable)`, `findFirst(Where[, SortSpec \| Sort])`, `findOne`, `count`, `exists`. Spring `Sort`는 `PropertyPath`로 검증한 뒤 `SortSpec.ofPath`로 변환하고, `NullHandling.NATIVE`는 D16 기본 정책, `ignoreCase`는 미지원. `Page`는 `PageableExecutionUtils`로 필요할 때만 count. ④ DML 실행기 `updateQuery()`·`deleteQuery()`·`insertQuery()`·`upsertQuery()`(D34 이름, `JpaRepository.delete(T)`와 충돌 방지). M10 엔진과 함께 구현(2026-11-16). 구현·세 DB 확인(`ExecutorTest`, `AutoConfigurationTest`) | 확정 |
+| D40 | UPSERT 문법 (M10) | `upsert(X)` 단축형 / `insert…onConflict` 명시형 / 둘 다 · do nothing 지원 여부 · 영향 행 수 | **2026-11-16 작성자 결정**: **둘 다 지원**. `qb.upsert(X).values(o -> …)`는 키가 @Id이고 충돌 시 대입한 열(키 제외)을 갱신한다. `qb.insert(X).values(…).onConflict(o -> 키).update(o -> …)`는 갱신 식을 따로 적는다(예: `o.setCnt(o.getCnt() + 1)`). **`onConflict(키).ignore()`(do nothing)는 lambdaQL이 에뮬레이션**한다: `insert … select … where not exists (…)`. 동시 삽입에는 원자적이지 않아 키 중복 오류가 날 수 있음을 문서화한다. 근거(2026-11-16 실측, Hibernate 6.6.5): HQL `on conflict(id) do update`는 H2·Oracle에서 `merge`, MariaDB에서 `on duplicate key update`로 세 DB 모두 동작. `on conflict … do nothing`은 H2·Oracle에서 일반 insert로 렌더링되어 PK 위반, MariaDB만 동작. **영향 행 수는 JDBC 값을 그대로 반환**(MariaDB는 갱신 시 2, H2·Oracle은 1)하고 문서화 | 확정 |
+| D41 | 실행기 DML 단축 메서드·보호·limit (M10, M12) | 이름: `delete(Where)` / `deleteAll`·`deleteOne` · 트랜잭션: `@Transactional` / 호출자 트랜잭션 필수 · limit: v0.2 / 지금 | **2026-11-16 작성자 결정**: ① 이름은 `deleteAll`/`deleteOne`, `updateAll`/`updateOne`, `insertAll`/`insertOne`, `upsertAll`/`upsertOne`. `All`은 조건에 맞는 행 전부(delete·update) 또는 목록의 행 전부(insert·upsert), `One`은 delete·update에서 **1행 보호**, insert·upsert에서 한 행. `deleteAll(Where)`는 bulk 삭제라 Spring `deleteAll()`(엔티티를 불러와 하나씩 삭제, cascade 적용)과 동작이 다르며 문서에 명시. 오버로드 충돌 없음(kotlinc 2.3.21·javac 바이트코드 확인). ② **`@Transactional`을 붙이지 않는다. 트랜잭션 없이는 동작하지 않는다**: 공유 `EntityManager`에서 트랜잭션이 없으면 SQL을 보내기 전에 `TransactionRequiredException`(Spring에서는 `InvalidDataAccessApiUsageException`). ③ **1행 보호**(`executeOne()`, `deleteOne`, `updateOne`): 조건에 맞는 id를 최대 2개 읽고, 2개면 아무것도 바꾸지 않고 `NonUniqueResultException`(Spring `IncorrectResultSizeDataAccessException`), 1개면 `id = :p and (조건)`으로 그 행만 변경. 롤백에 기대지 않고 2행 이상을 바꾸지 않는다. ④ **DML limit**: `where(…).orderBy(…).limit(n)`(정렬 없으면 id 순, S9). `e0.id in (select t.id from (select x0.id as id from X x0 … order by … limit n) t)`로 렌더링. 안쪽 select는 조회 규칙(조인, D36)을 그대로 써서 같은 행을 대상으로 한다. 파생 테이블 `t`로 MariaDB 1093·1235를 피한다. 구현·세 DB 확인(`DmlQueryTest`, `ExecutorTest`) | 확정 |
+| D42 | 순서 보장 Set 결과 (M5.5, M12) | `findAllAsSet` / `findSet` · 자동 distinct · 크기 검사 · DML offset | **2026-11-16 작성자 결정**: 쿼리 `toSet()`, 실행기 `findSet(Where[, SortSpec \| Sort])`, 반환 `SequencedSet<T>`(`LinkedHashSet`, 정렬 순서 유지). **자동 `distinct`는 넣지 않는다**: 엔티티 행은 기본 키가 있고 lambdaQL은 to-one만 조인하므로(컬렉션은 `exists`) 같은 행이 두 번 나오지 않아 결과가 같고 비용만 는다(Oracle 23.26은 LOB에도 distinct 허용, 실측). 값 조회의 distinct는 M9에서 다룬다. **크기 검사**: Set 크기가 행 수보다 작으면 `IllegalStateException`(엔티티 `equals`/`hashCode`가 다른 행을 같게 보거나 `@Id`가 유일하지 않은 경우의 조용한 유실 방지). **DML offset은 두지 않는다**(limit만). 구현·세 DB 확인(`ResultQueryTest`, `ExecutorTest`) | 확정 |
 | D8 | 라이선스와 특허 | (A/A'일 때) LGPL 의존 허용 여부. ExTree `LICENSE`(2.1)와 `pom.xml:30-35`(3.0) 불일치. FluentJPA `pom.xml:31-34`는 LGPL-3.0만 선언해 `LICENSE`(AGPL-3.0 소스 / LGPL-3.0 바이너리)와 불일치. FluentJPA `README.md:1`의 'Patent Pending' 표기는 (B) clean-room이라도 특허 여부 확인 필요 | 법무 확인 | D1과 함께 |
 
 ### 2.6 바이트코드 읽기 계층: ASM, `java.lang.classfile`, Babylon Code Reflection
@@ -915,7 +920,7 @@ public interface By {                         // 정렬 빌더 (람다 인자로
 OrderedSelectQuery<T> orderBy(SortBy<T> spec);
 OrderedSelectQuery<T> orderBy(SortKey<T> key);                  // ASC
 OrderedSelectQuery<T> orderBy(SortKey<T> key, Direction dir);
-OrderedSelectQuery<T> orderBy(SortSpec<T> spec);                // 재사용·조립형
+OrderedSelectQuery<T> orderBy(SortSpec<T> spec);                // 재사용·조립형: SortSpec.of(Order.class, (o, by) -> …), then(), reversed()
 ```
 
 ```java
@@ -1173,7 +1178,7 @@ public class LambdaQLException extends RuntimeException {   // 모든 lambdaQL �
   - `B&&false`, `B||true`, `B||false`가 예외 없이 축약되고, `c?x:false`·`c?true:x`·`c?false:true`가 각각 AND·OR·NOT이 되며, 일반 `c?x:y`는 예외를 던집니다.
 - **관련 파일**: `LPV`, `A/ShortCircuitReducer.java`(신규), `A/BranchEvent.java`(신규), `CSM`(삭제), `A/LogicalCondition.java`, `A/UnaryCondition.java`(`Not`으로 대체), `A/BinaryCondition.java`(`Compare`로 대체), `A/BinaryOperator.java`
 
-> **구현 현황 (2026-11-12)**: M1~M3(로딩·디코딩·조건 복원), M4의 기본 의미 해석(`Normalizer`: getter 경로, Host 값, equals·Objects.equals·areEqual, compareTo, 캡처 컬렉션 IN, enum 상수), M5의 기본 렌더링·실행(`HqlRenderer`, `SelectQuery.where/toHql/toList`, D36 INNER JOIN, D37 리터럴 규칙)이 구현됨. M5.5 정렬의 핵심(`Direction`, `By`, `SortBy`, `SortKey`, getter 메서드 레퍼런스, `OrderedSelectQuery.limit/offset`, 정렬 전용 LEFT JOIN, D16 NULL 정책, S9 tie-breaker)과 D36 null guard LEFT JOIN 보완이 구현됨. 캡처 값·상수만 쓰는 부분(`min == null` 등)은 실행할 때 Java 순서(왼쪽부터, `&&`/`||` 단락 평가)로 결정해 HQL에서 지움: `min == null || o.getPrice() > min`은 `min`이 null이면 조건 없음, 아니면 `e0.price > :p1`(분석 캐시는 그대로, HQL 문장만 값에 따라 다름). 결정하는 부분보다 앞의 부분은 Java가 먼저 실행하므로 오류 검사를 함(`o.getPrice() > min \|\| min == null`은 Java처럼 예외). `SelectQueryTest` 15개, `SortQueryTest` 9개가 H2·MariaDB 10.11·Oracle 23.26에서 통과(`-Dlql.db=mariadb\|oracle`, 테스트 테이블은 `SQ_` 접두, `DatabaseSelectionTest`가 실제 연결 DB를 확인). 정정: 이전 기록의 "세 DB 통과"는 `spring.profiles.include` 방식이라 실제로는 H2에 연결됐을 수 있음 → `spring.config.import` 방식으로 바꾸고 다시 확인함. 남은 것: M4의 나머지(문자열 함수 등 v0.2 항목 제외), Kotlin 패턴 테스트, M5.5의 `SortSpec`·`SortWhitelist`·조인형 `SortBy2/3`·컴파일 실패 테스트, M8 이후 전부.
+> **구현 현황 (2026-11-12)**: M1~M3(로딩·디코딩·조건 복원), M4의 기본 의미 해석(`Normalizer`: getter 경로, Host 값, equals·Objects.equals·areEqual, compareTo, 캡처 컬렉션 IN, enum 상수), M5의 기본 렌더링·실행(`HqlRenderer`, `SelectQuery.where/toHql/toList`, D36 INNER JOIN, D37 리터럴 규칙)이 구현됨. M5.5 정렬의 핵심(`Direction`, `By`, `SortBy`, `SortKey`, getter 메서드 레퍼런스, `OrderedSelectQuery.limit/offset`, 정렬 전용 LEFT JOIN, D16 NULL 정책, S9 tie-breaker)과 D36 null guard LEFT JOIN 보완이 구현됨. 캡처 값·상수만 쓰는 부분(`min == null` 등)은 실행할 때 Java 순서(왼쪽부터, `&&`/`||` 단락 평가)로 결정해 HQL에서 지움: `min == null || o.getPrice() > min`은 `min`이 null이면 조건 없음, 아니면 `e0.price > :p1`(분석 캐시는 그대로, HQL 문장만 값에 따라 다름). 결정하는 부분보다 앞의 부분은 Java가 먼저 실행하므로 오류 검사를 함(`o.getPrice() > min \|\| min == null`은 Java처럼 예외). `SortSpec`(재사용·조립형 정렬: `of`, `then`, `reversed`, S6)과 결과 함수 `first/one/count/exists`(D38)가 구현됨. `SelectQueryTest` 16개, `SortQueryTest` 12개, `ResultQueryTest` 4개가 H2·MariaDB 10.11·Oracle 23.26에서 통과(`-Dlql.db=mariadb\|oracle`, 테스트 테이블은 `SQ_` 접두, `DatabaseSelectionTest`가 실제 연결 DB를 확인). 정정: 이전 기록의 "세 DB 통과"는 `spring.profiles.include` 방식이라 실제로는 H2에 연결됐을 수 있음 → `spring.config.import` 방식으로 바꾸고 다시 확인함. 남은 것: M4의 나머지(문자열 함수 등 v0.2 항목 제외), Kotlin 패턴 테스트, M5.5의 `SortWhitelist`·조인형 `SortBy2/3`·컴파일 실패 테스트, M8 이후 전부.
 
 ### Milestone 4. 의미 해석: JPQL 경로, host 평가, String/boolean (2~3일)
 
@@ -1433,6 +1438,24 @@ qb.from(Order::class.java).groupBy { listOf(it.customer?.id, it.status) }       
 | P9 | 튜플(`Object[]`) | ✅ | ✅ | ✅ |
 
 ### Milestone 10. UPDATE·INSERT·DELETE (D28) **(2026-11-10 확정: 진입점 이름, 대입 표기 두 가지, `all()` 필수, `set()` 여러 번 + 한 `set` 안 여러 대입)**
+
+> **구현 현황(2026-11-16)**: 아래 범위를 구현했고 H2·MariaDB 10.11·Oracle 23.26에서 `DmlQueryTest` 13개, `AssignmentReaderTest` 3개가 통과했다(실측).
+>
+> - UPDATE: setter 형식과 `by.set` 형식, `set()` 여러 번(PATCH), 단계별 타입(`UpdateQuery` → `UpdateSet` → `ExecutableUpdate`, U5), `@Version` 엔티티의 `update versioned`
+> - DELETE: `where`·`all()`(U5)
+> - INSERT: 한 행, 목록(`values(list, (o, l) -> …)`, 문장당 값 500개 이하로 분할, U13), 생성 id 생략, INSERT … SELECT(원본 연관 경로는 명시적 left join, U10)
+> - UPSERT(D40): `upsert(X)`, `onConflict(키).update(…)`, `onConflict(키).ignore()`(`insert … select … where not exists` 에뮬레이션)
+> - 규칙 U1·U3·U4·U6 분석 시점 검사. `Objects.requireNonNullElse` → `coalesce`(U2). 상자에 담긴 상수(`Long.valueOf(100L)`)도 리터럴(D37)
+> - **연관 경로(U9 개정)**: SET 값과 where의 비FK 연관 경로는 상관 스칼라 서브쿼리 `(select s1.name from Customer s1 where s1.id = e0.customer.id)`로 렌더링한다. where에서 inner join 의미인 경로(D36)에는 `e0.customer.id is not null`을 더해 조회 `qb.from(X).where(같은 람다)`와 같은 행을 대상으로 한다(삭제 행 비교 실측). null guard로 LEFT 의미인 경로에는 더하지 않는다. 대상 테이블을 서브쿼리에서 읽지 않으므로 MariaDB 제약(1093)과 무관하다
+> - Spring 실행기: `updateQuery()`·`deleteQuery()`·`insertQuery()`·`upsertQuery()`(D39 ④). 실행은 호출자 트랜잭션이 필요하고, repository default 메서드 안에서는 오류가 `InvalidDataAccessApiUsageException`으로 변환된다(실측)
+>
+> - `AssignBy`는 값을 반환하지 않는다(`void set(T, SetBy)`). 그래서 Java 체인 `by.set(a, 1).set(b, 2)`, 문장 나열, Kotlin 인덱스 대입 `by[o.status] = 1`이 모두 같은 분석 경로를 탄다(KOTLIN.md 9절 "유지" 결정과 일치).
+> - Kotlin 대입 4형태(인덱스 대입, 체인, 속성 대입, `?.` 대입문)는 kotlinc 2.3.21로 컴파일해 분석 결과를 확인했다(실측, 빌드 밖 임시 하네스). Kotlin `price * 2`의 `iconst_2; i2d`는 상수로 접는다(D37).
+>
+> - DML limit·1행 보호·트랜잭션 필수(D41)를 구현했다. 실행기 단축 메서드는 `deleteAll`/`deleteOne` 등 8개다.
+> - NULL이 될 수 없는 열(id, 기본형, `nullable = false`)의 `is null`은 거짓으로 접는다. 단, 연관 경로가 없는 열에 한한다. Kotlin `it.id == id`(`Long?`)가 `not (e0.id is null or e0.id <> :p)` 대신 `e0.id = :p`로 렌더링된다(3.9 SARGable, `SelectQueryTest` region `never-null`).
+>
+> 미구현: `sub` 서브쿼리(M8), INSERT … SELECT 집계(M9), U9의 EXISTS 최적화, 빌드 안의 Kotlin 테스트 소스, 캡처 엔티티의 transient 검사(U11, 현재 Hibernate 바인딩 오류로 나타남), 복합 키 엔티티의 limit·1행 보호.
 
 진입점은 `qb.from` / `qb.update` / `qb.insert` / `qb.delete`다(D28, 이름 확정). 조회와 같은 원칙을 따른다. 람다는 한 번만 쓰고, 정적 헬퍼는 두지 않으며, 서브쿼리는 람다 인자 `sub`로 받는다(M8). **대입은 setter 호출로 적고, Kotlin은 프로퍼티 대입으로 적는다.** 람다 본문은 실행되지 않고 `SET 열 = 식` 목록으로 번역된다.
 
@@ -1856,10 +1879,16 @@ D32(DDL 지원 여부)는 2026-11-10 작성자 결정으로 **폐기**했다. DD
 | 모듈(아티팩트) | 내용 | 의존 |
 |---|---|---|
 | `lambdaql-core` | 분석 엔진, `QueryBuilder`, 조회·DML·프로시저, i18n 메시지 | `jakarta.persistence-api`, ASM(`asm`, `asm-tree`는 공개 API에 노출되므로 `api`), `slf4j-api`. **Spring 의존 0**. Hibernate 6.6+는 실행 시 사용자가 제공 |
-| `lambdaql-spring-data-jpa` | `LambdaQlExecutor<T>` repository fragment와 구현, `META-INF/spring.factories`, Boot 자동 구성(`QueryBuilder` 빈, 메타데이터 노출) | core + Spring Data JPA, Spring Boot는 `compileOnly`(Boot 없이도 fragment는 동작) |
-| (나중) `lambdaql-spring-boot-starter` | 의존성만 묶은 빈 모듈 | 필요해지면 추가 |
+| `lambdaql-spring-data-jpa` | `LambdaQlExecutor<T>` repository fragment와 구현, `META-INF/spring.factories`, Boot 자동 구성(`QueryBuilder` 빈) | core + Spring Data JPA, Spring Boot는 `compileOnly`(Boot 없이도 fragment는 동작) |
+| `lambdaql-spring-boot-starter` | 코드 없는 의존성 묶음(D39, v0.1) | spring-data-jpa 모듈 + `spring-boot-starter-data-jpa` |
 
-현재 `query` 모듈은 `lambdaql-core`가 된다. 정리할 것(실측): `implementation 'spring-boot-starter-jdbc'`·`-validation`(logback·Hikari·hibernate-validator가 사용자에게 전이), `compileOnly` MyBatis, Lombok 의존 제거. 엔진이 import하는 `jakarta.persistence.metamodel`은 지금 선언 없이 `compileOnly data-jpa`로만 컴파일되므로 명시한다. 루트 프로젝트 이름 `lambadaql`(오타)도 이때 `lambdaql`로 고친다.
+**구현 현황(2026-11-16)**: 세 모듈 구성 완료. 폴더는 `query`(→ `lambdaql-core`, `query/gradle.properties`의 `lql.artifactName`), `spring-data-jpa`, `spring-boot-starter`.
+
+- core 런타임 의존은 ASM 3종과 `slf4j-api`뿐이다(실측: `dependencies`).
+- `spring-boot-starter-jdbc`·`-validation`, MyBatis 의존은 제거했다.
+- `jakarta.persistence-api`와 `hibernate-core`는 `compileOnly`다. `hibernate-core`는 M10까지 남은 옛 `org.lambdaql.analyzer` 패키지에만 필요하다.
+- Lombok도 옛 analyzer 패키지에만 남아 있다(`compileOnly`).
+- 폴더 이름을 유지한 이유: 매뉴얼과 Javadoc의 GitHub 링크(`query/src/test/...`) 수백 개를 유지하기 위함.
 
 #### 12.2 실행기 API
 
@@ -1868,12 +1897,19 @@ public interface LambdaQlExecutor<T> {      // @NoRepositoryBean을 붙이면 fr
     SelectQuery<T> query();                 // qb.from(이 repository의 엔티티)
     <E> SelectQuery<E> from(Class<E> type);
     List<T> findAll(Where<T> where);
-    Optional<T> findOne(Where<T> where);
+    List<T> findAll(Where<T> where, SortSpec<T> sort);
+    List<T> findAll(Where<T> where, Sort sort);          // Spring Sort: PropertyPath 검증 후 SortSpec.ofPath
+    Page<T> findAll(Where<T> where, Pageable pageable);  // count는 PageableExecutionUtils로 필요할 때만
+    Optional<T> findFirst(Where<T> where);               // 정렬 없으면 id가 가장 작은 행
+    Optional<T> findFirst(Where<T> where, SortSpec<T> sort);
+    Optional<T> findFirst(Where<T> where, Sort sort);
+    Optional<T> findOne(Where<T> where);                 // 2행 이상: IncorrectResultSizeDataAccessException
     long count(Where<T> where);
     boolean exists(Where<T> where);
-    UpdateQuery<T> updateQuery();           // JpaRepository의 delete(T) 등과 이름이 겹치지 않게
+    UpdateQuery<T> updateQuery();                        // DML(D39 ④): 호출자 트랜잭션 필요
     DeleteQuery<T> deleteQuery();
     InsertQuery<T> insertQuery();
+    UpsertQuery<T> upsertQuery();                        // D40
 }
 
 interface OrderRepository extends JpaRepository<Order, Long>, LambdaQlExecutor<Order> {
@@ -1899,14 +1935,27 @@ interface OrderRepository : JpaRepository<Order, Long>, LambdaQlExecutor<Order> 
 | SD2 | **fragment 등록은 Spring Data 3.4+의 `META-INF/spring.factories`**(`org.lambdaql.spring.LambdaQlExecutor=org.lambdaql.spring.LambdaQlExecutorImpl`). Boot 자동 repository 스캔과 `@EnableJpaRepositories` 명시 설정 모두 동작하고, 사용자의 `OrderRepositoryImpl`과도 함께 쓸 수 있다(실측). 구현 클래스는 **생성자가 하나**여야 한다(둘이면 `No default constructor found`, 실측). repository가 `LambdaQlExecutor`를 **직접** 상속해야 한다 |
 | SD3 | 쓰지 않는 방식: Kotlin JDSL 같은 BeanPostProcessor + `setCustomImplementation`(사용자 커스텀 구현을 덮어써 기동 실패, 실측), 자동 구성 빈만 등록(fragment로 인식되지 않음, 실측), FactoryBean 교체(다른 라이브러리와 충돌, 설정 누락) |
 | SD4 | 구현은 Spring이 넘겨주는 **트랜잭션 공유 EntityManager**를 `QueryBuilder`에 넘긴다. `@Transactional` 안의 미반영 변경이 보이고, 롤백·`readOnly`가 그대로 전파된다(실측). 트랜잭션 밖에서는 트랜잭션이 없으므로(실측) 조회 메서드는 구현에 `@Transactional(readOnly = true)`, DML(`execute()`)은 호출자의 트랜잭션이 필요하다 |
-| SD5 | repository의 엔티티 타입: 람다가 있으면 `SerializedLambda.getInstantiatedMethodType()`에서, 람다가 없는 `query()`는 `RepositoryMethodContext`(자동 구성이 `setExposeMetadata(true)`를 건다, 실측)에서 얻는다. fragment 빈은 모든 repository가 공유한다 |
+| SD5 | repository의 엔티티 타입: 람다가 있으면 `SerializedLambda.getInstantiatedMethodType()`에서, 람다가 없는 `query()`는 `RepositoryMethodContext`(자동 구성이 `setExposeMetadata(true)`를 건다, 실측)에서 얻는다. fragment 빈은 모든 repository가 공유한다. **구현(2026-11-16)**: 구현 클래스가 `RepositoryMetadataAccess`를 구현하면 Spring Data가 메타데이터를 노출하므로 `RepositoryMethodContext.getContext().getMetadata().getDomainType()`으로 얻는다. 두 repository(`Member`, `Team`)가 실행기 하나를 공유해도 각자의 엔티티를 쓴다(실측, `AutoConfigurationTest`) |
 | SD6 | Java default 메서드 안의 람다는 repository interface의 private static `lambda$…`로 컴파일된다. `BytecodeLoader`가 interface 클래스 파일을 읽는지 M12 테스트로 확인한다(미실측) |
 | SD7 | **Kotlin**: 2.2 이상은 몸체가 있는 interface 메서드가 Java default 메서드로 컴파일되어 동작(kotlinc 2.3.21 실측). 2.2 미만은 `-Xjvm-default=all`이 필요(없으면 `No property … found` 기동 실패, `-jvm-default=disable` 실측). Spring Data Kotlin 지원에는 `kotlin-reflect`가 필요(`ClassNotFoundException: ReflectJvmMapping`, 실측). 문서화 |
 | SD8 | 지원 범위: **Spring Boot 3.4+ / Spring Data JPA 3.4+**와 Boot 4(Spring Data 4는 `RepositoryFragmentsContributor`가 생겼지만 spring.factories 방식도 문서에 남아 있음 — Boot 4 실측은 M12에서). 3.3 이하는 지원하지 않는다 |
-| SD9 | **재검토 중(2026-11-11, 작성자 지적: 사용 중인 코드)**. 기존 `org.lambdaql.jpa`(`DefaultMethodSupportJpaRepositoryFactoryBean` 등)의 의도는 "Impl 클래스 대신 interface default 메서드로 커스텀 구현". 실측(Boot 3.4.2): lambdaQL 코드 없이도 Java default 메서드는 Spring Data가 직접 실행하고(`PLAIN CALL -> hi bob count=0 byName=0`), FactoryBean을 지정해도 교체한 `QueryLookupStrategy`에는 default 메서드가 오지 않음(`RESOLVED [findByName]`). `DefaultMethodQuery.execute` 직접 실행은 `ClassCastException`/`WrongMethodTypeException`, `JpaConfiguration` 자동 교체는 `isAssignableFrom` 방향이 반대라 0건. **삭제하지 않고 `lambdaql-spring-data-jpa`로 옮긴다.** 작성자 확인 후: (a) Java 목적이면 Spring Data 기본 동작으로 문서화하고 정리, (b) Kotlin 2.2 미만(`DefaultImpls`) 목적이면 탐색 전략 + 인터셉터로 `DefaultImpls` 본문을 호출하도록 고쳐 살림(프로토타입 필요). 어느 쪽이든 실행 버그 2건 수정 |
+| SD9 | **정리 완료(2026-11-16, D39 ①)**: 옛 `org.lambdaql.jpa`(`DefaultMethodSupportJpaRepositoryFactoryBean` 등 4개 클래스)는 삭제했다. 목적이던 "Impl 클래스 대신 interface default 메서드로 커스텀 구현"은 Spring Data가 직접 지원한다(SD1, Boot 3.4.2 실측: FactoryBean이 교체한 `QueryLookupStrategy`에는 default 메서드가 전달되지 않음). Kotlin은 2.2 이상 기본 설정, 2.2 미만은 `-Xjvm-default=all`(SD7). 같은 결론이 hunet core `datasource/README.md`("JPA Repository를 default method로 구현하기")에도 정리되어 있다 |
 | SD10 | `@DataJpaTest`에서는 자동 구성을 import하는 방법을 문서화한다 |
 
 #### 12.4 의존 관계와 완료 기준
+
+**진행 현황(2026-11-16)**: 조회 실행기와 Boot 자동 구성을 구현했고, H2·MariaDB 10.11·Oracle 23.26에서 `ExecutorTest` 8개, `AutoConfigurationTest` 2개가 통과했다(Boot 3.4.2, Spring Data JPA 3.4.2).
+
+확인한 항목(실측):
+- 사용자 `Impl` fragment, `JpaSpecificationExecutor`와 함께 사용
+- 트랜잭션 안의 미반영 변경 조회와 롤백 전파(SD4)
+- `findOne` 2행 이상 시 `IncorrectResultSizeDataAccessException` 변환
+- 없는 `Sort` 속성의 `PropertyReferenceException`
+
+남은 항목:
+- Boot 4 실측(미측정)
+- Kotlin repository 실측(미측정, Kotlin 테스트 소스 없음)
+- 라우팅 데이터소스와의 조합 안내(매뉴얼 12장)
 
 - M5(조회 실행) 뒤. 모듈 분리(12.1)는 M5 전에 해도 된다(core 의존성 정리가 D33 I8과 같은 작업).
 - **완료 기준**: Boot 3.4와 Boot 4 샘플에서 12.2의 Java·Kotlin repository가 H2·MariaDB·Oracle에서 동작. 사용자 커스텀 구현과 함께 쓸 때 기동 성공. 트랜잭션 전파(SD4) 테스트. Kotlin 2.2 미만 + `-Xjvm-default=all` 안내가 매뉴얼에 있음.

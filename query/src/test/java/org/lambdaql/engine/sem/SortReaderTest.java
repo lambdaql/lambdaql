@@ -70,6 +70,22 @@ class SortReaderTest {
     }
 
     @Test
+    void pathText() {
+        EntityModel model = new JpaEntityModel(emf.getMetamodel());
+        // @start region="read-path"
+        Expr.Column name = SortReader.readPath("customer.name", Order.class, model);
+        assertEquals("col0.customer.name", name.toString());
+        assertEquals(List.of(true, false), name.association());       // customer is an association: a join is needed
+        // only real properties, ending at a basic value
+        assertThrows(IllegalArgumentException.class, () -> SortReader.readPath("customer", Order.class, model));
+        assertThrows(IllegalArgumentException.class, () -> SortReader.readPath("price desc; drop", Order.class, model));
+        // @end
+        assertEquals("col0.customer.id", SortReader.readPath("customer.id", Order.class, model).toString());
+        assertThrows(IllegalArgumentException.class, () -> SortReader.readPath("customer..name", Order.class, model));
+        assertThrows(IllegalArgumentException.class, () -> SortReader.readPath("customer.orders", Order.class, model));
+    }
+
+    @Test
     void notAChain() {
         assertThrows(LambdaAnalysisException.class, () -> items((o, by) -> by));
         assertThrows(LambdaAnalysisException.class,

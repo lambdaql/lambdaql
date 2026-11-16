@@ -4,7 +4,7 @@
 > [!NOTE]
 > **상태**
 > - **구현됨, H2·MariaDB·Oracle에서 테스트함:** `where` 조건과 `toList()`(컬럼 매핑, HQL 출력, 쿼리 실행). 테스트는 **Java** 람다를 사용합니다. **Kotlin 람다는 아직 테스트하지 않았습니다.**
-> - **설계됨, 아직 구현되지 않음:** 이 장의 Kotlin 전용 형태(`?.`, `?:`, `!!`, 범위, `when`, `in`). 이 형태들의 바이트코드는 프로토타입으로 컴파일하여 확인했고(kotlinc 1.7.22 ~ 2.3.21), 많은 조건을 H2에서 행 단위로 확인했습니다. 서브쿼리, `select`, update/insert/delete, 프로시저, Spring 모듈도 아직 설계 단계입니다. 정렬과 페이징의 핵심 기능은 구현되었습니다([4. 정렬과 페이징](04-order-paging.md)).
+> - **설계됨, 아직 구현되지 않음:** 이 장의 Kotlin 전용 형태(`?.`, `?:`, `!!`, 범위, `when`, `in`). 이 형태들의 바이트코드는 프로토타입으로 컴파일하여 확인했고(kotlinc 1.7.22 ~ 2.3.21), 많은 조건을 H2에서 행 단위로 확인했습니다. 서브쿼리, `select`, 프로시저도 아직 설계 단계입니다. 정렬과 페이징의 핵심 기능([4. 정렬과 페이징](04-order-paging.md)), update/insert/delete/upsert([7. 수정, 삽입, 삭제](07-dml.md)), Spring Data JPA 모듈([12. Spring Data JPA](12-spring-data-jpa.md))은 구현되었습니다.
 > - 이 장의 HQL은 **예정된** 출력입니다. 세부 사항(예: `e0`, `j1` 같은 별칭 이름)은 아직 조금 바뀔 수 있습니다.
 
 [Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [2. 시작하기](02-getting-started.md) | 다음: [4. 정렬과 페이징](04-order-paging.md) | [이 페이지의 Java 버전](../java/03-where.md)
@@ -226,6 +226,24 @@ Hibernate가 데이터베이스별로 `is not distinct from`을 쓰는 방법(�
 .where { it.description != text }
 // HQL: (e0.description <> :p1 or e0.description is null)
 ```
+
+**NULL이 될 수 없는 컬럼: `it.id == id`.** 예제 엔티티의 `id`는 `Long?`입니다. Kotlin은 `it.id == id`(캡처한 `id: Long`)를 null 검사와 비교로 컴파일합니다.
+
+이 바이트코드를 그대로 옮기면 `not (e0.id is null or e0.id <> :p1)`이 됩니다. 결과는 맞지만 데이터베이스가 인덱스를 제대로 사용하기 어렵습니다.
+id는 NULL이 될 수 없으므로 id의 `is null`은 항상 거짓입니다. lambdaQL은 이 검사를 제거하고 `e0.id = :p1`로 씁니다.
+
+기본형 속성과 `nullable = false` 컬럼에도 같은 규칙을 적용합니다. 단, 경로에 **연관 단계가 없을 때만** 적용합니다. 고객이 없는 주문이 있으므로 `it.customer?.id`는 NULL이 될 수 있고, 이 경로의 null 검사는 유지합니다.
+
+```kotlin
+.where { it.id == id }              // id: Long (captured)
+// HQL: e0.id = :p1
+.where { it.id == null }
+// HQL: 1=0
+.where { it.customer?.id == null }
+// HQL: e0.customer.id is null
+```
+
+같은 HQL을 Java 람다로 [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)에서 테스트했습니다(영역 `never-null`, [이 페이지의 Java 버전](../java/03-where.md#362--on-objects-compares-values) 참고). Java 테스트는 Kotlin의 `it.id == id`가 컴파일된 형태의 조건을 사용합니다.
 
 > [!WARNING]
 > **Kotlin의 non-null 타입은 증거가 되지 않습니다.** `var code: String` 속성에도 데이터베이스에서 온 NULL이 들어 있을 수 있습니다.

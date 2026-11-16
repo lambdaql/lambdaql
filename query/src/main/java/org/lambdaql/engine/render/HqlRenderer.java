@@ -2,6 +2,7 @@ package org.lambdaql.engine.render;
 
 import org.lambdaql.analyzer.LambdaAnalysisException;
 import org.lambdaql.engine.ir.ArithOp;
+import org.lambdaql.engine.ir.Assignment;
 import org.lambdaql.engine.ir.CmpOp;
 import org.lambdaql.engine.ir.Expr;
 import org.lambdaql.engine.ir.Pred;
@@ -50,9 +51,19 @@ public final class HqlRenderer {
     private final EntityModel model;
     private final HostEvaluator evaluator;
     private final Map<String, Join> joins = new LinkedHashMap<>();
-    private final Map<String, Object> params = new LinkedHashMap<>();
+    private final Map<String, Object> params;
+    /** Alias of root entities ({@code e0}); a nested select of a DML statement uses {@code x0}. */
+    private final String rootPrefix;
+    /** Alias prefix of joins ({@code j1}); a nested select of a DML statement uses {@code k1}. */
+    private final String joinPrefix;
     private Object[] captured = new Object[0];
     private boolean leftJoins;
+    /** The target entity while rendering UPDATE/DELETE (association paths become subqueries), else null. */
+    private Class<?> dmlRoot;
+    private int subqueries;
+    private boolean collectGuards;
+    /** Association prefixes used by a DML condition: key → the foreign key column to check for NOT NULL. */
+    private final Map<String, Expr.Column> dmlGuards = new LinkedHashMap<>();
     private java.util.Set<String> whereLeftJoins = java.util.Set.of();
 
     /**
@@ -71,8 +82,28 @@ public final class HqlRenderer {
      * @param loader class loader used to compute host values
      */
     public HqlRenderer(EntityModel model, ClassLoader loader) {
+        this(model, new HostEvaluator(loader), new LinkedHashMap<>(), "e", "j");
+    }
+
+    /** A renderer for a nested select that shares the parameters of its parent statement. */
+    private HqlRenderer(EntityModel model, HostEvaluator evaluator, Map<String, Object> params, String rootPrefix, String joinPrefix) {
         this.model = model;
-        this.evaluator = new HostEvaluator(loader);
+        this.evaluator = evaluator;
+        this.params = params;
+        this.rootPrefix = rootPrefix;
+        this.joinPrefix = joinPrefix;
+    }
+
+    /**
+     * Which rows an UPDATE/DELETE changes, besides its conditions.
+     *
+     * @param sorts the order for {@code limit} (the id is added as the last key, S9)
+     * @param limit the most rows to change, or {@code null} for no limit
+     * @param id    the id of the only row to change (the "one" protection), or {@code null}
+     */
+    public record DmlScope(List<SortBound> sorts, Integer limit, Object id) {
+        /** Every row that matches. */
+        public static final DmlScope ALL = new DmlScope(List.of(), null, null);
     }
 
     /**
@@ -85,12 +116,32 @@ public final class HqlRenderer {
     }
 
     /**
-     * The sort keys with the captured values of their lambda.
+     * The sort keys of one sort lambda, with the captured values of that lambda.
+     * A {@code SortSpec} made of several lambdas gives one {@code SortBound} per lambda.
      *
      * @param items    the keys in order
      * @param captured the captured values of the sort lambda (used to read run-time directions)
+     * @param reversed {@code true} to reverse every key (direction and NULL position), for {@code SortSpec.reversed()}
      */
-    public record SortBound(List<SortItem> items, Object[] captured) {
+    public record SortBound(List<SortItem> items, Object[] captured, boolean reversed) {
+        /**
+         * Makes sort keys that are not reversed.
+         *
+         * @param items    the keys in order
+         * @param captured the captured values of the sort lambda
+         */
+        public SortBound(List<SortItem> items, Object[] captured) {
+            this(items, captured, false);
+        }
+
+        /**
+         * Returns the same keys in the opposite order direction.
+         *
+         * @return a copy with {@code reversed} flipped
+         */
+        public SortBound reverse() {
+            return new SortBound(items, captured, !reversed);
+        }
     }
 
     /**
@@ -105,7 +156,35 @@ public final class HqlRenderer {
      * @throws LambdaAnalysisException if a host value cannot be computed or is not allowed (for example a null receiver)
      */
     public RenderedQuery select(Class<?> root, List<Bound> wheres) {
-        return select(root, wheres, null, false);
+        return select(root, wheres, List.of(), false);
+    }
+
+    /**
+     * Renders {@code select count(e0) from Entity e0 [join ...] [where ...]}.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.ResultQueryTest" region="count"}
+     *
+     * @param root   the main entity class
+     * @param wheres the conditions; they are joined with AND
+     * @return the HQL and its parameters; the result is one {@code Long}
+     */
+    public RenderedQuery count(Class<?> root, List<Bound> wheres) {
+        return render("count(e0)", root, wheres, List.of(), false);
+    }
+
+    /**
+     * Renders {@code select 1 from Entity e0 [join ...] [where ...]}; the caller reads at most one row.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.ResultQueryTest" region="exists"}
+     *
+     * @param root   the main entity class
+     * @param wheres the conditions; they are joined with AND
+     * @return the HQL and its parameters; the result rows are {@code Integer} 1
+     */
+    public RenderedQuery exists(Class<?> root, List<Bound> wheres) {
+        return render("1", root, wheres, List.of(), false);
     }
 
     /**
@@ -117,13 +196,34 @@ public final class HqlRenderer {
      *
      * @param root   the main entity class
      * @param wheres the conditions; they are joined with AND
-     * @param sort   the sort keys, or {@code null}
+     * @param sorts  the sort keys, one entry per sort lambda (empty for no sort)
      * @param paged  {@code true} if the query uses {@code limit} or {@code offset}; then the id is added as the last key
      *               when the keys do not contain it (S9)
      * @return the HQL and its parameters
      * @throws LambdaAnalysisException if a host value cannot be computed, or a run-time direction is null
      */
-    public RenderedQuery select(Class<?> root, List<Bound> wheres, SortBound sort, boolean paged) {
+    public RenderedQuery select(Class<?> root, List<Bound> wheres, List<SortBound> sorts, boolean paged) {
+        return render(rootPrefix + "0", root, wheres, sorts, paged);
+    }
+
+    private RenderedQuery render(String select, Class<?> root, List<Bound> wheres, List<SortBound> sorts, boolean paged) {
+        List<String> parts = whereParts(wheres);
+        List<String> orders = orderBy(root, sorts, paged);
+        StringBuilder hql = new StringBuilder("select ").append(select).append(" from ")
+                .append(model.entityName(root)).append(' ').append(rootPrefix).append('0');
+        joins.forEach((path, j) -> hql.append(j.left() ? " left join " : " join ").append(path).append(' ').append(j.alias()));
+        if (!parts.isEmpty()) hql.append(" where ").append(String.join(" and ", parts));
+        if (!orders.isEmpty()) hql.append(" order by ").append(String.join(", ", orders));
+        return new RenderedQuery(hql.toString(), new LinkedHashMap<>(params));
+    }
+
+    /**
+     * Folds and renders the conditions (joined later with AND). Also decides the join kinds (D36).
+     *
+     * @param wheres the conditions
+     * @return the parts; {@code ["1=0"]} if a condition is always false; empty if there is no condition
+     */
+    private List<String> whereParts(List<Bound> wheres) {
         List<Pred> folded = new ArrayList<>();
         Pred all = Pred.Bool.TRUE;
         for (Bound b : wheres) {
@@ -136,34 +236,369 @@ public final class HqlRenderer {
         List<String> parts = new ArrayList<>();
         if (all instanceof Pred.Bool b) {
             if (!b.value()) parts.add("1=0");
-        } else {
-            for (int i = 0; i < wheres.size(); i++) {
-                captured = wheres.get(i).captured();
-                Pred f = folded.get(i);
-                if (f instanceof Pred.Bool) continue;                  // TRUE here (a FALSE makes "all" FALSE)
-                String s = pred(f);
-                parts.add(wheres.size() > 1 && isComposite(f) ? "(" + s + ")" : s);
-            }
+            return parts;
         }
-        List<String> orders = orderBy(root, sort, paged);
-        StringBuilder hql = new StringBuilder("select e0 from ").append(model.entityName(root)).append(" e0");
+        for (int i = 0; i < wheres.size(); i++) {
+            captured = wheres.get(i).captured();
+            Pred f = folded.get(i);
+            if (f instanceof Pred.Bool) continue;                  // TRUE here (a FALSE makes "all" FALSE)
+            String s = pred(f);
+            parts.add(wheres.size() > 1 && isComposite(f) ? "(" + s + ")" : s);
+        }
+        return parts;
+    }
+
+    // ------------------------------------------------------------------ DML (ROADMAP M10)
+
+    /**
+     * The assignments of one assignment lambda, with the captured values of that lambda.
+     *
+     * @param items    the assignments in order
+     * @param captured the captured values (for {@code values(list, ...)}, the list element is added at the end)
+     */
+    public record AssignBound(List<Assignment> items, Object[] captured) {
+    }
+
+    /**
+     * Renders {@code update [versioned] Entity e0 set ... [where ...]}.
+     * <p>
+     * Association paths become correlated scalar subqueries ({@code (select s1.name from Customer s1 where s1.id = e0.customer.id)}),
+     * so the statement uses only its own table (ROADMAP U9; MariaDB cannot read the target table in a subquery).
+     * In the condition, a path that an inner join would use (D36) also gets {@code e0.customer.id is not null},
+     * so the rows are the same as {@code qb.from(...).where(same lambda)}.
+     * An entity with {@code @Version} gets {@code update versioned}.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update"}
+     *
+     * @param root   the entity class
+     * @param sets   the assignments of every {@code set()} call
+     * @param wheres the conditions ({@code all()} gives none)
+     * @return the HQL and its parameters
+     * @throws LambdaAnalysisException if a captured value cannot be used (for example null for a column that is never NULL)
+     */
+    public RenderedQuery update(Class<?> root, List<AssignBound> sets, List<Bound> wheres) {
+        return update(root, sets, wheres, DmlScope.ALL);
+    }
+
+    /**
+     * Renders an UPDATE that changes only some of the matching rows.
+     * <ul>
+     *   <li>With a limit: {@code where e0.id in (select t.id from (select x0.id as id from Entity x0 ... order by ... limit n) t)}.
+     *       The nested select uses the select rules (joins, D36), so the rows are the first {@code n} rows of
+     *       {@code qb.from(X).where(same).orderBy(same)}. The derived table {@code t} is needed by MariaDB, which cannot
+     *       read the target table or use {@code limit} directly in an {@code in} subquery (measured on all three databases).</li>
+     *   <li>With an id: {@code where e0.id = :p and (the conditions)}: exactly that row, if it still matches.</li>
+     * </ul>
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update-limit"}
+     *
+     * @param root   the entity class
+     * @param sets   the assignments
+     * @param wheres the conditions
+     * @param scope  the limit or the single id
+     * @return the HQL and its parameters
+     */
+    public RenderedQuery update(Class<?> root, List<AssignBound> sets, List<Bound> wheres, DmlScope scope) {
+        dmlRoot = root;
+        List<String> parts = new ArrayList<>();
+        for (AssignBound b : sets) {
+            captured = b.captured();
+            for (Assignment a : b.items()) parts.add(target(a.target(), "e0.") + " = " + assignValue(a));
+        }
+        String where = scopedWhere(root, wheres, scope);
+        StringBuilder hql = new StringBuilder("update ").append(model.versioned(root) ? "versioned " : "")
+                .append(model.entityName(root)).append(" e0 set ").append(String.join(", ", parts));
+        if (!where.isEmpty()) hql.append(" where ").append(where);
+        return new RenderedQuery(hql.toString(), new LinkedHashMap<>(params));
+    }
+
+    /**
+     * Renders {@code delete from Entity e0 [where ...]}, with the same path rules as {@link #update}.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.DmlQueryTest" region="delete"}
+     *
+     * @param root   the entity class
+     * @param wheres the conditions ({@code all()} gives none)
+     * @return the HQL and its parameters
+     */
+    public RenderedQuery delete(Class<?> root, List<Bound> wheres) {
+        return delete(root, wheres, DmlScope.ALL);
+    }
+
+    /**
+     * Renders a DELETE that removes only some of the matching rows (see {@link #update(Class, List, List, DmlScope)}).
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.DmlQueryTest" region="delete-limit"}
+     *
+     * @param root   the entity class
+     * @param wheres the conditions
+     * @param scope  the limit or the single id
+     * @return the HQL and its parameters
+     */
+    public RenderedQuery delete(Class<?> root, List<Bound> wheres, DmlScope scope) {
+        dmlRoot = root;
+        String where = scopedWhere(root, wheres, scope);
+        String hql = "delete from " + model.entityName(root) + " e0" + (where.isEmpty() ? "" : " where " + where);
+        return new RenderedQuery(hql, new LinkedHashMap<>(params));
+    }
+
+    /**
+     * Renders {@code select e0.id from Entity e0 ... where ...}: the ids of the matching rows,
+     * read first by the "one" protection (at most 2 are read).
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.DmlQueryTest" region="execute-one"}
+     *
+     * @param root   the entity class
+     * @param wheres the conditions
+     * @return the HQL and its parameters
+     * @throws LambdaAnalysisException if the entity has a composite id
+     */
+    public RenderedQuery ids(Class<?> root, List<Bound> wheres) {
+        return render(rootPrefix + "0." + idOf(root), root, wheres, List.of(), false);
+    }
+
+    private String idOf(Class<?> root) {
+        return model.idName(root).orElseThrow(() -> new LambdaAnalysisException(
+                "복합 키 엔티티에는 limit과 1행 보호를 아직 지원하지 않습니다: " + root.getName()));
+    }
+
+    private String scopedWhere(Class<?> root, List<Bound> wheres, DmlScope scope) {
+        if (scope.limit() != null) {
+            HqlRenderer inner = new HqlRenderer(model, evaluator, params, "x", "k");
+            String id = idOf(root);
+            String nested = inner.render("x0." + id + " as id", root, wheres, scope.sorts(), true).hql() + " limit " + scope.limit();
+            return "e0." + id + " in (select t.id from (" + nested + ") t)";
+        }
+        String where = dmlWhere(wheres);
+        if (scope.id() == null) return where;
+        String byId = "e0." + idOf(root) + " = " + bindRaw(scope.id());
+        return where.isEmpty() ? byId : byId + " and " + where;
+    }
+
+    /**
+     * Renders {@code insert into Entity (a, b) values (...), (...)}: one row per entry.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert"}
+     *
+     * @param root the entity class
+     * @param rows the rows; every row has the same target columns
+     * @return the HQL and its parameters
+     */
+    public RenderedQuery insertValues(Class<?> root, List<AssignBound> rows) {
+        List<String> tuples = new ArrayList<>();
+        for (AssignBound row : rows) tuples.add("(" + rowValues(row) + ")");
+        String hql = "insert into " + model.entityName(root) + " (" + targetList(rows.get(0)) + ") values " + String.join(", ", tuples);
+        return new RenderedQuery(hql, new LinkedHashMap<>(params));
+    }
+
+    /**
+     * Renders an upsert of one row: {@code insert into Entity e0 (...) values (...) on conflict(key) do update set ...}
+     * (ROADMAP D40). Hibernate turns it into {@code merge} (H2, Oracle) or {@code on duplicate key update} (MariaDB).
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.DmlQueryTest" region="upsert"}
+     *
+     * @param root    the entity class
+     * @param row     the inserted row
+     * @param key     the conflict key column
+     * @param updates the update on conflict; {@code null} means "the inserted values of every column except the key"
+     * @return the HQL and its parameters
+     * @throws LambdaAnalysisException if the row does not assign the key
+     */
+    public RenderedQuery upsert(Class<?> root, AssignBound row, Expr.Column key, AssignBound updates) {
+        String keyName = String.join(".", key.path());
+        requireKey(row, key);
+        List<String> sets = new ArrayList<>();
+        if (updates == null) {
+            for (Assignment a : row.items()) {
+                if (a.target().path().equals(key.path())) continue;
+                String name = String.join(".", a.target().path());
+                sets.add(name + " = excluded." + name);
+            }
+            if (sets.isEmpty()) return insertIgnore(root, row, key);        // only the key: nothing to update
+        }
+        String values = rowValues(row);
+        if (updates != null) {
+            dmlRoot = root;
+            captured = updates.captured();
+            for (Assignment a : updates.items()) sets.add(target(a.target(), "") + " = " + assignValue(a));
+        }
+        String hql = "insert into " + model.entityName(root) + " e0 (" + targetList(row) + ") values (" + values + ")"
+                + " on conflict(" + keyName + ") do update set " + String.join(", ", sets);
+        return new RenderedQuery(hql, new LinkedHashMap<>(params));
+    }
+
+    /**
+     * Renders "insert unless the key exists" for one row (ROADMAP D40):
+     * {@code insert into Entity (...) select ... where not exists (select 1 from Entity x where x.key = ...)}.
+     * Hibernate's {@code on conflict do nothing} becomes a plain insert on H2 and Oracle (measured), so lambdaQL
+     * writes this form itself. It is not atomic: two sessions inserting the same key at the same time can still
+     * get a duplicate key error.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert-ignore"}
+     *
+     * @param root the entity class
+     * @param row  the inserted row
+     * @param key  the key column
+     * @return the HQL and its parameters
+     */
+    public RenderedQuery insertIgnore(Class<?> root, AssignBound row, Expr.Column key) {
+        Assignment k = requireKey(row, key);
+        String values = rowValues(row);
+        captured = row.captured();
+        String keyValue = assignValue(k);
+        String entity = model.entityName(root);
+        String hql = "insert into " + entity + " (" + targetList(row) + ") select " + values
+                + " where not exists (select 1 from " + entity + " x where x." + String.join(".", key.path()) + " = " + keyValue + ")";
+        return new RenderedQuery(hql, new LinkedHashMap<>(params));
+    }
+
+    /**
+     * Renders {@code insert into Target (a, b) select e0.x, j1.y from Source e0 left join ... where ...}.
+     * Paths in the select list use explicit left joins, so source rows without the association stay (ROADMAP U10).
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert-select"}
+     *
+     * @param target  the target entity class
+     * @param source  the source entity class
+     * @param assigns target columns and values; the values use the source as root 0
+     * @param wheres  conditions on the source
+     * @return the HQL and its parameters
+     */
+    public RenderedQuery insertSelect(Class<?> target, Class<?> source, AssignBound assigns, List<Bound> wheres) {
+        List<String> parts = whereParts(wheres);
+        captured = assigns.captured();
+        leftJoins = true;
+        List<String> select = new ArrayList<>();
+        for (Assignment a : assigns.items()) select.add(value(a.value(), a.target().javaType()));
+        leftJoins = false;
+        StringBuilder hql = new StringBuilder("insert into ").append(model.entityName(target)).append(" (")
+                .append(targetList(assigns)).append(") select ").append(String.join(", ", select))
+                .append(" from ").append(model.entityName(source)).append(" e0");
         joins.forEach((path, j) -> hql.append(j.left() ? " left join " : " join ").append(path).append(' ').append(j.alias()));
         if (!parts.isEmpty()) hql.append(" where ").append(String.join(" and ", parts));
-        if (!orders.isEmpty()) hql.append(" order by ").append(String.join(", ", orders));
         return new RenderedQuery(hql.toString(), new LinkedHashMap<>(params));
+    }
+
+    private Assignment requireKey(AssignBound row, Expr.Column key) {
+        for (Assignment a : row.items()) {
+            if (a.target().path().equals(key.path())) return a;
+        }
+        throw new LambdaAnalysisException("충돌 키 " + String.join(".", key.path()) + "에 값을 대입해야 합니다(D40)");
+    }
+
+    private String targetList(AssignBound row) {
+        List<String> names = new ArrayList<>();
+        for (Assignment a : row.items()) names.add(String.join(".", a.target().path()));
+        return String.join(", ", names);
+    }
+
+    private String rowValues(AssignBound row) {
+        captured = row.captured();
+        List<String> values = new ArrayList<>();
+        for (Assignment a : row.items()) values.add(assignValue(a));
+        return String.join(", ", values);
+    }
+
+    private String target(Expr.Column c, String alias) {
+        return alias + String.join(".", c.path());
+    }
+
+    /**
+     * Renders the value of an assignment. A captured null becomes {@code null}
+     * (an error for a column that is never NULL, U6); a captured entity for an association is bound as is
+     * (Hibernate uses its id, U11).
+     */
+    private String assignValue(Assignment a) {
+        Expr v = a.value();
+        if (v instanceof Expr.Const c && c.isNull()) return "null";
+        if (isHostLike(v) && !(v instanceof Expr.Const)) {
+            Object x = eval(v);
+            if (x == null) {
+                if (a.target().nonNull()) {
+                    throw new LambdaAnalysisException("NULL이 될 수 없는 열에 null 값을 대입합니다(U6): " + String.join(".", a.target().path()));
+                }
+                return "null";
+            }
+            boolean association = a.target().association().get(a.target().association().size() - 1);
+            return association ? bindRaw(x) : bind(x, a.target().javaType());
+        }
+        return value(v, a.target().javaType());
+    }
+
+    /**
+     * Renders the condition of UPDATE/DELETE: association paths become subqueries, and inner-join paths get
+     * a NOT NULL check of their foreign key.
+     */
+    private String dmlWhere(List<Bound> wheres) {
+        collectGuards = true;
+        List<String> parts = whereParts(wheres);
+        collectGuards = false;
+        if (parts.equals(List.of("1=0"))) return "1=0";
+        for (Map.Entry<String, Expr.Column> g : dmlGuards.entrySet()) {
+            if (!whereLeftJoins.contains(g.getKey())) parts.add(path(g.getValue()) + " is not null");
+        }
+        return String.join(" and ", parts);
+    }
+
+    /**
+     * Renders a column that goes through an association as a correlated scalar subquery (UPDATE/DELETE only).
+     *
+     * @param c   the column
+     * @param hop index of the first association that needs a join
+     * @return for example {@code (select s1.name from Customer s1 where s1.id = e0.customer.id)}
+     */
+    private String subqueryPath(Expr.Column c, int hop) {
+        List<String> names = c.path();
+        Class<?> owner = dmlRoot;
+        for (int i = 0; i <= hop; i++) owner = model.property(owner, names.get(i)).orElseThrow().javaType();
+        String id = model.idName(owner).orElseThrow(() -> new LambdaAnalysisException("복합 키 연관 경로는 DML에서 아직 지원하지 않습니다"));
+        String alias = "s" + (++subqueries);
+        List<String> prefix = names.subList(0, hop + 1);
+        String fk = "e" + c.root() + "." + String.join(".", prefix) + "." + id;
+        if (collectGuards) {
+            List<String> fkPath = new ArrayList<>(prefix);
+            fkPath.add(id);
+            List<Boolean> fkAssoc = new ArrayList<>(c.association().subList(0, hop + 1));
+            fkAssoc.add(false);
+            dmlGuards.putIfAbsent(JoinPlanner.key(c.root(), prefix),
+                    new Expr.Column(c.root(), fkPath, fkAssoc, Object.class, false, true));
+        }
+        StringBuilder from = new StringBuilder(model.entityName(owner)).append(' ').append(alias);
+        String expr = alias;
+        for (int i = hop + 1; i < names.size(); i++) {
+            boolean last = i == names.size() - 1;
+            boolean fkOnly = c.idPath() && i == names.size() - 2;
+            if (!last && c.association().get(i) && !fkOnly) {
+                String inner = "s" + (++subqueries);
+                from.append(" left join ").append(expr).append('.').append(names.get(i)).append(' ').append(inner);
+                expr = inner;
+            } else {
+                expr = expr + "." + names.get(i);
+            }
+        }
+        return "(select " + expr + " from " + from + " where " + alias + "." + id + " = " + fk + ")";
     }
 
     // ------------------------------------------------------------------ order by
 
-    private List<String> orderBy(Class<?> root, SortBound sort, boolean paged) {
+    private List<String> orderBy(Class<?> root, List<SortBound> sorts, boolean paged) {
         List<String> out = new ArrayList<>();
         String id = paged ? model.idName(root).orElse(null) : null;
         boolean hasId = false;
-        if (sort != null) {
+        for (SortBound sort : sorts) {
             captured = sort.captured();
             leftJoins = true;
             for (SortItem item : sort.items()) {
-                Direction d = direction(item);
+                Direction d = sort.reversed() ? direction(item).reversed() : direction(item);
                 String key = value(item.key(), null);
                 String nulls = sortNonNull(item.key()) ? "" : d.nullsFirst() ? " nulls first" : " nulls last";
                 out.add(key + (d.ascending() ? " asc" : " desc") + nulls);
@@ -173,7 +608,7 @@ public final class HqlRenderer {
             }
             leftJoins = false;
         }
-        if (id != null && !hasId) out.add("e0." + id + " asc");
+        if (id != null && !hasId) out.add(rootPrefix + "0." + id + " asc");
         return out;
     }
 
@@ -432,15 +867,22 @@ public final class HqlRenderer {
     }
 
     private String path(Expr.Column c) {
-        String expr = "e" + c.root();
+        String expr = rootPrefix + c.root();
         List<String> names = c.path();
+        if (dmlRoot != null) {
+            for (int i = 0; i < names.size() - 1; i++) {
+                boolean fkOnly = c.idPath() && i == names.size() - 2;
+                if (c.association().get(i) && !fkOnly) return subqueryPath(c, i);
+            }
+            return expr + "." + String.join(".", names);
+        }
         for (int i = 0; i < names.size(); i++) {
             boolean last = i == names.size() - 1;
             boolean fkOnly = c.idPath() && i == names.size() - 2;
             if (!last && c.association().get(i) && !fkOnly) {
                 String key = expr + "." + names.get(i);
                 boolean left = leftJoins || whereLeftJoins.contains(JoinPlanner.key(c.root(), names.subList(0, i + 1)));
-                expr = joins.computeIfAbsent(key, k -> new Join("j" + (joins.size() + 1), left)).alias();
+                expr = joins.computeIfAbsent(key, k -> new Join(joinPrefix + (joins.size() + 1), left)).alias();
             } else {
                 expr = expr + "." + names.get(i);
             }

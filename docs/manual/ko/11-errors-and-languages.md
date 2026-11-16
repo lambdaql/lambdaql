@@ -317,7 +317,7 @@ WARN  [LQL-5001] ...컬럼 "price"에 대한 조건은 인덱스를 사용할 �
 이런 경고를 오류로 바꾸는 "엄격 모드"가 계획되어 있습니다.
 
 > [!NOTE]
-> 현재 `query` 모듈은 일부 Spring Boot 스타터를 일반 의존성으로 가지고 있어서, lambdaQL과 함께 이 스타터들(과 Logback)이 프로젝트에 들어옵니다. 설계에서는 이들을 `compileOnly`로 옮깁니다. 이 변경 후에는 lambdaQL이 `slf4j-api`만 가져옵니다.
+> `lambdaql-core`는 Spring에 의존하지 않습니다. 로깅 의존성은 `slf4j-api` 하나이므로 로깅 구현체는 사용자가 선택합니다. Spring 모듈(`lambdaql-spring-data-jpa`, `lambdaql-spring-boot-starter`)은 Spring Data JPA를 가져오고, 스타터는 `spring-boot-starter-data-jpa`와 Logback도 함께 가져옵니다.
 
 <a id="summary"></a>
 ## 요약

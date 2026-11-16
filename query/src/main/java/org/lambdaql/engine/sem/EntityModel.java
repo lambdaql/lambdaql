@@ -86,4 +86,13 @@ public interface EntityModel {
      * @return the id property name, for example {@code id}; empty for a composite id ({@code @IdClass})
      */
     Optional<String> idName(Class<?> entity);
+
+    /**
+     * Checks if an entity has a {@code @Version} property. Then UPDATE is rendered as {@code update versioned},
+     * so Hibernate also increases the version (ROADMAP M10).
+     *
+     * @param entity an entity class
+     * @return {@code true} if the entity has a version property
+     */
+    boolean versioned(Class<?> entity);
 }

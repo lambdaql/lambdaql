@@ -54,8 +54,9 @@ class SqlByDatabaseTest {
         qb = new QueryBuilder(emf);
         EntityManager em = emf.createEntityManager();
         em.getTransaction().begin();
-        em.createQuery("delete from Order").executeUpdate();     // empty tables: only the main SELECT runs
-        em.createQuery("delete from Customer").executeUpdate();
+        for (String e : List.of("Item", "Order", "Customer", "Archive", "VOrder", "IdOrder")) {
+            em.createQuery("delete from " + e).executeUpdate();     // empty tables: only the main statement runs
+        }
         em.getTransaction().commit();
         em.close();
 
@@ -119,6 +120,26 @@ class SqlByDatabaseTest {
         ex("sort-key#2", qb.from(Order.class).orderBy(Order::getPrice, Direction.DESC));
         ex("sort-page", qb.from(Order.class).orderBy((o, by) -> by.asc(o.getStatus())).limit(2).offset(2));
         ex("page-only", qb.from(Order.class).where(o -> o.isActive()).limit(2));
+        SortSpec<Order> byDescription = SortSpec.of(Order.class, (o, by) -> by.desc(o.getDescription()).asc(o.getId()));
+        ex("sort-spec", qb.from(Order.class).where(o -> o.isActive()).orderBy(byDescription));
+        SortSpec<Order> byStatus = SortSpec.of(Order.class, (o, by) -> by.asc(o.getStatus()));
+        SortSpec<Order> byPrice = SortSpec.of(Order.class, (o, by) -> by.desc(o.getPrice()));
+        ex("sort-spec-then", qb.from(Order.class).orderBy(byStatus.then(byPrice)));
+        SortSpec<Order> spec = SortSpec.of(Order.class, (o, by) -> by.asc(o.getDescription()).asc(o.getId()));
+        ex("sort-spec-reversed", qb.from(Order.class).orderBy(spec.reversed()));
+
+        // ---- ResultQueryTest
+        OrderedSelectQuery<Order> cheapest = qb.from(Order.class).orderBy((o, by) -> by.asc(o.getPrice()));
+        record("first", qb.from(Order.class).orderBy((o, by) -> by.asc(o.getPrice())).limit(1).toHql(),
+                () -> cheapest.first().stream().toList());
+        SelectQuery<Order> active = qb.from(Order.class).where(o -> o.isActive());
+        record("first#2", qb.from(Order.class).where(o -> o.isActive()).limit(1).toHql(), () -> active.first().stream().toList());
+        long id = 1;
+        SelectQuery<Order> byId = qb.from(Order.class).where(o -> o.getId() == id);
+        record("one", byId.toHql(), () -> byId.one().stream().toList());
+        record("count", active.countHql(), () -> List.of(active.count()), false);
+        SelectQuery<Order> rush = qb.from(Order.class).where(o -> o.getKind() == Order.Kind.RUSH);
+        record("exists", rush.existsHql(), () -> List.of(rush.exists()), false);
 
         // ---- HQL from the manual, given to Hibernate directly.
         // The manual's Order has a nullable Double price, so its HQL has "nulls last" for the price key;
@@ -129,6 +150,50 @@ class SqlByDatabaseTest {
                 + " order by e0.price desc nulls last, j1.name asc nulls first, e0.id asc", Map.of(), 40, 20);
         hql("page-design", "select e0 from Order e0 where e0.status = 1"
                 + " order by e0.price desc nulls last, e0.id asc", Map.of(), 40, 20);
+
+        // ---- DmlQueryTest (run on empty tables, in this order)
+        short st = 5;
+        ExecutableUpdate<Order> update = qb.update(Order.class)
+                .set(o -> { o.setStatus(st); o.setPrice(o.getPrice() * 2); }).where(o -> o.getStatus() == 1);
+        record("update", update.toHql(), () -> List.of(update.execute()), false);
+        ExecutableUpdate<Order> updateBy = qb.update(Order.class).set((o, by) -> by.set(o.getDescription(), "done"))
+                .where(o -> o.getStatus() == 2);
+        record("update-by", updateBy.toHql(), () -> List.of(updateBy.execute()), false);
+        ExecutableUpdate<Order> updatePath = qb.update(Order.class).set(o -> o.setCustName("K"))
+                .where(o -> o.getCustomer().getName().equals("Kim"));
+        record("update-path", updatePath.toHql(), () -> List.of(updatePath.execute()), false);
+        ExecutableUpdate<Order> copy = qb.update(Order.class).set(o -> o.setCustName(o.getCustomer().getName())).all();
+        record("update-path#2", copy.toHql(), () -> List.of(copy.execute()), false);
+        ExecutableUpdate<VOrder> versioned = qb.update(VOrder.class).set(v -> v.setStatus(2)).where(v -> v.getId() == 1L);
+        record("update-versioned", versioned.toHql(), () -> List.of(versioned.execute()), false);
+        ExecutableDelete<Order> delete = qb.delete(Order.class).where(o -> o.getStatus() == 3);
+        record("delete", delete.toHql(), () -> List.of(delete.execute()), false);
+        ExecutableDelete<Order> deletePath = qb.delete(Order.class).where(o -> o.getCustomer().getName() == null);
+        record("delete#2", deletePath.toHql(), () -> List.of(deletePath.execute()), false);
+        ExecutableInsert<Archive> insert = qb.insert(Archive.class)
+                .values(a -> { a.setId(100L); a.setPrice(9.5); a.setCustomerName("Kim"); });
+        record("insert", insert.toHql().get(0), () -> List.of(insert.execute()), false);
+        List<DmlQueryTest.Line> lines = List.of(new DmlQueryTest.Line(201, 1.0), new DmlQueryTest.Line(202, 2.0));
+        ExecutableInsert<Archive> insertList = qb.insert(Archive.class).values(lines, (a, l) -> { a.setId(l.id()); a.setPrice(l.price()); });
+        record("insert-list", insertList.toHql().get(0), () -> List.of(insertList.execute()), false);
+        ExecutableInsert<Archive> insertSelect = qb.insert(Archive.class).from(Order.class).where(o -> o.getStatus() == 1)
+                .select((a, o) -> { a.setId(o.getId()); a.setPrice(o.getPrice()); a.setCustomerName(o.getCustomer().getName()); });
+        record("insert-select", insertSelect.toHql().get(0), () -> List.of(insertSelect.execute()), false);
+        ExecutableInsert<Archive> upsert = qb.upsert(Archive.class).values(a -> { a.setId(100L); a.setPrice(2.0); });
+        record("upsert", upsert.toHql().get(0), () -> List.of(upsert.execute()), false);
+        ExecutableInsert<Archive> onConflict = qb.insert(Archive.class).values(a -> { a.setId(100L); a.setPrice(5.0); })
+                .onConflict(a -> a.getId()).update(a -> a.setPrice(a.getPrice() + 5.0));
+        record("on-conflict", onConflict.toHql().get(0), () -> List.of(onConflict.execute()), false);
+        ExecutableInsert<Archive> ignore = qb.insert(Archive.class).values(a -> { a.setId(300L); a.setPrice(1.0); })
+                .onConflict(a -> a.getId()).ignore();
+        record("insert-ignore", ignore.toHql().get(0), () -> List.of(ignore.execute()), false);
+
+        ExecutableDelete<Order> deleteLimit = qb.delete(Order.class).where(o -> o.getStatus() == 1)
+                .orderBy((o, by) -> by.asc(o.getPrice())).limit(1);
+        record("delete-limit", deleteLimit.toHql(), () -> List.of(deleteLimit.execute()), false);
+        ExecutableUpdate<Order> updateLimit = qb.update(Order.class).set(o -> o.setDescription("top"))
+                .where(o -> o.getCustomer().getName().equals("Kim")).orderBy((o, by) -> by.desc(o.getPrice())).limit(1);
+        record("update-limit", updateLimit.toHql(), () -> List.of(updateLimit.execute()), false);
 
         compare();
     }
@@ -171,11 +236,21 @@ class SqlByDatabaseTest {
     }
 
     private void record(String id, RenderedQuery hql, Supplier<List<?>> run) {
+        record(id, hql, run, true);
+    }
+
+    /**
+     * Runs a query and records its first SQL statement.
+     *
+     * @param shortSelect {@code false} to keep the select list (for {@code count()} and {@code exists()},
+     *                    where the select list is the point)
+     */
+    private void record(String id, RenderedQuery hql, Supplier<List<?>> run, boolean shortSelect) {
         SqlCapture.start();
         run.get();
         List<String> sql = SqlCapture.stop();
         assertFalse(sql.isEmpty(), "no SQL for " + id);
-        out.put(id, "-- HQL: " + hql.hql() + "\n" + docForm(sql.get(0)));
+        out.put(id, "-- HQL: " + hql.hql() + "\n" + docForm(sql.get(0), shortSelect));
     }
 
     /**

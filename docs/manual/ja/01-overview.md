@@ -4,9 +4,11 @@
 [マニュアルのホーム](README.md) | トラック: [Java](java/README.md) | [Kotlin](kotlin/README.md) | 次: 2. はじめよう（[Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md)）
 
 > [!NOTE]
-> **状況:** 解析コア（ラムダの読み込みと条件のデコード）と `where` + `toList()`（HQL の生成とクエリの実行）は実装済みです。H2、MariaDB、Oracle で Java のラムダを使ってテストしています。
-> ソートとページング（`orderBy`、`limit`、`offset`）の中核部分も実装済みで、テストしています。
-> サブクエリ、`select`、update/insert/delete、プロシージャ、Spring モジュールは設計済みですが、**まだ実装されていません**。
+> **状況:** 解析コア（ラムダの読み込みと条件のデコード）と、結果の関数 `toList()`、`toSet()`、`first()`、`one()`、`count()`、`exists()` を持つ `where`（HQL の生成とクエリの実行）は実装済みです。H2、MariaDB、Oracle で Java のラムダを使ってテストしています。
+> ソートとページング（`orderBy`、`limit`、`offset`、`SortSpec`）の中核部分も実装済みで、テストしています。
+> Spring Data JPA モジュール（`LambdaQlExecutor<T>` と Spring Boot の自動構成）も実装済みで、Spring Boot 3.4.2 でテストしています。
+> 更新、挿入、削除、upsert も実装済みで、テストしています。`limit` と 1 行保護 `executeOne()` も使えます。Spring Data JPA モジュールでも使えます（短縮メソッド `deleteAll`、`updateOne` など）。そこでは呼び出し側のトランザクションが必要です。
+> サブクエリ、`select`、プロシージャは設計済みですが、**まだ実装されていません**。
 > このページの HQL は、設計で定めた出力です。例は設計上の例です。
 
 このページは両方の言語向けです。コードは **Java** と **Kotlin** の別々のセクションに分けて載せています。
@@ -100,7 +102,7 @@ where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 | 2. バイトコードを読む | lambdaQL は ASM でその 1 つのメソッドだけを読みます。クラスファイルを読むだけで、コードは実行しません。 | 実装済み |
 | 3. 条件を組み立て直す | Java と Kotlin は `&&`、`\|\|`、`!` をジャンプ命令にコンパイルします。lambdaQL はこのジャンプから元の論理ツリーを組み立て直します。 | Java のラムダは実装済み。Kotlin だけの書き方は設計済み。 |
 | 4. HQL を組み立てる | getter やプロパティは JPA の属性パスになります（`o.getPrice()` や `it.price` → `e0.price`）。ラムダの中の定数はリテラルに、キャプチャした値はパラメーター（`:p1`）になります。 | `where` と `orderBy` について実装済み、H2・MariaDB・Oracle でテスト済み |
-| 5. 実行する | lambdaQL はパラメーターをバインドし、Hibernate で HQL を実行します。各ラムダの解析結果はキャッシュされるので、バイトコードを読むのは 1 回だけです。 | `toList()` について実装済み（`limit` / `offset` を使う場合も） |
+| 5. 実行する | lambdaQL はパラメーターをバインドし、Hibernate で HQL を実行します。各ラムダの解析結果はキャッシュされるので、バイトコードを読むのは 1 回だけです。 | `toList()` と `toSet()`（`limit` / `offset` を使う場合も）、`first()`、`one()`、`count()`、`exists()` について実装済み |
 
 1 つのラムダを読むのにかかる時間は数マイクロ秒です。キャッシュがあるので、lambdaQL があるラムダのバイトコードを読むのは 1 回だけです。
 
@@ -209,6 +211,7 @@ lambdaQL はインデックスを使える SQL（「SARGable」）を書きま�
 | `o.customer?.id !in sub.from(Customer::class.java).where { c -> c.grade!! > 3 }.select { c -> c.id }` | `o.customer.id not in (select ...)` | `not exists (select 1 ...)` |
 | `(it.description ?: "") == "x"` | `coalesce(e0.description, '') = 'x'` | `e0.description = 'x'` |
 | `it.description.isNullOrEmpty()` | `(e0.description is null or length(e0.description) = 0)` | `(e0.description is null or e0.description = :p1)` |
+| `it.id == id`（`it.id` は `Long?`） | `not (e0.id is null or e0.id <> :p1)` | `e0.id = :p1`（id は NULL になれない） |
 
 <a id="java-and-kotlin"></a>
 ### Java と Kotlin

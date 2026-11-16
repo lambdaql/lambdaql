@@ -238,6 +238,21 @@ class SelectQueryTest {
     }
 
     @Test
+    void neverNullColumn() {
+        long id = all.get(0).getId();
+        // @start region="never-null"
+        // the id can never be NULL, so the null check is dropped (this is what Kotlin's it.id == id compiles to)
+        assertEquals("select e0 from Order e0 where e0.id = :p1",
+                qb.from(Order.class).where(o -> o.getId() != null && o.getId() == id).toHql().hql());
+        assertEquals("select e0 from Order e0 where 1=0", qb.from(Order.class).where(o -> o.getId() == null).toHql().hql());
+        // through an association the row may have no customer, so the check stays
+        assertEquals("select e0 from Order e0 where e0.customer.id is null",
+                qb.from(Order.class).where(o -> Objects.equals(o.getCustomer().getId(), null)).toHql().hql());
+        // @end
+        assertEquals(List.of(id), ids(qb.from(Order.class).where(o -> o.getId() != null && o.getId() == id).toList()));
+    }
+
+    @Test
     void foreignKeyPathHasNoJoin() {
         // @start region="fk-path"
         RenderedQuery q = qb.from(Order.class).where(o -> o.getCustomer().getId() == 1).toHql();

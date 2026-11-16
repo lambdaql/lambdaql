@@ -3,9 +3,12 @@
 > [!NOTE]
 > **状态：** 目前你可以从源码构建 lambdaQL 并运行它的测试。
 > `where` 条件和 `toList()` 可以端到端运行。它们已在 H2、MariaDB 和 Oracle 上测试。
-> 排序与分页的核心部分（`orderBy`、`limit`、`offset`）也可以运行。
-> 子查询、`select`、update/insert/delete、存储过程和 Spring 模块**已设计，尚未实现**。
-> 目前还没有发布任何构件。下面的构件名称是临时的。
+> 结果函数 `first()`、`one()`、`count()`、`exists()` 和 `toSet()` 也可以运行（见[获取结果](#getting-the-result)）。
+> 排序与分页的核心部分（`orderBy`、`limit`、`offset`、`SortSpec`）也可以运行。
+> Spring Data JPA 模块（repository 执行器和 Spring Boot 自动配置）也可以运行（见 [12. Spring Data JPA](12-spring-data-jpa.md)）。
+> 更新、插入、删除和 upsert 也可以运行（见 [7. 更新、插入、删除](07-dml.md)）。
+> 子查询、`select` 和存储过程**已设计，尚未实现**。
+> 目前还没有任何构件发布到 Maven Central。请按下文从源码构建。
 
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[1. 概述](../01-overview.md) | 下一章：[3. 条件](03-where.md) | [本页的 Kotlin 版本](../kotlin/02-getting-started.md)
 
@@ -30,12 +33,13 @@
 ```bash
 git clone https://github.com/codebit0/lambdaql.git
 cd lambdaql
-./gradlew :query:build
+./gradlew build
 ```
 
 - Gradle wrapper（8.10）只能在 **JDK 23 或更低版本**上运行。请使用 JDK 21。
 - 仓库中有 `gradle/gradle-daemon-jvm.properties`，因此 Gradle 守护进程会使用 Java 21。
 - 在 IntelliJ IDEA 中，把 **Settings > Build Tools > Gradle > Gradle JVM** 设置为 Java 21 JDK。
+- 构建包含三个模块：`query`（构件 `lambdaql-core`）、`spring-data-jpa`（`lambdaql-spring-data-jpa`）和 `spring-boot-starter`（`lambdaql-spring-boot-starter`）。Spring 模块的说明见 [12. Spring Data JPA](12-spring-data-jpa.md)。
 
 运行单元测试：
 
@@ -57,13 +61,13 @@ cd lambdaql
 
 ### 在你的项目中使用本地构建
 
-把 jar 发布到本地 Maven 仓库：
+把三个模块的 jar 发布到本地 Maven 仓库：
 
 ```bash
-./gradlew :query:publishToMavenLocal
+./gradlew publishToMavenLocal
 ```
 
-然后把它添加到你的项目中。
+然后把 `lambdaql-core` 添加到你的项目中。
 
 Gradle（Groovy DSL）：
 
@@ -74,7 +78,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.lambdaql:lambadaql-query:1.0.0'
+    implementation 'org.lambdaql:lambdaql-core:1.0.0'
 }
 ```
 
@@ -83,15 +87,16 @@ Maven：
 ```xml
 <dependency>
   <groupId>org.lambdaql</groupId>
-  <artifactId>lambadaql-query</artifactId>
+  <artifactId>lambdaql-core</artifactId>
   <version>1.0.0</version>
 </dependency>
 ```
 
+使用 Spring Data JPA 或 Spring Boot 时，请改用 `lambdaql-spring-boot-starter` 或 `lambdaql-spring-data-jpa`。它们会带入 `lambdaql-core`（见 [12.2](12-spring-data-jpa.md#122-modules)）。
+
 > [!WARNING]
-> 这些坐标是**临时的**。
-> 名称 `lambadaql` 有一个拼写错误，会在首次发布前修正。
-> group、名称和版本都可能改变。lambdaQL 发布后请再次查看本页。
+> 这些构件**尚未发布到 Maven Central**。
+> 版本 `1.0.0` 来自仓库的 `gradle.properties`，在首次发布前可能改变。lambdaQL 发布后请再次查看本页。
 
 <a id="recommended-compiler-option--parameters"></a>
 ### 推荐的编译器选项：`-parameters`
@@ -169,7 +174,7 @@ public class Item {
 
 ## 创建 QueryBuilder
 
-`QueryBuilder` 是入口。它需要一个 JPA `EntityManagerFactory`。
+`QueryBuilder` 是入口。它需要一个 JPA `EntityManagerFactory` 或一个 `EntityManager`。
 
 ```java
 QueryBuilder qb = new QueryBuilder(entityManagerFactory);
@@ -186,7 +191,8 @@ QueryBuilder qb = new QueryBuilder(emf);
 
 ### 使用 Spring Boot
 
-Spring Boot 已经创建了 `EntityManagerFactory`。注入它并创建一个 `QueryBuilder` bean。
+使用 `lambdaql-spring-boot-starter` 时，Spring Boot 会为你创建 `QueryBuilder` bean（见 [12.8](12-spring-data-jpa.md#128-the-querybuilder-bean)）。
+不使用它时，请自己创建这个 bean。像自动配置那样，使用 Spring 的共享 `EntityManager`。
 
 ```java
 @Configuration
@@ -194,7 +200,7 @@ public class LambdaQlConfig {
 
     @Bean
     public QueryBuilder queryBuilder(EntityManagerFactory entityManagerFactory) {
-        return new QueryBuilder(entityManagerFactory);
+        return new QueryBuilder(SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory));
     }
 }
 ```
@@ -220,8 +226,8 @@ public class OrderService {
 }
 ```
 
-- 在 `lambdaql-spring-data-jpa` 模块发布之前，你需要自己创建 bean。该模块将为你创建它。
-- 在 Spring 事务中，lambdaQL 使用该事务共享的 `EntityManager`。
+- 共享的 `EntityManager` 绑定到当前事务。在 `@Transactional` 内部，lambdaQL 在同一个事务中运行。
+- 在 Spring 应用中不要使用接收 `EntityManagerFactory` 的构造函数。那样创建的 builder 会为每个查询打开自己的 `EntityManager`，位于 Spring 事务之外。
 - 如果要在 Spring Data 仓库中编写 lambdaQL 查询，请参阅 [12. Spring Data JPA](12-spring-data-jpa.md)。
 
 ## 你的第一个查询
@@ -247,7 +253,7 @@ where o1_0.status=1 and o1_0.price>100.0
 - `qb.from(Order.class)` 开始一个针对 `Order` 的查询。
 - `where(...)` 接收一个条件 Lambda。
 - `toList()` 执行查询并返回 `List<Order>`。
-- `toList()` 是目前唯一已确定的结果方法。其他结果方法还在计划中。
+- `toList()` 返回所有行。其他结果函数（`first()`、`one()`、`count()`、`exists()`、`toSet()`）见[获取结果](#getting-the-result)。
 
 为什么 `1` 和 `100.0` 被直接写入 HQL，而不是绑定参数？
 它们是**写在 Lambda 中的常量**。lambdaQL 会把常量（数字、字符串、布尔值、`null`、enum 常量）作为字面量写入 HQL。
@@ -341,6 +347,223 @@ where c1_0.name=?
 要查找没有客户的订单，请比较关联本身：`o.getCustomer() == null` 生成 `e0.customer is null`（不需要 join）。
 如果 null 守卫保留了没有客户的订单（`o.getCustomer() == null || ...`），lambdaQL 会使用 `left join`。
 见 [3.10](03-where.md#310-association-paths)。
+
+<a id="getting-the-result"></a>
+## 获取结果
+
+`toList()` 并不是执行查询的唯一方式。lambdaQL 有六个结果函数（决策 D38 和 D42）：
+
+| 函数 | 返回 | 可以在哪里调用 | 作用 |
+|---|---|---|---|
+| `toList()` | `List<T>` | `where` 之后，以及 `orderBy` / `limit` / `offset` 之后 | 返回所有行（或一页）。 |
+| `first()` | `Optional<T>` | `where` 之后，以及 `orderBy` / `limit` / `offset` 之后 | 返回第一行。只读取一行。 |
+| `one()` | `Optional<T>` | 只能在 `where` 之后 | 返回唯一的一行。如果有 2 行或更多行匹配，抛出 `NonUniqueResultException`。最多读取 2 行。 |
+| `count()` | `long` | 只能在 `where` 之后 | 返回匹配的行数。 |
+| `exists()` | `boolean` | 只能在 `where` 之后 | 如果有行匹配，返回 `true`。只读取一行，不加载任何实体。 |
+| `toSet()` | `SequencedSet<T>` | `where` 之后，以及 `orderBy` / `limit` / `offset` 之后 | 以保持行顺序的 Set 返回所有行（或一页）。如果 Set 比行数小，抛出 `IllegalStateException`。 |
+
+"`where` 之后" 指的是通过 `qb.from(...)` 和 `where(...)` 得到的查询（类型为 `SelectQuery`）。本手册把它称为 **where 阶段**。也可以不写 `where`，直接在 `qb.from(...)` 之后调用这些函数。
+
+在 `orderBy`、`limit` 或 `offset` 之后，查询的类型是 `OrderedSelectQuery`。它的结果函数只有 `toList()`、`toSet()` 和 `first()`。在那里 `one()`、`count()` 和 `exists()` 无法编译。
+这是有意的设计（决策 D38）：`limit(10).count()` 可能表示"所有行"，也可能表示"最多 10 行"，因此 lambdaQL 不允许这种写法。
+
+下面的示例复制自 [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)。该测试在 H2、MariaDB 和 Oracle 上运行这些示例，并把结果与在 Java 中计算出的相同答案进行比较。
+它使用 [3.3](03-where.md#33-basic-form) 中的测试实体：`price` 是 `double`，因此它的排序没有 `nulls` 部分；`Order` 还有一个枚举 `kind`。
+
+<a id="first"></a>
+### `first()`
+
+没有 `orderBy` 时，"第一行"指的是 id 最小的那一行（规则 S9）。因此每次得到的都是同一行。
+要选择顺序，请先调用 `orderBy(...)`。之后 `first()` 返回按该顺序排列的第一行。`offset` 会被保留：`orderBy(...).offset(1).first()` 返回第二行。
+如果没有匹配的行，结果是 `Optional.empty()`。
+
+**(已测试)** [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)，region `first`：
+
+```java
+Optional<Order> cheapest = qb.from(Order.class)
+        .orderBy((o, by) -> by.asc(o.getPrice()))
+        .first();
+// without orderBy, "first" is the row with the smallest id
+Optional<Order> firstActive = qb.from(Order.class).where(o -> o.isActive()).first();
+Optional<Order> none = qb.from(Order.class).where(o -> o.getStatus() == 9).first();
+```
+
+**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `first`（`cheapest`）：
+
+```sql
+-- H2, Oracle
+select …
+from orders o1_0
+order by o1_0.price,o1_0.id
+fetch first ? rows only
+
+-- MariaDB
+select …
+from orders o1_0
+order by o1_0.price,o1_0.id
+limit ?
+```
+
+**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `first#2`（`firstActive`）：
+
+```sql
+-- H2
+select …
+from orders o1_0
+where o1_0.active=true
+order by o1_0.id
+fetch first ? rows only
+
+-- MariaDB
+select …
+from orders o1_0
+where o1_0.active=1
+order by o1_0.id
+limit ?
+
+-- Oracle
+select …
+from orders o1_0
+where o1_0.active=1
+order by o1_0.id
+fetch first ? rows only
+```
+
+`first()` 只读取一行，因此它是一个分页查询。lambdaQL 会把 `id` 添加为最后一个排序键（见 [4.8](04-order-paging.md#tie-breaker-automatic-id)），Hibernate 会为每个数据库写出分页 SQL：H2 和 Oracle 上是 `fetch first ? rows only`，MariaDB 上是 `limit ?`。这里的 `?` 是 1。
+
+<a id="one"></a>
+### `one()`
+
+当条件最多只能匹配一行时（例如唯一键），请使用 `one()`。
+没有行时得到 `Optional.empty()`。两行或更多行时抛出 `jakarta.persistence.NonUniqueResultException`。如果返回任意一个匹配的行都可以，请使用 `first()`。
+
+**(已测试)** [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)，region `one`：
+
+```java
+long id = knownId;
+Optional<Order> order = qb.from(Order.class).where(o -> o.getId() == id).one();
+Optional<Order> missing = qb.from(Order.class).where(o -> o.getId() == -1L).one();
+// two or more rows: an exception (use first() if any row is fine)
+assertThrows(NonUniqueResultException.class, () -> qb.from(Order.class).where(o -> o.isActive()).one());
+```
+
+**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `one`：
+
+```sql
+-- H2, Oracle
+select …
+from orders o1_0
+where o1_0.id=?
+fetch first ? rows only
+
+-- MariaDB
+select …
+from orders o1_0
+where o1_0.id=?
+limit ?
+```
+
+`one()` 最多向数据库请求 2 行。这足以发现是否存在第二行。因此 SQL 中有 `fetch first ? rows only`（H2、Oracle）或 `limit ?`（MariaDB），这里的 `?` 是 2。没有 `order by`，因为这里顺序无关紧要。
+
+<a id="count-and-a-paged-screen"></a>
+### `count()` 与分页画面
+
+`count()` 返回匹配的行数。它只存在于 where 阶段，因此 `limit` 和 `offset` 永远不会改变它。
+
+对于分页画面，请把 where 阶段的查询保存在一个变量中。在它上面调用 `count()` 得到总数。然后在同一个变量上调用 `orderBy(...).limit(...).toList()` 得到这一页。
+
+**(已测试)** [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)，region `count`：
+
+```java
+SelectQuery<Order> active = qb.from(Order.class).where(o -> o.isActive());
+long total = active.count();                                   // every matching row
+List<Order> page = active.orderBy((o, by) -> by.desc(o.getPrice())).limit(2).toList();
+```
+
+**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `count`：
+
+```sql
+-- H2
+select count(o1_0.id)
+from orders o1_0
+where o1_0.active=true
+
+-- MariaDB, Oracle
+select count(o1_0.id)
+from orders o1_0
+where o1_0.active=1
+```
+
+HQL 是 `select count(e0) from Order e0 where e0.active = true`。Hibernate 把 `count(e0)` 变成 `select count(o1_0.id)`：它统计 id 列。计数查询没有分页。
+
+<a id="exists"></a>
+### `exists()`
+
+如果至少有一行匹配，`exists()` 返回 `true`。它执行 `select 1`，最多读取一行。不会加载任何实体。
+
+**(已测试)** [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)，region `exists`：
+
+```java
+boolean anyRush = qb.from(Order.class).where(o -> o.getKind() == Order.Kind.RUSH).exists();
+boolean anyStatus9 = qb.from(Order.class).where(o -> o.getStatus() == 9).exists();
+```
+
+**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `exists`（`anyRush`）：
+
+```sql
+-- H2, Oracle
+select 1
+from orders o1_0
+where o1_0.kind='RUSH'
+fetch first ? rows only
+
+-- MariaDB
+select 1
+from orders o1_0
+where o1_0.kind='RUSH'
+limit ?
+```
+
+HQL 是 `select 1 from Order e0 where e0.kind = org.lambdaql.query.Order$Kind.RUSH`。SQL 只 select 常量 `1`，因此不读取任何列，而分页（`?` 是 1）会在第一行之后停止。
+
+<a id="toset"></a>
+### `toSet()`
+
+`toSet()` 像 `toList()` 一样执行查询，但返回 `SequencedSet<T>`（决策 D42）。
+它是 `LinkedHashSet`，所以元素保持行的顺序。有 `orderBy` 时，就是排序的顺序。
+
+**(已测试)** [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)，region `to-set`：
+
+```java
+java.util.SequencedSet<Order> byPrice = qb.from(Order.class)
+        .orderBy((o, by) -> by.desc(o.getPrice()))
+        .toSet();
+```
+
+SQL 与 `toList()` 相同。lambdaQL **不会**添加 `distinct`：
+
+- 每个实体行都有主键。因此即使只查询一张表，同一行也不会返回两次。
+- lambdaQL 只 join to-one 关联。集合会变成 `exists` 子查询。因此 join 永远不会让行重复。
+- 所以 `distinct` 不会改变结果，只会增加开销。（这与数据库的限制无关：Oracle 23.26 也接受 LOB 列上的 `distinct`。这是实测结果。）
+
+值查询（`select`）的 `distinct` 在里程碑 M9 中处理。
+
+**大小检查。** 如果 Set 比行数小，`toSet()` 抛出 `IllegalStateException`。以下情况会发生这种问题：
+
+- 实体的 `equals` / `hashCode` 把两个不同的行视为相等
+- 它的 `@Id` 不唯一（例如映射到视图的实体）
+
+如果没有这个检查，行会在没有任何迹象的情况下丢失。这些情况请使用 `toList()`。
+
+在下面的测试中，`Tag.equals` 只比较名称，而表中有两行名称相同。
+
+**(已测试)** [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)，region `to-set-check`：
+
+```java
+// Tag.equals compares only the name: two different rows would become one element, so toSet() refuses
+assertThrows(IllegalStateException.class, () -> qb.from(Tag.class).toSet());
+assertEquals(2, qb.from(Tag.class).toList().size());
+```
 
 ## 需要知道的事
 

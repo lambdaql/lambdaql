@@ -3,8 +3,8 @@
 
 > [!NOTE]
 > **状态**
-> - **核心部分已实现并测试**，在 H2、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上：带有 `by.asc`、`by.desc` 和 `by.sort` 的 `orderBy((o, by) -> ...)`，一个排序键的写法 `orderBy(o -> key)` 和 `orderBy(key, Direction)`（也可以使用 `Order::getPrice` 这样的 getter 方法引用），`Direction.parse` / `reversed`，以及 `limit` / `offset`。
-> - **尚未实现：** `SortSpec`、`SortWhitelist`、join 写法 `(o, c, by)`、子查询内部的排序，以及 Spring `Sort` / `Pageable` 模块。
+> - **核心部分已实现并测试**，在 H2、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上：带有 `by.asc`、`by.desc` 和 `by.sort` 的 `orderBy((o, by) -> ...)`，一个排序键的写法 `orderBy(o -> key)` 和 `orderBy(key, Direction)`（也可以使用 `Order::getPrice` 这样的 getter 方法引用），`Direction.parse` / `reversed`，`limit` / `offset`，`orderBy` 之后的 `first()`，以及可重用排序 `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。Spring `Sort` 和 `Pageable` 可以在 Spring Data JPA 模块中使用（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。
+> - **尚未实现：** `SortWhitelist`、join 写法 `(o, c, by)`（`SortSpec` 也是）以及子查询内部的排序。
 > - 标记为 **(已测试)** 的示例是从测试代码中复制的。本章中的其他 HQL 遵循相同的规则，但没有经过测试。
 
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[3. 条件](03-where.md) | 下一章：[5. 子查询](05-subquery.md) | [本页的 Kotlin 版本](../kotlin/04-order-paging.md)
@@ -468,7 +468,7 @@ assertThrows(LambdaAnalysisException.class, () -> qb.from(Order.class).orderBy((
 | 在 `orderBy(...)` 之后调用 `where(...)` | 否（编译错误） |
 | 在 `limit(...)` 之后调用 `orderBy(...)` | 否（编译错误） |
 
-在 `orderBy`、`limit` 或 `offset` 之后，查询的类型是 `OrderedSelectQuery`。它只有 `limit`、`offset`、`toHql()` 和 `toList()`。
+在 `orderBy`、`limit` 或 `offset` 之后，查询的类型是 `OrderedSelectQuery`。它只有 `limit`、`offset`、`toHql()`、`toList()`、`toSet()` 和 `first()`。`one()`、`count()` 和 `exists()` 只能在 `orderBy`、`limit` 和 `offset` 之前使用（见[获取结果](02-getting-started.md#getting-the-result)）。
 
 <a id="48-paging"></a>
 ## 4.8 分页
@@ -589,6 +589,13 @@ order by o1_0.id
 fetch first ? rows only
 ```
 
+**第一行与总行数。**
+
+- `orderBy(...).first()` 以 `Optional` 的形式返回按该顺序排列的第一行。它只读取一行。`offset` 会被保留：`orderBy(...).offset(1).first()` 返回第二行。
+- `count()` 只存在于 where 阶段（`orderBy`、`limit` 和 `offset` 之前），因此它总是统计所有匹配的行。对于分页画面，请把 where 阶段的查询保存在一个变量中。在它上面调用 `count()` 得到总数，然后在它上面调用 `orderBy(...).limit(...).toList()` 得到这一页。
+
+两者都已测试。见[获取结果](02-getting-started.md#getting-the-result)。
+
 <a id="tie-breaker-automatic-id"></a>
 ### 决胜键（自动添加 `id`）
 
@@ -613,19 +620,132 @@ fetch first ? rows only
 <a id="410-reusable-and-external-sorts"></a>
 ## 4.10 可重用的排序与外部排序
 
-**尚未实现。** 设计中还包括：
+**`SortSpec`：可以保存起来的排序。** `SortSpec` 是一个可以保存在变量或字段中、并在许多查询中使用的排序。
+用 `SortSpec.of(Order.class, (o, by) -> ...)` 创建它。这个 Lambda 与 `orderBy((o, by) -> ...)` 中的相同，因此适用同样的规则（见 [4.6](#46-rules-for-the-lambda-body)）。
+然后把它传给 `orderBy(spec)`。
 
-- 用于可重用排序的 `SortSpec`，带有 `then()` 和 `reversed()`，传给 `orderBy(spec)`：
+```java
+public static final SortSpec<Order> NEWEST =
+        SortSpec.of(Order.class, (o, by) -> by.desc(o.getUpdateAt()).asc(o.getId()));
 
-  ```java
-  var newest = SortSpec.of(Order.class, (o, by) -> by.desc(o.getUpdateAt()).asc(o.getId()));
-  qb.from(Order.class).orderBy(newest).limit(20).toList();
-  ```
+qb.from(Order.class).where(o -> o.isActive()).orderBy(NEWEST).limit(20).toList();
+// HQL: select e0 from Order e0 where e0.active = true order by e0.updateAt desc nulls last, e0.id asc
+```
 
-- `SortWhitelist<T>`，用于把外部字符串（例如 `"price,desc_nulls_last"` 这样的请求参数）转换为排序。外部字符串只能通过白名单接受。
-- **计划中：** Spring `Sort` / `Pageable` 模块（每个 Spring `Sort.Order` 映射到一个 `Direction` 值）、使用 `(o, c, by) -> ...` 的 join、键集分页（keyset paging）。
+- `SortSpec` 不能被修改。`then()` 和 `reversed()` 会返回一个新的 spec。因此一个 spec 可以安全地在许多查询和线程之间共享，例如作为 `static final` 字段。
+- lambdaQL 在 spec 被用于 `orderBy` 时检查 Lambda。每个 Lambda 只分析一次。
+- 捕获的值是创建 Lambda 那一刻的值。放在 `static final` 字段中的 spec 会一直保留这些值。如果方向必须在运行时改变，请使用 `orderBy((o, by) -> by.sort(key, dir))`（见 [4.3](#43-direction)）。
+- 在 `orderBy(spec)` 之后，可以像平常一样分页：`limit`、`offset`、`toList()`、`first()`。
 
-在此之前，`Direction.parse` 和 `by.sort(key, dir)` 可以提供运行时的方向（见 [4.3](#43-direction)）。排序键请在普通 Java 代码中选择。
+**(已测试)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-spec`：
+
+```java
+// keep it, for example as a static final field, and use it in many queries
+SortSpec<Order> byDescription = SortSpec.of(Order.class, (o, by) -> by.desc(o.getDescription()).asc(o.getId()));
+RenderedQuery q = qb.from(Order.class).where(o -> o.isActive()).orderBy(byDescription).toHql();
+assertEquals("select e0 from Order e0 where e0.active = true order by e0.description desc nulls last, e0.id asc", q.hql());
+```
+
+**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-spec`：
+
+```sql
+-- H2
+select …
+from orders o1_0
+where o1_0.active=true
+order by o1_0.description desc,o1_0.id
+
+-- MariaDB
+select …
+from orders o1_0
+where o1_0.active=1
+order by o1_0.description desc,o1_0.id
+
+-- Oracle
+select …
+from orders o1_0
+where o1_0.active=1
+order by o1_0.description desc nulls last,o1_0.id
+```
+
+SQL 与用 `orderBy((o, by) -> ...)` 写出的同样排序相同。Oracle 会加上 `nulls last`，因为它自己对 `desc` 的默认规则正好相反（见 [4.4](#44-null-ordering-is-the-same-on-every-database)）。
+
+**`then()`：在已有排序键之后追加排序键。** `a.then(b)` 先按 `a` 的排序键排序。对于相等的行，再按 `b` 的排序键排序。
+`then()` 接受另一个 `SortSpec` 或一个排序 Lambda。
+
+**(已测试)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-spec-then`（在测试实体中，`status` 和 `price` 永远不会为 NULL，因此没有 `nulls` 部分）：
+
+```java
+SortSpec<Order> byStatus = SortSpec.of(Order.class, (o, by) -> by.asc(o.getStatus()));
+SortSpec<Order> byPrice = SortSpec.of(Order.class, (o, by) -> by.desc(o.getPrice()));
+assertEquals("select e0 from Order e0 order by e0.status asc, e0.price desc",
+        qb.from(Order.class).orderBy(byStatus.then(byPrice)).toHql().hql());
+// then() also takes a lambda
+assertEquals("select e0 from Order e0 order by e0.status asc, e0.id desc",
+        qb.from(Order.class).orderBy(byStatus.then((o, by) -> by.desc(o.getId()))).toHql().hql());
+```
+
+**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-spec-then`（第一个查询）：
+
+```sql
+-- H2, MariaDB, Oracle (same)
+select …
+from orders o1_0
+order by o1_0.status,o1_0.price desc
+```
+
+**`reversed()`：把每个排序键反过来。** `spec.reversed()` 会反转每个排序键。NULL 的位置也会一起反转：`asc`（NULL 在前）变成 `desc`（NULL 在后）。因此整个行顺序正好完全颠倒。
+这与 `Direction.reversed()` 相同（见 [4.3](#43-direction)）。`spec.reversed().reversed()` 会回到最初的顺序。
+
+**(已测试)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-spec-reversed`：
+
+```java
+SortSpec<Order> spec = SortSpec.of(Order.class, (o, by) -> by.asc(o.getDescription()).asc(o.getId()));
+// every key is reversed, the NULL position too: asc nulls first -> desc nulls last
+assertEquals("select e0 from Order e0 order by e0.description desc nulls last, e0.id desc",
+        qb.from(Order.class).orderBy(spec.reversed()).toHql().hql());
+```
+
+**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-spec-reversed`：
+
+```sql
+-- H2, MariaDB
+select …
+from orders o1_0
+order by o1_0.description desc,o1_0.id desc
+
+-- Oracle
+select …
+from orders o1_0
+order by o1_0.description desc nulls last,o1_0.id desc
+```
+
+H2 和 MariaDB 对 `desc` 本来就把 NULL 放在最后，因此不写额外的子句。Oracle 会加上 `nulls last`。
+
+**`SortSpec.ofPath`：根据属性名排序。** 有时排序键以文本形式来自代码外部，例如来自 Spring `Sort`（Spring 模块正是用 `ofPath` 处理它，见 [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。
+`SortSpec.ofPath(Order.class, "customer.name", Direction.DESC)` 根据属性路径和 `Direction` 创建一个 spec。
+
+- 路径是用 `.` 连接的属性名。每一部分都必须是持久化属性：中间是 to-one 关联或嵌入值，最后是基本值。
+- 其他任何内容都会报错（在 `orderBy` 中使用该 spec 时抛出 `IllegalArgumentException`）。因此这段文本永远不会变成其他 HQL。
+- 但是**任何**持久化属性都会被接受。如果文本来自用户（例如请求参数），请先用你自己的允许名称列表检查它。
+- 关联路径使用 `left join`，与排序 Lambda 中相同（规则 S8）。`then()` 可以把 `ofPath` spec 和 Lambda spec 连接起来。
+
+**(已测试)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-spec-path`：
+
+```java
+// for sorts chosen outside the code (Spring Sort uses this); only real properties are accepted
+SortSpec<Order> byName = SortSpec.ofPath(Order.class, "customer.name", Direction.DESC)
+        .then(SortSpec.ofPath(Order.class, "id", Direction.ASC));
+assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name desc nulls last, e0.id asc",
+        qb.from(Order.class).orderBy(byName).toHql().hql());
+assertThrows(IllegalArgumentException.class,
+        () -> qb.from(Order.class).orderBy(SortSpec.ofPath(Order.class, "price; drop table x", Direction.ASC)));
+```
+
+**尚未实现：**
+
+- `SortWhitelist<T>`，用于把外部字符串（例如 `"price,desc_nulls_last"` 这样的请求参数）转换为排序。它只接受列表中的名称。在此之前，`Direction.parse` 和 `by.sort(key, dir)` 可以提供运行时的方向（见 [4.3](#43-direction)）。排序键请在普通 Java 代码中选择，或者先用你自己的列表检查文本，再使用 `SortSpec.ofPath`。
+- **计划中：** 使用 `(o, c, by) -> ...` 的 join（`SortSpec` 中也是）、键集分页（keyset paging）。
 
 <a id="411-sorting-inside-subqueries"></a>
 ## 4.11 子查询内部的排序
@@ -646,12 +766,12 @@ fetch first ? rows only
 | S3 | 方向来自 `asc` / `desc` 或 `sort(key, Direction)`。`asc(key)`/`desc(key)`（`ASC`/`DESC`）使用 NULL 策略；`asc(key, nullsFirst)`、`desc(key, nullsFirst)` 和 `*_NULLS_*` 按写法使用 | 已实现 |
 | S4 | 主体只能是一条直接的 `by` 调用链。不能有 `if`、三元表达式或循环 | 已实现 |
 | S5 | 每个查询只调用一次 `orderBy`。`orderBy` 之后不能调用 `where`。`limit` 之后不能调用 `orderBy`（编译错误） | 已实现 |
-| S6 | 用 `SortSpec` 重用。外部字符串只能通过 `SortWhitelist` | 尚未实现 |
+| S6 | 用 `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）重用。外部字符串只能通过 `SortWhitelist` | `SortSpec` 已实现并测试。`SortWhitelist` 和 join 写法尚未实现 |
 | S7 | 排序键：列、对一路径、`+ - *`、拓宽转换。不能有值分支 | 已实现。列和对一路径已测试 |
 | S8 | 只在 `orderBy` 中使用的关联路径使用 `left join`，因此没有关联的行会被保留。如果 `where` 使用同一条路径，排序会使用 `where` 的 join | 已实现 |
 | S9 | 分页时，如果排序键不包含根实体的 `@Id`，会添加 `@Id asc`。集合 fetch join + 分页会被拒绝 | 根实体 id 部分已实现。join 相关部分尚未实现 |
 | S10 | 分析结果按 Lambda 缓存。捕获的 `Direction` 每次调用都会读取 | 已实现 |
-| S11 | Spring `Sort.Order` 与 `Direction` 一一对应（计划中的模块）。`SortWhitelist.parse("price,desc_nulls_last")` | 尚未实现 |
+| S11 | Spring `Sort.Order` 与 `Direction` 一一对应（Spring 模块，见 [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。`SortWhitelist.parse("price,desc_nulls_last")` | Spring `Sort` 已实现并测试（尚不支持 `ignoreCase`）。`SortWhitelist` 尚未实现 |
 | S12 | join 查询使用相同的形式：`(o, c, by)`、`(o, c, i, by)` | 尚未实现 |
 | S13 | 方法引用只能用于一个排序键的简短写法。能编译但含义错误的方法引用会被拒绝（见 [9. Java 说明](09-java-notes.md#99-method-references)） | 已实现（getter 引用） |
 | S14 | 子查询的排序：有 `limit` 时保留，没有 `limit` 时移除并发出警告。数据库差异由 lambdaQL 替你处理（见第 5 章） | 尚未实现 |

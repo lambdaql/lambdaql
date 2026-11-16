@@ -3,9 +3,11 @@
 [手册首页](README.md) | 路线：[Java](java/README.md) | [Kotlin](kotlin/README.md) | 下一章：2. 入门（[Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md)）
 
 > [!NOTE]
-> **状态：** 分析核心（Lambda 加载和条件解码）以及 `where` + `toList()`（HQL 生成和查询执行）已实现。它们已在 H2、MariaDB 和 Oracle 上用 Java Lambda 测试。
-> 排序与分页的核心部分（`orderBy`、`limit`、`offset`）也已实现并测试。
-> 子查询、`select`、update/insert/delete、存储过程和 Spring 模块已设计，但**尚未实现**。
+> **状态：** 分析核心（Lambda 加载和条件解码）以及带结果函数 `toList()`、`toSet()`、`first()`、`one()`、`count()` 和 `exists()` 的 `where`（HQL 生成和查询执行）已实现。它们已在 H2、MariaDB 和 Oracle 上用 Java Lambda 测试。
+> 排序与分页的核心部分（`orderBy`、`limit`、`offset`、`SortSpec`）也已实现并测试。
+> Spring Data JPA 模块（`LambdaQlExecutor<T>` 和 Spring Boot 自动配置）已实现，并已用 Spring Boot 3.4.2 测试。
+> 更新、插入、删除和 upsert 也已实现并测试，包括 `limit` 和单行保护 `executeOne()`，在 Spring Data JPA 模块中同样可用（快捷方法 `deleteAll`、`updateOne` 等）。在那里它们需要调用方的事务。
+> 子查询、`select` 和存储过程已设计，但**尚未实现**。
 > 本页展示的 HQL 是设计所定义的输出。示例均为设计示例。
 
 本页适用于两种语言。代码分别展示在 **Java** 和 **Kotlin** 两个小节中。
@@ -96,7 +98,7 @@ where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 | 2. 读取字节码 | lambdaQL 使用 ASM 只读取这一个方法。它读取 class 文件，不执行代码。 | 已实现 |
 | 3. 重建条件 | Java 和 Kotlin 会把 `&&`、`\|\|` 和 `!` 编译为跳转指令。lambdaQL 根据这些跳转重建原始的逻辑树。 | Java Lambda 已实现。Kotlin 特有的写法已设计。 |
 | 4. 构建 HQL | getter 和属性变成 JPA 属性路径（`o.getPrice()` 或 `it.price` → `e0.price`）。Lambda 中的常量变成字面量；捕获的值变成参数（`:p1`）。 | 已为 `where` 和 `orderBy` 实现，已在 H2、MariaDB、Oracle 上测试 |
-| 5. 执行 | lambdaQL 绑定参数，并通过 Hibernate 执行 HQL。每个 Lambda 的分析结果都会被缓存，因此字节码只读取一次。 | 已为 `toList()` 实现（也包括 `limit` / `offset`） |
+| 5. 执行 | lambdaQL 绑定参数，并通过 Hibernate 执行 HQL。每个 Lambda 的分析结果都会被缓存，因此字节码只读取一次。 | 已为 `toList()` 和 `toSet()`（也包括 `limit` / `offset`）、`first()`、`one()`、`count()` 和 `exists()` 实现 |
 
 读取一个 Lambda 只需几微秒。有了缓存，lambdaQL 对每个 Lambda 的字节码只读取一次。
 
@@ -200,6 +202,7 @@ lambdaQL 生成可以使用索引的 SQL（"SARGable"）。
 | `o.customer?.id !in sub.from(Customer::class.java).where { c -> c.grade!! > 3 }.select { c -> c.id }` | `o.customer.id not in (select ...)` | `not exists (select 1 ...)` |
 | `(it.description ?: "") == "x"` | `coalesce(e0.description, '') = 'x'` | `e0.description = 'x'` |
 | `it.description.isNullOrEmpty()` | `(e0.description is null or length(e0.description) = 0)` | `(e0.description is null or e0.description = :p1)` |
+| `it.id == id`（`it.id` 是 `Long?`） | `not (e0.id is null or e0.id <> :p1)` | `e0.id = :p1`（id 永远不会是 NULL） |
 
 ### Java 与 Kotlin
 

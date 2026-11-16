@@ -3,9 +3,12 @@
 > [!NOTE]
 > **状态：** 目前你可以从源码构建 lambdaQL 并运行它的测试。
 > `where` 条件和 `toList()` 可以端到端运行。它们已在 H2、MariaDB 和 Oracle 上用 **Java** Lambda 测试。Kotlin Lambda 尚未测试。
-> 排序与分页的核心部分（`orderBy`、`limit`、`offset`）也可以运行（同样只用 Java Lambda 测试过）。
-> 子查询、`select`、update/insert/delete、存储过程和 Spring 模块**已设计，尚未实现**。
-> 目前还没有发布任何构件。下面的构件名称是临时的。
+> 结果函数 `first()`、`one()`、`count()`、`exists()` 和 `toSet()` 也可以运行（见[获取结果](#getting-the-result)；同样只用 Java Lambda 测试过）。
+> 排序与分页的核心部分（`orderBy`、`limit`、`offset`、`SortSpec`）也可以运行（同样只用 Java Lambda 测试过）。
+> Spring Data JPA 模块（repository 执行器和 Spring Boot 自动配置）也可以运行（见 [12. Spring Data JPA](12-spring-data-jpa.md)；只用 Java repository 测试过）。
+> 更新、插入、删除和 upsert 也可以运行（见 [7. 更新、插入、删除](07-dml.md)；同样只用 Java Lambda 测试过）。
+> 子查询、`select` 和存储过程**已设计，尚未实现**。
+> 目前还没有任何构件发布到 Maven Central。请按下文从源码构建。
 
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[1. 概述](../01-overview.md) | 下一章：[3. 条件](03-where.md) | [本页的 Java 版本](../java/02-getting-started.md)
 
@@ -32,12 +35,13 @@
 ```bash
 git clone https://github.com/codebit0/lambdaql.git
 cd lambdaql
-./gradlew :query:build
+./gradlew build
 ```
 
 - Gradle wrapper（8.10）只能在 **JDK 23 或更低版本**上运行。请使用 JDK 21。
 - 仓库中有 `gradle/gradle-daemon-jvm.properties`，因此 Gradle 守护进程会使用 Java 21。
 - 在 IntelliJ IDEA 中，把 **Settings > Build Tools > Gradle > Gradle JVM** 设置为 Java 21 JDK。
+- 构建包含三个模块：`query`（构件 `lambdaql-core`）、`spring-data-jpa`（`lambdaql-spring-data-jpa`）和 `spring-boot-starter`（`lambdaql-spring-boot-starter`）。Spring 模块的说明见 [12. Spring Data JPA](12-spring-data-jpa.md)。
 
 运行单元测试：
 
@@ -49,13 +53,13 @@ cd lambdaql
 
 ### 在你的项目中使用本地构建
 
-把 jar 发布到本地 Maven 仓库：
+把三个模块的 jar 发布到本地 Maven 仓库：
 
 ```bash
-./gradlew :query:publishToMavenLocal
+./gradlew publishToMavenLocal
 ```
 
-然后把它添加到你的项目中（Gradle Kotlin DSL）：
+然后把 `lambdaql-core` 添加到你的项目中（Gradle Kotlin DSL）：
 
 ```kotlin
 repositories {
@@ -64,7 +68,7 @@ repositories {
 }
 
 dependencies {
-    implementation("org.lambdaql:lambadaql-query:1.0.0")
+    implementation("org.lambdaql:lambdaql-core:1.0.0")
 }
 ```
 
@@ -73,15 +77,16 @@ Maven：
 ```xml
 <dependency>
   <groupId>org.lambdaql</groupId>
-  <artifactId>lambadaql-query</artifactId>
+  <artifactId>lambdaql-core</artifactId>
   <version>1.0.0</version>
 </dependency>
 ```
 
+使用 Spring Data JPA 或 Spring Boot 时，请改用 `lambdaql-spring-boot-starter` 或 `lambdaql-spring-data-jpa`。它们会带入 `lambdaql-core`（见 [12.2](12-spring-data-jpa.md#122-modules)）。
+
 > [!WARNING]
-> 这些坐标是**临时的**。
-> 名称 `lambadaql` 有一个拼写错误，会在首次发布前修正。
-> group、名称和版本都可能改变。lambdaQL 发布后请再次查看本页。
+> 这些构件**尚未发布到 Maven Central**。
+> 版本 `1.0.0` 来自仓库的 `gradle.properties`，在首次发布前可能改变。lambdaQL 发布后请再次查看本页。
 
 <a id="kotlin-compiler-settings"></a>
 ## Kotlin 编译器设置
@@ -162,7 +167,7 @@ class Item(
 
 ## 创建 QueryBuilder
 
-`QueryBuilder` 是入口。它需要一个 JPA `EntityManagerFactory`。
+`QueryBuilder` 是入口。它需要一个 JPA `EntityManagerFactory` 或一个 `EntityManager`。
 
 ```kotlin
 val qb = QueryBuilder(entityManagerFactory)
@@ -179,14 +184,16 @@ val qb = QueryBuilder(emf)
 
 ### 使用 Spring Boot
 
-Spring Boot 已经创建了 `EntityManagerFactory`。注入它并创建一个 `QueryBuilder` bean。
+使用 `lambdaql-spring-boot-starter` 时，Spring Boot 会为你创建 `QueryBuilder` bean（见 [12.8](12-spring-data-jpa.md#128-the-querybuilder-bean)）。
+不使用它时，请自己创建这个 bean。像自动配置那样，使用 Spring 的共享 `EntityManager`。
 
 ```kotlin
 @Configuration
 class LambdaQlConfig {
 
     @Bean
-    fun queryBuilder(entityManagerFactory: EntityManagerFactory) = QueryBuilder(entityManagerFactory)
+    fun queryBuilder(entityManagerFactory: EntityManagerFactory) =
+        QueryBuilder(SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory))
 }
 ```
 
@@ -204,8 +211,8 @@ class OrderService(private val qb: QueryBuilder) {
 }
 ```
 
-- 在 `lambdaql-spring-data-jpa` 模块发布之前，你需要自己创建 bean。该模块将为你创建它。
-- 在 Spring 事务中，lambdaQL 使用该事务共享的 `EntityManager`。
+- 共享的 `EntityManager` 绑定到当前事务。在 `@Transactional` 内部，lambdaQL 在同一个事务中运行。
+- 在 Spring 应用中不要使用接收 `EntityManagerFactory` 的构造函数。那样创建的 builder 会为每个查询打开自己的 `EntityManager`，位于 Spring 事务之外。
 - 如果要在 Spring Data 仓库中编写 lambdaQL 查询，请参阅 [12. Spring Data JPA](12-spring-data-jpa.md)。
 
 ## 你的第一个查询
@@ -231,7 +238,7 @@ where o1_0.status=1 and o1_0.price>100.0
 - `qb.from(Order::class.java)` 开始一个针对 `Order` 的查询。
 - `where { ... }` 接收一个条件 Lambda。使用尾随 Lambda 和 `it`。
 - `toList()` 执行查询并返回 `List<Order>`。
-- `toList()` 是目前唯一已确定的结果方法。其他结果方法还在计划中。
+- `toList()` 返回所有行。其他结果函数（`first()`、`one()`、`count()`、`exists()`、`toSet()`）见[获取结果](#getting-the-result)。
 
 为什么要用 `!!`？`price` 是 `Double?`，对于可空值，Kotlin 无法编译 `it.price > 100.0`。`!!` 让它可以编译。lambdaQL 会**忽略** `!!`。`price` 为 NULL 的行只是不会被返回（SQL 语义）。
 
@@ -323,6 +330,187 @@ where c1_0.name=?
 要查找没有客户的订单，请比较关联本身：`it.customer == null` 生成 `e0.customer is null`（不需要 join）。
 `it.customer?.name == null` **不会**包含它们。
 如果 null 守卫保留了没有客户的订单（`it.customer == null || ...`），lambdaQL 会使用 `left join`。见 [3.10](03-where.md#310-association-paths)。
+
+<a id="getting-the-result"></a>
+## 获取结果
+
+`toList()` 并不是执行查询的唯一方式。lambdaQL 有六个结果函数（决策 D38 和 D42）：
+
+| 函数 | 返回 | 可以在哪里调用 | 作用 |
+|---|---|---|---|
+| `toList()` | `List<T>` | `where` 之后，以及 `orderBy` / `limit` / `offset` 之后 | 返回所有行（或一页）。 |
+| `first()` | `Optional<T>` | `where` 之后，以及 `orderBy` / `limit` / `offset` 之后 | 返回第一行。只读取一行。 |
+| `one()` | `Optional<T>` | 只能在 `where` 之后 | 返回唯一的一行。如果有 2 行或更多行匹配，抛出 `NonUniqueResultException`。最多读取 2 行。 |
+| `count()` | `Long` | 只能在 `where` 之后 | 返回匹配的行数。 |
+| `exists()` | `Boolean` | 只能在 `where` 之后 | 如果有行匹配，返回 `true`。只读取一行，不加载任何实体。 |
+| `toSet()` | `SequencedSet<T>` | `where` 之后，以及 `orderBy` / `limit` / `offset` 之后 | 以保持行顺序的 Set 返回所有行（或一页）。如果 Set 比行数小，抛出 `IllegalStateException`。 |
+
+"`where` 之后" 指的是通过 `qb.from(...)` 和 `where { }` 得到的查询（类型为 `SelectQuery`）。本手册把它称为 **where 阶段**。也可以不写 `where`，直接在 `qb.from(...)` 之后调用这些函数。
+
+在 `orderBy`、`limit` 或 `offset` 之后，查询的类型是 `OrderedSelectQuery`。它的结果函数只有 `toList()`、`toSet()` 和 `first()`。在那里 `one()`、`count()` 和 `exists()` 无法编译。
+这是有意的设计（决策 D38）：`limit(10).count()` 可能表示"所有行"，也可能表示"最多 10 行"，因此 lambdaQL 不允许这种写法。
+
+`first()` 和 `one()` 返回 Java 的 `Optional`。在 Kotlin 中，`.orElse(null)` 可以把它变成可空值（`Order?`）。
+
+目前还没有针对结果函数的 Kotlin 测试。用 Java 写的同样的调用在 [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java) 中测试过（H2、MariaDB 和 Oracle）。已测试的示例请看[本页的 Java 版本](../java/02-getting-started.md#getting-the-result)。
+
+<a id="first"></a>
+### `first()`
+
+没有 `orderBy` 时，"第一行"指的是 id 最小的那一行（规则 S9）。因此每次得到的都是同一行。
+要选择顺序，请先调用 `orderBy { }`。之后 `first()` 返回按该顺序排列的第一行。`offset` 会被保留：`orderBy { ... }.offset(1).first()` 返回第二行。
+如果没有匹配的行，结果是 `Optional.empty()`。
+
+```kotlin
+val cheapest: Order? = qb.from(Order::class.java)
+    .orderBy { o, by -> by.asc(o.price) }
+    .first()
+    .orElse(null)
+// HQL: select e0 from Order e0 order by e0.price asc nulls first, e0.id asc
+
+// without orderBy, "first" is the row with the smallest id
+val firstActive = qb.from(Order::class.java).where { it.active }.first()
+// HQL: select e0 from Order e0 where e0.active = true order by e0.id asc
+```
+
+**各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `first#2`（`firstActive`）：
+
+```sql
+-- H2
+select …
+from orders o1_0
+where o1_0.active=true
+order by o1_0.id
+fetch first ? rows only
+
+-- MariaDB
+select …
+from orders o1_0
+where o1_0.active=1
+order by o1_0.id
+limit ?
+
+-- Oracle
+select …
+from orders o1_0
+where o1_0.active=1
+order by o1_0.id
+fetch first ? rows only
+```
+
+`first()` 只读取一行，因此它是一个分页查询。lambdaQL 会把 `id` 添加为最后一个排序键（见 [4.8](04-order-paging.md#tie-breaker-automatic-id)），Hibernate 会为每个数据库写出分页 SQL：H2 和 Oracle 上是 `fetch first ? rows only`，MariaDB 上是 `limit ?`。这里的 `?` 是 1。
+针对 `cheapest` 的测试使用的 `price` 永远不会为 NULL，因此它的 HQL 没有 `nulls` 部分。这里的 `price` 是 `Double?`，因此 HQL 略有不同（请看 Java 页面中的示例 `first`）。
+
+<a id="one"></a>
+### `one()`
+
+当条件最多只能匹配一行时（例如唯一键），请使用 `one()`。
+没有行时得到 `Optional.empty()`。两行或更多行时抛出 `jakarta.persistence.NonUniqueResultException`。如果返回任意一个匹配的行都可以，请使用 `first()`。
+
+```kotlin
+fun find(id: Long): Order? =
+    qb.from(Order::class.java).where { it.id == id }.one().orElse(null)
+// HQL: select e0 from Order e0 where e0.id = :p1
+
+// two or more rows: an exception (use first() if any row is fine)
+assertThrows<NonUniqueResultException> { qb.from(Order::class.java).where { it.active }.one() }
+```
+
+**各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `one`：
+
+```sql
+-- H2, Oracle
+select …
+from orders o1_0
+where o1_0.id=?
+fetch first ? rows only
+
+-- MariaDB
+select …
+from orders o1_0
+where o1_0.id=?
+limit ?
+```
+
+`one()` 最多向数据库请求 2 行。这足以发现是否存在第二行。因此 SQL 中有 `fetch first ? rows only`（H2、Oracle）或 `limit ?`（MariaDB），这里的 `?` 是 2。没有 `order by`，因为这里顺序无关紧要。
+
+<a id="count-and-a-paged-screen"></a>
+### `count()` 与分页画面
+
+`count()` 返回匹配的行数。它只存在于 where 阶段，因此 `limit` 和 `offset` 永远不会改变它。
+
+对于分页画面，请把 where 阶段的查询保存在一个值中。在它上面调用 `count()` 得到总数。然后在同一个值上调用 `orderBy { }.limit(...).toList()` 得到这一页。
+
+```kotlin
+val active = qb.from(Order::class.java).where { it.active }
+val total: Long = active.count()                       // every matching row
+val page = active.orderBy { o, by -> by.desc(o.price) }.limit(20).toList()
+// count HQL: select count(e0) from Order e0 where e0.active = true
+```
+
+**各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `count`：
+
+```sql
+-- H2
+select count(o1_0.id)
+from orders o1_0
+where o1_0.active=true
+
+-- MariaDB, Oracle
+select count(o1_0.id)
+from orders o1_0
+where o1_0.active=1
+```
+
+Hibernate 把 `count(e0)` 变成 `select count(o1_0.id)`：它统计 id 列。计数查询没有分页。
+
+<a id="exists"></a>
+### `exists()`
+
+如果至少有一行匹配，`exists()` 返回 `true`。它执行 `select 1`，最多读取一行。不会加载任何实体。
+
+```kotlin
+val anyHighStatus: Boolean = qb.from(Order::class.java).where { it.status == 3 }.exists()
+// HQL: select 1 from Order e0 where e0.status = 3
+```
+
+已测试的示例（Java 测试中的 `exists`）使用了一个 Kotlin 示例实体中没有的枚举属性。它的 SQL 形式相同：H2 和 Oracle 上是 `select 1 from orders o1_0 where … fetch first ? rows only`，MariaDB 上是 `… limit ?`。这里的 `?` 是 1。请看[本页的 Java 版本](../java/02-getting-started.md#exists)。
+
+<a id="toset"></a>
+### `toSet()`
+
+`toSet()` 像 `toList()` 一样执行查询，但返回 `SequencedSet<T>`（决策 D42）。
+它是 `LinkedHashSet`，所以元素保持行的顺序。有 `orderBy { }` 时，就是排序的顺序。
+
+```kotlin
+val byPrice: SequencedSet<Order> = qb.from(Order::class.java)
+    .orderBy { o, by -> by.desc(o.price) }
+    .toSet()
+```
+
+SQL 与 `toList()` 相同。lambdaQL **不会**添加 `distinct`：
+
+- 每个实体行都有主键。因此即使只查询一张表，同一行也不会返回两次。
+- lambdaQL 只 join to-one 关联。集合会变成 `exists` 子查询。因此 join 永远不会让行重复。
+- 所以 `distinct` 不会改变结果，只会增加开销。（这与数据库的限制无关：Oracle 23.26 也接受 LOB 列上的 `distinct`。这是实测结果。）
+
+值查询（`select`）的 `distinct` 在里程碑 M9 中处理。
+
+**大小检查。** 如果 Set 比行数小，`toSet()` 抛出 `IllegalStateException`。以下情况会发生这种问题：
+
+- 实体的 `equals` / `hashCode` 把两个不同的行视为相等
+- 它的 `@Id` 不唯一（例如映射到视图的实体）
+
+如果没有这个检查，行会在没有任何迹象的情况下丢失。这些情况请使用 `toList()`。
+Kotlin 的 `data class` 只比较主构造函数中的属性。如果 `@Id` 不在其中，两个不同的行可能相等。
+
+```kotlin
+// Tag.equals compares only the name: two different rows would become one element, so toSet() refuses
+assertThrows<IllegalStateException> { qb.from(Tag::class.java).toSet() }
+val tags: List<Tag> = qb.from(Tag::class.java).toList()   // use toList() instead
+```
+
+目前还没有针对 `toSet()` 的 Kotlin 测试。用 Java 写的同样的调用在 [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java) 中测试过（region `to-set` 和 `to-set-check`，H2、MariaDB 和 Oracle）。请看[本页的 Java 版本](../java/02-getting-started.md#toset)。
 
 ## 需要知道的事
 

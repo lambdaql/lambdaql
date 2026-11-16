@@ -8,6 +8,9 @@ pluginManagement {
 
 rootProject.name = 'lambdaql'
 
+// query               -> lambdaql-core: engine and QueryBuilder, no Spring dependency
+// spring-data-jpa     -> lambdaql-spring-data-jpa: repository executor fragment and Boot auto-configuration
+// spring-boot-starter -> lambdaql-spring-boot-starter: dependencies only
 include 'query'
-
-
+include 'spring-data-jpa'
+include 'spring-boot-starter'

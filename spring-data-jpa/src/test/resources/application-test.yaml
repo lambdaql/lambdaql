@@ -1,0 +1,14 @@
+spring:
+  config:
+    # -Dlql.db=mariadb|oracle: the imported file wins over this file, so its datasource replaces H2
+    import: optional:classpath:lql-db-${lql.db:h2}.yaml
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:lqlspring;MODE=MySQL
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+logging:
+  level:
+    root: warn

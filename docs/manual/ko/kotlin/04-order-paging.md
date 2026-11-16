@@ -3,8 +3,8 @@
 
 > [!NOTE]
 > **상태**
-> - **핵심 기능 구현됨**, Hibernate 6.6.5로 H2, MariaDB 10.11, Oracle 23.26에서 테스트함: `by.asc`, `by.desc`, `by.sort`를 사용하는 `orderBy { o, by -> ... }`, 키 하나의 형태 `orderBy { it.key }`와 `orderBy({ it.key }, Direction)`, `Direction.parse` / `reversed`, 그리고 `limit` / `offset`. 테스트는 **Java** 람다를 사용합니다. **Kotlin 람다는 아직 테스트하지 않았습니다.**
-> - **아직 구현되지 않음:** Kotlin 속성 참조(`orderBy(Order::price)`), `SortSpec`, `SortWhitelist`, 조인 형태 `{ o, c, by -> }`, 서브쿼리 안의 정렬, Spring `Sort` / `Pageable` 모듈.
+> - **핵심 기능 구현됨**, Hibernate 6.6.5로 H2, MariaDB 10.11, Oracle 23.26에서 테스트함: `by.asc`, `by.desc`, `by.sort`를 사용하는 `orderBy { o, by -> ... }`, 키 하나의 형태 `orderBy { it.key }`와 `orderBy({ it.key }, Direction)`, `Direction.parse` / `reversed`, `limit` / `offset`, `orderBy` 뒤의 `first()`, 그리고 재사용 정렬 `SortSpec`(`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`). Spring `Sort`와 `Pageable`은 Spring Data JPA 모듈에서 동작합니다([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)). 테스트는 **Java** 람다를 사용합니다. **Kotlin 람다는 아직 테스트하지 않았습니다.**
+> - **아직 구현되지 않음:** Kotlin 속성 참조(`orderBy(Order::price)`), `SortWhitelist`, 조인 형태 `{ o, c, by -> }`(`SortSpec`에서도), 서브쿼리 안의 정렬.
 > - Kotlin 문법은 컴파일됩니다(프로토타입으로 확인, kotlinc 2.3.21). nullable 키, `?.` 키, 속성 참조는 컴파일되며, 엔티티 키는 컴파일되지 않습니다.
 > - 이 장의 HQL은 라이브러리의 규칙을 따르지만, Kotlin 람다로 테스트하지는 않았습니다.
 
@@ -264,7 +264,7 @@ lambdaQL은 `orderBy`를 호출할 때 이를 확인하고 `LambdaAnalysisExcept
 | `orderBy { }` 뒤의 `where { }` | 아니요(컴파일 오류) |
 | `limit(...)` 뒤의 `orderBy { }` | 아니요(컴파일 오류) |
 
-`orderBy`, `limit`, `offset` 뒤의 쿼리 타입은 `OrderedSelectQuery`입니다. 여기에는 `limit`, `offset`, `toHql()`, `toList()`만 있습니다.
+`orderBy`, `limit`, `offset` 뒤의 쿼리 타입은 `OrderedSelectQuery`입니다. 여기에는 `limit`, `offset`, `toHql()`, `toList()`, `toSet()`, `first()`만 있습니다. `one()`, `count()`, `exists()`는 `orderBy`, `limit`, `offset` 전에만 있습니다([결과 가져오기](02-getting-started.md#getting-the-result) 참고).
 
 <a id="48-paging"></a>
 ## 4.8 페이징
@@ -357,6 +357,13 @@ fetch first ? rows only
 
 페이징 SQL은 데이터베이스마다 다릅니다. H2와 Oracle은 `fetch first ? rows only`, MariaDB는 `limit ?`를 받습니다. offset이 있으면 H2와 Oracle은 `offset ? rows`를 더하고, MariaDB는 `limit ?,?`를 씁니다.
 
+**첫 행과 전체 수.**
+
+- `orderBy { ... }.first()`는 그 순서의 첫 행을 `Optional`로 반환합니다. 한 행만 읽습니다. `offset`은 유지됩니다: `orderBy { ... }.offset(1).first()`는 두 번째 행을 반환합니다.
+- `count()`는 where 단계(`orderBy`, `limit`, `offset` 전)에만 있으므로 항상 조건에 맞는 모든 행을 셉니다. 페이징 화면에서는 where 단계의 쿼리를 값에 담아 두십시오. 그 값에서 `count()`를 호출해 전체 수를 얻고, 이어서 `orderBy { ... }.limit(...).toList()`를 호출해 페이지를 얻습니다.
+
+[결과 가져오기](02-getting-started.md#getting-the-result)를 참고하십시오.
+
 <a id="tie-breaker-automatic-id"></a>
 ### 동순위 처리(자동 `id`)
 
@@ -381,13 +388,109 @@ fetch first ? rows only
 <a id="410-reusable-and-external-sorts"></a>
 ## 4.10 재사용 정렬과 외부 정렬
 
-**아직 구현되지 않음.** 설계에는 다음도 있습니다.
+**`SortSpec`: 보관해 둘 수 있는 정렬.** `SortSpec`은 값에 보관해 두고 여러 쿼리에서 쓰는 정렬입니다.
+`SortSpec.of(Order::class.java) { o, by -> ... }`로 만듭니다. 람다는 `orderBy { o, by -> ... }`의 람다와 같으므로 같은 규칙이 적용됩니다([4.6](#46-rules-for-the-lambda-body) 참고).
+그다음 `orderBy(spec)`에 넘깁니다.
 
-- 재사용 정렬을 위한 `SortSpec`: `SortSpec.of(Order::class.java) { o, by -> by.desc(o.updateAt).asc(o.id) }`. `then()`과 `reversed()`가 있고, `orderBy(spec)`으로 전달합니다.
-- 외부 문자열(`"price,desc_nulls_last"` 같은 요청 파라미터)을 정렬로 바꾸는 `SortWhitelist<T>`. 외부 문자열은 화이트리스트를 통해서만 받아들입니다.
-- **계획됨:** Spring `Sort` / `Pageable` 모듈(Spring `Sort.Order` 각각이 `Direction` 값 하나에 대응), `{ o, c, by -> ... }`를 사용한 조인, 키셋 페이징.
+```kotlin
+// for example at the top level or in a companion object
+val NEWEST: SortSpec<Order> = SortSpec.of(Order::class.java) { o, by -> by.desc(o.updateAt).asc(o.id) }
 
-그때까지는 `Direction.parse`와 `by.sort(key, dir)`로 실행 시점의 방향을 정할 수 있습니다([4.3](#43-direction) 참고). 키는 일반 Kotlin 코드에서 고르십시오.
+qb.from(Order::class.java).where { it.active }.orderBy(NEWEST).limit(20).toList()
+// HQL: select e0 from Order e0 where e0.active = true order by e0.updateAt desc nulls last, e0.id asc
+```
+
+- `SortSpec`은 바꿀 수 없습니다. `then()`과 `reversed()`는 새 spec을 반환합니다. 그래서 spec 하나를 여러 쿼리와 스레드가 안전하게 함께 쓸 수 있습니다. 예를 들어 최상위 `val`로 두어도 됩니다.
+- lambdaQL은 spec이 `orderBy`에서 쓰일 때 람다를 검사합니다. 각 람다는 한 번만 분석됩니다.
+- 캡처한 값은 람다가 만들어진 순간의 값입니다. 최상위 `val`의 spec은 그 값을 계속 유지합니다. 실행 시점에 방향을 바꿔야 한다면 `orderBy { o, by -> by.sort(key, dir) }`를 쓰십시오([4.3](#43-direction) 참고).
+- `orderBy(spec)` 뒤에는 평소처럼 페이징할 수 있습니다: `limit`, `offset`, `toList()`, `first()`.
+
+`SortSpec`에 대한 Kotlin 테스트는 아직 없습니다. 같은 spec을 Java로 쓴 것은 [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)에서 테스트합니다(H2, MariaDB, Oracle). 테스트한 예제는 [이 페이지의 Java 버전](../java/04-order-paging.md#410-reusable-and-external-sorts)에서 볼 수 있습니다.
+
+```kotlin
+val byDescription = SortSpec.of(Order::class.java) { o, by -> by.desc(o.description).asc(o.id) }
+qb.from(Order::class.java).where { it.active }.orderBy(byDescription).toList()
+// HQL: select e0 from Order e0 where e0.active = true order by e0.description desc nulls last, e0.id asc
+```
+
+**데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `sort-spec`:
+
+```sql
+-- H2
+select …
+from orders o1_0
+where o1_0.active=true
+order by o1_0.description desc,o1_0.id
+
+-- MariaDB
+select …
+from orders o1_0
+where o1_0.active=1
+order by o1_0.description desc,o1_0.id
+
+-- Oracle
+select …
+from orders o1_0
+where o1_0.active=1
+order by o1_0.description desc nulls last,o1_0.id
+```
+
+SQL은 같은 정렬을 `orderBy { o, by -> ... }`로 썼을 때와 같습니다. Oracle은 `desc`의 기본값이 반대이므로 `nulls last`를 붙입니다([4.4](#44-null-ordering-is-the-same-on-every-database) 참고).
+
+**`then()`: 기존 키 뒤에 키 추가.** `a.then(b)`는 먼저 `a`의 키로 정렬합니다. 값이 같은 행은 이어서 `b`의 키로 정렬합니다.
+`then()`은 다른 `SortSpec`이나 정렬 람다를 받습니다.
+
+```kotlin
+val byStatus = SortSpec.of(Order::class.java) { o, by -> by.asc(o.status) }
+val byPrice = SortSpec.of(Order::class.java) { o, by -> by.desc(o.price) }
+qb.from(Order::class.java).orderBy(byStatus.then(byPrice)).toList()
+// HQL: select e0 from Order e0 order by e0.status asc nulls first, e0.price desc nulls last
+qb.from(Order::class.java).orderBy(byStatus.then { o, by -> by.desc(o.id) }).toList()
+// HQL: select e0 from Order e0 order by e0.status asc nulls first, e0.id desc
+```
+
+여기서 `status`와 `price`는 NULL이 될 수 있으므로(`Int?`, `Double?`) HQL에 `nulls` 부분이 있습니다. Java 테스트 엔티티에서는 NULL이 될 수 없으므로, 테스트한 HQL과 SQL(예제 `sort-spec-then`)에는 `nulls` 부분이 없습니다. [이 페이지의 Java 버전](../java/04-order-paging.md#410-reusable-and-external-sorts)을 참고하십시오.
+
+**`reversed()`: 모든 키를 반대로.** `spec.reversed()`는 모든 키를 뒤집습니다. NULL 위치도 함께 뒤집힙니다: `asc`(NULL 먼저)는 `desc`(NULL 나중)가 됩니다. 그래서 행 순서 전체가 정확히 거꾸로 됩니다.
+이것은 `Direction.reversed()`와 같습니다([4.3](#43-direction) 참고). `spec.reversed().reversed()`는 원래 순서로 돌아옵니다.
+
+```kotlin
+val spec = SortSpec.of(Order::class.java) { o, by -> by.asc(o.description).asc(o.id) }
+qb.from(Order::class.java).orderBy(spec.reversed()).toList()
+// HQL: select e0 from Order e0 order by e0.description desc nulls last, e0.id desc
+```
+
+**데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `sort-spec-reversed`:
+
+```sql
+-- H2, MariaDB
+select …
+from orders o1_0
+order by o1_0.description desc,o1_0.id desc
+
+-- Oracle
+select …
+from orders o1_0
+order by o1_0.description desc nulls last,o1_0.id desc
+```
+
+H2와 MariaDB는 `desc`에서 이미 NULL을 나중에 두므로 추가 구문을 쓰지 않습니다. Oracle은 `nulls last`를 붙입니다.
+
+**`SortSpec.ofPath`: 속성 이름으로 만드는 정렬.** `SortSpec.ofPath(Order::class.java, "customer.name", Direction.DESC)`는 속성 경로로 spec을 만듭니다. 코드 밖에서 문자열로 들어오는 정렬 키에 사용하며, Spring 모듈은 Spring `Sort`를 이 방식으로 변환합니다([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) 참고).
+경로의 각 부분은 영속 속성이어야 하고, 마지막 부분은 기본 값이어야 합니다. 그 밖의 경로는 오류입니다. 단, 영속 속성이면 어느 것이든 받으므로 사용자 입력 문자열은 먼저 허용 목록과 대조하십시오.
+이 형태에는 람다가 없으므로 Kotlin에서도 Java와 같게 동작합니다. Java 테스트는 [이 페이지의 Java 버전](../java/04-order-paging.md#410-reusable-and-external-sorts)에 있습니다(영역 `sort-spec-path`).
+
+```kotlin
+val byName = SortSpec.ofPath(Order::class.java, "customer.name", Direction.DESC)
+    .then(SortSpec.ofPath(Order::class.java, "id", Direction.ASC))
+qb.from(Order::class.java).orderBy(byName).toList()
+// HQL: select e0 from Order e0 left join e0.customer j1 order by j1.name desc nulls last, e0.id asc
+```
+
+**아직 구현되지 않음:**
+
+- 외부 문자열(`"price,desc_nulls_last"` 같은 요청 파라미터)을 정렬로 바꾸는 `SortWhitelist<T>`. 목록에 있는 이름만 받아들입니다. 그때까지는 `Direction.parse`와 `by.sort(key, dir)`로 실행 시점의 방향을 정할 수 있습니다([4.3](#43-direction) 참고). 키는 일반 Kotlin 코드에서 고르거나, 문자열을 허용 목록과 대조한 뒤 `SortSpec.ofPath`를 사용하십시오.
+- **계획됨:** `{ o, c, by -> ... }`를 사용한 조인(`SortSpec`에서도), 키셋 페이징.
 
 <a id="411-sorting-inside-subqueries"></a>
 ## 4.11 서브쿼리 안의 정렬
@@ -408,12 +511,12 @@ fetch first ? rows only
 | S3 | 방향은 `asc` / `desc`나 `sort(key, Direction)`으로 정합니다. `asc(key)`/`desc(key)`(`ASC`/`DESC`)는 NULL 정책을 사용하고, `asc(key, nullsFirst)`, `desc(key, nullsFirst)`, `*_NULLS_*`는 쓴 그대로 사용합니다 | 구현됨 |
 | S4 | 본문은 `by` 호출을 곧게 이은 체인뿐입니다. `if`, `when`, 반복문은 안 됩니다 | 구현됨 |
 | S5 | `orderBy`는 쿼리당 한 번. `orderBy` 뒤에 `where` 불가. `limit` 뒤에 `orderBy` 불가(컴파일 오류) | 구현됨 |
-| S6 | 재사용은 `SortSpec`으로. 외부 문자열은 `SortWhitelist`를 통해서만 | 아직 구현되지 않음 |
+| S6 | 재사용은 `SortSpec`(`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`)으로. 외부 문자열은 `SortWhitelist`를 통해서만 | `SortSpec` 구현됨(Java 람다로 테스트함). `SortWhitelist`와 조인 형태는 아직 구현되지 않음 |
 | S7 | 키: 컬럼, to-one 경로, `+ - *`, 확대 변환. 값 분기는 안 됩니다. Kotlin `?.`는 경로로 읽습니다 | 구현됨(Kotlin 람다로는 테스트하지 않음) |
 | S8 | `orderBy`에만 쓰인 연관 경로는 `left join`을 사용하므로 연관이 없는 행도 유지됩니다. 같은 경로를 `where`에서 쓰면 정렬은 `where`의 조인을 사용합니다 | 구현됨 |
 | S9 | 페이징을 쓰면 키에 id가 없을 때 루트 `@Id asc`를 추가합니다. 컬렉션 fetch join + 페이징은 거부됩니다 | 루트 id는 구현됨. 조인 관련 부분은 아직 구현되지 않음 |
 | S10 | 분석 결과는 람다별로 캐시됩니다. 캡처한 `Direction`은 호출할 때마다 읽습니다 | 구현됨 |
-| S11 | Spring `Sort.Order`는 `Direction`에 1:1로 대응합니다(계획된 모듈). `SortWhitelist.parse("price,desc_nulls_last")` | 아직 구현되지 않음 |
+| S11 | Spring `Sort.Order`는 `Direction`에 1:1로 대응합니다(Spring 모듈, [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) 참고). `SortWhitelist.parse("price,desc_nulls_last")` | Spring `Sort`는 구현되고 Java로 테스트됨(`ignoreCase`는 아직 지원하지 않음). `SortWhitelist`는 아직 구현되지 않음 |
 | S12 | 조인 쿼리도 같은 모양을 사용합니다: `{ o, c, by -> }`, `{ o, c, i, by -> }` | 아직 구현되지 않음 |
 | S13 | 속성 참조는 키 하나의 짧은 형태(`orderBy(Order::price)`)에서만 사용합니다. 컴파일되지만 의미가 틀린 참조는 거부됩니다 | 아직 구현되지 않음(Kotlin 속성 참조) |
 | S14 | 서브쿼리 정렬: `limit`이 있으면 유지, 없으면 경고와 함께 제거. 데이터베이스 차이는 lambdaQL이 처리합니다(5장 참고) | 아직 구현되지 않음 |

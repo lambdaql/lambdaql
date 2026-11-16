@@ -4,8 +4,8 @@
 > [!NOTE]
 > **状況**
 > - **実装済み、H2・MariaDB・Oracle でテスト済み:** `where` の条件と `toList()`。lambdaQL は getter をカラムにマッピングし、HQL を書いて実行します。
-> - **これも実装済み:** ソートとページングの中核部分（[4. ソートとページング](04-order-paging.md)）。
-> - **設計済み、まだ実装されていないもの:** サブクエリ、`select`、update/insert/delete、プロシージャ、Spring モジュール（5〜8 章と 12 章）。
+> - **これも実装済み:** ソートとページングの中核部分（[4. ソートとページング](04-order-paging.md)）、update/insert/delete/upsert（[7. 更新、挿入、削除](07-dml.md)）、Spring Data JPA モジュール（[12. Spring Data JPA](12-spring-data-jpa.md)）。
+> - **設計済み、まだ実装されていないもの:** サブクエリ、`select`、プロシージャ（5、6、8 章）。
 > - **(テスト済み)** と書かれた例は、テストスイートからコピーしたものです。この章のそれ以外の HQL は、設計で定めた **予定の** 出力です。細かい部分（たとえば `e0`、`j1` のようなエイリアス名）はまだ変わることがあります。
 
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [2. はじめよう](02-getting-started.md) | 次: [4. ソートとページング](04-order-paging.md) | [このページの Kotlin 版](../kotlin/03-where.md)
@@ -310,6 +310,27 @@ where o1_0.description=?
 > [!TIP]
 > **IDE の警告。** IntelliJ はこの書き方に対して「Number objects compared using `==`」と表示します。
 > lambdaQL のラムダの中では、これは意図した書き方です。`@SuppressWarnings("NumberEquality")` を使えます。
+
+**NULL になれないカラム。** NULL になれないカラムがあります。id、プリミティブのカラム、`nullable = false` のカラムです。
+このようなカラムでは `is null` は常に偽なので、lambdaQL はそれを畳み込んで取り除きます。
+
+- `o.getId() == null` は `1=0`（行なし）になります。
+- `o.getId() != null && o.getId() == id` は `e0.id = :p1` になります。null チェックがなくなり、データベースはインデックスを使えます。
+
+これは `Long?` の id に対する Kotlin の `it.id == id` のバイトコードでもあるので、Kotlin の書き方も単純な `e0.id = :p1` になります。
+このルールは、パスに **関連のステップがない** ときだけ適用されます。注文には顧客がないこともあるので `o.getCustomer().getId()` は NULL になりえます。そのため、その null チェックは残ります。
+
+**(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `never-null`:
+
+```java
+// the id can never be NULL, so the null check is dropped (this is what Kotlin's it.id == id compiles to)
+assertEquals("select e0 from Order e0 where e0.id = :p1",
+        qb.from(Order.class).where(o -> o.getId() != null && o.getId() == id).toHql().hql());
+assertEquals("select e0 from Order e0 where 1=0", qb.from(Order.class).where(o -> o.getId() == null).toHql().hql());
+// through an association the row may have no customer, so the check stays
+assertEquals("select e0 from Order e0 where e0.customer.id is null",
+        qb.from(Order.class).where(o -> Objects.equals(o.getCustomer().getId(), null)).toHql().hql());
+```
 
 <a id="363-write-your-null-checks-yourself"></a>
 ### 3.6.3 null チェックは自分で書く

@@ -232,6 +232,67 @@ class SortQueryTest {
     }
 
     @Test
+    void reusableSpec() {
+        // @start region="sort-spec"
+        // keep it, for example as a static final field, and use it in many queries
+        SortSpec<Order> byDescription = SortSpec.of(Order.class, (o, by) -> by.desc(o.getDescription()).asc(o.getId()));
+        RenderedQuery q = qb.from(Order.class).where(o -> o.isActive()).orderBy(byDescription).toHql();
+        assertEquals("select e0 from Order e0 where e0.active = true order by e0.description desc nulls last, e0.id asc", q.hql());
+        // @end
+        assertEquals(all.stream().filter(Order::isActive)
+                        .sorted(nullsFirst(Order::getDescription).reversed().thenComparing(BY_ID)).map(Order::getId).toList(),
+                ids(qb.from(Order.class).where(o -> o.isActive()).orderBy(byDescription).toList()));
+    }
+
+    @Test
+    void specThen() {
+        // @start region="sort-spec-then"
+        SortSpec<Order> byStatus = SortSpec.of(Order.class, (o, by) -> by.asc(o.getStatus()));
+        SortSpec<Order> byPrice = SortSpec.of(Order.class, (o, by) -> by.desc(o.getPrice()));
+        assertEquals("select e0 from Order e0 order by e0.status asc, e0.price desc",
+                qb.from(Order.class).orderBy(byStatus.then(byPrice)).toHql().hql());
+        // then() also takes a lambda
+        assertEquals("select e0 from Order e0 order by e0.status asc, e0.id desc",
+                qb.from(Order.class).orderBy(byStatus.then((o, by) -> by.desc(o.getId()))).toHql().hql());
+        // @end
+        assertEquals(javaIds(Comparator.comparing(Order::getStatus).thenComparing(Comparator.comparing(Order::getPrice).reversed())),
+                ids(qb.from(Order.class).orderBy(byStatus.then(byPrice)).toList()));
+    }
+
+    @Test
+    void specReversed() {
+        // @start region="sort-spec-reversed"
+        SortSpec<Order> spec = SortSpec.of(Order.class, (o, by) -> by.asc(o.getDescription()).asc(o.getId()));
+        // every key is reversed, the NULL position too: asc nulls first -> desc nulls last
+        assertEquals("select e0 from Order e0 order by e0.description desc nulls last, e0.id desc",
+                qb.from(Order.class).orderBy(spec.reversed()).toHql().hql());
+        // @end
+        List<Long> forward = ids(qb.from(Order.class).orderBy(spec).toList());
+        List<Long> backward = new ArrayList<>(ids(qb.from(Order.class).orderBy(spec.reversed()).toList()));
+        java.util.Collections.reverse(backward);
+        assertEquals(forward, backward);
+        // reversing twice gives the first order again
+        assertEquals("select e0 from Order e0 order by e0.description asc nulls first, e0.id asc",
+                qb.from(Order.class).orderBy(spec.reversed().reversed()).toHql().hql());
+    }
+
+    @Test
+    void specFromPathText() {
+        // @start region="sort-spec-path"
+        // for sorts chosen outside the code (Spring Sort uses this); only real properties are accepted
+        SortSpec<Order> byName = SortSpec.ofPath(Order.class, "customer.name", Direction.DESC)
+                .then(SortSpec.ofPath(Order.class, "id", Direction.ASC));
+        assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name desc nulls last, e0.id asc",
+                qb.from(Order.class).orderBy(byName).toHql().hql());
+        assertThrows(IllegalArgumentException.class,
+                () -> qb.from(Order.class).orderBy(SortSpec.ofPath(Order.class, "price; drop table x", Direction.ASC)));
+        // @end
+        assertEquals(javaIds(nullsFirst((Order o) -> o.getCustomer() == null ? null : o.getCustomer().getName())
+                        .reversed().thenComparing(BY_ID)),
+                ids(qb.from(Order.class).orderBy(byName).toList()));
+    }
+
+    @Test
     void rejected() {
         // @start region="sort-rejected"
         // a condition inside the sort lambda (rule S4)

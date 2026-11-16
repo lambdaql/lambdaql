@@ -3,7 +3,7 @@
 > [!NOTE]
 > **Status**
 > - **Implemented and tested on H2, MariaDB and Oracle:** `where` conditions and `toList()` (mapping to columns, HQL output, running the query). The tests use **Java** lambdas. **Kotlin lambdas are not tested yet.**
-> - **Designed, not implemented yet:** the Kotlin-only forms in this chapter (`?.`, `?:`, `!!`, ranges, `when`, `in`). Their bytecode was compiled and checked with prototypes (kotlinc 1.7.22 to 2.3.21), and many conditions were checked row by row on H2. Subqueries, `select`, update/insert/delete, procedures and the Spring module are also designed only. The core of sorting and paging is implemented ([4. Sorting and paging](04-order-paging.md)).
+> - **Designed, not implemented yet:** the Kotlin-only forms in this chapter (`?.`, `?:`, `!!`, ranges, `when`, `in`). Their bytecode was compiled and checked with prototypes (kotlinc 1.7.22 to 2.3.21), and many conditions were checked row by row on H2. Subqueries, `select` and procedures are also designed only. The core of sorting and paging ([4. Sorting and paging](04-order-paging.md)), update/insert/delete/upsert ([7. Update, insert, delete](07-dml.md)) and the Spring Data JPA module ([12. Spring Data JPA](12-spring-data-jpa.md)) are implemented.
 > - The HQL in this chapter is the **planned** output. Small details (for example alias names like `e0`, `j1`) can still change.
 
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [2. Getting started](02-getting-started.md) | Next: [4. Sorting and paging](04-order-paging.md) | [Java version of this page](../java/03-where.md)
@@ -218,6 +218,23 @@ When lambdaQL knows that one side can never be NULL, it writes a simple `=` inst
 .where { it.description != text }
 // HQL: (e0.description <> :p1 or e0.description is null)
 ```
+
+**A column that can never be NULL: `it.id == id`.** In the example entity, `id` is a `Long?`. Kotlin compiles `it.id == id` (with a captured `id: Long`) to a null check and a compare.
+A plain translation would be `not (e0.id is null or e0.id <> :p1)`. That form is correct, but the database cannot use the index well.
+The id can never be NULL, so `is null` on it is always false. lambdaQL folds it away and writes `e0.id = :p1`.
+
+The same rule holds for a primitive property and a `nullable = false` column, but only when the path has **no association step**. `it.customer?.id` can be NULL, because an order can have no customer, so its null check stays.
+
+```kotlin
+.where { it.id == id }              // id: Long (captured)
+// HQL: e0.id = :p1
+.where { it.id == null }
+// HQL: 1=0
+.where { it.customer?.id == null }
+// HQL: e0.customer.id is null
+```
+
+The same HQL is tested with Java lambdas in [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java) (region `never-null`, see [the Java version of this page](../java/03-where.md#362--on-objects-compares-values)). The Java test writes the condition that Kotlin's `it.id == id` compiles to.
 
 > [!WARNING]
 > **A Kotlin non-null type is not proof.** A property `var code: String` can still hold NULL from the database,

@@ -29,7 +29,7 @@ lambdaQL 用**同一个引擎**和同一套 API 支持 Kotlin 和 Java。
 - [9.9 属性引用与作用域函数](#99-property-references-and-scope-functions)
 - [9.10 Kotlin 运算符](#910-kotlin-operators)
 - [9.11 结果：data class、`Pair` 和 `Triple`](#911-results-data-classes-pair-and-triple)
-- [9.12 更新、插入、删除：属性赋值和 `by[column] = value`](#912-update-insert-delete-property-assignment-and-bycolumn--value)
+- [9.12 更新、插入、删除：属性赋值和 `by.set`](#912-update-insert-delete-property-assignment-and-byset)
 - [9.13 存储过程与数据库函数](#913-procedures-and-db-functions)
 - [9.14 Kotlin 限制（KC1 到 KC21）](#914-kotlin-limits-kc1-to-kc21)
 - [9.15 lambdaQL 与直接运行 Kotlin 代码的不同之处](#915-where-lambdaql-differs-from-running-kotlin-code)
@@ -469,7 +469,7 @@ class OrderRepo(private val qb: QueryBuilder) {
 | 你自己的非 inline 扩展函数或扩展属性 | 不支持（KC11）。把它改为 `inline`，或直接写出条件 |
 | `takeIf { }` | 不支持（KC6） |
 
-在更新和插入的 Lambda 中，v0.1 不支持 `apply`、`with` 和 `also`（参见 [9.12](#912-update-insert-delete-property-assignment-and-bycolumn--value)）。
+在更新和插入的 Lambda 中，v0.1 不支持 `apply`、`with` 和 `also`（参见 [9.12](#912-update-insert-delete-property-assignment-and-byset)）。
 
 <a id="910-kotlin-operators"></a>
 ## 9.10 Kotlin 运算符
@@ -506,7 +506,7 @@ lambdaQL **没有 Kotlin 专用的运算符 API**（已决定）。普通的 Jav
 
 | Kotlin 写法 | 为什么可用 | 状态 |
 |---|---|---|
-| DML 中的 `by[o.status] = st` | Kotlin 把 `a[i] = b` 转换为 `a.set(i, b)`，而上下文对象有 `set(column, value)` | 保留 |
+| DML 中的 `by[o.status] = st` | Kotlin 把 `a[i] = b` 转换为 `a.set(i, b)`，赋值 Lambda 不返回值 | 保留（已用 kotlinc 2.3.21 确认） |
 | `x in sub.from(...).select { ... }` | Kotlin 把 `x in v` 转换为 `v.contains(x)` | 保留 |
 | `Agg.sum(x)!! + 1 > 3` | 对占位值进行普通的算术运算 | 保留 |
 | 排序运算符（`by + key`、`-key`） | 会给 Java 用户增加奇怪的方法，并且需要 Kotlin 专用的扩展 | 拒绝 |
@@ -545,8 +545,8 @@ qb.from(Order::class.java).groupBy { it.customer?.id to it.status }         // P
 
 详情：[6. 查询列、聚合与分组](06-select-group.md)。
 
-<a id="912-update-insert-delete-property-assignment-and-bycolumn--value"></a>
-## 9.12 更新、插入、删除：属性赋值和 `by[column] = value`
+<a id="912-update-insert-delete-property-assignment-and-byset"></a>
+## 9.12 更新、插入、删除：属性赋值和 `by.set`
 
 Kotlin 的属性赋值编译为与 Java 相同的 setter 调用，所以规则相同。
 
@@ -564,8 +564,8 @@ qb.insert(Order::class.java).values(lines) { o, l -> o.id = l.id; o.price = l.pr
 
 | Kotlin 写法 | 含义 |
 |---|---|
-| `by[o.status] = 1` | `by.set(o.status, 1)` 的 Kotlin 索引运算符写法。用于带有 `val` 属性（没有 setter）的实体 |
-| `by[o.cnt] += 1` | 无法编译（有意为之）。请写 `by[o.cnt] = o.cnt + 1` |
+| `by[o.status] = 1` | `by.set(o.status, 1)` 的 Kotlin 索引运算符写法。用于带有 `val` 属性（没有 setter）的实体。已用 kotlinc 2.3.21 确认（构建中还没有对应测试） |
+| `by[o.cnt] += 1` | 无法编译（有意为之：`by` 没有 `get`）。请写 `by[o.cnt] = o.cnt + 1` |
 | `it.cnt += 1` | 支持 |
 | `it.cnt++`、`--` | v0.1 不支持。请写 `it.cnt += 1` |
 | `set` 中的 `apply { }`、`with(it) { }`、`also { }` | v0.1 不支持。请直接写赋值 |

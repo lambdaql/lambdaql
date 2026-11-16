@@ -48,13 +48,19 @@ public final class Decoder implements Opcodes {
     private final Map<LabelNode, Integer> labelIndex = new HashMap<>();
     private final Map<State, Node> memo = new HashMap<>();
     private final boolean predicate;
+    private final List<Expr.Invoke> statements;
     private int uninitCounter;
 
     private Decoder(LambdaRef ref, MethodNode method, boolean predicate) {
+        this(ref, method, predicate, null);
+    }
+
+    private Decoder(LambdaRef ref, MethodNode method, boolean predicate, List<Expr.Invoke> statements) {
         this.ref = ref;
         this.method = method;
         this.insns = method.instructions.toArray();
         this.predicate = predicate;
+        this.statements = statements;
         for (int i = 0; i < insns.length; i++) {
             if (insns[i] instanceof LabelNode l) labelIndex.put(l, i);
         }
@@ -88,6 +94,27 @@ public final class Decoder implements Opcodes {
      */
     public static Node decodeValue(LambdaRef ref, MethodNode method) {
         return new Decoder(ref, method, false).run();
+    }
+
+    /**
+     * Decodes an assignment lambda that returns nothing, such as {@code o -> { o.setStatus(1); o.setPrice(p); }}
+     * (ROADMAP M10, rule U1). The body must be straight code: calls that return nothing (setters) are collected
+     * in order; a setter that returns {@code this} and is then dropped also counts.
+     * Conditions, loops and local variables are rejected. The Kotlin safe-call assignment
+     * {@code it.customer?.id = x} is read as a plain assignment (ROADMAP D23).
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java">AssignmentReaderTest</a>):
+     * {@snippet class="org.lambdaql.engine.sem.AssignmentReaderTest" region="read-assign"}
+     *
+     * @param ref    the lambda
+     * @param method the body method of the lambda
+     * @return the calls in source order, for example {@code [param0.setStatus[1], param0.setPrice[captured0]]}
+     * @throws LambdaAnalysisException if the body is not straight setter calls
+     */
+    public static List<Expr.Invoke> decodeStatements(LambdaRef ref, MethodNode method) {
+        List<Expr.Invoke> out = new ArrayList<>();
+        new Decoder(ref, method, false, out).run();
+        return List.copyOf(out);
     }
 
     // ------------------------------------------------------------------ state
@@ -208,7 +235,10 @@ public final class Decoder implements Opcodes {
                     if (e == null) throw error("초기화되지 않은 지역 변수 " + v, line);
                     stack.add(e);
                 }
-                case ISTORE, LSTORE, FSTORE, DSTORE, ASTORE -> set(locals, ((VarInsnNode) n).var, popExpr(stack, line));
+                case ISTORE, LSTORE, FSTORE, DSTORE, ASTORE -> {
+                    if (statements != null) throw error("대입 람다에서는 지역 변수를 쓸 수 없습니다(U1). 값을 대입문에 직접 쓰세요", line);
+                    set(locals, ((VarInsnNode) n).var, popExpr(stack, line));
+                }
                 case IINC -> {
                     IincInsnNode inc = (IincInsnNode) n;
                     Expr cur = locals.get(inc.var);
@@ -216,7 +246,11 @@ public final class Decoder implements Opcodes {
                 }
 
                 // ---- stack
-                case POP -> pop(stack, line);
+                case POP -> {
+                    Object popped = pop(stack, line);
+                    // a setter that returns this (builder style), and the result is dropped
+                    if (statements != null && popped instanceof Expr.Invoke inv && isSetterCall(inv)) statements.add(inv);
+                }
                 case POP2 -> {
                     Object top = pop(stack, line);
                     if (!isWide(top)) pop(stack, line);
@@ -293,6 +327,9 @@ public final class Decoder implements Opcodes {
                 case IFEQ, IFNE, IFLT, IFGE, IFGT, IFLE, IF_ICMPEQ, IF_ICMPNE, IF_ICMPLT, IF_ICMPGE, IF_ICMPGT,
                      IF_ICMPLE, IF_ACMPEQ, IF_ACMPNE, IFNULL, IFNONNULL -> {
                     JumpInsnNode j = (JumpInsnNode) n;
+                    if (statements != null) {
+                        throw error("대입 람다에서는 조건(if, ?:)을 쓸 수 없습니다(U1). 조건은 where에 쓰세요", line);
+                    }
                     Pred atom = jumpAtom(op, stack, line);
                     int target = target(j.label, i, line);
                     List<Object> st = snapshot(stack);
@@ -310,7 +347,10 @@ public final class Decoder implements Opcodes {
 
                 case TABLESWITCH, LOOKUPSWITCH -> throw error("switch(Kotlin when 등)는 아직 지원하지 않습니다", line);
                 case ATHROW -> throw error("예외를 던지는 경로는 지원하지 않습니다", line);
-                case RETURN -> throw error("값을 반환하지 않는 람다는 조건/값 람다가 아닙니다", line);
+                case RETURN -> {
+                    if (statements != null) return remember(key, Node.Leaf.TRUE);
+                    throw error("값을 반환하지 않는 람다는 조건/값 람다가 아닙니다", line);
+                }
                 default -> throw error("지원하지 않는 명령어: " + opName(op), line);
             }
             i++;
@@ -382,6 +422,9 @@ public final class Decoder implements Opcodes {
             int b = a >= 0 ? nextReal(a + 1) : -1;
             if (a >= 0 && b >= 0 && insns[a].getOpcode() == POP && insns[b].getOpcode() == ACONST_NULL) {
                 return jumpAt + 1; // keep x on the stack and go on with the non-null path
+            }
+            if (statements != null && a >= 0 && insns[a].getOpcode() == POP) {
+                return jumpAt + 1; // Kotlin "it.customer?.id = x": a plain assignment (D23)
             }
             return null;
         }
@@ -519,9 +562,19 @@ public final class Decoder implements Opcodes {
             if (m.owner.equals(KOTLIN_INTRINSICS) && m.name.startsWith("check")) {
                 return; // Kotlin !! and platform type checks: no value meaning (D23)
             }
+            if (statements != null) {
+                statements.add(new Expr.Invoke(receiver, mref, args));
+                return;
+            }
             throw error("반환값이 없는 호출은 조건 람다에서 쓸 수 없습니다: " + m.owner.replace('/', '.') + "." + m.name, line);
         }
         stack.add(new Expr.Invoke(receiver, mref, args));
+    }
+
+    private static boolean isSetterCall(Expr.Invoke inv) {
+        if (inv.receiver() == null) return false;
+        if (inv.method().owner().equals("org/lambdaql/query/SetBy")) return true;      // by.set(col, value), result dropped
+        return inv.args().size() == 1 && inv.method().name().startsWith("set");
     }
 
     /**

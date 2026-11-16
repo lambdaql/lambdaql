@@ -248,6 +248,60 @@ where o1_0.active=true
 order by o1_0.id
 fetch first ? rows only
 
+-- @example sort-spec
+-- HQL: select e0 from Order e0 where e0.active = true order by e0.description desc nulls last, e0.id asc
+select …
+from orders o1_0
+where o1_0.active=true
+order by o1_0.description desc,o1_0.id
+
+-- @example sort-spec-then
+-- HQL: select e0 from Order e0 order by e0.status asc, e0.price desc
+select …
+from orders o1_0
+order by o1_0.status,o1_0.price desc
+
+-- @example sort-spec-reversed
+-- HQL: select e0 from Order e0 order by e0.description desc nulls last, e0.id desc
+select …
+from orders o1_0
+order by o1_0.description desc,o1_0.id desc
+
+-- @example first
+-- HQL: select e0 from Order e0 order by e0.price asc, e0.id asc
+select …
+from orders o1_0
+order by o1_0.price,o1_0.id
+fetch first ? rows only
+
+-- @example first#2
+-- HQL: select e0 from Order e0 where e0.active = true order by e0.id asc
+select …
+from orders o1_0
+where o1_0.active=true
+order by o1_0.id
+fetch first ? rows only
+
+-- @example one
+-- HQL: select e0 from Order e0 where e0.id = :p1
+select …
+from orders o1_0
+where o1_0.id=?
+fetch first ? rows only
+
+-- @example count
+-- HQL: select count(e0) from Order e0 where e0.active = true
+select count(o1_0.id)
+from orders o1_0
+where o1_0.active=true
+
+-- @example exists
+-- HQL: select 1 from Order e0 where e0.kind = org.lambdaql.query.Order$Kind.RUSH
+select 1
+from orders o1_0
+where o1_0.kind='RUSH'
+fetch first ? rows only
+
 -- @example readme-first
 -- HQL: select e0 from Order e0 where e0.status = 1 and e0.price > :p1 order by e0.price desc nulls last, e0.id asc
 -- (this HQL is given to Hibernate directly)
@@ -277,3 +331,89 @@ where o1_0.status=1
 order by o1_0.price desc,o1_0.id
 offset ? rows
 fetch first ? rows only
+
+-- @example update
+-- HQL: update Order e0 set e0.status = :p1, e0.price = (e0.price * 2.0) where e0.status = 1
+update orders o1_0
+set status=?,price=(o1_0.price*2.0)
+where o1_0.status=1
+
+-- @example update-by
+-- HQL: update Order e0 set e0.description = 'done' where e0.status = 2
+update orders o1_0
+set description='done'
+where o1_0.status=2
+
+-- @example update-path
+-- HQL: update Order e0 set e0.custName = 'K' where (select s1.name from Customer s1 where s1.id = e0.customer.id) = 'Kim' and e0.customer.id is not null
+update orders o1_0
+set cust_name='K'
+where (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)='Kim' and o1_0.customer_id is not null
+
+-- @example update-path#2
+-- HQL: update Order e0 set e0.custName = (select s1.name from Customer s1 where s1.id = e0.customer.id)
+update orders o1_0
+set cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)
+
+-- @example update-versioned
+-- HQL: update versioned VOrder e0 set e0.status = 2 where e0.id = 1L
+update v_orders v1_0
+set status=2,version=(v1_0.version+1)
+where v1_0.id=1
+
+-- @example delete
+-- HQL: delete from Order e0 where e0.status = 3
+delete from orders o1_0
+where o1_0.status=3
+
+-- @example delete#2
+-- HQL: delete from Order e0 where (select s1.name from Customer s1 where s1.id = e0.customer.id) is null and e0.customer.id is not null
+delete from orders o1_0
+where (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id) is null and o1_0.customer_id is not null
+
+-- @example insert
+-- HQL: insert into Archive (id, price, customerName) values (100L, 9.5, 'Kim')
+insert into archive(id,price,customer_name)
+values (100,9.5,'Kim')
+
+-- @example insert-list
+-- HQL: insert into Archive (id, price) values (:p1, :p2), (:p3, :p4)
+insert into archive(id,price)
+values (?,?), (?,?)
+
+-- @example insert-select
+-- HQL: insert into Archive (id, price, customerName) select e0.id, e0.price, j1.name from Order e0 left join e0.customer j1 where e0.status = 1
+insert into archive(id,price,customer_name)
+select o1_0.id,o1_0.price,c1_0.name
+from orders o1_0
+left join customers c1_0 on c1_0.id=o1_0.customer_id
+where o1_0.status=1
+
+-- @example upsert
+-- HQL: insert into Archive e0 (id, price) values (100L, 2.0) on conflict(id) do update set price = excluded.price
+merge into archive a1_0 using (values (100,2.0)) excluded(id,price) on (a1_0.id=excluded.id) when matched then update
+set price=excluded.price when not matched then insert (id,price)
+values (excluded.id,excluded.price)
+
+-- @example on-conflict
+-- HQL: insert into Archive e0 (id, price) values (100L, 5.0) on conflict(id) do update set price = (e0.price + 5.0)
+merge into archive a1_0 using (values (100,5.0)) excluded(id,price) on (a1_0.id=excluded.id) when matched then update
+set price=(a1_0.price+5.0) when not matched then insert (id,price)
+values (excluded.id,excluded.price)
+
+-- @example insert-ignore
+-- HQL: insert into Archive (id, price) select 300L, 1.0 where not exists (select 1 from Archive x where x.id = 300L)
+insert into archive(id,price)
+select 300,1.0
+where not exists(select 1 from archive a2_0 where a2_0.id=300)
+
+-- @example delete-limit
+-- HQL: delete from Order e0 where e0.id in (select t.id from (select x0.id as id from Order x0 where x0.status = 1 order by x0.price asc, x0.id asc limit 1) t)
+delete from orders o1_0
+where o1_0.id in (select t1_0.id from (select o2_0.id from orders o2_0 where o2_0.status=1 order by o2_0.price,o2_0.id fetch first 1 rows only) t1_0(id))
+
+-- @example update-limit
+-- HQL: update Order e0 set e0.description = 'top' where e0.id in (select t.id from (select x0.id as id from Order x0 join x0.customer k1 where k1.name = 'Kim' order by x0.price desc, x0.id asc limit 1) t)
+update orders o1_0
+set description='top'
+where o1_0.id in (select t1_0.id from (select o2_0.id from orders o2_0 join customers c1_0 on c1_0.id=o2_0.customer_id where c1_0.name='Kim' order by o2_0.price desc,o2_0.id fetch first 1 rows only) t1_0(id))

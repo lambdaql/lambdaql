@@ -5,9 +5,11 @@
 
 > [!IMPORTANT]
 > **状況:** lambdaQL は開発の初期段階です。
-> 実装されているのは **解析コア**、**`where` + `toList()`**、そして **ソートとページング**（`orderBy`、`limit`、`offset`）の中核部分です。lambdaQL はラムダを読み込み、それをデコードし、HQL を書いて実行します。これは H2、MariaDB、Oracle でテスト済みです。
-> このトラックのそれ以外の内容（サブクエリ、`select`、update/insert/delete、プロシージャ、Spring モジュール）は **設計済み** です。構文とルールは決まっていて、H2、MariaDB、Oracle でプロトタイプによる確認もしましたが、コードはまだライブラリに入っていません。
-> 成果物（アーティファクト）はまだ公開していません。試すには、[ソースからビルド](02-getting-started.md#build-from-source)してください。
+> 実装されているのは **解析コア**、**結果の関数付きの `where`**（`toList()`、`toSet()`、`first()`、`one()`、`count()`、`exists()`）、そして **ソートとページング**（`orderBy`、`limit`、`offset`、`SortSpec`）の中核部分です。lambdaQL はラムダを読み込み、それをデコードし、HQL を書いて実行します。これは H2、MariaDB、Oracle でテスト済みです。
+> **更新、挿入、削除、upsert** も実装済みで、`limit` と 1 行保護 `executeOne()` も使えます（H2、MariaDB、Oracle でテスト済み）。
+> **Spring Data JPA モジュール** も実装済みです。リポジトリ用の実行器 `LambdaQlExecutor<T>`（Spring の `Sort`、`Pageable`、`deleteAll(where)` や `updateOne(where, set)` のような DML の短縮メソッド、および更新、削除、挿入、upsert のビルダーに対応）と Spring Boot の自動構成です（Spring Boot 3.4.2 でテスト済み）。DML には呼び出し側のトランザクションが必要です。
+> このトラックのそれ以外の内容（サブクエリ、`select`、プロシージャ、および更新と挿入の中のサブクエリと集計）は **設計済み** です。構文とルールは決まっていて、H2、MariaDB、Oracle でプロトタイプによる確認もしましたが、コードはまだライブラリに入っていません。
+> 成果物（アーティファクト）はまだ Maven Central に公開していません。試すには、[ソースからビルド](02-getting-started.md#build-from-source)してください。
 
 [マニュアルのホーム](../README.md) | [Kotlin トラック](../kotlin/README.md) | 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
 
@@ -61,7 +63,7 @@ fetch first ? rows only
 
 > [!NOTE]
 > **例について。**
-> 例は設計上の例です。機能が実装されると、その例はテストスイートから取ったコードに置き換えられ、テストファイルへのリンクが付きます。[3. 条件](03-where.md) と [4. ソートとページング](04-order-paging.md) では、それらの例に **(テスト済み)** と書いてあります。
+> 例は設計上の例です。機能が実装されると、その例はテストスイートから取ったコードに置き換えられ、テストファイルへのリンクが付きます。[3. 条件](03-where.md)、[4. ソートとページング](04-order-paging.md)、[7. 更新、挿入、削除](07-dml.md)、[12. Spring Data JPA](12-spring-data-jpa.md) では、それらの例に **(テスト済み)** と書いてあります。
 
 <a id="contents"></a>
 ## 目次
@@ -76,12 +78,13 @@ fetch first ? rows only
 | 4 | [ソートとページング](04-order-paging.md) | `orderBy`、`Direction`、NULL の順序、`limit`、`offset` |
 | 5 | [サブクエリ](05-subquery.md) | `exists`、`contains`（IN）、NOT EXISTS、スカラーサブクエリと相関サブクエリ |
 | 6 | [選択、集計、グループ化](06-select-group.md) | `select`、record と DTO、`Agg`、`groupBy`、`having`、派生テーブル、CTE |
-| 7 | [更新、挿入、削除](07-dml.md) | `set`、`by.set`、`values`、`all()`、`execute()` |
+| 7 | [更新、挿入、削除](07-dml.md) | `set`、`by.set`、`values`、`all()`、`execute()`、`limit`、`executeOne()` |
+| 7.6 | [Upsert](07-6-upsert.md) | `upsert`、`onConflict(...).update(...)`、`onConflict(...).ignore()`、データベースごとの行数 |
 | 8 | [プロシージャと DB 関数](08-procedures-functions.md) | `@SqlProcedure`、`@SqlFunction`、`qb.call`、`qb.exec` |
 | 9 | [Java の注意点](09-java-notes.md) | ボクシング、オブジェクトの `==`、`String` の比較、`Objects.equals`、メソッド参照、`this` のキャプチャ、コンパイラーの注意 |
 | 10 | [ルールと制限](10-rules-and-limits.md) | すべてのルール表、Java と SQL の違い、データベースごとの違い、サポートしないもの |
 | 11 | [エラーと言語](../11-errors-and-languages.md)（共通） | エラーコード、例外、メッセージの言語、ログ |
-| 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`、リポジトリの default メソッド、モジュール、トランザクション |
+| 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`、リポジトリの default メソッド、DML の短縮メソッド（`deleteAll`、`updateOne` など）、Spring の `Sort` と `Pageable`、モジュール、トランザクション、`QueryBuilder` の Bean |
 
 <a id="status"></a>
 ## 状況
@@ -92,14 +95,15 @@ fetch first ? rows only
 | 条件のデコード（`&&`、`\|\|`、`!`、比較、キャプチャした値） | 実装済み、ユニットテストあり | [3](03-where.md) |
 | getter から JPA 属性へのマッピング | 実装済み、H2・MariaDB・Oracle でテスト済み | [3](03-where.md) |
 | HQL の生成とクエリの実行（`where`、`toList()`） | 実装済み、H2・MariaDB・Oracle でテスト済み | [3](03-where.md) |
-| ソートとページング（`orderBy`、`limit`、`offset`） | 中核部分は実装済み、H2・MariaDB・Oracle でテスト済み。`SortSpec`、`SortWhitelist`、結合のソート: 設計済み | [4](04-order-paging.md) |
+| 結果の関数（`first()`、`one()`、`count()`、`exists()`、`toSet()`） | 実装済み、H2・MariaDB・Oracle でテスト済み | [2](02-getting-started.md#getting-the-result) |
+| ソートとページング（`orderBy`、`limit`、`offset`） | 中核部分は実装済み、H2・MariaDB・Oracle でテスト済み。`SortSpec` も含みます。`SortWhitelist`、結合のソート（`SortSpec` の結合の書き方も）: 設計済み | [4](04-order-paging.md) |
 | サブクエリ（`exists`、`contains`、スカラー、相関） | 設計済み | [5](05-subquery.md) |
 | 射影、`groupBy`、`having`、集計（`Agg`） | 設計済み | [6](06-select-group.md) |
 | 派生テーブルと CTE（`qb.from(sub -> ...)`、`qb.with(...)`） | 設計済み | [6](06-select-group.md) |
-| `update`、`insert`、`delete` | 設計済み | [7](07-dml.md) |
+| `update`、`insert`、`delete`、upsert | 実装済み、H2・MariaDB・Oracle でテスト済み。`limit` と `executeOne()` も含みます。DML の中のサブクエリ（`sub`）と `insert ... select` の集計: 設計済み | [7](07-dml.md) |
 | ストアドプロシージャと DB 関数 | 設計済み | [8](08-procedures-functions.md) |
 | 4 言語のエラーコードとメッセージ | 設計済み | [11](../11-errors-and-languages.md) |
-| Spring Data JPA（`LambdaQlExecutor<T>`、モジュール `lambdaql-spring-data-jpa`） | 設計済み | [12](12-spring-data-jpa.md) |
+| Spring Data JPA（`LambdaQlExecutor<T>`、Spring の `Sort` / `Pageable`、Spring Boot の自動構成） | 実装済み、Spring Boot 3.4.2 で H2・MariaDB・Oracle でテスト済み。DML の短縮メソッド（`deleteAll`、`updateOne` など）と、更新、削除、挿入、upsert のビルダーも含みます。Spring Boot 4: まだ検証していません | [12](12-spring-data-jpa.md) |
 
 用語の意味:
 
@@ -130,6 +134,7 @@ fetch first ? rows only
 | コンパイラー | javac（Eclipse のコンパイラーである ECJ は保証しません） |
 | Hibernate ORM | 6.6（設計は 6.6.5 で検証） |
 | 検証したデータベース | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
+| Spring Boot（任意） | 3.4（3.4.2 でテスト済み）。Spring Boot 4 はまだ検証していません |
 
 <a id="help-and-contributions"></a>
 ## ヘルプと貢献

@@ -5,8 +5,8 @@
 > 本章汇总了 lambdaQL 针对 Kotlin 的设计规则：Lambda 如何变成 SQL、NULL 如何处理、
 > Kotlin 与 SQL 的不同之处、各数据库的不同之处，以及哪些写法不受支持。
 > 这些规则已用原型在 H2 2.3、MariaDB 10.11 和 Oracle 23ai（Hibernate 6.6.5）上检查过，Kotlin 字节码已用 kotlinc 1.7.22 到 2.3.21 检查过。
-> 目前分析核心、`where` + `toList()` 以及排序与分页的核心部分可以工作（已在 H2、MariaDB 和 Oracle 上用 Java Lambda 测试）。
-> 下面关于子查询、`select`、update/insert/delete 和存储过程的规则**尚未实现**。一部分排序规则也尚未实现（见 [4.12](04-order-paging.md#412-rules-summary-s1-to-s14)）。
+> 目前分析核心、`where`、结果函数（`toList()`、`toSet()`、`first()`、`one()`、`count()`、`exists()`）、排序与分页的核心部分、`SortSpec`、update/insert/delete/upsert（[7](07-dml.md)）以及 Spring Data JPA 模块（[12](12-spring-data-jpa.md)）可以工作（已在 H2、MariaDB 和 Oracle 上用 Java Lambda 测试）。
+> 下面关于子查询、`select` 和存储过程的规则**尚未实现**，DML 中的子查询和聚合也尚未实现。一部分排序规则也尚未实现（见 [4.12](04-order-paging.md#412-rules-summary-s1-to-s14)）。
 > 完整状态请参阅 [路线 README](README.md)。
 
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[9. Kotlin 说明](09-kotlin-notes.md) | 下一章：[11. 错误与语言](../11-errors-and-languages.md) | [本页的 Java 版本](../java/10-rules-and-limits.md)
@@ -150,6 +150,7 @@ lambdaQL 会记录一条 **WARN**（严格模式：报错）。例外：在 Orac
 | `it.status != q`（两侧都可空） | `is distinct from`，或 `(a <> b or a is null)` | `q` 不为 null 时返回 NULL 行（Kotlin 的含义） |
 | `it.description.equals(text)`（`String?`） | 与 `==` 相同 | null 安全 |
 | `x == null`、`x != null` | `is null`、`is not null` | 二值 |
+| `it.id == id`（`it.id` 是 `Long?`，`id` 是捕获的 `Long`）、`it.id == null`：永远不会是 NULL 的列（id、基本类型、`nullable = false`，且路径上没有关联步骤） | `e0.id = :p1`，而不是 `not (e0.id is null or e0.id <> :p1)`；`it.id == null` 得到 `1=0`（用 Java 测试） | 该列没有 NULL。经过关联的路径（`it.customer?.id`）保留检查 |
 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR` | SQL 三值逻辑 |
 | `it.flag == true` / `it.flag != true` | `is not distinct from true` / `is distinct from true` | 与 Kotlin 相同。在三种数据库上都可用 |
 | `it.flag ?: false`（条件） | `(e0.flag is not null and e0.flag = true)` | NULL 视为 false |
@@ -253,6 +254,7 @@ Java 专用规则 R4（对实体值使用 `equals`）和 R5（Java 的 null 安�
 | 可空的 `when` / 区间主体 | 进入 `else`；`!in` 为 true | 不返回，在 `NOT` 之下也一样 | SQL 的含义（D22） |
 | 非空类型 `String` | 永远不为 null | 列可能为 NULL | lambdaQL 使用 JPA 元数据 |
 | Lambda 中的 `LocalDateTime.now()` | 应用程序时间 | – | 作为**应用程序时间**绑定。不支持数据库时间（`current_timestamp`） |
+| `Set` 中相等的元素 | 由 `equals` / `hashCode` 决定（`data class`：主构造函数中的属性） | 用主键区分行 | 如果 Set 比行数小，`toSet()` 和 `findSet()` 抛出 `IllegalStateException`（实体的 `equals` / `hashCode` 把不同的行视为相等，或 `@Id` 不唯一，例如视图）。请使用 `toList()`（D42，用 Java 测试） |
 
 <a id="106-database-differences"></a>
 ## 10.6 数据库之间的差异
@@ -302,11 +304,12 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 | 项目 | 现象 | lambdaQL |
 |---|---|---|
 | `SET a = ..., b = a + 1`（在设置某列之后又读取它） | MariaDB 读取**新**值，H2 和 Oracle 读取旧值 | 分析时报错（U3） |
-| DML 中的关联路径（`it.customer?.name`） | Hibernate 在各数据库上生成不同的 join，并且会**丢失**没有 customer 的行 | lambdaQL 写出关联 `exists`（在 `where` 中）或关联标量子查询（在 SET 中），所以 DML 与查询命中相同的行（U9） |
-| 带有同一张表子查询的 `DELETE` | MariaDB 错误 1093 | 包装在派生表中（U17） |
+| DML 中的关联路径（`it.customer?.name`） | Hibernate 在各数据库上生成不同的 join，并且会**丢失**没有 customer 的行 | lambdaQL 写出关联标量子查询（在 `where` 和 SET 中）。在 `where` 中，查询会做内连接的路径还会加上 `customer.id is not null`，所以 DML 与查询命中相同的行（U9，已测试） |
+| 带有同一张表子查询的 `DELETE` | MariaDB 错误 1093 | 包装在派生表中（U17；随子查询一起提供，里程碑 M8） |
 | 同一个 enum 值只绑定一次，同时用于 STRING 列和 ORDINAL 列 | H2 和 MariaDB 会**不报错地存入错误的值** | 每个位置使用一个参数，从不共用（U7） |
-| `values(list) { }` 中的大量行 | Oracle：绑定变量硬上限为 65,535（ORA-01745），远在达到之前就已非常慢 | 在事务内按绑定数拆分（默认 1,000 个绑定）（U13） |
-| `on conflict` / upsert | 每种数据库都不同 | v0.1 不支持 |
+| `values(list) { }` 中的大量行 | Oracle：绑定变量硬上限为 65,535（ORA-01745），远在达到之前就已非常慢 | 拆分：每条语句最多 500 个值，全部在一个事务中执行（U13） |
+| 带 `order by ... limit` 的 `update` / `delete` | MariaDB 拒绝 `in` 子查询中的 `limit`（错误 1235）和读取目标表的子查询（错误 1093） | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`：派生表 `t` 在三个数据库上都可用。内层 select 使用查询的连接（D36），因此行与查询相同（用 Java 测试） |
+| `on conflict` / upsert | H2 和 Oracle：`merge`。MariaDB：`insert ... on duplicate key update`，更新的行计为 2。Hibernate 的 `do nothing` 在 H2 和 Oracle 上会失败 | `upsert` 和 `onConflict(...).update(...)` 使用 Hibernate 的形式。`ignore()` 写成 `insert ... select ... where not exists`。行数原样返回（D40，已测试） |
 
 ### 存储过程与函数
 
@@ -381,8 +384,9 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 | 以实体作为排序键（`by.desc(o.customer)`） | 一个列：`by.desc(o.customer?.name)`（无法编译） |
 | join 排序 Lambda 中的属性引用 | Lambda |
 | `orderBy` 中的属性引用（`orderBy(Order::price)`，尚未实现） | Lambda：`orderBy { it.price }` |
-| `SortSpec`、`SortWhitelist`（尚未实现） | `val dir = Direction.parse(text)` 和 `by.sort(key, dir)` |
+| `SortWhitelist`（尚未实现） | `val dir = Direction.parse(text)` 和 `by.sort(key, dir)` |
 | 集合 fetch join 与 `limit` / `offset` 一起使用 | 先分页，再加载集合 |
+| Spring `Sort` 中的 `ignoreCase()`（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)），尚不支持 | 不带 `ignoreCase()` 的排序 |
 | 函数键（`lower(name)`） | 计划中 |
 | 按聚合别名排序（`by.desc(s.total)`） | 计划中 |
 | 以布尔 elvis 作为排序键（KC21） | 用键 `o.flag` 并指定 NULL 位置：`by.asc(o.flag, false)`（NULL 在后） |
@@ -413,15 +417,22 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 | 条件值（`if (c) a else b`、`when`、作为值的切换 `!it.active`） | 计划中（`CASE WHEN`）。使用两次带不同 `where` 的更新 |
 | 在 `set` Lambda 中用 `if` 选择要设置的列 | 多次调用 `set()` |
 | `set` 中的 `++`、`--`、`apply`、`with`、`also` | `it.cnt += 1`、直接赋值 |
-| `by[o.cnt] += 1` | `by[o.cnt] = o.cnt + 1`（`+=` 写法无法编译） |
+| `by[o.cnt] += 1` | `by[o.cnt] = o.cnt + 1` 或 `by.set(o.cnt, o.cnt + 1)` |
 | 赋值 Lambda 中的局部 `val` | 在每个位置写出表达式 |
 | 设置关联的非 `@Id` 属性（`it.customer?.name = x`） | 直接更新 `Customer` |
 | 向非可选列（`@Id`、`nullable = false`、基本类型）写入 `null` | – |
 | 自己写入 `@Version` 属性 | lambdaQL 会为你使用 `update versioned` |
 | 值中的字符串模板 | 计划中 |
 | 带显式 join 的 `insert ... select` | 计划中。在 v0.1 中请使用多对一路径 |
-| Upsert（`on conflict`） | 计划中 |
-| 带 `order by ... limit` 的 DML | 先查询 id，再 `delete ... where { it.id in ids }` |
+| 并发插入时原子的 `onConflict { ... }.ignore()` | 捕获键重复错误（`ignore()` 使用 `not exists`，见 [7.6](07-6-upsert.md)） |
+| 基于 `insert ... select` 的 upsert | 用 `values(list) { ... }` 逐行 upsert |
+| 对更新或删除写 `orderBy { ... }` 而没有 `limit(n)` | 加上 `limit(n)`，或去掉 `orderBy`（否则 `IllegalStateException`） |
+| 必须只改变一行的更新或删除，用 `execute() == 1` 和回滚来检查 | `executeOne()`：先读取 id（最多 2 个）。有 2 个时什么都不改变，并抛出 `NonUniqueResultException`。有 1 个时用 `id = :p and (条件)` 改变该行。绝不会改变超过一行（D41，用 Java 测试） |
+| `executeOne()` 与 `orderBy` 或 `limit` 一起使用 | 只用其中之一（否则 `IllegalStateException`） |
+| update 或 delete 上的 `offset` | 不计划提供（D42）。DML 只有 `limit(n)`。用 `where { }`、`orderBy { }` 和 `limit(n)` 选择行 |
+| 对复合键实体使用 `limit` 或 `executeOne()` | 目前还不支持。先查询 id，再 `delete ... where { it.id in ids }` |
+| 使用 Spring 共享 `EntityManager` 且没有事务的 DML（lambdaQL 中没有 `@Transactional`，D41） | 在 `@Transactional` 或 `TransactionTemplate` 中调用 |
+| 对仓库方法 `deleteAll { ... }`（批量删除）期望 cascade 或 `@PreRemove` | 使用 Spring Data 的 `deleteAll(Iterable)` 或 `delete(entity)`（见 [12.4](12-spring-data-jpa.md#deleteallwhere-is-not-spring-datas-deleteall)） |
 | `returning` | 在 DML 之后再查询一次 |
 | 数据库时间（`current_timestamp`） | 传入应用程序时间（`LocalDateTime.now()` 作为值绑定） |
 | 使用 `TABLE` id 生成器的 `insert ... select` | 使用 `values { }`，或 IDENTITY / SEQUENCE |
@@ -430,6 +441,7 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 DML 还需注意：批量 DML 不经过持久化上下文。Hibernate 会先刷新，但
 同一会话中的托管实体之后仍保留旧值。请调用 `clear()`（或 `refresh`）。
 JPA 的级联和 `orphanRemoval` 不适用。
+DML 语句需要事务：`QueryBuilder(EntityManagerFactory)` 会打开自己的事务；使用 `EntityManager`（包括 Spring 的共享 `EntityManager`）的构建器需要调用方的事务，没有事务时会在发送任何 SQL 之前失败。
 
 ### 存储过程
 
@@ -495,6 +507,7 @@ val list = if (flag) {
 | Java（JVM） | 21 |
 | Hibernate | 6.6（设计已用 6.6.5 检查过）。使用了 HQL 扩展（例如 `is distinct from`）；不保证其他 JPA 提供者可用 |
 | 数据库 | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
+| Spring | Spring Boot 3.4.2 和 Spring Data JPA 3.4.2（Spring 模块，[12](12-spring-data-jpa.md)；仅 Java repository）。Spring Boot 4 尚未验证 |
 | Kotlin 逐行检查 | 目前只在 H2 上进行。计划在 MariaDB 和 Oracle 上运行 Kotlin 用例 |
 | 未测试 | 高于 2.3 的 Kotlin、Kotlin Multiplatform、PostgreSQL、SQL Server、Oracle 19c 及更早版本（例如 PL/SQL 的 `BOOLEAN` 参数） |
 

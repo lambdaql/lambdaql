@@ -83,6 +83,64 @@ public final class Normalizer {
         return n.done(n.value(value));
     }
 
+    /**
+     * Finds the column that a setter call writes (ROADMAP M10, rules U1 and U6).
+     * <ul>
+     *   <li>{@code o.setStatus(x)}: a basic column; {@code o.setAddress(a)}: a whole embedded value;
+     *       {@code o.setCustomer(c)}: an association (its foreign key).</li>
+     *   <li>{@code o.getAddress().setCity(x)}: a field of an embedded value.</li>
+     *   <li>{@code o.getCustomer().setId(x)}: the foreign key. Other setters on an association
+     *       ({@code o.getCustomer().setName(x)}) change another table and are rejected.</li>
+     * </ul>
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java">AssignmentReaderTest</a>):
+     * {@snippet class="org.lambdaql.engine.sem.AssignmentReaderTest" region="read-assign"}
+     *
+     * @param receiver the object the setter is called on (from the decoded lambda)
+     * @param setter   the setter name, for example {@code setStatus}
+     * @param roots    entity class of each lambda parameter
+     * @param model    entity information
+     * @param loader   class loader
+     * @param where    a name for error messages
+     * @return the target column
+     * @throws LambdaAnalysisException if the call does not write a column of the entity
+     */
+    public static Expr.Column assignTarget(Expr receiver, String setter, List<Class<?>> roots, EntityModel model,
+                                           ClassLoader loader, String where) {
+        Normalizer n = new Normalizer(roots, model, loader, where);
+        if (!setter.startsWith("set") || setter.length() <= 3) {
+            throw n.error("대입 람다에는 setter 호출만 쓸 수 있습니다(U1): " + setter);
+        }
+        if (!(n.value(receiver) instanceof Path p)) {
+            throw n.error("setter는 엔티티나 그 값 객체·연관에 호출해야 합니다(U1): " + setter);
+        }
+        String base = decapitalize(setter.substring(3));
+        EntityModel.Property prop = model.property(p.type(), base)
+                .or(() -> model.property(p.type(), "is" + setter.substring(3)))
+                .orElseThrow(() -> n.error("엔티티 속성을 찾을 수 없습니다: " + p.type().getSimpleName() + "." + setter));
+        List<String> names = new ArrayList<>(p.names());
+        names.add(prop.name());
+        List<Boolean> assoc = new ArrayList<>(p.assoc());
+        if (p.kind().equals("ASSOCIATION")) {
+            if (!prop.id()) {
+                throw n.error("연관 엔티티는 @Id(외래 키)만 바꿀 수 있습니다(U6): " + String.join(".", names));
+            }
+            assoc.add(false);
+            return new Expr.Column(p.root(), names, assoc, prop.javaType(), prop.nonNull(), true);
+        }
+        return switch (prop.kind()) {
+            case BASIC, EMBEDDED -> {
+                assoc.add(false);
+                yield new Expr.Column(p.root(), names, assoc, prop.javaType(), prop.nonNull(), false);
+            }
+            case ASSOCIATION -> {
+                assoc.add(true);
+                yield new Expr.Column(p.root(), names, assoc, prop.javaType(), prop.nonNull(), false);
+            }
+            case COLLECTION -> throw n.error("컬렉션 속성은 대입할 수 없습니다(U6): " + prop.name());
+        };
+    }
+
     // ------------------------------------------------------------------ conditions
 
     private Pred pred(Pred p) {
@@ -118,21 +176,35 @@ public final class Normalizer {
         }
         Expr a = done(value(left));
         Expr b = done(value(right));
-        if (isNullLiteral(b)) return op == CmpOp.EQ ? new Pred.IsNull(a) : nullCheck(op, a);
-        if (isNullLiteral(a)) return op == CmpOp.EQ ? new Pred.IsNull(b) : nullCheck(op, b);
+        if (isNullLiteral(b)) return op == CmpOp.EQ ? isNullOf(a) : nullCheck(op, a);
+        if (isNullLiteral(a)) return op == CmpOp.EQ ? isNullOf(b) : nullCheck(op, b);
         if (a instanceof Expr.Column ca && b instanceof Expr.Host hb) b = retype(hb, ca.javaType());
         if (b instanceof Expr.Column cb && a instanceof Expr.Host ha) a = retype(ha, cb.javaType());
         rejectEntityCompare(a, b);
         return new Pred.Cmp(op, a, b, nullSafe);
     }
 
+    /**
+     * Makes {@code e is null}. A column that can never be NULL (id, primitive, {@code nullable = false}) and that
+     * is not reached through an association gives FALSE, so Kotlin's null-safe {@code it.id == id}
+     * ({@code it.id != null && it.id == id}) becomes just {@code e0.id = :p1} (SARGable, 3.9).
+     * A path through an association is kept: the row may have no association.
+     *
+     * @param e a normalized value
+     * @return the condition
+     */
+    private static Pred isNullOf(Expr e) {
+        if (e instanceof Expr.Column c && c.nonNull() && !c.association().contains(true)) return Pred.Bool.FALSE;
+        return new Pred.IsNull(e);
+    }
+
     private Pred nullCheck(CmpOp op, Expr e) {
-        if (op == CmpOp.NE) return Pred.not(new Pred.IsNull(e));
+        if (op == CmpOp.NE) return Pred.not(isNullOf(e));
         throw error("null과는 =, != 만 비교할 수 있습니다");
     }
 
     private Pred isNull(Expr operand) {
-        return new Pred.IsNull(done(value(operand)));
+        return isNullOf(done(value(operand)));
     }
 
     private Pred truth(Expr e) {
@@ -164,8 +236,8 @@ public final class Normalizer {
     }
 
     private Pred eq(Expr a, Expr b) {
-        if (isNullLiteral(b)) return new Pred.IsNull(a);
-        if (isNullLiteral(a)) return new Pred.IsNull(b);
+        if (isNullLiteral(b)) return isNullOf(a);
+        if (isNullLiteral(a)) return isNullOf(b);
         if (a instanceof Expr.Column ca && b instanceof Expr.Host hb) b = retype(hb, ca.javaType());
         if (b instanceof Expr.Column cb && a instanceof Expr.Host ha) a = retype(ha, cb.javaType());
         rejectEntityCompare(a, b);
@@ -200,6 +272,12 @@ public final class Normalizer {
         if (!usesEntity(e)) {
             // constants written in the lambda code stay literals; captured and computed values are bound
             if (e instanceof Expr.Const c && !(c.value() instanceof Type)) return new Done(c);
+            // a boxed constant (Long.valueOf(100L) for a Long setter or a generic argument) is still a constant (D37)
+            Expr.Const boxed = boxedConstant(e);
+            if (boxed != null) return new Done(boxed);
+            // a converted constant (Kotlin writes `price * 2` as iconst_2; i2d) is still a constant
+            Expr.Const converted = convertedConstant(e);
+            if (converted != null) return new Done(converted);
             Object enumConstant = enumConstant(e);
             if (enumConstant != null) return new Done(new Expr.Const(enumConstant, e.type()));
             return new Done(host(e, classOf(e.type()), false));
@@ -232,6 +310,10 @@ public final class Normalizer {
         if (!m.isStatic() && inv.args().isEmpty() && inv.receiver() != null) {
             V recv = value(inv.receiver());
             if (recv instanceof Path p) return step(p, m);
+        }
+        // Objects.requireNonNullElse(a, b): a, or b when a is null (U2)
+        if (m.isStatic() && m.is("java/util/Objects", "requireNonNullElse") && inv.args().size() == 2) {
+            return new Done(new Expr.Coalesce(done(value(inv.args().get(0))), done(value(inv.args().get(1))), inv.type()));
         }
         throw error("엔티티 값에 대해 지원하지 않는 메서드 호출입니다: " + m.ownerSimpleName() + "." + m.name());
     }
@@ -316,6 +398,45 @@ public final class Normalizer {
             return new Expr[]{inv.args().get(0), inv.args().get(1)};
         }
         return null;
+    }
+
+    /**
+     * Returns the constant inside a boxing call such as {@code Long.valueOf(100L)}.
+     *
+     * @param e an expression
+     * @return the constant, or {@code null} if this is not a boxed constant
+     */
+    private static Expr.Const boxedConstant(Expr e) {
+        if (!(e instanceof Expr.Invoke inv)) return null;
+        MethodRef m = inv.method();
+        if (!m.isStatic() || !m.name().equals("valueOf") || !BOXES.contains(m.owner()) || inv.args().size() != 1
+                || m.argumentTypes()[0].getSort() == Type.OBJECT) {
+            return null;
+        }
+        Expr arg = inv.args().get(0);
+        while (arg instanceof Expr.Convert c) arg = c.operand();
+        return arg instanceof Expr.Const c && c.value() != null && !(c.value() instanceof Type) ? c : null;
+    }
+
+    /**
+     * Folds a number conversion of a constant, such as {@code i2d} on {@code 2}, into a constant of the new type.
+     *
+     * @param e an expression
+     * @return the converted constant, or {@code null} if this is not a converted number constant
+     */
+    private static Expr.Const convertedConstant(Expr e) {
+        if (!(e instanceof Expr.Convert c)) return null;
+        Expr inner = c.operand();
+        if (inner instanceof Expr.Convert) inner = convertedConstant(inner);
+        if (!(inner instanceof Expr.Const k) || !(k.value() instanceof Number n)) return null;
+        Object v = switch (c.type().getSort()) {
+            case Type.INT, Type.SHORT, Type.BYTE, Type.CHAR -> n.intValue();
+            case Type.LONG -> n.longValue();
+            case Type.FLOAT -> n.floatValue();
+            case Type.DOUBLE -> n.doubleValue();
+            default -> null;
+        };
+        return v == null ? null : new Expr.Const(v, c.type());
     }
 
     /**

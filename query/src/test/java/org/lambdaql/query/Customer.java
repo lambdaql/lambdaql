@@ -59,4 +59,22 @@ public class Customer implements Serializable {
     public void setGrade(Integer grade) {
         this.grade = grade;
     }
+
+    /**
+     * Sets the id (used by DML examples: {@code o.getCustomer().setId(x)} changes the foreign key).
+     *
+     * @param id the id
+     */
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    /**
+     * Sets the name (used by a DML example that must be rejected).
+     *
+     * @param name the name
+     */
+    public void setName(String name) {
+        this.name = name;
+    }
 }

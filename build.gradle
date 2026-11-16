@@ -73,7 +73,9 @@ subprojects { subproject ->
 //      }
     }
 
-    def artifactName = "${rootProject.name}-${project.name}"
+    // a module can choose its artifact name with lql.artifactName in its gradle.properties
+    // (the "query" folder is published as lambdaql-core, ROADMAP D34)
+    def artifactName = subproject.findProperty('lql.artifactName') ?: "${rootProject.name}-${project.name}"
 
     plugins.withId('java-library') {
         jar {

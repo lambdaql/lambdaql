@@ -5,8 +5,8 @@
 > This chapter collects the rules of the lambdaQL design: how lambdas become SQL, how NULL works,
 > where Java and SQL differ, where databases differ, and what is not supported.
 > The rules were checked with prototypes on H2 2.3, MariaDB 10.11 and Oracle 23ai (Hibernate 6.6.5).
-> Today the analysis core, `where` + `toList()` and the core of sorting and paging work (tested on H2, MariaDB and Oracle).
-> The rules for subqueries, `select`, update/insert/delete and procedures below are **not implemented yet**. Some sorting rules are not implemented yet either (see [4.12](04-order-paging.md#412-rules-summary-s1-to-s14)).
+> Today the analysis core, `where`, the result functions (`toList()`, `toSet()`, `first()`, `one()`, `count()`, `exists()`), the core of sorting and paging, `SortSpec`, update/insert/delete/upsert ([7](07-dml.md)) and the Spring Data JPA module ([12](12-spring-data-jpa.md)) work (tested on H2, MariaDB and Oracle).
+> The rules for subqueries, `select` and procedures below are **not implemented yet**, and neither are subqueries and aggregates in DML. Some sorting rules are not implemented yet either (see [4.12](04-order-paging.md#412-rules-summary-s1-to-s14)).
 > See the [Java track README](README.md#status) for the full status.
 
 [Java track](README.md) | [Manual home](../README.md) | Previous: [9. Java notes](09-java-notes.md) | Next: [11. Errors and languages](../11-errors-and-languages.md) | [Kotlin version of this page](../kotlin/10-rules-and-limits.md)
@@ -140,6 +140,7 @@ See [8. Procedures and DB functions](08-procedures-functions.md).
 | `Objects.equals(o.getDescription(), p)`, `"x".equals(o.getDescription())`, `Boolean.TRUE.equals(o.getActive())` | null-safe | Like Java |
 | `!Boolean.TRUE.equals(o.getActive())` | `e0.active is distinct from true` | Like Java. Works on all three DBs |
 | `x == null`, `x != null` | `is null`, `is not null` | 2-valued |
+| `o.getId() == null` on a column that can never be NULL (the id, a primitive, `nullable = false`, no association step on the path) | `1=0`. Next to a compare, the check is dropped: `o.getId() != null && o.getId() == id` gives `e0.id = :p1` (tested) | The column has no NULL. A path through an association (`o.getCustomer().getId()`) keeps the check |
 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL 3-valued logic |
 | `o.getCustomer().getName()` in `where` | `j1.name` + `join e0.customer j1` (inner join by default) | No customer: the order is not selected |
 | `o.getCustomer() == null \|\| o.getCustomer().getName().equals(p)` | `e0.customer is null or j1.name = :p1` + `left join e0.customer j1` | No customer: selected, like Java |
@@ -227,6 +228,7 @@ More differences:
 | String length | UTF-16 units | H2 UTF-16 units, MariaDB code points | Documented |
 | String concatenation with NULL | `"null"` text | NULL (Oracle: `NULL \|\| 'x'` is `'x'`) | String concatenation is planned, not in v0.1 |
 | `LocalDateTime.now()` in a lambda | App time | – | Bound as **app time**. DB time (`current_timestamp`) is not supported |
+| Equal elements in a `Set` | `equals` / `hashCode` decide | The primary key tells rows apart | `toSet()` and `findSet()` throw `IllegalStateException` if the set is smaller than the number of rows (the entity's `equals` / `hashCode` treats different rows as equal, or its `@Id` is not unique, for example a view). Use `toList()` (D42, tested) |
 
 ## 10.6 Database differences
 
@@ -275,11 +277,12 @@ needed there; only Oracle gets a `NULLS` clause. To change the NULL position, us
 | Item | What happens | lambdaQL |
 |---|---|---|
 | `SET a = ..., b = a + 1` (read a column after you set it) | MariaDB reads the **new** value, H2 and Oracle the old value | Error at analysis time (U3) |
-| Association path in DML (`o.getCustomer().getName()`) | Hibernate makes different joins per DB and **loses rows** with no customer | lambdaQL writes a correlated `exists` (in `where`) or a correlated scalar subquery (in SET), so DML hits the same rows as the query (U9) |
-| `DELETE` with a subquery on the same table | MariaDB error 1093 | Wrapped in a derived table (U17) |
+| Association path in DML (`o.getCustomer().getName()`) | Hibernate makes different joins per DB and **loses rows** with no customer | lambdaQL writes a correlated scalar subquery (in `where` and in SET). In `where`, a path that a select would inner join also gets `customer.id is not null`, so DML hits the same rows as the query (U9, tested) |
+| `DELETE` with a subquery on the same table | MariaDB error 1093 | Wrapped in a derived table (U17; comes with subqueries, milestone M8) |
 | The same enum value bound once for a STRING and an ORDINAL column | H2 and MariaDB store a **wrong value without error** | One parameter per place, never shared (U7) |
-| Many rows in `values(list, ...)` | Oracle: hard limit 65,535 binds (ORA-01745), very slow long before | Split by bind count (default 1,000 binds) inside a transaction (U13) |
-| `on conflict` / upsert | Different on each DB | Not in v0.1 |
+| Many rows in `values(list, ...)` | Oracle: hard limit 65,535 binds (ORA-01745), very slow long before | Split: at most 500 values per statement, all in one transaction (U13) |
+| `update` / `delete` with `order by ... limit` | MariaDB rejects `limit` in an `in` subquery (error 1235) and a subquery on the target table (error 1093) | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: the derived table `t` works on all three databases. The inner select uses the select joins (D36), so the rows are the same as the select (tested) |
+| `on conflict` / upsert | H2 and Oracle: `merge`. MariaDB: `insert ... on duplicate key update`, and an updated row counts as 2. Hibernate's `do nothing` fails on H2 and Oracle | `upsert` and `onConflict(...).update(...)` use Hibernate's form. `ignore()` is written as `insert ... select ... where not exists`. The row count is returned as it is (D40, tested) |
 
 ### Procedures and functions
 
@@ -347,8 +350,9 @@ lambdaQL throws a clear error for every form in this list. "Planned" means a lat
 | `orderBy` twice, `where` after `orderBy`, `orderBy` after `limit` | One `orderBy` with all keys (these do not compile) |
 | An entity as a sort key (`by.desc(o.getCustomer())`) | A column: `by.desc(o.getCustomer().getName())` (does not compile) |
 | Method references in join sort lambdas | A lambda |
-| `SortSpec`, `SortWhitelist` (not implemented yet) | `Direction dir = Direction.parse(text)` and `by.sort(key, dir)` |
+| `SortWhitelist` (not implemented yet) | `Direction dir = Direction.parse(text)` and `by.sort(key, dir)` |
 | Collection fetch join with `limit` / `offset` | Page first, then load the collection |
+| `ignoreCase()` in a Spring `Sort` ([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)), not supported yet | A sort without `ignoreCase()` |
 | Function keys (`lower(name)`) | Planned |
 | Sort by an aggregate alias (`by.desc(s.total())`) | Planned |
 
@@ -381,8 +385,15 @@ lambdaQL throws a clear error for every form in this list. "Planned" means a lat
 | Writing the `@Version` property yourself | lambdaQL uses `update versioned` for you |
 | String concatenation in values | Planned |
 | `insert ... select` with an explicit join | Planned. In v0.1, use many-to-one paths |
-| Upsert (`on conflict`) | Planned |
-| DML with `order by ... limit` | Query the ids first, then `delete ... where ids.contains(id)` |
+| An atomic `onConflict(...).ignore()` under concurrent inserts | Catch the duplicate key error (`ignore()` uses `not exists`, see [7.6](07-6-upsert.md)) |
+| Upsert from `insert ... select` | Upsert row by row with `values(list, ...)` |
+| `orderBy(...)` on update or delete without `limit(n)` | Add `limit(n)`, or remove `orderBy` (`IllegalStateException` otherwise) |
+| An update or delete that must change one row, checked with `execute() == 1` and a rollback | `executeOne()`: it reads the ids first (at most 2). With 2 it changes nothing and throws `NonUniqueResultException`. With 1 it changes the row by `id = :p and (condition)`. It never changes more than one row (D41, tested) |
+| `executeOne()` together with `orderBy` or `limit` | Use one of them (`IllegalStateException` otherwise) |
+| `offset` on update or delete | Not planned (D42). DML has only `limit(n)`. Choose the rows with `where`, `orderBy(...)` and `limit(n)` |
+| `limit` or `executeOne()` on an entity with a composite key | Not supported yet. Query the ids first, then `delete ... where ids.contains(id)` |
+| DML with a Spring shared `EntityManager` and no transaction (no `@Transactional` in lambdaQL, D41) | Call it inside `@Transactional` or a `TransactionTemplate` |
+| Cascade or `@PreRemove` with the repository method `deleteAll(where)` (a bulk delete) | Spring Data's `deleteAll(Iterable)` or `delete(entity)` (see [12.4](12-spring-data-jpa.md#deleteallwhere-is-not-spring-datas-deleteall)) |
 | `returning` | Query again after the DML |
 | DB time (`current_timestamp`) | Pass app time (`LocalDateTime.now()` is bound as a value) |
 | `insert ... select` with a `TABLE` id generator | Use `values(...)`, or IDENTITY / SEQUENCE |
@@ -391,6 +402,7 @@ lambdaQL throws a clear error for every form in this list. "Planned" means a lat
 Also note for DML: bulk DML does not go through the persistence context. Hibernate flushes first, but
 managed entities in the same session keep old values afterwards. Call `clear()` (or `refresh`).
 JPA cascade and `orphanRemoval` do not apply.
+A DML statement needs a transaction: `QueryBuilder(EntityManagerFactory)` opens its own; a builder with an `EntityManager` (also Spring's shared one) needs the caller's, and without it fails before any SQL is sent.
 
 ### Procedures
 
@@ -445,6 +457,7 @@ List<Order> list = flag
 | Java | 21 (javac). ECJ is not guaranteed |
 | Hibernate | 6.6 (design checked with 6.6.5). HQL extensions are used (for example `is distinct from`); other JPA providers are not guaranteed |
 | Databases | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
+| Spring | Spring Boot 3.4.2 and Spring Data JPA 3.4.2 (the Spring module, [12](12-spring-data-jpa.md)). Spring Boot 4 is not verified yet |
 | Not tested | PostgreSQL, SQL Server, Oracle 19c and older (for example PL/SQL `BOOLEAN` parameters) |
 
 ---

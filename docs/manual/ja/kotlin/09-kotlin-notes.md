@@ -31,7 +31,7 @@ lambdaQL は Kotlin と Java を **同じエンジン**、同じ API でサポ�
 - [9.9 プロパティ参照とスコープ関数](#99-property-references-and-scope-functions)
 - [9.10 Kotlin の演算子](#910-kotlin-operators)
 - [9.11 結果: data class、`Pair`、`Triple`](#911-results-data-classes-pair-and-triple)
-- [9.12 更新、挿入、削除: プロパティへの代入と `by[column] = value`](#912-update-insert-delete-property-assignment-and-bycolumn--value)
+- [9.12 更新、挿入、削除: プロパティへの代入と `by.set`](#912-update-insert-delete-property-assignment-and-byset)
 - [9.13 プロシージャと DB 関数](#913-procedures-and-db-functions)
 - [9.14 Kotlin の制限（KC1 から KC21）](#914-kotlin-limits-kc1-to-kc21)
 - [9.15 lambdaQL と Kotlin コードの実行との違い](#915-where-lambdaql-differs-from-running-kotlin-code)
@@ -484,7 +484,7 @@ class OrderRepo(private val qb: QueryBuilder) {
 | 自分で作った inline でない拡張関数や拡張プロパティ | いいえ（KC11）。`inline` にするか、条件を直接書いてください |
 | `takeIf { }` | いいえ（KC6） |
 
-更新と挿入のラムダでは、`apply`、`with`、`also` は v0.1 ではサポートしていません（[9.12](#912-update-insert-delete-property-assignment-and-bycolumn--value) を参照）。
+更新と挿入のラムダでは、`apply`、`with`、`also` は v0.1 ではサポートしていません（[9.12](#912-update-insert-delete-property-assignment-and-byset) を参照）。
 
 <a id="910-kotlin-operators"></a>
 ## 9.10 Kotlin の演算子
@@ -522,7 +522,7 @@ lambdaQL には **Kotlin 専用の演算子 API はありません**（決定済
 
 | Kotlin の書き方 | 使える理由 | 状況 |
 |---|---|---|
-| DML の `by[o.status] = st` | Kotlin は `a[i] = b` を `a.set(i, b)` に変え、コンテキストオブジェクトには `set(column, value)` があります | 採用 |
+| DML の `by[o.status] = st` | Kotlin は `a[i] = b` を `a.set(i, b)` に変え、代入ラムダは値を返しません | 採用（kotlinc 2.3.21 で確認） |
 | `x in sub.from(...).select { ... }` | Kotlin は `x in v` を `v.contains(x)` に変えます | 採用 |
 | `Agg.sum(x)!! + 1 > 3` | プレースホルダーの値に対する普通の算術 | 採用 |
 | ソートの演算子（`by + key`、`-key`） | Java のユーザーにとって奇妙なメソッドが増え、Kotlin 専用の拡張が必要になります | 不採用 |
@@ -561,8 +561,8 @@ qb.from(Order::class.java).groupBy { it.customer?.id to it.status }         // P
 
 詳細: [6. 選択、集計、グループ化](06-select-group.md)。
 
-<a id="912-update-insert-delete-property-assignment-and-bycolumn--value"></a>
-## 9.12 更新、挿入、削除: プロパティへの代入と `by[column] = value`
+<a id="912-update-insert-delete-property-assignment-and-byset"></a>
+## 9.12 更新、挿入、削除: プロパティへの代入と `by.set`
 
 Kotlin のプロパティへの代入は Java と同じ setter の呼び出しにコンパイルされるので、ルールも同じです。
 
@@ -580,8 +580,8 @@ qb.insert(Order::class.java).values(lines) { o, l -> o.id = l.id; o.price = l.pr
 
 | Kotlin の書き方 | 意味 |
 |---|---|
-| `by[o.status] = 1` | `by.set(o.status, 1)` のための Kotlin のインデックス演算子。`val` プロパティ（setter なし）を持つエンティティに使います |
-| `by[o.cnt] += 1` | コンパイルできません（意図的です）。`by[o.cnt] = o.cnt + 1` と書いてください |
+| `by[o.status] = 1` | `by.set(o.status, 1)` のための Kotlin のインデックス演算子。`val` プロパティ（setter なし）を持つエンティティに使います。kotlinc 2.3.21 で確認（ビルド内のテストはまだありません） |
+| `by[o.cnt] += 1` | コンパイルできません（意図的です。`by` に `get` はありません）。`by[o.cnt] = o.cnt + 1` と書いてください |
 | `it.cnt += 1` | サポート |
 | `it.cnt++`、`--` | v0.1 ではサポートしません。`it.cnt += 1` と書いてください |
 | `set` の中の `apply { }`、`with(it) { }`、`also { }` | v0.1 ではサポートしません。直接代入を書いてください |
