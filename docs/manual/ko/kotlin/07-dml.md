@@ -278,7 +278,7 @@ lambdaQL은 서브쿼리를 직접 씁니다. 그러면 문장이 자기 테이�
 
 조회는 `where`의 경로에 inner join을 사용합니다(결정 D36). 그래서 DML에서는 이런 경로에 lambdaQL이 `e0.customer.id is not null`을 더합니다.
 그 결과 `update`와 `delete`는 `qb.from(X::class.java).where { 같은 람다 }`가 반환하는 **바로 그 행**만 대상으로 합니다(Java로 테스트함: 삭제된 행을 조회 결과와 비교).
-`it.customer == null || ...` 같은 null 가드가 있으면 조회에서도 고객이 없는 행이 남으므로, 그 경로에는 `is not null` 검사를 더하지 않습니다.
+`it.customer == null || ...` 같은 null 가드가 있어도 마찬가지입니다. 조회도 이 경로에 inner join을 사용하므로(결정 D48) 검사는 유지됩니다.
 
 `@Id`로 끝나는 경로(`it.customer?.id`)는 FK 컬럼입니다. 서브쿼리도 조인도 없습니다.
 

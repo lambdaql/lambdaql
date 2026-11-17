@@ -76,10 +76,10 @@ NULL에 대해 이것이 뜻하는 바:
 | `o.getStatus() == 1`, status가 NULL | NullPointerException | SQL 의미: UNKNOWN, 행이 반환되지 않음(규칙 R1) |
 | `o.getPrice() > 100`, price가 NULL | NullPointerException | 행이 반환되지 않음(R1) |
 | `!o.getActive()`(`Boolean`), active가 NULL | NullPointerException | 행이 반환되지 않음 |
-| `o.getPrice() > p`, 캡처한 `Double p`가 `null` | NullPointerException | 쿼리가 실행될 때 **예외** |
-| `i.getQty() == q`, `qty`는 `int`, 캡처한 `Integer q`가 `null` | NullPointerException | 쿼리가 실행될 때 **예외** |
+| `o.getPrice() > p`, 캡처한 `Double p`가 `null` | NullPointerException | `e0.price > :p1`에 NULL 바인딩, 일치하는 행 없음(`WARN` 수준 `LQL-4045`) |
+| `i.getQty() == q`, `qty`는 `int`, 캡처한 `Integer q`가 `null` | NullPointerException | `i.qty = :p1`에 NULL 바인딩, 일치하는 행 없음(`WARN` 수준 `LQL-4045`) |
 
-즉, NULL인 엔티티 값은 SQL을 따릅니다. 언박싱 위치에서 `null`인 캡처 값은 Java에 결과가 없으므로 오류입니다.
+즉, NULL인 엔티티 값과 `null`인 캡처 값은 모두 SQL을 따릅니다(결정 D48). 언박싱 위치의 캡처 값도 NULL로 바인딩됩니다.
 
 NULL 행을 원한다면 검사를 직접 작성하십시오.
 
@@ -92,7 +92,8 @@ NULL 행을 원한다면 검사를 직접 작성하십시오.
 ## 9.3 박싱된 값의 동등성
 
 Java에서 두 **객체** 사이의 `==`는 동일성(메모리 안의 같은 객체인지)을 검사합니다.
-lambdaQL에서 두 객체 사이의 `==`는 **null-safe 값 비교**입니다(결정 D12).
+lambdaQL에서 두 객체 사이의 `==`는 **값 비교**입니다(결정 D12).
+엔티티 값과 캡처 값은 모두 SQL 의미를 따릅니다(결정 D48, [3.6](03-where.md#36-null-rules) 참고).
 박싱 캐시(-128부터 127까지의 `Integer`와 `Long`)와 `new String(...)`은 상관없습니다.
 
 어떤 규칙이 적용되는지는 양쪽의 **Java 타입**에 따라 달라집니다.
@@ -100,53 +101,58 @@ lambdaQL에서 두 객체 사이의 `==`는 **null-safe 값 비교**입니다(�
 | 왼쪽 | 오른쪽 | javac가 만드는 것 | lambdaQL 규칙 | HQL |
 |---|---|---|---|---|
 | `Integer` 컬럼 | `int` 상수나 변수 | 언박싱, 숫자 비교 | R1, SQL 의미 | `e0.status = 1` |
-| `Integer` 컬럼 | `Integer` 변수 | 객체 비교 | R2, null-safe | `e0.status is not distinct from :p1` |
+| `Integer` 컬럼 | `Integer` 변수 | 객체 비교 | R2 | `e0.status = :p1` |
 | `Long` `@Id` 컬럼 | `Long` 변수 | 객체 비교 | R2, 하지만 한쪽은 절대 NULL이 아님 | `e0.id = :p1` |
 | `Long` 컬럼 | `long` 변수 | 언박싱 | R1 | `e0.id = :p1` |
-| `String` | `String` | 객체 비교 | R2, null-safe | `e0.description is not distinct from :p1` |
-| enum | enum | 객체 비교 | R2, null-safe | `x is not distinct from :p1` |
-| `Boolean` 컬럼 | `Boolean.TRUE` | 객체 비교 | null-safe | `e0.active is not distinct from true` |
+| `String` | `String` | 객체 비교 | R2 | `e0.description = :p1` |
+| `String` 컬럼 | `String` 컬럼 | 객체 비교 | R2, SQL 의미 | `e0.description = e0.custName`(어느 한쪽이 NULL이면 불일치) |
+| enum | enum | 객체 비교 | R2 | `x = :p1` |
+| `Boolean` 컬럼 | `Boolean.TRUE` | 객체 비교 | R2 | `e0.active = :p1` |
 | `Boolean` 컬럼 | `true` | 언박싱 | R1 | `e0.active = true` |
 | 무엇이든 | `null` | null 검사 | R3 | `x is null` |
 | 엔티티 | 엔티티(`o.getCustomer() == c`) | 객체 비교 | **v0.1에는 없음** | –(대신 id를 비교) |
 
-null-safe의 뜻:
+캡처 값과 비교할 때:
 
-| 컬럼 | 캡처 값 | 결과 |
-|---|---|---|
-| 3 | 3 | true |
-| NULL | `null` | **true** |
-| NULL | 3 | false |
-| 3 | `null` | false |
+| 컬럼 | 캡처 값 | HQL | 결과 |
+|---|---|---|---|
+| 3 | 3 | `e0.status = :p1` | true |
+| NULL | `null` | `e0.status = :p1` | **false**: `= NULL`은 참이 되지 않음(`WARN` 수준 `LQL-4045`) |
+| NULL | 3 | `e0.status = :p1` | false |
+| 3 | `null` | `e0.status = :p1` | false |
 
 ```java
 Integer wanted = request.getStatus();        // null일 수 있음
 qb.from(Order.class).where(o -> o.getStatus() == wanted).toList();
 // wanted = 3    -> status가 3인 행
-// wanted = null -> status가 NULL인 행
+// wanted = null -> 일치하는 행 없음(LQL-4045). NULL을 찾으려면 o.getStatus() == null
 ```
 
-한쪽이 절대 NULL이 될 수 없을 때(`@Id`, `nullable = false` 컬럼, 기본형 컬럼, null이 아닌 캡처 값) lambdaQL은 단순한 `=`를 씁니다. 결과는 같고, 데이터베이스는 인덱스를 사용할 수 있습니다.
+컬럼을 함수로 감싸지 않으므로 데이터베이스는 인덱스를 사용할 수 있습니다.
 
-객체 사이의 `!=`는 그 반대입니다: `is distinct from`(한쪽이 절대 NULL이 아니면 `(a <> b or a is null)`).
+객체 사이의 `!=`는 `<>`가 됩니다. 값이 NULL인 행은 `<>`에 일치하지 않습니다(SQL 의미, D48). Java라면 이 행을 반환합니다.
+이런 행을 유지하려면 `o.getStatus() == null || o.getStatus() != wanted`라고 쓰십시오.
+
+엔티티 값 두 개(`o.getDescription() == o.getCustName()`)는 `=`와 `<>`가 됩니다. 어느 한쪽이 NULL이면 일치하지 않으며, NULL과 NULL도 마찬가지입니다.
+결과가 Java와 다를 수 있으면 lambdaQL은 `LQL-5009`를 `DEBUG` 수준으로 기록합니다([3.6.3](03-where.md#363-write-your-null-checks-yourself) 참고).
 
 <a id="94-strings"></a>
 ## 9.4 문자열
 
 | Java 형태 | HQL | NULL 컬럼 | `p`가 `null` |
 |---|---|---|---|
-| `o.getDescription() == p` | `e0.description is not distinct from :p1` | `p == null`일 때만 일치 | 허용 |
-| `o.getDescription().equals(p)` | `e0.description = :p1` | 행이 반환되지 않음 | **예외** |
-| `p.equals(o.getDescription())` | `e0.description = :p1` | 행이 반환되지 않음 | **예외** |
+| `o.getDescription() == p` | `e0.description = :p1` | 행이 반환되지 않음 | 실행됨, 일치하는 행 없음(`LQL-4045`) |
+| `o.getDescription().equals(p)` | `e0.description = :p1` | 행이 반환되지 않음 | 실행됨, 일치하는 행 없음(`LQL-4045`) |
+| `p.equals(o.getDescription())` | `e0.description = :p1` | 행이 반환되지 않음 | 실행됨, 일치하는 행 없음(`LQL-4045`) |
 | `"abc".equals(o.getDescription())`(상수 수신 객체) | `e0.description = 'abc'`(상수는 NULL이 될 수 없으므로 단순한 `=`) | 행이 반환되지 않음 | – |
-| `Objects.equals(o.getDescription(), p)` | `e0.description is not distinct from :p1` | `p == null`일 때만 일치 | 허용 |
-| `o.getDescription().compareTo(p) < 0` | `e0.description < :p1` | 행이 반환되지 않음 | **예외** |
+| `Objects.equals(o.getDescription(), p)` | `e0.description = :p1` | 행이 반환되지 않음 | 실행됨, 일치하는 행 없음(`LQL-4045`) |
+| `o.getDescription().compareTo(p) < 0` | `e0.description < :p1` | 행이 반환되지 않음 | 실행됨, 일치하는 행 없음(`LQL-4045`) |
 | `o.getDescription() == null` | `e0.description is null` | 반환됨 | – |
 
 기억할 점:
 
 - 일반 Java에서 문자열에 대한 `==`는 버그입니다. lambdaQL 람다 안에서는 올바른 값 비교입니다.
-- `equals`와 `==`는 NULL에 대해서만 다르게 동작합니다. 원하는 NULL 동작에 따라 고르십시오.
+- `==`, `equals`, `Objects.equals`는 NULL에 대해 같게 동작합니다. 컬럼이 NULL이거나 `p`가 `null`이면 일치하는 행이 없습니다. NULL 행을 원하면 `o.getDescription() == null`을 직접 쓰십시오.
 - 비교는 Java가 아니라 **데이터베이스 콜레이션**을 따릅니다. MariaDB `_ci` 콜레이션은 대소문자와 끝의 공백을 무시합니다. Oracle은 `''`를 NULL로 저장합니다.
 - 람다에 직접 쓴 문자열 상수는 HQL 리터럴이 되고, 작은따옴표는 escape됩니다(`'O''Brien'`). 캡처한 문자열은 항상 바인드 파라미터입니다([3.3](03-where.md#33-basic-form) 참고).
 - 컬럼에 대한 문자열 메서드(`startsWith`, `contains`, `trim`, `toUpperCase`)는 계획 중이며 v0.1에는 없습니다.
@@ -160,15 +166,15 @@ qb.from(Order.class).where(o -> o.getDescription() == code).toList();
 <a id="95-null-safe-helpers"></a>
 ## 9.5 null-safe 헬퍼
 
-다음 Java 헬퍼는 `null`에 대해 정의된 결과가 있습니다. lambdaQL은 그 결과를 유지합니다(규칙 R5).
+다음 Java 헬퍼는 `==`와 같은 규칙, 즉 SQL 의미를 따릅니다(규칙 R5, D48). 캡처 값 `null`은 어떤 행에도 일치하지 않습니다.
 
 | Java | HQL | 참고 |
 |---|---|---|
-| `Objects.equals(o.getStatus(), s)` | `e0.status is not distinct from :p1` | |
-| `!Objects.equals(o.getStatus(), 1)` | `e0.status is distinct from 1` | Java처럼 NULL 행이 **반환됨** |
-| `Objects.equals(o.getDescription(), o.getCustomer().getName())` | `e0.description is not distinct from j1.name` | 두 컬럼 |
-| `Boolean.TRUE.equals(o.getActive())` | `e0.active is not distinct from true` | |
-| `!Boolean.TRUE.equals(o.getActive())` | `e0.active is distinct from true` | 세 데이터베이스 모두에서 동작 |
+| `Objects.equals(o.getStatus(), s)` | `e0.status = :p1` | `s`가 `null`이면 일치하는 행 없음(`LQL-4045`) |
+| `!Objects.equals(o.getStatus(), 1)` | `e0.status <> 1` | NULL 행이 **반환되지 않음**(SQL 의미. Java라면 반환) |
+| `Objects.equals(o.getDescription(), o.getCustomer().getName())` | `e0.description = j1.name` + `join e0.customer j1` | 두 컬럼: 어느 한쪽이 NULL이면 불일치 |
+| `Boolean.TRUE.equals(o.getActive())` | `e0.active = :p1` | |
+| `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | NULL 행이 **반환되지 않음**(SQL 의미) |
 | `"x".equals(o.getDescription())` | `e0.description = 'x'` | 상수 수신 객체: NULL이 될 수 없으므로 단순한 `=` |
 | `set` 값 안의 `Objects.requireNonNullElse(o.getPrice(), 0.0)` | `coalesce(o.price, 0.0)` | [7. 수정, 삽입, 삭제](07-dml.md) 참고 |
 
@@ -176,7 +182,8 @@ qb.from(Order.class).where(o -> o.getDescription() == code).toList();
 
 ```java
 .where(o -> o.getStatus() != 1)                 // e0.status <> 1           (NULL 행은 반환되지 않음)
-.where(o -> !Objects.equals(o.getStatus(), 1))  // e0.status is distinct from 1 (NULL 행이 반환됨)
+.where(o -> !Objects.equals(o.getStatus(), 1))  // e0.status <> 1           (NULL 행은 역시 반환되지 않음)
+.where(o -> o.getStatus() == null || !Objects.equals(o.getStatus(), 1))   // NULL 행이 반환됨
 ```
 
 <a id="96-small-types-char-short-byte-and-boolean"></a>
@@ -189,7 +196,7 @@ lambdaQL은 이를 알고 있습니다.
 - 상수는 컬럼의 타입으로 변환됩니다. 예를 들어 `int` 상수 `10`은 `short` 컬럼에 대해 `short` 값이 됩니다.
 - `boolean` getter는 단독으로 조건이 됩니다: `o.isActive()`는 `e0.active = true`가 됩니다.
 - `o.isActive() == (o.getStatus() > s)`(두 boolean 식)를 지원합니다. `AND`/`OR`가 됩니다([3.7](03-where.md#37-boolean-columns) 참고).
-- 기본형 속성(`boolean active`, `int qty`)은 `@Id`나 `nullable = false` 컬럼처럼 "절대 NULL이 아님"으로 취급합니다. 그래서 lambdaQL은 `is not distinct from` 대신 단순한 `=`를 쓸 수 있습니다([9.3](#93-equality-of-boxed-values)).
+- 기본형 속성(`boolean active`, `int qty`)은 `@Id`나 `nullable = false` 컬럼처럼 "절대 NULL이 아님"으로 취급합니다. 그래서 lambdaQL은 이 속성에 대한 null 검사를 생략할 수 있고, `o.getId() == null`은 `1=0`이 됩니다([3.6.2](03-where.md#362--on-objects-compares-values)).
 
 <a id="97-float-double-and-bigdecimal"></a>
 ## 9.7 float, double, BigDecimal

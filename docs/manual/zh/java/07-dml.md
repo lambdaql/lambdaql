@@ -1,5 +1,8 @@
 # 7. 更新、插入、删除（Java）
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/07-dml.md)。
+
 > [!NOTE]
 > **状态**
 > - **已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（Hibernate 6.6.5，里程碑 M10，决定 D28 和 D40）：更新（setter、`by.set`、多次调用 `set()`、`@Version`）、删除、插入（一行、列表、自动生成的 id、`insert ... select`）、upsert、规则 U1、U3、U4 和 U6 的检查，以及（决定 D41）更新和删除的 `limit` 与单行保护 `executeOne()`。

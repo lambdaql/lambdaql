@@ -1,5 +1,8 @@
 # 1. Overview
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../ko/01-overview.md) for the latest rules.
+
 [Manual home](README.md) | Tracks: [Java](java/README.md) | [Kotlin](kotlin/README.md) | Next: 2. Getting started ([Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md))
 
 > [!NOTE]
@@ -49,7 +52,7 @@ val orders = qb.from(Order::class.java)
 ### HQL (the same for both)
 
 ```
-select e0 from Order e0 left join e0.customer j1
+select e0 from Order e0 join e0.customer j1
 where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
 ```
 
@@ -61,14 +64,14 @@ where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
+join customers c1_0 on c1_0.id=o1_0.customer_id
 where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 ```
 
 Two `where` calls are joined with `AND`.
 The constant `"Kim"` is a literal; the captured `minPrice` is a bind parameter (`:p1`).
 A path like `o.getCustomer().getName()` in `where` is an inner `join` by default: orders without a customer are not returned.
-Here it is a `left join`, because an order with status 1 matches even without a customer (Java returns it too).
+This holds here too, even though an order with status 1 would match in Java without a customer: lambdaQL uses the SQL meaning (decision D48). Use `leftJoin` to keep such orders.
 
 The lambdas look like normal Java or Kotlin code.
 But they are a **query language** written with Java or Kotlin syntax.
@@ -160,8 +163,9 @@ lambdaQL follows its own documented rules, not the run-time rules of Java or Kot
 
 | You write | lambdaQL means | Why |
 |---|---|---|
-| `o.getId() == id` (two `Long` objects) | value equality, null-safe | In a query, `==` on objects means "same value", not "same object". |
-| `o.getCustomer().getName()` | the `name` column of the joined customer (in `where`: inner `join` by default) | A path names a column. lambdaQL does not check if the customer is null. In `where`, orders without a customer are not returned; to find them, write `o.getCustomer() == null`. A null guard (`o.getCustomer() == null \|\| ...`) makes the path a `left join`, so Java and SQL give the same rows. |
+| `o.getId() == id` (two `Long` objects) | value equality: `e0.id = :p1` | In a query, `==` on objects means "same value", not "same object". A captured `null` is bound as NULL and matches no row (`LQL-4045` at `WARN`); write `o.getId() == null` to find NULL. |
+| `Objects.equals(o.getDescription(), o.getCustName())`, `!text.equals(o.getDescription())` | `e0.description = e0.custName`, `e0.description <> :p1` (SQL meaning) | Two values of the entity, or `!=` against a value: a row whose value is NULL does not match. Java would return some of these rows. To keep them, write `o.getDescription() == null \|\| ...`. |
+| `o.getCustomer().getName()` | the `name` column of the joined customer (in `where`: inner `join` by default) | A path names a column. lambdaQL does not check if the customer is null. In `where`, orders without a customer are not returned; to find them, write `o.getCustomer() == null`. A null guard (`o.getCustomer() == null \|\| ...`) does not change this (SQL meaning, D48); use `leftJoin` to keep those orders. |
 | `o.getStatus() == 1` when `status` is NULL | the row does not match (SQL meaning) | Java would throw `NullPointerException`. SQL returns UNKNOWN. |
 | `o.getDescription() == null` | `e0.description is null` | You wrote the null check, so lambdaQL uses it. |
 
@@ -173,12 +177,14 @@ lambdaQL follows its own documented rules, not the run-time rules of Java or Kot
 
 | You write | lambdaQL means | Why |
 |---|---|---|
-| `it.id == id` (`id: Long?`, a nullable variable) | value equality, null-safe | Kotlin `==` already means "same value". lambdaQL keeps this meaning. |
-| `it.customer?.name` or `it.customer!!.name` | the `name` column of the joined customer (in `where`: inner `join` by default) | A path names a column. `?.` and `!!` do not change the column. `!!` is only there so the lambda compiles. In `where`, orders without a customer are not returned; to find them, write `it.customer == null`. A null guard (`it.customer == null \|\| ...`) makes the path a `left join`. |
+| `it.id == id` (`id: Long?`, a nullable variable) | value equality: `e0.id = :p1` | Kotlin `==` already means "same value". A captured `null` is bound as NULL and matches no row (`LQL-4045` at `WARN`). |
+| `it.description == it.custName`, `it.description != text` | `e0.description = e0.custName`, `e0.description <> :p1` (SQL meaning) | Two values of the entity, or `!=` against a value: a row whose value is NULL does not match. To keep such rows, write `it.description == null \|\| ...`. |
+| `it.customer?.name` or `it.customer!!.name` | the `name` column of the joined customer (in `where`: inner `join` by default) | A path names a column. `?.` and `!!` do not change the column. `!!` is only there so the lambda compiles. In `where`, orders without a customer are not returned; to find them, write `it.customer == null`. A null guard (`it.customer == null \|\| ...`) does not change this (SQL meaning, D48); use `leftJoin`. |
 | `it.price!! > 100.0` when `price` is NULL | the row does not match (SQL meaning) | Kotlin would throw `NullPointerException` at `!!`. lambdaQL ignores `!!`, and SQL returns UNKNOWN. |
 | `it.description == null` | `e0.description is null` | You wrote the null check, so lambdaQL uses it. |
 
 lambdaQL handles null **only where you write it**.
+All comparisons and methods in a lambda have the SQL meaning (decision D48), also with captured values and association paths. When the result can differ from Java or Kotlin, lambdaQL logs `LQL-5009` at `DEBUG` level, or `LQL-4045` at `WARN` level for a captured `null` in `=` or `<>`.
 See 3. Conditions ([Java](java/03-where.md) | [Kotlin](kotlin/03-where.md))
 and 10. Rules and limits ([Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md)).
 
@@ -194,13 +200,13 @@ lambdaQL writes SQL that can use indexes ("SARGable").
 
 | You write | lambdaQL does **not** write | lambdaQL writes |
 |---|---|---|
-| `!sub.from(Customer.class).where(c -> c.getGrade() > 3).select(c -> c.getId()).contains(o.getCustomer().getId())` | `o.customer.id not in (select ...)` | `not exists (select 1 ...)` |
+| `o.getId() != null && o.getId() == id` | `e0.id is not null and e0.id = :p1` | `e0.id = :p1` (the id can never be NULL) |
+| `o.getDescription() == text` | `e0.description is not distinct from :p1` (on Oracle `decode(...)`, no index) | `e0.description = :p1` |
 
 #### Kotlin
 
 | You write | lambdaQL does **not** write | lambdaQL writes |
 |---|---|---|
-| `o.customer?.id !in sub.from(Customer::class.java).where { c -> c.grade!! > 3 }.select { c -> c.id }` | `o.customer.id not in (select ...)` | `not exists (select 1 ...)` |
 | `(it.description ?: "") == "x"` | `coalesce(e0.description, '') = 'x'` | `e0.description = 'x'` |
 | `it.description.isNullOrEmpty()` | `(e0.description is null or length(e0.description) = 0)` | `(e0.description is null or e0.description = :p1)` |
 | `it.id == id` (`it.id` is a `Long?`) | `not (e0.id is null or e0.id <> :p1)` | `e0.id = :p1` (the id can never be NULL) |

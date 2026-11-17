@@ -54,7 +54,8 @@ where (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id) is n
 MariaDB는 `delete o1_0 from orders o1_0`로 씁니다. H2와 Oracle은 `delete from orders o1_0`로 씁니다.
 
 두 번째 문장은 `qb.from(Order.class).where(o -> o.getCustomer().getName() == null)`이 반환하는 것과 **같은 행**, 즉 고객의 이름이 없는 주문을 삭제합니다. 테스트는 삭제된 행을 이 조회 결과와 비교합니다.
-고객이 **없는** 주문은 삭제되지 않습니다(규칙 U9, 결정 D36). 그런 주문도 삭제하려면 `o.getCustomer() == null || o.getCustomer().getName() == null`이라고 쓰십시오. 이 null 가드가 있으면 lambdaQL은 `e0.customer.id is not null`을 더하지 않습니다.
+고객이 **없는** 주문은 삭제되지 않습니다(규칙 U9, 결정 D36). null 가드(`o.getCustomer() == null || ...`)를 써도 마찬가지입니다. 조회에서도 이 경로는 inner join이기 때문입니다(결정 D48).
+고객이 없는 주문을 삭제하려면 `o.getCustomer() == null` 조건으로 삭제 문장을 한 번 더 실행하십시오.
 
 모든 행을 삭제할 때는 `all()`이 필요합니다(규칙 U5).
 

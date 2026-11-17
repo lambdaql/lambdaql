@@ -1,5 +1,8 @@
 # 2. 入门（Kotlin）
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/02-getting-started.md)。
+
 > [!NOTE]
 > **状态：** 目前你可以从源码构建 lambdaQL 并运行它的测试。
 > `where` 条件和 `toList()` 可以端到端运行。它们已在 H2、MariaDB 和 Oracle 上测试，大多使用 **Java** Lambda。Kotlin Lambda 已对 `?.` 路径、捕获值、`in`、子查询、带 data class 和 `groupBy` 的 `select`、update、insert 和 delete 进行测试（[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)）。

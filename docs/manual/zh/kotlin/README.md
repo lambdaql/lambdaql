@@ -1,5 +1,8 @@
 # lambdaQL 手册：Kotlin 路线
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/README.md)。
+
 **其他语言：** [English](../../en/kotlin/README.md) | [한국어](../../ko/kotlin/README.md) | [日本語](../../ja/kotlin/README.md) | [简体中文](../../zh/kotlin/README.md)
 
 > [!IMPORTANT]

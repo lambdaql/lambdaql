@@ -455,6 +455,9 @@ public enum LqlMessage {
     /** LQL-4044: The Oracle package has several procedures with this name (overloads); lambdaQL cannot tell which one to call: &#123;0&#125; */
     PROC_OVERLOADED("LQL-4044", 1),
 
+    /** LQL-4045: A captured value is null in &#123;0&#125;. In SQL, = NULL and &lt;&gt; NULL match no row; use x == null in the lambda, or check the value before the query. */
+    NULL_CAPTURED_COMPARE("LQL-4045", 1),
+
     /** LQL-4999: Internal error in lambdaQL. Please report it: &#123;0&#125; */
     INTERNAL_ERROR("LQL-4999", 1),
 
@@ -480,7 +483,10 @@ public enum LqlMessage {
     SARGABLE_NONDETERMINISTIC("LQL-5007", 2),
 
     /** LQL-5008: The index or function metadata for &#123;0&#125; could not be read (&#123;1&#125;); the SARGable check goes on without it. */
-    SARGABLE_CHECK_SKIPPED("LQL-5008", 2);
+    SARGABLE_CHECK_SKIPPED("LQL-5008", 2),
+
+    /** LQL-5009: SQL meaning: in &#123;0&#125;, a row whose value is NULL does not match (Java would treat null differently). Add a null check such as x == null || ... to include it. */
+    SQL_NULL_MEANING("LQL-5009", 1);
 
     private final String code;
     private final int argCount;

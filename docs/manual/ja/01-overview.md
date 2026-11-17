@@ -1,6 +1,9 @@
 <a id="1-overview"></a>
 # 1. 概要
 
+> [!IMPORTANT]
+> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../ko/01-overview.md)を参照してください。
+
 [マニュアルのホーム](README.md) | トラック: [Java](java/README.md) | [Kotlin](kotlin/README.md) | 次: 2. はじめよう（[Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md)）
 
 > [!NOTE]
@@ -52,7 +55,7 @@ val orders = qb.from(Order::class.java)
 ### HQL（どちらも同じ）
 
 ```
-select e0 from Order e0 left join e0.customer j1
+select e0 from Order e0 join e0.customer j1
 where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
 ```
 
@@ -64,7 +67,7 @@ where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
+join customers c1_0 on c1_0.id=o1_0.customer_id
 where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 ```
 
@@ -169,7 +172,8 @@ lambdaQL は Java や Kotlin の実行時のルールではなく、ドキュメ
 
 | 書いたもの | lambdaQL での意味 | 理由 |
 |---|---|---|
-| `o.getId() == id`（2 つの `Long` オブジェクト） | 値の等価比較、null 安全 | クエリでは、オブジェクトの `==` は「同じオブジェクト」ではなく「同じ値」を意味します。 |
+| `o.getId() == id`（2 つの `Long` オブジェクト） | 値の等価比較: `e0.id = :p1`。キャプチャした `id` が null なら `e0.id is null` | クエリでは、オブジェクトの `==` は「同じオブジェクト」ではなく「同じ値」を意味します。キャプチャした値は Java のルールをそのまま使います。 |
+| `Objects.equals(o.getDescription(), o.getCustName())`、`!text.equals(o.getDescription())` | `e0.description = e0.custName`、`e0.description <> :p1`（SQL の意味） | エンティティの値どうし、または値との `!=` では、値が NULL の行は一致しません。Java ならこれらの行の一部を返します。残すには `o.getDescription() == null \|\| ...` と書きます。 |
 | `o.getCustomer().getName()` | 結合した customer の `name` カラム（`where` の中ではデフォルトで内部結合の `join`） | パスはカラムを指定します。lambdaQL は customer が null かどうかをチェックしません。`where` の中では、customer のない注文は返されません。それらを探すには `o.getCustomer() == null` と書きます。null ガード（`o.getCustomer() == null \|\| ...`）があるとパスは `left join` になるので、Java と SQL で同じ行が返ります。 |
 | `status` が NULL のときの `o.getStatus() == 1` | その行は一致しない（SQL の意味） | Java なら `NullPointerException` を投げます。SQL は UNKNOWN を返します。 |
 | `o.getDescription() == null` | `e0.description is null` | null チェックを書いたので、lambdaQL はそれを使います。 |
@@ -182,12 +186,14 @@ lambdaQL は Java や Kotlin の実行時のルールではなく、ドキュメ
 
 | 書いたもの | lambdaQL での意味 | 理由 |
 |---|---|---|
-| `it.id == id`（`id: Long?`、nullable な変数） | 値の等価比較、null 安全 | Kotlin の `==` はもともと「同じ値」を意味します。lambdaQL はこの意味をそのまま使います。 |
+| `it.id == id`（`id: Long?`、nullable な変数） | 値の等価比較: `e0.id = :p1`。`id` が null なら `e0.id is null` | Kotlin の `==` はもともと「同じ値」を意味します。キャプチャした値は Kotlin のルールをそのまま使います。 |
+| `it.description == it.custName`、`it.description != text` | `e0.description = e0.custName`、`e0.description <> :p1`（SQL の意味） | エンティティの値どうし、または値との `!=` では、値が NULL の行は一致しません。そのような行を残すには `it.description == null \|\| ...` と書きます。 |
 | `it.customer?.name` または `it.customer!!.name` | 結合した customer の `name` カラム（`where` の中ではデフォルトで内部結合の `join`） | パスはカラムを指定します。`?.` や `!!` でカラムは変わりません。`!!` はラムダをコンパイルするためだけにあります。`where` の中では、customer のない注文は返されません。それらを探すには `it.customer == null` と書きます。null ガード（`it.customer == null \|\| ...`）があるとパスは `left join` になります。 |
 | `price` が NULL のときの `it.price!! > 100.0` | その行は一致しない（SQL の意味） | Kotlin なら `!!` で `NullPointerException` を投げます。lambdaQL は `!!` を無視し、SQL は UNKNOWN を返します。 |
 | `it.description == null` | `e0.description is null` | null チェックを書いたので、lambdaQL はそれを使います。 |
 
 lambdaQL が null を扱うのは **あなたが書いた場所だけ** です。
+エンティティの値は SQL の意味で比べます（決定 D48）。結果が Java や Kotlin と異なりうるとき、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します。
 3. 条件（[Java](java/03-where.md) | [Kotlin](kotlin/03-where.md)）
 と 10. ルールと制限（[Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md)）を参照してください。
 

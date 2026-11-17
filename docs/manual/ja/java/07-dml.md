@@ -1,6 +1,9 @@
 <a id="7-update-insert-delete-java"></a>
 # 7. 更新、挿入、削除（Java）
 
+> [!IMPORTANT]
+> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/07-dml.md)を参照してください。
+
 > [!NOTE]
 > **状況**
 > - **実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、Hibernate 6.6.5、マイルストーン M10、決定 D28 と D40）: 更新（setter、`by.set`、複数回の `set()`、`@Version`）、削除、挿入（1 行、リスト、生成される id、`insert ... select`）、upsert、ルール U1、U3、U4、U6 の確認、および（決定 D41）更新と削除の `limit` と 1 行保護 `executeOne()`。

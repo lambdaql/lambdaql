@@ -1,5 +1,8 @@
 # 9. Java notes
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/java/09-java-notes.md) for the latest rules.
+
 > [!NOTE]
 > **Status**
 > - **Implemented (analysis core):** loading serializable lambdas, lambdas that capture `this`, detection of method references, rejection of lambdas that are not `Serializable`. See the tests in [9.13](#913-what-you-can-check-today).
@@ -87,7 +90,7 @@ If you want NULL rows, write the check yourself:
 ## 9.3 Equality of boxed values
 
 In Java, `==` between two **objects** checks identity (the same object in memory).
-In lambdaQL, `==` between two objects is a **null-safe value compare** (decision D12).
+In lambdaQL, `==` between two objects is a **value compare** (decision D12). Values of the entity and captured values follow the SQL meaning (decision D48, see [3.6](03-where.md#36-null-rules)).
 The boxing cache (`Integer` and `Long` from -128 to 127) and `new String(...)` do not matter.
 
 Which rule you get depends on the **Java types** of the two sides:
@@ -95,24 +98,25 @@ Which rule you get depends on the **Java types** of the two sides:
 | Left side | Right side | javac makes | lambdaQL rule | HQL |
 |---|---|---|---|---|
 | `Integer` column | `int` constant or variable | unboxing, number compare | R1, SQL meaning | `e0.status = 1` |
-| `Integer` column | `Integer` variable | object compare | R2, null-safe | `e0.status is not distinct from :p1` |
+| `Integer` column | `Integer` variable | object compare | R2 | `e0.status = :p1` |
 | `Long` `@Id` column | `Long` variable | object compare | R2, but one side is never NULL | `e0.id = :p1` |
 | `Long` column | `long` variable | unboxing | R1 | `e0.id = :p1` |
-| `String` | `String` | object compare | R2, null-safe | `e0.description is not distinct from :p1` |
-| enum | enum | object compare | R2, null-safe | `x is not distinct from :p1` |
-| `Boolean` column | `Boolean.TRUE` | object compare | null-safe | `e0.active is not distinct from true` |
+| `String` | `String` | object compare | R2 | `e0.description = :p1` |
+| `String` column | `String` column | object compare | R2, SQL meaning | `e0.description = e0.custName` (a NULL on either side: no match) |
+| enum | enum | object compare | R2 | `x = :p1` |
+| `Boolean` column | `Boolean.TRUE` | object compare | R2 | `e0.active = :p1` |
 | `Boolean` column | `true` | unboxing | R1 | `e0.active = true` |
 | anything | `null` | null check | R3 | `x is null` |
 | entity | entity (`o.getCustomer() == c`) | object compare | **not in v0.1** | – (compare ids instead) |
 
-Null-safe means:
+With a captured value:
 
-| Column | Captured value | Result |
-|---|---|---|
-| 3 | 3 | true |
-| NULL | `null` | **true** |
-| NULL | 3 | false |
-| 3 | `null` | false |
+| Column | Captured value | HQL | Result |
+|---|---|---|---|
+| 3 | 3 | `e0.status = :p1` | true |
+| NULL | `null` | `e0.status = :p1` | **false**: `= NULL` is never true (`LQL-4045` at `WARN`) |
+| NULL | 3 | `e0.status = :p1` | false |
+| 3 | `null` | `e0.status = :p1` | false |
 
 ```java
 Integer wanted = request.getStatus();        // may be null
@@ -121,19 +125,20 @@ qb.from(Order.class).where(o -> o.getStatus() == wanted).toList();
 // wanted = null -> rows with status NULL
 ```
 
-When one side can never be NULL (an `@Id`, a `nullable = false` column, a primitive column, or a captured value that is not null), lambdaQL writes a plain `=`. The result is the same, and the database can use an index.
+The column is never wrapped, so the database can use an index.
 
-`!=` between objects is the opposite: `is distinct from` (or `(a <> b or a is null)` when one side is never NULL).
+`!=` between objects gives `<>`. A row whose value is NULL does not match `<>` (SQL meaning, D48). Java would return it. To keep such rows, write `o.getStatus() == null || o.getStatus() != wanted`.
+Two values of the entity (`o.getDescription() == o.getCustName()`) give `=` and `<>`. A NULL on either side does not match, also NULL and NULL. lambdaQL logs `LQL-5009` at `DEBUG` level when the result can differ from Java (see [3.6.3](03-where.md#363-write-your-null-checks-yourself)).
 
 ## 9.4 Strings
 
 | Java form | HQL | NULL column | `p` is `null` |
 |---|---|---|---|
-| `o.getDescription() == p` | `e0.description is not distinct from :p1` | matches only `p == null` | allowed |
-| `o.getDescription().equals(p)` | `e0.description = :p1` | row not returned | **exception** |
+| `o.getDescription() == p` | `e0.description = :p1` | row not returned | runs, no row (`LQL-4045`) |
+| `o.getDescription().equals(p)` | `e0.description = :p1` | row not returned | runs, no row (`LQL-4045`) |
 | `p.equals(o.getDescription())` | `e0.description = :p1` | row not returned | **exception** |
 | `"abc".equals(o.getDescription())` (constant receiver) | `e0.description = 'abc'` (the constant is never NULL, so a plain `=`) | row not returned | – |
-| `Objects.equals(o.getDescription(), p)` | `e0.description is not distinct from :p1` | matches only `p == null` | allowed |
+| `Objects.equals(o.getDescription(), p)` | `e0.description = :p1` | row not returned | runs, no row (`LQL-4045`) |
 | `o.getDescription().compareTo(p) < 0` | `e0.description < :p1` | row not returned | **exception** |
 | `o.getDescription() == null` | `e0.description is null` | returned | – |
 
@@ -153,15 +158,15 @@ qb.from(Order.class).where(o -> o.getDescription() == code).toList();
 
 ## 9.5 Null-safe helpers
 
-These Java helpers have a defined result for `null`. lambdaQL keeps that result (rule R5):
+These Java helpers follow the same rules as `==` (rule R5): the SQL meaning (D48). A captured `null` matches no row:
 
 | Java | HQL | Note |
 |---|---|---|
-| `Objects.equals(o.getStatus(), s)` | `e0.status is not distinct from :p1` | |
-| `!Objects.equals(o.getStatus(), 1)` | `e0.status is distinct from 1` | NULL rows **are returned**, like Java |
-| `Objects.equals(o.getDescription(), o.getCustomer().getName())` | `e0.description is not distinct from j1.name` | two columns |
-| `Boolean.TRUE.equals(o.getActive())` | `e0.active is not distinct from true` | |
-| `!Boolean.TRUE.equals(o.getActive())` | `e0.active is distinct from true` | works on all three databases |
+| `Objects.equals(o.getStatus(), s)` | `e0.status = :p1` | `s` is `null`: no row (`LQL-4045`) |
+| `!Objects.equals(o.getStatus(), 1)` | `e0.status <> 1` | NULL rows **not returned** (SQL meaning; Java would return them) |
+| `Objects.equals(o.getDescription(), o.getCustomer().getName())` | `e0.description = j1.name` + `join e0.customer j1` | two columns: a NULL on either side does not match |
+| `Boolean.TRUE.equals(o.getActive())` | `e0.active = :p1` | |
+| `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | NULL rows **not returned** (SQL meaning) |
 | `"x".equals(o.getDescription())` | `e0.description = 'x'` | constant receiver: never NULL, so a plain `=` |
 | `Objects.requireNonNullElse(o.getPrice(), 0.0)` in a `set` value | `coalesce(o.price, 0.0)` | see [7. Update, insert, delete](07-dml.md) |
 
@@ -169,7 +174,8 @@ Compare with `!=`:
 
 ```java
 .where(o -> o.getStatus() != 1)                 // e0.status <> 1           (NULL rows not returned)
-.where(o -> !Objects.equals(o.getStatus(), 1))  // e0.status is distinct from 1 (NULL rows returned)
+.where(o -> !Objects.equals(o.getStatus(), 1))  // e0.status <> 1           (NULL rows not returned either)
+.where(o -> o.getStatus() == null || !Objects.equals(o.getStatus(), 1))   // NULL rows returned
 ```
 
 ## 9.6 Small types: char, short, byte and boolean
@@ -181,7 +187,7 @@ lambdaQL knows this:
 - A constant is converted to the type of its column. For example, the `int` constant `10` becomes a `short` value for a `short` column.
 - A `boolean` getter alone is a condition: `o.isActive()` becomes `e0.active = true`.
 - `o.isActive() == (o.getStatus() > s)` (two boolean expressions) is supported. It becomes `AND`/`OR` (see [3.7](03-where.md#37-boolean-columns)).
-- A primitive property (`boolean active`, `int qty`) counts as "never NULL", like an `@Id` or a `nullable = false` column. Then lambdaQL can write a plain `=` instead of `is not distinct from` ([9.3](#93-equality-of-boxed-values)).
+- A primitive property (`boolean active`, `int qty`) counts as "never NULL", like an `@Id` or a `nullable = false` column. Then lambdaQL can drop a null check on it, and `o.getId() == null` becomes `1=0` ([3.6.2](03-where.md#362--on-objects-compares-values)).
 
 ## 9.7 float, double and BigDecimal
 

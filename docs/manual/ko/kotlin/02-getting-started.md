@@ -340,7 +340,8 @@ where c1_0.name=?
 `it.customer!!.name`도 같은 HQL을 만듭니다. 마음에 드는 형태를 사용하십시오.
 고객이 없는 주문을 찾으려면 연관을 비교하십시오. `it.customer == null`은 `e0.customer is null`이 됩니다(조인 없음).
 `it.customer?.name == null`로는 그런 주문이 포함되지 **않습니다**.
-null 가드가 고객 없는 주문을 남기면(`it.customer == null || ...`) lambdaQL은 `left join`을 사용합니다. [3.10](03-where.md#310-association-paths)을 참고하십시오.
+null 가드(`it.customer == null || ...`)를 써도 고객 없는 주문은 남지 않습니다. 경로는 inner join이기 때문입니다(결정 D48).
+그런 주문을 남기려면 `leftJoin`을 사용하십시오([6.8](06-select-group.md#68-explicit-joins)). [3.10](03-where.md#310-association-paths)을 참고하십시오.
 
 <a id="getting-the-result"></a>
 ## 결과 가져오기

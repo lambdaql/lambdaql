@@ -1,6 +1,9 @@
 <a id="74-delete"></a>
 # 7.4 Delete (Kotlin)
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/07-4-delete.md) for the latest rules.
+
 > [!NOTE]
 > **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10). Most tests use **Java** lambdas. A delete with a `not exists` subquery is tested with a Kotlin lambda too ([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), marked **(tested)**). This includes `limit` and `executeOne()` (decision D41).
 > Subqueries (`sub`) in `where` are implemented and tested with Java lambdas too (milestone M8).
@@ -64,7 +67,7 @@ The test first inserts one `Archive` row, then deletes the orders without items,
 More statements written in Java are tested in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/07-4-delete.md) for those examples.
 
 The second statement deletes **the same rows** that `qb.from(Order::class.java).where { it.customer?.name == null }` returns: orders whose customer has no name. The Java test compares the deleted rows with this select.
-Orders **without** a customer are not deleted (rule U9, decision D36). To delete them too, write `it.customer == null || it.customer?.name == null`. With this null guard, lambdaQL does not add `e0.customer.id is not null`.
+Orders **without** a customer are not deleted (rule U9, decision D36). A null guard (`it.customer == null || ...`) does not change this, because the path is an inner join in the select too (decision D48). To delete orders without a customer, run a second delete with `it.customer == null`.
 
 Delete all rows: `all()` is required (rule U5).
 

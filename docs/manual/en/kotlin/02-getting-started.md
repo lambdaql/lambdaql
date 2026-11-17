@@ -1,5 +1,8 @@
 # 2. Getting started (Kotlin)
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/02-getting-started.md) for the latest rules.
+
 > [!NOTE]
 > **Status:** You can build lambdaQL from source and run its tests today.
 > `where` conditions and `toList()` work end to end. They are tested on H2, MariaDB and Oracle, mostly with **Java** lambdas. Kotlin lambdas are tested for `?.` paths, captured values, `in`, subqueries, `select` with data classes and `groupBy`, update, insert and delete ([`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)).
@@ -327,7 +330,7 @@ where c1_0.name=?
 `it.customer!!.name` gives the same HQL. Use the form you like.
 To find orders without a customer, compare the association: `it.customer == null` gives `e0.customer is null` (no join).
 `it.customer?.name == null` does **not** include them.
-If a null guard keeps orders without a customer (`it.customer == null || ...`), lambdaQL uses a `left join`. See [3.10](03-where.md#310-association-paths).
+A null guard (`it.customer == null || ...`) does not keep orders without a customer: the path is an inner join (decision D48). Use `leftJoin` for that. See [3.10](03-where.md#310-association-paths).
 
 ## Getting the result
 

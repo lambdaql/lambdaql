@@ -1,6 +1,9 @@
 <a id="9-kotlin-notes"></a>
 # 9. Kotlin の注意点
 
+> [!IMPORTANT]
+> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/09-kotlin-notes.md)を参照してください。
+
 > [!NOTE]
 > **状況: 一部実装済み。**
 > Kotlin のサポートは決定済みの設計です（決定 D17、D20 から D25、D27、D28、D31）。
@@ -142,26 +145,23 @@ lambdaQL は「あなたの」null チェックとコンパイラーのものを
 | 2 つの non-null のプリミティブ: `it.qty == 5` | 比較の分岐（Java と同じ） | R1 | `i.qty = 5` |
 | nullable なプリミティブと定数: `it.status == 1`（`Int?`） | 隠れた null チェック + 比較 | R12（隠れたチェックは無視、D22） | `e0.status = 1` |
 | `it.status != 1`（`Int?`） | 同じ | R12 | `e0.status <> 1`（NULL の行は返され **ません**） |
-| 参照型、または両側が nullable: `it.description == text`、`it.status == q`（`q: Int?`） | `Intrinsics.areEqual(a, b)` の呼び出し | R11: null-safe な値の等価 | `e0.description is not distinct from :p1` |
-| `it.description != text` | `!Intrinsics.areEqual(a, b)` | R11 | `e0.description is distinct from :p1` |
+| 参照型、または両側が nullable: `it.description == text`、`it.status == q`（`q: Int?`） | `Intrinsics.areEqual(a, b)` の呼び出し | R11: 値の等価 | `e0.description = :p1`（キャプチャした `null`: `is null`） |
+| `it.description != text` | `!Intrinsics.areEqual(a, b)` | R11、SQL の意味 | `e0.description <> :p1`（NULL の行は返され **ません**） |
+| エンティティの値どうし: `it.description == it.custName` | `Intrinsics.areEqual(a, b)` | R11、SQL の意味 | `e0.description = e0.custName`（どちらかが NULL: 一致しない） |
 | `it.id === q`、`!==` | `if_acmpeq` / `if_acmpne` | R17: 値の等価 | `==` と同じ |
 | enum: `it.kind == OrderKind.GIFT` | `if_acmpne` | R2、R17 | `e0.kind = com.example.OrderKind.GIFT`（完全なクラス名を使ったリテラル） |
 
-`Intrinsics.areEqual` は、`==` の裏にある Kotlin ランタイムの関数です。lambdaQL はこれを名前で見分け、**null-safe な値の等価** として読みます（`null == null` は true、片側だけが null なら false）。これは Kotlin と同じ意味です。
+`Intrinsics.areEqual` は、`==` の裏にある Kotlin ランタイムの関数です。lambdaQL はこれを名前で見分け、**値の等価** として読みます。エンティティの値は SQL の意味に従います（決定 D48）。どちらかが NULL なら一致せず、NULL と NULL も一致しません。キャプチャした `null` は Kotlin に従い、`is null` になります。結果が Kotlin と異なりうるとき、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します。
 
-<a id="when-lambdaql-writes-a-plain-"></a>
-### lambdaQL が普通の `=` を書く場合
+<a id="plain--and-"></a>
+### 普通の `=` と `<>`
 
-`is not distinct from` は正しいのですが、Oracle では `decode(...)` になり、インデックスを使えません。
-そのため、片側が **NULL でないと分かっている** 場合、lambdaQL は普通の `=`（`!=` には `(a <> b or a is null)`）を書きます。
-
-- プリミティブのプロパティ（`Int`、`Long`、`Double`、`Boolean`）
-- `@Id`、または `nullable = false` / `@Basic(optional = false)` のカラム
-- クエリの実行時に null でないキャプチャ値
+lambdaQL は常に普通の `=` と `<>` を書きます（決定 D48）。`is [not] distinct from` は書きません。これは Oracle では `decode(...)` になり、インデックスを使えないからです。
 
 ```kotlin
-.where { it.description == text }    // text が "abc" -> o.description = :p1
-.where { it.description != "x" }     // (e0.description <> 'x' or e0.description is null)
+.where { it.description == text }    // text が "abc" -> e0.description = :p1
+.where { it.description != "x" }     // e0.description <> 'x'   （description が NULL の行は一致しない）
+.where { it.description == null || it.description != "x" }   // NULL の行も返る
 ```
 
 > [!WARNING]
@@ -187,8 +187,8 @@ SQL の `=` は値だけを比較します。**lambdaQL は値の等価を使い
 ```kotlin
 .where { it.active }                       // e0.active = true
 .where { !it.active }                      // not (e0.active = true)
-.where { it.flag == true }                 // e0.flag is not distinct from true
-.where { it.flag != true }                 // e0.flag is distinct from true
+.where { it.flag == true }                 // e0.flag = true
+.where { it.flag != true }                 // e0.flag <> true   （NULL の行は返されない: SQL の意味）
 .where { it.active == (it.status!! > 1) }  // (e0.active = true and e0.status > 1) or (e0.active = false and e0.status <= 1)
 ```
 
@@ -264,7 +264,7 @@ lambdaQL では、customer に名前がない注文だけを返します。custo
 
 .where { it.customer == null || it.customer?.name == null }
 // customer のない注文と、customer に名前がない注文
-// select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name is null
+// select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name is null
 ```
 
 **データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `no-association`:
@@ -282,7 +282,7 @@ where o1_0.customer_id is null
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
+join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is null or c1_0.name is null
 ```
 
@@ -394,7 +394,7 @@ NULL の行が欲しい場合は、`it.status == null || it.status !in 1..5` と
 | `it.description!!.contains(s)` | `e0.description like :p1 escape '\'` | |
 | `it.description?.startsWith("A") == true` | 同じ `like` | これもサポート |
 | `startsWith(s, ignoreCase = true)`、`equals(s, ignoreCase = true)` | カラムによって変わります（下を参照） | D24 |
-| `it.description.equals(text)` | `==` と同じく null-safe | |
+| `it.description.equals(text)` | `==` と同じ | |
 | `it.description!!.lowercase() == "abc"` | `lower(e0.description) = 'abc'` | カラムに関数がかかる: 普通のインデックスは使われません |
 | `it.description!!.length > 3` | `length(e0.description) > 3` | 長さの単位は DB によって違うことがあります |
 | `it.description.isNullOrEmpty()` | `(e0.description is null or e0.description = :p1)` | Oracle では `''` は NULL です |
@@ -442,7 +442,7 @@ class OrderRepo(private val qb: QueryBuilder) {
 }
 ```
 
-キャプチャした `null` は、null-safe な形（`==`、`!=`）と、同じ値に対する null ガードの下（`lo == null || ...`）で使えます。ガードはクエリの実行時にアプリケーションの中で決まるので、`lo == null` ならこの `where` は絞り込みを追加しません。
+キャプチャした `null` は、`==` と `!=`（`is null` / `is not null` になる）と、同じ値に対する null ガードの下（`lo == null || ...`）で使えます。ガードはクエリの実行時にアプリケーションの中で決まるので、`lo == null` ならこの `where` は絞り込みを追加しません。
 それ以外の場所（`lo == null` のときの `it.status!! > lo!!`）では、lambdaQL は値をバインドするときにエラーを投げます。
 キャプチャした `NaN` や `Infinity` は常にエラーです。
 
@@ -496,7 +496,7 @@ class OrderRepo(private val qb: QueryBuilder) {
 | 数値の `< > <= >=`（nullable には `!!` を付けて） | サポート |
 | `BigDecimal`、`String`、`LocalDate`、`BigInteger` の `< > <= >=` | サポート（`compareTo` にコンパイルされます） |
 | `x.compareTo(y) > 0` | サポート。`x > y` として読みます |
-| `==`、`!=` | サポート（null-safe な値の等価、[9.4](#94-equality----and-areequal)） |
+| `==`、`!=` | サポート（SQL の意味による値の等価、[9.4](#94-equality----and-areequal)） |
 | `===`、`!==` | サポート。値の等価 |
 | enum の `==` | サポート |
 | enum の `<`、`>` | サポート。lambdaQL は enum 定数の `in (...)` に展開するので、ORDINAL と STRING のどちらのマッピングでも動きます |

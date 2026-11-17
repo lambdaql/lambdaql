@@ -1,5 +1,8 @@
 # 9. Kotlin notes
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/09-kotlin-notes.md) for the latest rules.
+
 > [!NOTE]
 > **Status: partly implemented.**
 > Kotlin support is a decided design (decisions D17, D20 to D25, D27, D28, D31).
@@ -38,7 +41,7 @@ How to read the examples:
 
 - The comment under an example shows the HQL that lambdaQL makes, when the design states it.
 - Constants written in the lambda (numbers, strings, booleans, `null`, enum constants, `const val`) are written into the HQL as literals. Captured and computed values are always bind parameters (`:p1`, `:p2`, ...) (D37).
-- `e0` is the alias of the root entity, and `j1` is the alias of the join that lambdaQL adds for an association path: an inner `join` in `where` by default (a `left join` when a null guard keeps rows without the association), and a `left join` when the path is used only in `orderBy` or `select` (D36). A subquery root is `s1`, `s2`, ... (see [5. Subqueries](05-subquery.md)). Examples of planned features (derived tables, CTEs, procedures) still use the planned aliases `o` and `c1`.
+- `e0` is the alias of the root entity, and `j1` is the alias of the join that lambdaQL adds for an association path: always an inner `join` in `where` (D48), and a `left join` when the path is used only in `orderBy` or `select` (D36). A subquery root is `s1`, `s2`, ... (see [5. Subqueries](05-subquery.md)). Examples of planned features (derived tables, CTEs, procedures) still use the planned aliases `o` and `c1`.
 - Entities are the ones from [2. Getting started](02-getting-started.md#example-entities). Some examples use two extra properties on `Order`: `var flag: Boolean? = null` and `var kind: OrderKind? = null` (with `enum class OrderKind { NORMAL, EXPRESS, GIFT }`).
 
 ---
@@ -111,7 +114,7 @@ So some Kotlin rules work differently. These four decisions are the base:
 
 | Decision | Rule |
 |---|---|
-| D20, D36 | A path like `it.customer?.name` is **a column**, not a call chain. In `where`, a to-one association is an inner join by default: an order without a customer is not returned. To find those orders, write `it.customer == null`. If the condition can be true without a customer (a null guard like `it.customer == null \|\| ...`), the path is a `left join`. |
+| D20, D36 | A path like `it.customer?.name` is **a column**, not a call chain. In `where`, a to-one association is an inner join by default: an order without a customer is not returned. To find those orders, write `it.customer == null`. A null guard like `it.customer == null \|\| ...` does not change the inner join (D48); use `leftJoin` to keep those orders. |
 | D22 | lambdaQL uses **only the null handling you wrote**: `== null`, `!= null`, `?.`, `?:`, and `==` between two nullable values. The null checks that the Kotlin compiler adds by itself are ignored. Any other NULL follows SQL: the condition is UNKNOWN and the row is not returned. |
 | D23 | `!!` is ignored. It is only there so that the code compiles. `it.customer!!.name` and `it.customer?.name` are the same column. |
 | D12 | `==` between objects (and `===`) means **value equality**, not object identity. |
@@ -135,25 +138,22 @@ The result: Kotlin and Java give the same SQL. `it.status == 1` is `e0.status = 
 | Two non-null primitives: `it.qty == 5` | a compare branch (like Java) | R1 | `i.qty = 5` |
 | Nullable primitive and a constant: `it.status == 1` (`Int?`) | hidden null check + compare | R12 (hidden check ignored, D22) | `e0.status = 1` |
 | `it.status != 1` (`Int?`) | the same | R12 | `e0.status <> 1` (NULL rows **not** returned) |
-| References or nullable on both sides: `it.description == text`, `it.status == q` (`q: Int?`) | a call `Intrinsics.areEqual(a, b)` | R11: null-safe value equality | `e0.description is not distinct from :p1` |
-| `it.description != text` | `!Intrinsics.areEqual(a, b)` | R11 | `e0.description is distinct from :p1` |
+| References or nullable on both sides: `it.description == text`, `it.status == q` (`q: Int?`) | a call `Intrinsics.areEqual(a, b)` | R11: value equality | `e0.description = :p1` (a captured `null`: no row, `LQL-4045`) |
+| `it.description != text` | `!Intrinsics.areEqual(a, b)` | R11, SQL meaning | `e0.description <> :p1` (NULL rows **not** returned) |
+| Two values of the entity: `it.description == it.custName` | `Intrinsics.areEqual(a, b)` | R11, SQL meaning | `e0.description = e0.custName` (a NULL on either side: no match) |
 | `it.id === q`, `!==` | `if_acmpeq` / `if_acmpne` | R17: value equality | the same as `==` |
 | enum: `it.kind == OrderKind.GIFT` | `if_acmpne` | R2, R17 | `e0.kind = com.example.OrderKind.GIFT` (a literal with the full class name) |
 
-`Intrinsics.areEqual` is the Kotlin runtime function behind `==`. lambdaQL recognizes it by name and reads it as **null-safe value equality** (`null == null` is true, only one side null is false). This is the same meaning as Kotlin.
+`Intrinsics.areEqual` is the Kotlin runtime function behind `==`. lambdaQL recognizes it by name and reads it as **value equality**. Values of the entity follow the SQL meaning (decision D48): a NULL on either side does not match, also NULL and NULL. A captured `null` is bound as NULL and matches no row (`LQL-4045` at `WARN`); write `x == null` to find NULL. When the result can differ from Kotlin, lambdaQL logs `LQL-5009` at `DEBUG` level.
 
-### When lambdaQL writes a plain `=`
+### Plain `=` and `<>`
 
-`is not distinct from` is correct, but on Oracle it becomes `decode(...)`, which cannot use an index.
-So lambdaQL writes a plain `=` (and `(a <> b or a is null)` for `!=`) when one side is **known not NULL**:
-
-- a primitive property (`Int`, `Long`, `Double`, `Boolean`),
-- an `@Id`, or a column with `nullable = false` / `@Basic(optional = false)`,
-- a captured value that is not null when the query runs.
+lambdaQL always writes a plain `=` and `<>` (decision D48). It never writes `is [not] distinct from`, which becomes `decode(...)` on Oracle and cannot use an index.
 
 ```kotlin
-.where { it.description == text }    // text is "abc" -> o.description = :p1
-.where { it.description != "x" }     // (e0.description <> 'x' or e0.description is null)
+.where { it.description == text }    // text is "abc" -> e0.description = :p1
+.where { it.description != "x" }     // e0.description <> 'x'   (a NULL description does not match)
+.where { it.description == null || it.description != "x" }   // NULL rows too
 ```
 
 > [!WARNING]
@@ -177,8 +177,8 @@ SQL `=` compares only the value. **lambdaQL uses value equality.**
 ```kotlin
 .where { it.active }                       // e0.active = true
 .where { !it.active }                      // not (e0.active = true)
-.where { it.flag == true }                 // e0.flag is not distinct from true
-.where { it.flag != true }                 // e0.flag is distinct from true
+.where { it.flag == true }                 // e0.flag = true
+.where { it.flag != true }                 // e0.flag <> true   (NULL rows not returned: SQL meaning)
 .where { it.active == (it.status!! > 1) }  // (e0.active = true and e0.status > 1) or (e0.active = false and e0.status <= 1)
 ```
 
@@ -242,15 +242,15 @@ A path is **a column**, not a call chain (D20). In `where`, lambdaQL uses an inn
 So an order without a customer is not returned, and you do not need `it.customer != null &&` before the path.
 
 **`?.` does not bring back orders without a customer.** In Kotlin, `it.customer?.name == null` is `true` when there is no customer.
-In lambdaQL it returns only orders whose customer has no name. To include orders without a customer, write it:
+In lambdaQL it returns only orders whose customer has no name. A null guard does not help either, because the path is an inner join (D48):
 
 ```kotlin
 .where { it.customer == null }
 // select e0 from Order e0 where e0.customer is null      (FK column, no join)
 
 .where { it.customer == null || it.customer?.name == null }
-// orders without a customer, and orders whose customer has no name
-// select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name is null
+// only orders whose customer has no name: the inner join leaves out orders without a customer
+// select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name is null
 ```
 
 **SQL by database (from the Java test run; Kotlin gives the same HQL)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `no-association`:
@@ -268,7 +268,7 @@ where o1_0.customer_id is null
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
+join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is null or c1_0.name is null
 ```
 
@@ -354,7 +354,7 @@ All forms in this section are supported in v0.1 (decisions D21 and D29). Details
 | `when (it.status) { 1, 2 -> true; else -> false }` | `e0.status in (1, 2)` | `Int`, `String` and enum subjects |
 | `when { a -> true; b -> true; else -> false }` | `a or b` | |
 | `it.customer?.id in sub.from(...).select { ... }` | `o.customer.id in (select ...)` | subquery, see [5.4](05-subquery.md#54-in) |
-| `x !in sub.from(...).select { ... }` | `not exists (...)` | see [5.5](05-subquery.md#55-not-in-is-written-as-not-exists) |
+| `x !in sub.from(...).select { ... }` | `x not in (select ...)` (SQL meaning) | see [5.5](05-subquery.md#55-not-in-is-written-as-not-exists) |
 | `it.status in listOf(1, 2)` (list made in the lambda) | **rejected** (KC8) | make the list outside |
 
 **Nullable subjects get no null guard** (D22). Kotlin defines `null in 1..5` as false, and `null !in 1..5` as true.
@@ -374,7 +374,7 @@ These Kotlin string forms have a design (rule R21). They follow the SARGable rul
 | `it.description!!.contains(s)` | `e0.description like :p1 escape '\'` | |
 | `it.description?.startsWith("A") == true` | the same `like` | also supported |
 | `startsWith(s, ignoreCase = true)`, `equals(s, ignoreCase = true)` | depends on the column (see below) | D24 |
-| `it.description.equals(text)` | null-safe, like `==` | |
+| `it.description.equals(text)` | the same as `==` | |
 | `it.description!!.lowercase() == "abc"` | `lower(e0.description) = 'abc'` | a function on the column: a normal index is not used |
 | `it.description!!.length > 3` | `length(e0.description) > 3` | the length unit can differ by DB |
 | `it.description.isNullOrEmpty()` | `(e0.description is null or e0.description = :p1)` | on Oracle `''` is NULL |
@@ -421,7 +421,7 @@ class OrderRepo(private val qb: QueryBuilder) {
 }
 ```
 
-A captured `null` is allowed in null-safe forms (`==`, `!=`) and under a null guard on the same value
+A captured `null` in `==` and `!=` is bound as NULL, so no row matches (`LQL-4045` at `WARN`). A captured `null` is allowed under a null guard on the same value
 (`lo == null || ...`). The guard is decided in the application when the query runs, so with `lo == null` this `where` adds no filter. In other places (`it.status!! > lo!!` with `lo == null`) lambdaQL throws an error when
 it binds the value. A captured `NaN` or `Infinity` is always an error.
 
@@ -471,7 +471,7 @@ This table comes from a compiler check of 126 operator forms (kotlinc 2.3.21, de
 | `< > <= >=` on numbers (with `!!` for nullable) | supported |
 | `< > <= >=` on `BigDecimal`, `String`, `LocalDate`, `BigInteger` | supported (they compile to `compareTo`) |
 | `x.compareTo(y) > 0` | supported, read as `x > y` |
-| `==`, `!=` | supported (null-safe value equality, [9.4](#94-equality----and-areequal)) |
+| `==`, `!=` | supported (value equality with the SQL meaning, [9.4](#94-equality----and-areequal)) |
 | `===`, `!==` | supported, value equality |
 | enum `==` | supported |
 | enum `<`, `>` | supported. lambdaQL expands it to `in (...)` of the enum constants, so it works with both ORDINAL and STRING mapping |
@@ -657,7 +657,7 @@ These differences are part of the design. They are not bugs.
 |---|---|
 | `!!` throws NPE | `!!` is ignored. NULL follows SQL rules |
 | `it.status != 1` with `status == null` is `true` | The hidden null check is ignored: `e0.status <> 1` is UNKNOWN for NULL, so the row is not returned. Write `it.status == null \|\| ...` to include it |
-| `it.customer?.name == null` is `true` when there is no customer | In `where` the path is an inner join by default, so an order without a customer is not returned. Write `it.customer == null \|\| it.customer?.name == null` to include it (this null guard makes the path a `left join`) |
+| `it.customer?.name == null` is `true` when there is no customer | In `where` the path is an inner join by default, so an order without a customer is not returned. To include it, use `leftJoin` with `c == null \|\| c.name == null`, or a second query with `it.customer == null` |
 | A `when` or range with a NULL subject goes to `else`, and `!in` is `true` | The row is not returned, also under `NOT` |
 | `===` is object identity | Value equality |
 | `BigDecimal` `==` compares scale (`1.0 != 1.00`) | Value equality |

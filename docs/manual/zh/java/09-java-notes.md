@@ -1,5 +1,8 @@
 # 9. Java 说明
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/09-java-notes.md)。
+
 > [!NOTE]
 > **状态**
 > - **已实现（分析核心）：** 加载可序列化 Lambda、捕获 `this` 的 Lambda、识别方法引用、拒绝不是 `Serializable` 的 Lambda。参见 [9.13](#913-what-you-can-check-today) 中的测试。
@@ -90,7 +93,7 @@ lambdaQL **忽略**装箱和拆箱调用（`valueOf`、`intValue`、`doubleValue
 ## 9.3 装箱值的相等比较
 
 在 Java 中，两个**对象**之间的 `==` 检查的是同一性（内存中是否为同一个对象）。
-在 lambdaQL 中，两个对象之间的 `==` 是 **null 安全的值比较**（决策 D12）。
+在 lambdaQL 中，两个对象之间的 `==` 是**值比较**（决策 D12）。实体值遵循 SQL 语义（决策 D48）；捕获的值保留 Java 规则（[3.6](03-where.md#36-null-rules)）。
 装箱缓存（-128 到 127 的 `Integer` 和 `Long`）以及 `new String(...)` 都不影响结果。
 
 适用哪条规则，取决于两侧的 **Java 类型**：
@@ -98,24 +101,25 @@ lambdaQL **忽略**装箱和拆箱调用（`valueOf`、`intValue`、`doubleValue
 | 左侧 | 右侧 | javac 生成 | lambdaQL 规则 | HQL |
 |---|---|---|---|---|
 | `Integer` 列 | `int` 常量或变量 | 拆箱，数值比较 | R1，SQL 含义 | `e0.status = 1` |
-| `Integer` 列 | `Integer` 变量 | 对象比较 | R2，null 安全 | `e0.status is not distinct from :p1` |
+| `Integer` 列 | `Integer` 变量 | 对象比较 | R2 | `e0.status = :p1`（捕获的 `null`：`e0.status is null`） |
 | `Long` `@Id` 列 | `Long` 变量 | 对象比较 | R2，但一侧永远不为 NULL | `e0.id = :p1` |
 | `Long` 列 | `long` 变量 | 拆箱 | R1 | `e0.id = :p1` |
-| `String` | `String` | 对象比较 | R2，null 安全 | `e0.description is not distinct from :p1` |
-| 枚举 | 枚举 | 对象比较 | R2，null 安全 | `x is not distinct from :p1` |
-| `Boolean` 列 | `Boolean.TRUE` | 对象比较 | null 安全 | `e0.active is not distinct from true` |
+| `String` | `String` | 对象比较 | R2 | `e0.description = :p1` |
+| `String` 列 | `String` 列 | 对象比较 | R2，SQL 含义 | `e0.description = e0.custName`（任一侧为 NULL：不匹配） |
+| 枚举 | 枚举 | 对象比较 | R2 | `x = :p1` |
+| `Boolean` 列 | `Boolean.TRUE` | 对象比较 | R2 | `e0.active = :p1` |
 | `Boolean` 列 | `true` | 拆箱 | R1 | `e0.active = true` |
 | 任意 | `null` | null 检查 | R3 | `x is null` |
 | 实体 | 实体（`o.getCustomer() == c`） | 对象比较 | **v0.1 不支持** | –（请改为比较 id） |
 
-null 安全的含义：
+与捕获值比较时：
 
-| 列 | 捕获值 | 结果 |
-|---|---|---|
-| 3 | 3 | true |
-| NULL | `null` | **true** |
-| NULL | 3 | false |
-| 3 | `null` | false |
+| 列 | 捕获值 | HQL | 结果 |
+|---|---|---|---|
+| 3 | 3 | `e0.status = :p1` | true |
+| NULL | `null` | `e0.status is null` | **true**（捕获的 `null` 适用 Java 规则） |
+| NULL | 3 | `e0.status = :p1` | false |
+| 3 | `null` | `e0.status is null` | false |
 
 ```java
 Integer wanted = request.getStatus();        // 可能为 null
@@ -124,20 +128,21 @@ qb.from(Order.class).where(o -> o.getStatus() == wanted).toList();
 // wanted = null -> status 为 NULL 的行
 ```
 
-当一侧永远不可能为 NULL 时（`@Id`、`nullable = false` 的列、基本类型的列，或不为 null 的捕获值），lambdaQL 会写成普通的 `=`。结果相同，而且数据库可以使用索引。
+列永远不会被函数包裹，因此数据库可以使用索引。
 
-对象之间的 `!=` 则相反：`is distinct from`（当一侧永远不为 NULL 时为 `(a <> b or a is null)`）。
+对象之间的 `!=` 生成 `<>`（捕获的 `null`：`is not null`）。值为 NULL 的行不匹配 `<>`（SQL 含义，D48）。Java 会返回该行。要保留这样的行，请写 `o.getStatus() == null || o.getStatus() != wanted`。
+两个实体值（`o.getDescription() == o.getCustName()`）生成 `=` 和 `<>`。任一侧为 NULL 时都不匹配，NULL 与 NULL 也一样。当结果可能与 Java 不同时，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`（见 [3.6.3](03-where.md#363-write-your-null-checks-yourself)）。
 
 <a id="94-strings"></a>
 ## 9.4 字符串
 
 | Java 写法 | HQL | 列为 NULL | `p` 为 `null` |
 |---|---|---|---|
-| `o.getDescription() == p` | `e0.description is not distinct from :p1` | 仅在 `p == null` 时匹配 | 允许 |
+| `o.getDescription() == p` | `e0.description = :p1`（`p` 为 `null`：`e0.description is null`） | 仅在 `p == null` 时匹配 | 允许 |
 | `o.getDescription().equals(p)` | `e0.description = :p1` | 不返回该行 | **抛出异常** |
 | `p.equals(o.getDescription())` | `e0.description = :p1` | 不返回该行 | **抛出异常** |
 | `"abc".equals(o.getDescription())`（常量接收者） | `e0.description = 'abc'`（常量永远不为 NULL，所以是普通的 `=`） | 不返回该行 | – |
-| `Objects.equals(o.getDescription(), p)` | `e0.description is not distinct from :p1` | 仅在 `p == null` 时匹配 | 允许 |
+| `Objects.equals(o.getDescription(), p)` | `e0.description = :p1`（`p` 为 `null`：`e0.description is null`） | 仅在 `p == null` 时匹配 | 允许 |
 | `o.getDescription().compareTo(p) < 0` | `e0.description < :p1` | 不返回该行 | **抛出异常** |
 | `o.getDescription() == null` | `e0.description is null` | 返回 | – |
 
@@ -158,15 +163,15 @@ qb.from(Order.class).where(o -> o.getDescription() == code).toList();
 <a id="95-null-safe-helpers"></a>
 ## 9.5 null 安全的辅助方法
 
-这些 Java 辅助方法对 `null` 有明确的结果。lambdaQL 保留该结果（规则 R5）：
+这些 Java 辅助方法遵循与 `==` 相同的规则（规则 R5）：捕获的 `null` 生成 `is null`，实体值遵循 SQL 含义（D48）：
 
 | Java | HQL | 说明 |
 |---|---|---|
-| `Objects.equals(o.getStatus(), s)` | `e0.status is not distinct from :p1` | |
-| `!Objects.equals(o.getStatus(), 1)` | `e0.status is distinct from 1` | 与 Java 一样，**会返回** NULL 行 |
-| `Objects.equals(o.getDescription(), o.getCustomer().getName())` | `e0.description is not distinct from j1.name` | 两列比较 |
-| `Boolean.TRUE.equals(o.getActive())` | `e0.active is not distinct from true` | |
-| `!Boolean.TRUE.equals(o.getActive())` | `e0.active is distinct from true` | 在三种数据库上都可用 |
+| `Objects.equals(o.getStatus(), s)` | `e0.status = :p1`（`s` 为 `null`：`e0.status is null`） | |
+| `!Objects.equals(o.getStatus(), 1)` | `e0.status <> 1` | **不返回** NULL 行（SQL 含义；Java 会返回它们） |
+| `Objects.equals(o.getDescription(), o.getCustomer().getName())` | `e0.description = j1.name` + `join e0.customer j1` | 两列比较：任一侧为 NULL 时不匹配 |
+| `Boolean.TRUE.equals(o.getActive())` | `e0.active = :p1` | |
+| `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | **不返回** NULL 行（SQL 含义） |
 | `"x".equals(o.getDescription())` | `e0.description = 'x'` | 常量接收者：永远不为 NULL，所以是普通的 `=` |
 | `set` 值中的 `Objects.requireNonNullElse(o.getPrice(), 0.0)` | `coalesce(o.price, 0.0)` | 见 [7. 更新、插入、删除](07-dml.md) |
 
@@ -174,7 +179,8 @@ qb.from(Order.class).where(o -> o.getDescription() == code).toList();
 
 ```java
 .where(o -> o.getStatus() != 1)                 // e0.status <> 1           （不返回 NULL 行）
-.where(o -> !Objects.equals(o.getStatus(), 1))  // e0.status is distinct from 1 （返回 NULL 行）
+.where(o -> !Objects.equals(o.getStatus(), 1))  // e0.status <> 1           （同样不返回 NULL 行）
+.where(o -> o.getStatus() == null || !Objects.equals(o.getStatus(), 1))   // 返回 NULL 行
 ```
 
 <a id="96-small-types-char-short-byte-and-boolean"></a>
@@ -187,7 +193,7 @@ lambdaQL 知道这一点：
 - 常量会被转换为其所在列的类型。例如，对于 `short` 列，`int` 常量 `10` 会变成 `short` 值。
 - 单独的 `boolean` getter 就是一个条件：`o.isActive()` 变成 `e0.active = true`。
 - 支持 `o.isActive() == (o.getStatus() > s)`（两个布尔表达式）。它会变成 `AND`/`OR`（见 [3.7](03-where.md#37-boolean-columns)）。
-- 基本类型属性（`boolean active`、`int qty`）与 `@Id` 或 `nullable = false` 列一样，被视为"永远不为 NULL"。这样 lambdaQL 就可以写成普通的 `=`，而不是 `is not distinct from`（[9.3](#93-equality-of-boxed-values)）。
+- 基本类型属性（`boolean active`、`int qty`）与 `@Id` 或 `nullable = false` 列一样，被视为"永远不为 NULL"。这样 lambdaQL 就可以去掉对它的 null 检查，`o.getId() == null` 会变成 `1=0`（[3.6.2](03-where.md#362--on-objects-compares-values)）。
 
 <a id="97-float-double-and-bigdecimal"></a>
 ## 9.7 float、double 和 BigDecimal

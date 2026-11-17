@@ -1,5 +1,8 @@
 # 10. 规则与限制（Java）
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/10-rules-and-limits.md)。
+
 > [!NOTE]
 > **状态：部分已实现。**
 > 本章汇总了 lambdaQL 设计中的规则：Lambda 如何变成 SQL、NULL 如何处理、
@@ -78,18 +81,17 @@ Lambda 是用 Java 语法编写的查询。因此：
 | Oracle 语言索引 `NLSSORT(... BINARY_CI)` | `e0.name collate binary_ci = :p1` | |
 | 没有可用途径 | 启动时 WARN（严格模式下为错误） | |
 
-**一侧为 NOT NULL 时的 null 安全相等比较**
+**用普通的 `=` 和 `<>` 进行相等比较**（决策 D48）
 
 ```java
 .where(o -> o.getDescription() == text)   // 查询执行时 text 不为 null
-// e0.description = :p1                       （而不是 "is not distinct from"）
+// e0.description = :p1
 .where(o -> o.getDescription() != text)
-// (e0.description <> :p1 or e0.description is null)
+// e0.description <> :p1                      （description 为 NULL 时不匹配）
 ```
 
-在 Oracle 上，`is not distinct from` 会变成 `decode(...)`，无法使用索引。
-因此，当已知一侧为 NOT NULL 时（`@Id`、`nullable = false`、基本类型属性，
-或不为 null 的绑定值），lambdaQL 会写成普通的 `=`。
+lambdaQL 永远不会写出 `is [not] distinct from`。在 Oracle 上它会变成 `decode(...)`，无法使用索引。
+实体值遵循 SQL 语义，因此普通的 `=` 或 `<>` 总是正确的。捕获的 `null` 生成 `is null` / `is not null`。
 
 **比较两个布尔表达式**（D25）
 
@@ -138,10 +140,13 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 | Lambda | SQL | NULL 行为 |
 |---|---|---|
 | `o.getId() == 10L`（拆箱，一侧为基本类型） | `e0.id = 10` | NULL：UNKNOWN，不选中该行（Java 会抛出 NPE） |
-| `o.getId() == p`（两个对象：`Long`、`String`、枚举等） | null 安全的 `is not distinct from`，一侧为 NOT NULL 时为 `=` | `null == null` 为 true |
+| `o.getId() == p`（两个对象：`Long`、`String`、枚举等） | `e0.id = :p1`；捕获的 `null`：`is null` | 列为 NULL：不选中。捕获的 `null` 遵循 Java（`is null`） |
+| `o.getDescription() != p` | `e0.description <> :p1`；捕获的 `null`：`is not null` | 列为 NULL：**不**选中（SQL 语义，D48；Java 会选中它） |
+| `o.getDescription() == o.getCustName()`（两个实体值） | `e0.description = e0.custName` | 任一侧为 NULL：不选中，NULL 与 NULL 也一样（SQL 语义，D48） |
 | `o.getDescription().equals(p)` | `e0.description = :p1` | description 为 NULL：UNKNOWN（Java 会抛出 NPE） |
-| `Objects.equals(o.getDescription(), p)`、`"x".equals(o.getDescription())`、`Boolean.TRUE.equals(o.getActive())` | null 安全 | 与 Java 相同 |
-| `!Boolean.TRUE.equals(o.getActive())` | `e0.active is distinct from true` | 与 Java 相同。在三种数据库上都可用 |
+| `Objects.equals(o.getDescription(), p)`、`"x".equals(o.getDescription())`、`Boolean.TRUE.equals(o.getActive())` | 与 `==` 相同 | 与 `==` 相同 |
+| `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | NULL：不选中（SQL 语义） |
+| `!o.getActive()`（可空 `Boolean`） | `e0.active = false` | NULL：不选中（NULL 不是 false） |
 | `x == null`、`x != null` | `is null`、`is not null` | 二值 |
 | 对永远不会是 NULL 的列（id、基本类型、`nullable = false`，且路径上没有关联步骤）写 `o.getId() == null` | `1=0`。与比较并列时，检查被去掉：`o.getId() != null && o.getId() == id` 得到 `e0.id = :p1`（已测试） | 该列没有 NULL。经过关联的路径（`o.getCustomer().getId()`）保留检查 |
 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR` | SQL 三值逻辑 |
@@ -160,7 +165,7 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 
 | 捕获值所在位置 | 允许 `null` 吗？ |
 |---|---|
-| null 安全写法：对象之间的 `==` / `!=`、`Objects.equals`、`"x".equals(col)` | 是 |
+| 对象之间的 `==` / `!=`、`Objects.equals`、`"x".equals(col)` | 是。生成 `is null` / `is not null` |
 | 在同一值的 null 守卫之下：`p == null \|\| o.getStatus() > p` | 是。这个守卫会在查询执行时在 Java 中决定：`p == null` 时不过滤，其他值时为 `e0.status > :p1` |
 | `p.equals(col)` 的接收者、`col.equals(p)` 的参数、拆箱比较、`<` `<=` `>` `>=` | **否。** 绑定值时报错（Java 会抛出 NPE 或结果始终为 false） |
 | `in` 中包含 `null` 元素的集合 | **否。** 绑定时报错 |
@@ -174,10 +179,10 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 | # | Lambda 写法 | 含义 |
 |---|---|---|
 | R1 | 基本类型比较，或一侧为基本类型（`o.getId() == 10L`、`o.getStatus() > p`） | `=`、`<>`、`<` ……，SQL NULL 规则 |
-| R2 | 对象的 `==` / `!=`（`Long`、`String`、`Boolean`、枚举） | null 安全的值相等。不是对象同一性 |
+| R2 | 对象的 `==` / `!=`（`Long`、`String`、`Boolean`、枚举） | 值相等，不是对象同一性。按 SQL 语义的 `=` / `<>`（D48）；捕获的 `null` 生成 `is null` / `is not null` |
 | R3 | `x == null`、`x != null` | `IS NULL`、`IS NOT NULL` |
 | R4 | `a.equals(b)` | `a = b`，SQL NULL 规则 |
-| R5 | `Objects.equals(a, b)`、`"x".equals(a)`、`Boolean.TRUE.equals(a)` | null 安全的值相等 |
+| R5 | `Objects.equals(a, b)`、`"x".equals(a)`、`Boolean.TRUE.equals(a)` | 与 R2 相同 |
 | R6 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR`。SQL 三值逻辑 |
 | R7 | 字符串值比较 | 遵循**数据库排序规则**（大小写、尾部空格）。Oracle 把 `''` 视为 NULL |
 | R8 | 实体 `==` 实体 | 计划中：标识符相等。v0.1 不支持 |
@@ -207,9 +212,9 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 
 | # | 差异 | lambdaQL 的处理 |
 |---|---|---|
-| G1 | 当 `status` 为 NULL 时，`!Objects.equals(status, 1)` 在 Java 中为 true；而 `status <> 1` 在 SQL 中为 UNKNOWN | 生成 null 安全的写法（`is distinct from`），返回与 Java 相同的行 |
-| G2 | `!Boolean.TRUE.equals(active)` 与 `NOT active` | 生成 `active is distinct from true`（在三种数据库上都可用） |
-| G3 | 参数为 NULL 时，`name = ?` 返回 0 行 | null 安全写法使用 `is [not] distinct from` |
+| G1 | 当 `status` 为 NULL 时，`!Objects.equals(status, 1)` 在 Java 中为 true；而 `status <> 1` 在 SQL 中为 UNKNOWN | 生成 `status <> 1`：SQL 语义（D48）。NULL 行被排除，并以 `DEBUG` 级别记录 `LQL-5009`。要保留它们，请写 `status == null \|\| ...` |
+| G2 | `!Boolean.TRUE.equals(active)`、`!active`（可空）与 Java 的差异 | 生成 `active <> :p1` 和 `active = false`：NULL 的 Boolean 不是 false（SQL 语义） |
+| G3 | 参数为 NULL 时，`name = ?` 返回 0 行 | 捕获的 `null` 生成 `name is null`（捕获的值适用 Java 规则） |
 | G4 | `status NOT IN (1, NULL)` 始终返回 0 行 | 捕获的集合中出现 `null` 是错误。子查询的 `NOT IN` 写成 `NOT EXISTS` |
 | G5 | Java 会抛出 NPE（拆箱、`o.getName().startsWith(...)`），SQL 只是返回行 | 已在文档中说明：实体的 NULL 遵循 SQL 规则 |
 | G6 | `NaN`：H2 把 NaN 当作最大值排序，且 `NaN = NaN` 为 true；MariaDB 无法存储它；Oracle 只能在 `BINARY_DOUBLE` 中存储它 | 捕获的 NaN 或 Infinity 是错误。已存储的 NaN 遵循数据库 |
@@ -261,7 +266,7 @@ lambdaQL 隐藏了许多差异，但有一些你必须了解。
 
 | 项目 | H2 | MariaDB | Oracle |
 |---|---|---|---|
-| `is not distinct from` | 原生支持 | `<=>`（可使用索引） | `decode(...)`（无法使用索引），因此 lambdaQL 在可能时优先使用 `=` |
+| `is not distinct from` | 原生支持 | `<=>`（可使用索引） | `decode(...)`（无法使用索引）。lambdaQL 不会写出它（D48） |
 | `is [not] true`、`coalesce(boolean, false)` | 可用 | 可用 | **ORA-00932**。lambdaQL 从不生成它们 |
 | 空字符串 `''` | 一个值 | 一个值 | **NULL** |
 | 大小写和尾部空格 | 精确 | `_ci`：忽略 | 精确（排序使用 `NLS_SORT`） |
@@ -464,7 +469,7 @@ List<Order> list = flag
 | 项目 | 版本 |
 |---|---|
 | Java | 21（javac）。不保证支持 ECJ |
-| Hibernate | 6.6（设计已用 6.6.5 检查）。使用了 HQL 扩展（例如 `is distinct from`）；不保证支持其他 JPA 提供者 |
+| Hibernate | 6.6（设计已用 6.6.5 检查）。使用了 HQL 扩展（例如 `function(...)` 和 `nulls first`）；不保证支持其他 JPA 提供者 |
 | 数据库 | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
 | Spring | Spring Boot 3.4.2 和 Spring Data JPA 3.4.2（Spring 模块，[12](12-spring-data-jpa.md)）。Spring Boot 4 尚未验证 |
 | 未测试 | PostgreSQL、SQL Server、Oracle 19c 及更早版本（例如 PL/SQL 的 `BOOLEAN` 参数） |

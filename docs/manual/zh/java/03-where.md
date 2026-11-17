@@ -1,5 +1,8 @@
 # 3. 条件（`where`）（Java）
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/03-where.md)。
+
 > [!NOTE]
 > **状态**
 > - **已实现，并在 H2、MariaDB 和 Oracle 上测试：** `where` 条件和 `toList()`。lambdaQL 把 getter 映射到列，生成 HQL 并执行它。
@@ -226,8 +229,8 @@ qb.from(Order.class).where(o -> o.getStatus() == wanted).toList();
 
 这是最重要的部分。有两条简单的原则：
 
-1. **在 Java 为 null 定义了结果的地方，lambdaQL 使用那个结果。**（对象之间的 `==`、`Objects.equals`、`x == null`）
-2. **在 Java 会抛出异常的地方，lambdaQL 使用 SQL 语义。**（拆箱、`a` 为 null 时的 `a.equals(b)`）
+1. **实体值按 SQL 语义比较**（决策 D48）。对象之间的 `==`、`equals`、`Objects.equals` 和 `!=` 变为 `=` 和 `<>`。值为 NULL 的行与两者都不匹配。当结果可能与 Java 不同时，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`。
+2. **捕获的值保留 Java 规则。** 它们先在 Java 中计算。捕获的 `null` 生成 `is null` 或 `is not null`。在 Java 会抛出异常的地方（拆箱、`null.equals(...)`），lambdaQL 也会抛出异常（见 [3.6.4](#364-captured-null-values)）。
 
 lambdaQL **只在你写出 null 处理时才处理 null**（`== null`、`!= null`）。
 它永远不会替你添加隐藏的 null 检查。
@@ -237,11 +240,12 @@ lambdaQL **只在你写出 null 处理时才处理 null**（`== null`、`!= null
 | # | Java 写法 | HQL | NULL 行为 |
 |---|---|---|---|
 | R1 | 一侧是基本类型：`o.getStatus() == 1`、`o.getPrice() > p` | `e0.status = 1`、`e0.price > :p1` | SQL 语义。列为 NULL：该行不返回 |
-| R2 | 两侧都是对象：`o.getStatus() == status`（`Integer == Integer`）、`String == String`、enum | `e0.status is not distinct from :p1` | **null 安全的值比较。** `null == null` 为 true。只有一侧为 null：false |
-| R2 | `o.getStatus() != status`（对象） | `e0.status is distinct from :p1` | null 安全 |
+| R2 | 两侧都是对象：`o.getStatus() == status`（`Integer == Integer`）、`String == String`、enum | `e0.status = :p1`。捕获的 `null`：`e0.status is null` | **值比较。** 列为 NULL：该行不返回 |
+| R2 | `o.getStatus() != status`（对象） | `e0.status <> :p1`。捕获的 `null`：`e0.status is not null` | SQL 语义：列为 NULL：该行**不**返回（Java 会返回它） |
+| R2 | 两个实体值：`o.getDescription() == o.getCustName()` | `e0.description = e0.custName` | SQL 语义：任一侧为 NULL：该行不返回（NULL 与 NULL 也一样） |
 | R3 | `x == null`、`x != null` | `x is null`、`x is not null` | |
 | R4 | `o.getDescription().equals(p)` | `e0.description = :p1` | SQL 语义。列为 NULL：该行不返回。`p == null`：异常 |
-| R5 | `Objects.equals(a, b)`、`"x".equals(a)`、`Boolean.TRUE.equals(a)` | `a is not distinct from b` | null 安全 |
+| R5 | `Objects.equals(a, b)`、`"x".equals(a)`、`Boolean.TRUE.equals(a)` | 与 R2 相同：`a = b`、`a = :p1`，捕获的 `null` 为 `a is null` | 与 R2 相同 |
 | R9 | 捕获的值 | 绑定参数 | 见 [3.6.4](#364-captured-null-values) |
 
 哪些 Java 类型适用 R1、哪些适用 R2，见 [9. Java 说明](09-java-notes.md#93-equality-of-boxed-values)。
@@ -256,28 +260,23 @@ Lambda 是查询，因此 Java 的内存规则不适用。
 ```java
 Integer status = request.getStatus();    // 可能为 null
 qb.from(Order.class).where(o -> o.getStatus() == status).toList();
-// HQL: e0.status is not distinct from :p1
-//   status = 3    -> status 为 3 的行
-//   status = null -> status 为 NULL 的行
+//   status = 3    -> HQL: e0.status = :p1    status 为 3 的行
+//   status = null -> HQL: e0.status is null  status 为 NULL 的行
 ```
 
-Hibernate 针对各数据库生成的写法（已验证）：
-
-| 数据库 | SQL |
-|---|---|
-| H2 | `status is not distinct from ?` |
-| MariaDB | `status <=> ?` |
-| Oracle | `decode(status, ?, 0, 1) = 0` |
-
-当 lambdaQL 知道某一侧永远不会为 NULL 时（`@Id`、`nullable = false` 的列、基本类型的列，或不为 null 的捕获值），它会改为生成简单的 `=`。结果相同，而且数据库可以使用索引。
+列永远不会被函数包裹，因此数据库可以使用索引。
 
 lambdaQL 在查询执行时查看捕获的值：`null` 生成 `is null`，其他任何值生成简单的 `= :p1`。
 **(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `null-safe`：
 
 ```java
+// the SQL meaning (D48): = NULL matches no row; lambdaQL logs LQL-4045 at WARN when it runs with a null
 String d = null;
 RenderedQuery q = qb.from(Order.class).where(o -> Objects.equals(o.getDescription(), d)).toHql();
-assertEquals("select e0 from Order e0 where e0.description is null", q.hql());
+assertEquals("select e0 from Order e0 where e0.description = :p1", q.hql());
+// to find NULL, write the null check
+RenderedQuery q3 = qb.from(Order.class).where(o -> o.getDescription() == null).toHql();
+assertEquals("select e0 from Order e0 where e0.description is null", q3.hql());
 
 String d2 = "a";
 RenderedQuery q2 = qb.from(Order.class).where(o -> Objects.equals(o.getDescription(), d2)).toHql();
@@ -290,7 +289,7 @@ assertEquals("select e0 from Order e0 where e0.description = :p1", q2.hql());
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-where o1_0.description is null
+where o1_0.description=?
 ```
 
 **各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `null-safe#2`：
@@ -327,6 +326,7 @@ assertEquals("select e0 from Order e0 where e0.customer.id is null",
         qb.from(Order.class).where(o -> Objects.equals(o.getCustomer().getId(), null)).toHql().hql());
 ```
 
+<a id="363-write-your-null-checks-yourself"></a>
 ### 3.6.3 自己编写 null 检查
 
 ```java
@@ -344,9 +344,32 @@ assertEquals("select e0 from Order e0 where e0.customer.id is null",
 ```java
 .where(o -> o.getDescription().equals(text))     // HQL: e0.description = :p1
 .where(o -> Objects.equals(o.getDescription(), text))
-                                                 // HQL: e0.description is not distinct from :p1
-.where(o -> !Objects.equals(o.getStatus(), 1))   // HQL: e0.status is distinct from 1
-                                                 //      （会返回 NULL 行，与 Java 一致）
+                                                 // HQL: e0.description = :p1（text 为 null 时：is null）
+.where(o -> !Objects.equals(o.getStatus(), 1))   // HQL: e0.status <> 1
+                                                 //      （不返回 NULL 行：SQL 语义）
+```
+
+**实体值的 SQL 语义**（决策 D48）。两个实体值之间的比较，以及实体值与一个值的 `!=` 比较，都遵循 SQL：值为 NULL 的行既不匹配 `=`，也不匹配 `<>`。
+在 Java 中，`!text.equals(null)` 为 true，`Objects.equals(null, null)` 也为 true，因此 Java 会返回这些行。可能出现这种情况时，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`（每个条件一次）。要保留 NULL 行，请在 Lambda 中写出 null 检查。
+
+**(已测试)** [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)，region `sql-meaning`（H2、MariaDB 和 Oracle；各行的 description/custName 组合为 `a/a`、`a/b`、`null/a`、`null/null`、`b/null`，`text` 为 `"a"`）：
+
+```java
+// two entity values: = and <> as in SQL; a row with a NULL on either side matches neither
+SelectQuery<Order> same = qb.from(Order.class).where(o -> Objects.equals(o.getDescription(), o.getCustName()));
+assertEquals("select e0 from Order e0 where e0.description = e0.custName", same.toHql().hql());
+assertEquals(List.of("a/a"), pairs(same.toList()));                    // null/null is not "equal" in SQL
+SelectQuery<Order> different = qb.from(Order.class).where(o -> !Objects.equals(o.getDescription(), o.getCustName()));
+assertEquals(List.of("a/b"), pairs(different.toList()));               // rows with a NULL are left out
+// an entity value and a value: a NULL column does not match <>
+SelectQuery<Order> notA = qb.from(Order.class).where(o -> !text.equals(o.getDescription()));
+assertEquals("select e0 from Order e0 where e0.description <> :p1", notA.toHql().hql());
+assertEquals(List.of("b/null"), pairs(notA.toList()));
+// to keep the NULL rows, say so in the lambda
+SelectQuery<Order> notAOrNull = qb.from(Order.class).where(o -> o.getDescription() == null || !text.equals(o.getDescription()));
+assertEquals(List.of("b/null", "null/a", "null/null"), pairs(notAOrNull.toList()));
+// a NULL Boolean is not false
+assertEquals(List.of("f"), qb.from(Coded.class).where(c -> !c.getVip()).toList().stream().map(Coded::getCode).toList());
 ```
 
 <a id="364-captured-null-values"></a>
@@ -354,7 +377,7 @@ assertEquals("select e0 from Order e0 where e0.customer.id is null",
 
 | 写法 | 捕获的值为 `null` |
 |---|---|
-| null 安全的写法（R2、R5）：`o.getStatus() == status`、`Objects.equals(...)` | 允许 |
+| 与捕获的值进行 `==`、`!=` 和 `Objects.equals(...)` 比较（R2、R5）：`o.getStatus() == status` | 允许：`is null` / `is not null` |
 | `p.equals(o.getDescription())`（`p` 是接收者） | 查询执行时**抛出异常** |
 | `o.getDescription().equals(p)` | **抛出异常** |
 | Java 会对值拆箱的比较：`o.getPrice() > p`（`Double p`），以及所有 `<`、`<=`、`>`、`>=` | **抛出异常** |
@@ -402,6 +425,20 @@ where o1_0.price>?
 - 守卫必须写在前面。`o.getPrice() > min || min == null` 在 `min == null` 时会在查询执行时抛出异常，与 Java 的 NullPointerException 相同。
 - 使用 `&&` 时，守卫的作用相反：`min != null && o.getPrice() > min` 在 `min == null` 时不返回任何行（`where 1=0`）。
 
+<a id="365-converted-attributes-convert"></a>
+### 3.6.5 转换的属性（`@Convert`）
+
+带有 JPA `AttributeConverter` 的属性按其 Java 值比较。Hibernate 6.6 会转换与这种属性比较的字面量，也会转换绑定参数。因此条件用 Java 值来写，并能找到存储的行（已在 H2、MariaDB 和 Oracle 上验证）。
+
+**(已测试)** [`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java)，region `convert`：
+
+```java
+// code is stored reversed ("abc" as "cba"); vip is stored as 'Y'/'N' (YesNoConverter)
+SelectQuery<Coded> literal = qb.from(Coded.class).where(c -> c.getCode().equals("abc"));
+assertEquals("select e0 from Coded e0 where e0.code = 'abc'", literal.toHql().hql());
+assertEquals(List.of("abc"), codes(literal.toList()));       // Hibernate converts the literal
+```
+
 <a id="37-boolean-columns"></a>
 ## 3.7 布尔列
 
@@ -412,8 +449,9 @@ where o1_0.price>?
 |---|---|---|
 | `o.isActive()` | `e0.active = true` | –（基本类型 `boolean` 永远不为 NULL） |
 | `!o.isActive()` | `e0.active = false` | –（基本类型 `boolean` 永远不为 NULL） |
-| `Boolean.TRUE.equals(o.getActive())`（可空 `Boolean`） | `e0.active is not distinct from true` | 不返回 |
-| `!Boolean.TRUE.equals(o.getActive())` | `e0.active is distinct from true` | **返回**（与 Java 一致） |
+| `Boolean.TRUE.equals(o.getActive())`（可空 `Boolean`） | `e0.active = :p1`（`:p1` 为 `true`） | 不返回 |
+| `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | **不返回**（SQL 语义，D48；Java 会返回它们） |
+| `!o.getActive()`（可空 `Boolean`） | `e0.active = false` | **不返回**（SQL 语义：NULL 不是 false） |
 
 **(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `boolean`：
 
@@ -613,11 +651,12 @@ where c1_0.name=?
 
 ```java
 String name = "Kim";
-// Java keeps orders without a customer here, so the path becomes a LEFT JOIN
+// the SQL meaning (D48): a where path is an inner join, so "customer is null" never matches here
+// (lambdaQL logs LQL-5009 at DEBUG); to keep orders without a customer, use leftJoin (D44)
 RenderedQuery q = qb.from(Order.class)
         .where(o -> o.getCustomer() == null || o.getCustomer().getName().equals(name))
         .toHql();
-assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1", q.hql());
+assertEquals("select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name = :p1", q.hql());
 
 // the guard removes those orders, so an inner join is right
 RenderedQuery q2 = qb.from(Order.class)
@@ -632,7 +671,7 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where e0.customer is n
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
+join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is null or c1_0.name=?
 ```
 

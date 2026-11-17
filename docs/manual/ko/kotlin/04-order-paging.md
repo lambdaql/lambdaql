@@ -240,7 +240,7 @@ order by c1_0.name asc nulls first,o1_0.id
 SQL에서 NULL 정책을 볼 수 있습니다. H2와 MariaDB는 자신의 기본값과 같으면 절을 생략합니다. Oracle은 자신의 기본값이 반대이므로 `asc nulls first` / `desc nulls last`를 씁니다. MariaDB에는 `NULLS` 문법이 없으므로, 기본값이 아닌 위치는 먼저 `case when … is null then … end`로 정렬합니다.
 
 별칭은 `where`와 함께 사용합니다. `where`가 같은 경로를 이미 조인했다면 정렬은 그 조인을 사용합니다.
-대부분은 inner join입니다. `where` 조건이 이미 고객 없는 주문을 걸러 냈기 때문입니다(결정 D36, [3.10](03-where.md#310-association-paths) 참고).
+이 조인은 inner join입니다. `where`의 경로는 항상 inner join이므로 고객 없는 주문은 이미 빠져 있습니다(결정 D36, D48, [3.10](03-where.md#310-association-paths) 참고).
 
 <a id="46-rules-for-the-lambda-body"></a>
 ## 4.6 람다 본문의 규칙

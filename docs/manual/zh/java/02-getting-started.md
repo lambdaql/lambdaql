@@ -1,5 +1,8 @@
 # 2. 入门（Java）
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/02-getting-started.md)。
+
 > [!NOTE]
 > **状态：** 目前你可以从源码构建 lambdaQL 并运行它的测试。
 > `where` 条件和 `toList()` 可以端到端运行。它们已在 H2、MariaDB 和 Oracle 上测试。

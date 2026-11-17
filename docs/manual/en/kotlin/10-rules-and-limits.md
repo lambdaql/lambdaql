@@ -1,5 +1,8 @@
 # 10. Rules and limits (Kotlin)
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/10-rules-and-limits.md) for the latest rules.
+
 > [!NOTE]
 > **Status: partly implemented.**
 > This chapter collects the rules of the lambdaQL design for Kotlin: how lambdas become SQL, how NULL works,
@@ -43,7 +46,7 @@ A lambda is a query written with Kotlin syntax. So:
 
 1. A path like `it.customer?.name` **names a column**. It is not a chain of calls.
    lambdaQL does not check if the customer is null (D20). In `where`, the path is an inner join by default, so an order without a customer is not returned (D36).
-   If the condition can be true without a customer (a null guard), the path is a `left join`, so the result is the same as in Kotlin.
+   A null guard (`... == null || ...`) does not change this: the path stays an inner join (D48). Use `leftJoin` to keep orders without a customer.
    To find those orders, compare the association itself: `it.customer == null`. `it.customer?.name == null` does not return them.
 2. NULL is handled **only where you wrote it** (`== null`, `!= null`, `?.`, `?:`, `==` between two nullable values) (D22).
    The null checks that the Kotlin compiler adds are ignored. Other NULLs follow SQL rules: the condition is UNKNOWN and the row is not returned.
@@ -74,18 +77,17 @@ This is a base rule of lambdaQL (design section 3.9).
 | Oracle linguistic index `NLSSORT(... BINARY_CI)` | `e0.description collate binary_ci = :p1` | |
 | No path | WARN at start (strict mode: error) | |
 
-**Null-safe equality when one side is NOT NULL**
+**Equality with plain `=` and `<>`** (decision D48)
 
 ```kotlin
 .where { it.description == text }   // text is not null when the query runs
-// e0.description = :p1                (not "is not distinct from")
+// e0.description = :p1
 .where { it.description != text }
-// (e0.description <> :p1 or e0.description is null)
+// e0.description <> :p1               (a NULL description does not match)
 ```
 
-On Oracle, `is not distinct from` becomes `decode(...)`, which cannot use an index.
-So when one side is known to be NOT NULL (`@Id`, `nullable = false`, a primitive property,
-or a bound value that is not null), lambdaQL writes a plain `=`.
+lambdaQL never writes `is [not] distinct from`. On Oracle it becomes `decode(...)`, which cannot use an index.
+Values of the entity follow the SQL meaning, so a plain `=` or `<>` is always correct. A captured `null` is bound as NULL and matches no row (`LQL-4045` at `WARN`).
 
 **Comparing two boolean expressions** (D25)
 
@@ -105,7 +107,7 @@ so lambdaQL does not use it.
 .where { it.description.isNullOrEmpty() }    // (o.description is null or e0.description = :p1)
 ```
 
-**NOT IN with a subquery** is written as `NOT EXISTS` (an anti-join, and NULL-safe; see [10.3](#103-null-rules)).
+**NOT IN with a subquery** is written as `NOT IN` (the SQL meaning, D48). A NULL in the subquery gives no rows; add a null check to the subquery to skip NULLs (see [10.3](#103-null-rules)).
 
 ### What the measurements showed
 
@@ -142,16 +144,17 @@ See [8. Procedures and DB functions](08-procedures-functions.md).
 | `it.status == 1` (`Int?` and a constant) | `e0.status = 1` | NULL: UNKNOWN, row not returned. The hidden compiler null check is ignored (D22) |
 | `it.status != 1` | `e0.status <> 1` | NULL: row **not** returned |
 | `it.price!! > p` | `e0.price > :p1` | NULL: row not returned. `!!` is ignored (D23) |
-| `it.status == q` (both nullable: `q: Int?`, `String?`, enum) | null-safe `is not distinct from`, or `=` when one side is NOT NULL | `null == null` is true (Kotlin meaning) |
-| `it.status != q` (both nullable) | `is distinct from`, or `(a <> b or a is null)` | NULL rows returned when `q` is not null (Kotlin meaning) |
-| `it.description.equals(text)` (`String?`) | the same as `==` | null-safe |
+| `it.status == q` (both nullable: `q: Int?`, `String?`, enum) | `e0.status = :p1` | NULL column: not returned. A captured `null`: no row (`= NULL`, `LQL-4045` at `WARN`) |
+| `it.status != q` (both nullable) | `e0.status <> :p1` | NULL column: **not** returned (SQL meaning, D48; Kotlin would return it). A captured `null`: no row |
+| `it.description == it.custName` (two values of the entity) | `e0.description = e0.custName` | NULL on either side: not returned, also NULL and NULL (SQL meaning, D48) |
+| `it.description.equals(text)` (`String?`) | the same as `==` | the same as `==` |
 | `x == null`, `x != null` | `is null`, `is not null` | 2-valued |
 | `it.id == id` (`it.id` is a `Long?`, `id` a captured `Long`), `it.id == null`: a column that can never be NULL (the id, a primitive, `nullable = false`, no association step on the path) | `e0.id = :p1` instead of `not (e0.id is null or e0.id <> :p1)`; `it.id == null` gives `1=0` (tested with Java) | The column has no NULL. A path through an association (`it.customer?.id`) keeps the check |
 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL 3-valued logic |
-| `it.flag == true` / `it.flag != true` | `is not distinct from true` / `is distinct from true` | like Kotlin. Works on all three DBs |
+| `it.flag == true` / `it.flag != true` | `e0.flag = true` / `e0.flag <> true` | NULL: not returned (SQL meaning, D48) |
 | `it.flag ?: false` (condition) | `(e0.flag is not null and e0.flag = true)` | NULL counts as false |
 | `it.customer?.name`, `it.customer!!.name` in `where` | `j1.name` + `join e0.customer j1` (inner join by default) | no customer: the order is not returned, also for `it.customer?.name == null` |
-| `it.customer == null \|\| it.customer?.name == p` | `e0.customer is null or j1.name = :p1` + `left join e0.customer j1` | no customer: returned, like Kotlin |
+| `it.customer == null \|\| it.customer?.name == p` | `e0.customer is null or j1.name = :p1` + `join e0.customer j1` | no customer: **not** returned (inner join, D48; `LQL-5009` at `DEBUG`). Use `leftJoin` to keep them |
 | the same path only in `orderBy` or `select` | `j1.name` + `left join e0.customer j1` | no customer: the column is NULL |
 | `it.customer == null`, `it.customer != null` | `e0.customer is null`, `e0.customer is not null` (FK column, no join) | orders without a customer / with a customer |
 | `it.customer?.id` | `e0.customer.id` (FK column, no join) | no customer: NULL |
@@ -159,7 +162,7 @@ See [8. Procedures and DB functions](08-procedures-functions.md).
 | `it.id in ids` | `e0.id in (:p1)` | NULL id: not returned |
 | `it.id !in ids` | `e0.id not in (:p1)` (the id is never NULL). For a column that can be NULL: `(x is null or x not in (:p1))` | NULL value (column that can be NULL): returned, like Kotlin |
 | `it.status in 1..5`, `!in 1..5`, `when (it.status) { ... }` | `between`, `not (... between ...)`, `in (...)` | NULL subject: not returned, also under `NOT` (no guard, D22) |
-| A subquery with `x !in sub...` | `not exists (...)` | correct even when the subquery returns NULL |
+| A subquery with `x !in sub...` | `x not in (select ...)` | a NULL in the subquery: no row is returned (SQL meaning, D48) |
 | `Agg.sum`, `avg`, `min`, `max` | `sum(...)` ... | NULL when there are no rows or all values are NULL |
 | `Agg.count()` | `count(*)` | 0 when there are no rows |
 
@@ -167,7 +170,7 @@ See [8. Procedures and DB functions](08-procedures-functions.md).
 
 | Where the captured value is | `null` allowed? |
 |---|---|
-| Null-safe forms: `==` / `!=` between two nullable values | yes |
+| `==` / `!=` between two nullable values | yes, but no row matches (`= NULL`). `LQL-4045` at `WARN` level when the query runs |
 | Under a null guard on the same value: `p == null \|\| it.status!! > p` | yes. The guard is decided in the application when the query runs: `p == null` gives no filter, any other value gives `e0.status > :p1` |
 | With `!!` or in an order compare (`<` `<=` `>` `>=`): `it.price!! > p!!` | **no.** Error when the value is bound (Kotlin would throw NPE) |
 | A collection with a `null` element in `in` | **no.** Error when bound |
@@ -180,14 +183,14 @@ This is the short form of the rule table in the design (section 3.6 and KOTLIN.m
 | # | Lambda form | Meaning |
 |---|---|---|
 | R1 | Compare of non-null primitives, or a compare after `!!` (`it.qty > 5`, `it.price!! > p`) | `=`, `<>`, `<`, ... SQL NULL rules |
-| R2 | `==` / `!=` that compile to a reference compare (enum `==`; `===`, see R17) | Null-safe value equality. Not object identity |
+| R2 | `==` / `!=` that compile to a reference compare (enum `==`; `===`, see R17) | Value equality, not object identity. `=` / `<>` with the SQL meaning (D48) |
 | R3 | `x == null`, `x != null` | `IS NULL`, `IS NOT NULL` |
 | R6 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR`. SQL 3-valued logic |
 | R7 | String value compare | Follows the **DB collation** (case, trailing spaces). Oracle treats `''` as NULL |
 | R8 | Entity `==` entity | Planned: identifier equality. Not in v0.1 (KC13) |
 | R9 | Captured value | Bind parameter with the value at run time |
 | R10 | Property access (`it.price`) | Getter call, mapped to the JPA attribute |
-| R11 | Kotlin `==`, `!=` that compile to `Intrinsics.areEqual` (references, or nullable on both sides) | Null-safe value equality. `=` only when one side is NOT NULL by the schema or the bound value |
+| R11 | Kotlin `==`, `!=` that compile to `Intrinsics.areEqual` (references, or nullable on both sides) | Value equality: `=` / `<>` with the SQL meaning (D48); a captured `null` matches no row |
 | R12 | Nullable primitive and a primitive (`it.id == 1L`, `id: Long?`) | The hidden null check is ignored: `e0.id = 1`, `e0.id <> 1` |
 | R13 | `!!` and other compiler null checks | Ignored (D23) |
 | R14 | `?.` | A path or a value with NULL propagation; the same column as without `?.` |
@@ -200,9 +203,9 @@ This is the short form of the rule table in the design (section 3.6 and KOTLIN.m
 | R21 | Kotlin string functions (`startsWith`, `endsWith`, `contains`, `equals(ignoreCase)`, `lowercase`, `length`, `isNullOrEmpty`) | `like ... escape '\'`, D24 ignore-case paths, `lower`, `length`, `(x is null or x = :p)` |
 | R22 | Kotlin host values (captured `var`, private properties, `companion` values) | Read on every run. Writing them is rejected |
 | R23 | Property references `Order::price` | The same as the getter. **Not implemented yet** in `orderBy` (`orderBy(Order::price)`): use `orderBy { it.price }` |
-| R24 | Association path (`it.customer?.name`, `it.customer!!.name`, Java entity `it.customer.name`) | A column. To-one association: an alias shared by where, order by and select. In `where` it is an inner join by default, and a `left join` when a null guard keeps rows without the association (D36); used only in order by or select, a `left join`. Embedded: same table. Ends with target `@Id`, or the association compared with `null`: FK column, no join. Collection: error |
+| R24 | Association path (`it.customer?.name`, `it.customer!!.name`, Java entity `it.customer.name`) | A column. To-one association: an alias shared by where, order by and select. In `where` it is always an inner join (D48; use `leftJoin` to keep rows without the association); used only in order by or select, a `left join`. Embedded: same table. Ends with target `@Id`, or the association compared with `null`: FK column, no join. Collection: error |
 
-The Java-only rules R4 (`equals` on an entity value) and R5 (Java null-safe helpers) are in the [Java track](../java/10-rules-and-limits.md). In Kotlin, `==` already gives the null-safe meaning.
+The Java-only rules R4 (`equals` on an entity value) and R5 (Java null-safe helpers) are in the [Java track](../java/10-rules-and-limits.md). In Kotlin, `==` gives the same meaning as R5.
 
 Other rules:
 
@@ -220,10 +223,10 @@ These differences come from SQL itself. They are not compiler problems.
 
 | # | Difference | What lambdaQL does |
 |---|---|---|
-| G1 | Null-safe inequality: in Kotlin `null != 3` is true; SQL `status <> 3` is UNKNOWN | `!=` between two nullable values is null-safe (`is distinct from`), the same rows as Kotlin. `!=` with a constant uses SQL meaning (D22) |
-| G2 | `it.flag != true` vs `NOT flag` | Renders `e0.flag is distinct from true` (works on all three DBs) |
-| G3 | `name = ?` with a NULL parameter returns 0 rows | Null-safe forms use `is [not] distinct from` |
-| G4 | `status NOT IN (1, NULL)` always returns 0 rows | A `null` in a captured collection is an error. Subquery `!in` is `NOT EXISTS` |
+| G1 | In Kotlin `null != 3` is true; SQL `status <> 3` is UNKNOWN | `!=` renders `<>`: the SQL meaning (D48). NULL rows are left out, and `LQL-5009` is logged at `DEBUG` level. Write `it.status == null \|\| ...` to keep them |
+| G2 | `it.flag != true` vs Kotlin | Renders `e0.flag <> true`: a NULL Boolean does not match (SQL meaning) |
+| G3 | `name = ?` with a NULL parameter returns 0 rows | Kept (SQL meaning, D48). lambdaQL logs `LQL-4045` at `WARN` level when it runs. Write `x == null` to find NULL |
+| G4 | `status NOT IN (1, NULL)` always returns 0 rows | A `null` in a captured collection is an error. A subquery `!in` keeps the SQL meaning (D48): add a null check in the subquery |
 | G5 | Kotlin throws NPE (`!!`, unboxing), SQL just compares | Documented: an entity NULL follows SQL rules |
 | G6 | `NaN`: H2 sorts NaN as the largest value and `NaN = NaN` is true; MariaDB cannot store it; Oracle can store it only in `BINARY_DOUBLE` | A captured NaN or Infinity is an error. A stored NaN follows the DB |
 | G7 | `Float` column compared with a `Double` value: results differ by DB | **No bit-exact Kotlin result is promised** for `Float`/`Double`. lambdaQL adds no `CAST`. Choose your column mapping (for example Oracle `binary_float` / `binary_double`) |
@@ -275,7 +278,7 @@ needed there; only Oracle gets a `NULLS` clause. To change the NULL position, us
 
 | Item | H2 | MariaDB | Oracle |
 |---|---|---|---|
-| `is not distinct from` | native | `<=>` (uses an index) | `decode(...)` (no index), so lambdaQL prefers `=` when it can |
+| `is not distinct from` | native | `<=>` (uses an index) | `decode(...)` (no index). lambdaQL does not write it (D48) |
 | `is [not] true`, `coalesce(boolean, false)` | works | works | **ORA-00932**. lambdaQL never writes them |
 | Empty string `''` | a value | a value | **NULL** |
 | Case and trailing spaces | exact | `_ci`: ignored | exact (`NLS_SORT` for sorting) |
@@ -495,7 +498,7 @@ val list = if (flag) {
 |---|---|
 | Kotlin | 2.x (design checked with kotlinc 1.7.22, 2.1.10, 2.2.21, 2.3.0, 2.3.21) |
 | Java (JVM) | 21 |
-| Hibernate | 6.6 (design checked with 6.6.5). HQL extensions are used (for example `is distinct from`); other JPA providers are not guaranteed |
+| Hibernate | 6.6 (design checked with 6.6.5). HQL extensions are used (for example `function(...)` and `nulls first`); other JPA providers are not guaranteed |
 | Databases | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
 | Spring | Spring Boot 3.4.2 and Spring Data JPA 3.4.2 (the Spring module, [12](12-spring-data-jpa.md); Java repositories only). Spring Boot 4 is not verified yet |
 | Kotlin row-by-row checks | H2 only so far. MariaDB and Oracle runs of the Kotlin cases are planned |

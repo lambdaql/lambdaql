@@ -1,5 +1,8 @@
 # 10. 规则与限制（Kotlin）
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/10-rules-and-limits.md)。
+
 > [!NOTE]
 > **状态：部分已实现。**
 > 本章汇总了 lambdaQL 针对 Kotlin 的设计规则：Lambda 如何变成 SQL、NULL 如何处理、
@@ -76,18 +79,17 @@ Lambda 是用 Kotlin 语法写成的查询。因此：
 | Oracle 语言索引 `NLSSORT(... BINARY_CI)` | `e0.description collate binary_ci = :p1` | |
 | 没有可用路径 | 启动时 WARN（严格模式：报错） | |
 
-**一侧为 NOT NULL 时的 null 安全相等**
+**用普通的 `=` 和 `<>` 进行相等比较**（决策 D48）
 
 ```kotlin
 .where { it.description == text }   // 查询执行时 text 不为 null
-// e0.description = :p1                （而不是 "is not distinct from"）
+// e0.description = :p1
 .where { it.description != text }
-// (e0.description <> :p1 or e0.description is null)
+// e0.description <> :p1               （description 为 NULL 时不匹配）
 ```
 
-在 Oracle 上，`is not distinct from` 会变成 `decode(...)`，无法使用索引。
-所以当一侧已知为 NOT NULL 时（`@Id`、`nullable = false`、基本类型属性，
-或不为 null 的绑定值），lambdaQL 写出普通的 `=`。
+lambdaQL 永远不会写出 `is [not] distinct from`。在 Oracle 上它会变成 `decode(...)`，无法使用索引。
+实体值遵循 SQL 语义，因此普通的 `=` 或 `<>` 总是正确的。捕获的 `null` 生成 `is null` / `is not null`。
 
 **比较两个布尔表达式**（D25）
 
@@ -146,13 +148,14 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 | `it.status == 1`（`Int?` 与常量） | `e0.status = 1` | NULL：UNKNOWN，不返回该行。忽略编译器隐藏的 null 检查（D22） |
 | `it.status != 1` | `e0.status <> 1` | NULL：**不**返回该行 |
 | `it.price!! > p` | `e0.price > :p1` | NULL：不返回该行。`!!` 被忽略（D23） |
-| `it.status == q`（两侧都可空：`q: Int?`、`String?`、enum） | null 安全的 `is not distinct from`，或一侧为 NOT NULL 时用 `=` | `null == null` 为 true（Kotlin 的含义） |
-| `it.status != q`（两侧都可空） | `is distinct from`，或 `(a <> b or a is null)` | `q` 不为 null 时返回 NULL 行（Kotlin 的含义） |
-| `it.description.equals(text)`（`String?`） | 与 `==` 相同 | null 安全 |
+| `it.status == q`（两侧都可空：`q: Int?`、`String?`、enum） | `e0.status = :p1`；捕获的 `null`：`is null` | 列为 NULL：不返回。捕获的 `null` 遵循 Kotlin（`is null`） |
+| `it.status != q`（两侧都可空） | `e0.status <> :p1`；捕获的 `null`：`is not null` | 列为 NULL：**不**返回（SQL 语义，D48；Kotlin 会返回它） |
+| `it.description == it.custName`（两个实体值） | `e0.description = e0.custName` | 任一侧为 NULL：不返回，NULL 与 NULL 也一样（SQL 语义，D48） |
+| `it.description.equals(text)`（`String?`） | 与 `==` 相同 | 与 `==` 相同 |
 | `x == null`、`x != null` | `is null`、`is not null` | 二值 |
 | `it.id == id`（`it.id` 是 `Long?`，`id` 是捕获的 `Long`）、`it.id == null`：永远不会是 NULL 的列（id、基本类型、`nullable = false`，且路径上没有关联步骤） | `e0.id = :p1`，而不是 `not (e0.id is null or e0.id <> :p1)`；`it.id == null` 得到 `1=0`（用 Java 测试） | 该列没有 NULL。经过关联的路径（`it.customer?.id`）保留检查 |
 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR` | SQL 三值逻辑 |
-| `it.flag == true` / `it.flag != true` | `is not distinct from true` / `is distinct from true` | 与 Kotlin 相同。在三种数据库上都可用 |
+| `it.flag == true` / `it.flag != true` | `e0.flag = true` / `e0.flag <> true` | NULL：不返回（SQL 语义，D48） |
 | `it.flag ?: false`（条件） | `(e0.flag is not null and e0.flag = true)` | NULL 视为 false |
 | `where` 中的 `it.customer?.name`、`it.customer!!.name` | `j1.name` + `join e0.customer j1`（默认是内连接） | 没有 customer：该订单不会被返回，`it.customer?.name == null` 也是如此 |
 | `it.customer == null \|\| it.customer?.name == p` | `e0.customer is null or j1.name = :p1` + `left join e0.customer j1` | 没有 customer：会被返回，与 Kotlin 相同 |
@@ -171,7 +174,7 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 
 | 捕获值所在的位置 | 允许 `null` 吗？ |
 |---|---|
-| null 安全的写法：两个可空值之间的 `==` / `!=` | 允许 |
+| 两个可空值之间的 `==` / `!=` | 允许。生成 `is null` / `is not null` |
 | 在同一个值的 null 保护之下：`p == null \|\| it.status!! > p` | 允许。这个保护会在查询执行时在应用程序中决定：`p == null` 时不过滤，其他值时为 `e0.status > :p1` |
 | 带 `!!` 或在大小比较（`<` `<=` `>` `>=`）中：`it.price!! > p!!` | **不允许。**绑定该值时报错（Kotlin 会抛出 NPE） |
 | `in` 中带有 `null` 元素的集合 | **不允许。**绑定时报错 |
@@ -185,14 +188,14 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 | # | Lambda 写法 | 含义 |
 |---|---|---|
 | R1 | 非空基本类型的比较，或 `!!` 之后的比较（`it.qty > 5`、`it.price!! > p`） | `=`、`<>`、`<`、... SQL 的 NULL 规则 |
-| R2 | 编译为引用比较的 `==` / `!=`（enum `==`；`===` 参见 R17） | null 安全的值相等。不是对象同一性 |
+| R2 | 编译为引用比较的 `==` / `!=`（enum `==`；`===` 参见 R17） | 值相等，不是对象同一性。按 SQL 语义的 `=` / `<>`（D48） |
 | R3 | `x == null`、`x != null` | `IS NULL`、`IS NOT NULL` |
 | R6 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR`。SQL 三值逻辑 |
 | R7 | 字符串值比较 | 遵循**数据库的排序规则**（大小写、末尾空格）。Oracle 把 `''` 视为 NULL |
 | R8 | 实体 `==` 实体 | 计划：标识符相等。v0.1 不支持（KC13） |
 | R9 | 捕获值 | 以运行时的值作为绑定参数 |
 | R10 | 属性访问（`it.price`） | getter 调用，映射到 JPA 属性 |
-| R11 | 编译为 `Intrinsics.areEqual` 的 Kotlin `==`、`!=`（引用，或两侧都可空） | null 安全的值相等。只有当一侧根据 schema 或绑定值为 NOT NULL 时才用 `=` |
+| R11 | 编译为 `Intrinsics.areEqual` 的 Kotlin `==`、`!=`（引用，或两侧都可空） | 值相等：按 SQL 语义的 `=` / `<>`（D48）；捕获的 `null` 生成 `is null` / `is not null` |
 | R12 | 可空基本类型与基本类型（`it.id == 1L`，`id: Long?`） | 忽略隐藏的 null 检查：`e0.id = 1`、`e0.id <> 1` |
 | R13 | `!!` 及其他编译器 null 检查 | 忽略（D23） |
 | R14 | `?.` | 带 NULL 传播的路径或值；与不带 `?.` 时是同一个列 |
@@ -207,7 +210,7 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 | R23 | 属性引用 `Order::price` | 与 getter 相同。在 `orderBy`（`orderBy(Order::price)`）中**尚未实现**：请使用 `orderBy { it.price }` |
 | R24 | 关联路径（`it.customer?.name`、`it.customer!!.name`、Java 实体的 `it.customer.name`） | 一个列。对一关联：where、order by、select 共用的别名。在 `where` 中默认是内连接，当 null 保护保留没有关联的行时是 `left join`（D36）；只在 order by 或 select 中使用时是 `left join`。嵌入类型：同一张表。以目标 `@Id` 结尾，或关联本身与 `null` 比较：外键列，不需要 join。集合：报错 |
 
-Java 专用规则 R4（对实体值使用 `equals`）和 R5（Java 的 null 安全辅助方法）在 [Java 路线](../java/10-rules-and-limits.md) 中。在 Kotlin 中，`==` 本身就具有 null 安全的含义。
+Java 专用规则 R4（对实体值使用 `equals`）和 R5（Java 的 null 安全辅助方法）在 [Java 路线](../java/10-rules-and-limits.md) 中。在 Kotlin 中，`==` 具有与 R5 相同的含义。
 
 其他规则：
 
@@ -226,9 +229,9 @@ Java 专用规则 R4（对实体值使用 `equals`）和 R5（Java 的 null 安�
 
 | # | 差异 | lambdaQL 的做法 |
 |---|---|---|
-| G1 | null 安全的不等：在 Kotlin 中 `null != 3` 为 true；SQL 的 `status <> 3` 为 UNKNOWN | 两个可空值之间的 `!=` 是 null 安全的（`is distinct from`），与 Kotlin 返回相同的行。与常量比较的 `!=` 使用 SQL 的含义（D22） |
-| G2 | `it.flag != true` 与 `NOT flag` | 渲染为 `e0.flag is distinct from true`（在三种数据库上都可用） |
-| G3 | 参数为 NULL 时 `name = ?` 返回 0 行 | null 安全的写法使用 `is [not] distinct from` |
+| G1 | 在 Kotlin 中 `null != 3` 为 true；SQL 的 `status <> 3` 为 UNKNOWN | `!=` 渲染为 `<>`：SQL 语义（D48）。NULL 行被排除，并以 `DEBUG` 级别记录 `LQL-5009`。要保留它们，请写 `it.status == null \|\| ...` |
+| G2 | `it.flag != true` 与 Kotlin 的差异 | 渲染为 `e0.flag <> true`：NULL 的 Boolean 不匹配（SQL 语义） |
+| G3 | 参数为 NULL 时 `name = ?` 返回 0 行 | 捕获的 `null` 生成 `name is null`（捕获的值适用 Kotlin 规则） |
 | G4 | `status NOT IN (1, NULL)` 总是返回 0 行 | 捕获集合中的 `null` 会报错。子查询的 `!in` 写成 `NOT EXISTS` |
 | G5 | Kotlin 会抛出 NPE（`!!`、拆箱），SQL 只是比较 | 已写入文档：实体中的 NULL 遵循 SQL 规则 |
 | G6 | `NaN`：H2 把 NaN 排为最大值且 `NaN = NaN` 为 true；MariaDB 无法存储它；Oracle 只能在 `BINARY_DOUBLE` 中存储 | 捕获的 NaN 或 Infinity 会报错。存储的 NaN 遵循数据库 |
@@ -282,7 +285,7 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 
 | 项目 | H2 | MariaDB | Oracle |
 |---|---|---|---|
-| `is not distinct from` | 原生支持 | `<=>`（可以使用索引） | `decode(...)`（无法使用索引），所以 lambdaQL 在可以时优先使用 `=` |
+| `is not distinct from` | 原生支持 | `<=>`（可以使用索引） | `decode(...)`（无法使用索引）。lambdaQL 不会写出它（D48） |
 | `is [not] true`、`coalesce(boolean, false)` | 可用 | 可用 | **ORA-00932**。lambdaQL 从不写出它们 |
 | 空字符串 `''` | 一个值 | 一个值 | **NULL** |
 | 大小写和末尾空格 | 精确 | `_ci`：忽略 | 精确（排序使用 `NLS_SORT`） |
@@ -505,7 +508,7 @@ val list = if (flag) {
 |---|---|
 | Kotlin | 2.x（设计已用 kotlinc 1.7.22、2.1.10、2.2.21、2.3.0、2.3.21 检查过） |
 | Java（JVM） | 21 |
-| Hibernate | 6.6（设计已用 6.6.5 检查过）。使用了 HQL 扩展（例如 `is distinct from`）；不保证其他 JPA 提供者可用 |
+| Hibernate | 6.6（设计已用 6.6.5 检查过）。使用了 HQL 扩展（例如 `function(...)` 和 `nulls first`）；不保证其他 JPA 提供者可用 |
 | 数据库 | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
 | Spring | Spring Boot 3.4.2 和 Spring Data JPA 3.4.2（Spring 模块，[12](12-spring-data-jpa.md)；仅 Java repository）。Spring Boot 4 尚未验证 |
 | Kotlin 逐行检查 | 目前只在 H2 上进行。计划在 MariaDB 和 Oracle 上运行 Kotlin 用例 |

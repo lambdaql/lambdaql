@@ -1,6 +1,9 @@
 <a id="9-java-notes"></a>
 # 9. Java の注意点
 
+> [!IMPORTANT]
+> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/09-java-notes.md)を参照してください。
+
 > [!NOTE]
 > **状況**
 > - **実装済み（解析コア）:** シリアライズ可能なラムダの読み込み、`this` をキャプチャするラムダ、メソッド参照の検出、`Serializable` でないラムダの拒否。テストは [9.13](#913-what-you-can-check-today) を参照してください。
@@ -92,7 +95,7 @@ NULL の行が欲しい場合は、チェックを自分で書いてください
 ## 9.3 ボクシングされた値の等価性
 
 Java では、2 つの **オブジェクト** の間の `==` は同一性（メモリ上で同じオブジェクトか）を調べます。
-lambdaQL では、2 つのオブジェクトの間の `==` は **null-safe な値の比較** です（決定 D12）。
+lambdaQL では、2 つのオブジェクトの間の `==` は **値の比較** です（決定 D12）。エンティティの値は SQL の意味に従い（決定 D48）、キャプチャした値は Java のルールをそのまま使います（[3.6](03-where.md#36-null-rules)）。
 ボクシングのキャッシュ（-128 から 127 の `Integer` と `Long`）や `new String(...)` は関係ありません。
 
 どのルールになるかは、両辺の **Java の型** で決まります。
@@ -100,24 +103,25 @@ lambdaQL では、2 つのオブジェクトの間の `==` は **null-safe な�
 | 左辺 | 右辺 | javac が作るもの | lambdaQL のルール | HQL |
 |---|---|---|---|---|
 | `Integer` のカラム | `int` の定数または変数 | アンボクシング、数値の比較 | R1、SQL の意味 | `e0.status = 1` |
-| `Integer` のカラム | `Integer` の変数 | オブジェクトの比較 | R2、null-safe | `e0.status is not distinct from :p1` |
+| `Integer` のカラム | `Integer` の変数 | オブジェクトの比較 | R2 | `e0.status = :p1`（キャプチャした `null`: `e0.status is null`） |
 | `Long` の `@Id` カラム | `Long` の変数 | オブジェクトの比較 | R2、ただし片側は決して NULL にならない | `e0.id = :p1` |
 | `Long` のカラム | `long` の変数 | アンボクシング | R1 | `e0.id = :p1` |
-| `String` | `String` | オブジェクトの比較 | R2、null-safe | `e0.description is not distinct from :p1` |
-| enum | enum | オブジェクトの比較 | R2、null-safe | `x is not distinct from :p1` |
-| `Boolean` のカラム | `Boolean.TRUE` | オブジェクトの比較 | null-safe | `e0.active is not distinct from true` |
+| `String` | `String` | オブジェクトの比較 | R2 | `e0.description = :p1` |
+| `String` のカラム | `String` のカラム | オブジェクトの比較 | R2、SQL の意味 | `e0.description = e0.custName`（どちらかが NULL: 一致しない） |
+| enum | enum | オブジェクトの比較 | R2 | `x = :p1` |
+| `Boolean` のカラム | `Boolean.TRUE` | オブジェクトの比較 | R2 | `e0.active = :p1` |
 | `Boolean` のカラム | `true` | アンボクシング | R1 | `e0.active = true` |
 | 何でも | `null` | null チェック | R3 | `x is null` |
 | エンティティ | エンティティ（`o.getCustomer() == c`） | オブジェクトの比較 | **v0.1 にはない** | –（代わりに id を比較する） |
 
-null-safe の意味:
+キャプチャ値との比較:
 
-| カラム | キャプチャ値 | 結果 |
-|---|---|---|
-| 3 | 3 | true |
-| NULL | `null` | **true** |
-| NULL | 3 | false |
-| 3 | `null` | false |
+| カラム | キャプチャ値 | HQL | 結果 |
+|---|---|---|---|
+| 3 | 3 | `e0.status = :p1` | true |
+| NULL | `null` | `e0.status is null` | **true**（キャプチャした `null` に対する Java のルール） |
+| NULL | 3 | `e0.status = :p1` | false |
+| 3 | `null` | `e0.status is null` | false |
 
 ```java
 Integer wanted = request.getStatus();        // null の場合もある
@@ -126,20 +130,21 @@ qb.from(Order.class).where(o -> o.getStatus() == wanted).toList();
 // wanted = null -> status が NULL の行
 ```
 
-片側が決して NULL にならない場合（`@Id`、`nullable = false` のカラム、プリミティブのカラム、null でないキャプチャ値）、lambdaQL は普通の `=` を書きます。結果は同じで、データベースはインデックスを使えます。
+カラムを関数で包むことはないので、データベースはインデックスを使えます。
 
-オブジェクト間の `!=` はその逆です: `is distinct from`（片側が決して NULL にならない場合は `(a <> b or a is null)`）。
+オブジェクト間の `!=` は `<>` になります（キャプチャした `null`: `is not null`）。値が NULL の行は `<>` に一致しません（SQL の意味、D48）。Java ならその行を返します。そのような行を残すには `o.getStatus() == null || o.getStatus() != wanted` と書きます。
+エンティティの値どうし（`o.getDescription() == o.getCustName()`）は `=` と `<>` になります。どちらかが NULL なら一致しません。NULL と NULL も同じです。結果が Java と異なりうるとき、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します（[3.6.3](03-where.md#363-write-your-null-checks-yourself) を参照）。
 
 <a id="94-strings"></a>
 ## 9.4 文字列
 
 | Java の書き方 | HQL | NULL のカラム | `p` が `null` |
 |---|---|---|---|
-| `o.getDescription() == p` | `e0.description is not distinct from :p1` | `p == null` のときだけ一致 | 可 |
+| `o.getDescription() == p` | `e0.description = :p1`（`p` が `null`: `e0.description is null`） | `p == null` のときだけ一致 | 可 |
 | `o.getDescription().equals(p)` | `e0.description = :p1` | 行は返らない | **例外** |
 | `p.equals(o.getDescription())` | `e0.description = :p1` | 行は返らない | **例外** |
 | `"abc".equals(o.getDescription())`（定数のレシーバー） | `e0.description = 'abc'`（定数は決して NULL にならないので単純な `=`） | 行は返らない | – |
-| `Objects.equals(o.getDescription(), p)` | `e0.description is not distinct from :p1` | `p == null` のときだけ一致 | 可 |
+| `Objects.equals(o.getDescription(), p)` | `e0.description = :p1`（`p` が `null`: `e0.description is null`） | `p == null` のときだけ一致 | 可 |
 | `o.getDescription().compareTo(p) < 0` | `e0.description < :p1` | 行は返らない | **例外** |
 | `o.getDescription() == null` | `e0.description is null` | 返る | – |
 
@@ -160,15 +165,15 @@ qb.from(Order.class).where(o -> o.getDescription() == code).toList();
 <a id="95-null-safe-helpers"></a>
 ## 9.5 null-safe なヘルパー
 
-次の Java のヘルパーは、`null` に対する結果が決まっています。lambdaQL はその結果を保ちます（ルール R5）。
+次の Java のヘルパーは `==` と同じルールに従います（ルール R5）。キャプチャした `null` は `is null` になり、エンティティの値は SQL の意味に従います（D48）。
 
 | Java | HQL | 注意 |
 |---|---|---|
-| `Objects.equals(o.getStatus(), s)` | `e0.status is not distinct from :p1` | |
-| `!Objects.equals(o.getStatus(), 1)` | `e0.status is distinct from 1` | Java と同じく、NULL の行も **返ります** |
-| `Objects.equals(o.getDescription(), o.getCustomer().getName())` | `e0.description is not distinct from j1.name` | 2 つのカラム |
-| `Boolean.TRUE.equals(o.getActive())` | `e0.active is not distinct from true` | |
-| `!Boolean.TRUE.equals(o.getActive())` | `e0.active is distinct from true` | 3 つのデータベースすべてで動く |
+| `Objects.equals(o.getStatus(), s)` | `e0.status = :p1`（`s` が `null`: `e0.status is null`） | |
+| `!Objects.equals(o.getStatus(), 1)` | `e0.status <> 1` | NULL の行は **返りません**（SQL の意味。Java なら返る） |
+| `Objects.equals(o.getDescription(), o.getCustomer().getName())` | `e0.description = j1.name` + `join e0.customer j1` | 2 つのカラム: どちらかが NULL なら一致しない |
+| `Boolean.TRUE.equals(o.getActive())` | `e0.active = :p1` | |
+| `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | NULL の行は **返りません**（SQL の意味） |
 | `"x".equals(o.getDescription())` | `e0.description = 'x'` | 定数のレシーバー: 決して NULL にならないので単純な `=` |
 | `set` の値の中の `Objects.requireNonNullElse(o.getPrice(), 0.0)` | `coalesce(o.price, 0.0)` | [7. 更新、挿入、削除](07-dml.md) を参照 |
 
@@ -176,7 +181,8 @@ qb.from(Order.class).where(o -> o.getDescription() == code).toList();
 
 ```java
 .where(o -> o.getStatus() != 1)                 // e0.status <> 1           （NULL の行は返らない）
-.where(o -> !Objects.equals(o.getStatus(), 1))  // e0.status is distinct from 1 （NULL の行も返る）
+.where(o -> !Objects.equals(o.getStatus(), 1))  // e0.status <> 1           （こちらも NULL の行は返らない）
+.where(o -> o.getStatus() == null || !Objects.equals(o.getStatus(), 1))   // NULL の行も返る
 ```
 
 <a id="96-small-types-char-short-byte-and-boolean"></a>
@@ -189,7 +195,7 @@ lambdaQL はこのことを知っています。
 - 定数はそのカラムの型に変換されます。たとえば、`short` のカラムに対しては、`int` の定数 `10` が `short` の値になります。
 - `boolean` の getter だけで条件になります: `o.isActive()` は `e0.active = true` になります。
 - `o.isActive() == (o.getStatus() > s)`（2 つの boolean の式）をサポートします。これは `AND`/`OR` になります（[3.7](03-where.md#37-boolean-columns) を参照）。
-- プリミティブのプロパティ（`boolean active`、`int qty`）は、`@Id` や `nullable = false` のカラムと同じく「決して NULL にならない」ものとして扱います。そのため lambdaQL は `is not distinct from` の代わりに普通の `=` を書けます（[9.3](#93-equality-of-boxed-values)）。
+- プリミティブのプロパティ（`boolean active`、`int qty`）は、`@Id` や `nullable = false` のカラムと同じく「決して NULL にならない」ものとして扱います。そのため lambdaQL はそれに対する null チェックを取り除けます。`o.getId() == null` は `1=0` になります（[3.6.2](03-where.md#362--on-objects-compares-values)）。
 
 <a id="97-float-double-and-bigdecimal"></a>
 ## 9.7 float、double、BigDecimal

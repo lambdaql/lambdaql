@@ -1,5 +1,8 @@
 # 10. Rules and limits (Java)
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/java/10-rules-and-limits.md) for the latest rules.
+
 > [!NOTE]
 > **Status: partly implemented.**
 > This chapter collects the rules of the lambdaQL design: how lambdas become SQL, how NULL works,
@@ -44,7 +47,7 @@ A lambda is a query written with Java syntax. So:
 
 1. A path like `o.getCustomer().getName()` **names a column**. It is not a chain of calls.
    lambdaQL does not check if the customer is null (D20). In `where`, the path is an inner join by default, so an order without a customer is not selected (D36).
-   If the condition can be true without a customer (a null guard), the path is a `left join`, so the result is the same as in Java.
+   A null guard (`... == null || ...`) does not change this: the path stays an inner join (D48). Use `leftJoin` to keep orders without a customer.
    To find those orders, compare the association itself: `o.getCustomer() == null`.
 2. NULL is handled **only where you wrote it** (`== null`, `!= null`) (D22).
    Other NULLs follow SQL rules: the condition is UNKNOWN and the row is not selected.
@@ -76,18 +79,17 @@ This is a base rule of lambdaQL (design section 3.9).
 | Oracle linguistic index `NLSSORT(... BINARY_CI)` | `e0.name collate binary_ci = :p1` | |
 | No path | WARN at start (strict mode: error) | |
 
-**Null-safe equality when one side is NOT NULL**
+**Equality with plain `=` and `<>`** (decision D48)
 
 ```java
 .where(o -> o.getDescription() == text)   // text is not null when the query runs
-// e0.description = :p1                       (not "is not distinct from")
+// e0.description = :p1
 .where(o -> o.getDescription() != text)
-// (e0.description <> :p1 or e0.description is null)
+// e0.description <> :p1                      (a NULL description does not match)
 ```
 
-On Oracle, `is not distinct from` becomes `decode(...)`, which cannot use an index.
-So when one side is known to be NOT NULL (`@Id`, `nullable = false`, a primitive property,
-or a bound value that is not null), lambdaQL writes a plain `=`.
+lambdaQL never writes `is [not] distinct from`. On Oracle it becomes `decode(...)`, which cannot use an index.
+Values of the entity follow the SQL meaning, so a plain `=` or `<>` is always correct. A captured `null` is bound as NULL and matches no row (`LQL-4045` at `WARN`).
 
 **Comparing two boolean expressions** (D25)
 
@@ -99,7 +101,7 @@ or a bound value that is not null), lambdaQL writes a plain `=`.
 The `CASE` form (`e0.active = case when ... end`) gives the right rows but needs a full scan,
 so lambdaQL does not use it.
 
-**NOT IN with a subquery** is written as `NOT EXISTS` (an anti-join, and NULL-safe; see 10.3).
+**NOT IN with a subquery** is written as `NOT IN` (the SQL meaning, D48). A NULL in the subquery gives no rows; add a null check to the subquery to skip NULLs (see 10.3).
 
 ### What the measurements showed
 
@@ -134,21 +136,24 @@ See [8. Procedures and DB functions](08-procedures-functions.md).
 | Lambda | SQL | NULL behavior |
 |---|---|---|
 | `o.getId() == 10L` (unboxing, a primitive on one side) | `e0.id = 10` | NULL: UNKNOWN, row not selected (Java would throw NPE) |
-| `o.getId() == p` (two objects: `Long`, `String`, enum, ...) | null-safe `is not distinct from`, or `=` when one side is NOT NULL | `null == null` is true |
+| `o.getId() == p` (two objects: `Long`, `String`, enum, ...) | `e0.id = :p1` | NULL column: not selected. A captured `null`: no row (`= NULL`, `LQL-4045` at `WARN`) |
+| `o.getDescription() != p` | `e0.description <> :p1` | NULL column: **not** selected (SQL meaning, D48; Java would select it). A captured `null`: no row |
+| `o.getDescription() == o.getCustName()` (two values of the entity) | `e0.description = e0.custName` | NULL on either side: not selected, also NULL and NULL (SQL meaning, D48) |
 | `o.getDescription().equals(p)` | `e0.description = :p1` | NULL description: UNKNOWN (Java would throw NPE) |
-| `Objects.equals(o.getDescription(), p)`, `"x".equals(o.getDescription())`, `Boolean.TRUE.equals(o.getActive())` | null-safe | Like Java |
-| `!Boolean.TRUE.equals(o.getActive())` | `e0.active is distinct from true` | Like Java. Works on all three DBs |
+| `Objects.equals(o.getDescription(), p)`, `"x".equals(o.getDescription())`, `Boolean.TRUE.equals(o.getActive())` | the same as `==` | the same as `==` |
+| `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | NULL: not selected (SQL meaning) |
+| `!o.getActive()` (nullable `Boolean`) | `e0.active = false` | NULL: not selected (NULL is not false) |
 | `x == null`, `x != null` | `is null`, `is not null` | 2-valued |
 | `o.getId() == null` on a column that can never be NULL (the id, a primitive, `nullable = false`, no association step on the path) | `1=0`. Next to a compare, the check is dropped: `o.getId() != null && o.getId() == id` gives `e0.id = :p1` (tested) | The column has no NULL. A path through an association (`o.getCustomer().getId()`) keeps the check |
 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL 3-valued logic |
 | `o.getCustomer().getName()` in `where` | `j1.name` + `join e0.customer j1` (inner join by default) | No customer: the order is not selected |
-| `o.getCustomer() == null \|\| o.getCustomer().getName().equals(p)` | `e0.customer is null or j1.name = :p1` + `left join e0.customer j1` | No customer: selected, like Java |
+| `o.getCustomer() == null \|\| o.getCustomer().getName().equals(p)` | `e0.customer is null or j1.name = :p1` + `join e0.customer j1` | No customer: **not** selected (inner join, D48; `LQL-5009` at `DEBUG`). Use `leftJoin` to keep them |
 | `o.getCustomer().getName()` only in `orderBy` or `select` | `j1.name` + `left join e0.customer j1` | No customer: the column is NULL |
 | `o.getCustomer() == null`, `o.getCustomer() != null` | `e0.customer is null`, `e0.customer is not null` (FK column, no join) | Orders without a customer / with a customer |
 | `o.getCustomer().getId()` | `e0.customer.id` (FK column, no join) | No customer: NULL |
 | `ids.contains(o.getId())` | `e0.id in (:p1)` | NULL id: not selected |
 | `!ids.contains(o.getId())` | `e0.id not in (:p1)` (the id is never NULL). For a column that can be NULL: `(x is null or x not in (:p1))` | NULL value (column that can be NULL): selected, like Java |
-| A subquery with `!...contains(x)` | `not exists (...)` | Correct even when the subquery returns NULL |
+| A subquery with `!...contains(x)` | `x not in (select ...)` | A NULL in the subquery: no row is selected (SQL meaning, D48) |
 | `Agg.sum`, `avg`, `min`, `max` | `sum(...)` ... | NULL when there are no rows or all values are NULL |
 | `Agg.count()` | `count(*)` | 0 when there are no rows |
 
@@ -156,7 +161,7 @@ See [8. Procedures and DB functions](08-procedures-functions.md).
 
 | Where the captured value is | `null` allowed? |
 |---|---|
-| Null-safe forms: `==` / `!=` between objects, `Objects.equals`, `"x".equals(col)` | Yes |
+| `==` / `!=` between objects, `Objects.equals`, `col.equals(p)` | Yes, but no row matches (`= NULL`). `LQL-4045` at `WARN` level when the query runs |
 | Under a null guard on the same value: `p == null \|\| o.getStatus() > p` | Yes. The guard is decided in Java when the query runs: `p == null` gives no filter, any other value gives `e0.status > :p1` |
 | Receiver of `p.equals(col)`, argument of `col.equals(p)`, unboxing compare, `<` `<=` `>` `>=` | **No.** Error when the value is bound (Java would throw NPE or always be false) |
 | A collection with a `null` element in `in` | **No.** Error when bound |
@@ -169,17 +174,17 @@ This is the short form of the rule table in the design (section 3.6).
 | # | Lambda form | Meaning |
 |---|---|---|
 | R1 | Primitive compare, or one side primitive (`o.getId() == 10L`, `o.getStatus() > p`) | `=`, `<>`, `<`, ... SQL NULL rules |
-| R2 | Object `==` / `!=` (`Long`, `String`, `Boolean`, enum) | Null-safe value equality. Not object identity |
+| R2 | Object `==` / `!=` (`Long`, `String`, `Boolean`, enum) | Value equality, not object identity. `=` / `<>` with the SQL meaning (D48); a captured `null` matches no row |
 | R3 | `x == null`, `x != null` | `IS NULL`, `IS NOT NULL` |
 | R4 | `a.equals(b)` | `a = b`, SQL NULL rules |
-| R5 | `Objects.equals(a, b)`, `"x".equals(a)`, `Boolean.TRUE.equals(a)` | Null-safe value equality |
+| R5 | `Objects.equals(a, b)`, `"x".equals(a)`, `Boolean.TRUE.equals(a)` | The same as R2 |
 | R6 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR`. SQL 3-valued logic |
 | R7 | String value compare | Follows the **DB collation** (case, trailing spaces). Oracle treats `''` as NULL |
 | R8 | Entity `==` entity | Planned: identifier equality. Not in v0.1 |
 | R9 | Captured value | Bind parameter with the value at run time |
 | R10 | Property access | Getter call, mapped to the JPA attribute |
 | R11 to R23 | Kotlin rules | See the [Kotlin version of this page](../kotlin/10-rules-and-limits.md) |
-| R24 | Association path (`o.getCustomer().getName()`) | A column. To-one association: an alias shared by where, order by and select. In `where` it is an inner join by default, and a `left join` when a null guard keeps rows without the association (D36); used only in order by or select, a `left join`. Embedded: same table. Ends with target `@Id`, or the association compared with `null`: FK column, no join. Collection: error |
+| R24 | Association path (`o.getCustomer().getName()`) | A column. To-one association: an alias shared by where, order by and select. In `where` it is always an inner join (D48; use `leftJoin` to keep rows without the association); used only in order by or select, a `left join`. Embedded: same table. Ends with target `@Id`, or the association compared with `null`: FK column, no join. Collection: error |
 
 Other rules:
 
@@ -201,10 +206,10 @@ These differences come from SQL itself. They are not compiler problems.
 
 | # | Difference | What lambdaQL does |
 |---|---|---|
-| G1 | `!Objects.equals(status, 1)` is true in Java when `status` is NULL; `status <> 1` is UNKNOWN in SQL | Renders null-safe (`is distinct from`), same rows as Java |
-| G2 | `!Boolean.TRUE.equals(active)` vs `NOT active` | Renders `active is distinct from true` (works on all three DBs) |
-| G3 | `name = ?` with a NULL parameter returns 0 rows | Null-safe forms use `is [not] distinct from` |
-| G4 | `status NOT IN (1, NULL)` always returns 0 rows | A `null` in a captured collection is an error. Subquery `NOT IN` is `NOT EXISTS` |
+| G1 | `!Objects.equals(status, 1)` is true in Java when `status` is NULL; `status <> 1` is UNKNOWN in SQL | Renders `status <> 1`: the SQL meaning (D48). NULL rows are left out, and `LQL-5009` is logged at `DEBUG` level. Write `status == null \|\| ...` to keep them |
+| G2 | `!Boolean.TRUE.equals(active)`, `!active` (nullable) vs Java | Renders `active <> :p1` and `active = false`: a NULL Boolean is not false (SQL meaning) |
+| G3 | `name = ?` with a NULL parameter returns 0 rows | Kept (SQL meaning, D48). lambdaQL logs `LQL-4045` at `WARN` level when it runs. Write `x == null` to find NULL |
+| G4 | `status NOT IN (1, NULL)` always returns 0 rows | A `null` in a captured collection is an error. A subquery `NOT IN` keeps the SQL meaning (D48): add a null check in the subquery |
 | G5 | Java throws NPE (unboxing, `o.getName().startsWith(...)`), SQL just returns rows | Documented: an entity NULL follows SQL rules |
 | G6 | `NaN`: H2 sorts NaN as the largest value and `NaN = NaN` is true; MariaDB cannot store it; Oracle can store it only in `BINARY_DOUBLE` | A captured NaN or Infinity is an error. A stored NaN follows the DB |
 | G7 | `float` column compared with a `double` value: results differ by DB | **No bit-exact Java result is promised** for float/double. lambdaQL adds no `CAST`. Choose your column mapping (for example Oracle `binary_float` / `binary_double`) |
@@ -254,7 +259,7 @@ needed there; only Oracle gets a `NULLS` clause. To change the NULL position, us
 
 | Item | H2 | MariaDB | Oracle |
 |---|---|---|---|
-| `is not distinct from` | native | `<=>` (uses an index) | `decode(...)` (no index), so lambdaQL prefers `=` when it can |
+| `is not distinct from` | native | `<=>` (uses an index) | `decode(...)` (no index). lambdaQL does not write it (D48) |
 | `is [not] true`, `coalesce(boolean, false)` | works | works | **ORA-00932**. lambdaQL never writes them |
 | Empty string `''` | a value | a value | **NULL** |
 | Case and trailing spaces | exact | `_ci`: ignored | exact (`NLS_SORT` for sorting) |
@@ -454,7 +459,7 @@ List<Order> list = flag
 | Item | Version |
 |---|---|
 | Java | 21 (javac). ECJ is not guaranteed |
-| Hibernate | 6.6 (design checked with 6.6.5). HQL extensions are used (for example `is distinct from`); other JPA providers are not guaranteed |
+| Hibernate | 6.6 (design checked with 6.6.5). HQL extensions are used (for example `function(...)` and `nulls first`); other JPA providers are not guaranteed |
 | Databases | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
 | Spring | Spring Boot 3.4.2 and Spring Data JPA 3.4.2 (the Spring module, [12](12-spring-data-jpa.md)). Spring Boot 4 is not verified yet |
 | Not tested | PostgreSQL, SQL Server, Oracle 19c and older (for example PL/SQL `BOOLEAN` parameters) |

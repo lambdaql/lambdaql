@@ -115,7 +115,7 @@ fetch first ? rows only
 | Kotlin | lambdaQL 람다 안에서 |
 |---|---|
 | `it.price!! > 100.0` | `!!`는 무시됩니다. 코드가 컴파일되도록 있을 뿐입니다. 람다는 실행되지 않으므로 `NullPointerException`은 없습니다. |
-| `it.customer?.name == "Kim"` | `it.customer?.name`은 조인한 고객의 컬럼을 가리킵니다. `where`에서는 기본적으로 inner `join`이므로 고객이 없는 주문은 반환되지 않습니다. null 가드(`it.customer == null \|\| ...`)를 쓰면 `left join`이 됩니다. `it.customer!!.name`도 같은 컬럼을 뜻합니다. |
+| `it.customer?.name == "Kim"` | `it.customer?.name`은 조인한 고객의 컬럼을 가리킵니다. `where`에서는 기본적으로 inner `join`이므로 고객이 없는 주문은 반환되지 않습니다. null 가드(`it.customer == null \|\| ...`)를 써도 마찬가지입니다(D48). 이런 주문을 유지하려면 `leftJoin`을 사용하십시오. `it.customer!!.name`도 같은 컬럼을 뜻합니다. |
 | `status: Int?`일 때 `it.status == 1` | `e0.status = 1`. `status`가 NULL이면 일치하지 않습니다(SQL 의미). lambdaQL은 Kotlin 컴파일러가 추가하는 null 검사를 무시합니다. **직접 작성한** null 검사만 의미가 있습니다. |
 
 자세한 내용: [9. Kotlin 노트](09-kotlin-notes.md).

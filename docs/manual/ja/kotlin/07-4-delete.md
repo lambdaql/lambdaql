@@ -1,6 +1,9 @@
 <a id="74-delete"></a>
 # 7.4 削除（Kotlin）
 
+> [!IMPORTANT]
+> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/07-4-delete.md)を参照してください。
+
 > [!NOTE]
 > **状況: 実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、マイルストーン M10）。ほとんどのテストは **Java** のラムダを使っています。`not exists` のサブクエリを使う delete は Kotlin のラムダでもテストしています（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、**(テスト済み)** と表示）。 `limit` と `executeOne()` も同じです（決定 D41）。
 > `where` の中のサブクエリ（`sub`）も実装済みで、Java のラムダでテスト済みです（マイルストーン M8）。

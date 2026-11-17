@@ -356,6 +356,14 @@ public final class Normalizer {
             if (converted != null) return new Done(converted);
             Object enumConstant = enumConstant(e);
             if (enumConstant != null) return new Done(new Expr.Const(enumConstant, e.type()));
+            // D48: unboxing a captured value (min.doubleValue()) is not evaluated in Java; the boxed value is bound,
+            // so a null becomes NULL in SQL (no row matches, WARN when it runs) instead of a NullPointerException
+            Expr unboxed = e;
+            while (unboxed instanceof Expr.Invoke inv && !inv.method().isStatic() && inv.args().isEmpty()
+                    && inv.method().name().endsWith("Value") && BOXES.contains(inv.method().owner())) {
+                unboxed = inv.receiver();
+            }
+            if (unboxed != e) return new Done(host(unboxed, classOf(unboxed.type()), false));
             return new Done(host(e, classOf(e.type()), false));
         }
         return switch (e) {

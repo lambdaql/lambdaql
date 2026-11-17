@@ -1,5 +1,8 @@
 # 11. Errors and languages
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../ko/11-errors-and-languages.md) for the latest rules.
+
 [Manual home](README.md) | Tracks: [Java](java/README.md) | [Kotlin](kotlin/README.md) | Previous: 10. Rules and limits ([Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md)) | Next: 12. Spring Data JPA ([Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md))
 
 > [!NOTE]
@@ -32,8 +35,8 @@ All messages are the values of the enum `org.lambdaql.i18n.LqlMessage`. Each val
 | `LQL-1xxx` | Input and lambda loading | `LQL-1001` to `LQL-1013` | `LambdaAnalysisException` |
 | `LQL-2xxx` | Decoding the bytecode | `LQL-2001` to `LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | Meaning and values computed in Java | `LQL-3001` to `LQL-3064` | `TranslationException` |
-| `LQL-4xxx` | Rendering, binding and running | `LQL-4001` to `LQL-4044`, `LQL-4999` (internal error) | `LambdaQLException` itself, or a JDK/JPA standard exception (see [Exceptions](#exceptions)) |
-| `LQL-5xxx` | Warnings (in the log) | `LQL-5001` to `LQL-5008` | – (a log line: `WARN`, or `INFO` for `LQL-5004` to `LQL-5006` and `LQL-5008` and for `LQL-5003` in the default sort mode) |
+| `LQL-4xxx` | Rendering, binding and running | `LQL-4001` to `LQL-4045`, `LQL-4999` (internal error) | `LambdaQLException` itself, or a JDK/JPA standard exception (see [Exceptions](#exceptions)). `LQL-4045` is a `WARN` log |
+| `LQL-5xxx` | Warnings (in the log) | `LQL-5001` to `LQL-5009` | – (a log line: `WARN`, or `INFO` for `LQL-5004` to `LQL-5006` and `LQL-5008` and for `LQL-5003` in the default sort mode, `DEBUG` for `LQL-5009`) |
 
 Some real codes:
 
@@ -53,6 +56,7 @@ Some real codes:
 | `LQL-4040` | `SortNotAllowedException` | Sorting by this name is not allowed for {0}: {1}. Allow it with SortRules (allow or alias). |
 | `LQL-4043` | `LambdaQLException` | The stub arguments of {0} have the database parameter names in another order. Stub: {1}, database: {2} |
 | `LQL-4044` | `LambdaQLException` | The Oracle package has several procedures with this name (overloads); lambdaQL cannot tell which one to call: {0} |
+| `LQL-4045` | – (`WARN` log, when the query runs) | A captured value is null in {0}. In SQL, = NULL and <> NULL match no row; use x == null in the lambda, or check the value before the query. |
 | `LQL-5001` | – (`WARN` log) | The function {0} is applied to the column {1}, so a normal index on the column cannot be used and the query may scan the whole table. Compare the column with a value instead, or (Oracle) create a function-based index: {2} |
 | `LQL-5002` | – (`WARN` log) | A subquery sort without limit does not change the result, so it was removed (Q4): {0} |
 | `LQL-5003` | – (`INFO` or `WARN` log) | An outside sort is not in the sort rules of {0}: {1}. It runs now; with SortMode.STRICT it would be rejected. |
@@ -61,6 +65,7 @@ Some real codes:
 | `LQL-5006` | – (`INFO` log) | The overloads of {0} could not be checked ({1}); the call goes on without the check. |
 | `LQL-5007` | – (`WARN` log) | The MariaDB function {0} is NOT DETERMINISTIC, so it is computed for every row and an index on the compared column is not used for a range. Declare it DETERMINISTIC if it is: {1} |
 | `LQL-5008` | – (`INFO` log) | The index or function metadata for {0} could not be read ({1}); the SARGable check goes on without it. |
+| `LQL-5009` | – (`DEBUG` log) | SQL meaning: in {0}, a row whose value is NULL does not match (Java would treat null differently). Add a null check such as x == null || ... to include it. |
 
 `{0}` and `{1}` are the arguments, for example the expression or the procedure name.
 The full list is in the message files (see [For translators](#for-translators)).
@@ -217,26 +222,26 @@ The full list is in [9. Kotlin notes](kotlin/09-kotlin-notes.md).
 ### Null captured values
 
 Some forms accept a `null` captured value, some do not.
-If you want "match NULL too", write the null check yourself.
+A captured `null` in `=` or `<>` matches no row (the SQL meaning, decision D48), and lambdaQL logs `LQL-4045` at `WARN` level when it runs. To match NULL, write the null check yourself.
 All null rules are in 3. Conditions ([Java](java/03-where.md) | [Kotlin](kotlin/03-where.md)).
 
 #### Java
 
 | Form | `name` is `null` | Result |
 |---|---|---|
-| `o.getDescription() == name` (reference `==`) | allowed | `e0.description is not distinct from :p1` (null-safe) |
-| `Objects.equals(o.getDescription(), name)` | allowed | null-safe, the same as above |
-| `o.getDescription().equals(name)` | error at binding | In Java this is never true. lambdaQL does not turn it into `is null`. |
+| `o.getDescription() == name` (reference `==`) | runs | `e0.description = :p1` with NULL: no row. `LQL-4045` at `WARN` |
+| `Objects.equals(o.getDescription(), name)` | runs | the same as above |
+| `o.getDescription().equals(name)` | runs | the same as above |
 | `name.equals(o.getDescription())` | error at binding | In Java this throws `NullPointerException`. |
 | `o.getStatus() > minStatus` (`minStatus` is `null`) | error at binding | An order comparison with null has no Java meaning. |
 
-"Match NULL too": `o.getDescription() == null || o.getDescription().equals(name)`.
+To find NULL: `o.getDescription() == null`. To skip the filter when `name` is null: `name == null || o.getDescription().equals(name)` (the guard is decided before the query).
 
 #### Kotlin
 
 | Form | Captured value is `null` | Result |
 |---|---|---|
-| `it.description == name` | allowed | `e0.description is not distinct from :p1` (null-safe) |
+| `it.description == name` | runs | `e0.description = :p1` with NULL: no row. `LQL-4045` at `WARN` |
 | `minPrice == null \|\| it.price!! > minPrice` | allowed | You wrote the null check, so lambdaQL uses it. |
 | `it.price!! > minPrice!!` (`minPrice` is `null`) | error at binding | An order comparison with null has no meaning. |
 | `it.id in ids` (`ids` has a `null` element) | error at binding | `IN` with a null element is a trap in SQL. |
@@ -381,6 +386,7 @@ The warnings that lambdaQL has today:
 
 | Code | When |
 |---|---|
+| `LQL-4045` | A captured value is `null` in `=` or `<>` (`==`, `!=`, `equals`, `Objects.equals`), so no row can match (the SQL meaning, decision D48). Known only when the query runs. Logged at `WARN` level. Write `x == null` to find NULL (see 3.6: [Java](java/03-where.md#36-null-rules) \| [Kotlin](kotlin/03-where.md#36-null-rules)) |
 | `LQL-5001` | A DB function wraps a column in a condition (`OrderFns.discount(o.getPrice()) > 10`, a Boolean function on a column, a function inside `IN` or `IS NULL`), so a normal index cannot be used. Logged at `WARN` level, once per `where` lambda. Not on Oracle when a function-based index with the same expression exists (see [8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable)) |
 | `LQL-5002` | A subquery has `orderBy` but no `limit`, so lambdaQL removes the sort (it has no effect, rule Q4) |
 | `LQL-5003` | An outside sort (a Spring `Sort`, `SortSpec.ofPath`) uses a name that is not in the sort rules, and the mode is `SortMode.INFO` (the default, logged at `INFO` level) or `SortMode.WARN` (logged at `WARN` level). The sort runs. The message is logged once for each entity and name (see [4.10 the sort policy](java/04-order-paging.md#sort-policy)) |
@@ -389,6 +395,7 @@ The warnings that lambdaQL has today:
 | `LQL-5006` | Only the Oracle overload lookup (`all_arguments`) fails. The call goes on without the overload check. Logged at `INFO` level |
 | `LQL-5007` | MariaDB only: a `NOT DETERMINISTIC` DB function on the value side is compared with a column (`o.getPrice() > OrderFns.nondet(base)`), so the index is not used for a range. Logged at `WARN` level |
 | `LQL-5008` | The index or function metadata for the SARGable check cannot be read (for example without permission). Logged at `INFO` level. `LQL-5001` is still logged; `LQL-5007` is not checked |
+| `LQL-5009` | A condition compares values of the entity with the SQL meaning (decision D48), so a row whose value is NULL does not match where Java or Kotlin would match it: two entity values with `==`/`equals`, `!=` against a value, `!` on a nullable `Boolean`, a null guard on an association path (the path stays an inner join), `NOT IN` with a subquery. Logged at `DEBUG` level, once per condition text (see 3.6.3: [Java](java/03-where.md#363-write-your-null-checks-yourself) \| [Kotlin](kotlin/03-where.md#363-write-your-null-checks-yourself)) |
 
 ```
 WARN  [LQL-5002] A subquery sort without limit does not change the result, so it was removed (Q4): ...

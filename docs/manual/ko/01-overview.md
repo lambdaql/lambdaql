@@ -52,7 +52,7 @@ val orders = qb.from(Order::class.java)
 ### HQL (두 언어 모두 동일)
 
 ```
-select e0 from Order e0 left join e0.customer j1
+select e0 from Order e0 join e0.customer j1
 where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
 ```
 
@@ -64,14 +64,15 @@ where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
+join customers c1_0 on c1_0.id=o1_0.customer_id
 where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 ```
 
 두 `where` 호출은 `AND`로 결합됩니다.
 상수 `"Kim"`은 리터럴이고, 캡처한 `minPrice`는 바인드 파라미터(`:p1`)입니다.
 `where`의 `o.getCustomer().getName()` 같은 경로는 기본적으로 inner `join`입니다. 고객이 없는 주문은 반환되지 않습니다.
-여기서는 `left join`입니다. status가 1인 주문은 고객이 없어도 조건에 맞기 때문입니다(Java도 그 주문을 반환합니다).
+이 예제도 마찬가지입니다. Java라면 status가 1인 주문은 고객이 없어도 조건에 맞지만, lambdaQL은 SQL 의미를 사용합니다(결정 D48).
+이런 주문을 유지하려면 `leftJoin`을 사용하십시오.
 
 람다는 평범한 Java나 Kotlin 코드처럼 보입니다.
 하지만 람다는 Java나 Kotlin 문법으로 쓴 **쿼리 언어**입니다.
@@ -169,8 +170,9 @@ lambdaQL은 Java나 Kotlin의 실행 규칙이 아니라 문서화된 자체 규
 
 | 작성한 코드 | lambdaQL의 의미 | 이유 |
 |---|---|---|
-| `o.getId() == id`(두 `Long` 객체) | 값 동등성, null-safe | 쿼리에서 객체에 대한 `==`는 "같은 객체"가 아니라 "같은 값"을 뜻합니다. |
-| `o.getCustomer().getName()` | 조인한 고객의 `name` 컬럼(`where`에서는 기본적으로 inner `join`) | 경로는 컬럼을 가리킵니다. lambdaQL은 customer가 null인지 검사하지 않습니다. `where`에서는 고객이 없는 주문이 반환되지 않습니다. 그런 주문을 찾으려면 `o.getCustomer() == null`이라고 쓰십시오. null 가드(`o.getCustomer() == null \|\| ...`)를 쓰면 경로가 `left join`이 되므로 Java와 SQL이 같은 행을 돌려줍니다. |
+| `o.getId() == id`(두 `Long` 객체) | 값 동등성: `e0.id = :p1` | 쿼리에서 객체에 대한 `==`는 "같은 객체"가 아니라 "같은 값"을 뜻합니다. 캡처 값 `null`은 NULL로 바인딩되어 어떤 행에도 일치하지 않습니다(`WARN` 수준 `LQL-4045`). NULL을 찾으려면 `o.getId() == null`이라고 쓰십시오. |
+| `Objects.equals(o.getDescription(), o.getCustName())`, `!text.equals(o.getDescription())` | `e0.description = e0.custName`, `e0.description <> :p1`(SQL 의미) | 엔티티 값 두 개를 비교하거나 값과 `!=`로 비교하면, 값이 NULL인 행은 일치하지 않습니다. Java라면 이 중 일부 행을 반환합니다. 이런 행을 유지하려면 `o.getDescription() == null \|\| ...`이라고 쓰십시오. |
+| `o.getCustomer().getName()` | 조인한 고객의 `name` 컬럼(`where`에서는 기본적으로 inner `join`) | 경로는 컬럼을 가리킵니다. lambdaQL은 customer가 null인지 검사하지 않습니다. `where`에서는 고객이 없는 주문이 반환되지 않습니다. 그런 주문을 찾으려면 `o.getCustomer() == null`이라고 쓰십시오. null 가드(`o.getCustomer() == null \|\| ...`)를 써도 마찬가지입니다(SQL 의미, D48). 이런 주문을 유지하려면 `leftJoin`을 사용하십시오. |
 | `status`가 NULL일 때 `o.getStatus() == 1` | 행이 일치하지 않음(SQL 의미) | Java라면 `NullPointerException`을 던집니다. SQL은 UNKNOWN을 반환합니다. |
 | `o.getDescription() == null` | `e0.description is null` | null 검사를 직접 작성했으므로 lambdaQL이 이를 사용합니다. |
 
@@ -182,12 +184,15 @@ lambdaQL은 Java나 Kotlin의 실행 규칙이 아니라 문서화된 자체 규
 
 | 작성한 코드 | lambdaQL의 의미 | 이유 |
 |---|---|---|
-| `it.id == id`(`id: Long?`, nullable 변수) | 값 동등성, null-safe | Kotlin의 `==`는 원래 "같은 값"을 뜻합니다. lambdaQL은 이 의미를 유지합니다. |
-| `it.customer?.name` 또는 `it.customer!!.name` | 조인한 고객의 `name` 컬럼(`where`에서는 기본적으로 inner `join`) | 경로는 컬럼을 가리킵니다. `?.`와 `!!`는 컬럼을 바꾸지 않습니다. `!!`는 람다를 컴파일하기 위해 있을 뿐입니다. `where`에서는 고객이 없는 주문이 반환되지 않습니다. 그런 주문을 찾으려면 `it.customer == null`이라고 쓰십시오. null 가드(`it.customer == null \|\| ...`)를 쓰면 경로가 `left join`이 됩니다. |
+| `it.id == id`(`id: Long?`, nullable 변수) | 값 동등성: `e0.id = :p1` | Kotlin의 `==`는 원래 "같은 값"을 뜻합니다. 캡처 값 `null`은 NULL로 바인딩되어 어떤 행에도 일치하지 않습니다(`WARN` 수준 `LQL-4045`). |
+| `it.description == it.custName`, `it.description != text` | `e0.description = e0.custName`, `e0.description <> :p1`(SQL 의미) | 엔티티 값 두 개를 비교하거나 값과 `!=`로 비교하면, 값이 NULL인 행은 일치하지 않습니다. 이런 행을 유지하려면 `it.description == null \|\| ...`이라고 쓰십시오. |
+| `it.customer?.name` 또는 `it.customer!!.name` | 조인한 고객의 `name` 컬럼(`where`에서는 기본적으로 inner `join`) | 경로는 컬럼을 가리킵니다. `?.`와 `!!`는 컬럼을 바꾸지 않습니다. `!!`는 람다를 컴파일하기 위해 있을 뿐입니다. `where`에서는 고객이 없는 주문이 반환되지 않습니다. 그런 주문을 찾으려면 `it.customer == null`이라고 쓰십시오. null 가드(`it.customer == null \|\| ...`)를 써도 마찬가지입니다(SQL 의미, D48). 이런 주문을 유지하려면 `leftJoin`을 사용하십시오. |
 | `price`가 NULL일 때 `it.price!! > 100.0` | 행이 일치하지 않음(SQL 의미) | Kotlin이라면 `!!`에서 `NullPointerException`을 던집니다. lambdaQL은 `!!`를 무시하고, SQL은 UNKNOWN을 반환합니다. |
 | `it.description == null` | `e0.description is null` | null 검사를 직접 작성했으므로 lambdaQL이 이를 사용합니다. |
 
 lambdaQL은 **직접 작성한 곳에서만** null을 처리합니다.
+람다 안의 모든 비교와 메서드는 SQL 의미를 따릅니다(결정 D48). 캡처 값과 연관 경로도 마찬가지입니다.
+결과가 Java나 Kotlin과 다를 수 있으면 lambdaQL은 `LQL-5009`를 `DEBUG` 수준으로 기록합니다. `=`나 `<>`에 캡처 값 `null`이 쓰이면 `LQL-4045`를 `WARN` 수준으로 기록합니다.
 3. 조건([Java](java/03-where.md) | [Kotlin](kotlin/03-where.md))과
 10. 규칙과 제한([Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md))을 참고하십시오.
 
@@ -203,13 +208,13 @@ lambdaQL은 인덱스를 사용할 수 있는("SARGable") SQL을 만듭니다.
 
 | 작성한 코드 | lambdaQL이 만들지 **않는** 것 | lambdaQL이 만드는 것 |
 |---|---|---|
-| `!sub.from(Customer.class).where(c -> c.getGrade() > 3).select(c -> c.getId()).contains(o.getCustomer().getId())` | `o.customer.id not in (select ...)` | `not exists (select 1 ...)` |
+| `o.getId() != null && o.getId() == id` | `e0.id is not null and e0.id = :p1` | `e0.id = :p1`(id는 NULL이 될 수 없음) |
+| `o.getDescription() == text` | `e0.description is not distinct from :p1`(Oracle에서는 `decode(...)`, 인덱스 없음) | `e0.description = :p1` |
 
 #### Kotlin
 
 | 작성한 코드 | lambdaQL이 만들지 **않는** 것 | lambdaQL이 만드는 것 |
 |---|---|---|
-| `o.customer?.id !in sub.from(Customer::class.java).where { c -> c.grade!! > 3 }.select { c -> c.id }` | `o.customer.id not in (select ...)` | `not exists (select 1 ...)` |
 | `(it.description ?: "") == "x"` | `coalesce(e0.description, '') = 'x'` | `e0.description = 'x'` |
 | `it.description.isNullOrEmpty()` | `(e0.description is null or length(e0.description) = 0)` | `(e0.description is null or e0.description = :p1)` |
 | `it.id == id`(`it.id`는 `Long?`) | `not (e0.id is null or e0.id <> :p1)` | `e0.id = :p1`(id는 NULL이 될 수 없음) |

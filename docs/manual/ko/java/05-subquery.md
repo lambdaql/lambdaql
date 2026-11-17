@@ -3,7 +3,7 @@
 
 > [!NOTE]
 > **상태**
-> - **구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, Hibernate 6.6.5, 마일스톤 M8-1): 조회, 수정, 삭제의 `where((o, sub) -> ...)` 안의 서브쿼리. `exists` / `not exists`, `contains`(IN), `!contains`(NOT EXISTS로 작성), 스칼라 집계(`count`, `sum`, `avg`, `min`, `max`), top-1 형태 `orderBy(...).limit(1)...first()`, 상관 서브쿼리와 중첩 서브쿼리, 캡처 값을 포함합니다.
+> - **구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, Hibernate 6.6.5, 마일스톤 M8-1): 조회, 수정, 삭제의 `where((o, sub) -> ...)` 안의 서브쿼리. `exists` / `not exists`, `contains`(IN), `!contains`(`NOT IN`으로 작성), 스칼라 집계(`count`, `sum`, `avg`, `min`, `max`), top-1 형태 `orderBy(...).limit(1)...first()`, 상관 서브쿼리와 중첩 서브쿼리, 캡처 값을 포함합니다.
 > - **아직 구현되지 않음:** `set` 값 안의 서브쿼리, MariaDB `lateral` 재작성. (파생 테이블과 CTE는 다른 문법으로 구현했습니다. [6. 조회, 집계, 그룹화](06-select-group.md#69-derived-table-subquery-in-from)를 참고하십시오.)
 > - **(테스트됨)** 표시가 있는 예제는 테스트 코드에서 그대로 가져온 것입니다. 나머지 예제는 같은 규칙을 따르지만 테스트가 없습니다.
 
@@ -34,7 +34,7 @@ lambdaQL은 인자의 개수로 두 형태를 구분합니다.
 | `sub.from(X.class).where(...).exists()` | 조건 | `exists (select 1 from X x where ...)` |
 | `!sub.from(X.class).where(...).exists()` | 조건 | `not exists (...)` |
 | `sub.from(X.class).where(...).select(x -> v).contains(y)` | 조건 | `y in (select x.v from X x where ...)` |
-| `!... .contains(y)` | 조건 | `not exists (... and x.v = y)` |
+| `!... .contains(y)` | 조건 | `y not in (select x.v from X x where ...)` |
 | `sub.from(X.class).avg(x -> v)`(`sum`, `min`, `max`, `count()`도) | 값 | `(select avg(x.v) from X x)` |
 | `sub.from(X.class)...orderBy(...).limit(1).select(x -> v).first()` | 값 | top-1 서브쿼리 |
 
@@ -127,19 +127,21 @@ where o1_0.customer_id in (select c2_0.id from customers c2_0 where c2_0.grade i
 직접 작성한 null 검사(`c.getGrade() != null`)는 HQL에 `s1.grade is not null`로 남습니다.
 
 <a id="55-not-in-is-written-as-not-exists"></a>
-## 5.5 NOT IN은 NOT EXISTS로 작성됨
+## 5.5 NOT IN과 NULL
 
-`!values.contains(x)`는 `NOT IN`으로 렌더링되지 **않습니다**. lambdaQL은 `NOT EXISTS`를 씁니다.
+`!values.contains(x)`는 SQL 의미 그대로 `NOT IN`으로 렌더링됩니다(결정 D48).
 
 **(테스트됨)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java), 영역 `not-in`:
 
 ```java
-// the grades are 5, 2 and NULL. SQL "not in" would give no rows because of the NULL;
-// lambdaQL writes NOT EXISTS, which gives the same rows as Java (rule Q2)
+// the SQL meaning (D48): NOT IN. The grades are 5, 2 and NULL, so no row matches: x NOT IN (5, 2, NULL)
+// is never true. To skip the NULL, say so in the subquery: where(c -> c.getGrade() != null)
 SelectQuery<Order> q = qb.from(Order.class)
         .where((o, sub) -> !sub.from(Customer.class).select(c -> c.getGrade()).contains((int) o.getStatus()));
-assertEquals("select e0 from Order e0 where not exists (select 1 from Customer s1 where s1.grade = e0.status)",
-        q.toHql().hql());
+assertEquals("select e0 from Order e0 where e0.status not in (select s1.grade from Customer s1)", q.toHql().hql());
+SelectQuery<Order> withoutNull = qb.from(Order.class)
+        .where((o, sub) -> !sub.from(Customer.class).where(c -> c.getGrade() != null).select(c -> c.getGrade())
+                .contains((int) o.getStatus()));
 ```
 
 **데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `sub-not-in`:
@@ -148,14 +150,14 @@ assertEquals("select e0 from Order e0 where not exists (select 1 from Customer s
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-where not exists(select 1 from customers c2_0 where c2_0.grade=o1_0.status)
+where o1_0.status not in (select c2_0.grade from customers c2_0)
 ```
 
 이유:
 
-- `x NOT IN (subquery)`는 서브쿼리가 NULL을 하나라도 반환하면 **행을 하나도 반환하지 않습니다**. 흔한 SQL 함정입니다.
-- `NOT EXISTS`에는 이런 문제가 없습니다. 데이터베이스도 이를 잘 실행합니다(안티 조인으로).
-- 결과: 이 쿼리는 Java의 `!grades.contains(status)`와 같은 행을 줍니다. 테스트는 NULL 등급이 있는 데이터로 이를 확인합니다.
+- `x NOT IN (subquery)`는 서브쿼리가 NULL을 하나라도 반환하면 **행을 하나도 반환하지 않습니다**. lambdaQL은 이 SQL 의미를 유지하고(결정 D48) `LQL-5009`를 `DEBUG` 수준으로 기록합니다.
+- NULL을 건너뛰려면 테스트의 두 번째 쿼리처럼 서브쿼리에 `where(c -> c.getGrade() != null)`을 쓰십시오. 그러면 NULL 등급을 뺀 Java의 `!grades.contains(status)`와 같은 결과가 나옵니다.
+- `!sub...exists()`는 여전히 `NOT EXISTS`로 작성됩니다.
 
 <a id="56-correlated-subqueries"></a>
 ## 5.6 상관 서브쿼리
@@ -196,9 +198,8 @@ from orders o1_0
 where exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id and i1_0.qty>?)
 ```
 
-**상관 조건의 `==`.** `i.getOrder().getId() == o.getId()`는 두 `Long` 객체를 비교합니다. 일반 규칙에 따르면 이는 null-safe 비교입니다(`is not distinct from`, [3.6](03-where.md#36-null-rules) 참고).
-하지만 `o.id`는 `@Id`이므로 절대 NULL이 될 수 없습니다. 이 경우 lambdaQL은 단순한 `=`를 씁니다(`!=`는 `(a <> b or a is null)`).
-결과는 같고, 데이터베이스는 인덱스를 사용할 수 있습니다. Oracle에서 `is not distinct from`은 `decode(...)`가 되어 인덱스를 사용할 수 없습니다.
+**상관 조건의 `==`.** `i.getOrder().getId() == o.getId()`는 두 `Long` 객체를 비교합니다. 엔티티 값 두 개는 SQL 의미로 비교하므로(결정 D48, [3.6](03-where.md#36-null-rules) 참고) lambdaQL은 단순한 `=`를 씁니다(`!=`는 `<>`).
+데이터베이스는 인덱스를 사용할 수 있습니다.
 
 <a id="57-scalar-subqueries"></a>
 ## 5.7 스칼라 서브쿼리
@@ -337,8 +338,8 @@ Java는 중첩된 람다에서 같은 이름을 두 번 쓰는 것을 허용하�
 
 서브쿼리 안에서 조건, 경로, NULL은 **바깥 쿼리와 똑같이** 동작합니다([3. 조건(`where`)](03-where.md)).
 
-- 객체에 대한 `==`는 null-safe 값 비교입니다.
-- 서브쿼리 자신의 엔티티에 대한 연관 경로는 바깥 `where`와 같은 조인 규칙을 따릅니다(결정 D36). 기본은 inner `join`이고, null 가드가 연관이 없는 행을 남기면 `left join`입니다.
+- 객체에 대한 `==`는 SQL 의미의 값 비교입니다(D48). 캡처 값 `null`은 어떤 행에도 일치하지 않습니다(`LQL-4045`).
+- 서브쿼리 자신의 엔티티에 대한 연관 경로는 바깥 `where`와 같은 조인 규칙을 따릅니다. 항상 inner `join`입니다(결정 D48).
 - `@Id`로 끝나는 경로는 외래 키 컬럼입니다(조인 없음).
 - **바깥 엔티티**는 자신의 컬럼과 외래 키 id(`o.getId()`, `o.getCustomer().getId()`)만 사용할 수 있습니다. 조인이 필요한 바깥 엔티티의 경로(`o.getCustomer().getName()`)는 분석 시점에 오류가 됩니다. 대신 외래 키 id를 비교하십시오.
 - 컬렉션 경로(`o.getItems()`)는 거부됩니다. 컬렉션에 대해 물으려면 서브쿼리를 사용하십시오.
@@ -361,10 +362,10 @@ Java는 중첩된 람다에서 같은 이름을 두 번 쓰는 것을 허용하�
 | # | 규칙 |
 |---|---|
 | Q1 | 서브쿼리 안의 조건, 경로, NULL 규칙은 바깥과 같습니다. 조건 안의 연관 경로도 같은 조인 규칙(기본은 inner `join`)을 따릅니다. 조인이 필요한 바깥 엔티티의 경로는 오류이고, 외래 키 id는 허용됩니다 |
-| Q2 | **NOT IN은 NOT EXISTS로 렌더링됩니다**: `!values.contains(x)`는 `not exists (select 1 from C c where <condition> and c.sel = x)`가 됩니다. `NOT IN` + NULL 함정을 피합니다 |
+| Q2 | **NOT IN은 SQL 의미를 유지합니다**(D48): `!values.contains(x)`는 `x not in (select c.sel from C c where <condition>)`이 됩니다. 서브쿼리에 NULL이 있으면 행이 반환되지 않습니다(`DEBUG` 수준 `LQL-5009`). NULL을 건너뛰려면 서브쿼리에 `c.sel != null`을 추가합니다 |
 | Q3 | 스칼라 서브쿼리는 한 행을 주어야 합니다: 집계(`max`, `min`, `avg`, `sum`, `count`)나 `orderBy(...).limit(1)...first()`. 그 밖의 `first()`는 오류입니다 |
 | Q4 | 서브쿼리 정렬: `limit`이 있으면 유지, 없으면 경고와 함께 제거. `IN (... limit)`은 파생 테이블로 감쌉니다. `row_number()`를 쓰는 MariaDB `lateral` 재작성은 아직 구현되지 않았습니다 |
-| Q5 | 상관 조건에서 한쪽이 절대 NULL이 될 수 없으면(`@Id`, `nullable = false`, 기본형) `==`를 `=`로 씁니다. `!=`는 `(a <> b or a is null)`이 됩니다. 인덱스 사용을 유지합니다 |
+| Q5 | 상관 조건에서 `==`는 `=`로, `!=`는 `<>`로 씁니다(SQL 의미, D48). 어느 한쪽이 NULL이면 일치하지 않습니다. 인덱스 사용을 유지합니다 |
 | Q6 | 서브쿼리의 `where`는 자신의 `sub` 인자를 받을 수 있습니다: `where((i, sub2) -> ...)`. 모든 단계에서 같은 규칙이 적용됩니다 |
 
 ---

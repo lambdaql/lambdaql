@@ -1,5 +1,8 @@
 # 1. 概述
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../ko/01-overview.md)。
+
 [手册首页](README.md) | 路线：[Java](java/README.md) | [Kotlin](kotlin/README.md) | 下一章：2. 入门（[Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md)）
 
 > [!NOTE]
@@ -49,7 +52,7 @@ val orders = qb.from(Order::class.java)
 ### HQL（两种语言相同）
 
 ```
-select e0 from Order e0 left join e0.customer j1
+select e0 from Order e0 join e0.customer j1
 where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
 ```
 
@@ -61,7 +64,7 @@ where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
+join customers c1_0 on c1_0.id=o1_0.customer_id
 where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 ```
 
@@ -161,7 +164,8 @@ lambdaQL 遵循它自己有文档说明的规则，而不是 Java 或 Kotlin 的
 
 | 你写的 | lambdaQL 的含义 | 原因 |
 |---|---|---|
-| `o.getId() == id`（两个 `Long` 对象） | 值相等，null 安全 | 在查询中，对象上的 `==` 表示"值相同"，而不是"同一个对象"。 |
+| `o.getId() == id`（两个 `Long` 对象） | 值相等：`e0.id = :p1`，捕获的 `id` 为 null 时是 `e0.id is null` | 在查询中，对象上的 `==` 表示"值相同"，而不是"同一个对象"。捕获的值保留 Java 规则。 |
+| `Objects.equals(o.getDescription(), o.getCustName())`、`!text.equals(o.getDescription())` | `e0.description = e0.custName`、`e0.description <> :p1`（SQL 语义） | 两个实体值，或用 `!=` 与一个值比较：值为 NULL 的行不匹配。Java 会返回其中一些行。要保留它们，请写 `o.getDescription() == null \|\| ...`。 |
 | `o.getCustomer().getName()` | 关联客户的 `name` 列（在 `where` 中：默认是内连接 `join`） | 路径指代一个列。lambdaQL 不检查 customer 是否为 null。在 `where` 中，没有客户的订单不会被返回；要查找它们，请写 `o.getCustomer() == null`。null 守卫（`o.getCustomer() == null \|\| ...`）会让路径变成 `left join`，因此 Java 和 SQL 给出相同的行。 |
 | `status` 为 NULL 时的 `o.getStatus() == 1` | 该行不匹配（SQL 语义） | Java 会抛出 `NullPointerException`。SQL 返回 UNKNOWN。 |
 | `o.getDescription() == null` | `e0.description is null` | 你写了 null 检查，所以 lambdaQL 使用它。 |
@@ -174,12 +178,14 @@ lambdaQL 遵循它自己有文档说明的规则，而不是 Java 或 Kotlin 的
 
 | 你写的 | lambdaQL 的含义 | 原因 |
 |---|---|---|
-| `it.id == id`（`id: Long?`，可空变量） | 值相等，null 安全 | Kotlin 的 `==` 本来就表示"值相同"。lambdaQL 保留这个含义。 |
+| `it.id == id`（`id: Long?`，可空变量） | 值相等：`e0.id = :p1`，`id` 为 null 时是 `e0.id is null` | Kotlin 的 `==` 本来就表示"值相同"。捕获的值保留 Kotlin 规则。 |
+| `it.description == it.custName`、`it.description != text` | `e0.description = e0.custName`、`e0.description <> :p1`（SQL 语义） | 两个实体值，或用 `!=` 与一个值比较：值为 NULL 的行不匹配。要保留这样的行，请写 `it.description == null \|\| ...`。 |
 | `it.customer?.name` 或 `it.customer!!.name` | 关联客户的 `name` 列（在 `where` 中：默认是内连接 `join`） | 路径指代一个列。`?.` 和 `!!` 不会改变列。`!!` 只是为了让 Lambda 能够编译。在 `where` 中，没有客户的订单不会被返回；要查找它们，请写 `it.customer == null`。null 守卫（`it.customer == null \|\| ...`）会让路径变成 `left join`。 |
 | `price` 为 NULL 时的 `it.price!! > 100.0` | 该行不匹配（SQL 语义） | Kotlin 会在 `!!` 处抛出 `NullPointerException`。lambdaQL 忽略 `!!`，SQL 返回 UNKNOWN。 |
 | `it.description == null` | `e0.description is null` | 你写了 null 检查，所以 lambdaQL 使用它。 |
 
 lambdaQL **只在你写出 null 处理的地方**处理 null。
+实体值按 SQL 语义比较（决策 D48）。当结果可能与 Java 或 Kotlin 不同时，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`。
 见 3. 条件（[Java](java/03-where.md) | [Kotlin](kotlin/03-where.md)）
 和 10. 规则与限制（[Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md)）。
 

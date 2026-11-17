@@ -228,8 +228,12 @@ qb.from(Order.class).where(o -> o.getStatus() == wanted).toList();
 
 가장 중요한 부분입니다. 단순한 원칙 두 가지가 있습니다.
 
-1. **Java가 null에 대한 결과를 정의하는 곳에서는 lambdaQL도 그 결과를 사용합니다.** (객체 사이의 `==`, `Objects.equals`, `x == null`)
-2. **Java라면 예외를 던지는 곳에서는 lambdaQL이 SQL 의미를 사용합니다.** (언박싱, `a`가 null인 `a.equals(b)`)
+1. **엔티티 값은 SQL 의미로 비교합니다**(결정 D48). 객체 사이의 `==`, `equals`, `Objects.equals`, `!=`는 `=`와 `<>`가 됩니다.
+   값이 NULL인 행은 어느 쪽에도 일치하지 않습니다.
+   결과가 Java와 다를 수 있으면 lambdaQL은 `LQL-5009`를 `DEBUG` 수준으로 기록합니다.
+2. **캡처 값은 Java에서 먼저 계산하고, 비교는 역시 SQL 의미를 따릅니다.** 캡처 값 `null`은 NULL로 바인딩되므로 `= :p1`과 `<> :p1`은 어떤 행에도 일치하지 않습니다.
+   이 경우 lambdaQL은 실행 시점에 `LQL-4045`를 `WARN` 수준으로 기록합니다. NULL을 찾으려면 `x == null`이라고 쓰십시오(`is null`이 됨).
+   캡처 값에 대한 메서드 호출(`p.trim()` 등)은 쿼리 전에 Java에서 값을 준비하는 단계이므로, 값이 `null`이면 Java처럼 예외를 던집니다([3.6.4](#364-captured-null-values) 참고).
 
 lambdaQL은 **직접 작성한 경우에만 null을 처리합니다**(`== null`, `!= null`).
 숨겨진 null 검사를 절대 대신 추가하지 않습니다.
@@ -240,11 +244,12 @@ lambdaQL은 **직접 작성한 경우에만 null을 처리합니다**(`== null`,
 | # | Java 형태 | HQL | NULL 동작 |
 |---|---|---|---|
 | R1 | 한쪽이 기본형: `o.getStatus() == 1`, `o.getPrice() > p` | `e0.status = 1`, `e0.price > :p1` | SQL 의미. 컬럼이 NULL이면 행이 반환되지 않음 |
-| R2 | 양쪽이 객체: `o.getStatus() == status`(`Integer == Integer`), `String == String`, enum | `e0.status is not distinct from :p1` | **null-safe 값 비교.** `null == null`은 true. 한쪽만 null이면 false |
-| R2 | `o.getStatus() != status`(객체) | `e0.status is distinct from :p1` | null-safe |
+| R2 | 양쪽이 객체: `o.getStatus() == status`(`Integer == Integer`), `String == String`, enum | `e0.status = :p1` | **값 비교.** 컬럼이 NULL이면 행이 반환되지 않음. 캡처 값 `null`: 일치하는 행 없음(`LQL-4045`) |
+| R2 | `o.getStatus() != status`(객체) | `e0.status <> :p1` | SQL 의미. 컬럼이 NULL이면 행이 반환**되지 않음**(Java라면 반환). 캡처 값 `null`: 일치하는 행 없음(`LQL-4045`) |
+| R2 | 엔티티 값 두 개: `o.getDescription() == o.getCustName()` | `e0.description = e0.custName` | SQL 의미. 어느 한쪽이 NULL이면 행이 반환되지 않음(NULL과 NULL도 마찬가지) |
 | R3 | `x == null`, `x != null` | `x is null`, `x is not null` | |
-| R4 | `o.getDescription().equals(p)` | `e0.description = :p1` | SQL 의미. 컬럼이 NULL이면 행이 반환되지 않음. `p == null`이면 예외 |
-| R5 | `Objects.equals(a, b)`, `"x".equals(a)`, `Boolean.TRUE.equals(a)` | `a is not distinct from b` | null-safe |
+| R4 | `o.getDescription().equals(p)` | `e0.description = :p1` | SQL 의미. 컬럼이 NULL이면 행이 반환되지 않음. `p == null`이면 일치하는 행 없음(`LQL-4045`) |
+| R5 | `Objects.equals(a, b)`, `"x".equals(a)`, `Boolean.TRUE.equals(a)` | R2와 같음: `a = b`, `a = :p1` | R2와 같음 |
 | R9 | 캡처 값 | 바인드 파라미터 | [3.6.4](#364-captured-null-values) 참고 |
 
 어떤 Java 타입이 R1이 되고 어떤 타입이 R2가 되는지는 [9. Java 노트](09-java-notes.md#93-equality-of-boxed-values)에서 설명합니다.
@@ -259,28 +264,25 @@ lambdaQL에서는 **값 비교**입니다. 127보다 큰 `Long` 값이나 `new S
 ```java
 Integer status = request.getStatus();    // null일 수 있음
 qb.from(Order.class).where(o -> o.getStatus() == status).toList();
-// HQL: e0.status is not distinct from :p1
-//   status = 3    -> status가 3인 행
-//   status = null -> status가 NULL인 행
+//   status = 3    -> HQL: e0.status = :p1    status가 3인 행
+//   status = null -> HQL: e0.status = :p1    일치하는 행 없음: = NULL은 참이 되지 않음(WARN 수준 LQL-4045)
 ```
 
-Hibernate가 데이터베이스별로 이를 쓰는 방법(확인함):
+status가 NULL인 행을 찾으려면 null 검사를 작성하십시오. `o.getStatus() == null`은 `e0.status is null`이 됩니다.
 
-| 데이터베이스 | SQL |
-|---|---|
-| H2 | `status is not distinct from ?` |
-| MariaDB | `status <=> ?` |
-| Oracle | `decode(status, ?, 0, 1) = 0` |
+컬럼을 함수로 감싸지 않으므로 데이터베이스는 인덱스를 사용할 수 있습니다.
 
-한쪽이 절대 NULL이 될 수 없다는 것을 lambdaQL이 알 때(`@Id`, `nullable = false` 컬럼, 기본형 컬럼, null이 아닌 캡처 값)는 대신 단순한 `=`를 씁니다. 결과는 같고, 데이터베이스는 인덱스를 사용할 수 있습니다.
-
-lambdaQL은 쿼리가 실행될 때 캡처 값을 봅니다. `null`이면 `is null`, 다른 값이면 단순한 `= :p1`이 됩니다.
+lambdaQL은 쿼리가 실행될 때 캡처 값을 바인딩합니다. `null`은 NULL로 바인딩되고, 일치할 수 있는 행이 없으므로 lambdaQL은 `LQL-4045`를 `WARN` 수준으로 기록합니다.
 **(테스트됨)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), 영역 `null-safe`:
 
 ```java
+// the SQL meaning (D48): = NULL matches no row; lambdaQL logs LQL-4045 at WARN when it runs with a null
 String d = null;
 RenderedQuery q = qb.from(Order.class).where(o -> Objects.equals(o.getDescription(), d)).toHql();
-assertEquals("select e0 from Order e0 where e0.description is null", q.hql());
+assertEquals("select e0 from Order e0 where e0.description = :p1", q.hql());
+// to find NULL, write the null check
+RenderedQuery q3 = qb.from(Order.class).where(o -> o.getDescription() == null).toHql();
+assertEquals("select e0 from Order e0 where e0.description is null", q3.hql());
 
 String d2 = "a";
 RenderedQuery q2 = qb.from(Order.class).where(o -> Objects.equals(o.getDescription(), d2)).toHql();
@@ -293,7 +295,7 @@ assertEquals("select e0 from Order e0 where e0.description = :p1", q2.hql());
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-where o1_0.description is null
+where o1_0.description=?
 ```
 
 **데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `null-safe#2`:
@@ -349,9 +351,34 @@ assertEquals("select e0 from Order e0 where e0.customer.id is null",
 ```java
 .where(o -> o.getDescription().equals(text))     // HQL: e0.description = :p1
 .where(o -> Objects.equals(o.getDescription(), text))
-                                                 // HQL: e0.description is not distinct from :p1
-.where(o -> !Objects.equals(o.getStatus(), 1))   // HQL: e0.status is distinct from 1
-                                                 //      (Java처럼 NULL 행이 반환됨)
+                                                 // HQL: e0.description = :p1 (text가 null이면 일치하는 행 없음)
+.where(o -> !Objects.equals(o.getStatus(), 1))   // HQL: e0.status <> 1
+                                                 //      (NULL 행이 반환되지 않음: SQL 의미)
+```
+
+**엔티티 값에 대한 SQL 의미**(결정 D48). 엔티티 값 두 개의 비교와, 엔티티 값을 값과 `!=`로 비교하는 경우는 SQL을 따릅니다. 값이 NULL인 행은 `=`에도 `<>`에도 일치하지 않습니다.
+
+Java에서는 `!text.equals(null)`이 true이고 `Objects.equals(null, null)`도 true이므로 Java라면 이런 행을 반환합니다.
+이런 차이가 생길 수 있으면 lambdaQL은 `LQL-5009`를 `DEBUG` 수준으로 조건마다 한 번 기록합니다. NULL 행을 유지하려면 람다에 null 검사를 직접 작성하십시오.
+
+**(테스트됨)** [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java), 영역 `sql-meaning`(H2, MariaDB, Oracle. 행은 description/custName 쌍 `a/a`, `a/b`, `null/a`, `null/null`, `b/null`이고 `text`는 `"a"`):
+
+```java
+// two entity values: = and <> as in SQL; a row with a NULL on either side matches neither
+SelectQuery<Order> same = qb.from(Order.class).where(o -> Objects.equals(o.getDescription(), o.getCustName()));
+assertEquals("select e0 from Order e0 where e0.description = e0.custName", same.toHql().hql());
+assertEquals(List.of("a/a"), pairs(same.toList()));                    // null/null is not "equal" in SQL
+SelectQuery<Order> different = qb.from(Order.class).where(o -> !Objects.equals(o.getDescription(), o.getCustName()));
+assertEquals(List.of("a/b"), pairs(different.toList()));               // rows with a NULL are left out
+// an entity value and a value: a NULL column does not match <>
+SelectQuery<Order> notA = qb.from(Order.class).where(o -> !text.equals(o.getDescription()));
+assertEquals("select e0 from Order e0 where e0.description <> :p1", notA.toHql().hql());
+assertEquals(List.of("b/null"), pairs(notA.toList()));
+// to keep the NULL rows, say so in the lambda
+SelectQuery<Order> notAOrNull = qb.from(Order.class).where(o -> o.getDescription() == null || !text.equals(o.getDescription()));
+assertEquals(List.of("b/null", "null/a", "null/null"), pairs(notAOrNull.toList()));
+// a NULL Boolean is not false
+assertEquals(List.of("f"), qb.from(Coded.class).where(c -> !c.getVip()).toList().stream().map(Coded::getCode).toList());
 ```
 
 <a id="364-captured-null-values"></a>
@@ -359,14 +386,16 @@ assertEquals("select e0 from Order e0 where e0.customer.id is null",
 
 | 형태 | 캡처 값이 `null`일 때 |
 |---|---|
-| null-safe 형태(R2, R5): `o.getStatus() == status`, `Objects.equals(...)` | 허용 |
-| `p.equals(o.getDescription())`(`p`가 수신 객체) | 쿼리가 실행될 때 **예외** |
-| `o.getDescription().equals(p)` | **예외** |
-| Java가 값을 언박싱하는 비교: `o.getPrice() > p`(`Double p`), 그리고 모든 `<`, `<=`, `>`, `>=` | **예외** |
+| 캡처 값과의 `==`, `!=`, `Objects.equals(...)`, `o.getDescription().equals(p)` | 실행됨: NULL을 바인딩한 `= :p1` / `<> :p1`이므로 일치하는 행이 **없음**. `WARN` 수준 `LQL-4045` |
+| `p.equals(o.getDescription())`(`p`가 수신 객체) | 위와 같음: `e0.description = :p1`(NULL), 일치하는 행 **없음**. `WARN` 수준 `LQL-4045` |
+| 크기 비교: `o.getPrice() > p`(`Double p`), 그리고 모든 `<`, `<=`, `>`, `>=` | 위와 같음: `e0.price > :p1`(NULL), 일치하는 행 **없음**. `WARN` 수준 `LQL-4045` |
 
-이유: Java에서 이런 형태는 NullPointerException을 던지거나 항상 false입니다. 이를 `IS NULL`로 바꾸면 Java라면 절대 반환하지 않을 행을 반환하게 됩니다.
+이유: 람다 안의 비교는 모두 SQL 문법 기준입니다(결정 D48). SQL에서 NULL과의 `=`, `<>`, `<`, `>`는 참이 되지 않습니다.
+캡처 값이 null인지는 쿼리가 실행될 때만 알 수 있으므로, lambdaQL은 실행할 때 경고를 기록합니다.
 
-**규칙의 예외: null 가드.** 같은 캡처 값을 먼저 null 검사하면 null을 허용합니다.
+NULL 행을 찾으려면 `x == null`이라고 쓰십시오. 캡처 값에 대한 메서드 호출(`p.trim()` 등)은 쿼리 전에 Java에서 값을 준비하는 단계라 `null`이면 Java처럼 예외(`LQL-4012`)를 던집니다.
+
+**null 가드로 필터 생략.** 같은 캡처 값을 null 검사하면, 값이 null일 때 그 조건이 필터 없이 사라집니다.
 **(테스트됨)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), 영역 `captured-null-guard`:
 
 ```java
@@ -404,8 +433,24 @@ where o1_0.price>?
 - `min == null`이면 가드가 참이므로 조건 전체가 참입니다. 필터가 없습니다. 비교 `o.getPrice() > min`은 HQL에 쓰지 않습니다(Java도 이 비교를 실행하지 않습니다).
 - `min = 100.0`이면 가드가 거짓이므로 `e0.price > :p1`만 남습니다.
 - 람다는 여전히 한 번만 분석합니다. 값에 따라 달라지는 것은 HQL 텍스트뿐입니다.
-- 가드가 먼저 와야 합니다. `min == null`일 때 `o.getPrice() > min || min == null`은 쿼리가 실행될 때 예외를 던집니다. Java의 NullPointerException과 같습니다.
+- 가드의 위치는 결과에 영향을 주지 않습니다. `min == null`일 때 `o.getPrice() > min || min == null`도 필터가 없습니다. SQL에는 평가 순서가 없으므로 null 캡처 값과의 비교가 예외를 던지지 않기 때문입니다(Java라면 `NullPointerException`).
 - `&&`에서는 가드가 반대로 동작합니다. `min == null`일 때 `min != null && o.getPrice() > min`은 행을 반환하지 않습니다(`where 1=0`).
+
+<a id="365-converted-attributes-convert"></a>
+### 3.6.5 변환 속성(`@Convert`)
+
+JPA `AttributeConverter`가 붙은 속성은 Java 값으로 비교합니다. Hibernate 6.6은 이런 속성과 비교하는 리터럴을 변환하고, 바인드 파라미터도 변환합니다.
+
+따라서 조건을 Java 값으로 작성해도 저장된 행을 찾습니다(H2, MariaDB, Oracle에서 확인함).
+
+**(테스트됨)** [`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java), 영역 `convert`:
+
+```java
+// code is stored reversed ("abc" as "cba"); vip is stored as 'Y'/'N' (YesNoConverter)
+SelectQuery<Coded> literal = qb.from(Coded.class).where(c -> c.getCode().equals("abc"));
+assertEquals("select e0 from Coded e0 where e0.code = 'abc'", literal.toHql().hql());
+assertEquals(List.of("abc"), codes(literal.toList()));       // Hibernate converts the literal
+```
 
 <a id="37-boolean-columns"></a>
 ## 3.7 boolean 컬럼
@@ -417,8 +462,9 @@ where o1_0.price>?
 |---|---|---|
 | `o.isActive()` | `e0.active = true` | –(기본형 `boolean`은 NULL이 될 수 없음) |
 | `!o.isActive()` | `e0.active = false` | –(기본형 `boolean`은 NULL이 될 수 없음) |
-| `Boolean.TRUE.equals(o.getActive())`(nullable `Boolean`) | `e0.active is not distinct from true` | 반환 안 됨 |
-| `!Boolean.TRUE.equals(o.getActive())` | `e0.active is distinct from true` | **반환됨**(Java와 같음) |
+| `Boolean.TRUE.equals(o.getActive())`(nullable `Boolean`) | `e0.active = :p1`(`:p1`은 `true`) | 반환 안 됨 |
+| `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | **반환 안 됨**(SQL 의미, D48. Java라면 반환) |
+| `!o.getActive()`(nullable `Boolean`) | `e0.active = false` | **반환 안 됨**(SQL 의미: NULL은 false가 아님) |
 
 **(테스트됨)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), 영역 `boolean`:
 
@@ -535,7 +581,8 @@ from orders o1_0
 where o1_0.status in (?,?)
 ```
 
-`!contains`는 `not in`이 됩니다. id는 NULL이 될 수 없으므로 `is null` 부분이 없습니다. NULL이 될 수 있는 컬럼에는 lambdaQL이 `x is null or`를 추가합니다. 목록에 `null`이 없으면 Java의 `!contains`는 NULL 값에 대해 true이기 때문입니다.
+`!contains`는 `not in`이 됩니다. NULL이 될 수 있는 컬럼도 단순한 `not in`입니다(SQL 의미, 결정 D48).
+값이 NULL인 행은 `not in`에 일치하지 않으며, lambdaQL은 `LQL-5009`를 `DEBUG` 수준으로 기록합니다. Java의 `!contains`는 NULL 값에 대해 true이므로, 이런 행을 유지하려면 `o.getDescription() == null || !descs.contains(o.getDescription())`처럼 null 검사를 작성하십시오.
 **(테스트됨)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), 영역 `not-in`:
 
 ```java
@@ -543,10 +590,10 @@ List<Long> ids = List.of(1L, 2L);
 // the id can never be NULL: a plain NOT IN
 assertEquals("select e0 from Order e0 where e0.id not in (:p1)",
         qb.from(Order.class).where(o -> !ids.contains(o.getId())).toHql().hql());
-// a column that can be NULL: Java keeps the rows with NULL (the list has no null), so "is null" is added
-// (List.of(...).contains(null) would throw NullPointerException in Java; Arrays.asList returns false)
+// a column that can be NULL: the SQL meaning (D48), a NULL value is not "not in" the list (DEBUG LQL-5009);
+// to keep those rows, write o.getDescription() == null || !descs.contains(o.getDescription())
 List<String> descs = Arrays.asList("a", "b");
-assertEquals("select e0 from Order e0 where (e0.description is null or e0.description not in (:p1))",
+assertEquals("select e0 from Order e0 where e0.description not in (:p1)",
         qb.from(Order.class).where(o -> !descs.contains(o.getDescription())).toHql().hql());
 ```
 
@@ -565,7 +612,7 @@ where o1_0.id not in (?,?)
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-where (o1_0.description is null or o1_0.description not in (?,?))
+where o1_0.description not in (?,?)
 ```
 
 | 경우 | 결과 |
@@ -613,17 +660,19 @@ where c1_0.name=?
 - **고객이 없는 주문**은 결과에 없습니다. 조인할 고객 행이 없기 때문입니다.
 - lambdaQL은 null 검사를 대신 추가하지 않습니다. 경로 앞에 `o.getCustomer() != null &&`를 쓸 필요가 없습니다.
 
-**null 가드는 고객이 없는 주문을 남깁니다.** 고객이 없는 주문에서 조건이 참이 될 수 있으면 lambdaQL은 그 경로에 `left join`을 사용합니다.
-inner join을 쓰면 Java와 SQL의 결과 행이 달라집니다. Java는 그 주문을 반환하지만 inner join은 그 주문을 잃습니다(결정 D36).
+**null 가드로는 고객이 없는 주문이 남지 않습니다.** `where`의 경로는 항상 inner join입니다(SQL 의미, 결정 D48).
+그래서 `o.getCustomer() == null || ...`은 고객이 없는 주문과 일치하지 않습니다. 그 주문에는 조인할 고객 행이 없기 때문입니다. 이런 조건에 대해 lambdaQL은 `LQL-5009`를 `DEBUG` 수준으로 기록합니다.
+고객이 없는 주문을 남기려면 명시적 `leftJoin`(결정 D44, [6.8](06-select-group.md#68-explicit-joins) 참고)을 사용하고 `c == null || ...`이라고 쓰십시오.
 **(테스트됨)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), 영역 `null-guard`:
 
 ```java
 String name = "Kim";
-// Java keeps orders without a customer here, so the path becomes a LEFT JOIN
+// the SQL meaning (D48): a where path is an inner join, so "customer is null" never matches here
+// (lambdaQL logs LQL-5009 at DEBUG); to keep orders without a customer, use leftJoin (D44)
 RenderedQuery q = qb.from(Order.class)
         .where(o -> o.getCustomer() == null || o.getCustomer().getName().equals(name))
         .toHql();
-assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1", q.hql());
+assertEquals("select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name = :p1", q.hql());
 
 // the guard removes those orders, so an inner join is right
 RenderedQuery q2 = qb.from(Order.class)
@@ -638,7 +687,7 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where e0.customer is n
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
+join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is null or c1_0.name=?
 ```
 
@@ -652,10 +701,9 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is not null and c1_0.name=?
 ```
 
-`left join` 뒤에서 Hibernate는 `e0.customer is null`을 `c1_0.id is null`로 씁니다. 의미는 같습니다. 고객이 없는 주문입니다.
+Hibernate는 `e0.customer is null`을 `c1_0.id is null`로 씁니다. inner join 뒤에서는 이 조건이 참이 되지 않습니다.
 
-- `||`의 다른 부분도 주문을 남길 수 있습니다. `o.getStatus() == 1 || o.getCustomer().getName().equals(name)`도 `left join`을 사용합니다. Java에서 status가 1인 주문은 고객이 없어도 조건에 맞기 때문입니다.
-- 다른 `where` 호출이 어차피 그런 주문을 걸러 낸다면(예: `.where(o -> o.getCustomer().getName() != null)`) 조인은 inner로 남습니다.
+- `||`의 다른 부분도 마찬가지입니다. `o.getStatus() == 1 || o.getCustomer().getName().equals(name)`도 inner join을 사용하므로, status가 1이지만 고객이 없는 주문은 반환되지 않습니다(Java라면 반환).
 
 고객이 **없는** 주문을 찾으려면 연관 자체를 비교하십시오. 조인 없이 외래 키 컬럼을 검사합니다.
 **(테스트됨)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), 영역 `no-association`:
@@ -694,7 +742,7 @@ where o1_0.customer_id=1
 추가 사항:
 
 - 같은 경로는 별칭 하나를 받습니다. 이 별칭은 `where`, `orderBy`, `select`가 함께 사용합니다.
-- `orderBy`나 `select`에**만** 쓰인 경로는 `left join`이므로 그곳에서는 행을 잃지 않습니다(규칙 S8, J1). 같은 경로를 `where`에서도 쓰면 `orderBy`와 `select`는 `where`의 조인을 사용합니다. null 가드가 `left join`으로 만들지 않았다면 inner join입니다.
+- `orderBy`나 `select`에**만** 쓰인 경로는 `left join`이므로 그곳에서는 행을 잃지 않습니다(규칙 S8, J1). 같은 경로를 `where`에서도 쓰면 `orderBy`와 `select`는 `where`의 조인, 즉 inner join을 사용합니다.
 - 두 엔티티의 비교(`o.getCustomer() == c`)는 **계획 중**입니다. 지금은 id를 비교하십시오: `o.getCustomer().getId() == c.getId()`(여기서 `c`는 캡처한 객체).
 
 <a id="311-captured-values"></a>
@@ -731,11 +779,13 @@ qb.from(Item.class)
 
 가드 아래의 `/`, `%`, 캐스트는 거부됩니다. 대신 나눗셈 없이 비교하십시오: `i.getQty() > 0 && i.getPrice() > 2 * i.getQty()`.
 
+null 캡처 값과의 비교는 평가 순서와 상관없습니다. `o.getPrice() > min || min == null`과 `min == null || o.getPrice() > min`은 같은 결과를 냅니다([3.6.4](#364-captured-null-values) 참고).
+
 <a id="313-what-is-rejected"></a>
 ## 3.13 거부되는 것
 
 lambdaQL은 코드 `[LQL-xxxx]`와 소스 줄 번호가 담긴 예외를 던집니다. 추측하지 않습니다.
-대부분의 모양은 람다를 분석할 때(처음 사용할 때) 발견됩니다. 잘못된 캡처 값(null, NaN)은 쿼리가 실행될 때 발견됩니다.
+대부분의 모양은 람다를 분석할 때(처음 사용할 때) 발견됩니다. 잘못된 캡처 값(NaN, `null` 요소가 있는 컬렉션, 메서드를 호출한 `null` 값)은 쿼리가 실행될 때 발견됩니다.
 [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
 
 | 형태 | 예 | 해결 방법 |
@@ -751,7 +801,6 @@ lambdaQL은 코드 `[LQL-xxxx]`와 소스 줄 번호가 담긴 예외를 던집�
 | 엔티티 컬렉션 경로 | `o.getItems().size() > 0` | `exists` 서브쿼리 |
 | 엔티티와 엔티티 비교 | `o.getCustomer() == c` | id 비교(엔티티 비교는 계획 중) |
 | 가드 아래의 `/`, `%`, 캐스트 | [3.12](#312-errors-that-depend-on-order-of-evaluation) 참고 | 가드를 없애거나 조건을 바꿈 |
-| R1/R4 형태의 null 캡처 값 | `p == null`일 때 `o.getDescription().equals(p)` | `Objects.equals`나 null 가드 사용 |
 | `NaN` / `Infinity` 캡처 값 | `o.getPrice() > Double.NaN` | NaN을 보내지 않음 |
 | 익명 클래스, `Serializable`이 아닌 람다 | `new Where<Order>() { ... }`, `java.util.function.Predicate` | 람다 사용 |
 

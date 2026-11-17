@@ -1,6 +1,9 @@
 <a id="2-getting-started-java"></a>
 # 2. はじめよう（Java）
 
+> [!IMPORTANT]
+> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/02-getting-started.md)を参照してください。
+
 > [!NOTE]
 > **状況:** 現在、lambdaQL をソースからビルドし、テストを実行できます。
 > `where` の条件と `toList()` は最初から最後まで動きます。H2、MariaDB、Oracle でテスト済みです。

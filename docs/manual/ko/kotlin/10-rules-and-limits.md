@@ -46,9 +46,9 @@ lambdaQL은 **람다를 절대 실행하지 않습니다**. 바이트코드를 �
 
 1. `it.customer?.name` 같은 경로는 **컬럼을 가리킵니다**. 호출의 연쇄가 아닙니다.
    lambdaQL은 고객이 null인지 검사하지 않습니다(D20). `where`에서 경로는 기본적으로 inner join이므로 고객이 없는 주문은 반환되지 않습니다(D36).
-   고객이 없어도 조건이 참이 될 수 있으면(null 가드) 경로는 `left join`이므로 결과가 Kotlin과 같습니다.
+   null 가드(`... == null || ...`)를 써도 마찬가지입니다. 경로는 inner join으로 남습니다(D48). 고객이 없는 주문을 유지하려면 `leftJoin`을 사용하십시오.
    그런 주문을 찾으려면 연관 자체를 비교하십시오: `it.customer == null`. `it.customer?.name == null`로는 반환되지 않습니다.
-2. NULL은 **직접 작성한 곳에서만** 처리됩니다(`== null`, `!= null`, `?.`, `?:`, 두 nullable 값 사이의 `==`)(D22).
+2. NULL은 **직접 작성한 곳에서만** 처리됩니다(`== null`, `!= null`, `?.`, `?:`)(D22).
    Kotlin 컴파일러가 추가하는 null 검사는 무시됩니다. 그 밖의 NULL은 SQL 규칙을 따릅니다. 조건은 UNKNOWN이 되고 행은 반환되지 않습니다.
 3. `!!`는 무시됩니다(D23). Kotlin의 메모리 규칙(객체 동일성, 박싱)은 적용되지 않습니다. `==`와 `===`는 **값 동등성**을 뜻합니다(D12, R17).
 4. **어떤 형태에 대한 규칙이 없으면 lambdaQL은 추측하지 않습니다.** 코드 `[LQL-xxxx]`와 소스 줄 번호가 담긴
@@ -79,18 +79,17 @@ lambdaQL은 **람다를 절대 실행하지 않습니다**. 바이트코드를 �
 | Oracle 언어별 인덱스 `NLSSORT(... BINARY_CI)` | `e0.description collate binary_ci = :p1` | |
 | 경로 없음 | 시작할 때 WARN(엄격 모드: 오류) | |
 
-**한쪽이 NOT NULL일 때의 null-safe 동등 비교**
+**단순한 `=`와 `<>`를 쓰는 동등 비교**(결정 D48)
 
 ```kotlin
 .where { it.description == text }   // 쿼리가 실행될 때 text는 null이 아님
-// e0.description = :p1                ("is not distinct from"이 아님)
+// e0.description = :p1
 .where { it.description != text }
-// (e0.description <> :p1 or e0.description is null)
+// e0.description <> :p1               (description이 NULL이면 일치하지 않음)
 ```
 
-Oracle에서 `is not distinct from`은 `decode(...)`가 되며, 이는 인덱스를 사용할 수 없습니다.
-그래서 한쪽이 NOT NULL임을 알 때(`@Id`, `nullable = false`, 기본형 속성,
-null이 아닌 바인드 값) lambdaQL은 단순한 `=`를 씁니다.
+lambdaQL은 `is [not] distinct from`을 쓰지 않습니다. 이 형태는 Oracle에서 `decode(...)`가 되어 인덱스를 사용할 수 없습니다.
+엔티티 값은 SQL 의미를 따르므로 단순한 `=`나 `<>`가 항상 올바릅니다. 캡처 값 `null`은 NULL로 바인딩되어 어떤 행에도 일치하지 않습니다(`WARN` 수준 `LQL-4045`).
 
 **두 boolean 식의 비교**(D25)
 
@@ -110,7 +109,7 @@ lambdaQL은 이를 사용하지 않습니다.
 .where { it.description.isNullOrEmpty() }    // (o.description is null or e0.description = :p1)
 ```
 
-**서브쿼리를 사용한 NOT IN**은 `NOT EXISTS`로 씁니다(안티 조인이며 null을 안전하게 처리합니다. [10.3](#103-null-rules) 참고).
+**서브쿼리를 사용한 NOT IN**은 `NOT IN`으로 씁니다(SQL 의미, D48). 서브쿼리에 NULL이 있으면 행이 반환되지 않습니다. NULL을 건너뛰려면 서브쿼리에 null 검사를 추가하십시오([10.3](#103-null-rules) 참고).
 
 <a id="what-the-measurements-showed"></a>
 ### 측정 결과
@@ -151,24 +150,25 @@ MariaDB에서 `NOT DETERMINISTIC`(기본값) 함수는 인자가 파라미터뿐
 | `it.status == 1`(`Int?`와 상수) | `e0.status = 1` | NULL: UNKNOWN, 행이 반환되지 않음. 컴파일러가 숨겨 둔 null 검사는 무시됨(D22) |
 | `it.status != 1` | `e0.status <> 1` | NULL: 행이 반환되지 **않음** |
 | `it.price!! > p` | `e0.price > :p1` | NULL: 행이 반환되지 않음. `!!`는 무시됨(D23) |
-| `it.status == q`(둘 다 nullable: `q: Int?`, `String?`, enum) | null-safe `is not distinct from`, 또는 한쪽이 NOT NULL이면 `=` | `null == null`은 true(Kotlin의 의미) |
-| `it.status != q`(둘 다 nullable) | `is distinct from`, 또는 `(a <> b or a is null)` | `q`가 null이 아니면 NULL 행이 반환됨(Kotlin의 의미) |
-| `it.description.equals(text)`(`String?`) | `==`와 같음 | null-safe |
+| `it.status == q`(둘 다 nullable: `q: Int?`, `String?`, enum) | `e0.status = :p1` | 컬럼이 NULL: 반환되지 않음. 캡처 값 `null`: 일치하는 행 없음(`= NULL`, `WARN` 수준 `LQL-4045`) |
+| `it.status != q`(둘 다 nullable) | `e0.status <> :p1` | 컬럼이 NULL: 반환되지 **않음**(SQL 의미, D48. Kotlin이라면 반환). 캡처 값 `null`: 일치하는 행 없음 |
+| `it.description == it.custName`(엔티티 값 두 개) | `e0.description = e0.custName` | 어느 한쪽이 NULL: 반환되지 않음. NULL과 NULL도 마찬가지(SQL 의미, D48) |
+| `it.description.equals(text)`(`String?`) | `==`와 같음 | `==`와 같음 |
 | `x == null`, `x != null` | `is null`, `is not null` | 2값 |
 | `it.id == id`(`it.id`는 `Long?`, `id`는 캡처한 `Long`), `it.id == null`: NULL이 될 수 없는 컬럼(id, 기본형, `nullable = false`, 경로에 연관 단계 없음) | `not (e0.id is null or e0.id <> :p1)` 대신 `e0.id = :p1`. `it.id == null`은 `1=0`(Java로 테스트함) | 컬럼에 NULL이 없음. 연관을 거치는 경로(`it.customer?.id`)는 검사 유지 |
 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL 3값 논리 |
-| `it.flag == true` / `it.flag != true` | `is not distinct from true` / `is distinct from true` | Kotlin과 같음. 세 DB 모두에서 동작 |
+| `it.flag == true` / `it.flag != true` | `e0.flag = true` / `e0.flag <> true` | NULL: 반환되지 않음(SQL 의미, D48) |
 | `it.flag ?: false`(조건) | `(e0.flag is not null and e0.flag = true)` | NULL은 false로 취급 |
 | `where` 안의 `it.customer?.name`, `it.customer!!.name` | `j1.name` + `join e0.customer j1`(기본은 inner join) | 고객 없음: 주문이 반환되지 않음. `it.customer?.name == null`도 마찬가지 |
-| `it.customer == null \|\| it.customer?.name == p` | `e0.customer is null or j1.name = :p1` + `left join e0.customer j1` | 고객 없음: 반환됨(Kotlin과 같음) |
+| `it.customer == null \|\| it.customer?.name == p` | `e0.customer is null or j1.name = :p1` + `join e0.customer j1` | 고객 없음: 반환되지 **않음**(inner join, D48. `DEBUG` 수준 `LQL-5009`). 유지하려면 `leftJoin` 사용 |
 | 같은 경로를 `orderBy`나 `select`에만 씀 | `j1.name` + `left join e0.customer j1` | 고객 없음: 컬럼이 NULL |
 | `it.customer == null`, `it.customer != null` | `e0.customer is null`, `e0.customer is not null`(외래 키 컬럼, 조인 없음) | 고객이 없는 주문 / 고객이 있는 주문 |
 | `it.customer?.id` | `e0.customer.id`(외래 키 컬럼, 조인 없음) | 고객 없음: NULL |
 | `a ?: b`(값) | 값에서는 `coalesce(a, b)`, 문자열 조건에서는 SARGable 형태 | [9.5](09-kotlin-notes.md#95-null-operators---and-) 참고 |
 | `it.id in ids` | `e0.id in (:p1)` | NULL id: 반환 안 됨 |
-| `it.id !in ids` | `e0.id not in (:p1)`(id는 NULL이 될 수 없음). NULL이 될 수 있는 컬럼: `(x is null or x not in (:p1))` | NULL 값(NULL이 될 수 있는 컬럼): 반환됨, Kotlin과 같음 |
+| `it.id !in ids` | `e0.id not in (:p1)`. NULL이 될 수 있는 컬럼도 같음 | NULL 값: 반환되지 **않음**(SQL 의미, D48. `DEBUG` 수준 `LQL-5009`. Kotlin이라면 반환) |
 | `it.status in 1..5`, `!in 1..5`, `when (it.status) { ... }` | `between`, `not (... between ...)`, `in (...)` | 대상이 NULL: 반환 안 됨. `NOT` 아래에서도 마찬가지(가드 없음, D22) |
-| `x !in sub...` 형태의 서브쿼리 | `not exists (...)` | 서브쿼리가 NULL을 반환해도 올바름 |
+| `x !in sub...` 형태의 서브쿼리 | `x not in (select ...)` | 서브쿼리에 NULL이 있으면 어떤 행도 반환되지 않음(SQL 의미, D48) |
 | `Agg.sum`, `avg`, `min`, `max` | `sum(...)` ... | 행이 없거나 모든 값이 NULL이면 NULL |
 | `Agg.count()` | `count(*)` | 행이 없으면 0 |
 
@@ -177,9 +177,10 @@ MariaDB에서 `NOT DETERMINISTIC`(기본값) 함수는 인자가 파라미터뿐
 
 | 캡처 값이 있는 위치 | `null` 허용? |
 |---|---|
-| null-safe 형태: 두 nullable 값 사이의 `==` / `!=` | 예 |
-| 같은 값에 대한 null 가드 아래: `p == null \|\| it.status!! > p` | 예. 가드는 쿼리가 실행될 때 애플리케이션에서 결정합니다. `p == null`이면 필터 없음, 다른 값이면 `e0.status > :p1` |
-| `!!`와 함께 쓰거나 크기 비교(`<` `<=` `>` `>=`)에 사용: `it.price!! > p!!` | **아니요.** 값을 바인딩할 때 오류(Kotlin이라면 NPE를 던짐) |
+| 두 nullable 값 사이의 `==` / `!=` | 예. 단, 일치하는 행이 없음(`= NULL`). 쿼리가 실행될 때 `LQL-4045`를 `WARN` 수준으로 기록 |
+| 같은 값에 대한 null 가드 아래: `p == null \|\| it.status!! > p` | 예. 가드는 쿼리가 실행될 때 애플리케이션에서 결정합니다. `p == null`이면 필터 없음, 다른 값이면 `e0.status > :p1`. 가드의 위치(앞이나 뒤)는 상관없음 |
+| 크기 비교(`<` `<=` `>` `>=`)에 사용: `it.price!! > p!!` | 예. 단, 일치하는 행이 없음(`> NULL`). `!!`는 무시되고(D23) `LQL-4045`를 `WARN` 수준으로 기록 |
+| 캡처 값에 대한 메서드 호출(`p.trim()`) | **아니요.** 쿼리 전에 값을 준비할 때 오류(`LQL-4012`, Kotlin이라면 NPE) |
 | `in`에 사용하는 컬렉션 안의 `null` 요소 | **아니요.** 바인딩할 때 오류 |
 | `NaN`, `Infinity` | **아니요.** 항상 오류 |
 
@@ -191,14 +192,14 @@ MariaDB에서 `NOT DETERMINISTIC`(기본값) 함수는 인자가 파라미터뿐
 | # | 람다 형태 | 의미 |
 |---|---|---|
 | R1 | non-null 기본형의 비교, 또는 `!!` 뒤의 비교(`it.qty > 5`, `it.price!! > p`) | `=`, `<>`, `<`, ... SQL NULL 규칙 |
-| R2 | 참조 비교로 컴파일되는 `==` / `!=`(enum `==`; `===`는 R17 참고) | null-safe 값 동등성. 객체 동일성이 아님 |
+| R2 | 참조 비교로 컴파일되는 `==` / `!=`(enum `==`; `===`는 R17 참고) | 객체 동일성이 아니라 값 동등성. SQL 의미의 `=` / `<>`(D48) |
 | R3 | `x == null`, `x != null` | `IS NULL`, `IS NOT NULL` |
 | R6 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR`. SQL 3값 논리 |
 | R7 | 문자열 값 비교 | **DB 콜레이션**을 따름(대소문자, 끝의 공백). Oracle은 `''`을 NULL로 취급 |
 | R8 | 엔티티 `==` 엔티티 | 계획 중: 식별자 동등성. v0.1에는 없음(KC13) |
 | R9 | 캡처 값 | 실행 시점의 값을 가진 바인드 파라미터 |
 | R10 | 속성 접근(`it.price`) | getter 호출. JPA 속성에 매핑됨 |
-| R11 | `Intrinsics.areEqual`로 컴파일되는 Kotlin `==`, `!=`(참조, 또는 양쪽 모두 nullable) | null-safe 값 동등성. 스키마나 바인드 값으로 한쪽이 NOT NULL일 때만 `=` |
+| R11 | `Intrinsics.areEqual`로 컴파일되는 Kotlin `==`, `!=`(참조, 또는 양쪽 모두 nullable) | 값 동등성: SQL 의미의 `=` / `<>`(D48). 캡처 값 `null`은 어떤 행에도 일치하지 않음 |
 | R12 | nullable 기본형과 기본형(`it.id == 1L`, `id: Long?`) | 숨겨진 null 검사는 무시됨: `e0.id = 1`, `e0.id <> 1` |
 | R13 | `!!`와 그 밖의 컴파일러 null 검사 | 무시됨(D23) |
 | R14 | `?.` | NULL이 전파되는 경로 또는 값. `?.`가 없을 때와 같은 컬럼 |
@@ -206,14 +207,14 @@ MariaDB에서 `NOT DETERMINISTIC`(기본값) 함수는 인자가 파라미터뿐
 | R16 | 연관 조인 | R24로 대체됨 |
 | R17 | `===`, `!==` | `==`처럼 값 동등성 |
 | R18 | 범위 `in a..b`, `until`, `..<`, `downTo`, `!in` | `between`, `>= and <`, `not (...)`. 자동 null 가드 없음 |
-| R19 | 컬렉션 `x in c`, `x !in c`(캡처한 `c`) | `x in (:p)`, `(x is null or x not in (:p))`. null 요소: 오류. 빈 컬렉션: FALSE / TRUE |
+| R19 | 컬렉션 `x in c`, `x !in c`(캡처한 `c`) | `x in (:p)`, `x not in (:p)`(SQL 의미, D48). null 요소: 오류. 빈 컬렉션: FALSE / TRUE |
 | R20 | `true`/`false`로 끝나는 상수 분기를 가진 `when (subject)` | `in (...)` 또는 비교의 `OR` |
 | R21 | Kotlin 문자열 함수(`startsWith`, `endsWith`, `contains`, `equals(ignoreCase)`, `lowercase`, `length`, `isNullOrEmpty`) | `like ... escape '\'`, D24 대소문자 무시 경로, `lower`, `length`, `(x is null or x = :p)` |
 | R22 | Kotlin 호스트 값(캡처한 `var`, private 속성, `companion` 값) | 실행할 때마다 읽음. 쓰기는 거부됨 |
 | R23 | 속성 참조 `Order::price` | getter와 같음. `orderBy`(`orderBy(Order::price)`)에서는 **아직 구현되지 않음**: `orderBy { it.price }`를 사용하십시오 |
-| R24 | 연관 경로(`it.customer?.name`, `it.customer!!.name`, Java 엔티티의 `it.customer.name`) | 컬럼. to-one 연관: where, order by, select가 함께 사용하는 별칭. `where`에서는 기본적으로 inner join이고 null 가드가 연관이 없는 행을 남기면 `left join`(D36), order by나 select에만 쓰면 `left join`. 임베디드: 같은 테이블. 대상의 `@Id`로 끝나거나 연관을 `null`과 비교: 외래 키 컬럼, 조인 없음. 컬렉션: 오류 |
+| R24 | 연관 경로(`it.customer?.name`, `it.customer!!.name`, Java 엔티티의 `it.customer.name`) | 컬럼. to-one 연관: where, order by, select가 함께 사용하는 별칭. `where`에서는 항상 inner join(D48. 연관이 없는 행을 유지하려면 `leftJoin` 사용), order by나 select에만 쓰면 `left join`. 임베디드: 같은 테이블. 대상의 `@Id`로 끝나거나 연관을 `null`과 비교: 외래 키 컬럼, 조인 없음. 컬렉션: 오류 |
 
-Java 전용 규칙 R4(엔티티 값에 대한 `equals`)와 R5(Java null-safe 헬퍼)는 [Java 트랙](../java/10-rules-and-limits.md)에 있습니다. Kotlin에서는 `==`가 이미 null-safe 의미를 갖습니다.
+Java 전용 규칙 R4(엔티티 값에 대한 `equals`)와 R5(Java null-safe 헬퍼)는 [Java 트랙](../java/10-rules-and-limits.md)에 있습니다. Kotlin에서는 `==`가 R5와 같은 의미를 갖습니다.
 
 그 밖의 규칙:
 
@@ -232,10 +233,10 @@ Java 전용 규칙 R4(엔티티 값에 대한 `equals`)와 R5(Java null-safe 헬
 
 | # | 차이 | lambdaQL의 처리 |
 |---|---|---|
-| G1 | null-safe 부등 비교: Kotlin에서 `null != 3`은 true, SQL의 `status <> 3`은 UNKNOWN | 두 nullable 값 사이의 `!=`는 null-safe(`is distinct from`)이며 Kotlin과 같은 행을 반환. 상수와의 `!=`는 SQL 의미를 사용(D22) |
-| G2 | `it.flag != true`와 `NOT flag` | `e0.flag is distinct from true`로 렌더링(세 DB 모두에서 동작) |
-| G3 | NULL 파라미터로 `name = ?`를 실행하면 0행 반환 | null-safe 형태는 `is [not] distinct from`을 사용 |
-| G4 | `status NOT IN (1, NULL)`은 항상 0행 반환 | 캡처한 컬렉션 안의 `null`은 오류. 서브쿼리 `!in`은 `NOT EXISTS` |
+| G1 | Kotlin에서 `null != 3`은 true, SQL의 `status <> 3`은 UNKNOWN | `!=`는 `<>`로 렌더링: SQL 의미(D48). NULL 행은 제외되고 `LQL-5009`를 `DEBUG` 수준으로 기록. 이런 행을 유지하려면 `it.status == null \|\| ...`이라고 쓰십시오 |
+| G2 | `it.flag != true`와 Kotlin | `e0.flag <> true`로 렌더링: NULL Boolean은 일치하지 않음(SQL 의미) |
+| G3 | NULL 파라미터로 `name = ?`를 실행하면 0행 반환 | 그대로 유지(SQL 의미, D48). 실행할 때 `LQL-4045`를 `WARN` 수준으로 기록. NULL을 찾으려면 `x == null`이라고 쓰십시오 |
+| G4 | `status NOT IN (1, NULL)`은 항상 0행 반환 | 캡처한 컬렉션 안의 `null`은 오류. 서브쿼리 `!in`은 SQL 의미를 유지(D48): 서브쿼리에 null 검사를 추가하십시오 |
 | G5 | Kotlin은 NPE를 던지지만(`!!`, 언박싱) SQL은 그냥 비교 | 문서화: 엔티티의 NULL은 SQL 규칙을 따름 |
 | G6 | `NaN`: H2는 NaN을 가장 큰 값으로 정렬하고 `NaN = NaN`이 true, MariaDB는 저장할 수 없음, Oracle은 `BINARY_DOUBLE`에만 저장 가능 | 캡처한 NaN이나 Infinity는 오류. 저장된 NaN은 DB를 따름 |
 | G7 | `Float` 컬럼과 `Double` 값의 비교: DB마다 결과가 다름 | `Float`/`Double`에 대해 **Kotlin과 비트 단위까지 같은 결과는 약속하지 않음**. lambdaQL은 `CAST`를 추가하지 않음. 컬럼 매핑을 직접 선택(예: Oracle `binary_float` / `binary_double`) |
@@ -290,7 +291,7 @@ lambdaQL은 NULL이 될 수 있는 모든 키에 대해 HQL에 `nulls first` / `
 
 | 항목 | H2 | MariaDB | Oracle |
 |---|---|---|---|
-| `is not distinct from` | 기본 지원 | `<=>`(인덱스 사용) | `decode(...)`(인덱스 사용 불가). 그래서 lambdaQL은 가능하면 `=`를 선호 |
+| `is not distinct from` | 기본 지원 | `<=>`(인덱스 사용) | `decode(...)`(인덱스 사용 불가). lambdaQL은 이 형태를 쓰지 않음(D48) |
 | `is [not] true`, `coalesce(boolean, false)` | 동작 | 동작 | **ORA-00932**. lambdaQL은 절대 쓰지 않음 |
 | 빈 문자열 `''` | 값 | 값 | **NULL** |
 | 대소문자와 끝의 공백 | 정확히 비교 | `_ci`: 무시 | 정확히 비교(정렬에는 `NLS_SORT`) |
@@ -524,7 +525,7 @@ val list = if (flag) {
 |---|---|
 | Kotlin | 2.x (설계는 kotlinc 1.7.22, 2.1.10, 2.2.21, 2.3.0, 2.3.21로 확인) |
 | Java (JVM) | 21 |
-| Hibernate | 6.6 (설계는 6.6.5로 확인). HQL 확장(예: `is distinct from`)을 사용하므로 다른 JPA 구현체는 보장하지 않음 |
+| Hibernate | 6.6 (설계는 6.6.5로 확인). HQL 확장(예: `function(...)`, `nulls first`)을 사용하므로 다른 JPA 구현체는 보장하지 않음 |
 | 데이터베이스 | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
 | Spring | Spring Boot 3.4.2, Spring Data JPA 3.4.2(Spring 모듈, [12](12-spring-data-jpa.md); Java 리포지토리만). Spring Boot 4는 아직 검증하지 않음 |
 | Kotlin 행 단위 확인 | 지금까지는 H2만. Kotlin 사례의 MariaDB와 Oracle 실행은 계획 중 |

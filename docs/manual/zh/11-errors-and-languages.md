@@ -1,5 +1,8 @@
 # 11. 错误与语言
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../ko/11-errors-and-languages.md)。
+
 [手册首页](README.md) | 路线：[Java](java/README.md) | [Kotlin](kotlin/README.md) | 上一章：10. 规则与限制（[Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md)） | 下一章：12. Spring Data JPA（[Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md)）
 
 > [!NOTE]
@@ -33,8 +36,8 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-1xxx` | 输入与 Lambda 加载 | `LQL-1001` 至 `LQL-1013` | `LambdaAnalysisException` |
 | `LQL-2xxx` | 字节码解码 | `LQL-2001` 至 `LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | 语义与在 Java 中计算的值 | `LQL-3001` 至 `LQL-3064` | `TranslationException` |
-| `LQL-4xxx` | 生成、绑定与执行 | `LQL-4001` 至 `LQL-4044`、`LQL-4999`（内部错误） | `LambdaQLException` 本身，或 JDK/JPA 标准异常（见[异常](#exceptions)） |
-| `LQL-5xxx` | 警告（记录在日志中） | `LQL-5001` 至 `LQL-5008` | –（一条日志：级别为 `WARN`；`LQL-5004` 至 `LQL-5006`、`LQL-5008` 以及默认排序模式下的 `LQL-5003` 为 `INFO`） |
+| `LQL-4xxx` | 生成、绑定与执行 | `LQL-4001` 至 `LQL-4045`、`LQL-4999`（内部错误） | `LambdaQLException` 本身，或 JDK/JPA 标准异常（见[异常](#exceptions)）。`LQL-4045` 是 `WARN` 日志 |
+| `LQL-5xxx` | 警告（记录在日志中） | `LQL-5001` 至 `LQL-5009` | –（一条日志：级别为 `WARN`；`LQL-5004` 至 `LQL-5006`、`LQL-5008` 以及默认排序模式下的 `LQL-5003` 为 `INFO`，`LQL-5009` 为 `DEBUG`） |
 
 一些实际的错误码：
 
@@ -54,6 +57,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-4040` | `SortNotAllowedException` | {0} 不允许按此名称排序：{1}。请用 SortRules 的 allow 或 alias 允许它。 |
 | `LQL-4043` | `LambdaQLException` | {0} 的存根参数与数据库参数名称相同但顺序不同。存根：{1}，数据库：{2} |
 | `LQL-4044` | `LambdaQLException` | Oracle 包中有多个同名的存储过程（重载），lambdaQL 无法区分要调用哪一个：{0} |
+| `LQL-4045` | –（执行时的 `WARN` 日志） | {0} 中捕获的值为 null。在 SQL 中，= NULL 和 <> NULL 不匹配任何行；请在 lambda 中使用 x == null，或在查询前检查该值。 |
 | `LQL-5001` | –（`WARN` 日志） | 函数 {0} 作用在列 {1} 上，因此无法使用该列的普通索引，查询可能全表扫描。请改为把列与值比较，或（Oracle）创建基于函数的索引：{2} |
 | `LQL-5002` | –（`WARN` 日志） | 没有 limit 的子查询排序不影响结果，已被移除（Q4）：{0} |
 | `LQL-5003` | –（`INFO` 或 `WARN` 日志） | 外部排序不在 {0} 的排序规则中：{1}。现在会执行，但在 SortMode.STRICT 下会被拒绝。 |
@@ -62,6 +66,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-5006` | –（`INFO` 日志） | 无法检查 {0} 的重载（{1}）；不做检查继续调用。 |
 | `LQL-5007` | –（`WARN` 日志） | MariaDB 函数 {0} 是 NOT DETERMINISTIC，因此会逐行计算，比较列上的索引无法用于范围查找。如果它是确定性的，请声明为 DETERMINISTIC：{1} |
 | `LQL-5008` | –（`INFO` 日志） | 无法读取 {0} 的索引或函数元数据（{1}）；在没有元数据的情况下继续 SARGable 检查。 |
+| `LQL-5009` | –（`DEBUG` 日志） | SQL 语义：在 {0} 中，值为 NULL 的行不满足条件（与 Java 的 null 处理不同）。要包含这些行，请写出 null 检查，例如 x == null || ...。 |
 
 `{0}` 和 `{1}` 是参数，例如表达式或存储过程名。
 完整列表见消息文件（见[致译者](#for-translators)）。
@@ -226,8 +231,8 @@ lambdaQL 也会缓存失败的结果，所以有问题的 Lambda 下次会很快
 
 | 写法 | `name` 为 `null` | 结果 |
 |---|---|---|
-| `o.getDescription() == name`（引用 `==`） | 允许 | `e0.description is not distinct from :p1`（null 安全） |
-| `Objects.equals(o.getDescription(), name)` | 允许 | null 安全，与上面相同 |
+| `o.getDescription() == name`（引用 `==`） | 允许 | `e0.description is null`（捕获的值保留 Java 规则） |
+| `Objects.equals(o.getDescription(), name)` | 允许 | 与上面相同 |
 | `o.getDescription().equals(name)` | 绑定时报错 | 在 Java 中这永远不会为 true。lambdaQL 不会把它转换为 `is null`。 |
 | `name.equals(o.getDescription())` | 绑定时报错 | 在 Java 中这会抛出 `NullPointerException`。 |
 | `o.getStatus() > minStatus`（`minStatus` 为 `null`） | 绑定时报错 | 与 null 进行大小比较在 Java 中没有意义。 |
@@ -238,7 +243,7 @@ lambdaQL 也会缓存失败的结果，所以有问题的 Lambda 下次会很快
 
 | 写法 | 捕获的值为 `null` | 结果 |
 |---|---|---|
-| `it.description == name` | 允许 | `e0.description is not distinct from :p1`（null 安全） |
+| `it.description == name` | 允许 | `e0.description is null`（捕获的值保留 Kotlin 规则） |
 | `minPrice == null \|\| it.price!! > minPrice` | 允许 | 你写了 null 检查，所以 lambdaQL 使用它。 |
 | `it.price!! > minPrice!!`（`minPrice` 为 `null`） | 绑定时报错 | 与 null 进行大小比较没有意义。 |
 | `it.id in ids`（`ids` 中有 `null` 元素） | 绑定时报错 | 带有 null 元素的 `IN` 在 SQL 中是一个陷阱。 |
@@ -385,6 +390,7 @@ lambdaQL 目前提供的警告：
 
 | 错误码 | 何时 |
 |---|---|
+| `LQL-4045` | `=` 或 `<>`（`==`、`!=`、`equals`、`Objects.equals`）中捕获的值为 `null`，因此没有匹配的行（SQL 语义，决策 D48）。只有执行时才能知道。以 `WARN` 级别记录。要查找 NULL，请写 `x == null`（见 3.6：[Java](java/03-where.md#36-null-rules) \| [Kotlin](kotlin/03-where.md#36-null-rules)） |
 | `LQL-5001` | 条件中数据库函数包住了列（`OrderFns.discount(o.getPrice()) > 10`、作用于列的 Boolean 函数、`IN` 或 `IS NULL` 中的函数），因此无法使用普通索引。每个 `where` Lambda 以 `WARN` 级别记录一次。在 Oracle 上，如果存在相同表达式的基于函数的索引，则不记录（见 [8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable)） |
 | `LQL-5002` | 子查询有 `orderBy` 但没有 `limit`，因此 lambdaQL 会移除排序（它不起作用，规则 Q4） |
 | `LQL-5003` | 外部排序（Spring `Sort`、`SortSpec.ofPath`）使用了不在排序规则中的名称，并且模式是 `SortMode.INFO`（默认值，以 `INFO` 级别记录）或 `SortMode.WARN`（以 `WARN` 级别记录）。排序会执行。按实体和名称各记录一次（见 [4.10 排序策略](java/04-order-paging.md#sort-policy)） |
@@ -393,6 +399,7 @@ lambdaQL 目前提供的警告：
 | `LQL-5006` | 只有 Oracle 重载查询（`all_arguments`）失败。不检查重载继续调用。以 `INFO` 级别记录 |
 | `LQL-5007` | 仅 MariaDB：值一侧的 `NOT DETERMINISTIC` 数据库函数与列比较（`o.getPrice() > OrderFns.nondet(base)`），索引无法用于范围查找。以 `WARN` 级别记录 |
 | `LQL-5008` | 无法读取 SARGable 检查所需的索引或函数元数据（例如没有权限）。以 `INFO` 级别记录。仍会记录 `LQL-5001`；不检查 `LQL-5007` |
+| `LQL-5009` | 条件按 SQL 语义比较实体值（决策 D48），因此在 Java 或 Kotlin 中会匹配的 NULL 行可能被排除：实体值之间的 `==`/`equals`、与值的 `!=`、可空 `Boolean` 的 `!`、关联路径上的 null 守卫（路径仍为内连接）、子查询的 `NOT IN`。每个条件文本以 `DEBUG` 级别记录一次（见 3.6.3：[Java](java/03-where.md#363-write-your-null-checks-yourself) \| [Kotlin](kotlin/03-where.md#363-write-your-null-checks-yourself)） |
 
 ```
 WARN  [LQL-5002] 没有 limit 的子查询排序不影响结果，已被移除（Q4）：...

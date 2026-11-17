@@ -1,6 +1,9 @@
 <a id="11-errors-and-languages"></a>
 # 11. エラーと言語
 
+> [!IMPORTANT]
+> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../ko/11-errors-and-languages.md)を参照してください。
+
 [マニュアルのホーム](README.md) | トラック: [Java](java/README.md) | [Kotlin](kotlin/README.md) | 前: 10. ルールと制限（[Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md)） | 次: 12. Spring Data JPA（[Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md)）
 
 > [!NOTE]
@@ -34,8 +37,8 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-1xxx` | 入力とラムダの読み込み | `LQL-1001`〜`LQL-1013` | `LambdaAnalysisException` |
 | `LQL-2xxx` | バイトコードのデコード | `LQL-2001`〜`LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | 意味と Java で計算する値 | `LQL-3001`〜`LQL-3064` | `TranslationException` |
-| `LQL-4xxx` | 生成、バインド、実行 | `LQL-4001`〜`LQL-4044`、`LQL-4999`（内部エラー） | `LambdaQLException` そのもの、または JDK/JPA の標準例外（[例外](#exceptions) を参照） |
-| `LQL-5xxx` | 警告（ログに出力） | `LQL-5001`〜`LQL-5008` | –（ログ行。レベルは `WARN`。`LQL-5004`〜`LQL-5006`、`LQL-5008` と、デフォルトのソートモードの `LQL-5003` は `INFO`） |
+| `LQL-4xxx` | 生成、バインド、実行 | `LQL-4001`〜`LQL-4045`、`LQL-4999`（内部エラー） | `LambdaQLException` そのもの、または JDK/JPA の標準例外（[例外](#exceptions) を参照）。`LQL-4045` は `WARN` ログ |
+| `LQL-5xxx` | 警告（ログに出力） | `LQL-5001`〜`LQL-5009` | –（ログ行。レベルは `WARN`。`LQL-5004`〜`LQL-5006`、`LQL-5008` と、デフォルトのソートモードの `LQL-5003` は `INFO`、`LQL-5009` は `DEBUG`） |
 
 実際のコードの例:
 
@@ -55,6 +58,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-4040` | `SortNotAllowedException` | {0} ではこの名前でソートできません: {1}。SortRules の allow か alias で許可してください。 |
 | `LQL-4043` | `LambdaQLException` | {0} のスタブ引数は、データベースの引数と名前が同じで順序だけが違います。スタブ: {1}、データベース: {2} |
 | `LQL-4044` | `LambdaQLException` | Oracle パッケージにこの名前のプロシージャが複数あります（オーバーロード）。どれを呼ぶか区別できません: {0} |
+| `LQL-4045` | –（実行時の `WARN` ログ） | {0} でキャプチャした値が null です。SQL では = NULL と <> NULL はどの行にも合いません。ラムダで x == null を使うか、クエリの前に値を確認してください。 |
 | `LQL-5001` | –（`WARN` ログ） | 関数 {0} が列 {1} に適用されているため、列の通常のインデックスを使えず、全件スキャンになることがあります。列を値と比較する形に変えるか、（Oracle）関数ベースのインデックスを作ってください: {2} |
 | `LQL-5002` | –（`WARN` ログ） | limit のないサブクエリのソートは結果に影響しないため削除しました（Q4）: {0} |
 | `LQL-5003` | –（`INFO` または `WARN` ログ） | 外部からのソートが {0} のソート規則にありません: {1}。今は実行しますが、SortMode.STRICT では拒否されます。 |
@@ -63,6 +67,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-5006` | –（`INFO` ログ） | {0} のオーバーロードを確認できませんでした（{1}）。確認せずに呼び出します。 |
 | `LQL-5007` | –（`WARN` ログ） | MariaDB の関数 {0} は NOT DETERMINISTIC のため行ごとに計算され、比較する列のインデックスが範囲検索に使われません。決定的な関数なら DETERMINISTIC と宣言してください: {1} |
 | `LQL-5008` | –（`INFO` ログ） | {0} のインデックス・関数のメタデータを読めませんでした（{1}）。メタデータなしで SARGable の確認を続けます。 |
+| `LQL-5009` | –（`DEBUG` ログ） | SQL の意味: {0} では値が NULL の行は条件に合いません（Java の null の扱いとは異なります）。含めるには x == null || ... のように null の確認を書いてください。 |
 
 `{0}` と `{1}` は引数です。たとえば式やプロシージャ名が入ります。
 一覧はメッセージファイルにあります（[翻訳者向け](#for-translators) を参照）。
@@ -233,8 +238,8 @@ null のルールはすべて 3. 条件（[Java](java/03-where.md) | [Kotlin](ko
 
 | 書き方 | `name` が `null` のとき | 結果 |
 |---|---|---|
-| `o.getDescription() == name`（参照の `==`） | 許可 | `e0.description is not distinct from :p1`（null 安全） |
-| `Objects.equals(o.getDescription(), name)` | 許可 | null 安全、上と同じ |
+| `o.getDescription() == name`（参照の `==`） | 許可 | `e0.description is null`（キャプチャした値は Java のルールをそのまま使う） |
+| `Objects.equals(o.getDescription(), name)` | 許可 | 上と同じ |
 | `o.getDescription().equals(name)` | バインド時にエラー | Java では決して true になりません。lambdaQL はこれを `is null` に変えません。 |
 | `name.equals(o.getDescription())` | バインド時にエラー | Java では `NullPointerException` を投げます。 |
 | `o.getStatus() > minStatus`（`minStatus` が `null`） | バインド時にエラー | null との大小比較は Java で意味を持ちません。 |
@@ -245,7 +250,7 @@ null のルールはすべて 3. 条件（[Java](java/03-where.md) | [Kotlin](ko
 
 | 書き方 | キャプチャした値が `null` のとき | 結果 |
 |---|---|---|
-| `it.description == name` | 許可 | `e0.description is not distinct from :p1`（null 安全） |
+| `it.description == name` | 許可 | `e0.description is null`（キャプチャした値は Kotlin のルールをそのまま使う） |
 | `minPrice == null \|\| it.price!! > minPrice` | 許可 | null チェックを書いたので、lambdaQL はそれを使います。 |
 | `it.price!! > minPrice!!`（`minPrice` が `null`） | バインド時にエラー | null との大小比較は意味を持ちません。 |
 | `it.id in ids`（`ids` に `null` の要素がある） | バインド時にエラー | null の要素を含む `IN` は SQL の落とし穴です。 |
@@ -395,6 +400,7 @@ lambdaQL は **SLF4J API** を通してログを出します。
 
 | コード | いつ |
 |---|---|
+| `LQL-4045` | `=` や `<>`（`==`、`!=`、`equals`、`Objects.equals`）でキャプチャした値が `null` のため、合う行がないとき（SQL の意味、決定 D48）。実行するときにだけ分かる。`WARN` レベルで出る。NULL を探すには `x == null`（3.6 を参照: [Java](java/03-where.md#36-null-rules) \| [Kotlin](kotlin/03-where.md#36-null-rules)） |
 | `LQL-5001` | 条件で DB 関数がカラムを包んでいるとき（`OrderFns.discount(o.getPrice()) > 10`、カラムに対する Boolean の関数、`IN` や `IS NULL` の中の関数）。通常のインデックスを使えない。`where` のラムダごとに 1 回、`WARN` レベルで出る。Oracle で同じ式の関数ベースのインデックスがあれば出ない（[8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) を参照） |
 | `LQL-5002` | サブクエリに `orderBy` があって `limit` がないため、lambdaQL がソートを取り除くとき（ソートに効果がないため、ルール Q4） |
 | `LQL-5003` | 外部のソート（Spring の `Sort`、`SortSpec.ofPath`）がソートのルールにない名前を使い、モードが `SortMode.INFO`（デフォルト、`INFO` レベルで出る）か `SortMode.WARN`（`WARN` レベルで出る）のとき。ソートは実行される。エンティティと名前ごとに 1 回出る（[4.10 ソートポリシー](java/04-order-paging.md#sort-policy) を参照） |
@@ -403,6 +409,7 @@ lambdaQL は **SLF4J API** を通してログを出します。
 | `LQL-5006` | Oracle のオーバーロードの取得（`all_arguments`）だけが失敗したとき。オーバーロードのチェックなしで呼び出す。`INFO` レベルで出る |
 | `LQL-5007` | MariaDB のみ: 値の側の `NOT DETERMINISTIC` な DB 関数をカラムと比べるとき（`o.getPrice() > OrderFns.nondet(base)`）。インデックスが範囲検索に使われない。`WARN` レベルで出る |
 | `LQL-5008` | SARGable の確認のためのインデックスや関数のメタデータを読めないとき（たとえば権限がない）。`INFO` レベルで出る。`LQL-5001` はそのまま出し、`LQL-5007` は確認しない |
+| `LQL-5009` | 条件がエンティティの値を SQL の意味で比べるため（決定 D48）、Java や Kotlin なら合う NULL の行が外れることがあるとき: エンティティの値どうしの `==`/`equals`、値との `!=`、NULL になりうる `Boolean` の `!`、関連のパスの null ガード（パスは内部結合のまま）、サブクエリの `NOT IN`。条件の文ごとに 1 回、`DEBUG` レベルで出る（3.6.3 を参照: [Java](java/03-where.md#363-write-your-null-checks-yourself) \| [Kotlin](kotlin/03-where.md#363-write-your-null-checks-yourself)） |
 
 ```
 WARN  [LQL-5002] A subquery sort without limit does not change the result, so it was removed (Q4): ...

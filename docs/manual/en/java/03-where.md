@@ -1,5 +1,8 @@
 # 3. Conditions (`where`) (Java)
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/java/03-where.md) for the latest rules.
+
 > [!NOTE]
 > **Status**
 > - **Implemented and tested on H2, MariaDB and Oracle:** `where` conditions and `toList()`. lambdaQL maps getters to columns, writes the HQL and runs it.
@@ -222,8 +225,8 @@ qb.from(Order.class).where(o -> o.getStatus() == wanted).toList();
 
 This is the most important part. There are two simple principles:
 
-1. **Where Java defines a result for null, lambdaQL uses that result.** (`==` between objects, `Objects.equals`, `x == null`)
-2. **Where Java would throw an exception, lambdaQL uses SQL meaning.** (unboxing, `a.equals(b)` with a null `a`)
+1. **Values of the entity are compared with the SQL meaning** (decision D48). `==` between objects, `equals`, `Objects.equals` and `!=` become `=` and `<>`. A row whose value is NULL does not match either of them. When the result can differ from Java, lambdaQL logs `LQL-5009` at `DEBUG` level.
+2. **Captured values are computed in Java first, then compared with the SQL meaning too.** A captured `null` is bound as NULL, so `= :p1` and `<> :p1` match no row. lambdaQL logs `LQL-4045` at `WARN` level when this happens at run time. To find NULL, write `x == null` (it gives `is null`). Where Java would throw while computing the value (unboxing, `null.equals(...)`), lambdaQL throws too (see [3.6.4](#364-captured-null-values)).
 
 lambdaQL **only handles null when you write it** (`== null`, `!= null`).
 It never adds a hidden null check for you.
@@ -233,11 +236,12 @@ It never adds a hidden null check for you.
 | # | Java form | HQL | NULL behavior |
 |---|---|---|---|
 | R1 | One side is a primitive: `o.getStatus() == 1`, `o.getPrice() > p` | `e0.status = 1`, `e0.price > :p1` | SQL meaning. NULL column: row not returned |
-| R2 | Both sides are objects: `o.getStatus() == status` (`Integer == Integer`), `String == String`, enum | `e0.status is not distinct from :p1` | **null-safe value compare.** `null == null` is true. Only one side null: false |
-| R2 | `o.getStatus() != status` (objects) | `e0.status is distinct from :p1` | null-safe |
+| R2 | Both sides are objects: `o.getStatus() == status` (`Integer == Integer`), `String == String`, enum | `e0.status = :p1` | **value compare.** NULL column: row not returned. A captured `null`: no row (`LQL-4045`) |
+| R2 | `o.getStatus() != status` (objects) | `e0.status <> :p1` | SQL meaning: NULL column: row **not** returned (Java would return it). A captured `null`: no row (`LQL-4045`) |
+| R2 | Two entity values: `o.getDescription() == o.getCustName()` | `e0.description = e0.custName` | SQL meaning: a NULL on either side: row not returned (also NULL and NULL) |
 | R3 | `x == null`, `x != null` | `x is null`, `x is not null` | |
 | R4 | `o.getDescription().equals(p)` | `e0.description = :p1` | SQL meaning. NULL column: row not returned. `p == null`: exception |
-| R5 | `Objects.equals(a, b)`, `"x".equals(a)`, `Boolean.TRUE.equals(a)` | `a is not distinct from b` | null-safe |
+| R5 | `Objects.equals(a, b)`, `"x".equals(a)`, `Boolean.TRUE.equals(a)` | the same as R2: `a = b`, `a = :p1` | the same as R2 |
 | R9 | Captured values | bind parameters | see [3.6.4](#364-captured-null-values) |
 
 Which Java types give R1 and which give R2 is explained in [9. Java notes](09-java-notes.md#93-equality-of-boxed-values).
@@ -251,28 +255,25 @@ The lambda is a query, so Java memory rules do not apply.
 ```java
 Integer status = request.getStatus();    // may be null
 qb.from(Order.class).where(o -> o.getStatus() == status).toList();
-// HQL: e0.status is not distinct from :p1
-//   status = 3    -> rows with status 3
-//   status = null -> rows with status NULL
+//   status = 3    -> HQL: e0.status = :p1    rows with status 3
+//   status = null -> HQL: e0.status = :p1    no row: = NULL is never true (LQL-4045 at WARN)
 ```
 
-How Hibernate writes this for each database (checked):
+To find rows where `status` is NULL, write the null check: `o.getStatus() == null` gives `e0.status is null`.
 
-| Database | SQL |
-|---|---|
-| H2 | `status is not distinct from ?` |
-| MariaDB | `status <=> ?` |
-| Oracle | `decode(status, ?, 0, 1) = 0` |
+The column is never wrapped, so the database can use an index.
 
-When lambdaQL knows that one side can never be NULL (an `@Id`, a `nullable = false` column, a primitive column, or a captured value that is not null), it writes a simple `=` instead. The result is the same, and the database can use an index.
-
-lambdaQL looks at a captured value when the query runs: `null` gives `is null`, any other value gives a plain `= :p1`.
+lambdaQL binds a captured value when the query runs. A `null` value is bound as NULL, and lambdaQL logs `LQL-4045` at `WARN` level because no row can match.
 **(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `null-safe`:
 
 ```java
+// the SQL meaning (D48): = NULL matches no row; lambdaQL logs LQL-4045 at WARN when it runs with a null
 String d = null;
 RenderedQuery q = qb.from(Order.class).where(o -> Objects.equals(o.getDescription(), d)).toHql();
-assertEquals("select e0 from Order e0 where e0.description is null", q.hql());
+assertEquals("select e0 from Order e0 where e0.description = :p1", q.hql());
+// to find NULL, write the null check
+RenderedQuery q3 = qb.from(Order.class).where(o -> o.getDescription() == null).toHql();
+assertEquals("select e0 from Order e0 where e0.description is null", q3.hql());
 
 String d2 = "a";
 RenderedQuery q2 = qb.from(Order.class).where(o -> Objects.equals(o.getDescription(), d2)).toHql();
@@ -285,7 +286,7 @@ assertEquals("select e0 from Order e0 where e0.description = :p1", q2.hql());
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-where o1_0.description is null
+where o1_0.description=?
 ```
 
 **SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `null-safe#2`:
@@ -339,21 +340,43 @@ assertEquals("select e0 from Order e0 where e0.customer.id is null",
 ```java
 .where(o -> o.getDescription().equals(text))     // HQL: e0.description = :p1
 .where(o -> Objects.equals(o.getDescription(), text))
-                                                 // HQL: e0.description is not distinct from :p1
-.where(o -> !Objects.equals(o.getStatus(), 1))   // HQL: e0.status is distinct from 1
-                                                 //      (NULL rows are returned, like Java)
+                                                 // HQL: e0.description = :p1 (a null text: no row)
+.where(o -> !Objects.equals(o.getStatus(), 1))   // HQL: e0.status <> 1
+                                                 //      (NULL rows are not returned: SQL meaning)
+```
+
+**The SQL meaning for values of the entity** (decision D48). Two entity values, and an entity value compared with a value by `!=`, follow SQL: a row whose value is NULL does not match `=` or `<>`.
+In Java, `!text.equals(null)` is true and `Objects.equals(null, null)` is true, so Java would return those rows. lambdaQL logs `LQL-5009` at `DEBUG` level (once per condition) when this can happen. To keep the NULL rows, write the null check in the lambda.
+
+**(tested)** [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java), region `sql-meaning` (H2, MariaDB and Oracle; the rows are description/custName pairs `a/a`, `a/b`, `null/a`, `null/null`, `b/null`, and `text` is `"a"`):
+
+```java
+// two entity values: = and <> as in SQL; a row with a NULL on either side matches neither
+SelectQuery<Order> same = qb.from(Order.class).where(o -> Objects.equals(o.getDescription(), o.getCustName()));
+assertEquals("select e0 from Order e0 where e0.description = e0.custName", same.toHql().hql());
+assertEquals(List.of("a/a"), pairs(same.toList()));                    // null/null is not "equal" in SQL
+SelectQuery<Order> different = qb.from(Order.class).where(o -> !Objects.equals(o.getDescription(), o.getCustName()));
+assertEquals(List.of("a/b"), pairs(different.toList()));               // rows with a NULL are left out
+// an entity value and a value: a NULL column does not match <>
+SelectQuery<Order> notA = qb.from(Order.class).where(o -> !text.equals(o.getDescription()));
+assertEquals("select e0 from Order e0 where e0.description <> :p1", notA.toHql().hql());
+assertEquals(List.of("b/null"), pairs(notA.toList()));
+// to keep the NULL rows, say so in the lambda
+SelectQuery<Order> notAOrNull = qb.from(Order.class).where(o -> o.getDescription() == null || !text.equals(o.getDescription()));
+assertEquals(List.of("b/null", "null/a", "null/null"), pairs(notAOrNull.toList()));
+// a NULL Boolean is not false
+assertEquals(List.of("f"), qb.from(Coded.class).where(c -> !c.getVip()).toList().stream().map(Coded::getCode).toList());
 ```
 
 ### 3.6.4 Captured null values
 
 | Form | Captured value is `null` |
 |---|---|
-| null-safe forms (R2, R5): `o.getStatus() == status`, `Objects.equals(...)` | allowed |
-| `p.equals(o.getDescription())` (`p` is the receiver) | **exception** when the query runs |
-| `o.getDescription().equals(p)` | **exception** |
+| `==`, `!=`, `Objects.equals(...)` and `o.getDescription().equals(p)` with a captured value | runs: `= :p1` / `<> :p1` with NULL, so **no row** matches. `LQL-4045` at `WARN` level |
+| `p.equals(o.getDescription())` (`p` is the receiver) | **exception** when the query runs (`LQL-4011`) |
 | compare where Java unboxes the value: `o.getPrice() > p` (`Double p`), and every `<`, `<=`, `>`, `>=` | **exception** |
 
-Why: in Java these forms throw NullPointerException or are always false. Turning them into `IS NULL` would return rows Java never returns.
+Why: in SQL, `= NULL` and `<> NULL` are never true, so lambdaQL keeps that meaning and warns. The forms that need the value in Java (a method on `null`, unboxing) throw, as in Java. To find NULL rows, write `x == null`.
 
 **Exception to the rule: a null guard.** If the same captured value is checked for null first, null is allowed.
 **(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `captured-null-guard`:
@@ -396,6 +419,20 @@ How it works:
 - The guard must come first. `o.getPrice() > min || min == null` with `min == null` throws when the query runs, the same as Java's NullPointerException.
 - With `&&` the guard works the other way: `min != null && o.getPrice() > min` with `min == null` returns no rows (`where 1=0`).
 
+<a id="365-converted-attributes-convert"></a>
+### 3.6.5 Converted attributes (`@Convert`)
+
+An attribute with a JPA `AttributeConverter` is compared with its Java value. Hibernate 6.6 converts a literal that is compared with such an attribute, and it converts bound parameters too. So the condition is written with Java values, and it finds the stored rows (checked on H2, MariaDB and Oracle).
+
+**(tested)** [`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java), region `convert`:
+
+```java
+// code is stored reversed ("abc" as "cba"); vip is stored as 'Y'/'N' (YesNoConverter)
+SelectQuery<Coded> literal = qb.from(Coded.class).where(c -> c.getCode().equals("abc"));
+assertEquals("select e0 from Coded e0 where e0.code = 'abc'", literal.toHql().hql());
+assertEquals(List.of("abc"), codes(literal.toList()));       // Hibernate converts the literal
+```
+
 ## 3.7 Boolean columns
 
 In the example entity, `active` is a primitive `boolean` (getter `isActive()`).
@@ -405,8 +442,9 @@ The rows with `getActive()` are for a nullable `Boolean` column.
 |---|---|---|
 | `o.isActive()` | `e0.active = true` | – (a primitive `boolean` is never NULL) |
 | `!o.isActive()` | `e0.active = false` | – (a primitive `boolean` is never NULL) |
-| `Boolean.TRUE.equals(o.getActive())` (nullable `Boolean`) | `e0.active is not distinct from true` | not returned |
-| `!Boolean.TRUE.equals(o.getActive())` | `e0.active is distinct from true` | **returned** (like Java) |
+| `Boolean.TRUE.equals(o.getActive())` (nullable `Boolean`) | `e0.active = :p1` (`:p1` is `true`) | not returned |
+| `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | **not returned** (SQL meaning, D48; Java would return them) |
+| `!o.getActive()` (nullable `Boolean`) | `e0.active = false` | **not returned** (SQL meaning: NULL is not false) |
 
 **(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `boolean`:
 
@@ -598,17 +636,18 @@ where c1_0.name=?
 - An order **without a customer** is not in the result. There is no customer row to join.
 - lambdaQL does not add a null check for you. You do not need `o.getCustomer() != null &&` before the path.
 
-**A null guard keeps orders without a customer.** If the condition can be true for an order without a customer, lambdaQL uses a `left join` for that path.
-With an inner join, Java and SQL would give different rows: Java returns the order, but the inner join would lose it (decision D36).
+**A null guard does not keep orders without a customer.** A path in `where` is always an inner join (the SQL meaning, decision D48). So `o.getCustomer() == null || ...` cannot match an order without a customer: that order has no customer row to join. lambdaQL logs `LQL-5009` at `DEBUG` level for such a condition.
+To keep orders without a customer, use an explicit `leftJoin` (decision D44, see [6.8](06-select-group.md#68-explicit-joins)) and write `c == null || ...`.
 **(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `null-guard`:
 
 ```java
 String name = "Kim";
-// Java keeps orders without a customer here, so the path becomes a LEFT JOIN
+// the SQL meaning (D48): a where path is an inner join, so "customer is null" never matches here
+// (lambdaQL logs LQL-5009 at DEBUG); to keep orders without a customer, use leftJoin (D44)
 RenderedQuery q = qb.from(Order.class)
         .where(o -> o.getCustomer() == null || o.getCustomer().getName().equals(name))
         .toHql();
-assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1", q.hql());
+assertEquals("select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name = :p1", q.hql());
 
 // the guard removes those orders, so an inner join is right
 RenderedQuery q2 = qb.from(Order.class)
@@ -623,7 +662,7 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where e0.customer is n
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
+join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is null or c1_0.name=?
 ```
 
@@ -637,10 +676,9 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is not null and c1_0.name=?
 ```
 
-After the `left join`, Hibernate writes `c1_0.id is null` for `e0.customer is null`. The meaning is the same: the order has no customer.
+Hibernate writes `c1_0.id is null` for `e0.customer is null`. After the inner join it is never true.
 
-- Other parts of an `||` can keep the order too. `o.getStatus() == 1 || o.getCustomer().getName().equals(name)` also uses a `left join`, because in Java an order with status 1 matches even without a customer.
-- If another `where` call removes those orders anyway (for example `.where(o -> o.getCustomer().getName() != null)`), the join stays inner.
+- The same holds for other parts of an `||`: `o.getStatus() == 1 || o.getCustomer().getName().equals(name)` also uses an inner join, so an order with status 1 but without a customer is not returned (Java would return it).
 
 To find orders **without** a customer, compare the association itself. This checks the foreign key column, with no join.
 **(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `no-association`:
@@ -733,7 +771,7 @@ See [11. Errors and languages](../11-errors-and-languages.md).
 | Entity collection paths | `o.getItems().size() > 0` | `exists` subquery |
 | Entity compared to entity | `o.getCustomer() == c` | Compare ids (planned: entity compare) |
 | `/`, `%`, cast under a guard | see [3.12](#312-errors-that-depend-on-order-of-evaluation) | Remove the guard or change the condition |
-| Null captured value in R1/R4 forms | `o.getDescription().equals(p)` with `p == null` | Use `Objects.equals` or a null guard |
+| Null captured value as the receiver | `p.equals(o.getDescription())` with `p == null` | Write `o.getDescription().equals(p)`, or check `p` before the query |
 | `NaN` / `Infinity` captured value | `o.getPrice() > Double.NaN` | Do not send NaN |
 | Anonymous class, lambda that is not `Serializable` | `new Where<Order>() { ... }`, a `java.util.function.Predicate` | Use a lambda |
 

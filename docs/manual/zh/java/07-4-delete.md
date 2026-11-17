@@ -1,6 +1,9 @@
 <a id="74-delete"></a>
 # 7.4 删除（Java）
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/07-4-delete.md)。
+
 > [!NOTE]
 > **状态：已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（里程碑 M10），包括 `limit` 和 `executeOne()`（决定 D41）。
 > `where` 中的子查询（`sub`）同样已实现并测试（里程碑 M8）。

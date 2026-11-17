@@ -1,5 +1,8 @@
 # 9. Kotlin 说明
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/09-kotlin-notes.md)。
+
 > [!NOTE]
 > **状态：部分已实现。**
 > Kotlin 支持是已经确定的设计（决策 D17、D20 到 D25、D27、D28、D31）。
@@ -139,25 +142,22 @@ lambdaQL 如何区分"你的" null 检查和编译器的 null 检查？字节码
 | 两个非空基本类型：`it.qty == 5` | 比较分支（与 Java 相同） | R1 | `i.qty = 5` |
 | 可空基本类型与常量：`it.status == 1`（`Int?`） | 隐藏的 null 检查 + 比较 | R12（忽略隐藏检查，D22） | `e0.status = 1` |
 | `it.status != 1`（`Int?`） | 相同 | R12 | `e0.status <> 1`（**不**返回 NULL 行） |
-| 引用，或两侧都可空：`it.description == text`、`it.status == q`（`q: Int?`） | 调用 `Intrinsics.areEqual(a, b)` | R11：null 安全的值相等 | `e0.description is not distinct from :p1` |
-| `it.description != text` | `!Intrinsics.areEqual(a, b)` | R11 | `e0.description is distinct from :p1` |
+| 引用，或两侧都可空：`it.description == text`、`it.status == q`（`q: Int?`） | 调用 `Intrinsics.areEqual(a, b)` | R11：值相等 | `e0.description = :p1`（捕获的 `null`：`is null`） |
+| `it.description != text` | `!Intrinsics.areEqual(a, b)` | R11，SQL 语义 | `e0.description <> :p1`（**不**返回 NULL 行） |
+| 两个实体值：`it.description == it.custName` | `Intrinsics.areEqual(a, b)` | R11，SQL 语义 | `e0.description = e0.custName`（任一侧为 NULL：不匹配） |
 | `it.id === q`、`!==` | `if_acmpeq` / `if_acmpne` | R17：值相等 | 与 `==` 相同 |
 | enum：`it.kind == OrderKind.GIFT` | `if_acmpne` | R2、R17 | `e0.kind = com.example.OrderKind.GIFT`（带完整类名的字面量） |
 
-`Intrinsics.areEqual` 是 `==` 背后的 Kotlin 运行时函数。lambdaQL 按名字识别它，并把它理解为 **null 安全的值相等**（`null == null` 为 true，只有一侧为 null 时为 false）。这与 Kotlin 的含义相同。
+`Intrinsics.areEqual` 是 `==` 背后的 Kotlin 运行时函数。lambdaQL 按名字识别它，并把它理解为**值相等**。实体值遵循 SQL 语义（决策 D48）：任一侧为 NULL 时不匹配，NULL 与 NULL 也一样。捕获的 `null` 遵循 Kotlin，生成 `is null`。当结果可能与 Kotlin 不同时，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`。
 
-### lambdaQL 何时写出普通的 `=`
+### 普通的 `=` 和 `<>`
 
-`is not distinct from` 是正确的，但在 Oracle 上它会变成 `decode(...)`，无法使用索引。
-所以当一侧**已知不为 NULL** 时，lambdaQL 写出普通的 `=`（对于 `!=` 则写 `(a <> b or a is null)`）：
-
-- 基本类型属性（`Int`、`Long`、`Double`、`Boolean`），
-- `@Id`，或带有 `nullable = false` / `@Basic(optional = false)` 的列，
-- 查询执行时不为 null 的捕获值。
+lambdaQL 总是写出普通的 `=` 和 `<>`（决策 D48）。它永远不会写出 `is [not] distinct from`，后者在 Oracle 上会变成 `decode(...)`，无法使用索引。
 
 ```kotlin
-.where { it.description == text }    // text 为 "abc" -> o.description = :p1
-.where { it.description != "x" }     // (e0.description <> 'x' or e0.description is null)
+.where { it.description == text }    // text 为 "abc" -> e0.description = :p1
+.where { it.description != "x" }     // e0.description <> 'x'   （description 为 NULL 时不匹配）
+.where { it.description == null || it.description != "x" }   // 也返回 NULL 行
 ```
 
 > [!WARNING]
@@ -181,8 +181,8 @@ SQL 的 `=` 只比较值。**lambdaQL 使用值相等。**
 ```kotlin
 .where { it.active }                       // e0.active = true
 .where { !it.active }                      // not (e0.active = true)
-.where { it.flag == true }                 // e0.flag is not distinct from true
-.where { it.flag != true }                 // e0.flag is distinct from true
+.where { it.flag == true }                 // e0.flag = true
+.where { it.flag != true }                 // e0.flag <> true   （不返回 NULL 行：SQL 语义）
 .where { it.active == (it.status!! > 1) }  // (e0.active = true and e0.status > 1) or (e0.active = false and e0.status <= 1)
 ```
 
@@ -255,7 +255,7 @@ where o1_0.customer_id=5
 
 .where { it.customer == null || it.customer?.name == null }
 // 没有 customer 的订单，以及 customer 没有名字的订单
-// select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name is null
+// select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name is null
 ```
 
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `no-association`：
@@ -273,7 +273,7 @@ where o1_0.customer_id is null
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
+join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is null or c1_0.name is null
 ```
 
@@ -381,7 +381,7 @@ lambdaQL 不会添加保护：NULL 主体既不会被 `in` 返回，**也**不�
 | `it.description!!.contains(s)` | `e0.description like :p1 escape '\'` | |
 | `it.description?.startsWith("A") == true` | 相同的 `like` | 也受支持 |
 | `startsWith(s, ignoreCase = true)`、`equals(s, ignoreCase = true)` | 取决于列（见下文） | D24 |
-| `it.description.equals(text)` | null 安全，与 `==` 相同 | |
+| `it.description.equals(text)` | 与 `==` 相同 | |
 | `it.description!!.lowercase() == "abc"` | `lower(e0.description) = 'abc'` | 列上有函数：不会使用普通索引 |
 | `it.description!!.length > 3` | `length(e0.description) > 3` | 长度单位可能因数据库而异 |
 | `it.description.isNullOrEmpty()` | `(e0.description is null or e0.description = :p1)` | 在 Oracle 上 `''` 就是 NULL |
@@ -429,7 +429,7 @@ class OrderRepo(private val qb: QueryBuilder) {
 }
 ```
 
-捕获的 `null` 可以用在 null 安全的写法（`==`、`!=`）中，以及同一个值的 null 保护之下
+捕获的 `null` 可以用在 `==` 和 `!=` 中（生成 `is null` / `is not null`），以及同一个值的 null 保护之下
 （`lo == null || ...`）。这个保护会在查询执行时在应用程序中决定，因此 `lo == null` 时这个 `where` 不添加任何过滤。在其他地方（`lo == null` 时的 `it.status!! > lo!!`），lambdaQL 会在
 绑定该值时抛出错误。捕获的 `NaN` 或 `Infinity` 总是报错。
 
@@ -481,7 +481,7 @@ class OrderRepo(private val qb: QueryBuilder) {
 | 数字上的 `< > <= >=`（可空时加 `!!`） | 支持 |
 | `BigDecimal`、`String`、`LocalDate`、`BigInteger` 上的 `< > <= >=` | 支持（它们编译为 `compareTo`） |
 | `x.compareTo(y) > 0` | 支持，理解为 `x > y` |
-| `==`、`!=` | 支持（null 安全的值相等，[9.4](#94-equality----and-areequal)） |
+| `==`、`!=` | 支持（按 SQL 语义的值相等，[9.4](#94-equality----and-areequal)） |
 | `===`、`!==` | 支持，值相等 |
 | enum `==` | 支持 |
 | enum `<`、`>` | 支持。lambdaQL 把它展开为由 enum 常量组成的 `in (...)`，所以 ORDINAL 和 STRING 映射都可以使用 |

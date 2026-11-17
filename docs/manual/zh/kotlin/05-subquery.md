@@ -1,5 +1,8 @@
 # 5. 子查询（Kotlin）
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/05-subquery.md)。
+
 > [!NOTE]
 > **状态**
 > - **已实现**（里程碑 M8-1），并在 H2 2.3、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上测试：select、update 和 delete 的 `where { o, sub -> ... }` 中的子查询。包括 `exists` / `!exists`、`in`、`!in`（写成 NOT EXISTS）、标量聚合、top-1 写法、关联子查询和嵌套子查询，以及捕获值。大多数测试使用 **Java** Lambda。
@@ -160,7 +163,7 @@ qb.from(Order::class.java)
     .where { o, sub -> o.status !in sub.from(Customer::class.java).select { c -> c.grade } }
     .toList()
 // HQL: select e0 from Order e0
-//      where not exists (select 1 from Customer s1 where s1.grade = e0.status)
+//      where e0.status not in (select s1.grade from Customer s1)
 ```
 
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sub-not-in`：
@@ -169,7 +172,7 @@ qb.from(Order::class.java)
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-where not exists(select 1 from customers c2_0 where c2_0.grade=o1_0.status)
+where o1_0.status not in (select c2_0.grade from customers c2_0)
 ```
 
 原因：
@@ -221,9 +224,8 @@ from orders o1_0
 where exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id and i1_0.qty>?)
 ```
 
-**关联中的 `==`。** `i.order?.id == o.id` 比较两个 `Long?` 值。按照通常的规则，这是 null 安全的比较（`is not distinct from`，见 [3.6](03-where.md#36-null-rules)）。
-但 `o.id` 是 `@Id`，永远不会是 NULL。这种情况下 lambdaQL 会写成简单的 `=`（`!=` 写成 `(a <> b or a is null)`）。
-结果相同，而且数据库可以使用索引。在 Oracle 上，`is not distinct from` 会变成 `decode(...)`，无法使用索引。
+**关联中的 `==`。** `i.order?.id == o.id` 比较两个 `Long?` 值。两个实体值按 SQL 语义比较（决策 D48，见 [3.6](03-where.md#36-null-rules)），因此 lambdaQL 写成简单的 `=`（`!=` 写成 `<>`）。
+数据库可以使用索引。
 
 <a id="57-scalar-subqueries"></a>
 ## 5.7 标量子查询
@@ -358,7 +360,7 @@ where exists(select 1 from orders o1_0 where o1_0.customer_id=c1_0.id and exists
 
 在子查询内部，条件、路径和 NULL 的行为与外部查询**完全相同**（[3. 条件](03-where.md)）：
 
-- 两个可空值之间的 `==` 是 null 安全的值比较。
+- 两个实体值之间的 `==` 是按 SQL 语义的值比较（D48）；捕获的 `null` 生成 `is null`。
 - `!!` 会被忽略。路径上的 `?.` 指向同一列。
 - 子查询自身实体的关联路径遵循与外部 `where` 相同的 join 规则（决策 D36）：默认是内连接 `join`，当 null 守卫保留没有关联的行时是 `left join`。
 - 以 `@Id` 结尾的路径是外键列（不需要 join）。
@@ -386,7 +388,7 @@ where exists(select 1 from orders o1_0 where o1_0.customer_id=c1_0.id and exists
 | Q2 | **NOT IN 输出为 NOT EXISTS**：`x !in values` 变成 `not exists (select 1 from C c where <condition> and c.sel = x)`。这样可以避开 `NOT IN` + NULL 的陷阱 |
 | Q3 | 标量子查询必须返回一行：聚合（`max`、`min`、`avg`、`sum`、`count`）或 `orderBy { }.limit(1)...first()`。其他任何 `first()` 都是错误 |
 | Q4 | 子查询排序：带 `limit` 时保留，不带 `limit` 时删除并发出警告。`IN (... limit)` 会被包装成派生表。MariaDB 用 `row_number()` 改写 `lateral` 尚未实现 |
-| Q5 | 在关联中，当一侧永远不会是 NULL（`@Id`、`nullable = false`、基本类型）时，`==` 写成 `=`。`!=` 变成 `(a <> b or a is null)`。这样可以保留索引的使用 |
+| Q5 | 在关联中，`==` 写成 `=`，`!=` 写成 `<>`（SQL 语义，D48）：任一侧为 NULL 时不匹配。这样可以保留索引的使用 |
 | Q6 | 子查询的 `where` 可以接收自己的 `sub` 参数：`where { i, sub2 -> ... }`。同样的规则在每一层都适用 |
 
 ---

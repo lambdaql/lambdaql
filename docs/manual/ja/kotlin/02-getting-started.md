@@ -1,6 +1,9 @@
 <a id="2-getting-started-kotlin"></a>
 # 2. はじめよう（Kotlin）
 
+> [!IMPORTANT]
+> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/02-getting-started.md)を参照してください。
+
 > [!NOTE]
 > **状況:** 現在、lambdaQL をソースからビルドし、テストを実行できます。
 > `where` の条件と `toList()` は最初から最後まで動きます。H2、MariaDB、Oracle でテスト済みで、ほとんどは **Java** のラムダを使っています。Kotlin のラムダは、`?.` のパス、キャプチャ値、`in`、サブクエリ、data class と `groupBy` を使う `select`、更新、挿入、削除をテストしています（[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)）。

@@ -1,6 +1,9 @@
 <a id="10-rules-and-limits-java"></a>
 # 10. ルールと制限（Java）
 
+> [!IMPORTANT]
+> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/10-rules-and-limits.md)を参照してください。
+
 > [!NOTE]
 > **状況: 一部実装済み。**
 > この章には lambdaQL の設計のルールをまとめています。ラムダがどのように SQL になるか、NULL がどう扱われるか、
@@ -81,18 +84,17 @@ lambdaQL は **ラムダを決して実行しません**。バイトコードを
 | Oracle の言語インデックス `NLSSORT(... BINARY_CI)` | `e0.name collate binary_ci = :p1` | |
 | 手段がない | 起動時に WARN（strict モード: エラー） | |
 
-**片方が NOT NULL のときの null-safe 比較**
+**普通の `=` と `<>` による等価比較**（決定 D48）
 
 ```java
 .where(o -> o.getDescription() == text)   // クエリの実行時に text は null ではない
-// e0.description = :p1                       （"is not distinct from" ではない）
+// e0.description = :p1
 .where(o -> o.getDescription() != text)
-// (e0.description <> :p1 or e0.description is null)
+// e0.description <> :p1                      （description が NULL の行は一致しない）
 ```
 
-Oracle では `is not distinct from` は `decode(...)` になり、インデックスを使えません。
-そのため、片方が NOT NULL だと分かっている場合（`@Id`、`nullable = false`、プリミティブのプロパティ、
-null ではないバインド値）、lambdaQL は普通の `=` を書きます。
+lambdaQL は `is [not] distinct from` を書きません。Oracle ではこれが `decode(...)` になり、インデックスを使えないからです。
+エンティティの値は SQL の意味に従うので、普通の `=` や `<>` が常に正しい形です。キャプチャした `null` は `is null` / `is not null` になります。
 
 **2 つの boolean 式の比較**（D25）
 
@@ -143,10 +145,13 @@ MariaDB では、`NOT DETERMINISTIC`（デフォルト）の関数は、引数�
 | ラムダ | SQL | NULL の動作 |
 |---|---|---|
 | `o.getId() == 10L`（アンボクシング、片方がプリミティブ） | `e0.id = 10` | NULL: UNKNOWN で、行は選ばれない（Java なら NPE を投げる） |
-| `o.getId() == p`（2 つのオブジェクト: `Long`、`String`、enum、...） | null-safe の `is not distinct from`、または片方が NOT NULL なら `=` | `null == null` は true |
+| `o.getId() == p`（2 つのオブジェクト: `Long`、`String`、enum、...） | `e0.id = :p1`。キャプチャした `null`: `is null` | カラムが NULL: 選ばれない。キャプチャした `null` は Java に従う（`is null`） |
+| `o.getDescription() != p` | `e0.description <> :p1`。キャプチャした `null`: `is not null` | カラムが NULL: 選ば **れない**（SQL の意味、D48。Java なら選ばれる） |
+| `o.getDescription() == o.getCustName()`（エンティティの値どうし） | `e0.description = e0.custName` | どちらかが NULL: 選ばれない。NULL と NULL も同じ（SQL の意味、D48） |
 | `o.getDescription().equals(p)` | `e0.description = :p1` | description が NULL: UNKNOWN（Java なら NPE を投げる） |
-| `Objects.equals(o.getDescription(), p)`、`"x".equals(o.getDescription())`、`Boolean.TRUE.equals(o.getActive())` | null-safe | Java と同じ |
-| `!Boolean.TRUE.equals(o.getActive())` | `e0.active is distinct from true` | Java と同じ。3 つの DB すべてで動く |
+| `Objects.equals(o.getDescription(), p)`、`"x".equals(o.getDescription())`、`Boolean.TRUE.equals(o.getActive())` | `==` と同じ | `==` と同じ |
+| `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | NULL: 選ばれない（SQL の意味） |
+| `!o.getActive()`（nullable な `Boolean`） | `e0.active = false` | NULL: 選ばれない（NULL は false ではない） |
 | `x == null`、`x != null` | `is null`、`is not null` | 2 値 |
 | NULL になれないカラム（id、プリミティブ、`nullable = false`、パスに関連のステップがない）での `o.getId() == null` | `1=0`。比較と並ぶとチェックは取り除かれる: `o.getId() != null && o.getId() == id` は `e0.id = :p1`（テスト済み） | カラムに NULL はない。関連を通るパス（`o.getCustomer().getId()`）ではチェックが残る |
 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR` | SQL の 3 値論理 |
@@ -166,7 +171,7 @@ MariaDB では、`NOT DETERMINISTIC`（デフォルト）の関数は、引数�
 
 | キャプチャ値の場所 | `null` を使えるか |
 |---|---|
-| null-safe の書き方: オブジェクト同士の `==` / `!=`、`Objects.equals`、`"x".equals(col)` | はい |
+| オブジェクト同士の `==` / `!=`、`Objects.equals`、`"x".equals(col)` | はい。`is null` / `is not null` になる |
 | 同じ値に対する null ガードの下: `p == null \|\| o.getStatus() > p` | はい。ガードはクエリの実行時に Java の中で決まる: `p == null` なら絞り込みなし、それ以外の値なら `e0.status > :p1` |
 | `p.equals(col)` のレシーバー、`col.equals(p)` の引数、アンボクシングの比較、`<` `<=` `>` `>=` | **いいえ。** 値をバインドするときにエラー（Java なら NPE を投げるか、常に false） |
 | `in` で使う、`null` 要素を含むコレクション | **いいえ。** バインドするときにエラー |
@@ -180,10 +185,10 @@ MariaDB では、`NOT DETERMINISTIC`（デフォルト）の関数は、引数�
 | # | ラムダの書き方 | 意味 |
 |---|---|---|
 | R1 | プリミティブの比較、または片方がプリミティブ（`o.getId() == 10L`、`o.getStatus() > p`） | `=`、`<>`、`<`、... SQL の NULL のルール |
-| R2 | オブジェクトの `==` / `!=`（`Long`、`String`、`Boolean`、enum） | null-safe の値の等価。オブジェクトの同一性ではない |
+| R2 | オブジェクトの `==` / `!=`（`Long`、`String`、`Boolean`、enum） | 値の等価（オブジェクトの同一性ではない）。SQL の意味による `=` / `<>`（D48）。キャプチャした `null` は `is null` / `is not null` になる |
 | R3 | `x == null`、`x != null` | `IS NULL`、`IS NOT NULL` |
 | R4 | `a.equals(b)` | `a = b`、SQL の NULL のルール |
-| R5 | `Objects.equals(a, b)`、`"x".equals(a)`、`Boolean.TRUE.equals(a)` | null-safe の値の等価 |
+| R5 | `Objects.equals(a, b)`、`"x".equals(a)`、`Boolean.TRUE.equals(a)` | R2 と同じ |
 | R6 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR`。SQL の 3 値論理 |
 | R7 | 文字列の値の比較 | **DB の照合順序** に従う（大文字小文字、末尾の空白）。Oracle は `''` を NULL として扱う |
 | R8 | エンティティ `==` エンティティ | 予定: 識別子の等価。v0.1 にはない |
@@ -213,9 +218,9 @@ MariaDB では、`NOT DETERMINISTIC`（デフォルト）の関数は、引数�
 
 | # | 違い | lambdaQL の動作 |
 |---|---|---|
-| G1 | `status` が NULL のとき、Java では `!Objects.equals(status, 1)` は true。SQL では `status <> 1` は UNKNOWN | null-safe（`is distinct from`）で出力し、Java と同じ行になる |
-| G2 | `!Boolean.TRUE.equals(active)` と `NOT active` | `active is distinct from true` を出力する（3 つの DB すべてで動く） |
-| G3 | NULL パラメーターでの `name = ?` は 0 行を返す | null-safe の書き方は `is [not] distinct from` を使う |
+| G1 | `status` が NULL のとき、Java では `!Objects.equals(status, 1)` は true。SQL では `status <> 1` は UNKNOWN | `status <> 1` を出力する: SQL の意味（D48）。NULL の行は除かれ、`LQL-5009` が `DEBUG` レベルでログに出る。残すには `status == null \|\| ...` と書く |
+| G2 | `!Boolean.TRUE.equals(active)`、`!active`（nullable）と Java の違い | `active <> :p1` と `active = false` を出力する: NULL の Boolean は false ではない（SQL の意味） |
+| G3 | NULL パラメーターでの `name = ?` は 0 行を返す | キャプチャした `null` は `name is null` になる（キャプチャした値に対する Java のルール） |
 | G4 | `status NOT IN (1, NULL)` は常に 0 行を返す | キャプチャしたコレクションの `null` はエラー。サブクエリの `NOT IN` は `NOT EXISTS` |
 | G5 | Java は NPE を投げる（アンボクシング、`o.getName().startsWith(...)`）が、SQL はただ行を返す | ドキュメントに記載: エンティティの NULL は SQL のルールに従う |
 | G6 | `NaN`: H2 は NaN を最大の値としてソートし、`NaN = NaN` は true。MariaDB は保存できない。Oracle は `BINARY_DOUBLE` でだけ保存できる | キャプチャした NaN や Infinity はエラー。保存された NaN は DB に従う |
@@ -269,7 +274,7 @@ lambdaQL は、NULL になりうるすべてのキーについて HQL に `nulls
 
 | 項目 | H2 | MariaDB | Oracle |
 |---|---|---|---|
-| `is not distinct from` | ネイティブ | `<=>`（インデックスを使う） | `decode(...)`（インデックスなし）。そのため lambdaQL は可能なら `=` を優先する |
+| `is not distinct from` | ネイティブ | `<=>`（インデックスを使う） | `decode(...)`（インデックスなし）。lambdaQL はこれを書かない（D48） |
 | `is [not] true`、`coalesce(boolean, false)` | 動く | 動く | **ORA-00932**。lambdaQL はこれらを書かない |
 | 空文字列 `''` | 値 | 値 | **NULL** |
 | 大文字小文字と末尾の空白 | 厳密 | `_ci`: 無視 | 厳密（ソートには `NLS_SORT`） |
@@ -483,7 +488,7 @@ List<Order> list = flag
 | 項目 | バージョン |
 |---|---|
 | Java | 21（javac）。ECJ は保証しない |
-| Hibernate | 6.6（設計は 6.6.5 で確認）。HQL の拡張（たとえば `is distinct from`）を使う。他の JPA プロバイダーは保証しない |
+| Hibernate | 6.6（設計は 6.6.5 で確認）。HQL の拡張（たとえば `function(...)` や `nulls first`）を使う。他の JPA プロバイダーは保証しない |
 | データベース | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
 | Spring | Spring Boot 3.4.2 と Spring Data JPA 3.4.2（Spring モジュール、[12](12-spring-data-jpa.md)）。Spring Boot 4 はまだ検証していません |
 | テストしていない | PostgreSQL、SQL Server、Oracle 19c 以前（たとえば PL/SQL の `BOOLEAN` パラメーター） |

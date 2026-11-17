@@ -1,6 +1,9 @@
 <a id="3-conditions-where-kotlin"></a>
 # 3. 条件（`where`）（Kotlin）
 
+> [!IMPORTANT]
+> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/03-where.md)を参照してください。
+
 > [!NOTE]
 > **状況**
 > - **実装済み、H2・MariaDB・Oracle でテスト済み:** `where` の条件と `toList()`（カラムへのマッピング、HQL の出力、クエリの実行）。ほとんどのテストは **Java** のラムダを使っています。
@@ -186,8 +189,9 @@ val wanted = if (flag) 1 else 2
 
 ここがいちばん重要な部分です。簡単な原則が 2 つあります。
 
-1. **null チェックを書いた場所では、lambdaQL はそれを使います。**（`== null`、`!= null`、`?.`、`?:`、2 つの nullable な値の間の `==`）
-2. **書いていない場所では、lambdaQL は SQL の意味を使います。** カラムが NULL なら比較は UNKNOWN になり、その行は返されません。
+1. **null チェックを書いた場所では、lambdaQL はそれを使います。**（`== null`、`!= null`、`?.`、`?:`）
+2. **書いていない場所では、lambdaQL は SQL の意味を使います。** カラムが NULL なら比較は UNKNOWN になり、その行は返されません。これはエンティティの値どうしの `==` と `!=` にも当てはまります（決定 D48）。結果が Kotlin と異なりうるとき、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します。
+3. **キャプチャした値は Kotlin のルールをそのまま使います。** キャプチャした値は先に計算されます。キャプチャした `null` は `is null` または `is not null` になります。
 
 Kotlin コンパイラーは、バイトコードに **隠れた** null チェックを追加します（たとえば `status` が `Int?` のときの `it.status == 1`）。lambdaQL はそれを **無視** します（決定 D22）。意味を持つのは、ソースコードにある null チェックだけです。
 そのため、同じ意味の Kotlin のラムダと Java のラムダは、同じ SQL になります。
@@ -200,8 +204,9 @@ Kotlin コンパイラーは、バイトコードに **隠れた** null チェ�
 | R12 | nullable なカラムと、定数または non-null の値: `it.status == 1`、`it.id == id`（`id: Long`） | `e0.status = 1`、`e0.id = :p1` | SQL の意味。カラムが NULL: 行は返されない |
 | R12 | `it.status != 1` | `e0.status <> 1` | SQL の意味。カラムが NULL: 行は返され **ない** |
 | R1 | 大小比較: `it.price!! > p`、`it.status!! <= 3` | `e0.price > :p1`、`e0.status <= 3` | SQL の意味 |
-| R11 | どちらも NULL になりうる 2 つの値: `it.status == q`（`q: Int?`）、`it.description == text`（`String?`）、enum の `==` | `e0.status is not distinct from :p1` | **null 安全な値の比較。** `null == null` は true。片方だけ null: false |
-| R11 | `it.status != q`（両方 nullable） | `e0.status is distinct from :p1` | null 安全。`q` が null でなければ、NULL の行が返 **される** |
+| R11 | nullable なカラムと nullable なキャプチャした値: `it.status == q`（`q: Int?`）、`it.description == text`（`String?`）、enum の `==` | `e0.status = :p1`。キャプチャした `null`: `e0.status is null` | 値の比較。カラムが NULL: 行は返されない |
+| R11 | `it.status != q` | `e0.status <> :p1`。キャプチャした `null`: `e0.status is not null` | SQL の意味（D48）。カラムが NULL: 行は返され **ない**（Kotlin なら返される） |
+| R11 | エンティティの値どうし: `it.description == it.custName` | `e0.description = e0.custName` | SQL の意味（D48）。どちらかが NULL: 行は返されない（NULL と NULL も同じ） |
 | R3 | `x == null`、`x != null` | `x is null`、`x is not null` | |
 | R17 | `===`、`!==` | `==`、`!=` と同じ | オブジェクトの同一性ではなく、値の比較 |
 | R9 | キャプチャした値 | バインドパラメーター | [3.6.4](#364-captured-null-values) を参照 |
@@ -215,27 +220,17 @@ Kotlin の `==` はもともと値を比較します。lambdaQL では、`===` �
 ```kotlin
 val status: Int? = request.status    // null かもしれない
 .where { it.status == status }
-// HQL: e0.status is not distinct from :p1
-//   status = 3    -> status が 3 の行
-//   status = null -> status が NULL の行
+//   status = 3    -> HQL: e0.status = :p1    status が 3 の行
+//   status = null -> HQL: e0.status is null  status が NULL の行
 ```
 
-Hibernate がデータベースごとに `is not distinct from` をどう書くか（確認済み）:
-
-| データベース | SQL |
-|---|---|
-| H2 | `status is not distinct from ?` |
-| MariaDB | `status <=> ?` |
-| Oracle | `decode(status, ?, 0, 1) = 0` |
-
-片方が決して NULL にならないと lambdaQL が分かっている場合は、代わりに単純な `=` を書きます。結果は同じで、データベースはインデックスを使えます（[10.2](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql) を参照）。
-「決して NULL にならない」とは、`@Id`、`nullable = false` のカラム、プリミティブのプロパティ（`Int`、`Long`、`Double`、`Boolean`）、またはクエリの実行時に null でないキャプチャ値のことです。
+カラムを関数で包むことはないので、データベースはインデックスを使えます（[10.2](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql) を参照）。
 
 ```kotlin
 .where { it.description == text }    // クエリの実行時に text は null ではない
 // HQL: e0.description = :p1
 .where { it.description != text }
-// HQL: (e0.description <> :p1 or e0.description is null)
+// HQL: e0.description <> :p1          （description が NULL の行は一致しない: SQL の意味）
 ```
 
 **NULL になれないカラム: `it.id == id`。** 例のエンティティでは、`id` は `Long?` です。Kotlin は `it.id == id`（キャプチャした `id: Long`）を、null チェックと比較にコンパイルします。
@@ -282,13 +277,26 @@ id は NULL になれないので、それに対する `is null` は常に偽で
 
 ```kotlin
 val q: Int? = 3
-.where { it.status != 3 }    // e0.status <> 3                                 NULL の行は返されない
-.where { it.status != q }    // (e0.status <> :p1 or e0.status is null)        NULL の行が返される
+.where { it.status != 3 }    // e0.status <> 3       NULL の行は返されない
+.where { it.status != q }    // e0.status <> :p1     NULL の行はこちらも返されない（SQL の意味、D48）
 ```
 
-2 つめの書き方は、どちらも NULL になりうる 2 つの値を比較しています。Kotlin は null に対する結果を定めているので、lambdaQL はそれを守ります（null 安全）。
+どちらの書き方も NULL の行を除きます。Kotlin では `null != 3` は `true` なので、Kotlin ならそれらの行を返します。このようなことが起こりうるとき、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します（条件ごとに 1 回）。NULL の行を残すには、null チェックを書いてください: `it.status == null || it.status != q`。
 
-`String?` に対する `it.description.equals(text)` は `==` と同じです（null 安全）。
+`String?` に対する `it.description.equals(text)` は `==` と同じです。
+
+**エンティティの値に対する SQL の意味**（決定 D48）。これについての Kotlin のテストはまだありません。同じルールを Java で H2、MariaDB、Oracle でテストしています（[`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)、リージョン `sql-meaning`、[このページの Java 版](../java/03-where.md#363-write-your-null-checks-yourself) を参照）。次は設計上の例です。
+
+```kotlin
+// two entity values: = and <> as in SQL; a row with a NULL on either side matches neither
+qb.from(Order::class.java).where { it.description == it.custName }.toList()     // e0.description = e0.custName
+// an entity value and a value: a NULL column does not match <>
+qb.from(Order::class.java).where { it.description != text }.toList()           // e0.description <> :p1
+// to keep the NULL rows, say so in the lambda
+qb.from(Order::class.java).where { it.description == null || it.description != text }.toList()
+// a NULL Boolean is not false
+qb.from(Coded::class.java).where { it.vip == false }.toList()                   // e0.vip = false
+```
 
 `?.`、`?:`、`!!` についての詳細: [9. Kotlin の注意点](09-kotlin-notes.md)。
 
@@ -297,7 +305,7 @@ val q: Int? = 3
 
 | 書き方 | キャプチャした値が `null` のとき |
 |---|---|
-| null 安全な書き方: `it.status == q`、`it.description != text` | 許可 |
+| キャプチャした値との `==` と `!=`: `it.status == q`、`it.description != text` | 許可: `is null` / `is not null` |
 | 大小比較: `it.price!! > min!!`、すべての `<`、`<=`、`>`、`>=` | クエリの実行時に **例外** |
 | `in` で使うコレクションの中の `null` の要素 | クエリの実行時に **例外** |
 
@@ -339,6 +347,16 @@ where o1_0.price>?
 
 これについての Kotlin のテストはまだありません。同じガードを Java で書いたものはテスト済みです。[このページの Java 版](../java/03-where.md#364-captured-null-values) を参照してください。
 
+<a id="365-converted-attributes-convert"></a>
+### 3.6.5 変換される属性（`@Convert`）
+
+JPA の `AttributeConverter` を持つ属性は、Kotlin の値で比べます。Hibernate 6.6 は、このような属性と比べるリテラルを変換し、バインドパラメーターも変換します（H2、MariaDB、Oracle で確認済み）。テストは Java で書いています（[`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java)、リージョン `convert`）。次は設計上の例です。
+
+```kotlin
+// code is stored reversed ("abc" as "cba"); vip is stored as 'Y'/'N' (YesNoConverter)
+qb.from(Coded::class.java).where { it.code == "abc" }.toList()   // e0.code = 'abc': Hibernate converts the literal
+```
+
 <a id="37-boolean-columns"></a>
 ## 3.7 boolean のカラム
 
@@ -349,8 +367,9 @@ where o1_0.price>?
 |---|---|---|
 | `it.active` | `e0.active = true` | –（NULL にならない） |
 | `!it.active` | `e0.active = false` | – |
-| `it.flag == true` | `e0.flag is not distinct from true` | 返されない |
-| `it.flag != true` | `e0.flag is distinct from true` | **返される**（Kotlin と同じ） |
+| `it.flag == true` | `e0.flag = true` | 返されない |
+| `it.flag != true` | `e0.flag <> true` | **返されない**（SQL の意味、D48。Kotlin なら返される） |
+| `it.flag == false` | `e0.flag = false` | 返されない（NULL は false ではない） |
 | `it.flag ?: false` | `(e0.flag is not null and e0.flag = true)` | 返されない |
 | `!(it.flag ?: false)` | `(e0.flag is null or not (e0.flag = true))` | **返される** |
 | `it.flag!!` | `e0.flag = true` | 返されない（`!!` は無視される） |
@@ -479,7 +498,7 @@ where c1_0.name=?
 
 ```kotlin
 .where { it.customer == null || it.customer?.name == name }
-// HQL: select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1
+// HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name = :p1
 
 .where { it.customer != null && it.customer?.name == name }
 // HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is not null and j1.name = :p1
@@ -491,7 +510,7 @@ where c1_0.name=?
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
+join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is null or c1_0.name=?
 ```
 

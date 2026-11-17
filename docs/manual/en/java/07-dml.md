@@ -1,5 +1,8 @@
 # 7. Update, insert, delete (Java)
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/java/07-dml.md) for the latest rules.
+
 > [!NOTE]
 > **Status**
 > - **Implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5, milestone M10, decisions D28 and D40): update (setters, `by.set`, many `set()` calls, `@Version`), delete, insert (one row, a list, a generated id, `insert ... select`), upsert, the checks for rules U1, U3, U4 and U6, and (decision D41) `limit` for update and delete and the one-row protection `executeOne()`.
@@ -241,7 +244,7 @@ lambdaQL writes the subqueries itself. The statement then reads only its own tab
 
 A select uses an inner join for a path in `where` (decision D36). So in DML, lambdaQL adds `e0.customer.id is not null` for such a path.
 Then `update` and `delete` touch **exactly the rows** that `qb.from(X.class).where(same lambda)` returns (tested: the deleted rows are compared with the select).
-A null guard such as `o.getCustomer() == null || ...` keeps rows without a customer in the select, so that path gets no `is not null` check.
+A null guard such as `o.getCustomer() == null || ...` does not change this: the select uses an inner join for the path too (decision D48), so the check stays.
 
 A path that ends with the `@Id` (`o.getCustomer().getId()`) is the FK column. No subquery, no join.
 

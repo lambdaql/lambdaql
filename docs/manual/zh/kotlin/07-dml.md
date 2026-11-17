@@ -1,5 +1,8 @@
 # 7. 更新、插入、删除（Kotlin）
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/07-dml.md)。
+
 > [!NOTE]
 > **状态**
 > - **已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（Hibernate 6.6.5，里程碑 M10，决定 D28 和 D40）：更新、删除、插入、`insert ... select`、upsert，以及（决定 D41）更新和删除的 `limit` 与单行保护 `executeOne()`。大多数测试使用 **Java** Lambda。

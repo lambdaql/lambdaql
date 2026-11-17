@@ -1,5 +1,8 @@
 # 5. 子查询（Java）
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/05-subquery.md)。
+
 > [!NOTE]
 > **状态**
 > - **已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（Hibernate 6.6.5，里程碑 M8-1）：select、update 和 delete 的 `where((o, sub) -> ...)` 中的子查询。包括 `exists` / `not exists`、`contains`（IN）、`!contains`（写成 NOT EXISTS）、标量聚合（`count`、`sum`、`avg`、`min`、`max`）、top-1 写法 `orderBy(...).limit(1)...first()`、关联子查询和嵌套子查询，以及捕获值。
@@ -132,12 +135,14 @@ where o1_0.customer_id in (select c2_0.id from customers c2_0 where c2_0.grade i
 **(已测试)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)，region `not-in`：
 
 ```java
-// the grades are 5, 2 and NULL. SQL "not in" would give no rows because of the NULL;
-// lambdaQL writes NOT EXISTS, which gives the same rows as Java (rule Q2)
+// the SQL meaning (D48): NOT IN. The grades are 5, 2 and NULL, so no row matches: x NOT IN (5, 2, NULL)
+// is never true. To skip the NULL, say so in the subquery: where(c -> c.getGrade() != null)
 SelectQuery<Order> q = qb.from(Order.class)
         .where((o, sub) -> !sub.from(Customer.class).select(c -> c.getGrade()).contains((int) o.getStatus()));
-assertEquals("select e0 from Order e0 where not exists (select 1 from Customer s1 where s1.grade = e0.status)",
-        q.toHql().hql());
+assertEquals("select e0 from Order e0 where e0.status not in (select s1.grade from Customer s1)", q.toHql().hql());
+SelectQuery<Order> withoutNull = qb.from(Order.class)
+        .where((o, sub) -> !sub.from(Customer.class).where(c -> c.getGrade() != null).select(c -> c.getGrade())
+                .contains((int) o.getStatus()));
 ```
 
 **各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sub-not-in`：
@@ -146,7 +151,7 @@ assertEquals("select e0 from Order e0 where not exists (select 1 from Customer s
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-where not exists(select 1 from customers c2_0 where c2_0.grade=o1_0.status)
+where o1_0.status not in (select c2_0.grade from customers c2_0)
 ```
 
 原因：
@@ -194,9 +199,8 @@ from orders o1_0
 where exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id and i1_0.qty>?)
 ```
 
-**关联中的 `==`。** `i.getOrder().getId() == o.getId()` 比较的是两个 `Long` 对象。按照通常的规则，这是一次 null 安全比较（`is not distinct from`，见 [3.6](03-where.md#36-null-rules)）。
-但 `o.id` 是 `@Id`，永远不会是 NULL。这种情况下 lambdaQL 会写成简单的 `=`（`!=` 则写成 `(a <> b or a is null)`）。
-结果相同，而且数据库可以使用索引。在 Oracle 上，`is not distinct from` 会变成 `decode(...)`，无法使用索引。
+**关联中的 `==`。** `i.getOrder().getId() == o.getId()` 比较的是两个 `Long` 对象。两个实体值按 SQL 语义比较（决策 D48，见 [3.6](03-where.md#36-null-rules)），因此 lambdaQL 写成简单的 `=`（`!=` 则写成 `<>`）。
+数据库可以使用索引。
 
 <a id="57-scalar-subqueries"></a>
 ## 5.7 标量子查询
@@ -335,7 +339,7 @@ Java 不允许在嵌套的 Lambda 中重复使用同一个名字。请在每一�
 
 在子查询内部，条件、路径和 NULL 的行为与外层查询**完全相同**（[3. 条件](03-where.md)）：
 
-- 对象上的 `==` 是 null 安全的值比较。
+- 对象上的 `==` 是按 SQL 语义的值比较（D48）；捕获的 `null` 生成 `is null`。
 - 子查询自身实体的关联路径遵循与外层 `where` 相同的 join 规则（决策 D36）：默认是内连接 `join`，当 null 守卫保留没有关联的行时是 `left join`。
 - 以 `@Id` 结尾的路径是外键列（不需要 join）。
 - **外层实体**只能使用它自己的列和外键 id（`o.getId()`、`o.getCustomer().getId()`）。需要 join 的外层实体路径（`o.getCustomer().getName()`）会在分析时报错。请改为比较外键 id。
@@ -362,7 +366,7 @@ Java 不允许在嵌套的 Lambda 中重复使用同一个名字。请在每一�
 | Q2 | **NOT IN 被渲染为 NOT EXISTS**：`!values.contains(x)` 变成 `not exists (select 1 from C c where <condition> and c.sel = x)`。这样可以避开 `NOT IN` + NULL 的陷阱 |
 | Q3 | 标量子查询必须返回一行：聚合（`max`、`min`、`avg`、`sum`、`count`）或 `orderBy(...).limit(1)...first()`。其他任何 `first()` 都是错误 |
 | Q4 | 子查询排序：带 `limit` 时保留，不带 `limit` 时删除并发出警告。`IN (... limit)` 会被包装成派生表。MariaDB 用 `row_number()` 改写 `lateral` 尚未实现 |
-| Q5 | 在关联中，当一侧永远不会是 NULL（`@Id`、`nullable = false`、基本类型）时，`==` 写成 `=`。`!=` 变成 `(a <> b or a is null)`。这样可以保留索引的使用 |
+| Q5 | 在关联中，`==` 写成 `=`，`!=` 写成 `<>`（SQL 语义，D48）：任一侧为 NULL 时不匹配。这样可以保留索引的使用 |
 | Q6 | 子查询的 `where` 可以接收自己的 `sub` 参数：`where((i, sub2) -> ...)`。同样的规则在每一层都适用 |
 
 ---

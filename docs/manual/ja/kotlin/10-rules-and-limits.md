@@ -1,6 +1,9 @@
 <a id="10-rules-and-limits-kotlin"></a>
 # 10. ルールと制限（Kotlin）
 
+> [!IMPORTANT]
+> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/10-rules-and-limits.md)を参照してください。
+
 > [!NOTE]
 > **状況: 一部実装済み。**
 > この章には、Kotlin 向けの lambdaQL の設計のルールをまとめています。ラムダがどのように SQL になるか、NULL がどう扱われるか、
@@ -79,18 +82,17 @@ lambdaQL は **ラムダを決して実行しません**。バイトコードを
 | Oracle の言語インデックス `NLSSORT(... BINARY_CI)` | `e0.description collate binary_ci = :p1` | |
 | 経路がない | 起動時に WARN（strict モード: エラー） | |
 
-**片側が NOT NULL のときの null-safe 比較**
+**普通の `=` と `<>` による等価比較**（決定 D48）
 
 ```kotlin
 .where { it.description == text }   // クエリの実行時に text は null ではない
-// e0.description = :p1                ("is not distinct from" ではない)
+// e0.description = :p1
 .where { it.description != text }
-// (e0.description <> :p1 or e0.description is null)
+// e0.description <> :p1               (description が NULL の行は一致しない)
 ```
 
-Oracle では、`is not distinct from` は `decode(...)` になり、インデックスを使えません。
-そのため、片側が NOT NULL だと分かっている場合（`@Id`、`nullable = false`、プリミティブのプロパティ、
-または null ではないバインド値）、lambdaQL は普通の `=` を書きます。
+lambdaQL は `is [not] distinct from` を書きません。Oracle ではこれが `decode(...)` になり、インデックスを使えないからです。
+エンティティの値は SQL の意味に従うので、普通の `=` や `<>` が常に正しい形です。キャプチャした `null` は `is null` / `is not null` になります。
 
 **2 つの boolean の式の比較**（D25）
 
@@ -151,13 +153,14 @@ MariaDB では、`NOT DETERMINISTIC`（デフォルト）の関数は、引数�
 | `it.status == 1`（`Int?` と定数） | `e0.status = 1` | NULL: UNKNOWN で、行は返されない。コンパイラーが隠れて追加する null チェックは無視される（D22） |
 | `it.status != 1` | `e0.status <> 1` | NULL: 行は返され **ない** |
 | `it.price!! > p` | `e0.price > :p1` | NULL: 行は返されない。`!!` は無視される（D23） |
-| `it.status == q`（両方 nullable: `q: Int?`、`String?`、enum） | null-safe の `is not distinct from`、または片側が NOT NULL なら `=` | `null == null` は true（Kotlin の意味） |
-| `it.status != q`（両方 nullable） | `is distinct from`、または `(a <> b or a is null)` | `q` が null でなければ NULL の行も返される（Kotlin の意味） |
-| `it.description.equals(text)`（`String?`） | `==` と同じ | null-safe |
+| `it.status == q`（両方 nullable: `q: Int?`、`String?`、enum） | `e0.status = :p1`。キャプチャした `null`: `is null` | カラムが NULL: 返されない。キャプチャした `null` は Kotlin に従う（`is null`） |
+| `it.status != q`（両方 nullable） | `e0.status <> :p1`。キャプチャした `null`: `is not null` | カラムが NULL: 返され **ない**（SQL の意味、D48。Kotlin なら返される） |
+| `it.description == it.custName`（エンティティの値どうし） | `e0.description = e0.custName` | どちらかが NULL: 返されない。NULL と NULL も同じ（SQL の意味、D48） |
+| `it.description.equals(text)`（`String?`） | `==` と同じ | `==` と同じ |
 | `x == null`、`x != null` | `is null`、`is not null` | 2 値 |
 | `it.id == id`（`it.id` は `Long?`、`id` はキャプチャした `Long`）、`it.id == null`: NULL になれないカラム（id、プリミティブ、`nullable = false`、パスに関連のステップがない） | `not (e0.id is null or e0.id <> :p1)` の代わりに `e0.id = :p1`。`it.id == null` は `1=0`（Java でテスト済み） | カラムに NULL はない。関連を通るパス（`it.customer?.id`）ではチェックが残る |
 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR` | SQL の 3 値論理 |
-| `it.flag == true` / `it.flag != true` | `is not distinct from true` / `is distinct from true` | Kotlin と同じ。3 つの DB すべてで動作 |
+| `it.flag == true` / `it.flag != true` | `e0.flag = true` / `e0.flag <> true` | NULL: 返されない（SQL の意味、D48） |
 | `it.flag ?: false`（条件） | `(e0.flag is not null and e0.flag = true)` | NULL は false として扱う |
 | `where` の中の `it.customer?.name`、`it.customer!!.name` | `j1.name` + `join e0.customer j1`（デフォルトで内部結合） | customer がない: 注文は返されない。`it.customer?.name == null` でも同じ |
 | `it.customer == null \|\| it.customer?.name == p` | `e0.customer is null or j1.name = :p1` + `left join e0.customer j1` | customer がない: Kotlin と同じく返される |
@@ -177,7 +180,7 @@ MariaDB では、`NOT DETERMINISTIC`（デフォルト）の関数は、引数�
 
 | キャプチャ値がある場所 | `null` を使えるか |
 |---|---|
-| null-safe の形: 2 つの nullable な値の間の `==` / `!=` | はい |
+| 2 つの nullable な値の間の `==` / `!=` | はい。`is null` / `is not null` になる |
 | 同じ値に対する null ガードの下: `p == null \|\| it.status!! > p` | はい。ガードはクエリの実行時にアプリケーションの中で決まる: `p == null` なら絞り込みなし、それ以外の値なら `e0.status > :p1` |
 | `!!` 付き、または大小比較（`<` `<=` `>` `>=`）の中: `it.price!! > p!!` | **いいえ。** 値をバインドするときにエラー（Kotlin なら NPE を投げる） |
 | `in` の中の、`null` の要素を持つコレクション | **いいえ。** バインドするときにエラー |
@@ -191,14 +194,14 @@ MariaDB では、`NOT DETERMINISTIC`（デフォルト）の関数は、引数�
 | # | ラムダの書き方 | 意味 |
 |---|---|---|
 | R1 | null でないプリミティブの比較、または `!!` の後の比較（`it.qty > 5`、`it.price!! > p`） | `=`、`<>`、`<`、... SQL の NULL のルール |
-| R2 | 参照の比較にコンパイルされる `==` / `!=`（enum の `==`。`===` は R17 を参照） | null-safe な値の等価。オブジェクトの同一性ではない |
+| R2 | 参照の比較にコンパイルされる `==` / `!=`（enum の `==`。`===` は R17 を参照） | 値の等価（オブジェクトの同一性ではない）。SQL の意味による `=` / `<>`（D48） |
 | R3 | `x == null`、`x != null` | `IS NULL`、`IS NOT NULL` |
 | R6 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR`。SQL の 3 値論理 |
 | R7 | 文字列の値の比較 | **DB の照合順序** に従う（大文字と小文字、末尾の空白）。Oracle は `''` を NULL として扱う |
 | R8 | エンティティ `==` エンティティ | 予定: 識別子の等価。v0.1 にはない（KC13） |
 | R9 | キャプチャ値 | 実行時の値を持つバインドパラメーター |
 | R10 | プロパティへのアクセス（`it.price`） | getter の呼び出し。JPA の属性にマッピングされる |
-| R11 | `Intrinsics.areEqual` にコンパイルされる Kotlin の `==`、`!=`（参照、または両側が nullable） | null-safe な値の等価。スキーマまたはバインド値によって片側が NOT NULL のときだけ `=` |
+| R11 | `Intrinsics.areEqual` にコンパイルされる Kotlin の `==`、`!=`（参照、または両側が nullable） | 値の等価: SQL の意味による `=` / `<>`（D48）。キャプチャした `null` は `is null` / `is not null` になる |
 | R12 | nullable なプリミティブとプリミティブ（`it.id == 1L`、`id: Long?`） | 隠れた null チェックは無視される: `e0.id = 1`、`e0.id <> 1` |
 | R13 | `!!` とその他のコンパイラーの null チェック | 無視される（D23） |
 | R14 | `?.` | NULL が伝わるパスまたは値。`?.` がない場合と同じカラム |
@@ -213,7 +216,7 @@ MariaDB では、`NOT DETERMINISTIC`（デフォルト）の関数は、引数�
 | R23 | プロパティ参照 `Order::price` | getter と同じ。`orderBy`（`orderBy(Order::price)`）では**まだ実装されていません**。`orderBy { it.price }` を使ってください |
 | R24 | 関連のパス（`it.customer?.name`、`it.customer!!.name`、Java のエンティティの `it.customer.name`） | カラム。to-one の関連: where、order by、select で共有するエイリアス。`where` ではデフォルトで内部結合、null ガードが関連のない行を残すときは `left join`（D36）。order by か select だけで使うなら `left join`。Embedded: 同じテーブル。対象の `@Id` で終わる、または関連を `null` と比較する: FK カラム、結合なし。コレクション: エラー |
 
-Java だけのルール R4（エンティティの値に対する `equals`）と R5（Java の null-safe なヘルパー）は [Java トラック](../java/10-rules-and-limits.md) にあります。Kotlin では、`==` がすでに null-safe の意味を持っています。
+Java だけのルール R4（エンティティの値に対する `equals`）と R5（Java の null-safe なヘルパー）は [Java トラック](../java/10-rules-and-limits.md) にあります。Kotlin では、`==` が R5 と同じ意味になります。
 
 その他のルール:
 
@@ -232,9 +235,9 @@ Java だけのルール R4（エンティティの値に対する `equals`）と
 
 | # | 違い | lambdaQL の動作 |
 |---|---|---|
-| G1 | null-safe な不等価: Kotlin では `null != 3` は true。SQL の `status <> 3` は UNKNOWN | 2 つの nullable な値の間の `!=` は null-safe（`is distinct from`）で、Kotlin と同じ行になる。定数との `!=` は SQL の意味を使う（D22） |
-| G2 | `it.flag != true` と `NOT flag` | `e0.flag is distinct from true` を出力する（3 つの DB すべてで動作） |
-| G3 | NULL のパラメーターを使う `name = ?` は 0 行を返す | null-safe の形は `is [not] distinct from` を使う |
+| G1 | Kotlin では `null != 3` は true。SQL の `status <> 3` は UNKNOWN | `!=` は `<>` を出力する: SQL の意味（D48）。NULL の行は除かれ、`LQL-5009` が `DEBUG` レベルでログに出る。残すには `it.status == null \|\| ...` と書く |
+| G2 | `it.flag != true` と Kotlin の違い | `e0.flag <> true` を出力する: NULL の Boolean は一致しない（SQL の意味） |
+| G3 | NULL のパラメーターを使う `name = ?` は 0 行を返す | キャプチャした `null` は `name is null` になる（キャプチャした値に対する Kotlin のルール） |
 | G4 | `status NOT IN (1, NULL)` は常に 0 行を返す | キャプチャしたコレクションの中の `null` はエラー。サブクエリの `!in` は `NOT EXISTS` |
 | G5 | Kotlin は NPE を投げる（`!!`、アンボクシング）が、SQL は比較するだけ | ドキュメントに記載: エンティティの NULL は SQL のルールに従う |
 | G6 | `NaN`: H2 は NaN を最大の値としてソートし、`NaN = NaN` は true。MariaDB は保存できない。Oracle は `BINARY_DOUBLE` にだけ保存できる | キャプチャした NaN や Infinity はエラー。保存された NaN は DB に従う |
@@ -290,7 +293,7 @@ lambdaQL は、NULL になりうるすべてのキーについて HQL に `nulls
 
 | 項目 | H2 | MariaDB | Oracle |
 |---|---|---|---|
-| `is not distinct from` | ネイティブ | `<=>`（インデックスを使う） | `decode(...)`（インデックスなし）。そのため lambdaQL はできるだけ `=` を使う |
+| `is not distinct from` | ネイティブ | `<=>`（インデックスを使う） | `decode(...)`（インデックスなし）。lambdaQL はこれを書かない（D48） |
 | `is [not] true`、`coalesce(boolean, false)` | 動作する | 動作する | **ORA-00932**。lambdaQL はこれらを書かない |
 | 空文字列 `''` | 値 | 値 | **NULL** |
 | 大文字と小文字、末尾の空白 | 厳密 | `_ci`: 無視 | 厳密（ソートには `NLS_SORT`） |
@@ -524,7 +527,7 @@ val list = if (flag) {
 |---|---|
 | Kotlin | 2.x（設計は kotlinc 1.7.22、2.1.10、2.2.21、2.3.0、2.3.21 で確認） |
 | Java（JVM） | 21 |
-| Hibernate | 6.6（設計は 6.6.5 で確認）。HQL の拡張（たとえば `is distinct from`）を使うので、他の JPA プロバイダーは保証しない |
+| Hibernate | 6.6（設計は 6.6.5 で確認）。HQL の拡張（たとえば `function(...)` や `nulls first`）を使うので、他の JPA プロバイダーは保証しない |
 | データベース | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
 | Spring | Spring Boot 3.4.2 と Spring Data JPA 3.4.2（Spring モジュール、[12](12-spring-data-jpa.md)。Java のリポジトリのみ）。Spring Boot 4 はまだ検証していません |
 | Kotlin の 1 行ずつの確認 | 今のところ H2 だけ。Kotlin のケースを MariaDB と Oracle で実行することは予定 |

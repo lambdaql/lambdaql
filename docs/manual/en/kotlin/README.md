@@ -1,5 +1,8 @@
 # lambdaQL Manual: Kotlin track
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/README.md) for the latest rules.
+
 **Other languages:** English | [한국어](../../ko/kotlin/README.md) | [日本語](../../ja/kotlin/README.md) | [简体中文](../../zh/kotlin/README.md)
 
 > [!IMPORTANT]
@@ -110,7 +113,7 @@ Most properties are nullable `var` properties, because a database column can be 
 | Kotlin | In a lambdaQL lambda |
 |---|---|
 | `it.price!! > 100.0` | `!!` is ignored. It is only there so that the code compiles. There is no `NullPointerException`, because the lambda never runs. |
-| `it.customer?.name == "Kim"` | `it.customer?.name` names a column of the joined customer. In `where` it is an inner `join` by default: orders without a customer are not returned. A null guard (`it.customer == null \|\| ...`) makes it a `left join`. `it.customer!!.name` means the same column. |
+| `it.customer?.name == "Kim"` | `it.customer?.name` names a column of the joined customer. In `where` it is an inner `join` by default: orders without a customer are not returned. A null guard (`it.customer == null \|\| ...`) does not change this (D48); use `leftJoin`. `it.customer!!.name` means the same column. |
 | `it.status == 1` with `status: Int?` | `e0.status = 1`. A NULL `status` does not match (SQL meaning). lambdaQL ignores the null checks that the Kotlin compiler adds. Only the null checks **you write** count. |
 
 Details: [9. Kotlin notes](09-kotlin-notes.md).

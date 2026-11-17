@@ -352,7 +352,10 @@ public final class HqlRenderer {
             folded.add(f);
             all = Pred.and(all, f);
         }
-        whereLeftJoins = JoinPlanner.leftJoins(all);
+        // D48: a where path is an inner join (the SQL meaning of the path); the null-guard LEFT JOIN is not used.
+        // Tell (DEBUG) when Java would keep rows that the inner join leaves out.
+        if (!JoinPlanner.leftJoins(all).isEmpty()) sqlMeaning("a null check on an association that a where path also uses");
+        whereLeftJoins = java.util.Set.of();
         List<String> parts = new ArrayList<>();
         if (all instanceof Pred.Bool b) {
             if (!b.value()) parts.add("1=0");
@@ -1057,21 +1060,43 @@ public final class HqlRenderer {
         if (nullSafe) {
             if (isHostLike(b)) return nullSafeWithValue(op, a, b);
             if (isHostLike(a)) return nullSafeWithValue(op, b, a);
-            boolean nonNull = nonNull(a) || nonNull(b);
-            String l = value(a, null), r = value(b, null);
-            if (nonNull) return l + " " + op.symbol() + " " + r;
-            return l + (op == CmpOp.EQ ? " is not distinct from " : " is distinct from ") + r;
+            // two entity values: the SQL meaning (D48); a row with a NULL value does not match
+            String text = value(a, null) + " " + op.symbol() + " " + value(b, null);
+            if (!nonNull(a) || !nonNull(b)) sqlMeaning(text);
+            return text;
         }
-        return value(a, peerType(b)) + " " + op.symbol() + " " + value(b, peerType(a));
+        if ((op == CmpOp.EQ || op == CmpOp.NE) && ((isHostLike(a) && eval(a) == null) || (isHostLike(b) && eval(b) == null))) {
+            String nulled = value(a, peerType(b)) + " " + op.symbol() + " " + value(b, peerType(a));
+            if (LOG.isWarnEnabled()) LOG.warn("{}", LqlMessage.NULL_CAPTURED_COMPARE.format(nulled));
+            return nulled;
+        }
+        String text = value(a, peerType(b)) + " " + op.symbol() + " " + value(b, peerType(a));
+        if ((op == CmpOp.EQ || op == CmpOp.NE) && !isHostLike(a) && !isHostLike(b) && (!nonNull(a) || !nonNull(b))) sqlMeaning(text);
+        return text;
+    }
+
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(HqlRenderer.class);
+    private static final java.util.Set<String> MEANING_LOGGED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** D48: entity values are compared with the SQL meaning; tell (DEBUG, once per condition text) when NULL rows drop out. */
+    private static void sqlMeaning(String condition) {
+        if (LOG.isDebugEnabled() && MEANING_LOGGED.add(condition)) LOG.debug("{}", LqlMessage.SQL_NULL_MEANING.format(condition));
     }
 
     private String nullSafeWithValue(CmpOp op, Expr column, Expr host) {
         Object v = eval(host);
         String col = value(column, null);
-        if (v == null) return col + (op == CmpOp.EQ ? " is null" : " is not null");
+        if (v == null) {
+            // D48: the SQL meaning, = NULL / <> NULL match no row; the value is known only now, so warn when it runs
+            String text = col + " " + op.symbol() + " " + bindRaw(null);
+            if (LOG.isWarnEnabled()) LOG.warn("{}", LqlMessage.NULL_CAPTURED_COMPARE.format(text));
+            return text;
+        }
         String param = host instanceof Expr.Const c ? literal(c, peerType(column)) : bind(v, peerType(column));
         if (op == CmpOp.EQ) return col + " = " + param;
-        return nonNull(column) ? col + " <> " + param : "(" + col + " <> " + param + " or " + col + " is null)";
+        // an entity value compared with a non-null value: the SQL meaning (D48), a NULL column does not match
+        if (!nonNull(column)) sqlMeaning(col + " <> " + param);
+        return col + " <> " + param;
     }
 
     private String isNull(Expr e, boolean positive) {
@@ -1088,14 +1113,17 @@ public final class HqlRenderer {
         }
         String x = value(e, null);
         if (positive) return x + " = true";
-        return nonNull(e) ? x + " = false" : x + " is distinct from true";
+        // the SQL meaning (D48): a NULL Boolean is not false
+        if (!nonNull(e)) sqlMeaning(x + " = false");
+        return x + " = false";
     }
 
     private String in(Expr value, Expr values, boolean positive) {
         if (values instanceof Expr.Subquery q) {
             String x = value(value, null);
-            // NOT IN (subquery) gives no rows when the subquery has a NULL; NOT EXISTS is exact (Q2)
-            return positive ? x + " in " + subquery(q, null) : "not exists " + subquery(q, x);
+            // D48: the SQL meaning, NOT IN; it gives no rows when the subquery has a NULL
+            if (!positive) sqlMeaning(x + " not in (subquery)");
+            return x + (positive ? " in " : " not in ") + subquery(q, null);
         }
         Object v = eval(values);
         if (v == null) throw LqlMessage.IN_COLLECTION_NULL.exception();
@@ -1109,7 +1137,9 @@ public final class HqlRenderer {
         for (Object o : c) list.add(HostEvaluator.convert(o, peerType(value)));
         String param = bindRaw(list);
         if (positive) return x + " in (" + param + ")";
-        return nonNull(value) ? x + " not in (" + param + ")" : "(" + x + " is null or " + x + " not in (" + param + "))";
+        // D48: the SQL meaning; a NULL value is not "not in" the list
+        if (!nonNull(value)) sqlMeaning(x + " not in (...)");
+        return x + " not in (" + param + ")";
     }
 
     // ------------------------------------------------------------------ values
@@ -1119,7 +1149,12 @@ public final class HqlRenderer {
             case Expr.Column c -> path(c);
             case Expr.Host h -> {
                 Object v = eval(h);
-                if (v == null) throw LqlMessage.NULL_ORDER_COMPARE.exception(h);
+                if (v == null) {
+                    // D48: a null captured value is bound as NULL (SQL meaning: no row matches); known only now
+                    String p = bindRaw(null);
+                    if (LOG.isWarnEnabled()) LOG.warn("{}", LqlMessage.NULL_CAPTURED_COMPARE.format(h.expr() + " -> " + p));
+                    yield p;
+                }
                 yield bind(v, peer);
             }
             case Expr.Const c -> literal(c, peer);
@@ -1228,11 +1263,8 @@ public final class HqlRenderer {
 
     private Object eval(Expr e) {
         if (e instanceof Expr.Host h) {
-            Object v = evaluator.eval(h, captured);
-            if (v == null && h.nonNullRequired()) {
-                throw LqlMessage.NULL_EQUALS.exception(h.expr());
-            }
-            return v;
+            // D48: x.equals(column) with a null x is compared as SQL (= NULL), with a WARN where it is rendered
+            return evaluator.eval(h, captured);
         }
         return evaluator.eval(e, captured);
     }

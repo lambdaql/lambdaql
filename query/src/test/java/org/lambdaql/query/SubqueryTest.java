@@ -130,15 +130,18 @@ class SubqueryTest {
     @Test
     void notInIsNotExists() {
         // @start region="not-in"
-        // the grades are 5, 2 and NULL. SQL "not in" would give no rows because of the NULL;
-        // lambdaQL writes NOT EXISTS, which gives the same rows as Java (rule Q2)
+        // the SQL meaning (D48): NOT IN. The grades are 5, 2 and NULL, so no row matches: x NOT IN (5, 2, NULL)
+        // is never true. To skip the NULL, say so in the subquery: where(c -> c.getGrade() != null)
         SelectQuery<Order> q = qb.from(Order.class)
                 .where((o, sub) -> !sub.from(Customer.class).select(c -> c.getGrade()).contains((int) o.getStatus()));
-        assertEquals("select e0 from Order e0 where not exists (select 1 from Customer s1 where s1.grade = e0.status)",
-                q.toHql().hql());
+        assertEquals("select e0 from Order e0 where e0.status not in (select s1.grade from Customer s1)", q.toHql().hql());
+        SelectQuery<Order> withoutNull = qb.from(Order.class)
+                .where((o, sub) -> !sub.from(Customer.class).where(c -> c.getGrade() != null).select(c -> c.getGrade())
+                        .contains((int) o.getStatus()));
         // @end
-        List<Integer> grades = customers.stream().map(Customer::getGrade).toList();
-        assertEquals(java(o -> !grades.contains((int) o.getStatus())), idsOf(q.toList()));
+        assertEquals(List.of(), idsOf(q.toList()));
+        List<Integer> grades = customers.stream().map(Customer::getGrade).filter(java.util.Objects::nonNull).toList();
+        assertEquals(java(o -> !grades.contains((int) o.getStatus())), idsOf(withoutNull.toList()));
     }
 
     @Test

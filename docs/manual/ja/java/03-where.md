@@ -1,6 +1,9 @@
 <a id="3-conditions-where-java"></a>
 # 3. 条件（`where`）（Java）
 
+> [!IMPORTANT]
+> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/03-where.md)を参照してください。
+
 > [!NOTE]
 > **状況**
 > - **実装済み、H2・MariaDB・Oracle でテスト済み:** `where` の条件と `toList()`。lambdaQL は getter をカラムにマッピングし、HQL を書いて実行します。
@@ -229,8 +232,8 @@ qb.from(Order.class).where(o -> o.getStatus() == wanted).toList();
 
 ここがいちばん重要な部分です。簡単な原則が 2 つあります。
 
-1. **Java が null に対する結果を定めている場合、lambdaQL はその結果を使います。**（オブジェクト同士の `==`、`Objects.equals`、`x == null`）
-2. **Java なら例外を投げる場合、lambdaQL は SQL の意味を使います。**（アンボクシング、`a` が null のときの `a.equals(b)`）
+1. **エンティティの値は SQL の意味で比べます**（決定 D48）。オブジェクト同士の `==`、`equals`、`Objects.equals`、`!=` は `=` と `<>` になります。値が NULL の行はどちらにも一致しません。結果が Java と異なりうるとき、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します。
+2. **キャプチャした値は Java のルールをそのまま使います。** キャプチャした値は先に Java で計算されます。キャプチャした `null` は `is null` または `is not null` になります。Java なら例外を投げる場合（アンボクシング、`null.equals(...)`）、lambdaQL も例外を投げます（[3.6.4](#364-captured-null-values) を参照）。
 
 lambdaQL が null を扱うのは **あなたが書いたときだけ** です（`== null`、`!= null`）。
 隠れた null チェックを勝手に追加することはありません。
@@ -241,11 +244,12 @@ lambdaQL が null を扱うのは **あなたが書いたときだけ** です�
 | # | Java の書き方 | HQL | NULL の動作 |
 |---|---|---|---|
 | R1 | 片方がプリミティブ: `o.getStatus() == 1`、`o.getPrice() > p` | `e0.status = 1`、`e0.price > :p1` | SQL の意味。カラムが NULL: 行は返されない |
-| R2 | 両方がオブジェクト: `o.getStatus() == status`（`Integer == Integer`）、`String == String`、enum | `e0.status is not distinct from :p1` | **null 安全な値の比較。** `null == null` は true。片方だけ null: false |
-| R2 | `o.getStatus() != status`（オブジェクト） | `e0.status is distinct from :p1` | null 安全 |
+| R2 | 両方がオブジェクト: `o.getStatus() == status`（`Integer == Integer`）、`String == String`、enum | `e0.status = :p1`。キャプチャした `null`: `e0.status is null` | **値の比較。** カラムが NULL: 行は返されない |
+| R2 | `o.getStatus() != status`（オブジェクト） | `e0.status <> :p1`。キャプチャした `null`: `e0.status is not null` | SQL の意味。カラムが NULL: 行は **返されない**（Java なら返される） |
+| R2 | エンティティの値どうし: `o.getDescription() == o.getCustName()` | `e0.description = e0.custName` | SQL の意味。どちらかが NULL: 行は返されない（NULL と NULL も同じ） |
 | R3 | `x == null`、`x != null` | `x is null`、`x is not null` | |
 | R4 | `o.getDescription().equals(p)` | `e0.description = :p1` | SQL の意味。カラムが NULL: 行は返されない。`p == null`: 例外 |
-| R5 | `Objects.equals(a, b)`、`"x".equals(a)`、`Boolean.TRUE.equals(a)` | `a is not distinct from b` | null 安全 |
+| R5 | `Objects.equals(a, b)`、`"x".equals(a)`、`Boolean.TRUE.equals(a)` | R2 と同じ: `a = b`、`a = :p1`、キャプチャした `null` なら `a is null` | R2 と同じ |
 | R9 | キャプチャした値 | バインドパラメーター | [3.6.4](#364-captured-null-values) を参照 |
 
 どの Java の型が R1 になり、どの型が R2 になるかは、[9. Java の注意点](09-java-notes.md#93-equality-of-boxed-values) で説明しています。
@@ -260,28 +264,23 @@ lambdaQL では、これは **値の比較** です。127 を超える `Long` �
 ```java
 Integer status = request.getStatus();    // null かもしれない
 qb.from(Order.class).where(o -> o.getStatus() == status).toList();
-// HQL: e0.status is not distinct from :p1
-//   status = 3    -> status が 3 の行
-//   status = null -> status が NULL の行
+//   status = 3    -> HQL: e0.status = :p1    status が 3 の行
+//   status = null -> HQL: e0.status is null  status が NULL の行
 ```
 
-Hibernate がデータベースごとにこれをどう書くか（確認済み）:
-
-| データベース | SQL |
-|---|---|
-| H2 | `status is not distinct from ?` |
-| MariaDB | `status <=> ?` |
-| Oracle | `decode(status, ?, 0, 1) = 0` |
-
-片方が決して NULL にならないと lambdaQL が分かっている場合（`@Id`、`nullable = false` のカラム、プリミティブのカラム、null でないキャプチャした値）は、代わりに単純な `=` を書きます。結果は同じで、データベースはインデックスを使えます。
+カラムを関数で包むことはないので、データベースはインデックスを使えます。
 
 lambdaQL は、クエリの実行時にキャプチャした値を見ます。`null` なら `is null`、それ以外の値なら単純な `= :p1` になります。
 **(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `null-safe`:
 
 ```java
+// the SQL meaning (D48): = NULL matches no row; lambdaQL logs LQL-4045 at WARN when it runs with a null
 String d = null;
 RenderedQuery q = qb.from(Order.class).where(o -> Objects.equals(o.getDescription(), d)).toHql();
-assertEquals("select e0 from Order e0 where e0.description is null", q.hql());
+assertEquals("select e0 from Order e0 where e0.description = :p1", q.hql());
+// to find NULL, write the null check
+RenderedQuery q3 = qb.from(Order.class).where(o -> o.getDescription() == null).toHql();
+assertEquals("select e0 from Order e0 where e0.description is null", q3.hql());
 
 String d2 = "a";
 RenderedQuery q2 = qb.from(Order.class).where(o -> Objects.equals(o.getDescription(), d2)).toHql();
@@ -294,7 +293,7 @@ assertEquals("select e0 from Order e0 where e0.description = :p1", q2.hql());
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-where o1_0.description is null
+where o1_0.description=?
 ```
 
 **データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `null-safe#2`:
@@ -349,9 +348,32 @@ assertEquals("select e0 from Order e0 where e0.customer.id is null",
 ```java
 .where(o -> o.getDescription().equals(text))     // HQL: e0.description = :p1
 .where(o -> Objects.equals(o.getDescription(), text))
-                                                 // HQL: e0.description is not distinct from :p1
-.where(o -> !Objects.equals(o.getStatus(), 1))   // HQL: e0.status is distinct from 1
-                                                 //      （Java と同じく NULL の行が返される）
+                                                 // HQL: e0.description = :p1（text が null なら is null）
+.where(o -> !Objects.equals(o.getStatus(), 1))   // HQL: e0.status <> 1
+                                                 //      （NULL の行は返されない: SQL の意味）
+```
+
+**エンティティの値に対する SQL の意味**（決定 D48）。エンティティの値どうし、およびエンティティの値と値の `!=` による比較は SQL に従います。値が NULL の行は `=` にも `<>` にも一致しません。
+Java では `!text.equals(null)` も `Objects.equals(null, null)` も true なので、Java ならそれらの行を返します。このようなことが起こりうるとき、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します（条件ごとに 1 回）。NULL の行を残すには、ラムダの中に null チェックを書いてください。
+
+**(テスト済み)** [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)、リージョン `sql-meaning`（H2、MariaDB、Oracle。行は description/custName の組 `a/a`、`a/b`、`null/a`、`null/null`、`b/null` で、`text` は `"a"`）:
+
+```java
+// two entity values: = and <> as in SQL; a row with a NULL on either side matches neither
+SelectQuery<Order> same = qb.from(Order.class).where(o -> Objects.equals(o.getDescription(), o.getCustName()));
+assertEquals("select e0 from Order e0 where e0.description = e0.custName", same.toHql().hql());
+assertEquals(List.of("a/a"), pairs(same.toList()));                    // null/null is not "equal" in SQL
+SelectQuery<Order> different = qb.from(Order.class).where(o -> !Objects.equals(o.getDescription(), o.getCustName()));
+assertEquals(List.of("a/b"), pairs(different.toList()));               // rows with a NULL are left out
+// an entity value and a value: a NULL column does not match <>
+SelectQuery<Order> notA = qb.from(Order.class).where(o -> !text.equals(o.getDescription()));
+assertEquals("select e0 from Order e0 where e0.description <> :p1", notA.toHql().hql());
+assertEquals(List.of("b/null"), pairs(notA.toList()));
+// to keep the NULL rows, say so in the lambda
+SelectQuery<Order> notAOrNull = qb.from(Order.class).where(o -> o.getDescription() == null || !text.equals(o.getDescription()));
+assertEquals(List.of("b/null", "null/a", "null/null"), pairs(notAOrNull.toList()));
+// a NULL Boolean is not false
+assertEquals(List.of("f"), qb.from(Coded.class).where(c -> !c.getVip()).toList().stream().map(Coded::getCode).toList());
 ```
 
 <a id="364-captured-null-values"></a>
@@ -359,7 +381,7 @@ assertEquals("select e0 from Order e0 where e0.customer.id is null",
 
 | 書き方 | キャプチャした値が `null` のとき |
 |---|---|
-| null 安全な書き方（R2、R5）: `o.getStatus() == status`、`Objects.equals(...)` | 許可 |
+| キャプチャした値との `==`、`!=`、`Objects.equals(...)`（R2、R5）: `o.getStatus() == status` | 許可: `is null` / `is not null` |
 | `p.equals(o.getDescription())`（`p` がレシーバー） | クエリの実行時に **例外** |
 | `o.getDescription().equals(p)` | **例外** |
 | Java が値をアンボクシングする比較: `o.getPrice() > p`（`Double p`）、そしてすべての `<`、`<=`、`>`、`>=` | **例外** |
@@ -407,6 +429,20 @@ where o1_0.price>?
 - ガードは先に書かなければなりません。`min == null` のとき `o.getPrice() > min || min == null` はクエリの実行時に例外を投げます。Java の NullPointerException と同じです。
 - `&&` では、ガードは逆に働きます: `min == null` のとき `min != null && o.getPrice() > min` は行を返しません（`where 1=0`）。
 
+<a id="365-converted-attributes-convert"></a>
+### 3.6.5 変換される属性（`@Convert`）
+
+JPA の `AttributeConverter` を持つ属性は、Java の値で比べます。Hibernate 6.6 は、このような属性と比べるリテラルを変換し、バインドパラメーターも変換します。そのため条件は Java の値で書き、保存された行を見つけられます（H2、MariaDB、Oracle で確認済み）。
+
+**(テスト済み)** [`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java)、リージョン `convert`:
+
+```java
+// code is stored reversed ("abc" as "cba"); vip is stored as 'Y'/'N' (YesNoConverter)
+SelectQuery<Coded> literal = qb.from(Coded.class).where(c -> c.getCode().equals("abc"));
+assertEquals("select e0 from Coded e0 where e0.code = 'abc'", literal.toHql().hql());
+assertEquals(List.of("abc"), codes(literal.toList()));       // Hibernate converts the literal
+```
+
 <a id="37-boolean-columns"></a>
 ## 3.7 boolean のカラム
 
@@ -417,8 +453,9 @@ where o1_0.price>?
 |---|---|---|
 | `o.isActive()` | `e0.active = true` | –（プリミティブの `boolean` は決して NULL にならない） |
 | `!o.isActive()` | `e0.active = false` | –（プリミティブの `boolean` は決して NULL にならない） |
-| `Boolean.TRUE.equals(o.getActive())`（nullable な `Boolean`） | `e0.active is not distinct from true` | 返されない |
-| `!Boolean.TRUE.equals(o.getActive())` | `e0.active is distinct from true` | **返される**（Java と同じ） |
+| `Boolean.TRUE.equals(o.getActive())`（nullable な `Boolean`） | `e0.active = :p1`（`:p1` は `true`） | 返されない |
+| `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | **返されない**（SQL の意味、D48。Java なら返される） |
+| `!o.getActive()`（nullable な `Boolean`） | `e0.active = false` | **返されない**（SQL の意味: NULL は false ではない） |
 
 **(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `boolean`:
 
@@ -619,11 +656,12 @@ where c1_0.name=?
 
 ```java
 String name = "Kim";
-// Java keeps orders without a customer here, so the path becomes a LEFT JOIN
+// the SQL meaning (D48): a where path is an inner join, so "customer is null" never matches here
+// (lambdaQL logs LQL-5009 at DEBUG); to keep orders without a customer, use leftJoin (D44)
 RenderedQuery q = qb.from(Order.class)
         .where(o -> o.getCustomer() == null || o.getCustomer().getName().equals(name))
         .toHql();
-assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1", q.hql());
+assertEquals("select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name = :p1", q.hql());
 
 // the guard removes those orders, so an inner join is right
 RenderedQuery q2 = qb.from(Order.class)
@@ -638,7 +676,7 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where e0.customer is n
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
+join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is null or c1_0.name=?
 ```
 

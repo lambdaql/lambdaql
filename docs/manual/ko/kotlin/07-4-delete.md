@@ -64,7 +64,8 @@ assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where
 더 많은 문장을 Java로 작성한 테스트가 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)에 있습니다(H2, MariaDB, Oracle). 그 예제는 [이 페이지의 Java 버전](../java/07-4-delete.md)을 참고하십시오.
 
 두 번째 문장은 `qb.from(Order::class.java).where { it.customer?.name == null }`이 반환하는 것과 **같은 행**, 즉 고객의 이름이 없는 주문을 삭제합니다. Java 테스트는 삭제된 행을 이 조회 결과와 비교합니다.
-고객이 **없는** 주문은 삭제되지 않습니다(규칙 U9, 결정 D36). 그런 주문도 삭제하려면 `it.customer == null || it.customer?.name == null`이라고 쓰십시오. 이 null 가드가 있으면 lambdaQL은 `e0.customer.id is not null`을 더하지 않습니다.
+고객이 **없는** 주문은 삭제되지 않습니다(규칙 U9, 결정 D36). null 가드(`it.customer == null || ...`)를 써도 마찬가지입니다. 조회에서도 이 경로는 inner join이기 때문입니다(결정 D48).
+고객이 없는 주문을 삭제하려면 `it.customer == null` 조건으로 삭제 문장을 한 번 더 실행하십시오.
 
 모든 행을 삭제할 때는 `all()`이 필요합니다(규칙 U5).
 

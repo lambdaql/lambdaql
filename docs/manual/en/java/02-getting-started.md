@@ -1,5 +1,8 @@
 # 2. Getting started (Java)
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/java/02-getting-started.md) for the latest rules.
+
 > [!NOTE]
 > **Status:** You can build lambdaQL from source and run its tests today.
 > `where` conditions and `toList()` work end to end. They are tested on H2, MariaDB and Oracle.
@@ -343,7 +346,7 @@ where c1_0.name=?
 ```
 
 To find orders without a customer, compare the association: `o.getCustomer() == null` gives `e0.customer is null` (no join).
-If a null guard keeps orders without a customer (`o.getCustomer() == null || ...`), lambdaQL uses a `left join`.
+A null guard (`o.getCustomer() == null || ...`) does not keep orders without a customer: the path is an inner join (decision D48). Use `leftJoin` for that ([6.8](06-select-group.md#68-explicit-joins)).
 See [3.10](03-where.md#310-association-paths).
 
 ## Getting the result

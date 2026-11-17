@@ -183,10 +183,14 @@ val wanted = if (flag) 1 else 2
 <a id="36-null-rules"></a>
 ## 3.6 NULL 규칙
 
-가장 중요한 부분입니다. 단순한 원칙 두 가지가 있습니다.
+가장 중요한 부분입니다. 단순한 원칙 세 가지가 있습니다.
 
-1. **null 검사를 직접 작성한 곳에서는 lambdaQL이 그 검사를 사용합니다.** (`== null`, `!= null`, `?.`, `?:`, 그리고 두 nullable 값 사이의 `==`)
+1. **null 검사를 직접 작성한 곳에서는 lambdaQL이 그 검사를 사용합니다.** (`== null`, `!= null`, `?.`, `?:`)
 2. **작성하지 않은 곳에서는 lambdaQL이 SQL 의미를 사용합니다.** 컬럼이 NULL이면 비교는 UNKNOWN이 되고 행은 반환되지 않습니다.
+   엔티티 값 사이의 `==`, `!=`에도 같은 규칙을 적용합니다(결정 D48).
+   결과가 Kotlin과 다를 수 있으면 lambdaQL은 `LQL-5009`를 `DEBUG` 수준으로 기록합니다.
+3. **캡처 값은 먼저 계산하고, 비교는 역시 SQL 의미를 따릅니다.** 캡처 값 `null`은 NULL로 바인딩되므로 `= :p1`과 `<> :p1`은 어떤 행에도 일치하지 않습니다.
+   이 경우 lambdaQL은 실행 시점에 `LQL-4045`를 `WARN` 수준으로 기록합니다. NULL을 찾으려면 `x == null`이라고 쓰십시오(`is null`이 됨).
 
 Kotlin 컴파일러는 바이트코드에 **숨겨진** null 검사를 추가합니다(예: `status`가 `Int?`일 때 `it.status == 1`). lambdaQL은 이를 **무시합니다**(결정 D22). 소스 코드에 있는 null 검사만 의미가 있습니다.
 그래서 의미가 같은 Kotlin 람다와 Java 람다는 같은 SQL을 만듭니다.
@@ -199,8 +203,9 @@ Kotlin 컴파일러는 바이트코드에 **숨겨진** null 검사를 추가합
 | R12 | nullable 컬럼과 상수 또는 non-null 값: `it.status == 1`, `it.id == id`(`id: Long`) | `e0.status = 1`, `e0.id = :p1` | SQL 의미. 컬럼이 NULL이면 행이 반환되지 않음 |
 | R12 | `it.status != 1` | `e0.status <> 1` | SQL 의미. 컬럼이 NULL이면 행이 반환되지 **않음** |
 | R1 | 크기 비교: `it.price!! > p`, `it.status!! <= 3` | `e0.price > :p1`, `e0.status <= 3` | SQL 의미 |
-| R11 | 둘 다 NULL일 수 있는 두 값: `it.status == q`(`q: Int?`), `it.description == text`(`String?`), enum `==` | `e0.status is not distinct from :p1` | **null-safe 값 비교.** `null == null`은 true. 한쪽만 null이면 false |
-| R11 | `it.status != q`(둘 다 nullable) | `e0.status is distinct from :p1` | null-safe. `q`가 null이 아니면 NULL 행이 반환**됨** |
+| R11 | nullable 컬럼과 nullable 캡처 값: `it.status == q`(`q: Int?`), `it.description == text`(`String?`), enum `==` | `e0.status = :p1` | 값 비교. 컬럼이 NULL이면 행이 반환되지 않음. 캡처 값 `null`: 일치하는 행 없음(`LQL-4045`) |
+| R11 | `it.status != q` | `e0.status <> :p1` | SQL 의미(D48). 컬럼이 NULL이면 행이 반환되지 **않음**(Kotlin이라면 반환). 캡처 값 `null`: 일치하는 행 없음(`LQL-4045`) |
+| R11 | 엔티티 값 두 개: `it.description == it.custName` | `e0.description = e0.custName` | SQL 의미(D48). 어느 한쪽이 NULL이면 행이 반환되지 않음(NULL과 NULL도 마찬가지) |
 | R3 | `x == null`, `x != null` | `x is null`, `x is not null` | |
 | R17 | `===`, `!==` | `==`, `!=`와 같음 | 객체 동일성이 아니라 값 비교 |
 | R9 | 캡처 값 | 바인드 파라미터 | [3.6.4](#364-captured-null-values) 참고 |
@@ -214,27 +219,19 @@ Kotlin의 `==`는 원래 값을 비교합니다. lambdaQL에서는 `===`도 **�
 ```kotlin
 val status: Int? = request.status    // null일 수 있음
 .where { it.status == status }
-// HQL: e0.status is not distinct from :p1
-//   status = 3    -> status가 3인 행
-//   status = null -> status가 NULL인 행
+//   status = 3    -> HQL: e0.status = :p1    status가 3인 행
+//   status = null -> HQL: e0.status = :p1    일치하는 행 없음: = NULL은 참이 되지 않음(WARN 수준 LQL-4045)
 ```
 
-Hibernate가 데이터베이스별로 `is not distinct from`을 쓰는 방법(확인함):
+status가 NULL인 행을 찾으려면 null 검사를 작성하십시오. `it.status == null`은 `e0.status is null`이 됩니다.
 
-| 데이터베이스 | SQL |
-|---|---|
-| H2 | `status is not distinct from ?` |
-| MariaDB | `status <=> ?` |
-| Oracle | `decode(status, ?, 0, 1) = 0` |
-
-한쪽이 절대 NULL이 될 수 없다는 것을 lambdaQL이 알 때는 대신 단순한 `=`를 씁니다. 결과는 같고, 데이터베이스는 인덱스를 사용할 수 있습니다([10.2](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql) 참고).
-"절대 NULL이 아님"은 `@Id`, `nullable = false` 컬럼, 기본형 속성(`Int`, `Long`, `Double`, `Boolean`), 또는 쿼리가 실행될 때 null이 아닌 캡처 값을 뜻합니다.
+컬럼을 함수로 감싸지 않으므로 데이터베이스는 인덱스를 사용할 수 있습니다([10.2](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql) 참고).
 
 ```kotlin
 .where { it.description == text }    // 쿼리가 실행될 때 text는 null이 아님
 // HQL: e0.description = :p1
 .where { it.description != text }
-// HQL: (e0.description <> :p1 or e0.description is null)
+// HQL: e0.description <> :p1          (description이 NULL이면 일치하지 않음: SQL 의미)
 ```
 
 **NULL이 될 수 없는 컬럼: `it.id == id`.** 예제 엔티티의 `id`는 `Long?`입니다. Kotlin은 `it.id == id`(캡처한 `id: Long`)를 null 검사와 비교로 컴파일합니다.
@@ -282,13 +279,31 @@ id는 NULL이 될 수 없으므로 id의 `is null`은 항상 거짓입니다. la
 
 ```kotlin
 val q: Int? = 3
-.where { it.status != 3 }    // e0.status <> 3                                 NULL 행 반환 안 됨
-.where { it.status != q }    // (e0.status <> :p1 or e0.status is null)        NULL 행 반환됨
+.where { it.status != 3 }    // e0.status <> 3       NULL 행 반환 안 됨
+.where { it.status != q }    // e0.status <> :p1     NULL 행 역시 반환 안 됨(SQL 의미, D48)
 ```
 
-두 번째 형태는 둘 다 NULL일 수 있는 두 값을 비교합니다. Kotlin이 null에 대한 결과를 정의하므로 lambdaQL은 그 결과를 유지합니다(null-safe).
+두 형태 모두 NULL 행을 제외합니다. Kotlin에서 `null != 3`은 `true`이므로 Kotlin이라면 이런 행을 반환합니다.
 
-`String?`에 대한 `it.description.equals(text)`는 `==`와 같습니다(null-safe).
+이런 차이가 생길 수 있으면 lambdaQL은 `LQL-5009`를 `DEBUG` 수준으로 조건마다 한 번 기록합니다.
+NULL 행을 유지하려면 `it.status == null || it.status != q`처럼 null 검사를 작성하십시오.
+
+`String?`에 대한 `it.description.equals(text)`는 `==`와 같습니다.
+
+**엔티티 값에 대한 SQL 의미**(결정 D48). 이에 대한 Kotlin 테스트는 아직 없습니다.
+같은 규칙을 Java로 H2, MariaDB, Oracle에서 테스트했습니다([`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java), 영역 `sql-meaning`, [이 페이지의 Java 버전](../java/03-where.md#363-write-your-null-checks-yourself) 참고).
+다음은 설계 예제입니다.
+
+```kotlin
+// two entity values: = and <> as in SQL; a row with a NULL on either side matches neither
+qb.from(Order::class.java).where { it.description == it.custName }.toList()     // e0.description = e0.custName
+// an entity value and a value: a NULL column does not match <>
+qb.from(Order::class.java).where { it.description != text }.toList()           // e0.description <> :p1
+// to keep the NULL rows, say so in the lambda
+qb.from(Order::class.java).where { it.description == null || it.description != text }.toList()
+// a NULL Boolean is not false
+qb.from(Coded::class.java).where { it.vip == false }.toList()                   // e0.vip = false
+```
 
 `?.`, `?:`, `!!`에 대한 자세한 내용: [9. Kotlin 노트](09-kotlin-notes.md).
 
@@ -297,13 +312,16 @@ val q: Int? = 3
 
 | 형태 | 캡처 값이 `null`일 때 |
 |---|---|
-| null-safe 형태: `it.status == q`, `it.description != text` | 허용 |
-| 크기 비교: `it.price!! > min!!`, 모든 `<`, `<=`, `>`, `>=` | 쿼리가 실행될 때 **예외** |
+| 캡처 값과의 `==`, `!=`: `it.status == q`, `it.description != text` | 실행됨: NULL을 바인딩한 `= :p1` / `<> :p1`이므로 일치하는 행이 **없음**. `WARN` 수준 `LQL-4045` |
+| 크기 비교: `it.price!! > min!!`, 모든 `<`, `<=`, `>`, `>=` | 위와 같음: `e0.price > :p1`(NULL), 일치하는 행 **없음**. `WARN` 수준 `LQL-4045`(`!!`는 무시됨) |
 | `in`에 사용하는 컬렉션 안의 null 요소 | 쿼리가 실행될 때 **예외** |
 
-이유: Kotlin이라면 여기서 `NullPointerException`을 던집니다(`min!!`). 이를 `IS NULL`로 바꾸면 Kotlin이라면 절대 반환하지 않을 행을 반환하게 됩니다.
+이유: 람다 안의 비교는 모두 SQL 의미를 따릅니다(결정 D48). SQL에서 NULL과의 `=`, `<>`, `<`, `>`는 참이 되지 않습니다.
+캡처 값이 null인지는 쿼리가 실행될 때만 알 수 있으므로, lambdaQL은 실행할 때 경고를 기록합니다.
 
-**규칙의 예외: null 가드.** 같은 캡처 값을 먼저 null 검사하면 null을 허용합니다.
+NULL 행을 찾으려면 `x == null`이라고 쓰십시오. 캡처 값에 대한 메서드 호출(`text.trim()` 등)은 쿼리 전에 값을 준비하는 단계이므로 `null`이면 Kotlin처럼 예외(`LQL-4012`)를 던집니다.
+
+**null 가드로 필터 생략.** 같은 캡처 값을 null 검사하면, 값이 null일 때 그 조건이 필터 없이 사라집니다.
 
 ```kotlin
 val min: Double? = request.minPrice   // null일 수 있음
@@ -335,9 +353,21 @@ where o1_0.price>?
 - `min == null`이면 가드가 참이므로 조건 전체가 참입니다. 필터가 없습니다. `min`과의 비교는 HQL에 쓰지 않습니다(Kotlin도 이 비교를 실행하지 않습니다).
 - `min = 100.0`이면 가드가 거짓이므로 `e0.price > :p1`만 남습니다.
 - 람다는 여전히 한 번만 분석합니다. 값에 따라 달라지는 것은 HQL 텍스트뿐입니다.
-- 가드가 먼저 와야 합니다. `min == null`일 때 `it.price!! > min!! || min == null`은 쿼리가 실행될 때 예외를 던집니다. Kotlin의 `NullPointerException`과 같습니다.
+- 가드의 위치는 결과에 영향을 주지 않습니다. `min == null`일 때 `it.price!! > min!! || min == null`도 필터가 없습니다. SQL에는 평가 순서가 없고 `!!`는 무시되므로 예외가 나지 않습니다(Kotlin이라면 `NullPointerException`).
 
 이에 대한 Kotlin 테스트는 아직 없습니다. 같은 가드를 Java로 쓴 것은 테스트했습니다. [이 페이지의 Java 버전](../java/03-where.md#364-captured-null-values)을 참고하십시오.
+
+<a id="365-converted-attributes-convert"></a>
+### 3.6.5 변환 속성(`@Convert`)
+
+JPA `AttributeConverter`가 붙은 속성은 Kotlin 값으로 비교합니다. Hibernate 6.6은 이런 속성과 비교하는 리터럴을 변환하고, 바인드 파라미터도 변환합니다(H2, MariaDB, Oracle에서 확인함).
+
+테스트는 Java로 작성했습니다([`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java), 영역 `convert`). 다음은 설계 예제입니다.
+
+```kotlin
+// code is stored reversed ("abc" as "cba"); vip is stored as 'Y'/'N' (YesNoConverter)
+qb.from(Coded::class.java).where { it.code == "abc" }.toList()   // e0.code = 'abc': Hibernate converts the literal
+```
 
 <a id="37-boolean-columns"></a>
 ## 3.7 boolean 컬럼
@@ -349,8 +379,9 @@ where o1_0.price>?
 |---|---|---|
 | `it.active` | `e0.active = true` | –(절대 NULL이 아님) |
 | `!it.active` | `e0.active = false` | – |
-| `it.flag == true` | `e0.flag is not distinct from true` | 반환 안 됨 |
-| `it.flag != true` | `e0.flag is distinct from true` | **반환됨**(Kotlin과 같음) |
+| `it.flag == true` | `e0.flag = true` | 반환 안 됨 |
+| `it.flag != true` | `e0.flag <> true` | **반환 안 됨**(SQL 의미, D48. Kotlin이라면 반환) |
+| `it.flag == false` | `e0.flag = false` | 반환 안 됨(NULL은 false가 아님) |
 | `it.flag ?: false` | `(e0.flag is not null and e0.flag = true)` | 반환 안 됨 |
 | `!(it.flag ?: false)` | `(e0.flag is null or not (e0.flag = true))` | **반환됨** |
 | `it.flag!!` | `e0.flag = true` | 반환 안 됨(`!!`는 무시됨) |
@@ -415,7 +446,8 @@ assertEquals("select e0 from Order e0 where e0.status in (:p1)", q.toHql().hql()
 
 `statuses`는 캡처한 `listOf<Short>(1, 3)`입니다.
 
-`!in`은 `not in`이 됩니다. id는 NULL이 될 수 없으므로 `is null` 부분이 없습니다. NULL이 될 수 있는 컬럼에는 lambdaQL이 `x is null or`를 추가합니다. 목록에 `null`이 없으면 Kotlin의 `!in`은 NULL 값에 대해 true이기 때문입니다.
+`!in`은 `not in`이 됩니다. NULL이 될 수 있는 컬럼도 단순한 `not in`입니다(SQL 의미, 결정 D48).
+값이 NULL인 행은 `not in`에 일치하지 않으며, lambdaQL은 `LQL-5009`를 `DEBUG` 수준으로 기록합니다. Kotlin의 `!in`은 NULL 값에 대해 true이므로, 이런 행을 유지하려면 `it.description == null || it.description !in descs`처럼 null 검사를 작성하십시오.
 
 | 경우 | 결과 |
 |---|---|
@@ -474,12 +506,13 @@ where c1_0.name=?
 - **고객이 없는 주문**은 결과에 없습니다. 조인할 고객 행이 없기 때문입니다.
 - lambdaQL은 null 검사를 대신 추가하지 않습니다. 경로 앞에 `it.customer != null &&`를 쓸 필요가 없습니다.
 
-**null 가드는 고객이 없는 주문을 남깁니다.** 고객이 없는 주문에서 조건이 참이 될 수 있으면 lambdaQL은 그 경로에 `left join`을 사용합니다.
-inner join을 쓰면 Kotlin과 SQL의 결과 행이 달라집니다. Kotlin은 그 주문을 반환하지만 inner join은 그 주문을 잃습니다(결정 D36).
+**null 가드로는 고객이 없는 주문이 남지 않습니다.** `where`의 경로는 항상 inner join입니다(SQL 의미, 결정 D48).
+그래서 `it.customer == null || ...`은 고객이 없는 주문과 일치하지 않습니다. 그 주문에는 조인할 고객 행이 없기 때문입니다. 이런 조건에 대해 lambdaQL은 `LQL-5009`를 `DEBUG` 수준으로 기록합니다.
+고객이 없는 주문을 남기려면 명시적 `leftJoin`(결정 D44, [6.8](06-select-group.md#68-explicit-joins) 참고)을 사용하고 `c == null || ...`이라고 쓰십시오.
 
 ```kotlin
 .where { it.customer == null || it.customer?.name == name }
-// HQL: select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1
+// HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name = :p1
 
 .where { it.customer != null && it.customer?.name == name }
 // HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is not null and j1.name = :p1
@@ -491,7 +524,7 @@ inner join을 쓰면 Kotlin과 SQL의 결과 행이 달라집니다. Kotlin은 �
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
+join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is null or c1_0.name=?
 ```
 
@@ -505,11 +538,10 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is not null and c1_0.name=?
 ```
 
-`left join` 뒤에서 Hibernate는 `e0.customer is null`을 `c1_0.id is null`로 씁니다. 의미는 같습니다. 고객이 없는 주문입니다.
+Hibernate는 `e0.customer is null`을 `c1_0.id is null`로 씁니다. inner join 뒤에서는 이 조건이 참이 되지 않습니다.
 
-- `||`의 다른 부분도 주문을 남길 수 있습니다. `it.status == 1 || it.customer?.name == name`도 `left join`을 사용합니다. Kotlin에서 status가 1인 주문은 고객이 없어도 조건에 맞기 때문입니다.
-- 다른 `where` 호출이 어차피 그런 주문을 걸러 낸다면(예: `.where { it.customer?.name != null }`) 조인은 inner로 남습니다.
-- null 가드에 대한 Kotlin 테스트는 아직 없습니다. 같은 조건을 Java로 쓴 것은 테스트했습니다. [이 페이지의 Java 버전](../java/03-where.md#310-association-paths)을 참고하십시오.
+- `||`의 다른 부분도 마찬가지입니다. `it.status == 1 || it.customer?.name == name`도 inner join을 사용하므로, status가 1이지만 고객이 없는 주문은 반환되지 않습니다(Kotlin이라면 반환).
+- 이에 대한 Kotlin 테스트는 아직 없습니다. 같은 조건을 Java로 쓴 것은 테스트했습니다. [이 페이지의 Java 버전](../java/03-where.md#310-association-paths)을 참고하십시오.
 
 고객이 **없는** 주문을 찾으려면 연관 자체를 비교하십시오. 조인 없이 외래 키 컬럼을 검사합니다.
 
@@ -530,13 +562,13 @@ where o1_0.customer_id is null
 > [!WARNING]
 > **`?.`를 써도 고객 없는 주문은 돌아오지 않습니다.** Kotlin에서 `it.customer?.name == null`은 고객이 없을 때 `true`입니다.
 > lambdaQL에서는 여기서 경로가 inner join이므로 `it.customer?.name == null`은 고객의 이름이 없는 주문만 반환합니다.
-> 고객 없는 주문도 포함하려면 `it.customer == null || it.customer?.name == null`이라고 쓰십시오. 이 null 가드가 경로를 `left join`으로 만듭니다(위 참고).
+> 고객 없는 주문도 포함하려면 명시적 `leftJoin`과 `c == null || c.name == null`을 사용하거나([6.8](06-select-group.md#68-explicit-joins) 참고), `it.customer == null`로 쿼리를 한 번 더 실행하십시오.
 
 추가 사항:
 
 - 같은 경로는 별칭 하나를 받습니다. 이 별칭은 `where`, `orderBy`, `select`가 함께 사용합니다.
 - `it.customer?.id == 5L`은 외래 키 컬럼 `e0.customer.id`를 사용합니다. 조인이 필요 없습니다.
-- `orderBy`나 `select`에**만** 쓰인 경로는 `left join`이므로 그곳에서는 행을 잃지 않습니다(규칙 S8, J1). 같은 경로를 `where`에서도 쓰면 `orderBy`와 `select`는 `where`의 조인을 사용합니다. null 가드가 `left join`으로 만들지 않았다면 inner join입니다.
+- `orderBy`나 `select`에**만** 쓰인 경로는 `left join`이므로 그곳에서는 행을 잃지 않습니다(규칙 S8, J1). 같은 경로를 `where`에서도 쓰면 `orderBy`와 `select`는 `where`의 조인, 즉 inner join을 사용합니다.
 - 두 엔티티의 비교(`it.customer == c`)는 **계획 중**입니다(KC13). 지금은 id를 비교하십시오: `it.customer?.id == c.id`(여기서 `c`는 캡처한 객체).
 
 <a id="311-captured-values"></a>
@@ -579,11 +611,13 @@ qb.from(Item::class.java)
 
 가드 아래의 `/`, `%`, 캐스트는 거부됩니다. 나눗셈 없이 조건을 작성하십시오. 예: `it.qty > 0 && it.price!! > 2.0 * it.qty`(`qty`가 양수일 때 같은 행).
 
+null 캡처 값과의 비교는 평가 순서와 상관없습니다. `it.price!! > min!! || min == null`과 `min == null || it.price!! > min`은 같은 결과를 냅니다([3.6.4](#364-captured-null-values) 참고).
+
 <a id="313-what-is-rejected"></a>
 ## 3.13 거부되는 것
 
 lambdaQL은 코드 `[LQL-xxxx]`와 소스 줄 번호가 담긴 예외를 던집니다. 추측하지 않습니다.
-대부분의 모양은 람다를 분석할 때(처음 사용할 때) 발견됩니다. 잘못된 캡처 값(null, NaN)은 쿼리가 실행될 때 발견됩니다.
+대부분의 모양은 람다를 분석할 때(처음 사용할 때) 발견됩니다. 잘못된 캡처 값(NaN, `null` 요소가 있는 컬렉션, 메서드를 호출한 `null` 값)은 쿼리가 실행될 때 발견됩니다.
 [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
 
 | 형태 | 예 | 해결 방법 |
@@ -601,7 +635,6 @@ lambdaQL은 코드 `[LQL-xxxx]`와 소스 줄 번호가 담긴 예외를 던집�
 | 엔티티 컬렉션 경로 | `it.items.size > 0` | `exists()` 서브쿼리 |
 | 엔티티와 엔티티 비교(KC13) | `it.customer == c` | id 비교(엔티티 비교는 계획 중) |
 | 가드 아래의 `/`, `%`, 캐스트 | [3.12](#312-errors-that-depend-on-order-of-evaluation) 참고 | 가드를 없애거나 조건을 바꿈 |
-| 크기 비교의 null 캡처 값 | `min == null`일 때 `it.price!! > min!!` | null 가드 추가 |
 | `NaN` / `Infinity` 캡처 값 | `it.price!! > Double.NaN` | NaN을 보내지 않음 |
 | `isNaN()`(KC14) | `it.price!!.isNaN()` | – |
 | 캡처 변수에 쓰기(KC12) | `{ n++; it.active }` | 람다 밖에서 계산 |

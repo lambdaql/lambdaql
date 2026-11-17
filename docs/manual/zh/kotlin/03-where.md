@@ -1,5 +1,8 @@
 # 3. 条件（`where`）（Kotlin）
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/03-where.md)。
+
 > [!NOTE]
 > **状态**
 > - **已实现，并在 H2、MariaDB 和 Oracle 上测试：** `where` 条件和 `toList()`（映射到列、HQL 输出、执行查询）。大多数测试使用 **Java** Lambda。
@@ -182,8 +185,9 @@ val wanted = if (flag) 1 else 2
 
 这是最重要的部分。有两条简单的原则：
 
-1. **在你写了 null 检查的地方，lambdaQL 使用它。**（`== null`、`!= null`、`?.`、`?:`，以及两个可空值之间的 `==`）
-2. **在你没有写的地方，lambdaQL 使用 SQL 语义。** NULL 列使比较结果为 UNKNOWN，该行不会被返回。
+1. **在你写了 null 检查的地方，lambdaQL 使用它。**（`== null`、`!= null`、`?.`、`?:`）
+2. **在你没有写的地方，lambdaQL 使用 SQL 语义。** NULL 列使比较结果为 UNKNOWN，该行不会被返回。实体值之间的 `==` 和 `!=` 也是如此（决策 D48）。当结果可能与 Kotlin 不同时，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`。
+3. **捕获的值保留 Kotlin 规则。** 它们先被计算。捕获的 `null` 生成 `is null` 或 `is not null`。
 
 Kotlin 编译器会在字节码中添加**隐藏的** null 检查（例如 `status` 为 `Int?` 时的 `it.status == 1`）。lambdaQL 会**忽略**它们（决策 D22）。只有源代码中的 null 检查才算数。
 因此，含义相同的 Kotlin Lambda 和 Java Lambda 会生成相同的 SQL。
@@ -195,8 +199,9 @@ Kotlin 编译器会在字节码中添加**隐藏的** null 检查（例如 `stat
 | R12 | 可空列与常量或非空值：`it.status == 1`、`it.id == id`（`id: Long`） | `e0.status = 1`、`e0.id = :p1` | SQL 语义。列为 NULL：该行不返回 |
 | R12 | `it.status != 1` | `e0.status <> 1` | SQL 语义。列为 NULL：该行**不**返回 |
 | R1 | 大小比较：`it.price!! > p`、`it.status!! <= 3` | `e0.price > :p1`、`e0.status <= 3` | SQL 语义 |
-| R11 | 两个都可能为 NULL 的值：`it.status == q`（`q: Int?`）、`it.description == text`（`String?`）、enum `==` | `e0.status is not distinct from :p1` | **null 安全的值比较。** `null == null` 为 true。只有一侧为 null：false |
-| R11 | `it.status != q`（两侧都可空） | `e0.status is distinct from :p1` | null 安全。当 `q` 不为 null 时，NULL 行**会**被返回 |
+| R11 | 可空列与可空的捕获值：`it.status == q`（`q: Int?`）、`it.description == text`（`String?`）、enum `==` | `e0.status = :p1`。捕获的 `null`：`e0.status is null` | 值比较。列为 NULL：该行不返回 |
+| R11 | `it.status != q` | `e0.status <> :p1`。捕获的 `null`：`e0.status is not null` | SQL 语义（D48）。列为 NULL：该行**不**返回（Kotlin 会返回它） |
+| R11 | 两个实体值：`it.description == it.custName` | `e0.description = e0.custName` | SQL 语义（D48）。任一侧为 NULL：该行不返回，NULL 与 NULL 也一样 |
 | R3 | `x == null`、`x != null` | `x is null`、`x is not null` | |
 | R17 | `===`、`!==` | 与 `==`、`!=` 相同 | 值比较，而不是对象同一性 |
 | R9 | 捕获的值 | 绑定参数 | 见 [3.6.4](#364-captured-null-values) |
@@ -210,27 +215,17 @@ Kotlin 的 `==` 本来就比较值。在 lambdaQL 中，`===` 也比较**值**�
 ```kotlin
 val status: Int? = request.status    // 可能为 null
 .where { it.status == status }
-// HQL: e0.status is not distinct from :p1
-//   status = 3    -> status 为 3 的行
-//   status = null -> status 为 NULL 的行
+//   status = 3    -> HQL: e0.status = :p1    status 为 3 的行
+//   status = null -> HQL: e0.status is null  status 为 NULL 的行
 ```
 
-Hibernate 针对各数据库生成 `is not distinct from` 的写法（已验证）：
-
-| 数据库 | SQL |
-|---|---|
-| H2 | `status is not distinct from ?` |
-| MariaDB | `status <=> ?` |
-| Oracle | `decode(status, ?, 0, 1) = 0` |
-
-当 lambdaQL 知道某一侧永远不会为 NULL 时，它会改为生成简单的 `=`。结果相同，而且数据库可以使用索引（见 [10.2](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql)）。
-"永远不为 NULL"是指：`@Id`、`nullable = false` 的列、基本类型属性（`Int`、`Long`、`Double`、`Boolean`），或在查询执行时不为 null 的捕获值。
+列永远不会被函数包裹，因此数据库可以使用索引（见 [10.2](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql)）。
 
 ```kotlin
 .where { it.description == text }    // 查询执行时 text 不为 null
 // HQL: e0.description = :p1
 .where { it.description != text }
-// HQL: (e0.description <> :p1 or e0.description is null)
+// HQL: e0.description <> :p1          （description 为 NULL 时不匹配：SQL 语义）
 ```
 
 **永远不会是 NULL 的列：`it.id == id`。** 在示例实体中，`id` 是 `Long?`。Kotlin 把 `it.id == id`（捕获的 `id: Long`）编译为一个 null 检查加一个比较。
@@ -255,6 +250,7 @@ id 永远不会是 NULL，因此对它的 `is null` 总是假。lambdaQL 把它�
 > 因为 Hibernate 会不加检查地把列值写入字段。
 > lambdaQL 看的是 JPA 元数据，而不是 Kotlin 类型。
 
+<a id="363-write-your-null-checks-yourself"></a>
 ### 3.6.3 自己编写 null 检查
 
 ```kotlin
@@ -276,13 +272,26 @@ id 永远不会是 NULL，因此对它的 `is null` 总是假。lambdaQL 把它�
 
 ```kotlin
 val q: Int? = 3
-.where { it.status != 3 }    // e0.status <> 3                                 不返回 NULL 行
-.where { it.status != q }    // (e0.status <> :p1 or e0.status is null)        返回 NULL 行
+.where { it.status != 3 }    // e0.status <> 3       不返回 NULL 行
+.where { it.status != q }    // e0.status <> :p1     同样不返回 NULL 行（SQL 语义，D48）
 ```
 
-第二种写法比较的是两个都可能为 NULL 的值。Kotlin 为 null 定义了结果，因此 lambdaQL 保留它（null 安全）。
+两种写法都不返回 NULL 行。在 Kotlin 中，`null != 3` 为 `true`，因此 Kotlin 会返回它们。可能出现这种情况时，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`（每个条件一次）。要保留 NULL 行，请写出 null 检查：`it.status == null || it.status != q`。
 
-对 `String?` 使用 `it.description.equals(text)` 与 `==` 相同（null 安全）。
+对 `String?` 使用 `it.description.equals(text)` 与 `==` 相同。
+
+**实体值的 SQL 语义**（决策 D48）。这一点目前还没有 Kotlin 测试。相同的规则已用 Java 在 H2、MariaDB 和 Oracle 上测试（[`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)，region `sql-meaning`，见[本页的 Java 版本](../java/03-where.md#363-write-your-null-checks-yourself)）。以下是设计示例：
+
+```kotlin
+// two entity values: = and <> as in SQL; a row with a NULL on either side matches neither
+qb.from(Order::class.java).where { it.description == it.custName }.toList()     // e0.description = e0.custName
+// an entity value and a value: a NULL column does not match <>
+qb.from(Order::class.java).where { it.description != text }.toList()           // e0.description <> :p1
+// to keep the NULL rows, say so in the lambda
+qb.from(Order::class.java).where { it.description == null || it.description != text }.toList()
+// a NULL Boolean is not false
+qb.from(Coded::class.java).where { it.vip == false }.toList()                   // e0.vip = false
+```
 
 关于 `?.`、`?:` 和 `!!` 的更多内容：[9. Kotlin 说明](09-kotlin-notes.md)。
 
@@ -291,7 +300,7 @@ val q: Int? = 3
 
 | 写法 | 捕获的值为 `null` |
 |---|---|
-| null 安全的写法：`it.status == q`、`it.description != text` | 允许 |
+| 与捕获的值进行 `==` 和 `!=` 比较：`it.status == q`、`it.description != text` | 允许：`is null` / `is not null` |
 | 大小比较：`it.price!! > min!!`，以及所有 `<`、`<=`、`>`、`>=` | 查询执行时**抛出异常** |
 | 与 `in` 一起使用的集合中有 null 元素 | 查询执行时**抛出异常** |
 
@@ -333,6 +342,16 @@ where o1_0.price>?
 
 这一点目前还没有 Kotlin 测试。用 Java 写的同一个守卫已经测试过；见[本页的 Java 版本](../java/03-where.md#364-captured-null-values)。
 
+<a id="365-converted-attributes-convert"></a>
+### 3.6.5 转换的属性（`@Convert`）
+
+带有 JPA `AttributeConverter` 的属性按其 Kotlin 值比较。Hibernate 6.6 会转换与这种属性比较的字面量，也会转换绑定参数（已在 H2、MariaDB 和 Oracle 上验证）。测试用 Java 编写（[`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java)，region `convert`）。以下是设计示例：
+
+```kotlin
+// code is stored reversed ("abc" as "cba"); vip is stored as 'Y'/'N' (YesNoConverter)
+qb.from(Coded::class.java).where { it.code == "abc" }.toList()   // e0.code = 'abc': Hibernate converts the literal
+```
+
 ## 3.7 布尔列
 
 在示例实体中，`active` 是 Kotlin `Boolean`（JVM 基本类型，永远不为 NULL）。
@@ -342,8 +361,9 @@ where o1_0.price>?
 |---|---|---|
 | `it.active` | `e0.active = true` | –（永远不为 NULL） |
 | `!it.active` | `e0.active = false` | – |
-| `it.flag == true` | `e0.flag is not distinct from true` | 不返回 |
-| `it.flag != true` | `e0.flag is distinct from true` | **返回**（与 Kotlin 一致） |
+| `it.flag == true` | `e0.flag = true` | 不返回 |
+| `it.flag != true` | `e0.flag <> true` | **不返回**（SQL 语义，D48；Kotlin 会返回它们） |
+| `it.flag == false` | `e0.flag = false` | 不返回（NULL 不是 false） |
 | `it.flag ?: false` | `(e0.flag is not null and e0.flag = true)` | 不返回 |
 | `!(it.flag ?: false)` | `(e0.flag is null or not (e0.flag = true))` | **返回** |
 | `it.flag!!` | `e0.flag = true` | 不返回（`!!` 被忽略） |
@@ -471,7 +491,7 @@ where c1_0.name=?
 
 ```kotlin
 .where { it.customer == null || it.customer?.name == name }
-// HQL: select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1
+// HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name = :p1
 
 .where { it.customer != null && it.customer?.name == name }
 // HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is not null and j1.name = :p1
@@ -483,7 +503,7 @@ where c1_0.name=?
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
+join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is null or c1_0.name=?
 ```
 

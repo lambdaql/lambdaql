@@ -1,8 +1,11 @@
 # 5. Subqueries (Kotlin)
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/05-subquery.md) for the latest rules.
+
 > [!NOTE]
 > **Status**
-> - **Implemented** (milestone M8-1) and tested on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5): subqueries in `where { o, sub -> ... }` of a select, an update and a delete. This covers `exists` / `!exists`, `in`, `!in` (written as NOT EXISTS), scalar aggregates, the top-1 form, correlated and nested subqueries, and captured values. Most tests use **Java** lambdas.
+> - **Implemented** (milestone M8-1) and tested on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5): subqueries in `where { o, sub -> ... }` of a select, an update and a delete. This covers `exists` / `!exists`, `in`, `!in` (written as `NOT IN`), scalar aggregates, the top-1 form, correlated and nested subqueries, and captured values. Most tests use **Java** lambdas.
 > - **Tested with Kotlin lambdas** ([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), in the build, H2, MariaDB and Oracle): `exists`, `in` and a scalar `avg`. These examples are marked **(tested)**. The other Kotlin forms (`!in`, top-1, nested) were compiled with kotlinc 2.3.21 outside the build and give the same HQL as the Java forms.
 > - **Not implemented yet:** subqueries in the values of `set`, and the MariaDB `lateral` rewrite. (Derived tables and CTEs are implemented with another syntax, see [6. Select, aggregates and group by](06-select-group.md#69-derived-table-subquery-in-from).)
 > - The other Kotlin code shows the tested Java queries in Kotlin syntax. The tested Java examples are in [the Java version of this page](../java/05-subquery.md).
@@ -33,7 +36,7 @@ What you can do with `sub`:
 | `sub.from(X::class.java).where { ... }.exists()` | condition | `exists (select 1 from X x where ...)` |
 | `!sub.from(X::class.java).where { ... }.exists()` | condition | `not exists (...)` |
 | `y in sub.from(X::class.java).where { ... }.select { x -> v }` | condition | `y in (select x.v from X x where ...)` |
-| `y !in sub.from(...)...select { ... }` | condition | `not exists (... and x.v = y)` |
+| `y !in sub.from(...)...select { ... }` | condition | `y not in (select x.v from X x where ...)` |
 | `sub.from(X::class.java).avg { x -> v }` (also `sum`, `min`, `max`, `count()`) | value | `(select avg(x.v) from X x)` |
 | `sub.from(X::class.java)...orderBy { ... }.limit(1).select { x -> v }.first()` | value | top-1 subquery |
 
@@ -149,9 +152,10 @@ where o1_0.customer_id in (select c2_0.id from customers c2_0 where c2_0.grade>3
 `o.customer?.id` ends with the customer `@Id`, so it is the foreign key column `e0.customer.id`. No join is needed.
 `!!` is ignored (decision D23): `c.grade!! > 3` is `s1.grade > 3`.
 
-## 5.5 NOT IN is written as NOT EXISTS
+<a id="55-not-in-is-written-as-not-exists"></a>
+## 5.5 NOT IN and NULL
 
-`x !in values` is **not** rendered as `NOT IN`. lambdaQL writes `NOT EXISTS`:
+`x !in values` is rendered as `NOT IN`, with the SQL meaning (decision D48):
 
 ```kotlin
 // Orders whose status is not a grade of any customer
@@ -159,7 +163,7 @@ qb.from(Order::class.java)
     .where { o, sub -> o.status !in sub.from(Customer::class.java).select { c -> c.grade } }
     .toList()
 // HQL: select e0 from Order e0
-//      where not exists (select 1 from Customer s1 where s1.grade = e0.status)
+//      where e0.status not in (select s1.grade from Customer s1)
 ```
 
 **SQL by database (from the Java test run; Kotlin gives the same HQL)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sub-not-in`:
@@ -168,14 +172,14 @@ qb.from(Order::class.java)
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-where not exists(select 1 from customers c2_0 where c2_0.grade=o1_0.status)
+where o1_0.status not in (select c2_0.grade from customers c2_0)
 ```
 
 Why:
 
-- `x NOT IN (subquery)` returns **no rows at all** if the subquery returns even one NULL. This is a common SQL trap.
-- `NOT EXISTS` does not have this problem. Databases also run it well (as an anti-join).
-- Result: the query gives the same rows as `o.status !in grades` in Kotlin. The Java test checks this with a NULL grade in the data.
+- `x NOT IN (subquery)` returns **no rows at all** if the subquery returns even one NULL. lambdaQL keeps this SQL meaning (decision D48) and logs `LQL-5009` at `DEBUG` level.
+- To skip the NULLs, say so in the subquery: `sub.from(Customer::class.java).where { c -> c.grade != null }.select { c -> c.grade }`. The Java test checks both queries with a NULL grade in the data.
+- `NOT EXISTS` is still written for `!sub...exists()`.
 
 ## 5.6 Correlated subqueries
 
@@ -219,9 +223,8 @@ from orders o1_0
 where exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id and i1_0.qty>?)
 ```
 
-**`==` in the correlation.** `i.order?.id == o.id` compares two `Long?` values. By the normal rule this is a null-safe compare (`is not distinct from`, see [3.6](03-where.md#36-null-rules)).
-But `o.id` is an `@Id`, so it can never be NULL. In this case lambdaQL writes a simple `=` (and `(a <> b or a is null)` for `!=`).
-The result is the same, and the database can use an index. On Oracle, `is not distinct from` becomes `decode(...)`, which cannot use an index.
+**`==` in the correlation.** `i.order?.id == o.id` compares two `Long?` values. Two values of the entity are compared with the SQL meaning (decision D48, see [3.6](03-where.md#36-null-rules)), so lambdaQL writes a plain `=` (and `<>` for `!=`).
+The database can use an index.
 
 ## 5.7 Scalar subqueries
 
@@ -352,9 +355,9 @@ The NULL policy and the automatic `id` tie-breaker from [4. Sorting and paging](
 
 Inside a subquery, conditions, paths and NULL work **exactly like the outer query** ([3. Conditions](03-where.md)):
 
-- `==` between two nullable values is a null-safe value compare.
+- `==` between two values of the entity is a value compare with the SQL meaning (D48); a captured `null` matches no row (`LQL-4045`).
 - `!!` is ignored. `?.` on a path names the same column.
-- Association paths of the subquery's own entity follow the same join rule as the outer `where` (decision D36): an inner `join` by default, and a `left join` when a null guard keeps rows without the association.
+- Association paths of the subquery's own entity follow the same join rule as the outer `where`: always an inner `join` (decision D48).
 - A path that ends with `@Id` is a foreign key column (no join).
 - **The outer entity** can be used only with its own columns and its foreign key ids (`o.id`, `o.customer?.id`). A path of the outer entity that needs a join (`o.customer?.name`) is an error at analysis time. Compare the foreign key ids instead.
 - Collection paths (`o.items`) are rejected. A subquery is the way to ask about a collection:
@@ -375,10 +378,10 @@ Inside a subquery, conditions, paths and NULL work **exactly like the outer quer
 | # | Rule |
 |---|---|
 | Q1 | Conditions, paths and NULL rules inside a subquery are the same as outside. Association paths in conditions use the same join rule (inner `join` by default). A path of the outer entity that needs a join is an error; foreign key ids are allowed |
-| Q2 | **NOT IN is rendered as NOT EXISTS**: `x !in values` becomes `not exists (select 1 from C c where <condition> and c.sel = x)`. This avoids the `NOT IN` + NULL trap |
+| Q2 | **NOT IN keeps the SQL meaning** (D48): `x !in values` becomes `x not in (select c.sel from C c where <condition>)`. A NULL in the subquery gives no rows (`LQL-5009` at `DEBUG`); add `c.sel != null` to the subquery to skip NULLs |
 | Q3 | A scalar subquery must give one row: an aggregate (`max`, `min`, `avg`, `sum`, `count`) or `orderBy { }.limit(1)...first()`. Any other `first()` is an error |
 | Q4 | Subquery sorts: kept with `limit`, removed with a warning without `limit`. `IN (... limit)` is wrapped in a derived table. The MariaDB `lateral` rewrite with `row_number()` is not implemented yet |
-| Q5 | In a correlation, `==` is written as `=` when one side can never be NULL (`@Id`, `nullable = false`, primitive). `!=` becomes `(a <> b or a is null)`. This keeps index use |
+| Q5 | In a correlation, `==` is written as `=` and `!=` as `<>` (the SQL meaning, D48): a NULL on either side does not match. This keeps index use |
 | Q6 | A subquery's `where` can take its own `sub` argument: `where { i, sub2 -> ... }`. The same rules apply at every level |
 
 ---

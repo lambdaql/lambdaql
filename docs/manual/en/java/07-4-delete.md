@@ -1,6 +1,9 @@
 <a id="74-delete"></a>
 # 7.4 Delete (Java)
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/java/07-4-delete.md) for the latest rules.
+
 > [!NOTE]
 > **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10), including `limit` and `executeOne()` (decision D41).
 > Subqueries (`sub`) in `where` are implemented and tested too (milestone M8).
@@ -54,7 +57,7 @@ where (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id) is n
 MariaDB writes `delete o1_0 from orders o1_0`. H2 and Oracle write `delete from orders o1_0`.
 
 The second statement deletes **the same rows** that `qb.from(Order.class).where(o -> o.getCustomer().getName() == null)` returns: orders whose customer has no name. The test compares the deleted rows with this select.
-Orders **without** a customer are not deleted (rule U9, decision D36). To delete them too, write `o.getCustomer() == null || o.getCustomer().getName() == null`. With this null guard, lambdaQL does not add `e0.customer.id is not null`.
+Orders **without** a customer are not deleted (rule U9, decision D36). A null guard (`o.getCustomer() == null || ...`) does not change this, because the path is an inner join in the select too (decision D48). To delete orders without a customer, run a second delete with `o.getCustomer() == null`.
 
 Delete all rows: `all()` is required (rule U5).
 

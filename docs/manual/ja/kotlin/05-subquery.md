@@ -1,6 +1,9 @@
 <a id="5-subqueries-kotlin"></a>
 # 5. サブクエリ（Kotlin）
 
+> [!IMPORTANT]
+> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/05-subquery.md)を参照してください。
+
 > [!NOTE]
 > **状況**
 > - **実装済み**（マイルストーン M8-1）、H2 2.3、MariaDB 10.11、Oracle 23.26（Hibernate 6.6.5）でテスト済み: select、update、delete の `where { o, sub -> ... }` の中のサブクエリ。`exists` / `!exists`、`in`、`!in`（NOT EXISTS として書かれる）、スカラーの集計、top-1 の形、相関サブクエリと入れ子のサブクエリ、キャプチャ値を含みます。ほとんどのテストは **Java** のラムダを使います。
@@ -162,7 +165,7 @@ qb.from(Order::class.java)
     .where { o, sub -> o.status !in sub.from(Customer::class.java).select { c -> c.grade } }
     .toList()
 // HQL: select e0 from Order e0
-//      where not exists (select 1 from Customer s1 where s1.grade = e0.status)
+//      where e0.status not in (select s1.grade from Customer s1)
 ```
 
 **データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sub-not-in`:
@@ -171,7 +174,7 @@ qb.from(Order::class.java)
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-where not exists(select 1 from customers c2_0 where c2_0.grade=o1_0.status)
+where o1_0.status not in (select c2_0.grade from customers c2_0)
 ```
 
 理由:
@@ -223,9 +226,8 @@ from orders o1_0
 where exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id and i1_0.qty>?)
 ```
 
-**相関での `==`。** `i.order?.id == o.id` は 2 つの `Long?` の値を比較します。通常のルールでは、これは null-safe 比較（`is not distinct from`、[3.6](03-where.md#36-null-rules) を参照）です。
-しかし `o.id` は `@Id` なので、NULL になることはありません。この場合、lambdaQL は単純な `=` を書きます（`!=` には `(a <> b or a is null)`）。
-結果は同じで、データベースはインデックスを使えます。Oracle では `is not distinct from` は `decode(...)` になり、インデックスを使えません。
+**相関での `==`。** `i.order?.id == o.id` は 2 つの `Long?` の値を比較します。エンティティの値どうしは SQL の意味で比べるので（決定 D48、[3.6](03-where.md#36-null-rules) を参照）、lambdaQL は単純な `=` を書きます（`!=` には `<>`）。
+データベースはインデックスを使えます。
 
 <a id="57-scalar-subqueries"></a>
 ## 5.7 スカラーサブクエリ
@@ -360,7 +362,7 @@ where exists(select 1 from orders o1_0 where o1_0.customer_id=c1_0.id and exists
 
 サブクエリの中では、条件、パス、NULL は **外側のクエリとまったく同じように** 動きます（[3. 条件](03-where.md)）。
 
-- nullable な 2 つの値の間の `==` は null-safe な値の比較です。
+- エンティティの値どうしの `==` は SQL の意味による値の比較です（D48）。キャプチャした `null` は `is null` になります。
 - `!!` は無視されます。パスの `?.` は同じカラムを指します。
 - サブクエリ自身のエンティティの関連のパスは、外側の `where` と同じ結合のルールに従います（決定 D36）。デフォルトは内部結合の `join` で、null ガードが関連のない行を残す場合は `left join` です。
 - `@Id` で終わるパスは外部キーのカラムです（結合なし）。
@@ -388,7 +390,7 @@ where exists(select 1 from orders o1_0 where o1_0.customer_id=c1_0.id and exists
 | Q2 | **NOT IN は NOT EXISTS として出力される**: `x !in values` は `not exists (select 1 from C c where <condition> and c.sel = x)` になる。これで `NOT IN` + NULL の落とし穴を避ける |
 | Q3 | スカラーサブクエリは 1 行を返さなければならない: 集計（`max`、`min`、`avg`、`sum`、`count`）または `orderBy { }.limit(1)...first()`。それ以外の `first()` はエラー |
 | Q4 | サブクエリのソート: `limit` があれば残し、`limit` がなければ警告を出して削除。`IN (... limit)` は派生テーブルに包む。MariaDB の `lateral` の `row_number()` による書き換えはまだ実装されていない |
-| Q5 | 相関では、片方が決して NULL にならない（`@Id`、`nullable = false`、プリミティブ）とき、`==` を `=` として書く。`!=` は `(a <> b or a is null)` になる。これでインデックスを使える |
+| Q5 | 相関では、`==` を `=`、`!=` を `<>` として書く（SQL の意味、D48）。どちらかが NULL なら一致しない。これでインデックスを使える |
 | Q6 | サブクエリの `where` は自分の `sub` 引数を受け取れる: `where { i, sub2 -> ... }`。どの階層でも同じルールが適用される |
 
 ---

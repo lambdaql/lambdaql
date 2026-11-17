@@ -1,6 +1,9 @@
 <a id="7-update-insert-delete-kotlin"></a>
 # 7. 更新、挿入、削除（Kotlin）
 
+> [!IMPORTANT]
+> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/07-dml.md)を参照してください。
+
 > [!NOTE]
 > **状況**
 > - **実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、Hibernate 6.6.5、マイルストーン M10、決定 D28 と D40）: 更新、削除、挿入、`insert ... select`、upsert、および（決定 D41）更新と削除の `limit` と 1 行保護 `executeOne()`。ほとんどのテストは **Java** のラムダを使っています。

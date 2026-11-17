@@ -26,10 +26,10 @@ from orders o1_0
 where o1_0.description='O''Brien'
 
 -- @example null-safe
--- HQL: select e0 from Order e0 where e0.description is null
+-- HQL: select e0 from Order e0 where e0.description = :p1
 select …
 from orders o1_0
-where o1_0.description is null
+where o1_0.description=?
 
 -- @example null-safe#2
 -- HQL: select e0 from Order e0 where e0.description = :p1
@@ -45,10 +45,10 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.name=?
 
 -- @example null-guard
--- HQL: select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1
+-- HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name = :p1
 select …
 from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
+join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is null or c1_0.name=?
 
 -- @example null-guard#2
@@ -112,16 +112,16 @@ from orders o1_0
 where o1_0.id not in (?,?)
 
 -- @example not-in#2
--- HQL: select e0 from Order e0 where (e0.description is null or e0.description not in (:p1))
+-- HQL: select e0 from Order e0 where e0.description not in (:p1)
 select …
 from orders o1_0
-where (o1_0.description is null or o1_0.description not in (?,?))
+where o1_0.description not in (?,?)
 
 -- @example overview-first
--- HQL: select e0 from Order e0 left join e0.customer j1 where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
+-- HQL: select e0 from Order e0 join e0.customer j1 where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
 select …
 from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
+join customers c1_0 on c1_0.id=o1_0.customer_id
 where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 
 -- @example start-captured
@@ -162,10 +162,10 @@ from orders o1_0
 where o1_0.customer_id=5
 
 -- @example null-guard-name-null
--- HQL: select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name is null
+-- HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name is null
 select …
 from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
+join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is null or c1_0.name is null
 
 -- @example sort-basic
@@ -426,10 +426,10 @@ from orders o1_0
 where o1_0.customer_id in (select c2_0.id from customers c2_0 where c2_0.grade is not null and c2_0.grade>3)
 
 -- @example sub-not-in
--- HQL: select e0 from Order e0 where not exists (select 1 from Customer s1 where s1.grade = e0.status)
+-- HQL: select e0 from Order e0 where e0.status not in (select s1.grade from Customer s1)
 select …
 from orders o1_0
-where not exists(select 1 from customers c2_0 where c2_0.grade=o1_0.status)
+where o1_0.status not in (select c2_0.grade from customers c2_0)
 
 -- @example sub-scalar
 -- HQL: select e0 from Order e0 where e0.price > (select avg(s1.price) from Order s1)

@@ -1,5 +1,8 @@
 # 3. Conditions (`where`) (Kotlin)
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/03-where.md) for the latest rules.
+
 > [!NOTE]
 > **Status**
 > - **Implemented and tested on H2, MariaDB and Oracle:** `where` conditions and `toList()` (mapping to columns, HQL output, running the query). Most tests use **Java** lambdas.
@@ -177,10 +180,11 @@ val wanted = if (flag) 1 else 2
 
 ## 3.6 NULL rules
 
-This is the most important part. There are two simple principles:
+This is the most important part. There are three simple principles:
 
-1. **Where you wrote a null check, lambdaQL uses it.** (`== null`, `!= null`, `?.`, `?:`, and `==` between two nullable values)
-2. **Where you did not, lambdaQL uses SQL meaning.** A NULL column makes the comparison UNKNOWN, and the row is not returned.
+1. **Where you wrote a null check, lambdaQL uses it.** (`== null`, `!= null`, `?.`, `?:`)
+2. **Where you did not, lambdaQL uses SQL meaning.** A NULL column makes the comparison UNKNOWN, and the row is not returned. This holds for `==` and `!=` between values of the entity too (decision D48). When the result can differ from Kotlin, lambdaQL logs `LQL-5009` at `DEBUG` level.
+3. **Captured values are computed first, then compared with the SQL meaning too.** A captured `null` is bound as NULL, so `= :p1` and `<> :p1` match no row. lambdaQL logs `LQL-4045` at `WARN` level when this happens at run time. To find NULL, write `x == null` (it gives `is null`).
 
 The Kotlin compiler adds **hidden** null checks to the bytecode (for example for `it.status == 1` when `status` is `Int?`). lambdaQL **ignores** them (decision D22). Only the null checks in your source code count.
 So a Kotlin lambda and a Java lambda with the same meaning give the same SQL.
@@ -192,8 +196,9 @@ So a Kotlin lambda and a Java lambda with the same meaning give the same SQL.
 | R12 | Nullable column and a constant or a non-null value: `it.status == 1`, `it.id == id` (`id: Long`) | `e0.status = 1`, `e0.id = :p1` | SQL meaning. NULL column: row not returned |
 | R12 | `it.status != 1` | `e0.status <> 1` | SQL meaning. NULL column: row **not** returned |
 | R1 | Order compare: `it.price!! > p`, `it.status!! <= 3` | `e0.price > :p1`, `e0.status <= 3` | SQL meaning |
-| R11 | Two values that can both be NULL: `it.status == q` (`q: Int?`), `it.description == text` (`String?`), enum `==` | `e0.status is not distinct from :p1` | **null-safe value compare.** `null == null` is true. Only one side null: false |
-| R11 | `it.status != q` (both nullable) | `e0.status is distinct from :p1` | null-safe. NULL rows **are** returned when `q` is not null |
+| R11 | A nullable column and a nullable captured value: `it.status == q` (`q: Int?`), `it.description == text` (`String?`), enum `==` | `e0.status = :p1` | value compare. NULL column: row not returned. A captured `null`: no row (`LQL-4045`) |
+| R11 | `it.status != q` | `e0.status <> :p1` | SQL meaning (D48). NULL column: row **not** returned (Kotlin would return it). A captured `null`: no row (`LQL-4045`) |
+| R11 | Two values of the entity: `it.description == it.custName` | `e0.description = e0.custName` | SQL meaning (D48). A NULL on either side: row not returned, also NULL and NULL |
 | R3 | `x == null`, `x != null` | `x is null`, `x is not null` | |
 | R17 | `===`, `!==` | the same as `==`, `!=` | value compare, not object identity |
 | R9 | Captured values | bind parameters | see [3.6.4](#364-captured-null-values) |
@@ -206,27 +211,19 @@ A query has no object identity. Two different `Long` boxes with the same value a
 ```kotlin
 val status: Int? = request.status    // may be null
 .where { it.status == status }
-// HQL: e0.status is not distinct from :p1
-//   status = 3    -> rows with status 3
-//   status = null -> rows with status NULL
+//   status = 3    -> HQL: e0.status = :p1    rows with status 3
+//   status = null -> HQL: e0.status = :p1    no row: = NULL is never true (LQL-4045 at WARN)
 ```
 
-How Hibernate writes `is not distinct from` for each database (checked):
+To find rows where `status` is NULL, write the null check: `it.status == null` gives `e0.status is null`.
 
-| Database | SQL |
-|---|---|
-| H2 | `status is not distinct from ?` |
-| MariaDB | `status <=> ?` |
-| Oracle | `decode(status, ?, 0, 1) = 0` |
-
-When lambdaQL knows that one side can never be NULL, it writes a simple `=` instead. The result is the same, and the database can use an index (see [10.2](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql)).
-"Never NULL" means: an `@Id`, a `nullable = false` column, a primitive property (`Int`, `Long`, `Double`, `Boolean`), or a captured value that is not null when the query runs.
+The column is never wrapped, so the database can use an index (see [10.2](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql)).
 
 ```kotlin
 .where { it.description == text }    // text is not null when the query runs
 // HQL: e0.description = :p1
 .where { it.description != text }
-// HQL: (e0.description <> :p1 or e0.description is null)
+// HQL: e0.description <> :p1          (a NULL description does not match: SQL meaning)
 ```
 
 **A column that can never be NULL: `it.id == id`.** In the example entity, `id` is a `Long?`. Kotlin compiles `it.id == id` (with a captured `id: Long`) to a null check and a compare.
@@ -272,13 +269,26 @@ Compare a constant and a nullable variable:
 
 ```kotlin
 val q: Int? = 3
-.where { it.status != 3 }    // e0.status <> 3                                 NULL rows not returned
-.where { it.status != q }    // (e0.status <> :p1 or e0.status is null)        NULL rows returned
+.where { it.status != 3 }    // e0.status <> 3       NULL rows not returned
+.where { it.status != q }    // e0.status <> :p1     NULL rows not returned either (SQL meaning, D48)
 ```
 
-The second form compares two values that can both be NULL. Kotlin defines the result for null, so lambdaQL keeps it (null-safe).
+Both forms leave out the NULL rows. In Kotlin, `null != 3` is `true`, so Kotlin would return them. lambdaQL logs `LQL-5009` at `DEBUG` level (once per condition) when this can happen. To keep the NULL rows, write the null check: `it.status == null || it.status != q`.
 
-`it.description.equals(text)` on a `String?` is the same as `==` (null-safe).
+`it.description.equals(text)` on a `String?` is the same as `==`.
+
+**The SQL meaning for values of the entity** (decision D48). There are no Kotlin tests for this yet. The same rules are tested in Java on H2, MariaDB and Oracle ([`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java), region `sql-meaning`, see [the Java version of this page](../java/03-where.md#363-write-your-null-checks-yourself)). This is a design example:
+
+```kotlin
+// two entity values: = and <> as in SQL; a row with a NULL on either side matches neither
+qb.from(Order::class.java).where { it.description == it.custName }.toList()     // e0.description = e0.custName
+// an entity value and a value: a NULL column does not match <>
+qb.from(Order::class.java).where { it.description != text }.toList()           // e0.description <> :p1
+// to keep the NULL rows, say so in the lambda
+qb.from(Order::class.java).where { it.description == null || it.description != text }.toList()
+// a NULL Boolean is not false
+qb.from(Coded::class.java).where { it.vip == false }.toList()                   // e0.vip = false
+```
 
 More about `?.`, `?:` and `!!`: [9. Kotlin notes](09-kotlin-notes.md).
 
@@ -286,11 +296,11 @@ More about `?.`, `?:` and `!!`: [9. Kotlin notes](09-kotlin-notes.md).
 
 | Form | Captured value is `null` |
 |---|---|
-| null-safe forms: `it.status == q`, `it.description != text` | allowed |
+| `==` and `!=` with a captured value: `it.status == q`, `it.description != text` | runs: `= :p1` / `<> :p1` with NULL, so **no row** matches. `LQL-4045` at `WARN` level |
 | order compare: `it.price!! > min!!`, every `<`, `<=`, `>`, `>=` | **exception** when the query runs |
 | a null element in a collection used with `in` | **exception** when the query runs |
 
-Why: Kotlin would throw a `NullPointerException` here (`min!!`). Turning it into `IS NULL` would return rows that Kotlin never returns.
+Why: in SQL, `= NULL` and `<> NULL` are never true, so lambdaQL keeps that meaning and warns. Kotlin would throw a `NullPointerException` at `min!!`, so an order compare with `null` throws too. To find NULL rows, write `x == null`.
 
 **Exception to the rule: a null guard.** If the same captured value is checked for null first, null is allowed:
 
@@ -328,6 +338,16 @@ How it works:
 
 There are no Kotlin tests for this yet. The same guard written in Java is tested; see [the Java version of this page](../java/03-where.md#364-captured-null-values).
 
+<a id="365-converted-attributes-convert"></a>
+### 3.6.5 Converted attributes (`@Convert`)
+
+An attribute with a JPA `AttributeConverter` is compared with its Kotlin value. Hibernate 6.6 converts a literal that is compared with such an attribute, and it converts bound parameters too (checked on H2, MariaDB and Oracle). The test is written in Java ([`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java), region `convert`). This is a design example:
+
+```kotlin
+// code is stored reversed ("abc" as "cba"); vip is stored as 'Y'/'N' (YesNoConverter)
+qb.from(Coded::class.java).where { it.code == "abc" }.toList()   // e0.code = 'abc': Hibernate converts the literal
+```
+
 ## 3.7 Boolean columns
 
 In the example entity, `active` is a Kotlin `Boolean` (a JVM primitive, never NULL).
@@ -337,8 +357,9 @@ The rows with `flag` are for a nullable column `var flag: Boolean? = null`.
 |---|---|---|
 | `it.active` | `e0.active = true` | – (never NULL) |
 | `!it.active` | `e0.active = false` | – |
-| `it.flag == true` | `e0.flag is not distinct from true` | not returned |
-| `it.flag != true` | `e0.flag is distinct from true` | **returned** (like Kotlin) |
+| `it.flag == true` | `e0.flag = true` | not returned |
+| `it.flag != true` | `e0.flag <> true` | **not returned** (SQL meaning, D48; Kotlin would return them) |
+| `it.flag == false` | `e0.flag = false` | not returned (NULL is not false) |
 | `it.flag ?: false` | `(e0.flag is not null and e0.flag = true)` | not returned |
 | `!(it.flag ?: false)` | `(e0.flag is null or not (e0.flag = true))` | **returned** |
 | `it.flag!!` | `e0.flag = true` | not returned (`!!` is ignored) |
@@ -459,12 +480,12 @@ where c1_0.name=?
 - An order **without a customer** is not in the result. There is no customer row to join.
 - lambdaQL does not add a null check for you. You do not need `it.customer != null &&` before the path.
 
-**A null guard keeps orders without a customer.** If the condition can be true for an order without a customer, lambdaQL uses a `left join` for that path.
-With an inner join, Kotlin and SQL would give different rows: Kotlin returns the order, but the inner join would lose it (decision D36).
+**A null guard does not keep orders without a customer.** A path in `where` is always an inner join (the SQL meaning, decision D48). So `it.customer == null || ...` cannot match an order without a customer: that order has no customer row to join. lambdaQL logs `LQL-5009` at `DEBUG` level for such a condition.
+To keep orders without a customer, use an explicit `leftJoin` (decision D44, see [6.8](06-select-group.md#68-explicit-joins)) and write `c == null || ...`.
 
 ```kotlin
 .where { it.customer == null || it.customer?.name == name }
-// HQL: select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1
+// HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name = :p1
 
 .where { it.customer != null && it.customer?.name == name }
 // HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is not null and j1.name = :p1
@@ -476,7 +497,7 @@ With an inner join, Kotlin and SQL would give different rows: Kotlin returns the
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
+join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is null or c1_0.name=?
 ```
 
@@ -490,11 +511,10 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is not null and c1_0.name=?
 ```
 
-After the `left join`, Hibernate writes `c1_0.id is null` for `e0.customer is null`. The meaning is the same: the order has no customer.
+Hibernate writes `c1_0.id is null` for `e0.customer is null`. After the inner join it is never true.
 
-- Other parts of an `||` can keep the order too. `it.status == 1 || it.customer?.name == name` also uses a `left join`, because in Kotlin an order with status 1 matches even without a customer.
-- If another `where` call removes those orders anyway (for example `.where { it.customer?.name != null }`), the join stays inner.
-- There are no Kotlin tests for the null guard yet. The same conditions written in Java are tested; see [the Java version of this page](../java/03-where.md#310-association-paths).
+- The same holds for other parts of an `||`: `it.status == 1 || it.customer?.name == name` also uses an inner join, so an order with status 1 but without a customer is not returned (Kotlin would return it).
+- There are no Kotlin tests for this yet. The same conditions written in Java are tested; see [the Java version of this page](../java/03-where.md#310-association-paths).
 
 To find orders **without** a customer, compare the association itself. This checks the foreign key column, with no join:
 
@@ -515,7 +535,7 @@ where o1_0.customer_id is null
 > [!WARNING]
 > **`?.` does not bring back orders without a customer.** In Kotlin, `it.customer?.name == null` is `true` when there is no customer.
 > In lambdaQL, the path is an inner join here, so `it.customer?.name == null` returns only orders whose customer has no name.
-> To include orders without a customer, write `it.customer == null || it.customer?.name == null`. This null guard makes the path a `left join` (see above).
+> To include orders without a customer, use an explicit `leftJoin` with `c == null || c.name == null` (see [6.8](06-select-group.md#68-explicit-joins)), or run a second query with `it.customer == null`.
 
 More facts:
 
