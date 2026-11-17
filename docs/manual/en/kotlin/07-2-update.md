@@ -2,7 +2,7 @@
 # 7.2 Update (Kotlin)
 
 > [!NOTE]
-> **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10). The tests use **Java** lambdas. **Kotlin lambdas in DML are not tested yet.** This includes `limit` and `executeOne()` (decision D41).
+> **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10). Most tests use **Java** lambdas. Property assignment and the index form `by[column] = value` are tested with Kotlin lambdas too ([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), marked **(tested)**). This includes `limit` and `executeOne()` (decision D41).
 > Subqueries (`sub`) in `where` are implemented too (milestone M8). The delete form is tested with Java lambdas; see [7.4](07-4-delete.md).
 > **Not implemented yet:** `sub` subqueries in the values of `set`, and `limit` / `executeOne()` on entities with a composite key.
 > The Kotlin code shows the tested Java statements in Kotlin syntax, and the HQL comes from the Java tests in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java). Examples without HQL follow the design.
@@ -46,7 +46,19 @@ where o1_0.status=1
 
 Oracle writes the alias in `set` (`set o1_0.status=?`); H2 and MariaDB do not.
 
-There are no Kotlin tests yet. The same statements written in Java are tested in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/07-2-update.md) for the tested examples.
+**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `update`:
+
+```kotlin
+val u = qb.update(Order::class.java)
+    .set { it.status = st; it.price = it.price * 2 }
+    .where { it.customer?.name == "Kim" }
+assertEquals("update Order e0 set e0.status = :p1, e0.price = (e0.price * 2.0)"
+    + " where (select s1.name from Customer s1 where s1.id = e0.customer.id) = 'Kim' and e0.customer.id is not null",
+    u.toHql().hql())
+```
+
+`st` is a captured `Short` (`7`). The test entity's `price` is a primitive `double`, so there is no `!!`. The path `it.customer?.name` in the `where` of an update becomes a subquery (see [Where with paths and subqueries](#where-with-paths-and-subqueries) below). The test runs the statement and reads the rows back.
+More statements written in Java are tested in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/07-2-update.md) for those examples.
 
 ## Values: null, date, boolean
 
@@ -259,9 +271,9 @@ var u = qb.update(Order::class.java).set { it.description = memo }
 if (newStatus != null) u = u.set { it.status = newStatus }
 val changed = u.where { it.id == id }.execute()
 
-// reading a column that an earlier assignment wrote is an error (U3): LambdaAnalysisException
+// reading a column that an earlier assignment wrote is an error (U3): TranslationException (LQL-3042)
 qb.update(Order::class.java).set { it.price = 1.0; it.total = it.price }
-// the same column twice is an error (U4), also across set() calls: LambdaAnalysisException
+// the same column twice is an error (U4), also across set() calls: TranslationException (LQL-3041)
 qb.update(Order::class.java).set { it.status = 1 }.set { it.status = 2 }
 ```
 

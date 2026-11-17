@@ -225,8 +225,6 @@ default List<Member> topGraded(int n) {
 }
 ```
 
-結果の関数（ここでは `toList()`）は、`query()` を呼んだのと同じメソッドの中で呼んでください。完成していないクエリを返さないでください。[12.9](#129-routing-datasource) を参照してください。
-
 次の例では、`repository` は `MemberRepository` です。
 
 **(テスト済み)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `find-all-sort`:
@@ -447,7 +445,7 @@ Page<Member> page = repository.findAll(m -> m.isActive(), PageRequest.of(1, 2, S
 | Spring の `Sort` に知らないプロパティがある | `PropertyReferenceException`（テスト済み） |
 | Spring の `Sort` で `ignoreCase()` を使う | `UnsupportedOperationException`（テスト済み） |
 | リポジトリの呼び出し（短縮メソッド、または default メソッドの中の `execute()`）で、トランザクションなしに更新、削除、挿入、upsert を実行する | `InvalidDataAccessApiUsageException`（テスト済み）。JPA の `TransactionRequiredException` から Spring が作ります。リポジトリのメソッドの外（`QueryBuilder` の Bean）では JPA の `TransactionRequiredException` |
-| ルールに違反する代入のラムダ（U1、U3、U4、U6） | `LambdaAnalysisException`。変換されません（[7.8](07-dml.md#rules-checked-at-analysis-time) を参照） |
+| ルールに違反する代入のラムダ（U1、U3、U4、U6） | `LambdaQLException`（例: `TranslationException`、`LQL-3042`）。変換されません（[7.8](07-dml.md#rules-checked-at-analysis-time) を参照） |
 
 `QueryBuilder` の Bean（12.8）はリポジトリではないので、Spring はそのエラーを変換しません。そこでは、2 行以上に一致する `one()` と `executeOne()` は `NonUniqueResultException` を投げます。
 
@@ -506,37 +504,14 @@ public QueryBuilder queryBuilder(EntityManagerFactory entityManagerFactory) {
 
 **`@DataJpaTest` を使うテスト。** `@DataJpaTest` のスライステストは、一部の自動構成だけを読み込みます。そこでもリポジトリのメソッドは動きますが、`QueryBuilder` の Bean は作られません。テストで必要な場合は、テストクラスに `@ImportAutoConfiguration(LambdaQlAutoConfiguration.class)` を付けてください（まだテストしていません）。
 
-<a id="129-routing-datasource"></a>
-## 12.9 ルーティング DataSource
-
-> [!WARNING]
-> **設計上の注意で、実測していません。** この節は、ルーティング DataSource ではテストしていません。
-
-アプリケーションによっては、メソッド名に対する AOP のルールでデータベースを選びます。たとえば、`find*` のメソッドを読み取り用のレプリカに送るルールです。
-このようなルールが当てはまるのは、ルールに一致したメソッドの **中で** 実行される SQL です。
-
-- `findAll`、`findOne` などの短いメソッドは、リポジトリの default メソッドの中か、同じサービスメソッドの中で呼んでください。
-- `repo.query().where(...).toList()` では、SQL は `query()` を呼んだときではなく、`toList()` を呼んだときに実行されます。`toList()` がリポジトリのメソッドの外で実行されると、リポジトリのメソッドに対するルールはそれに当てはまりません。
-
-```java
-// a rule on repository methods applies: the SQL runs inside findActive()
-default List<Member> findActive() {
-    return query().where(m -> m.isActive()).toList();
-}
-
-// a rule on repository methods does not apply: the SQL runs in toList(), after query() has returned
-// (a rule on the calling service method still applies)
-List<Member> rows = repository.query().where(m -> m.isActive()).toList();
-```
-
-<a id="1210-kotlin-repositories"></a>
-## 12.10 Kotlin のリポジトリ
+<a id="129-kotlin-repositories"></a>
+## 12.9 Kotlin のリポジトリ
 
 Kotlin で書いたリポジトリには、いくつかのコンパイラー設定が必要です。Kotlin 2.2 以降はデフォルトの設定で動きます。それより古い Kotlin には `-Xjvm-default=all` が必要です。また、Spring Data には `kotlin-reflect` が必要です。
-[このページの Kotlin 版](../kotlin/12-spring-data-jpa.md#1210-kotlin-compile-settings) を参照してください。
+[このページの Kotlin 版](../kotlin/12-spring-data-jpa.md#129-kotlin-compile-settings) を参照してください。
 
-<a id="1211-not-implemented-yet"></a>
-## 12.11 まだ実装されていないもの
+<a id="1210-not-implemented-yet"></a>
+## 12.10 まだ実装されていないもの
 
 - **Spring Boot 4。** 自動構成は Spring Boot 4 のクラス名も書いていますが、テストしたのは Spring Boot 3.4.2 だけです。
 - Spring の `Sort` の **`ignoreCase()`**。

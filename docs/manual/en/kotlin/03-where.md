@@ -2,9 +2,11 @@
 
 > [!NOTE]
 > **Status**
-> - **Implemented and tested on H2, MariaDB and Oracle:** `where` conditions and `toList()` (mapping to columns, HQL output, running the query). The tests use **Java** lambdas. **Kotlin lambdas are not tested yet.**
-> - **Designed, not implemented yet:** the Kotlin-only forms in this chapter (`?.`, `?:`, `!!`, ranges, `when`, `in`). Their bytecode was compiled and checked with prototypes (kotlinc 1.7.22 to 2.3.21), and many conditions were checked row by row on H2. Derived tables, CTEs and procedures are also designed only. The core of sorting and paging ([4. Sorting and paging](04-order-paging.md)), subqueries ([5. Subqueries](05-subquery.md)), `select` with `groupBy`, `having` and `Agg` ([6. Select, aggregates and group by](06-select-group.md)), update/insert/delete/upsert ([7. Update, insert, delete](07-dml.md)) and the Spring Data JPA module ([12. Spring Data JPA](12-spring-data-jpa.md)) are implemented.
-> - The HQL in this chapter is the **planned** output. Small details (for example alias names like `e0`, `j1`) can still change.
+> - **Implemented and tested on H2, MariaDB and Oracle:** `where` conditions and `toList()` (mapping to columns, HQL output, running the query). Most tests use **Java** lambdas.
+> - **Tested with Kotlin lambdas** ([`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), in the build, kotlinc 2.3.21): `?.` paths, captured values, and `in` with a captured collection. `!!` is tested in the Kotlin tests of [5. Subqueries](05-subquery.md). These examples are marked **(tested)**.
+> - **Designed, not tested yet:** the other Kotlin-only forms in this chapter (`?:`, ranges, `when`). Their bytecode was compiled and checked with prototypes (kotlinc 1.7.22 to 2.3.21), and many conditions were checked row by row on H2.
+> - **Also implemented:** the core of sorting and paging ([4. Sorting and paging](04-order-paging.md)), subqueries ([5. Subqueries](05-subquery.md)), `select` with `groupBy`, `having` and `Agg`, joins, derived tables and CTEs ([6. Select, aggregates and group by](06-select-group.md)), update/insert/delete/upsert ([7. Update, insert, delete](07-dml.md)), procedures and DB functions ([8. Procedures and DB functions](08-procedures-functions.md)) and the Spring Data JPA module ([12. Spring Data JPA](12-spring-data-jpa.md)).
+> - The other HQL in this chapter is the **planned** output. Small details (for example alias names like `e0`, `j1`) can still change.
 
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [2. Getting started](02-getting-started.md) | Next: [4. Sorting and paging](04-order-paging.md) | [Java version of this page](../java/03-where.md)
 
@@ -63,7 +65,15 @@ from orders o1_0
 where o1_0.status=1 and o1_0.price>100.0
 ```
 
-There are no Kotlin tests yet. The same queries written in Java are tested in [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/03-where.md) for the tested examples.
+**(tested)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), region `captured`:
+
+```kotlin
+val q = qb.from(Order::class.java).where { it.price > min && it.status.toInt() == 1 }
+assertEquals("select e0 from Order e0 where e0.price > :p1 and e0.status = 1", q.toHql().hql())
+```
+
+`min` is a captured local `val` (`100.0`), so it is a bind parameter. The Kotlin tests use the Java test entity: `price` is a primitive `double` (no `!!` needed) and `status` is a `short` (so the test writes `it.status.toInt() == 1`; lambdaQL ignores the conversion).
+More queries written in Java are tested in [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/03-where.md) for those examples.
 
 You can call `where()` many times. The conditions are joined with `AND`:
 
@@ -382,6 +392,15 @@ from orders o1_0
 where o1_0.id not in (?,?)
 ```
 
+**(tested)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), region `in`:
+
+```kotlin
+val q = qb.from(Order::class.java).where { it.status in statuses }
+assertEquals("select e0 from Order e0 where e0.status in (:p1)", q.toHql().hql())
+```
+
+`statuses` is a captured `listOf<Short>(1, 3)`.
+
 `!in` gives `not in`. The id can never be NULL, so there is no `is null` part. For a column that can be NULL, lambdaQL adds `x is null or`, because Kotlin's `!in` is true for a NULL value (when the list has no `null`).
 
 | Case | Result |
@@ -417,6 +436,14 @@ qb.from(Order::class.java)
     .where { it.customer?.name == name }
     .toList()
 // HQL: select e0 from Order e0 join e0.customer j1 where j1.name = :p1
+```
+
+**(tested)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), region `safe-call` (with a constant instead of `name`):
+
+```kotlin
+// it.customer?.name reads as the path customer.name (inner join: orders without a customer are left out)
+val q = qb.from(Order::class.java).where { it.customer?.name == "Kim" }
+assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim'", q.toHql().hql())
 ```
 
 **SQL by database (from the Java test run; Kotlin gives the same HQL)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `inner-join`:
@@ -467,7 +494,7 @@ After the `left join`, Hibernate writes `c1_0.id is null` for `e0.customer is nu
 
 - Other parts of an `||` can keep the order too. `it.status == 1 || it.customer?.name == name` also uses a `left join`, because in Kotlin an order with status 1 matches even without a customer.
 - If another `where` call removes those orders anyway (for example `.where { it.customer?.name != null }`), the join stays inner.
-- There are no Kotlin tests for this yet. The same conditions written in Java are tested; see [the Java version of this page](../java/03-where.md#310-association-paths).
+- There are no Kotlin tests for the null guard yet. The same conditions written in Java are tested; see [the Java version of this page](../java/03-where.md#310-association-paths).
 
 To find orders **without** a customer, compare the association itself. This checks the foreign key column, with no join:
 

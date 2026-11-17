@@ -1,12 +1,12 @@
 # 9. Kotlin 说明
 
 > [!NOTE]
-> **状态：已设计，尚未实现。**
+> **状态：部分已实现。**
 > Kotlin 支持是已经确定的设计（决策 D17、D20 到 D25、D27、D28、D31）。
 > 本章中每种写法的字节码都已用 kotlinc
 > 1.7.22、2.1.10、2.2.21、2.3.0 和 2.3.21 编译并检查过。许多条件也已在 H2 上逐行检查。
-> 目前它在 lambdaQL 中**还不能**运行。目前只有分析核心以及 `where` + `toList()` 可以工作
-> （已在 H2、MariaDB 和 Oracle 上用 Java Lambda 测试）。完整状态请参阅 [路线 README](README.md)。
+> **已在构建中用 Kotlin Lambda 测试**（kotlinc 2.3.21，H2、MariaDB 和 Oracle）：`?.` 路径、`!!`、捕获值、对捕获集合使用 `in`、子查询（`exists`、`in`、标量）、带 `limit` 的排序、使用 data class、`Pair` 和 `Triple` 的 `select`、`listOf` 键的 `groupBy`、`having`、update 中的属性赋值和 `by[column] = value`、insert 以及 delete（[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)）。
+> **已设计，尚未测试：** 本页的其他写法（例如 `?:`、区间、`when`、属性引用、字符串模板）。编译器版本矩阵（kotlinc 1.7.22 到 2.3.0）还没有加入构建。完整状态请参阅 [路线 README](README.md)。
 
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[8. 存储过程与数据库函数](08-procedures-functions.md) | 下一章：[10. 规则与限制](10-rules-and-limits.md) | [本页的 Java 版本：9. Java 说明](../java/09-java-notes.md)
 

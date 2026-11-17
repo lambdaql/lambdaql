@@ -224,8 +224,6 @@ default List<Member> topGraded(int n) {
 }
 ```
 
-请在调用 `query()` 的同一个方法中调用结果函数（这里是 `toList()`）。不要返回未完成的查询。见 [12.9](#129-routing-datasource)。
-
 在下面的示例中，`repository` 是一个 `MemberRepository`。
 
 **(已测试)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `find-all-sort`：
@@ -446,7 +444,7 @@ Page<Member> page = repository.findAll(m -> m.isActive(), PageRequest.of(1, 2, S
 | Spring `Sort` 中有未知属性 | `PropertyReferenceException`（已测试） |
 | Spring `Sort` 中使用 `ignoreCase()` | `UnsupportedOperationException`（已测试） |
 | 在 repository 调用中（快捷方法，或默认方法内部的 `execute()`）没有事务时执行更新、删除、插入或 upsert | `InvalidDataAccessApiUsageException`（已测试），由 Spring 从 JPA 的 `TransactionRequiredException` 转换而来。在 repository 方法外部（`QueryBuilder` bean）则是 JPA 的 `TransactionRequiredException` |
-| 违反规则（U1、U3、U4、U6）的赋值 Lambda | `LambdaAnalysisException`，不做转换（见 [7.8](07-dml.md#rules-checked-at-analysis-time)） |
+| 违反规则（U1、U3、U4、U6）的赋值 Lambda | `LambdaQLException`（例如 `TranslationException`，`LQL-3042`），不做转换（见 [7.8](07-dml.md#rules-checked-at-analysis-time)） |
 
 `QueryBuilder` bean（12.8）不是 repository，因此 Spring 不会转换它的错误。在那里，`one()` 和 `executeOne()` 遇到 2 行或更多行时会抛出 `NonUniqueResultException`。
 
@@ -505,37 +503,14 @@ public QueryBuilder queryBuilder(EntityManagerFactory entityManagerFactory) {
 
 **使用 `@DataJpaTest` 的测试。** `@DataJpaTest` 切片测试只加载部分自动配置。repository 方法在那里可以使用，但不会创建 `QueryBuilder` bean。如果测试需要它，请在测试类上加 `@ImportAutoConfiguration(LambdaQlAutoConfiguration.class)`（尚未测试）。
 
-<a id="129-routing-datasource"></a>
-## 12.9 路由 DataSource
-
-> [!WARNING]
-> **设计说明，未经实测。** 本节没有用路由 DataSource 测试过。
-
-有些应用按方法名用 AOP 规则选择数据库。例如，某条规则把 `find*` 方法发送到只读副本。
-这样的规则作用于在它所匹配的方法**内部**执行的 SQL。
-
-- 请在 repository 的默认方法中，或在同一个服务方法中调用 `findAll`、`findOne` 以及其他简短方法。
-- 对于 `repo.query().where(...).toList()`，SQL 在调用 `toList()` 时执行，而不是在调用 `query()` 时执行。如果 `toList()` 在 repository 方法之外执行，作用于 repository 方法的规则就不会作用于它。
-
-```java
-// a rule on repository methods applies: the SQL runs inside findActive()
-default List<Member> findActive() {
-    return query().where(m -> m.isActive()).toList();
-}
-
-// a rule on repository methods does not apply: the SQL runs in toList(), after query() has returned
-// (a rule on the calling service method still applies)
-List<Member> rows = repository.query().where(m -> m.isActive()).toList();
-```
-
-<a id="1210-kotlin-repositories"></a>
-## 12.10 Kotlin repository
+<a id="129-kotlin-repositories"></a>
+## 12.9 Kotlin repository
 
 用 Kotlin 编写的 repository 需要一些编译器设置：Kotlin 2.2 或更高版本使用默认设置即可，较旧的 Kotlin 需要 `-Xjvm-default=all`，并且 Spring Data 需要 `kotlin-reflect`。
-见[本页的 Kotlin 版本](../kotlin/12-spring-data-jpa.md#1210-kotlin-compile-settings)。
+见[本页的 Kotlin 版本](../kotlin/12-spring-data-jpa.md#129-kotlin-compile-settings)。
 
-<a id="1211-not-implemented-yet"></a>
-## 12.11 尚未实现
+<a id="1210-not-implemented-yet"></a>
+## 12.10 尚未实现
 
 - **Spring Boot 4。** 自动配置也写出了 Spring Boot 4 的类名，但只测试了 Spring Boot 3.4.2。
 - Spring `Sort` 中的 **`ignoreCase()`**。

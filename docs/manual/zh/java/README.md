@@ -8,7 +8,8 @@
 > **更新、插入、删除和 upsert** 也已实现，包括 `limit` 和单行保护 `executeOne()`（已在 H2、MariaDB 和 Oracle 上测试）。
 > **Spring Data JPA 模块**也已实现：repository 执行器 `LambdaQlExecutor<T>`（支持 Spring `Sort`、`Pageable`、`deleteAll(where)` 和 `updateOne(where, set)` 等 DML 快捷方法，以及更新、删除、插入和 upsert 构建器）以及 Spring Boot 自动配置（已用 Spring Boot 3.4.2 测试）。DML 需要调用方的事务。
 > **子查询**（`where((o, sub) -> ...)`，也可用于 update 和 delete）和 **`select`**（record 和 DTO、`groupBy`、`having`、`Agg` 聚合，也可用于 `insert ... select`）同样已实现（已在 H2、MariaDB 和 Oracle 上测试）。
-> 本路线中的其他内容（派生表、CTE、存储过程）都处于**已设计**状态：语法和规则已经确定，并已在 H2、MariaDB 和 Oracle 上用原型验证过，但代码还没有进入库中。
+> **显式 join**（`join`、`leftJoin`、`crossJoin`）、**派生表和 CTE**（`qb.from(valueQuery)`、`qb.with(valueQuery)`）、**存储过程与数据库函数**（`@SqlProcedure`、`@SqlFunction`、`qb.call`、`qb.exec`）以及**带四种语言消息的错误码**（`[LQL-xxxx]`）同样已实现（已在 H2、MariaDB 和 Oracle 上测试；存储过程在 MariaDB 和 Oracle 上测试）。
+> 本路线中的其余内容（例如 `SortWhitelist` 和 SARGable 警告）处于**已设计**状态：语法和规则已经确定，并已用原型验证过，但代码还没有进入库中。
 > 目前还没有任何构件发布到 Maven Central。如果想试用，请[从源码构建](02-getting-started.md#build-from-source)。
 
 [手册首页](../README.md) | [Kotlin 路线](../kotlin/README.md) | 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -63,7 +64,7 @@ fetch first ? rows only
 
 > [!NOTE]
 > **关于示例。**
-> 示例均为设计示例。某个功能实现后，其示例将替换为取自测试套件的代码，并附上测试文件的链接。在 [3. 条件](03-where.md)、[4. 排序与分页](04-order-paging.md)、[5. 子查询](05-subquery.md)、[6. 查询列、聚合与分组](06-select-group.md)、[7. 更新、插入、删除](07-dml.md) 和 [12. Spring Data JPA](12-spring-data-jpa.md) 中，这些示例标记为 **(已测试)**。
+> 示例均为设计示例。某个功能实现后，其示例将替换为取自测试套件的代码，并附上测试文件的链接。在 [3. 条件](03-where.md)、[4. 排序与分页](04-order-paging.md)、[5. 子查询](05-subquery.md)、[6. 查询列、聚合与分组](06-select-group.md)、[7. 更新、插入、删除](07-dml.md)、[8. 存储过程与数据库函数](08-procedures-functions.md)、[11. 错误与语言](../11-errors-and-languages.md) 和 [12. Spring Data JPA](12-spring-data-jpa.md) 中，这些示例标记为 **(已测试)**。
 
 ## 目录
 
@@ -76,7 +77,7 @@ fetch first ? rows only
 | 3 | [条件（`where`）](03-where.md) | 运算符、NULL 规则、捕获的值、关联路径 |
 | 4 | [排序与分页](04-order-paging.md) | `orderBy`、`Direction`、NULL 排序、`limit`、`offset` |
 | 5 | [子查询](05-subquery.md) | `exists`、`contains`（IN）、NOT EXISTS、标量子查询和关联子查询 |
-| 6 | [查询列、聚合与分组](06-select-group.md) | `select`、record 和 DTO、`Agg`、`groupBy`、`having`、派生表、CTE |
+| 6 | [查询列、聚合与分组](06-select-group.md) | `select`、record 和 DTO、`Agg`、`groupBy`、`having`、join（`join`、`leftJoin`、`crossJoin`）、派生表、CTE |
 | 7 | [更新、插入、删除](07-dml.md) | `set`、`by.set`、`values`、`all()`、`execute()`、`limit`、`executeOne()` |
 | 7.6 | [Upsert](07-6-upsert.md) | `upsert`、`onConflict(...).update(...)`、`onConflict(...).ignore()`、各数据库的行数 |
 | 8 | [存储过程与数据库函数](08-procedures-functions.md) | `@SqlProcedure`、`@SqlFunction`、`qb.call`、`qb.exec` |
@@ -95,13 +96,14 @@ fetch first ? rows only
 | 将 getter 映射到 JPA 属性 | 已实现，已在 H2、MariaDB、Oracle 上测试 | [3](03-where.md) |
 | HQL 生成与查询执行（`where`、`toList()`） | 已实现，已在 H2、MariaDB、Oracle 上测试 | [3](03-where.md) |
 | 结果函数（`first()`、`one()`、`count()`、`exists()`、`toSet()`） | 已实现，已在 H2、MariaDB、Oracle 上测试 | [2](02-getting-started.md#getting-the-result) |
-| 排序与分页（`orderBy`、`limit`、`offset`） | 核心部分已实现，已在 H2、MariaDB、Oracle 上测试，包括 `SortSpec`。`SortWhitelist` 和 join 排序（包括 `SortSpec` 的 join 写法）：已设计 | [4](04-order-paging.md) |
+| 排序与分页（`orderBy`、`limit`、`offset`） | 核心部分已实现，已在 H2、MariaDB、Oracle 上测试，包括 `SortSpec` 和 join 排序 `(o, c, by)`。`SortWhitelist` 和 `SortSpec` 的 join 写法：已设计 | [4](04-order-paging.md) |
 | 子查询（`exists`、`contains`、标量、关联） | 已实现，已在 H2、MariaDB、Oracle 上测试。MariaDB 的 `lateral` 改写：尚未实现 | [5](05-subquery.md) |
 | 投影、`groupBy`、`having`、聚合（`Agg`） | 已实现，已在 H2、MariaDB、Oracle 上测试，包括 `distinct()` 和结果函数。按聚合排序：v0.2 候选 | [6](06-select-group.md) |
-| 派生表与 CTE（`qb.from(sub -> ...)`、`qb.with(...)`） | 已设计 | [6](06-select-group.md) |
+| 显式 join（`join`、`leftJoin`、`crossJoin`，最多三个实体） | 已实现，已在 H2、MariaDB、Oracle 上测试，包括所有实体上的 `where`、`orderBy`、`select` 和分页。DML 中和子查询中的 join：以后 | [6](06-select-group.md#68-explicit-joins) |
+| 派生表与 CTE（`qb.from(valueQuery)`、`qb.with(valueQuery)`） | 已实现，已在 H2、MariaDB、Oracle 上测试。与派生表的 join 以及两次使用同一个 CTE：以后 | [6](06-select-group.md#69-derived-table-subquery-in-from) |
 | `update`、`insert`、`delete`、upsert | 已实现，已在 H2、MariaDB、Oracle 上测试，包括 `limit` 和 `executeOne()`。update 和 delete 的 `where` 中的子查询（`sub`）以及 `insert ... select` 中的聚合：已实现。`set` 值中的子查询：已设计 | [7](07-dml.md) |
-| 存储过程与数据库函数 | 已设计 | [8](08-procedures-functions.md) |
-| 4 种语言的错误码和消息 | 已设计 | [11](../11-errors-and-languages.md) |
+| 存储过程与数据库函数 | 已实现：查询中的数据库函数和单独调用，已在 H2、MariaDB、Oracle 上测试；存储过程（`call`、`exec`、OUT、INOUT、结果集）已在 MariaDB 和 Oracle 上测试（H2 没有 OUT 参数）。SARGable 警告、存储过程参数的类型和名字检查、Oracle 包重载：尚未实现 | [8](08-procedures-functions.md) |
+| 4 种语言的错误码和消息 | 已实现，已做单元测试：`[LQL-xxxx]` 错误码、`LambdaQLException` 及其子类、英文、日文、中文和韩文消息、`lambdaql.locale`。警告 `LQL-5001` 和严格模式：尚未实现 | [11](../11-errors-and-languages.md) |
 | Spring Data JPA（`LambdaQlExecutor<T>`、Spring `Sort` / `Pageable`、Spring Boot 自动配置） | 已实现，已在 H2、MariaDB、Oracle 上用 Spring Boot 3.4.2 测试，包括 DML 快捷方法（`deleteAll`、`updateOne` 等）以及更新、删除、插入和 upsert 构建器。Spring Boot 4：尚未验证 | [12](12-spring-data-jpa.md) |
 
 术语含义：

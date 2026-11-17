@@ -7,7 +7,7 @@
 > Java と SQL がどこで違うか、データベースごとにどこが違うか、何がサポートされないか、です。
 > ルールは H2 2.3、MariaDB 10.11、Oracle 23ai（Hibernate 6.6.5）でプロトタイプを使って確認しました。
 > 現在動くのは解析コア、`where`、結果の関数（`toList()`、`toSet()`、`first()`、`one()`、`count()`、`exists()`）、ソートとページングの中核部分、`SortSpec`、update/insert/delete/upsert（[7](07-dml.md)）、そして Spring Data JPA モジュール（[12](12-spring-data-jpa.md)）です（H2、MariaDB、Oracle でテスト済み）。
-> サブクエリ（[5](05-subquery.md)）と集計を含む `select`（[6](06-select-group.md)）のルールも実装済みで、DML の中でも使えます。以下の派生テーブル、CTE、プロシージャのルールは **まだ実装されていません**。ソートのルールにも、まだ実装されていないものがあります（[4.12](04-order-paging.md#412-rules-summary-s1-to-s14) を参照）。
+> サブクエリ（[5](05-subquery.md)）と集計を含む `select`（[6](06-select-group.md)）のルールも実装済みで、DML の中でも使えます。明示的な結合、派生テーブル、CTE（[6](06-select-group.md)）、プロシージャと DB 関数（[8](08-procedures-functions.md)）のルールも実装済みです。カラムに対する DB 関数の警告（[10.2](#db-functions-on-a-column)）は **まだ実装されていません**。ソートのルールにも、まだ実装されていないものがあります（[4.12](04-order-paging.md#412-rules-summary-s1-to-s14) を参照）。
 > 全体の状況は [Java トラックの README](README.md#status) を参照してください。
 
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [9. Java の注意点](09-java-notes.md) | 次: [11. エラーと言語](../11-errors-and-languages.md) | [このページの Kotlin 版](../kotlin/10-rules-and-limits.md)
@@ -132,11 +132,12 @@ MariaDB 10.11 と Oracle 23ai、20,000〜50,000 行:
 ### カラムに対する DB 関数
 
 カラム側の DB 関数（`OrderFns.discount(o.getPrice()) > 10`）は通常のインデックスを使えません。
-lambdaQL は **WARN** をログに出します（strict モード: エラー）。例外: Oracle では、関数が
+lambdaQL は **WARN** をログに出す予定です（strict モード: エラー）。例外: Oracle では、関数が
 `DETERMINISTIC` で、同じ式の関数ベースのインデックスがあれば WARN は出ません。MariaDB では、
 `NOT DETERMINISTIC`（デフォルト）の関数は、引数がパラメーターだけでもフルスキャンになります
 （`o.getPrice() > OrderFns.discount(rate)`）。そのため、その場合も lambdaQL は警告します。
 [8. プロシージャと DB 関数](08-procedures-functions.md) を参照してください。
+この警告は **まだ実装されていません**。
 
 <a id="103-null-rules"></a>
 ## 10.3 NULL のルール
@@ -438,7 +439,7 @@ DML の文にはトランザクションが必要です。`QueryBuilder(EntityMa
 | ラムダの中の、スタブメソッドの呼び出し 1 つ以外のもの（ログ、入れ子の呼び出し、分岐） | 呼び出しは 1 つ。引数は先に計算する |
 | OUT パラメーターを持つプロシージャへの `exec` | `call` |
 | 引数の DB のデフォルト値 | すべての引数を渡す |
-| Oracle のパッケージのオーバーロード、動的なプロシージャ名 | 予定 |
+| Oracle のパッケージのオーバーロード（まだ検出しません）、動的なプロシージャ名 | 予定 |
 | Oracle の暗黙の結果（`DBMS_SQL.RETURN_RESULT`）、MariaDB のパッケージ、プロシージャの結果のページング | サポートしない |
 
 <a id="108-caching-a-lambda-is-analyzed-once"></a>

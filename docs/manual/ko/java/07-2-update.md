@@ -270,10 +270,10 @@ if (newStatus != null) u = u.set(o -> o.setStatus(newStatus));
 int changed = u.where(o -> o.getId() == id).execute();
 
 // reading a column that an earlier assignment wrote is an error (U3): the databases disagree on its value
-assertThrows(LambdaAnalysisException.class,
+assertThrows(LambdaQLException.class,
         () -> qb.update(Order.class).set(o -> { o.setPrice(1); o.setTex((float) o.getPrice()); }));
 // the same column twice is an error (U4), also across set() calls
-assertThrows(LambdaAnalysisException.class,
+assertThrows(LambdaQLException.class,
         () -> qb.update(Order.class).set(o -> o.setStatus((short) 1)).set(o -> o.setStatus((short) 2)));
 ```
 

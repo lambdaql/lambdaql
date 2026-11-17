@@ -2,10 +2,10 @@
 
 > [!NOTE]
 > **Status**
-> - **Implemented** (milestone M8-1) and tested on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5): subqueries in `where { o, sub -> ... }` of a select, an update and a delete. This covers `exists` / `!exists`, `in`, `!in` (written as NOT EXISTS), scalar aggregates, the top-1 form, correlated and nested subqueries, and captured values. The tests use **Java** lambdas. **Kotlin lambdas are not tested in the build yet.**
-> - The Kotlin forms in this chapter (`exists`, `in` / `!in`, scalar, top-1, nested) were compiled with kotlinc 2.3.21 outside the build. lambdaQL gives the same HQL for them as for the Java forms.
-> - **Not implemented yet:** subqueries in `from` (derived tables) and CTEs (milestone M8-2), subqueries in the values of `set`, and the MariaDB `lateral` rewrite.
-> - The Kotlin code shows the tested Java queries in Kotlin syntax. The tested Java examples are in [the Java version of this page](../java/05-subquery.md).
+> - **Implemented** (milestone M8-1) and tested on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5): subqueries in `where { o, sub -> ... }` of a select, an update and a delete. This covers `exists` / `!exists`, `in`, `!in` (written as NOT EXISTS), scalar aggregates, the top-1 form, correlated and nested subqueries, and captured values. Most tests use **Java** lambdas.
+> - **Tested with Kotlin lambdas** ([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), in the build, H2, MariaDB and Oracle): `exists`, `in` and a scalar `avg`. These examples are marked **(tested)**. The other Kotlin forms (`!in`, top-1, nested) were compiled with kotlinc 2.3.21 outside the build and give the same HQL as the Java forms.
+> - **Not implemented yet:** subqueries in the values of `set`, and the MariaDB `lateral` rewrite. (Derived tables and CTEs are implemented with another syntax, see [6. Select, aggregates and group by](06-select-group.md#69-derived-table-subquery-in-from).)
+> - The other Kotlin code shows the tested Java queries in Kotlin syntax. The tested Java examples are in [the Java version of this page](../java/05-subquery.md).
 
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [4. Sorting and paging](04-order-paging.md) | Next: [6. Select, aggregates and group by](06-select-group.md) | [Java version of this page](../java/05-subquery.md)
 
@@ -47,7 +47,7 @@ The inner lambdas (`{ i -> ... }` inside `sub.from(...).where { }`) do not need 
 
 In the HQL, the subquery root has the alias `s1`, `s2`, ... (the outer root is `e0`). A join inside a subquery gets an alias like `s1j1`.
 
-There are no Kotlin tests yet. The same queries written in Java are tested in [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/05-subquery.md) for the tested examples.
+The examples marked **(tested)** come from [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt). It uses the Java test entity: `price` is a primitive `double` and `qty` is an `int`. More queries written in Java are tested in [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/05-subquery.md) for those examples.
 
 ## 5.2 EXISTS
 
@@ -63,6 +63,15 @@ qb.from(Order::class.java)
     .toList()
 // HQL: select e0 from Order e0
 //      where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > 10)
+```
+
+**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `exists`:
+
+```kotlin
+val q = qb.from(Order::class.java)
+    .where { o, sub -> sub.from(Item::class.java).where { i -> i.order?.id == o.id && i.qty > 10 }.exists() }
+assertEquals("select e0 from Order e0 where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > 10)",
+    q.toHql().hql())
 ```
 
 **About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 6.6.5, and it fails if Hibernate's SQL changes. The test uses Java lambdas. A Kotlin lambda with the same meaning gives the same HQL, so it gets the same SQL.
@@ -117,6 +126,15 @@ qb.from(Order::class.java)
     .toList()
 // HQL: select e0 from Order e0
 //      where e0.customer.id in (select s1.id from Customer s1 where s1.grade > 3)
+```
+
+**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `in`:
+
+```kotlin
+val q = qb.from(Order::class.java)
+    .where { o, sub -> o.customer?.id in sub.from(Customer::class.java).where { c -> c.grade!! > 3 }.select { c -> c.id } }
+assertEquals("select e0 from Order e0 where e0.customer.id in (select s1.id from Customer s1 where s1.grade > 3)",
+    q.toHql().hql())
 ```
 
 **SQL by database (Hibernate's SQL for this HQL)** — recorded by [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java), which gives the same HQL to Hibernate directly. The Java test (region `in`) also writes the null check `c.getGrade() != null`; its SQL is example `sub-in`. From `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql), example `05-in-subquery`:
@@ -219,6 +237,13 @@ qb.from(Order::class.java)
 //      where e0.price > (select avg(s1.price) from Order s1)
 ```
 
+**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `scalar` (the test `price` is a `double`, so there is no `!!`):
+
+```kotlin
+val q = qb.from(Order::class.java).where { o, sub -> o.price > sub.from(Order::class.java).avg { x -> x.price } }
+assertEquals("select e0 from Order e0 where e0.price > (select avg(s1.price) from Order s1)", q.toHql().hql())
+```
+
 **SQL by database (from the Java test run; Kotlin gives the same HQL)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sub-scalar`:
 
 ```sql
@@ -235,7 +260,7 @@ A scalar subquery must **always give one row**. Two shapes are allowed (rule Q3)
 | An aggregate: `count()`, `sum`, `avg`, `min`, `max` | `sub.from(Item::class.java).where { i -> i.order?.id == o.id }.count()` |
 | Top-1: `orderBy { ... }.limit(1)...first()` | see below |
 
-Any other `first()` is an error at analysis time (`LambdaAnalysisException`).
+Any other `first()` is an error at analysis time (`TranslationException`, `LQL-3017`).
 
 Orders with two or more items (`count()`):
 
@@ -343,7 +368,7 @@ Inside a subquery, conditions, paths and NULL work **exactly like the outer quer
 
 - **Subqueries in update / delete**: the same `sub` syntax in `where`. This is implemented (tested with Java lambdas, region `dml-subquery`). See [7.4 Delete](07-4-delete.md) and [7.2 Update](07-2-update.md).
 - **Subqueries in the values of `set`** (`o.total = sub.from(...).sum { ... }`): not implemented yet. See [7.2 Update](07-2-update.md).
-- **Subqueries in `from` (derived tables) and CTEs** (`qb.from { sub -> ... }`, `qb.with { sub -> ... }`): designed, not implemented yet (milestone M8-2). See [6. Select, aggregates and group by](06-select-group.md).
+- **Subqueries in `from` (derived tables) and CTEs**: implemented (milestone M8-2). They do not use `sub`: pass a value query to `qb.from(...)` or `qb.with(...)`. See [6.9 Derived table](06-select-group.md#69-derived-table-subquery-in-from) and [6.10 CTE](06-select-group.md#610-cte-with).
 
 ## 5.12 Rules summary (Q1 to Q6)
 

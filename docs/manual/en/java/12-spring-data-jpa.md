@@ -220,8 +220,6 @@ default List<Member> topGraded(int n) {
 }
 ```
 
-Call the result function (`toList()` here) in the same method that called `query()`. Do not return the unfinished query. See [12.9](#129-routing-datasource).
-
 In the next examples, `repository` is a `MemberRepository`.
 
 **(tested)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `find-all-sort`:
@@ -436,7 +434,7 @@ Errors go through Spring's exception translation, the same as for other reposito
 | An unknown property in a Spring `Sort` | `PropertyReferenceException` (tested) |
 | `ignoreCase()` in a Spring `Sort` | `UnsupportedOperationException` (tested) |
 | An update, delete, insert or upsert without a transaction, in a repository call (a shortcut, or `execute()` inside a default method) | `InvalidDataAccessApiUsageException` (tested), made by Spring from JPA's `TransactionRequiredException`. Outside a repository method (the `QueryBuilder` bean), JPA's `TransactionRequiredException` |
-| An assignment lambda that breaks a rule (U1, U3, U4, U6) | `LambdaAnalysisException`, not translated (see [7.8](07-dml.md#rules-checked-at-analysis-time)) |
+| An assignment lambda that breaks a rule (U1, U3, U4, U6) | `LambdaQLException` (for example `TranslationException`, `LQL-3042`), not translated (see [7.8](07-dml.md#rules-checked-at-analysis-time)) |
 
 The `QueryBuilder` bean (12.8) is not a repository, so Spring does not translate its errors. There, `one()` and `executeOne()` with 2 or more rows throw `NonUniqueResultException`.
 
@@ -493,34 +491,12 @@ public QueryBuilder queryBuilder(EntityManagerFactory entityManagerFactory) {
 
 **Tests with `@DataJpaTest`.** A `@DataJpaTest` slice test loads only some auto-configurations. The repository methods work there, but the `QueryBuilder` bean is not made. If a test needs it, add `@ImportAutoConfiguration(LambdaQlAutoConfiguration.class)` to the test class (not tested yet).
 
-## 12.9 Routing DataSource
-
-> [!WARNING]
-> **Design note, not measured.** This section was not tested with a routing DataSource.
-
-Some applications choose the database with AOP rules on method names. For example, a rule sends `find*` methods to a read replica.
-Such a rule applies to the SQL that runs **inside** the method it matches.
-
-- Call `findAll`, `findOne` and the other short methods inside a repository default method, or in the same service method.
-- With `repo.query().where(...).toList()`, the SQL runs when `toList()` is called, not when `query()` is called. If `toList()` runs outside the repository method, a rule on repository methods does not apply to it.
-
-```java
-// a rule on repository methods applies: the SQL runs inside findActive()
-default List<Member> findActive() {
-    return query().where(m -> m.isActive()).toList();
-}
-
-// a rule on repository methods does not apply: the SQL runs in toList(), after query() has returned
-// (a rule on the calling service method still applies)
-List<Member> rows = repository.query().where(m -> m.isActive()).toList();
-```
-
-## 12.10 Kotlin repositories
+## 12.9 Kotlin repositories
 
 Repositories written in Kotlin need some compiler settings: Kotlin 2.2 or newer works with the default settings, older Kotlin needs `-Xjvm-default=all`, and Spring Data needs `kotlin-reflect`.
-See [the Kotlin version of this page](../kotlin/12-spring-data-jpa.md#1210-kotlin-compile-settings).
+See [the Kotlin version of this page](../kotlin/12-spring-data-jpa.md#129-kotlin-compile-settings).
 
-## 12.11 Not implemented yet
+## 12.10 Not implemented yet
 
 - **Spring Boot 4.** The auto-configuration names the Spring Boot 4 classes too, but only Spring Boot 3.4.2 is tested.
 - **`ignoreCase()`** in a Spring `Sort`.

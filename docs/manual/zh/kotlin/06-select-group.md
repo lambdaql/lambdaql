@@ -2,10 +2,11 @@
 
 > [!NOTE]
 > **状态**
-> - **已实现**（里程碑 M9，决定 D27），并在 H2 2.3、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上测试：查询一个值、data class、`Pair` 或 `Triple` 的 `select`；带一个键或多个键（`listOf`、`a to b`、`Triple`）的 `groupBy`；`having`；`Agg` 函数；`distinct()`、`limit`、`offset`、`toList`、`toSet`、`first`、`one`；`orderBy { }.select { }`；以及规则 J3、J4 和 J7 的检查。这些测试使用的是 **Java** Lambda。**Kotlin Lambda 尚未在构建中测试。**
-> - 本章中的 Kotlin 写法（data class、`to`、带 `it.customer?.id` 的 `listOf` 键、`Triple`、`select` 和 `having` 中的 `Agg`）已在构建之外用 kotlinc 2.3.21 编译。对这些写法，lambdaQL 生成与 Java 写法相同的 HQL。
-> - **已设计，尚未实现：** 派生表和 CTE（6.8 和 6.9，里程碑 M8-2）、按聚合排序以及分组查询上的 `orderBy`（v0.2 候选），以及 join 投影 `{ o, c -> ... }`。
-> - Kotlin 代码用 Kotlin 语法展示已测试的 Java 查询。已测试的 Java 示例见[本页的 Java 版本](../java/06-select-group.md)。完整状态见[路线 README](README.md)。
+> - **已实现**（里程碑 M9，决定 D27），并在 H2 2.3、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上测试：查询一个值、data class、`Pair` 或 `Triple` 的 `select`；带一个键或多个键（`listOf`、`a to b`、`Triple`）的 `groupBy`；`having`；`Agg` 函数；`distinct()`、`limit`、`offset`、`toList`、`toSet`、`first`、`one`；`orderBy { }.select { }`；以及规则 J3、J4 和 J7 的检查。
+> - **已用 Kotlin Lambda 测试**（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，在构建中，H2、MariaDB 和 Oracle）：data class、`Pair`、一个键的 `groupBy` 加 `having`、`listOf` 键的 `groupBy` 加 `Triple` 结果。这些示例标记为 **(已测试)**。其他 Kotlin 写法已在构建之外用 kotlinc 2.3.21 编译，生成与 Java 写法相同的 HQL。
+> - **也已实现**（决定 D44、D45、D46，用 Java Lambda 测试）：用 `join`、`leftJoin` 和 `crossJoin` 进行最多三个实体的显式 join，也支持 `select { o, c -> ... }`（6.8）；用 `qb.from(valueQuery)` 和 `qb.with(valueQuery)` 的派生表和 CTE（6.9 和 6.10，里程碑 M8-2）。
+> - **尚未实现：** 按聚合排序以及分组查询上的 `orderBy`（v0.2 候选）；DML 中和子查询内的 join；与派生表的 join；两次使用同一个 CTE。
+> - 其他 Kotlin 代码用 Kotlin 语法展示已测试的 Java 查询。已测试的 Java 示例见[本页的 Java 版本](../java/06-select-group.md)。完整状态见[路线 README](README.md)。
 
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[5. 子查询](05-subquery.md) | 下一章：[7. 更新、插入、删除](07-dml.md) | [本页的 Java 版本](../java/06-select-group.md)
 
@@ -19,7 +20,8 @@
 - Kotlin data class、`Pair` 或 `Triple`
 - 带 `groupBy` 和 `having` 的聚合（`count`、`sum`、`avg` 等）
 - 值查询的 `distinct`、分页和结果函数
-- FROM 子句中的子查询（派生表）和 CTE（`with`）：仅为设计
+- 与其他实体的显式 join（`join`、`leftJoin`、`crossJoin`）
+- FROM 子句中的子查询（派生表）和 CTE（`with`）
 
 ## 目录
 
@@ -30,10 +32,11 @@
 - [6.5 Group by](#65-group-by)
 - [6.6 Having](#66-having)
 - [6.7 Distinct、分页与结果](#67-distinct-paging-and-results)
-- [6.8 派生表（FROM 中的子查询）](#68-derived-table-subquery-in-from)
-- [6.9 CTE（`with`）](#69-cte-with)
-- [6.10 规则 J1 至 J8](#610-rules-j1-to-j8)
-- [6.11 v0.1 中不包含的内容](#611-not-in-v01)
+- [6.8 显式 join](#68-explicit-joins)
+- [6.9 派生表（FROM 中的子查询）](#69-derived-table-subquery-in-from)
+- [6.10 CTE（`with`）](#610-cte-with)
+- [6.11 规则 J1 至 J8](#611-rules-j1-to-j8)
+- [6.12 v0.1 中不包含的内容](#612-not-in-v01)
 
 ---
 
@@ -63,7 +66,17 @@ data class Total(val count: Long, val average: Double?)
 > 如果 NULL 被传入这样的参数，lambdaQL 会抛出 `IllegalStateException`。对于基本类型，消息会指出是哪个参数，并提示改用包装类型。
 > `count` 永远不会返回 NULL，因此 `count: Long` 没有问题。
 
-目前还没有 Kotlin 测试。用 Java 写的同样的查询在 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) 中测试过（H2、MariaDB 和 Oracle）。已测试的示例请看[本页的 Java 版本](../java/06-select-group.md)。
+标记为 **(已测试)** 的示例来自 [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)。它使用 Java 测试实体（`price` 是基本类型 `double`，`status` 是 `short`，`Customer.id` 是 `int`）和以下结果类型：
+
+```kotlin
+/** A row of one order (Kotlin data class). */
+data class OrderRow(val id: Long?, val customerName: String?, val price: Double)
+
+/** A row of one customer group. Aggregates can be NULL, so the types are nullable (J4). */
+data class CustomerStat(val customerId: Int?, val count: Long, val total: Double?)
+```
+
+更多用 Java 写的查询在 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) 中测试过（H2、MariaDB 和 Oracle）。这些示例请看[本页的 Java 版本](../java/06-select-group.md)。
 
 ---
 
@@ -138,6 +151,22 @@ val pairs: List<Pair<String?, Double?>> = qb.from(Order::class.java)
 // HQL: select j1.name, e0.price from Order e0 left join e0.customer j1
 ```
 
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `data-class`：
+
+```kotlin
+val q = qb.from(Order::class.java).select { OrderRow(it.id, it.customer?.name, it.price) }
+assertEquals("select e0.id, j1.name, e0.price from Order e0 left join e0.customer j1", q.toHql().hql())
+```
+
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `pair`：
+
+```kotlin
+val q = qb.from(Order::class.java).where { it.status.toInt() == 1 }.select { it.customer?.name to it.price }
+assertEquals("select j1.name, e0.price from Order e0 left join e0.customer j1 where e0.status = 1", q.toHql().hql())
+```
+
+测试实体的 `status` 是 `short`，所以测试比较的是 `it.status.toInt() == 1`。lambdaQL 会忽略这个转换。
+
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `record`（data class 示例）：
 
 ```sql
@@ -154,7 +183,7 @@ lambdaQL 会把每个值转换为构造函数参数的类型（例如把 Hiberna
 
 可以返回的类型：
 
-| 结果类型 | 简单的 `select` | 派生表或 CTE 的行类型（已设计） |
+| 结果类型 | 简单的 `select` | 派生表或 CTE 的行类型（[6.9](#69-derived-table-subquery-in-from)） |
 |---|---|---|
 | 一个值（`it.price`） | 是 | – |
 | Kotlin data class | 是 | 是 |
@@ -276,6 +305,17 @@ val counts: List<KeyCount> = qb.from(Order::class.java)
 .groupBy { Triple(it.customer?.id, it.status, it.active) }    // 三个键
 ```
 
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `group-many`（结果是 `Triple`）：
+
+```kotlin
+val q = qb.from(Order::class.java)
+    .where { it.customer != null }
+    .groupBy { listOf(it.customer?.id, it.status) }
+    .select { Triple(it.customer?.id, it.status, Agg.count()) }
+assertEquals("select e0.customer.id, e0.status, count(*) from Order e0 where e0.customer is not null"
+    + " group by e0.customer.id, e0.status", q.toHql().hql())
+```
+
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `group-many`：
 
 ```sql
@@ -305,10 +345,10 @@ group by o1_0.customer_id,o1_0.status
 qb.from(Order::class.java)
     .groupBy { it.customer?.id }
     .select { KeyCount(it.customer?.id, it.status, Agg.count()) }
-// → LambdaAnalysisException
+// → TranslationException (LQL-3035)
 ```
 
-同样的检查已用 Java 测试（region `rules`，见 [6.10](#610-rules-j1-to-j8)）。
+同样的检查已用 Java 测试（region `rules`，见 [6.11](#611-rules-j1-to-j8)）。
 
 ---
 
@@ -326,6 +366,17 @@ val big: List<Stat> = qb.from(Order::class.java)
     .toList()
 // HQL: select e0.customer.id, count(*), sum(e0.price) from Order e0 group by e0.customer.id
 //      having sum(e0.price) > 200.0
+```
+
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `group-by`：
+
+```kotlin
+val q = qb.from(Order::class.java)
+    .groupBy { it.customer?.id }
+    .having { Agg.sum(it.price) > 200 }
+    .select { CustomerStat(it.customer?.id, Agg.count(), Agg.sum(it.price)) }
+assertEquals("select e0.customer.id, count(*), sum(e0.price) from Order e0 group by e0.customer.id"
+    + " having sum(e0.price) > 200.0", q.toHql().hql())
 ```
 
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `group-by`：
@@ -375,7 +426,7 @@ from orders o1_0
 order by o1_0.price desc
 ```
 
-- 使用 `distinct()` 时，每个排序键都必须是被查询的值（规则 J7）。否则 lambdaQL 会在分析时抛出 `LambdaAnalysisException`。
+- 使用 `distinct()` 时，每个排序键都必须是被查询的值（规则 J7）。否则 lambdaQL 会在分析时抛出 `TranslationException`（`LQL-3046`）。
 - 值查询上的 `toSet()` 总是使用 `select distinct`。这里出现重复值是预期的，所以没有数量检查（与实体上的 `toSet()` 不同，见 [2. 入门](02-getting-started.md#toset)）。
 
 **分页。** `limit` 和 `offset` 的用法与 [4. 排序与分页](04-order-paging.md) 中相同。
@@ -410,41 +461,192 @@ limit ?,?
 
 ---
 
-<a id="68-derived-table-subquery-in-from"></a>
-## 6.8 派生表（FROM 中的子查询）
+<a id="68-explicit-joins"></a>
+## 6.8 显式 join
 
-> [!NOTE]
-> **已设计，尚未实现**（里程碑 M8-2）。下面的 HQL 是**计划**的输出。
+关联路径（`it.customer?.name`）会自动 join 一个对一关联（见 [3.10](03-where.md#310-association-paths)）。
+要用你自己的条件，或者不带条件地 join 另一个实体，请使用 `join`、`leftJoin` 或 `crossJoin`（决定 D44、D45）。
 
-把一个 Lambda 传给 `qb.from`。这个 Lambda 接收子查询工厂（`sub`）并构建内部查询。
-内部的 `select` 决定行类型。在外部查询中，像使用实体一样使用这一行。
+| 函数 | HQL | 行 |
+|---|---|---|
+| `join(Customer::class.java) { o, c -> ... }` | `join Customer e1 on ...` | 内连接：只有匹配的行 |
+| `leftJoin(Customer::class.java) { o, c -> ... }` | `left join Customer e1 on ...` | 没有匹配的主实体行也会保留 |
+| `crossJoin(Customer::class.java)` | `cross join Customer e1` | 所有行的每一种组合；条件写在 `where` 中 |
+
+join 之后，每个 Lambda 都按 join 的顺序得到所有实体：
+`where { o, c -> ... }`、`orderBy { o, c, by -> ... }`（`by` 在最后，规则 S12）和 `select { o, c -> ... }`。
+被 join 的实体得到别名 `e1`、`e2`。
+
+join 已用 **Java** Lambda 在 [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java) 中测试（H2、MariaDB 和 Oracle）。目前还没有 Kotlin 的 join 测试。
+下面的 Kotlin 代码用 Kotlin 语法展示已测试的 Java 查询，HQL 来自 Java 测试。已测试的代码见[本页的 Java 版本](../java/06-select-group.md#68-explicit-joins)。
+
+```kotlin
+val q = qb.from(Order::class.java)
+    .join(Customer::class.java) { o, c -> o.customer?.id == c.id }
+    .where { o, c -> c.grade != null && c.grade!! >= 5 }
+// HQL: select e0 from Order e0 join Customer e1 on e0.customer.id = e1.id
+//      where e1.grade is not null and e1.grade >= 5
+```
+
+**结果是主实体。** 没有 `select` 时，`toList()` 返回 `List<Order>`。
+被 join 的实体只用于条件、排序和 `select`。
+要读取被 join 实体的值，请使用 `select { o, c -> ... }`（见下文）。
+
+<a id="left-join-and-null"></a>
+### left join 与 NULL
+
+```kotlin
+// 没有客户的订单没有 c：c == null 能找到这些行
+val q = qb.from(Order::class.java)
+    .leftJoin(Customer::class.java) { o, c -> o.customer?.id == c.id }
+    .where { o, c -> c == null || c.name == "Kim" }
+// HQL: select e0 from Order e0 left join Customer e1 on e0.customer.id = e1.id
+//      where e1.id is null or e1.name = 'Kim'
+```
+
+- `c == null` 表示“没有匹配”。lambdaQL 把它写成 `e1.id is null`（被 join 实体的 `@Id`）。
+  Lambda 参数 `c` 是非空类型，所以 Kotlin 编译器可能会警告 `c == null` 总是 false。lambdaQL 仍然把它读作“没有匹配”。
+- `leftJoin` 之后，对被 join 实体的列的条件具有 **SQL 含义**。没有匹配时，该列是 NULL，条件不为真，这一行会被排除。
+  要保留没有匹配的行，请像示例那样写 `c == null || ...`。
+
+<a id="sort-and-select"></a>
+### 排序与 select
+
+```kotlin
+val q = qb.from(Order::class.java)
+    .leftJoin(Customer::class.java) { o, c -> o.customer?.id == c.id }
+    .orderBy { o, c, by -> by.asc(c.name).asc(o.id) }
+// HQL: select e0 from Order e0 left join Customer e1 on e0.customer.id = e1.id
+//      order by e1.name asc nulls first, e0.id asc
+
+data class Row(val orderId: Long?, val customerName: String?)
+
+val rows = qb.from(Order::class.java)
+    .leftJoin(Customer::class.java) { o, c -> o.customer?.id == c.id }
+    .orderBy { o, c, by -> by.asc(o.id) }
+    .select { o, c -> Row(o.id, c.name) }
+// HQL: select e0.id, e1.name from Order e0 left join Customer e1 on e0.customer.id = e1.id
+//      order by e0.id asc
+```
+
+对于没有客户的订单，`customerName` 是 `null`。
+`select` 返回 `ValueQuery`，所以 `distinct()`、`limit`、`offset` 以及 [6.7](#67-distinct-paging-and-results) 的结果函数都可以使用。
+
+<a id="three-entities-and-repeated-rows"></a>
+### 三个实体与重复的行
+
+最多可以 join 三个实体。第三个 join 的 Lambda 得到全部三个实体：`{ o, c, i -> ... }`。
+
+```kotlin
+// 有数量 > 10 的商品的客户订单；每匹配一个商品，订单就重复一次
+val q = qb.from(Order::class.java)
+    .join(Customer::class.java) { o, c -> o.customer?.id == c.id }
+    .join(Item::class.java) { o, c, i -> i.order?.id == o.id }
+    .where { o, c, i -> i.qty > 10 }
+// HQL: select e0 from Order e0 join Customer e1 on e0.customer.id = e1.id
+//      join Item e2 on e2.order.id = e0.id where e2.qty > 10
+```
+
+> [!WARNING]
+> 当 join 匹配多行时，**主实体的行会重复**：每个匹配一次。`toList()` 和 `count()` 会计入每一次重复（已用 Java 测试）。
+> 如果每个订单只想要一次，请用 `exists()` 子查询（[5. 子查询](05-subquery.md)）代替 join，或者用 `distinct()` 查询值。
+
+<a id="cross-join"></a>
+### cross join
+
+`crossJoin` 没有 join 条件。这个名字表明你需要所有行的每一种组合。条件写在 `where` 中。
+
+```kotlin
+// 所有行的每一种组合；条件写在 where 中
+val q = qb.from(Order::class.java)
+    .crossJoin(Customer::class.java)
+    .where { o, c -> c.grade != null && o.price!! > 100 }
+// HQL: select e0 from Order e0 cross join Customer e1 where e1.grade is not null and e0.price > 100.0
+```
+
+lambdaQL 没有 `from(Order::class.java, Customer::class.java)`（逗号 join）。没有条件时它会不小心产生所有组合，而且不清楚哪个实体是结果（决定 D45）。这种情况请使用 `crossJoin`。
+
+<a id="paging"></a>
+### 分页
+
+分页时，lambdaQL 会把**每个**实体的 id 加为最后的排序键，所以各页永远不会重叠（规则 S9）：
+
+```kotlin
+// 分页时，每个实体的 id 都会加到排序中，所以各页永远不会重叠（S9）
+val pairs = qb.from(Order::class.java)
+    .crossJoin(Customer::class.java)
+    .orderBy { o, c, by -> by.desc(o.price) }
+    .select { o, c -> Row(o.id, c.name) }
+    .limit(5)
+// HQL: select e0.id, e1.name from Order e0 cross join Customer e1 order by e0.price desc, e0.id asc, e1.id asc
+```
+
+这个 HQL 来自 Java 测试，其中 `price` 是基本类型 `double`。使用本手册中可空的 `price: Double?` 时，排序键会带上 `nulls last`（见 [4.4](04-order-paging.md#44-null-ordering-is-the-same-on-every-database)）。
+
+<a id="what-a-join-query-has"></a>
+### join 查询提供的函数
+
+| 之后 | 函数 |
+|---|---|
+| `join`、`leftJoin`、`crossJoin` | `where`、`join` / `leftJoin` / `crossJoin`（最多三个实体）、`orderBy`、`select`、`limit`、`toList`、`toSet`、`first`、`count`、`exists`、`toHql` |
+| `orderBy { o, c, by -> ... }` | `select`、`limit`、`offset`、`toList`、`first`，以及排序后查询的其他函数（[4. 排序与分页](04-order-paging.md)） |
+
+v0.1 中尚不支持：update、delete 和 insert 中的 join，子查询内的 join，超过三个实体，`SortSpec` 的 join 形式，以及与派生表的 join。
+
+---
+
+<a id="69-derived-table-subquery-in-from"></a>
+## 6.9 派生表（FROM 中的子查询）
+
+用 `select` 创建一个值查询（一个 data class，见 [6.3](#63-select-a-data-class-pair-or-triple)），然后把它传给 `qb.from(...)`。
+它的行会成为外层查询的表（决定 D46）。
+结果是 `DerivedQuery<R>`。`R` 是行类型。
+
+派生表已用 **Java** Lambda 在 [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java) 中测试（H2、MariaDB 和 Oracle）。目前还没有 Kotlin 测试。
+下面的 Kotlin 代码用 Kotlin 语法展示已测试的 Java 查询。已测试的代码见[本页的 Java 版本](../java/06-select-group.md#69-derived-table-subquery-in-from)。
 
 ```kotlin
 data class CustomerTotal(val customerId: Long?, val cnt: Long, val total: Double?)
 
-val rows: List<CustomerTotal> = qb.from { sub ->
-        sub.from(Order::class.java)
-            .groupBy { it.customer?.id }
-            .select { CustomerTotal(it.customer?.id, Agg.count(), Agg.sum(it.price)) }
-    }
+// 分组查询的行成为外层查询的表；r.total 读取列 "total"
+val q = qb.from(qb.from(Order::class.java)
+        .where { it.customer != null }
+        .groupBy { it.customer?.id }
+        .select { CustomerTotal(it.customer?.id, Agg.count(), Agg.sum(it.price)) })
     .where { r -> r.total!! > 100 }
-    .toList()
+    .orderBy { r, by -> by.desc(r.total) }
+// HQL: select e0.customerId, e0.cnt, e0.total from (select d0.customer.id as customerId, count(*) as cnt,
+//      sum(d0.price) as total from Order d0 where d0.customer is not null group by d0.customer.id) e0
+//      where e0.total > 100.0 order by e0.total desc nulls last
 ```
 
-HQL（select 别名 `customerId`、`cnt`、`total` 作为列名，规则 J5）：
+- 内层查询使用别名 `d0`（其中的 join 为 `dj1` 等）。外层查询使用 `e0`。
+- 每个 data class 属性按主构造函数的顺序为一列命名：`as customerId`、`as cnt`、`as total`（规则 J5）。
+- 在外层 Lambda 中，用属性读取列：`r.total` 就是 `e0.total`。
+- 外层查询提供 `where`、`orderBy`、`limit`、`offset`、`select`、`toList`、`first`、`count` 和 `toHql`。
 
-```sql
-select r.customerId, r.cnt, r.total
-from (select o.customer.id as customerId, count(*) as cnt, sum(o.price) as total
-      from Order o group by o.customer.id) r
-where r.total > 100
+也可以查询行中的一个值（`.select { r -> r.customerId }`）。内层和外层的捕获值按顺序绑定。
+内层查询的 `limit` 和 `offset` 保留在内层查询中（HQL `limit` 和 `offset`），所以可以对前几行再次排序：
+
+```kotlin
+data class Priced(val id: Long?, val price: Double?)
+
+// 价格最高的三个订单中最便宜的那个
+val cheapestOfTop = qb.from(qb.from(Order::class.java)
+        .orderBy { o, by -> by.desc(o.price) }
+        .limit(3)
+        .select { Priced(it.id, it.price) })
+    .orderBy { r, by -> by.asc(r.price) }
+    .first()
 ```
 
-**关于计划中的 SQL 块。** [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) 把本节和 6.9 中计划的 HQL 直接交给 Hibernate，并记录在 H2 2.3、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上得到的 SQL。lambdaQL 目前还不会生成这些查询。如果 Hibernate 的 SQL 发生变化，测试就会失败。
+**关于 SQL 块。** [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) 把同样形式但更简单的 HQL 直接交给 Hibernate，并记录在 H2 2.3、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上得到的 SQL。如果 Hibernate 的 SQL 发生变化，测试就会失败。它展示了各数据库如何写派生表。
 
-**各数据库的 SQL（计划中）** — Hibernate 对计划中 HQL 的翻译，由 `PlannedSqlTest` 记录；lambdaQL 目前还不会生成此查询。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `06-derived`：
+**各数据库的 SQL（Hibernate 对这种 HQL 形式生成的 SQL）** — 来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `06-derived`：
 
 ```sql
+-- HQL: select r.customerId, r.cnt, r.total from (select o.customer.id as customerId, count(*) as cnt, sum(o.price) as total from Order o group by o.customer.id) r where r.total > 100
+
 -- H2
 select r1_0.customerId,r1_0.cnt,r1_0.total
 from (select o1_0.customer_id,count(*),sum(o1_0.price) from orders o1_0 group by o1_0.customer_id) r1_0(customerId,cnt,total)
@@ -456,47 +658,42 @@ from (select o1_0.customer_id customerId,count(*) cnt,sum(o1_0.price) total from
 where r1_0.total>100
 ```
 
-H2 把列清单放在别名上（`r1_0(customerId,cnt,total)`）。MariaDB 和 Oracle 把列别名写在子查询里面。
+H2 把列清单放在别名上（`r1_0(customerId,cnt,total)`）。MariaDB 和 Oracle 把列别名放在子查询内部。
 
 规则：
 
 - 行类型必须是 **Kotlin data class**（或 Java record）（规则 J5）。
-  lambdaQL 按 data class 的 `componentN` 顺序取得列别名。
-- 这里不允许使用普通类。lambdaQL 无法知道其构造函数参数的名字。
-- 在外部 Lambda 中，通过属性读取这一行（`r.total`）。
+  lambdaQL 按主构造函数的顺序从 data class 属性中取得列名。
+- 这里不允许普通类、`Pair`、`Triple` 或单个值：lambdaQL 无法为它的列命名。lambdaQL 会抛出 `TranslationException`（`LQL-3064`，已用 Java 以单个值测试）。
+
+v0.1 中尚不支持：两个派生表之间的 join、派生表与实体的 join，以及在 update、delete 或 insert 中使用派生表。
 
 ---
 
-<a id="69-cte-with"></a>
-## 6.9 CTE（`with`）
+<a id="610-cte-with"></a>
+## 6.10 CTE（`with`）
 
-> [!NOTE]
-> **已设计，尚未实现**（里程碑 M8-2）。下面的 HQL 是**计划**的输出。
-
-用 `qb.with { ... }` 创建一个句柄，然后在 `qb.from(...)` 中使用这个句柄。
-同一个句柄可以使用多次。
+用 `qb.with(valueQuery)` 创建一个类型为 `Cte<R>` 的句柄，然后用 `qb.from(句柄)` 读取它。
+内层查询与派生表（6.9）相同。
 
 ```kotlin
-val t = qb.with { sub ->
-    sub.from(Order::class.java)
-        .groupBy { it.customer?.id }
-        .select { CustomerTotal(it.customer?.id, Agg.count(), Agg.sum(it.price)) }
-}
+val perCustomer = qb.from(Order::class.java)
+    .where { it.customer != null }
+    .groupBy { it.customer?.id }
+    .select { CustomerTotal(it.customer?.id, Agg.count(), Agg.sum(it.price)) }
 
-val rows = qb.from(t).where { r -> r.total!! > 100 }.toList()
+val t: Cte<CustomerTotal> = qb.with(perCustomer)
+val rows = qb.from(t).where { r -> r.cnt >= 2 }.toList()
+// HQL: with t as (select d0.customer.id as customerId, count(*) as cnt, sum(d0.price) as total
+//      from Order d0 where d0.customer is not null group by d0.customer.id)
+//      select e0.customerId, e0.cnt, e0.total from t e0 where e0.cnt >= 2L
 ```
 
-HQL（select 别名 `customerId`、`cnt`、`total` 作为列名，规则 J5）：
+**各数据库的 SQL（Hibernate 对这种 HQL 形式生成的 SQL）** — 由 `PlannedSqlTest` 记录。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `06-cte`：
 
 ```sql
-with t as (select o.customer.id as customerId, count(*) as cnt, sum(o.price) as total
-           from Order o group by o.customer.id)
-select x.customerId, x.cnt, x.total from t x where x.total > 100
-```
+-- HQL: with t as (select o.customer.id as customerId, count(*) as cnt, sum(o.price) as total from Order o group by o.customer.id) select x.customerId, x.cnt, x.total from t x where x.total > 100
 
-**各数据库的 SQL（计划中）** — Hibernate 对计划中 HQL 的翻译，由 `PlannedSqlTest` 记录；lambdaQL 目前还不会生成此查询。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `06-cte`：
-
-```sql
 -- H2
 select x1_0.customerId,x1_0.cnt,x1_0.total
 from (select o1_0.customer_id,count(*),sum(o1_0.price) from orders o1_0 group by o1_0.customer_id) x1_0(customerId,cnt,total)
@@ -513,42 +710,43 @@ MariaDB 和 Oracle 执行真正的 `with`。列清单由 Hibernate 自己写出�
 
 说明：
 
-- lambdaQL 在外部查询中总会给 CTE 一个别名（`from t x`）。HQL 需要它（规则 J6）。
-- CTE 的列名由 select 别名（`as customerId`）确定。HQL 不接受 CTE 名称后面的列清单；列清单由 Hibernate 加到 SQL 中（规则 J6）。
-- MariaDB 和 Oracle 执行真正的 `with`。在 H2 上，Hibernate 会把它展开为派生表。结果相同（已检查）。
-- 行类型规则与派生表相同：data class 或 record（J5）。
+- CTE 的名字是 `t`。外层查询总是给它别名 `e0`（`from t e0`）。HQL 需要别名（规则 J6）。
+- CTE 的列用 select 别名命名（`as customerId`）。HQL 不接受 CTE 名后面的列清单；Hibernate 会在 SQL 中加上它（规则 J6）。
+- MariaDB 和 Oracle 执行真正的 `with`。在 H2 上，Hibernate 把它展开为派生表。结果相同（已用 Java Lambda 在三种数据库上测试）。
+- 行类型的规则与派生表相同：data class 或 record（J5）。
+- v0.1 中尚不支持：在一个查询中两次使用同一个 CTE，以及在 update、delete 或 insert 中使用 CTE。
 
 ---
 
-<a id="610-rules-j1-to-j8"></a>
-## 6.10 规则 J1 至 J8
+<a id="611-rules-j1-to-j8"></a>
+## 6.11 规则 J1 至 J8
 
 | # | 规则 | 状态 |
 |---|---|---|
-| J1 | `select` 的 Lambda 返回**一个值表达式**或**一次构造函数调用**。每个构造函数参数都是一个值表达式（规则见 [3. 条件](03-where.md)）。只在 `select` 中使用的关联路径会变成 `left join` 别名，因此不会丢失行。如果 `where` 使用同一条路径，`select` 会使用 `where` 的 join（R24）。 | 已实现（用 Java Lambda 测试） |
-| J2 | 对于构造函数，lambdaQL 只查询列，并自己调用构造函数。它不会写 `select new`。`Pair`/`Triple` 也以同样方式构建。 | 已实现（用 Java Lambda 测试） |
-| J3 | 有聚合时，`select` 和 `having`（以及 `insert ... select` 的值）中每个非聚合值都必须是 `groupBy` 的键。否则会在分析时报错。 | 已实现（用 Java Lambda 测试）。目前的错误是 `LambdaAnalysisException`；`TranslationException` 是设计中的（[11](../11-errors-and-languages.md)） |
+| J1 | `select` 的 Lambda 返回**一个值表达式**或**一次构造函数调用**。每个构造函数参数都是一个值表达式（规则见 [3. 条件](03-where.md)）。只在 `select` 中使用的关联路径会变成 `left join` 别名，因此不会丢失行。如果 `where` 使用同一条路径，`select` 会使用 `where` 的 join（R24）。 | 已实现（已测试，也用 Kotlin Lambda 测试） |
+| J2 | 对于构造函数，lambdaQL 只查询列，并自己调用构造函数。它不会写 `select new`。`Pair`/`Triple` 也以同样方式构建。 | 已实现（已测试，也用 Kotlin Lambda 测试） |
+| J3 | 有聚合时，`select` 和 `having`（以及 `insert ... select` 的值）中每个非聚合值都必须是 `groupBy` 的键。否则会在分析时报错。 | 已实现（用 Java Lambda 测试）。错误是 `TranslationException`（`LQL-3035`，见 [11](../11-errors-and-languages.md)） |
 | J4 | 没有行或所有值都是 NULL 时，`sum`/`avg`/`min`/`max` 返回 NULL，`count` 返回 0。请使用可空的构造函数参数。NULL 进入非空参数时会抛出 `IllegalStateException`。 | 已实现（用 Java Lambda 测试） |
-| J5 | 派生表或 CTE 的行类型：**只能是 Kotlin data class 或 Java record**。普通类只允许用于简单的 `select`。 | 已设计（M8-2） |
-| J6 | 用 `qb.with { }` 创建的 CTE 用 select 别名为列命名：`with t as (select o.customer.id as customerId, ...) select x.customerId ... from t x`。HQL 不接受名称后面的列清单：Hibernate 会以 `SyntaxException` 拒绝 `with t (col list) as (...)`。列清单由 Hibernate 自己写进 SQL（在 MariaDB 和 Oracle 上为 `with t (customerId,cnt,total) as (...)`）；H2 把 CTE 变成派生表。外部查询总是为它使用别名（`from t x`）。 | 已设计（M8-2） |
+| J5 | 派生表或 CTE 的行类型：**只能是 Kotlin data class 或 Java record**。普通类只允许用于简单的 `select`。否则：`LQL-3064`。 | 已实现（用 Java Lambda 测试） |
+| J6 | 用 `qb.with(...)` 创建的 CTE 用 select 别名为列命名：`with t as (select d0.customer.id as customerId, ...) select e0.customerId ... from t e0`。HQL 不接受名称后面的列清单：Hibernate 会以 `SyntaxException` 拒绝 `with t (col list) as (...)`。列清单由 Hibernate 自己写进 SQL（在 MariaDB 和 Oracle 上为 `with t (customerId,cnt,total) as (...)`）；H2 把 CTE 变成派生表。外部查询总是为它使用别名（`from t e0`）。 | 已实现（用 Java Lambda 测试） |
 | J7 | `distinct()` 渲染为 `select distinct`。与排序一起使用时，排序键必须在查询列中（数据库的规则）。lambdaQL 会在分析时检查这一点。 | 已实现（用 Java Lambda 测试） |
 | J8 | 查询列可以与排序（[4. 排序与分页](04-order-paging.md)）、分页和子查询（[5. 子查询](05-subquery.md)）一起使用。按聚合排序（`by.desc(s.total)`）是 v0.2 候选。 | 已实现，按聚合排序除外 |
 
-[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) 中的 Java 测试 region `rules` 检查了 J3、`where` 中的 `Agg`、J7 和 J4。见[本页的 Java 版本](../java/06-select-group.md#610-rules-j1-to-j8)。
+[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) 中的 Java 测试 region `rules` 检查了 J3、`where` 中的 `Agg`、J7 和 J4。见[本页的 Java 版本](../java/06-select-group.md#611-rules-j1-to-j8)。
 
 ---
 
-<a id="611-not-in-v01"></a>
-## 6.11 v0.1 中不包含的内容
+<a id="612-not-in-v01"></a>
+## 6.12 v0.1 中不包含的内容
 
 | 项目 | 状态 |
 |---|---|
 | 按聚合结果或查询列别名排序，例如 `orderBy { s, by -> by.desc(s.total) }`，以及分组查询上的 `orderBy` | v0.2 候选 |
-| 派生表和 CTE（6.8、6.9） | 已设计，尚未实现（里程碑 M8-2） |
 | 用户自定义聚合函数和窗口函数 | v0.2 候选 |
-| 跨 join 的投影，`select { o, c -> OrderView(o.id, c.name, o.price) }` | 已计划；join 语法尚未最终确定 |
+| update、delete 和 insert 中的 join，子查询内的 join，超过三个实体，与派生表的 join | 以后 |
+| 在一个查询中两次使用同一个 CTE，在 DML 中使用派生表和 CTE | 以后 |
 
-目前本章的错误（错误的分组键、`where` 中的 `Agg`、使用 `distinct` 时排序键未被查询）是 `LambdaAnalysisException`。`[LQL-xxxx]` 代码和 `LambdaQLException` 子类是设计中的内容。见 [11. 错误与语言](../11-errors-and-languages.md)。
+本章的错误是带错误码的 `TranslationException`：`LQL-3035`（错误的分组键，J3）、`LQL-3005`（`where` 中的 `Agg`）、`LQL-3046`（使用 `distinct` 时排序键未被查询，J7）和 `LQL-3064`（派生表或 CTE 的行类型，J5）。见 [11. 错误与语言](../11-errors-and-languages.md)。
 
 ---
 

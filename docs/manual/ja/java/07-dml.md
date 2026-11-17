@@ -191,7 +191,7 @@ SQL では、SET の右辺にあるすべてのカラムは更新 **前** の値
 // error: price is assigned first, then read again
 ```
 
-**同じ文の中で、カラムに代入したあとにそのカラムを読む** と、lambdaQL は `set(...)` を呼んだときに `LambdaAnalysisException` を投げます（ルール U3）。
+**同じ文の中で、カラムに代入したあとにそのカラムを読む** と、lambdaQL は `set(...)` を呼んだときに `TranslationException`（`LQL-3042`）を投げます（ルール U3）。
 理由: この場合 MariaDB は **新しい** 値を使い、H2 と Oracle は古い値を使います。結果が異なります（確認結果: MariaDB は 200、H2 と Oracle は 100）。
 
 次のケースは問題ありません。3 つのデータベースの結果が一致するからです。
@@ -213,17 +213,17 @@ SQL では、SET の右辺にあるすべてのカラムは更新 **前** の値
 <a id="rules-checked-at-analysis-time"></a>
 ### 解析時に確認するルール
 
-lambdaQL は、ラムダを読むときにルール U1、U3、U4、U6 を確認します。このテストはユーザー API ではなく、内部クラス `AssignmentReader` を呼びます。ユーザー API も、`set(...)` と `values(...)` から同じ `LambdaAnalysisException` を投げます。
+lambdaQL は、ラムダを読むときにルール U1、U3、U4、U6 を確認します。このテストはユーザー API ではなく、内部クラス `AssignmentReader` を呼びます。ユーザー API も、`set(...)` と `values(...)` から同じ `LambdaQLException` を投げます（たとえば U1 は `LQL-3037`、U3 は `LQL-3042`、U4 は `LQL-3041`）。
 
 **(テスト済み)** [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)、リージョン `rules`:
 
 ```java
 // U1: only setters; no condition, no local variable
-assertThrows(LambdaAnalysisException.class, () -> setters(o -> { if (o.isActive()) o.setStatus((short) 1); }));
+assertThrows(LambdaQLException.class, () -> setters(o -> { if (o.isActive()) o.setStatus((short) 1); }));
 // U6: an association's other properties belong to another table
-assertThrows(LambdaAnalysisException.class, () -> setters(o -> o.getCustomer().setName("x")));
+assertThrows(LambdaQLException.class, () -> setters(o -> o.getCustomer().setName("x")));
 // U3: a value reads a column written before
-assertThrows(LambdaAnalysisException.class, () -> AssignmentReader.checkRules(
+assertThrows(LambdaQLException.class, () -> AssignmentReader.checkRules(
         AssignmentReader.readSetters(SerializedLambdaExtractor.extract((Assign<Order>) o -> {
             o.setPrice(1);
             o.setTex((float) o.getPrice());
@@ -374,7 +374,7 @@ upsert のルール（決定 D40）は [7.6 Upsert](07-6-upsert.md#rules) にあ
 | `returning` | 拒否 | – |
 | データベースの時刻（`current_timestamp`） | 拒否 | アプリケーションの時刻をバインドする（U8） |
 
-現在、ルールに違反すると、簡単なメッセージ（今は韓国語）付きの `LambdaAnalysisException` が投げられます。予定している `[LQL-xxxx]` コードと基底クラス `LambdaQLException` は [11. エラーと言語](../11-errors-and-languages.md) にあります。
+ルールに違反すると、`[LQL-xxxx]` コード付きの `LambdaQLException` が投げられます（ほとんどのルールは `TranslationException`、代入ラムダの中の条件やローカル変数は `UnsupportedLambdaShapeException`）。[11. エラーと言語](../11-errors-and-languages.md) を参照してください。
 すべてのルールを 1 か所にまとめたもの: [10. ルールと制限](10-rules-and-limits.md)。
 
 ---

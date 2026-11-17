@@ -4,58 +4,88 @@
 [매뉴얼 홈](README.md) | 트랙: [Java](java/README.md) | [Kotlin](kotlin/README.md) | 이전: 10. 규칙과 제한 ([Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md)) | 다음: 12. Spring Data JPA ([Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md))
 
 > [!NOTE]
-> **상태:** 설계됨, **아직 구현되지 않았습니다**.
-> 현재 분석 코어는 단순한 메시지(지금은 한국어)와 원래 원인을 담은 `LambdaAnalysisException`을 던집니다. 아직 `[LQL-xxxx]` 코드와 메시지 번들은 없습니다.
-> 오류 코드, `LambdaQLException` 기본 클래스, 네 가지 메시지 언어, SLF4J 로깅은 설계에서 확정되었습니다. 이 페이지의 코드 예제는 설계된 API를 보여 줍니다. 설계 예제입니다.
+> **상태:** 구현됨, 테스트함(결정 D33).
+> 모든 메시지에 `[LQL-xxxx]` 코드가 붙고, 메시지는 영어, 일본어, 중국어(간체), 한국어로 제공합니다.
+> 예외는 `LambdaQLException`과 그 하위 클래스입니다. 경고는 SLF4J로 기록합니다.
+> **(테스트됨)** 표시가 있는 예제는 테스트 코드([`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java))에서 그대로 가져온 것입니다. 이 페이지의 다른 코드는 설계 예제입니다.
+> 아직 구현되지 않음: 비SARGable 경고 `LQL-5001`, 경고를 오류로 바꾸는 엄격 모드.
 
 이 페이지는 두 언어 모두를 위한 것입니다. 코드는 **Java**와 **Kotlin** 섹션으로 나누어 보여 줍니다.
-
-<a id="what-works-today"></a>
-## 현재 동작하는 것
-
-분석 코어는 이미 일부 형태를 거부합니다. 다음 단위 테스트가 이를 보여 줍니다. 이 테스트는 사용자 API가 아니라 내부 클래스를 호출하며 `LambdaAnalysisException`을 기대합니다.
-
-| 테스트 | 거부하는 것 |
-|---|---|
-| [LoadExamplesTest.java](../../../query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java) (`notSerializable`) | 직렬화할 수 없는 람다(`java.util.function.Predicate`) |
-| [ConditionDecodeTest.java](../../../query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java) (`valueTernaryIsRejected`) | 값 삼항 연산자: `o.getStatus() == (flag ? 1 : 2)` |
-
-이 섹션 아래의 내용은 모두 설계입니다.
 
 <a id="error-codes"></a>
 ## 오류 코드
 
 모든 lambdaQL 메시지는 `[LQL-xxxx]` 형식의 코드로 시작합니다.
-코드는 언어에 따라 바뀌지 않습니다. 코드 뒤의 텍스트가 번역됩니다.
+코드는 언어에 따라 바뀌지 않습니다. 코드 뒤의 텍스트만 번역합니다.
 
-```
-[LQL-2004] ...선택한 언어로 된 메시지 텍스트...
+**(테스트됨)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), 영역 `format`:
+
+```java
+LqlMessages.setLocale(Locale.ENGLISH);
+assertEquals("[LQL-4014] limit must be 0 or more: -1", LqlMessage.LIMIT_NEGATIVE.format(-1));
+// the same message in another language: the code stays
+assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.LIMIT_NEGATIVE.format(Locale.KOREAN, -1));
 ```
 
-| 범위 | 영역 | 문제의 예 |
+모든 메시지는 enum `org.lambdaql.i18n.LqlMessage`의 값입니다. 값마다 코드와 인자 개수가 있습니다.
+
+| 범위 | 영역 | 현재 코드 | 예외 |
+|---|---|---|---|
+| `LQL-1xxx` | 입력과 람다 로딩 | `LQL-1001`~`LQL-1013` | `LambdaAnalysisException` |
+| `LQL-2xxx` | 바이트코드 디코딩 | `LQL-2001`~`LQL-2025` | `UnsupportedLambdaShapeException` |
+| `LQL-3xxx` | 의미 해석과 Java에서 계산하는 값 | `LQL-3001`~`LQL-3064` | `TranslationException` |
+| `LQL-4xxx` | 렌더링, 바인딩, 실행 | `LQL-4001`~`LQL-4039`, `LQL-4999`(내부 오류) | `LambdaQLException` 자체, 또는 JDK/JPA 표준 예외([예외](#exceptions) 참고) |
+| `LQL-5xxx` | 경고(로그에 기록) | `LQL-5002` | –(`WARN` 로그 한 줄) |
+
+실제 코드의 예:
+
+| 코드 | 예외 | 메시지(한국어) |
 |---|---|---|
-| `LQL-1xxx` | 입력과 람다 로딩 | 인자가 직렬화 가능한 람다가 아닙니다. 익명 클래스입니다. 클래스 파일을 읽을 수 없습니다. |
-| `LQL-2xxx` | 바이트코드 디코딩 | 람다 안의 반복문. 값 삼항 연산자(`a ? 1 : 2`, Kotlin `if (a) 1 else 2`). lambdaQL이 지원하지 않는 명령어. |
-| `LQL-3xxx` | 의미와 호스트 값 | SQL에서 의미가 없는 메서드 호출. `groupBy` 키가 아닌 비집계 값. lambdaQL이 캡처 값을 계산할 때 생긴 문제. |
-| `LQL-4xxx` | 렌더링과 실행 | lambdaQL이 HQL을 만들거나 실행할 때 생긴 문제. |
-| `LQL-5xxx` | 경고(로그에 기록) | 인덱스를 사용할 수 없는 조건(SARGable 아님). |
+| `LQL-1002` | `LambdaAnalysisException` | Serializable 람다만 분석할 수 있습니다. java.util.function 대신 lambdaQL 람다 타입을 쓰세요: {0} |
+| `LQL-2004` | `UnsupportedLambdaShapeException` | 람다 안의 반복문은 지원하지 않습니다. 목록은 람다 밖에서 만들고 캡처하세요. |
+| `LQL-3005` | `TranslationException` | Agg 집계 함수는 where에 쓸 수 없습니다. having을 쓰세요(J3): Agg.{0} |
+| `LQL-3035` | `TranslationException` | 집계와 함께 쓰는 값은 groupBy 키여야 합니다(J3): {0} |
+| `LQL-3058` | `TranslationException` | DB 함수 {0}은 SQL 이름이 따로 있어 등록이 필요합니다. 클래스를 lambdaql.functions.classes 설정에 넣으세요. |
+| `LQL-3064` | `TranslationException` | 파생 테이블·CTE의 행 타입은 Java record나 Kotlin data class여야 합니다(J5): {0} |
+| `LQL-4009` | `LambdaQLException` | null 값은 <, <=, >, >=로 비교할 수 없습니다(Java에서는 NullPointerException): {0} |
+| `LQL-4014` | `IllegalArgumentException` | limit은 0 이상이어야 합니다: {0} |
+| `LQL-4025` | `NonUniqueResultException` | one()의 조건에 맞는 행이 2개 이상입니다. 조건을 좁히거나 first()를 쓰세요: {0} |
+| `LQL-4034` | `DbOnlyException` | {0}은 DB 함수입니다. lambdaQL 람다 안에서만 쓰며 Java에서는 실행되지 않습니다. |
+| `LQL-4036` | `LambdaQLException` | 스텁이 DB 프로시저 {0}와 맞지 않습니다: {1} |
+| `LQL-5002` | –(`WARN` 로그) | limit 없는 서브쿼리 정렬은 결과에 영향이 없어 제거했습니다(Q4): {0} |
+
+`{0}`, `{1}`은 인자입니다. 예를 들어 식이나 프로시저 이름이 들어갑니다.
+전체 목록은 메시지 파일에 있습니다([번역자를 위한 안내](#for-translators) 참고).
 
 코드 규칙:
 
 - 코드는 릴리스 후 다시 사용하지 않습니다. 코드로 검색하거나 코드에서 코드 값을 검사해도 안전합니다.
-- 정확한 코드 번호는 아직 확정되지 않았습니다. 메시지가 구현되면 여기에 목록을 싣습니다.
+- 모든 코드가 중복 없이 `LQL-`와 네 자리 숫자 형식인지 단위 테스트가 검사합니다.
 
 <a id="exceptions"></a>
 ## 예외
 
-모든 lambdaQL 예외는 `LambdaQLException`을 상속합니다. `RuntimeException`이므로 Kotlin과 Java에서 같은 방식으로 처리합니다.
+모든 lambdaQL 예외는 `org.lambdaql.LambdaQLException`을 상속합니다. `RuntimeException`이므로 Kotlin과 Java에서 같은 방식으로 처리합니다.
+예외 클래스는 코드 범위에 따라 정해집니다.
 
-| 예외 | 발생 시점 | 예 |
+| 예외 | 코드 | 발생 시점 | 예 |
+|---|---|---|---|
+| `LambdaQLException` | `LQL-4xxx` | 모든 lambdaQL 예외의 기본 클래스. 렌더링, 바인딩, 실행 문제에는 이 클래스 자체를 던집니다 | 크기 비교에 쓴 `null` 캡처 값(`LQL-4009`). DB와 맞지 않는 프로시저 스텁(`LQL-4036`). |
+| `LambdaAnalysisException` | `LQL-1xxx` | lambdaQL이 람다를 로드할 수 없을 때 | 람다 대신 익명 클래스(Kotlin `object : ...`). 직렬화할 수 없는 람다(`LQL-1002`). |
+| `UnsupportedLambdaShapeException` | `LQL-2xxx` | lambdaQL이 지원하지 않는 모양의 바이트코드일 때 | 반복문(`LQL-2004`). 값 삼항 연산자나 값 `if`/`when`. 일반적인 boolean 삼항 연산자 `c ? x : y`. |
+| `TranslationException` | `LQL-3xxx` | 람다가 HQL에서 정의된 의미를 갖지 않을 때 | getter가 아닌 엔티티 메서드. 두 엔티티를 `==`로 비교(아직 미지원). `groupBy` 키가 아닌 비집계 값(`LQL-3035`). |
+| `DbOnlyException` | `LQL-4034` | 직접 만든 `@SqlFunction` 메서드를 lambdaQL 람다 밖의 Java에서 호출했을 때 | `OrderFns.discount(1.0)`([람다 밖에서 호출한 플레이스홀더](#placeholders-called-outside-a-lambda) 참고) |
+
+이 클래스는 모두 `org.lambdaql` 패키지에 있습니다.
+
+**표준 예외는 타입을 유지합니다.** Java 코드가 JDK나 JPA 예외를 기대하는 경우에는 그 타입을 던지고, 메시지에만 코드를 붙입니다.
+
+| 예외 | 예 | 코드 |
 |---|---|---|
-| `LambdaQLException` | 모든 lambdaQL 예외의 기본 클래스 | – |
-| `LambdaAnalysisException` | lambdaQL이 람다를 로드할 수 없을 때 | 람다 대신 익명 클래스(Kotlin `object : ...`). 직렬화할 수 없는 람다. |
-| `UnsupportedLambdaShapeException` | lambdaQL이 지원하지 않는 모양의 바이트코드일 때 | 반복문. 값 삼항 연산자나 값 `if`/`when`. 일반적인 boolean 삼항 연산자 `c ? x : y`. |
-| `TranslationException` | 람다가 HQL에서 정의된 의미를 갖지 않을 때 | getter가 아닌 엔티티 메서드. 두 엔티티를 `==`로 비교(아직 미지원). `groupBy` 키가 아닌 비집계 값. |
+| `IllegalArgumentException` | `limit(-1)` | `LQL-4014` |
+| `IllegalStateException` | primitive 생성자 인자에 들어가는 NULL 값(규칙 J4). 람다 밖에서 호출한 `Agg.sum(...)`. 행 수보다 요소 수가 적은 `toSet()` | `LQL-4021`, `LQL-4032`, `LQL-4019` |
+| `jakarta.persistence.NonUniqueResultException` | `one()`의 결과가 2행 이상. `executeOne()`의 조건에 맞는 행이 2행 이상 | `LQL-4025`, `LQL-4023` |
+| `jakarta.persistence.TransactionRequiredException` | 트랜잭션 없는 update, insert, delete | `LQL-4024` |
 
 `LambdaQLException`의 메서드:
 
@@ -64,8 +94,26 @@
 | `code()` | 고정된 코드, 예: `"LQL-2004"` |
 | `key()` | 메시지 키(`LqlMessage` 값) |
 | `args()` | 메시지 인자 |
+| `where()` | 람다의 위치(람다 본문을 담은 메서드, 알 수 있으면 줄 번호), 없으면 `null` |
 | `getMessage()` | 예외가 생성될 때 선택되어 있던 lambdaQL 언어의 메시지 |
 | `getMessage(Locale locale)` | 같은 메시지를 다른 언어로, 예: 영어는 `Locale.ROOT` |
+
+**(테스트됨)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), 영역 `exception`:
+
+```java
+LqlMessages.setLocale(Locale.KOREAN);
+LambdaQLException e = LqlMessage.LOOP_NOT_SUPPORTED.exceptionAt("app.Repo.lambda$find$0 (line 12)");
+// check the code in tests, not the text
+assertEquals("LQL-2004", e.code());
+assertInstanceOf(UnsupportedLambdaShapeException.class, e);
+assertTrue(e.getMessage().startsWith("[LQL-2004] 람다 안의 반복문은"), e.getMessage());
+// the same message in English, with the place of the lambda at the end
+assertEquals("[LQL-2004] Loops are not supported in a lambda. Build the list outside the lambda and capture it."
+        + " — app.Repo.lambda$find$0 (line 12)", e.getMessage(Locale.ROOT));
+```
+
+이 테스트는 예외를 직접 만듭니다. 실제 코드에서는 lambdaQL이 람다를 읽을 때 예외를 만듭니다.
+처리 방법은 다음과 같습니다(설계 예제).
 
 ### Java
 
@@ -97,7 +145,7 @@ try {
 ### 메시지에 담기는 내용
 
 - 코드, 그다음 선택한 언어의 텍스트.
-- 끝에는 고정 형식으로 람다의 위치가 붙습니다. 람다 본문을 담은 메서드와 **소스 줄 번호**입니다.
+- 끝에는 고정 형식으로 람다의 위치가 붙습니다. ` — ` 다음에 람다 본문을 담은 메서드와 **소스 줄 번호**가 옵니다(`where()`로도 얻을 수 있습니다).
 - 디코딩 오류에는 바이트코드 덤프가 담긴 줄이 더 붙을 수 있습니다. 이 추가 줄은 번역하지 않습니다.
 - 대부분의 메시지는 문제를 고치는 방법도 알려 줍니다. 예를 들어 Kotlin 메시지는 리스트를 람다 밖에서 만들고 캡처하라고 알려 줍니다.
 
@@ -199,16 +247,19 @@ null 규칙 전체는 3. 조건([Java](java/03-where.md) | [Kotlin](kotlin/03-wh
 
 | 메서드 | 쿼리 람다 밖에서 호출하면 |
 |---|---|
-| `Agg.count()`, `Agg.sum(...)` 및 다른 `Agg` 메서드 | `IllegalStateException`을 던짐 |
-| 직접 만든 `@SqlFunction` 메서드 | lambdaQL은 본문을 절대 실행하지 않습니다. 설계 예제의 본문은 `DbOnlyException`을 던집니다. |
+| `Agg.count()`, `Agg.sum(...)` 및 다른 `Agg` 메서드 | `IllegalStateException`을 던짐(`LQL-4032`) |
+| 직접 만든 `@SqlFunction` 메서드 | lambdaQL은 본문을 절대 실행하지 않습니다. 본문은 `DbOnlyException`(`LQL-4034`)을 던지기만 해야 합니다. 값을 계산하는 본문은 거부합니다(`LQL-3052`). |
 
 #### Java
 
+**(테스트됨)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `rules`(앞부분):
+
 ```java
-public interface OrderFns {
-    @SqlFunction("FN_DISCOUNT") static Double discount(Double price) { throw new DbOnlyException(); }
-}
+// the body never runs in Java
+assertEquals("LQL-4034", assertThrows(DbOnlyException.class, () -> OrderFns.discount(1.0)).code());
 ```
+
+`OrderFns`의 선언은 8. 프로시저와 DB 함수([Java](java/08-procedures-functions.md#86-declare-db-functions) | [Kotlin](kotlin/08-procedures-functions.md#86-declare-db-functions))에 있습니다.
 
 #### Kotlin
 
@@ -250,6 +301,24 @@ lambdaQL은 다음 세 곳을 이 순서로 확인합니다. 처음으로 설정
 | `ko`(예: `ko_KR`) | 한국어 |
 | 그 밖의 모든 언어(`en`, `fr`, `de`, ...) | 영어 |
 
+**(테스트됨)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), 영역 `locale`:
+
+```java
+// 1. setLocale wins, 2. then -Dlambdaql.locale, 3. then the JVM default
+LqlMessages.setLocale(Locale.JAPANESE);
+assertEquals(Locale.JAPANESE, LqlMessages.locale());
+LqlMessages.setLocale(null);
+System.setProperty(LqlMessages.LOCALE_PROPERTY, "ko_KR");
+assertEquals(Locale.KOREAN, LqlMessages.bundleLocale(LqlMessages.locale()));
+// only the language counts; other languages get English (the root bundle)
+assertEquals(Locale.CHINESE, LqlMessages.bundleLocale(Locale.TRADITIONAL_CHINESE));
+assertEquals(Locale.ROOT, LqlMessages.bundleLocale(Locale.FRENCH));
+```
+
+`LqlMessages.LOCALE_PROPERTY`는 이름 `"lambdaql.locale"`입니다. `LqlMessages.bundleLocale(locale)`은 로캘이 사용하는 메시지 파일을 알려 줍니다.
+
+애플리케이션에서는 다음과 같이 씁니다(설계 예제).
+
 #### Java
 
 ```java
@@ -288,9 +357,19 @@ org/lambdaql/i18n/LqlMessages_zh.properties   중국어(간체)
 org/lambdaql/i18n/LqlMessages_ko.properties   한국어
 ```
 
+- 키는 `LqlMessage` 값의 이름입니다. 예: `LOOP_NOT_SUPPORTED`.
 - 인자는 `{0}`, `{1}`, ...로 씁니다.
 - lambdaQL은 `MessageFormat`을 사용하지 않습니다. 그래서 작은따옴표(`can't`)를 그대로 쓸 수 있습니다. 숫자는 서식을 적용하지 않습니다(줄 번호 `1234567`은 `1234567` 그대로입니다).
-- 모든 키는 네 파일 모두에 있어야 합니다. 단위 테스트가 이를 검사합니다. 새 메시지는 네 언어 모두로 추가해야 합니다.
+- 모든 키는 같은 인자로 네 파일 모두에 있어야 합니다. 단위 테스트가 이를 검사합니다. 새 메시지는 네 언어 모두로 추가해야 합니다.
+
+**(테스트됨)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), 영역 `fill`:
+
+```java
+// no MessageFormat: quotes and big numbers stay as they are (rule I4)
+assertEquals("can't read line 1234567", LqlMessages.fill("can't read line {0}", 1234567));
+assertEquals("a null b", LqlMessages.fill("a {0} b", (Object) null));
+assertEquals("{x} {9}", LqlMessages.fill("{x} {9}", "unused"));
+```
 
 <a id="logging"></a>
 ## 로깅
@@ -302,17 +381,20 @@ lambdaQL은 **SLF4J API**로 로그를 남깁니다.
 - 경고는 `WARN` 레벨을 사용하며 `LQL-5xxx` 범위의 코드로 시작합니다.
 - `WARN` 레벨이 꺼져 있으면 lambdaQL은 메시지 텍스트를 만들지 않습니다.
 
-경고의 예(코드와 텍스트는 예시이며, 최종 텍스트는 다를 수 있습니다):
+현재 lambdaQL이 기록하는 경고:
+
+| 코드 | 발생 조건 |
+|---|---|
+| `LQL-5002` | 서브쿼리에 `orderBy`는 있지만 `limit`이 없어 lambdaQL이 정렬을 제거할 때(정렬은 결과에 영향이 없음, 규칙 Q4) |
 
 ```
-WARN  [LQL-5001] ...컬럼 "price"에 대한 조건은 인덱스를 사용할 수 없습니다...
+WARN  [LQL-5002] limit 없는 서브쿼리 정렬은 결과에 영향이 없어 제거했습니다(Q4): ...
 ```
 
-예를 들어 다음과 같은 경우 이런 경고를 보게 됩니다.
+계획된 경고(아직 구현되지 않음):
 
-- 조건의 컬럼 쪽에 데이터베이스 함수를 사용해서(Java `OrderFns.discount(o.getPrice()) > 10`, Kotlin `OrderFns.discount(it.price)!! > 10`) 데이터베이스가 인덱스를 사용할 수 없을 때
+- `LQL-5001`: 조건의 컬럼 쪽에 데이터베이스 함수를 사용해서(Java `OrderFns.discount(o.getPrice()) > 10`, Kotlin `OrderFns.discount(it.price)!! > 10`) 데이터베이스가 인덱스를 사용할 수 없을 때
 - 대소문자를 구분하지 않는 비교에 맞는 인덱스나 콜레이션이 그 컬럼에 없을 때
-- 서브쿼리에 `orderBy`는 있지만 `limit`이 없어서 lambdaQL이 정렬을 제거할 때(정렬은 효과가 없습니다)
 
 이런 경고를 오류로 바꾸는 "엄격 모드"가 계획되어 있습니다.
 

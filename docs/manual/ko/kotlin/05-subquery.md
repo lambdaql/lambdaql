@@ -3,10 +3,10 @@
 
 > [!NOTE]
 > **상태**
-> - **구현됨**(마일스톤 M8-1). H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 6.6.5)에서 테스트했습니다. 대상은 조회, 수정, 삭제의 `where { o, sub -> ... }` 안의 서브쿼리입니다. `exists` / `!exists`, `in`, `!in`(NOT EXISTS로 작성), 스칼라 집계, top-1 형태, 상관 서브쿼리와 중첩 서브쿼리, 캡처 값을 포함합니다. 테스트는 **Java** 람다를 사용합니다. **Kotlin 람다는 아직 빌드 안에서 테스트하지 않았습니다.**
-> - 이 장의 Kotlin 형태(`exists`, `in` / `!in`, 스칼라, top-1, 중첩)는 빌드 밖에서 kotlinc 2.3.21로 컴파일했습니다. lambdaQL은 이 형태에 대해 Java 형태와 같은 HQL을 만듭니다.
-> - **아직 구현되지 않음:** `from` 안의 서브쿼리(파생 테이블)와 CTE(마일스톤 M8-2), `set` 값 안의 서브쿼리, MariaDB `lateral` 재작성.
-> - Kotlin 코드는 테스트된 Java 쿼리를 Kotlin 문법으로 옮긴 것입니다. 테스트된 Java 예제는 [이 페이지의 Java 버전](../java/05-subquery.md)에 있습니다.
+> - **구현됨**(마일스톤 M8-1). H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 6.6.5)에서 테스트했습니다. 대상은 조회, 수정, 삭제의 `where { o, sub -> ... }` 안의 서브쿼리입니다. `exists` / `!exists`, `in`, `!in`(NOT EXISTS로 작성), 스칼라 집계, top-1 형태, 상관 서브쿼리와 중첩 서브쿼리, 캡처 값을 포함합니다. 테스트는 대부분 **Java** 람다를 사용합니다.
+> - **Kotlin 람다로 테스트함**([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 빌드에 포함, H2, MariaDB, Oracle): `exists`, `in`, 스칼라 `avg`. 이 예제에는 **(테스트됨)** 표시가 있습니다. 그 밖의 Kotlin 형태(`!in`, top-1, 중첩)는 빌드 밖에서 kotlinc 2.3.21로 컴파일했고, Java 형태와 같은 HQL을 만듭니다.
+> - **아직 구현되지 않음:** `set` 값 안의 서브쿼리, MariaDB `lateral` 재작성. (파생 테이블과 CTE는 다른 문법으로 구현했습니다. [6. 조회, 집계, 그룹화](06-select-group.md#69-derived-table-subquery-in-from)를 참고하십시오.)
+> - 그 밖의 Kotlin 코드는 테스트된 Java 쿼리를 Kotlin 문법으로 옮긴 것입니다. 테스트된 Java 예제는 [이 페이지의 Java 버전](../java/05-subquery.md)에 있습니다.
 
 [Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [4. 정렬과 페이징](04-order-paging.md) | 다음: [6. 조회, 집계, 그룹화](06-select-group.md) | [이 페이지의 Java 버전](../java/05-subquery.md)
 
@@ -49,7 +49,8 @@ Kotlin에서 `y in values`는 `values.contains(y)`로 컴파일됩니다. 그래
 
 HQL에서 서브쿼리 루트의 별칭은 `s1`, `s2`, ...입니다(바깥 루트는 `e0`). 서브쿼리 안의 조인은 `s1j1` 같은 별칭을 받습니다.
 
-아직 Kotlin 테스트는 없습니다. 같은 쿼리를 Java로 작성한 테스트가 [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)에 있습니다(H2, MariaDB, Oracle). 테스트된 예제는 [이 페이지의 Java 버전](../java/05-subquery.md)을 참고하십시오.
+**(테스트됨)** 표시가 있는 예제는 [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)에서 가져온 것입니다. 이 테스트는 Java 테스트 엔티티를 사용합니다. `price`는 기본형 `double`이고 `qty`는 `int`입니다.
+더 많은 쿼리를 Java로 작성한 테스트가 [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)에 있습니다(H2, MariaDB, Oracle). 그 예제는 [이 페이지의 Java 버전](../java/05-subquery.md)을 참고하십시오.
 
 ## 5.2 EXISTS
 
@@ -65,6 +66,15 @@ qb.from(Order::class.java)
     .toList()
 // HQL: select e0 from Order e0
 //      where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > 10)
+```
+
+**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `exists`:
+
+```kotlin
+val q = qb.from(Order::class.java)
+    .where { o, sub -> sub.from(Item::class.java).where { i -> i.order?.id == o.id && i.qty > 10 }.exists() }
+assertEquals("select e0 from Order e0 where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > 10)",
+    q.toHql().hql())
 ```
 
 **SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 6.6.5로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다. 이 테스트는 Java 람다를 사용합니다. 의미가 같은 Kotlin 람다는 같은 HQL을 만들므로 SQL도 같습니다.
@@ -119,6 +129,15 @@ qb.from(Order::class.java)
     .toList()
 // HQL: select e0 from Order e0
 //      where e0.customer.id in (select s1.id from Customer s1 where s1.grade > 3)
+```
+
+**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `in`:
+
+```kotlin
+val q = qb.from(Order::class.java)
+    .where { o, sub -> o.customer?.id in sub.from(Customer::class.java).where { c -> c.grade!! > 3 }.select { c -> c.id } }
+assertEquals("select e0 from Order e0 where e0.customer.id in (select s1.id from Customer s1 where s1.grade > 3)",
+    q.toHql().hql())
 ```
 
 **데이터베이스별 SQL (이 HQL에 대한 Hibernate의 SQL)** — [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)가 같은 HQL을 Hibernate에 직접 넘겨 기록했습니다. Java 테스트(영역 `in`)에는 null 검사 `c.getGrade() != null`이 더 있으며, 그 SQL은 예제 `sub-in`입니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `05-in-subquery`:
@@ -224,6 +243,13 @@ qb.from(Order::class.java)
 //      where e0.price > (select avg(s1.price) from Order s1)
 ```
 
+**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `scalar`(테스트의 `price`는 `double`이므로 `!!`가 없음):
+
+```kotlin
+val q = qb.from(Order::class.java).where { o, sub -> o.price > sub.from(Order::class.java).avg { x -> x.price } }
+assertEquals("select e0 from Order e0 where e0.price > (select avg(s1.price) from Order s1)", q.toHql().hql())
+```
+
 **데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `sub-scalar`:
 
 ```sql
@@ -240,7 +266,7 @@ where o1_0.price>(select avg(o2_0.price) from orders o2_0)
 | 집계: `count()`, `sum`, `avg`, `min`, `max` | `sub.from(Item::class.java).where { i -> i.order?.id == o.id }.count()` |
 | top-1: `orderBy { ... }.limit(1)...first()` | 아래 참고 |
 
-그 밖의 `first()`는 분석 시점 오류(`LambdaAnalysisException`)입니다.
+그 밖의 `first()`는 분석 시점 오류(`TranslationException`, `LQL-3017`)입니다.
 
 품목이 두 개 이상인 주문(`count()`):
 
@@ -352,7 +378,7 @@ where exists(select 1 from orders o1_0 where o1_0.customer_id=c1_0.id and exists
 
 - **update / delete의 서브쿼리**: `where`에서 같은 `sub` 문법을 사용합니다. 구현되어 있습니다(Java 람다로 테스트, 영역 `dml-subquery`). [7.4 삭제(delete)](07-4-delete.md)와 [7.2 수정(update)](07-2-update.md)을 참고하십시오.
 - **`set` 값 안의 서브쿼리**(`o.total = sub.from(...).sum { ... }`): 아직 구현되지 않았습니다. [7.2 수정(update)](07-2-update.md)을 참고하십시오.
-- **`from`의 서브쿼리(파생 테이블)와 CTE**(`qb.from { sub -> ... }`, `qb.with { sub -> ... }`): 설계됨, 아직 구현되지 않음(마일스톤 M8-2). [6. 조회, 집계, 그룹화](06-select-group.md)를 참고하십시오.
+- **`from`의 서브쿼리(파생 테이블)와 CTE**: 구현됨(마일스톤 M8-2). `sub`를 쓰지 않고 값 쿼리를 `qb.from(...)`이나 `qb.with(...)`에 전달합니다. [6.9 파생 테이블](06-select-group.md#69-derived-table-subquery-in-from)과 [6.10 CTE](06-select-group.md#610-cte-with)를 참고하십시오.
 
 <a id="512-rules-summary-q1-to-q6"></a>
 ## 5.12 규칙 요약(Q1 ~ Q6)

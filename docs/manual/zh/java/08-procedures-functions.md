@@ -1,11 +1,13 @@
 # 8. 存储过程与数据库函数（Java）
 
 > [!NOTE]
-> **状态：已设计，尚未实现。**
-> 本章是已确定的设计（决定 D30 和 D31，里程碑 M11）。
-> 该语法在 Java 中可以编译，调用已在 H2、MariaDB 和 Oracle 23ai 上使用 Hibernate 6.6.5 检查过。
-> 目前它在 lambdaQL 中**还不能**运行。目前只有分析核心以及 `where` + `toList()` 可以工作
-> （已在 H2、MariaDB 和 Oracle 上测试）。完整状态见 [Java 路线 README](README.md#status)。
+> **状态**
+> - **已实现并测试**（决定 D30 和 D31，里程碑 M11，Hibernate 6.6.5）：
+>   查询中的数据库函数（`@SqlFunction`），在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上测试（[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)）；
+>   存储过程调用（`@SqlProcedure`、`@InOut`、`qb.call`、`qb.exec`）在 MariaDB 和 Oracle 上测试，单独调用数据库函数在全部三种数据库上测试（[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)）。
+>   H2 没有 OUT 参数，所以存储过程的测试不在 H2 上运行。
+> - **尚未实现：** 作用于列的函数的 SARGable 警告（规则 PR8、FN7）、对照数据库检查参数的**类型**和**名字**（规则 PR2 的一部分及其 WARN），以及 Oracle 包重载的检测。
+> - 标记为 **(已测试)** 的示例是从测试代码中复制的。其他示例遵循相同的规则，但没有测试覆盖。完整状态见 [Java 路线 README](README.md#status)。
 
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[7. 更新、插入、删除](07-dml.md) | 下一章：[9. Java 说明](09-java-notes.md) | [本页的 Kotlin 版本](../kotlin/08-procedures-functions.md)
 
@@ -45,25 +47,66 @@ lambdaQL **从不执行**这些方法。它读取 Lambda 字节码中的调用�
 编写一个接口。在每个**抽象**方法上加上 `@SqlProcedure("NAME")`。
 你不需要编写实现。lambdaQL 也不会生成实现。
 
+**(已测试)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `declare`：
+
 ```java
-interface OrderProcs {
-    @SqlProcedure("SQ_CALC")     Double calc(Long id, Double rate);              // 1 个 OUT → 返回值
-    @SqlProcedure("SQ_CALC2")    CalcOut calc2(Long id, Double rate);            // 多个 OUT → record
-    @SqlProcedure("SP_ADJUST")   AdjOut adjust(Long id, @InOut Integer balance); // INOUT
-    @SqlProcedure("SP_RECENT")   List<OrderView> recent(Long custId);           // 结果集 / Oracle REF CURSOR
-    @SqlProcedure("SQ_PKG.CALC") Double pkgCalc(Long id, Double rate);           // 包名或模式名
-    @SqlProcedure("SP_PURGE")    void purge(Integer days);                       // 没有结果
+/** One OUT value or more: a record in the database order. */
+record Stat(Double total, Integer cnt) {
 }
 
-record CalcOut(Double total, Integer cnt) {}
-record AdjOut(Integer balance, String msg) {}
+/** The INOUT value and the OUT value, in the database order. */
+record Adjusted(Integer balance, String msg) {
+}
+
+/** A row of a result set: columns are matched by name (customer_id or customerId). */
+record Line(Long id, Double price) {
+}
+
+/** A stub interface: lambdaQL reads the calls and never implements it. */
+interface OrderProcs {
+    @SqlProcedure("SQ_PROC_CALC")
+    Double calc(Integer customerId, Double rate);                 // IN, IN, OUT
+
+    @SqlProcedure("SQ_PROC_STAT")
+    Stat stat(Integer customerId);                                // IN, OUT, OUT
+
+    @SqlProcedure("SQ_PROC_ADJUST")
+    Adjusted adjust(Integer add, @InOut Integer balance);         // IN, INOUT, OUT
+
+    @SqlProcedure("SQ_PROC_RECENT")
+    List<Line> recent(Integer customerId);                        // a result set (Oracle: a REF CURSOR)
+
+    @SqlProcedure("SQ_PROC_PURGE")
+    void purge(Integer status);                                   // no result
+
+    @SqlProcedure("SQ_PROC_CALC")
+    Double calcWrong(Integer customerId);                         // does not match the database: 1 argument
+}
+
+/** A database function. */
+interface MathFns {
+    @SqlFunction("SQ_FN_HALF")
+    static Double half(Double value) {
+        throw new DbOnlyException();
+    }
+}
 ```
+
+测试在运行前会在 MariaDB 和 Oracle 上创建这些存储过程，例如（MariaDB）：
+
+```sql
+CREATE OR REPLACE PROCEDURE SQ_PROC_CALC(IN p_cust INT, IN p_rate DOUBLE, OUT p_total DOUBLE)
+  BEGIN SELECT COALESCE(SUM(price), 0) * p_rate INTO p_total FROM SQ_orders WHERE customer_id = p_cust; END
+```
+
+`calcWrong` 是故意写错的。测试用它检查规则 PR2（见 [8.4](#84-warning-argument-order)）。
 
 说明：
 
 - `@SqlProcedure`（或 `@SqlFunction`）是**必需的**。它告诉 lambdaQL 这个方法是什么。
   （没有使用 `@Procedure` 和 `@Function` 这两个名字：`@Procedure` 也是 Spring Data JPA 的注解，而 `@Function` 与 Kotlin 的 `kotlin.Function` 冲突。）
 - 如果值为空，名字取自方法名：`calcTotal` → `CALC_TOTAL`。
+- `@SqlProcedure` 还有 `schema` 和 `pkg`（Oracle 包）：`@SqlProcedure(value = "CALC", schema = "LQL", pkg = "SQ_PKG")`。
 - 请使用装箱的返回类型（`Double`、`Integer`）。存储过程可能返回 NULL。
 - 接口和结果 record 是数据库签名的副本。这是类型安全的代价。lambdaQL 会对照数据库检查其中一部分（规则 PR2）。
 - 存储过程（抽象方法）和数据库函数（静态方法）可以放在**同一个接口**中。
@@ -75,14 +118,23 @@ record AdjOut(Integer balance, String msg) {}
 
 使用 `qb.call(Interface.class, p -> p.method(args))`，然后调用 `execute()`。
 
-```java
-Double d          = qb.call(OrderProcs.class, p -> p.calc(id, rate)).execute();
-CalcOut co        = qb.call(OrderProcs.class, p -> p.calc2(id, rate)).execute();
-AdjOut a          = qb.call(OrderProcs.class, p -> p.adjust(id, balance)).execute();
-List<OrderView> r = qb.call(OrderProcs.class, p -> p.recent(custId)).execute();
+**(已测试)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `call`（MariaDB 和 Oracle）：
 
-// 没有结果（void）：使用 exec
-qb.exec(OrderProcs.class, p -> p.purge(30)).execute();
+```java
+Double total = qb.call(OrderProcs.class, p -> p.calc(customerId, rate)).execute();
+Stat stat = qb.call(OrderProcs.class, p -> p.stat(customerId)).execute();
+Adjusted adjusted = qb.call(OrderProcs.class, p -> p.adjust(5, 10)).execute();
+List<Line> recent = qb.call(OrderProcs.class, p -> p.recent(customerId)).execute();
+```
+
+`customerId` 和 `rate` 是捕获的局部值。测试把每个结果与用 Java 进行的同样计算作比较。例如，`adjusted` 是 `new Adjusted(15, "ok")`。
+
+没有结果（`void`）的存储过程使用 `exec`：
+
+**(已测试)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `exec`（MariaDB 和 Oracle）：
+
+```java
+qb.exec(OrderProcs.class, p -> p.purge(9)).execute();
 ```
 
 为什么 void 用 `exec` 而不是 `call`？
@@ -101,7 +153,8 @@ Lambda 体是**对存根方法的一次调用**。除此之外什么都没有。
 
 其他要点：
 
-- 对带有 OUT 参数的存储过程使用 `exec` 是错误。这样可以防止 OUT 值被意外丢弃。
+- 对带有 OUT 参数的存储过程使用 `exec` 是错误（`LQL-4037`）。这样可以防止 OUT 值被意外丢弃。
+- 调用没有 `@SqlProcedure` 的方法是错误（`LQL-3060`）。
 - 不能使用数据库中参数的默认值。请传入每个 IN 参数。
 - 用 `null` 作为 IN 值没有问题。
 
@@ -116,7 +169,7 @@ Lambda 体是**对存根方法的一次调用**。除此之外什么都没有。
 |---|---|
 | 什么都没有 | `void` → 用 `qb.exec(...)` 调用 |
 | 1 个 OUT 参数 | 该值（`Double`、`Integer` 等） |
-| 多个 OUT / INOUT 参数 | Java record |
+| 多个 OUT / INOUT 参数 | Java record（Kotlin：data class） |
 | 1 个结果集（MariaDB 的 `SELECT`、Oracle 的 `SYS_REFCURSOR` OUT、H2 的 `ResultSet` 函数） | `List<T>` |
 | 多个结果集 | 带 `List` 组件的 record |
 | OUT 值和结果集（MariaDB） | 带标量组件和 `List` 组件的 record |
@@ -125,28 +178,35 @@ record 组件的填充方式：
 
 - **标量组件** ← OUT 和 INOUT 参数（游标除外），按数据库中的顺序。
 - **`List` 组件** ← 结果集，按顺序（Oracle：游标 OUT 参数的顺序；MariaDB：返回结果集的顺序）。
-- 如果数量不匹配，lambdaQL 会抛出错误。
+- 如果数量不匹配，lambdaQL 会抛出错误（`LQL-4038`）。
 - 像 IN、OUT、IN、INOUT 这样混合的位置没有问题。lambdaQL 从数据库元数据中读取位置。
 
 ### INOUT
 
 用 `@InOut` 标记参数。你传入的值**进入**存储过程。**出来**的值是返回 record 的一个组件。
 
-```java
-@SqlProcedure("SP_ADJUST") AdjOut adjust(Long id, @InOut Integer balance);
+测试中的 `SQ_PROC_ADJUST(p_add IN, p_balance IN OUT, p_msg OUT)` 把 `p_add` 加到 `p_balance` 上：
 
-AdjOut a = qb.call(OrderProcs.class, p -> p.adjust(id, 100)).execute();
-// a.balance() 是新的余额
+```java
+@SqlProcedure("SQ_PROC_ADJUST")
+Adjusted adjust(Integer add, @InOut Integer balance);         // IN, INOUT, OUT
+
+Adjusted adjusted = qb.call(OrderProcs.class, p -> p.adjust(5, 10)).execute();
+// adjusted.balance() 是 15（新的余额），adjusted.msg() 是 "ok"
 ```
+
+`@InOut` 必须恰好标在数据库中为 INOUT 的参数上。否则第一次调用会失败（`LQL-4036`）。
 
 ### 结果集的元素类型 `T`
 
 | `T` 是 | lambdaQL 的读取方式 |
 |---|---|
-| 实体 | Hibernate 结果类 |
-| record 或 DTO | JDBC `CallableStatement`，**按标签**匹配列（`camelCase` ↔ `snake_case`，忽略大小写） |
+| 实体 | Hibernate 结果类（`StoredProcedureQuery`） |
+| Java record（Kotlin：data class） | JDBC `CallableStatement`，**按标签**匹配列：去掉 `_` 并忽略大小写，所以 `customer_id` 与 `customerId` 匹配（已用 `Line` 测试） |
+| 一个值（`Long`、`String` 等） | 每行的第一列 |
 
-lambdaQL 从不按位置映射列，因为 MariaDB 和 Oracle 返回 `SELECT *` 的列顺序不同。
+普通 DTO 类不能作为这里的行类型。请使用 record。
+lambdaQL 从不按位置映射 record 组件，因为 MariaDB 和 Oracle 返回 `SELECT *` 的列顺序不同。
 它会转换常见类型（例如把数字转换为 `Long`/`Integer`，把时间戳转换为 `LocalDateTime`）。
 
 限制：
@@ -158,7 +218,7 @@ lambdaQL 从不按位置映射列，因为 MariaDB 和 Oracle 返回 `SELECT *` 
 
 - 存储过程中的 DML 是调用方事务的一部分，会随之回滚。
 - 调用之前，lambdaQL 会刷新持久化上下文，但仅在有活动事务且存在更改时才这样做。
-- 在事务之外，调用是自动提交的。
+- `QueryBuilder(EntityManagerFactory)` 在自己的事务中执行调用。带 `EntityManager` 的 `QueryBuilder`（包括 Spring 的共享 EntityManager）使用调用方的事务。没有事务时，调用是自动提交的。
 - 调用之后，已加载的实体可能是过期的。请对这些实体使用 `refresh` 或 `evict`。
 - 存储过程中的 `COMMIT` 或 DDL 会破坏事务。lambdaQL 无法阻止这种情况。
 
@@ -180,14 +240,32 @@ lambdaQL **按位置**绑定参数（规则 PR2）。
 MariaDB 和 H2 的驱动不支持命名参数。
 所以如果顺序错误，你可能会得到**错误的结果却没有任何报错**。
 
-lambdaQL 在第一次调用时检查的内容（来自 JDBC 元数据）：
+lambdaQL 在第一次调用时检查的内容（来自 JDBC 元数据 `getProcedureColumns`）。结果按存储过程名缓存：
 
 | 检查项 | 能发现吗？ |
 |---|---|
-| 参数个数 | 能，报错 |
-| 模式（IN / OUT / INOUT / 游标） | 能，报错 |
-| 类型 | 能，报错 |
-| 两个**相同类型**的参数互换 | **仅当参数名可用时** |
+| 存储过程存在 | 能，报错 `LQL-4035` |
+| IN 和 INOUT 参数的个数 = 存根参数的个数 | 能，报错 `LQL-4036`（已测试） |
+| INOUT 参数 = 带 `@InOut` 的参数 | 能，报错 `LQL-4036` |
+| OUT 值和结果集的个数 = 返回类型的组成部分 | 能，报错 `LQL-4038` |
+| 类型 | **尚未实现** |
+| 两个**相同类型**的参数互换 | **尚未实现**（计划：仅当参数名可用时） |
+
+**(已测试)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `rules`（MariaDB 和 Oracle）：
+
+```java
+// PR2: the stub is checked against the database parameters on the first call
+assertEquals("LQL-4036", assertThrows(LambdaQLException.class,
+        () -> qb.call(OrderProcs.class, p -> p.calcWrong(1)).execute()).code());
+// exec cannot drop OUT values
+assertEquals("LQL-4037", assertThrows(LambdaQLException.class,
+        () -> qb.exec(OrderProcs.class, p -> p.calc(1, 1.0)).execute()).code());
+// only @SqlProcedure methods of the stub can be called
+assertEquals("LQL-3060", assertThrows(LambdaQLException.class,
+        () -> qb.call(OrderProcs.class, p -> p.toString()).execute()).code());
+```
+
+最后一种情况调用的是没有 `@SqlProcedure` 的 `toString()`。所以错误码是 `LQL-3060`（该方法不是 `@SqlProcedure`）。
 
 危险情况的示例：
 
@@ -197,35 +275,34 @@ lambdaQL 在第一次调用时检查的内容（来自 JDBC 元数据）：
 ```
 
 个数、模式和类型都匹配。只有名字才能暴露这个错误。
-当 lambdaQL 能获取名字时会比较它们：用 javac `-parameters` 编译，或使用 `@Param`。
-它会忽略 `p_` 前缀和大小写。如果名字不可用，并且两个相邻参数类型相同，lambdaQL 会记录一条 WARN。
+lambdaQL **目前还不**比较名字。计划是：在名字可用时（javac `-parameters` 或 `@Param`）比较名字，忽略 `p_` 前缀和大小写；名字不可用且两个相邻参数类型相同时记录一条 WARN。
 
-**建议：** 用 `-parameters` 编译（见 [2. 入门](02-getting-started.md#recommended-compiler-option--parameters)），并使用与数据库相同的名字。
+**建议：** 手动检查存根参数的顺序。用 `-parameters` 编译（见 [2. 入门](02-getting-started.md#recommended-compiler-option--parameters)），并使用与数据库相同的名字，这样计划中的检查就能发现错误。
 
-在 Oracle 上，lambdaQL 还可以使用真正的按名字绑定（`pass_procedure_paramater_names=true` 加上存根的参数名）。
+Oracle 上真正的按名字绑定（`pass_procedure_paramater_names=true` 加上存根的参数名）也在计划中。
 
 ---
 
 <a id="85-procedure-rules-pr1-to-pr15-summary"></a>
 ## 8.5 存储过程规则 PR1 至 PR15（汇总）
 
-| # | 规则 |
-|---|---|
-| PR1 | 名字：注解的值原样使用。值为空时：方法名转为 UPPER_SNAKE。可以使用包名或模式名（`SQ_PKG.CALC`、`LQL.SQ_CALC`）。为避免混淆，也可以写成 `@SqlProcedure(schema = ..., pkg = ..., value = ...)`。 |
-| PR2 | 参数**按位置**绑定。第一次调用时，会对照数据库元数据检查个数、模式和类型。相同类型参数的互换只能通过参数名发现（见 [8.4](#84-warning-argument-order)）。包中的 Oracle 重载在 v0.1 中是错误。 |
-| PR3 | 一个 OUT → 返回值。多个 OUT/INOUT → record。`@InOut` 标记 INOUT 参数。 |
-| PR4 | 一个结果集 → `List<T>`。实体通过 Hibernate；record/DTO 通过 JDBC 并按标签匹配。不能分页。 |
-| PR5 | 多个结果集 → record 的 `List` 组件，按顺序。拒绝 Oracle 隐式结果。 |
-| PR6 | 单独调用的数据库函数在不同数据库上使用不同的路径（见 [8.8](#88-call-a-db-function-alone)）。 |
-| PR7 | 查询中的数据库函数：见 [8.6](#86-declare-db-functions) 和规则 FN1 至 FN11。 |
-| PR8 | 条件中作用于列的数据库函数会产生 WARN，因为无法使用索引（见 [8.9](#89-warning-functions-on-columns-and-indexes-sargable)）。 |
-| PR9 | 存储过程在调用方的事务中运行。需要时 lambdaQL 会在调用前刷新。调用后已加载的实体可能是过期的。 |
-| PR10 | 没有通用的受影响行数。请使用 OUT 参数。 |
-| PR11 | IN 值为 `null` 没有问题。不能使用数据库参数的默认值。 |
-| PR12 | Lambda 是一次存根调用。参数是捕获值、常量或它们的计算。带 OUT 参数时使用 `exec` 是错误。 |
-| PR13 | 布尔参数在 MariaDB 和 Oracle 23ai 及以上版本中可用。 |
-| PR14 | 每个 Lambda 只分析一次。每个名字的存储过程元数据只读取一次。 |
-| PR15 | H2 没有 OUT、INOUT、多结果集或包。请在 MariaDB 或 Oracle 上测试存储过程（例如使用 Testcontainers）。 |
+| # | 规则 | 状态 |
+|---|---|---|
+| PR1 | 名字：注解的值原样使用。值为空时：方法名转为 UPPER_SNAKE。可以使用包名或模式名（`SQ_PKG.CALC`、`LQL.SQ_CALC`）。为避免混淆，也可以写成 `@SqlProcedure(schema = ..., pkg = ..., value = ...)`。 | 已实现。模式名和包名没有测试覆盖 |
+| PR2 | 参数**按位置**绑定。第一次调用时，会对照数据库元数据检查 IN/INOUT 参数的个数和 `@InOut` 的位置。类型和名字的检查在计划中（见 [8.4](#84-warning-argument-order)）。 | 个数和 `@InOut` 检查已实现（已测试）。类型和名字检查、Oracle 包重载的检测：尚未实现 |
+| PR3 | 一个 OUT → 返回值。多个 OUT/INOUT → record。`@InOut` 标记 INOUT 参数。 | 已实现（已测试） |
+| PR4 | 一个结果集 → `List<T>`。实体通过 Hibernate；record 通过 JDBC 并按标签匹配。不能分页。 | 已实现（已用 record 测试） |
+| PR5 | 多个结果集 → record 的 `List` 组件，按顺序。不支持 Oracle 隐式结果。 | 已实现，没有测试覆盖 |
+| PR6 | 单独调用的数据库函数在不同数据库上使用不同的路径（见 [8.8](#88-call-a-db-function-alone)）。 | 已实现（已测试） |
+| PR7 | 查询中的数据库函数：见 [8.6](#86-declare-db-functions) 和规则 FN1 至 FN11。 | 已实现（已测试） |
+| PR8 | 条件中作用于列的数据库函数会产生 WARN，因为无法使用索引（见 [8.9](#89-warning-functions-on-columns-and-indexes-sargable)）。 | 尚未实现 |
+| PR9 | 存储过程在调用方的事务中运行。需要时 lambdaQL 会在调用前刷新。调用后已加载的实体可能是过期的。 | 已实现 |
+| PR10 | 没有通用的受影响行数。请使用 OUT 参数。 | – |
+| PR11 | IN 值为 `null` 没有问题。不能使用数据库参数的默认值。 | 已实现 |
+| PR12 | Lambda 是一次存根调用。参数是捕获值、常量或它们的计算。带 OUT 参数时使用 `exec` 是错误。 | 已实现（已测试） |
+| PR13 | 布尔参数在 MariaDB 和 Oracle 23ai 及以上版本中可用。 | 没有测试覆盖 |
+| PR14 | 每个 Lambda 只分析一次。每个名字的存储过程元数据只读取一次。 | 已实现 |
+| PR15 | H2 没有 OUT、INOUT、多结果集或包。请在 MariaDB 或 Oracle 上测试存储过程（例如使用 Testcontainers）。 | lambdaQL 的测试遵循这一点 |
 
 PR11、PR12 和 PR13 有额外的 Kotlin 部分（默认参数、命名参数、可空类型）。它们在[本页的 Kotlin 版本](../kotlin/08-procedures-functions.md)中。
 
@@ -238,22 +315,49 @@ PR11、PR12 和 PR13 有额外的 Kotlin 部分（默认参数、命名参数、
 把它声明为带有 `@SqlFunction` 的**接口静态方法**。
 方法体只能抛出异常。它在 lambdaQL 中从不执行。
 
+**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `declare`：
+
 ```java
+/** Database functions: static methods of your own interface. The bodies only throw. */
 public interface OrderFns {
-    @SqlFunction("FN_DISCOUNT") static Double discount(Double price) { throw new DbOnlyException(); }
-    @SqlFunction("FN_IS_VIP")   static Boolean isVip(Long customerId) { throw new DbOnlyException(); }  // Boolean：Oracle 23ai 及以上
+    /** {@code SQ_FN_DISCOUNT(price)}: 90% of the price. */
+    @SqlFunction("SQ_FN_DISCOUNT")
+    static Double discount(Double price) {
+        throw new DbOnlyException();
+    }
+
+    /** {@code SQ_FN_IS_GOLD(grade)}: a grade of 5 or more. */
+    @SqlFunction("SQ_FN_IS_GOLD")
+    static Boolean isGold(Integer grade) {
+        throw new DbOnlyException();
+    }
+
+    /** A query name with its own SQL name; registered with lambdaql.functions.classes. */
+    @SqlFunction(value = "SQ_TAX", sql = "SQ_FN_DISCOUNT")
+    static Double tax(Double price) {
+        throw new DbOnlyException();
+    }
 }
 ```
 
-如果在 lambdaQL 的 Lambda **外部**调用 `OrderFns.discount(...)`，它会抛出异常。这是有意为之。
+测试在运行前会在数据库中创建 `SQ_FN_DISCOUNT` 和 `SQ_FN_IS_GOLD`，结束时删除它们。布尔结果需要 Oracle 23ai 及以上版本。
+
+如果在 lambdaQL 的 Lambda **外部**调用 `OrderFns.discount(...)`，它会抛出 `DbOnlyException`（`LQL-4034`）。这是有意为之。
+
+`@SqlFunction` 有两个值：
+
+| 值 | 含义 |
+|---|---|
+| `value` | 查询中的函数名。为空时：方法名转为 UPPER_SNAKE（`isVip` → `IS_VIP`）。可以带模式名（`PUBLIC.SQ_FN`） |
+| `sql` | SQL 名，当它与 `value` 不同时使用。这样的函数必须注册（见[注册](#registration-optional)） |
 
 其他声明方式：
 
 | 声明 | 状态 |
 |---|---|
-| 接口静态方法 | **推荐** |
-| 类静态方法 | 支持 |
-| 接口 default 方法 + 单例常量 | 支持，但写起来更长 |
+| 接口静态方法 | **推荐**（已测试） |
+| 类静态方法 | 已设计，没有测试覆盖 |
+| 接口 default 方法 + 单例常量 | 已设计，没有测试覆盖 |
 | 你的仓库 `implements` 函数接口（mixin） | 不支持 |
 | 函数式接口常量（`DISCOUNT.apply(x)`） | 不支持 |
 
@@ -264,36 +368,71 @@ public interface OrderFns {
 <a id="87-use-db-functions-in-queries"></a>
 ## 8.7 在查询中使用数据库函数
 
-直接调用函数即可。不需要上下文参数。它在每种 Lambda 中都可用：
-`where`、`select`、`orderBy`、`groupBy`、`having`、`set`，以及子查询内部。
+直接调用函数即可。不需要上下文参数。它可以用在 `where`、`select`、`orderBy` 和 `set` 中（已测试），也可以用在 `groupBy`、`having` 和子查询中（已设计，没有测试覆盖）。
+
+**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `where`：
 
 ```java
-qb.from(Order.class).where(o -> OrderFns.discount(o.getPrice()) > 10).toList();
-// → where function('FN_DISCOUNT' as Double, o.price) > 10
-
-qb.from(Order.class).where(o -> OrderFns.isVip(o.getCustomer().getId())).toList();   // 单独使用 Boolean 函数
-
-qb.from(Order.class).where(o -> o.getPrice() > OrderFns.discount(base)).toList();     // 列这一侧保持干净
-
-qb.from(Order.class).orderBy((o, by) -> by.desc(OrderFns.discount(o.getPrice()))).toList();
-
-qb.from(Order.class).select(o -> new OrderView(o.getId(), o.getCustomer().getName(), OrderFns.discount(o.getPrice()))).toList();
-
-qb.update(Order.class).set(o -> o.setPrice(OrderFns.discount(o.getPrice()))).all().execute();
+// the function call is written as function('<name>' as <type>, ...); the column is its argument
+SelectQuery<Order> q = qb.from(Order.class).where(o -> OrderFns.discount(o.getPrice()) > 100);
+assertEquals("select e0 from Order e0 where function('SQ_FN_DISCOUNT' as Double, e0.price) > 100.0", q.toHql().hql());
 ```
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。[`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) 把本页的 HQL 直接交给 Hibernate，并记录在 H2 2.3、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上得到的 SQL。lambdaQL 目前还不会生成这些查询。如果 Hibernate 的 SQL 发生变化，测试就会失败。
+**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `captured`：
 
-**各数据库的 SQL（计划中）** — Hibernate 对计划中 HQL 的翻译，由 `PlannedSqlTest` 记录；lambdaQL 目前还不会生成此查询。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `08-function`：
+```java
+// a function of captured values only is still computed by the database (the value is bound)
+SelectQuery<Order> q = qb.from(Order.class).where(o -> o.getPrice() > OrderFns.discount(base));
+assertEquals("select e0 from Order e0 where e0.price > function('SQ_FN_DISCOUNT' as Double, :p1)", q.toHql().hql());
+```
+
+Boolean 函数可以单独作为整个条件。lambdaQL 会加上 `= true`：
+
+**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `boolean`：
+
+```java
+SelectQuery<Order> q = qb.from(Order.class).where(o -> OrderFns.isGold(o.getCustomer().getGrade()));
+assertEquals("select e0 from Order e0 join e0.customer j1 where function('SQ_FN_IS_GOLD' as Boolean, j1.grade) = true",
+        q.toHql().hql());
+```
+
+**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `select`（在 `select` 和 `orderBy` 中）：
+
+```java
+ValueQuery<Priced> q = qb.from(Order.class)
+        .orderBy((o, by) -> by.desc(OrderFns.discount(o.getPrice())))
+        .select(o -> new Priced(o.getId(), OrderFns.discount(o.getPrice())));
+assertEquals("select e0.id, function('SQ_FN_DISCOUNT' as Double, e0.price) from Order e0"
+        + " order by function('SQ_FN_DISCOUNT' as Double, e0.price) desc nulls last", q.toHql().hql());
+```
+
+`Priced` 是 `record Priced(Long id, Double discounted)`。
+
+**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `update`：
+
+```java
+ExecutableUpdate<Order> u = qb.update(Order.class)
+        .set(o -> o.setPrice(OrderFns.discount(o.getPrice())))
+        .where(o -> o.getPrice() > 100);
+assertEquals("update Order e0 set e0.price = function('SQ_FN_DISCOUNT' as Double, e0.price) where e0.price > 100.0",
+        u.toHql().hql());
+```
+
+测试会执行每个查询，并把结果行与用 Java 进行的同样计算（`price * 0.9`）作比较。
+
+**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。[`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) 把同样形式的 HQL（函数名为 `FN_DISCOUNT`）直接交给 Hibernate，并记录在 H2 2.3、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上得到的 SQL。如果 Hibernate 的 SQL 发生变化，测试就会失败。
+
+**各数据库的 SQL（Hibernate 对这种 HQL 形式生成的 SQL）** — 由 `PlannedSqlTest` 记录。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `08-function`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
+-- HQL: select o from Order o where function('FN_DISCOUNT' as Double, o.price) > 10
 select …
 from orders o1_0
-where fn_discount(o1_0.price)>10
+where FN_DISCOUNT(o1_0.price)>10
 ```
 
-除非注册了函数，否则函数名会变成小写（`fn_discount`）。见下面的“注册”。
+测试环境中有 `lambdaql.functions.classes` 设置。有了它，Hibernate 会保留函数名的大小写（`FN_DISCOUNT`），即使是没有注册的函数也一样（在全部三种数据库上观察到；原因尚不清楚）。完全没有注册时，Hibernate 可能会把名字写成小写。不带引号的名字两种情况下都能工作。
 
 ### lambdaQL 的渲染方式
 
@@ -311,12 +450,13 @@ function('<NAME>' as <Type>, arg1, arg2, ...)
 
 泛型返回（`<X> X nvl(X, X)`）、实体、集合和 `void` 会在分析时被拒绝。
 
+<a id="registration-optional"></a>
 ### 注册（可选）
 
 `function('FN_DISCOUNT' as Double, ...)` 这种形式不需要注册（已在三种数据库上检查）。
 如果注册了函数接口，Hibernate 还会保留名字的大小写，并检查参数个数和类型。
 
-lambdaQL 计划提供一个 `FunctionContributor`（通过 ServiceLoader 发现）。你在 Hibernate 属性中列出这些接口：
+lambdaQL 提供一个 Hibernate `FunctionContributor`：`org.lambdaql.hibernate.LambdaQlFunctionContributor`（通过 ServiceLoader 发现）。你在 Hibernate 属性中列出这些接口：
 
 ```properties
 # 纯 Hibernate
@@ -327,18 +467,28 @@ spring.jpa.properties.lambdaql.functions.classes=com.acme.OrderFns
 ```
 
 如果没有设置该属性，就不会注册任何东西。v0.1 中不支持包扫描。
+对于嵌套接口，请使用带 `$` 的二进制名。测试环境中写的是 `lambdaql.functions.classes: org.lambdaql.query.FunctionTest$OrderFns`。
 
-### 大小写混合的名字需要注册
+<a id="a-different-sql-name-needs-registration"></a>
+### SQL 名不同时需要注册
 
-用引号创建的大小写混合的函数名（`"SQ_Fn_Mixed"`）在不注册时会失败（在 H2 和 Oracle 上名字会变成小写）。
-请把键和 SQL 名分开，并注册该接口：
+`value` 是查询中的名字，`sql` 是 SQL 中的名字。两者不同时，必须注册该函数。
+这对用引号创建的大小写混合的函数名（`"SQ_Fn_Mixed"`）很有用：不注册时，在 H2 和 Oracle 上名字可能会变成小写。
 
 ```java
-@SqlFunction(key = "SQ_Fn_Mixed", sql = "\"SQ_Fn_Mixed\"")
+@SqlFunction(value = "SQ_Fn_Mixed", sql = "\"SQ_Fn_Mixed\"")
 static Double mixed(Double v) { throw new DbOnlyException(); }
 ```
 
-如果这样的函数没有注册，lambdaQL 会在第一次使用时失败。
+**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `registered`：
+
+```java
+// SQ_TAX is registered at start-up (lambdaql.functions.classes) and runs SQ_FN_DISCOUNT in SQL
+SelectQuery<Order> q = qb.from(Order.class).where(o -> OrderFns.tax(o.getPrice()) > 100);
+assertEquals("select e0 from Order e0 where function('SQ_TAX' as Double, e0.price) > 100.0", q.toHql().hql());
+```
+
+如果这样的函数没有注册，lambdaQL 会在读取 Lambda 时失败（`LQL-3058`，见 [8.10](#810-function-rules-fn1-to-fn11-summary)）。
 
 ---
 
@@ -347,18 +497,23 @@ static Double mixed(Double v) { throw new DbOnlyException(); }
 
 使用带有**无参数 Lambda** 的 `qb.call(() -> ...)`：
 
+**(已测试)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `function`（H2、MariaDB 和 Oracle）：
+
 ```java
-Double v = qb.call(() -> OrderFns.discount(price)).execute();
+Double half = qb.call(() -> MathFns.half(price)).execute();
 ```
 
-**各数据库的 SQL（计划中）** — Hibernate 对计划中 HQL 的翻译，由 `PlannedSqlTest` 记录；lambdaQL 目前还不会生成此查询。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `08-function-alone`：
+`price` 是捕获的 `double`（150），`half` 是 75.0。Lambda 必须是一次 `@SqlFunction` 调用（`LQL-3063`）。
+
+**各数据库的 SQL（Hibernate 对这种 HQL 形式生成的 SQL）** — 由 `PlannedSqlTest` 以名字 `FN_DISCOUNT` 记录。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `08-function-alone`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
-select fn_discount(?)
+-- HQL: select function('FN_DISCOUNT' as Double, :p1)
+select FN_DISCOUNT(?)
 ```
 
-它作为没有 FROM 的 `select fn_discount(?)` 运行。Oracle 从 23ai 起才接受这种写法；在 Oracle 上，lambdaQL 改用 JDBC 函数调用（见下表）。
+它作为没有 FROM 的 `select FN_DISCOUNT(?)` 运行。Oracle 从 23ai 起才接受这种写法；在 Oracle 上，lambdaQL 改用 JDBC 函数调用（见下表）。
 
 它与 `qb.call(OrderProcs.class, p -> ...)` 不冲突，因为参数个数不同。
 
@@ -376,24 +531,27 @@ lambdaQL 会先刷新待处理的更改（与 PR9 相同），所以函数能看
 <a id="89-warning-functions-on-columns-and-indexes-sargable"></a>
 ## 8.9 警告：列上的函数与索引（SARGable）
 
+> [!NOTE]
+> 本节的警告**尚未实现**（规则 PR8、FN7）。目前 lambdaQL 生成这些查询时不会发出警告。
+
 lambdaQL 尽量生成**能够使用索引**的 SQL（见 [10. 规则与限制](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql)）。
 包在列外面的函数通常**无法**使用普通索引：
 
 ```java
 .where(o -> OrderFns.discount(o.getPrice()) > 10)
-// → function('FN_DISCOUNT' as Double, o.price) > 10   -- 不使用 price 上的索引
+// → function('FN_DISCOUNT' as Double, e0.price) > 10   -- 不使用 price 上的索引
 ```
 
-**各数据库的 SQL（计划中）** — Hibernate 对计划中 HQL 的翻译，由 `PlannedSqlTest` 记录；lambdaQL 目前还不会生成此查询。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `08-function`：
+**各数据库的 SQL（Hibernate 对这种 HQL 形式生成的 SQL）** — 由 `PlannedSqlTest` 记录。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `08-function`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-where fn_discount(o1_0.price)>10
+where FN_DISCOUNT(o1_0.price)>10
 ```
 
-所以 lambdaQL 会对这种形式记录一条 **WARN**。在严格模式下，它是错误（规则 PR8、FN7）。
+所以 lambdaQL 将对这种形式记录一条 **WARN**。在严格模式下，它是错误（规则 PR8、FN7）。
 
 | 情况 | MariaDB | Oracle |
 |---|---|---|
@@ -411,19 +569,40 @@ where fn_discount(o1_0.price)>10
 <a id="810-function-rules-fn1-to-fn11-summary"></a>
 ## 8.10 函数规则 FN1 至 FN11（汇总）
 
-| # | 规则 |
-|---|---|
-| FN1 | `@SqlFunction` 是方法注解。值为空时：方法名转为 UPPER_SNAKE。 |
-| FN2 | lambdaQL 找到被调用的方法并读取它的注解。方法体只能抛出异常（`throw new ...`）。有实际方法体的方法是错误，因为 Java 和数据库可能给出不同的值。 |
-| FN3 | 同名的所有重载必须映射到同一个数据库函数。否则报错。 |
-| FN4 | 没有注解的调用，或 lambdaQL 无法识别的调用，是错误。它从不会被悄悄跳过。 |
-| FN5 | 参数遵循 [3. 条件](03-where.md)中的值规则。即使参数只由捕获值构成，也会被绑定并**在数据库中**求值。 |
-| FN6 | 装箱调用会被跳过。返回类型取自声明的方法。 |
-| FN7 | 作用于列的函数会产生 WARN（见 [8.9](#89-warning-functions-on-columns-and-indexes-sargable)）。 |
-| FN8 | 与 Hibernate 内置函数（`COALESCE`、`ROUND`、`SYSDATE` 等）同名是错误。Hibernate 会悄悄使用内置函数。请使用前缀或模式名（`PUBLIC.SQ_FN`）。 |
-| FN9 | 仅限 Kotlin（默认参数、`inline`、`vararg`）。见 Kotlin 路线。 |
-| FN10 | v0.1 只支持标量函数。用户自定义聚合函数和窗口函数计划在 v0.2 中提供。没有参数的函数渲染为 `fn()`。 |
-| FN11 | 已知的数据库差异：在 MariaDB 上，返回 VARCHAR 的函数可能与字符串字面量发生排序规则（collation）冲突。`BigDecimal` 结果的小数位数不同（MariaDB 和 Oracle 为 0，H2 为 1）。布尔结果需要 Oracle 23ai 及以上版本。 |
+| # | 规则 | 状态 |
+|---|---|---|
+| FN1 | `@SqlFunction` 是方法注解。值为空时：方法名转为 UPPER_SNAKE。 | 已实现 |
+| FN2 | lambdaQL 找到被调用的方法并读取它的注解。方法体只能抛出异常（`throw new ...`）。有实际方法体的方法是错误（`LQL-3052`），因为 Java 和数据库可能给出不同的值。 | 已实现（已测试） |
+| FN3 | 同名的所有重载必须映射到同一个数据库函数。否则报错（`LQL-3053`）。 | 已实现 |
+| FN4 | 没有注解的调用，或 lambdaQL 无法识别的调用，是错误。它从不会被悄悄跳过。 | 已实现 |
+| FN5 | 参数遵循 [3. 条件](03-where.md)中的值规则。即使参数只由捕获值构成，也会被绑定并**在数据库中**求值。 | 已实现（已测试） |
+| FN6 | 装箱调用会被跳过。返回类型取自声明的方法，必须是 `Double`、`Integer`、`Long`、`BigDecimal`、`String`、`LocalDate`、`LocalDateTime` 或 `Boolean`（`LQL-3055`）。 | 已实现（已测试） |
+| FN7 | 作用于列的函数会产生 WARN（见 [8.9](#89-warning-functions-on-columns-and-indexes-sargable)）。 | 尚未实现 |
+| FN8 | 与 Hibernate 内置函数（`COALESCE`、`ROUND`、`SYSDATE` 等）同名是错误（`LQL-3054`）。Hibernate 会悄悄使用内置函数。请使用前缀或模式名（`PUBLIC.SQ_FN`）。 | 已实现（已测试） |
+| FN9 | 仅限 Kotlin（默认参数、`inline`、`vararg`）。见 Kotlin 路线。 | 默认参数和 `vararg`：已实现。`inline`：已设计 |
+| FN10 | v0.1 只支持标量函数。用户自定义聚合函数和窗口函数计划在 v0.2 中提供。没有参数的函数渲染为 `fn()`。 | 标量函数已实现 |
+| FN11 | 已知的数据库差异：在 MariaDB 上，返回 VARCHAR 的函数可能与字符串字面量发生排序规则（collation）冲突。`BigDecimal` 结果的小数位数不同（MariaDB 和 Oracle 为 0，H2 为 1）。布尔结果需要 Oracle 23ai 及以上版本。 | 已用原型测量 |
+
+**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `rules`：
+
+```java
+// the body never runs in Java
+assertEquals("LQL-4034", assertThrows(DbOnlyException.class, () -> OrderFns.discount(1.0)).code());
+// FN2: a body that computes a value is rejected (Java and the database could give different values)
+assertEquals("LQL-3052", assertThrows(LambdaQLException.class,
+        () -> qb.from(Order.class).where(o -> BadFns.computes(o.getPrice()) > 1)).code());
+// FN8: a Hibernate built-in name would silently run the built-in function
+assertEquals("LQL-3054", assertThrows(LambdaQLException.class,
+        () -> qb.from(Order.class).where(o -> BadFns.builtin(o.getPrice()) > 1)).code());
+// a function with its own SQL name must be registered
+assertEquals("LQL-3058", assertThrows(LambdaQLException.class,
+        () -> qb.from(Order.class).where(o -> BadFns.unregistered(o.getPrice()) > 1)).code());
+// the return type must have an HQL type
+assertEquals("LQL-3055", assertThrows(LambdaQLException.class,
+        () -> qb.from(Order.class).where(o -> BadFns.anything(o.getPrice()) != null)).code());
+```
+
+`BadFns` 是测试中的一个接口，每种情况各有一个有问题的函数：返回 `price` 的方法体、名字 `COALESCE`、`value = "SQ_OTHER"` 配 `sql = "SQ_FN_DISCOUNT"`（未注册），以及返回类型 `Object`。
 
 ---
 
@@ -438,12 +617,14 @@ where fn_discount(o1_0.price)>10
 | 多个结果集 | 不支持 | 支持 | 支持（多个游标 OUT 参数） |
 | 同时有 OUT 值和结果集 | 不支持 | 支持 | 支持 |
 | 包名（`PKG.PROC`） | 不支持 | 不支持（需要 `sql_mode=ORACLE`） | 支持 |
-| 查询中的数据库函数 | 支持 | 支持 | 支持 |
+| 查询中的数据库函数 | 支持（已测试） | 支持（已测试） | 支持（已测试） |
+| 单独调用数据库函数 | 支持（已测试） | 支持（已测试） | 支持（已测试） |
+| lambdaQL 中的存储过程调用 | – | 支持（已测试） | 支持（已测试） |
 | 布尔参数 / 结果 | – | 支持 | 支持（23ai 及以上） |
 
 v0.1 中未计划的内容：用于动态存储过程名的字符串构建器（v0.2 候选）、Oracle 包重载、表值函数、存储过程结果的分页。
 
-本章的错误是带有 `[LQL-xxxx]` 代码的 `LambdaQLException` 子类。见 [11. 错误与语言](../11-errors-and-languages.md)。
+本章的错误是带有 `[LQL-xxxx]` 错误码的 `LambdaQLException`（或其子类）：读取 Lambda 时为 `LQL-3052` 至 `LQL-3063`，执行调用时为 `LQL-4034` 至 `LQL-4039`。见 [11. 错误与语言](../11-errors-and-languages.md)。
 
 ---
 

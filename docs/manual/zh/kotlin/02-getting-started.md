@@ -2,13 +2,13 @@
 
 > [!NOTE]
 > **状态：** 目前你可以从源码构建 lambdaQL 并运行它的测试。
-> `where` 条件和 `toList()` 可以端到端运行。它们已在 H2、MariaDB 和 Oracle 上用 **Java** Lambda 测试。Kotlin Lambda 尚未测试。
+> `where` 条件和 `toList()` 可以端到端运行。它们已在 H2、MariaDB 和 Oracle 上测试，大多使用 **Java** Lambda。Kotlin Lambda 已对 `?.` 路径、捕获值、`in`、子查询、带 data class 和 `groupBy` 的 `select`、update、insert 和 delete 进行测试（[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)）。
 > 结果函数 `first()`、`one()`、`count()`、`exists()` 和 `toSet()` 也可以运行（见[获取结果](#getting-the-result)；同样只用 Java Lambda 测试过）。
-> 排序与分页的核心部分（`orderBy`、`limit`、`offset`、`SortSpec`）也可以运行（同样只用 Java Lambda 测试过）。
+> 排序与分页的核心部分（`orderBy`、`limit`、`offset`、`SortSpec`）也可以运行（有一个 Kotlin 排序测试；其余用 Java Lambda 测试）。
 > Spring Data JPA 模块（repository 执行器和 Spring Boot 自动配置）也可以运行（见 [12. Spring Data JPA](12-spring-data-jpa.md)；只用 Java repository 测试过）。
-> 更新、插入、删除和 upsert 也可以运行（见 [7. 更新、插入、删除](07-dml.md)；同样只用 Java Lambda 测试过）。
-> 子查询和 `select`（带 `groupBy`、`having` 和 `Agg`）同样可以使用（见 [5. 子查询](05-subquery.md) 和 [6. 查询列、聚合与分组](06-select-group.md)；同样只用 Java Lambda 测试过）。
-> 派生表、CTE 和存储过程**已设计，尚未实现**。
+> 更新、插入、删除和 upsert 也可以运行（见 [7. 更新、插入、删除](07-dml.md)；upsert 只用 Java Lambda 测试过）。
+> 子查询和 `select`（带 `groupBy`、`having` 和 `Agg`）同样可以使用（见 [5. 子查询](05-subquery.md) 和 [6. 查询列、聚合与分组](06-select-group.md)）。
+> 显式 join、派生表和 CTE、存储过程与数据库函数同样可以使用（见 [6](06-select-group.md#68-explicit-joins) 和 [8](08-procedures-functions.md)；只用 Java Lambda 测试过）。
 > 目前还没有任何构件发布到 Maven Central。请按下文从源码构建。
 
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[1. 概述](../01-overview.md) | 下一章：[3. 条件](03-where.md) | [本页的 Java 版本](../java/02-getting-started.md)

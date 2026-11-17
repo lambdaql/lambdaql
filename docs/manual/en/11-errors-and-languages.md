@@ -3,55 +3,86 @@
 [Manual home](README.md) | Tracks: [Java](java/README.md) | [Kotlin](kotlin/README.md) | Previous: 10. Rules and limits ([Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md)) | Next: 12. Spring Data JPA ([Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md))
 
 > [!NOTE]
-> **Status:** Designed, **not implemented yet**.
-> Today the analysis core throws `LambdaAnalysisException` with a plain message (in Korean for now) and the original cause. It has no `[LQL-xxxx]` code and no message bundle yet.
-> Error codes, the `LambdaQLException` base class, the four message languages and SLF4J logging are decided in the design. The code examples on this page show the designed API. They are design examples.
+> **Status:** Implemented and tested (decision D33).
+> Every message has a code `[LQL-xxxx]`, and the messages exist in English, Japanese, Chinese (Simplified) and Korean.
+> The exceptions are `LambdaQLException` and its subclasses. Warnings go to SLF4J.
+> Examples marked **(tested)** are copied from the test suite ([`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)). The other code on this page is a design example.
+> Not implemented yet: the non-SARGable warning `LQL-5001` and a strict mode that turns warnings into errors.
 
 This page is for both languages. Code is shown in separate **Java** and **Kotlin** sections.
-
-## What works today
-
-The analysis core already rejects some forms. These unit tests show it. They call internal classes, not the user API, and they expect `LambdaAnalysisException`.
-
-| Test | What it rejects |
-|---|---|
-| [LoadExamplesTest.java](../../../query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java) (`notSerializable`) | A lambda that is not serializable (`java.util.function.Predicate`) |
-| [ConditionDecodeTest.java](../../../query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java) (`valueTernaryIsRejected`) | A value ternary: `o.getStatus() == (flag ? 1 : 2)` |
-
-Everything below this section is the design.
 
 ## Error codes
 
 Every lambdaQL message starts with a code in the form `[LQL-xxxx]`.
 The code does not depend on the language. The text after the code is translated.
 
-```
-[LQL-2004] ...message text in the selected language...
+**(tested)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), region `format`:
+
+```java
+LqlMessages.setLocale(Locale.ENGLISH);
+assertEquals("[LQL-4014] limit must be 0 or more: -1", LqlMessage.LIMIT_NEGATIVE.format(-1));
+// the same message in another language: the code stays
+assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.LIMIT_NEGATIVE.format(Locale.KOREAN, -1));
 ```
 
-| Range | Area | Examples of problems |
+All messages are the values of the enum `org.lambdaql.i18n.LqlMessage`. Each value has a code and a number of arguments.
+
+| Range | Area | Codes today | Exception |
+|---|---|---|---|
+| `LQL-1xxx` | Input and lambda loading | `LQL-1001` to `LQL-1013` | `LambdaAnalysisException` |
+| `LQL-2xxx` | Decoding the bytecode | `LQL-2001` to `LQL-2025` | `UnsupportedLambdaShapeException` |
+| `LQL-3xxx` | Meaning and values computed in Java | `LQL-3001` to `LQL-3064` | `TranslationException` |
+| `LQL-4xxx` | Rendering, binding and running | `LQL-4001` to `LQL-4039`, `LQL-4999` (internal error) | `LambdaQLException` itself, or a JDK/JPA standard exception (see [Exceptions](#exceptions)) |
+| `LQL-5xxx` | Warnings (in the log) | `LQL-5002` | – (a `WARN` log line) |
+
+Some real codes:
+
+| Code | Exception | English text |
 |---|---|---|
-| `LQL-1xxx` | Input and lambda loading | The argument is not a serializable lambda. It is an anonymous class. The class file cannot be read. |
-| `LQL-2xxx` | Decoding the bytecode | A loop in the lambda. A value ternary (`a ? 1 : 2`, Kotlin `if (a) 1 else 2`). An instruction that lambdaQL does not support. |
-| `LQL-3xxx` | Meaning and host values | A method call with no meaning in SQL. A non-aggregated value that is not a `groupBy` key. A problem when lambdaQL evaluates a captured value. |
-| `LQL-4xxx` | Rendering and running | A problem when lambdaQL builds or runs the HQL. |
-| `LQL-5xxx` | Warnings (in the log) | A condition that cannot use an index (not SARGable). |
+| `LQL-1002` | `LambdaAnalysisException` | Only Serializable lambdas can be analyzed. Use a lambdaQL lambda type, not java.util.function: {0} |
+| `LQL-2004` | `UnsupportedLambdaShapeException` | Loops are not supported in a lambda. Build the list outside the lambda and capture it. |
+| `LQL-3005` | `TranslationException` | Aggregate functions cannot be used in where. Use having (J3): Agg.{0} |
+| `LQL-3035` | `TranslationException` | A value used with aggregates must be a groupBy key (J3): {0} |
+| `LQL-3058` | `TranslationException` | The DB function {0} has its own SQL name, so it must be registered. Add its class to the setting lambdaql.functions.classes. |
+| `LQL-3064` | `TranslationException` | The row type of a derived table or CTE must be a Java record or a Kotlin data class (J5): {0} |
+| `LQL-4009` | `LambdaQLException` | A null value cannot be compared with <, <=, > or >= (Java would throw NullPointerException): {0} |
+| `LQL-4014` | `IllegalArgumentException` | limit must be 0 or more: {0} |
+| `LQL-4025` | `NonUniqueResultException` | Two or more rows match one(). Narrow the condition or use first(): {0} |
+| `LQL-4034` | `DbOnlyException` | {0} is a database function. It works only inside a lambdaQL lambda and is never run in Java. |
+| `LQL-4036` | `LambdaQLException` | The stub does not match the database procedure {0}: {1} |
+| `LQL-5002` | – (`WARN` log) | A subquery sort without limit does not change the result, so it was removed (Q4): {0} |
+
+`{0}` and `{1}` are the arguments, for example the expression or the procedure name.
+The full list is in the message files (see [For translators](#for-translators)).
 
 Rules for codes:
 
 - A code is never reused after a release. You can safely search for a code or check it in code.
-- Exact code numbers are not final yet. They will be listed here when the messages are implemented.
+- A unit test checks that every code is unique and has the form `LQL-` + four digits.
 
 ## Exceptions
 
-All lambdaQL exceptions extend `LambdaQLException`. It is a `RuntimeException`, so Kotlin and Java handle it the same way.
+All lambdaQL exceptions extend `org.lambdaql.LambdaQLException`. It is a `RuntimeException`, so Kotlin and Java handle it the same way.
+The exception class comes from the code range.
 
-| Exception | When | Example |
+| Exception | Codes | When | Example |
+|---|---|---|---|
+| `LambdaQLException` | `LQL-4xxx` | Base class of all lambdaQL exceptions. lambdaQL throws this class itself for rendering, binding and running problems | A `null` captured value in an order compare (`LQL-4009`). A procedure stub that does not match the database (`LQL-4036`). |
+| `LambdaAnalysisException` | `LQL-1xxx` | lambdaQL cannot load the lambda | An anonymous class (Kotlin `object : ...`) instead of a lambda. A non-serializable lambda (`LQL-1002`). |
+| `UnsupportedLambdaShapeException` | `LQL-2xxx` | The bytecode has a shape that lambdaQL does not support | A loop (`LQL-2004`). A value ternary or value `if`/`when`. A general boolean ternary `c ? x : y`. |
+| `TranslationException` | `LQL-3xxx` | The lambda has no defined meaning in HQL | An entity method that is not a getter. Comparing two entities with `==` (not supported yet). A non-aggregated value that is not a `groupBy` key (`LQL-3035`). |
+| `DbOnlyException` | `LQL-4034` | Your `@SqlFunction` method was called in Java, outside a lambdaQL lambda | `OrderFns.discount(1.0)` (see [Placeholders called outside a lambda](#placeholders-called-outside-a-lambda)) |
+
+All these classes are in the package `org.lambdaql`.
+
+**Standard exceptions keep their type.** In some cases Java code expects a JDK or JPA exception. Then lambdaQL throws that type, and only the message has a code:
+
+| Exception | Example | Code |
 |---|---|---|
-| `LambdaQLException` | Base class of all lambdaQL exceptions | – |
-| `LambdaAnalysisException` | lambdaQL cannot load the lambda | An anonymous class (Kotlin `object : ...`) instead of a lambda. A non-serializable lambda. |
-| `UnsupportedLambdaShapeException` | The bytecode has a shape that lambdaQL does not support | A loop. A value ternary or value `if`/`when`. A general boolean ternary `c ? x : y`. |
-| `TranslationException` | The lambda has no defined meaning in HQL | An entity method that is not a getter. Comparing two entities with `==` (not supported yet). A non-aggregated value that is not a `groupBy` key. |
+| `IllegalArgumentException` | `limit(-1)` | `LQL-4014` |
+| `IllegalStateException` | A NULL value for a primitive constructor argument (rule J4). `Agg.sum(...)` called outside a lambda. `toSet()` that gets fewer elements than rows | `LQL-4021`, `LQL-4032`, `LQL-4019` |
+| `jakarta.persistence.NonUniqueResultException` | `one()` finds two or more rows. `executeOne()` matches two or more rows | `LQL-4025`, `LQL-4023` |
+| `jakarta.persistence.TransactionRequiredException` | An update, insert or delete without a transaction | `LQL-4024` |
 
 Methods of `LambdaQLException`:
 
@@ -60,8 +91,25 @@ Methods of `LambdaQLException`:
 | `code()` | The stable code, for example `"LQL-2004"` |
 | `key()` | The message key (an `LqlMessage` value) |
 | `args()` | The message arguments |
+| `where()` | The place of the lambda (the method that holds the lambda body, and the line when it is known), or `null` |
 | `getMessage()` | The message in the lambdaQL language that was selected when the exception was created |
 | `getMessage(Locale locale)` | The same message in another language, for example `Locale.ROOT` for English |
+
+**(tested)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), region `exception`:
+
+```java
+LqlMessages.setLocale(Locale.KOREAN);
+LambdaQLException e = LqlMessage.LOOP_NOT_SUPPORTED.exceptionAt("app.Repo.lambda$find$0 (line 12)");
+// check the code in tests, not the text
+assertEquals("LQL-2004", e.code());
+assertInstanceOf(UnsupportedLambdaShapeException.class, e);
+assertTrue(e.getMessage().startsWith("[LQL-2004] 람다 안의 반복문은"), e.getMessage());
+// the same message in English, with the place of the lambda at the end
+assertEquals("[LQL-2004] Loops are not supported in a lambda. Build the list outside the lambda and capture it."
+        + " — app.Repo.lambda$find$0 (line 12)", e.getMessage(Locale.ROOT));
+```
+
+The test makes the exception directly. In your code, lambdaQL makes it when it reads a lambda. Catch it like this (design examples):
 
 ### Java
 
@@ -92,7 +140,7 @@ try {
 ### What a message has
 
 - The code, then the text in the selected language.
-- At the end, the place of the lambda in a fixed format: the method that holds the lambda body and the **source line number**.
+- At the end, the place of the lambda in a fixed format: ` — ` and then the method that holds the lambda body and the **source line number** (also in `where()`).
 - For decode errors, extra lines with a bytecode dump can follow. These extra lines are not translated.
 - Most messages also tell you how to fix the problem. For example, a Kotlin message says to build a list outside the lambda and capture it.
 
@@ -188,16 +236,19 @@ Some methods exist only to be read inside a lambda. Their return values are plac
 
 | Method | Called outside a query lambda |
 |---|---|
-| `Agg.count()`, `Agg.sum(...)`, and other `Agg` methods | throws `IllegalStateException` |
-| Your `@SqlFunction` methods | The body is never run by lambdaQL. The design example body throws `DbOnlyException`. |
+| `Agg.count()`, `Agg.sum(...)`, and other `Agg` methods | throws `IllegalStateException` (`LQL-4032`) |
+| Your `@SqlFunction` methods | The body is never run by lambdaQL. It must only throw `DbOnlyException` (`LQL-4034`). A body that computes a value is rejected (`LQL-3052`). |
 
 #### Java
 
+**(tested)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `rules` (the first lines):
+
 ```java
-public interface OrderFns {
-    @SqlFunction("FN_DISCOUNT") static Double discount(Double price) { throw new DbOnlyException(); }
-}
+// the body never runs in Java
+assertEquals("LQL-4034", assertThrows(DbOnlyException.class, () -> OrderFns.discount(1.0)).code());
 ```
+
+The declaration of `OrderFns` is in 8. Procedures and DB functions ([Java](java/08-procedures-functions.md#86-declare-db-functions) | [Kotlin](kotlin/08-procedures-functions.md#86-declare-db-functions)).
 
 #### Kotlin
 
@@ -237,6 +288,24 @@ Then lambdaQL looks only at the **language** of that locale:
 | `ko` (for example `ko_KR`) | Korean |
 | anything else (`en`, `fr`, `de`, ...) | English |
 
+**(tested)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), region `locale`:
+
+```java
+// 1. setLocale wins, 2. then -Dlambdaql.locale, 3. then the JVM default
+LqlMessages.setLocale(Locale.JAPANESE);
+assertEquals(Locale.JAPANESE, LqlMessages.locale());
+LqlMessages.setLocale(null);
+System.setProperty(LqlMessages.LOCALE_PROPERTY, "ko_KR");
+assertEquals(Locale.KOREAN, LqlMessages.bundleLocale(LqlMessages.locale()));
+// only the language counts; other languages get English (the root bundle)
+assertEquals(Locale.CHINESE, LqlMessages.bundleLocale(Locale.TRADITIONAL_CHINESE));
+assertEquals(Locale.ROOT, LqlMessages.bundleLocale(Locale.FRENCH));
+```
+
+`LqlMessages.LOCALE_PROPERTY` is the name `"lambdaql.locale"`. `LqlMessages.bundleLocale(locale)` tells which message file a locale uses.
+
+In your application (design examples):
+
 #### Java
 
 ```java
@@ -274,9 +343,19 @@ org/lambdaql/i18n/LqlMessages_zh.properties   Chinese (Simplified)
 org/lambdaql/i18n/LqlMessages_ko.properties   Korean
 ```
 
+- The keys are the names of the `LqlMessage` values, for example `LOOP_NOT_SUPPORTED`.
 - Arguments are written `{0}`, `{1}`, ...
 - lambdaQL does not use `MessageFormat`. So you can write a single quote (`can't`) as is. Numbers are not formatted (line `1234567` stays `1234567`).
-- Every key must exist in all four files. A unit test checks this. A new message must be added in all four languages.
+- Every key must exist in all four files, with the same arguments. A unit test checks this. A new message must be added in all four languages.
+
+**(tested)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), region `fill`:
+
+```java
+// no MessageFormat: quotes and big numbers stay as they are (rule I4)
+assertEquals("can't read line 1234567", LqlMessages.fill("can't read line {0}", 1234567));
+assertEquals("a null b", LqlMessages.fill("a {0} b", (Object) null));
+assertEquals("{x} {9}", LqlMessages.fill("{x} {9}", "unused"));
+```
 
 ## Logging
 
@@ -287,17 +366,20 @@ lambdaQL logs through the **SLF4J API**.
 - Warnings use the `WARN` level and start with a code from the `LQL-5xxx` range.
 - If the `WARN` level is off, lambdaQL does not build the message text.
 
-Example of a warning (the code and text are examples; the final text can differ):
+The warning that lambdaQL has today:
+
+| Code | When |
+|---|---|
+| `LQL-5002` | A subquery has `orderBy` but no `limit`, so lambdaQL removes the sort (it has no effect, rule Q4) |
 
 ```
-WARN  [LQL-5001] ...the condition on column "price" cannot use an index...
+WARN  [LQL-5002] A subquery sort without limit does not change the result, so it was removed (Q4): ...
 ```
 
-You see warnings like this, for example, when:
+Planned warnings (not implemented yet):
 
-- a database function is used on the column side of a condition (Java `OrderFns.discount(o.getPrice()) > 10`, Kotlin `OrderFns.discount(it.price)!! > 10`), so the database cannot use an index;
-- a case-insensitive comparison has no matching index or collation for that column;
-- a subquery has `orderBy` but no `limit`, so lambdaQL removes the sort (it has no effect).
+- `LQL-5001`: a database function is used on the column side of a condition (Java `OrderFns.discount(o.getPrice()) > 10`, Kotlin `OrderFns.discount(it.price)!! > 10`), so the database cannot use an index;
+- a case-insensitive comparison has no matching index or collation for that column.
 
 A "strict mode" that turns these warnings into errors is planned.
 

@@ -2,12 +2,12 @@
 # 9. Kotlin 노트
 
 > [!NOTE]
-> **상태: 설계됨, 아직 구현되지 않음.**
+> **상태: 일부 구현됨.**
 > Kotlin 지원은 확정된 설계입니다(결정 D17, D20 ~ D25, D27, D28, D31).
 > 이 장에 나오는 모든 형태의 바이트코드는 kotlinc
 > 1.7.22, 2.1.10, 2.2.21, 2.3.0, 2.3.21로 컴파일하여 확인했습니다. 많은 조건은 H2에서 행 단위로도 확인했습니다.
-> 현재 lambdaQL에서는 동작하지 **않습니다**. 지금은 분석 코어와 `where` + `toList()`만 동작합니다
-> (H2, MariaDB, Oracle에서 Java 람다로 테스트함). 전체 상태는 [트랙 README](README.md)를 참고하십시오.
+> **빌드 안에서 Kotlin 람다로 테스트함**(kotlinc 2.3.21, H2, MariaDB, Oracle): `?.` 경로, `!!`, 캡처 값, 캡처 컬렉션의 `in`, 서브쿼리(`exists`, `in`, 스칼라), `limit`이 있는 정렬, 데이터 클래스·`Pair`·`Triple`을 쓰는 `select`, `listOf` 키의 `groupBy`, `having`, update의 속성 대입과 `by[column] = value`, insert, delete([`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)).
+> **설계됨, 아직 테스트하지 않음:** 이 장의 나머지 형태(예: `?:`, 범위, `when`, 속성 참조, 문자열 템플릿). 컴파일러 버전 매트릭스(kotlinc 1.7.22 ~ 2.3.0)는 아직 빌드에 없습니다. 전체 상태는 [트랙 README](README.md)를 참고하십시오.
 
 [Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [8. 프로시저와 DB 함수](08-procedures-functions.md) | 다음: [10. 규칙과 제한](10-rules-and-limits.md) | [이 페이지의 Java 버전: 9. Java 노트](../java/09-java-notes.md)
 

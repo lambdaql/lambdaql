@@ -226,7 +226,7 @@ public class SelectJoin3Query<T, U, V> {
     }
 
     /**
-     * Returns at most {@code count} rows (sorted by the main entity id).
+     * Returns at most {@code count} rows, sorted by the id of every entity (main first, then the joined ones).
      *
      * @param count the most rows
      * @return the ordered query

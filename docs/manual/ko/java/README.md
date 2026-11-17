@@ -9,7 +9,8 @@
 > **수정, 삽입, 삭제, 업서트**도 `limit`과 1행 보호 `executeOne()`을 포함해 구현되어 있습니다(H2, MariaDB, Oracle에서 테스트함).
 > **Spring Data JPA 모듈**도 구현되어 있습니다. 리포지토리 실행기 `LambdaQlExecutor<T>`(Spring `Sort`, `Pageable`, `deleteAll(where)`·`updateOne(where, set)` 같은 DML 단축 메서드, 수정·삭제·삽입·업서트 빌더 포함)와 Spring Boot 자동 구성이 대상이며, Spring Boot 3.4.2에서 테스트했습니다. DML에는 호출자의 트랜잭션이 필요합니다.
 > **서브쿼리**(`where((o, sub) -> ...)`, 수정·삭제 포함)와 **`select`**(레코드와 DTO, `groupBy`, `having`, `Agg` 집계, `insert ... select` 포함)도 구현되어 있습니다(H2, MariaDB, Oracle에서 테스트함).
-> 이 트랙의 나머지 내용(파생 테이블, CTE, 프로시저)은 모두 **설계** 단계입니다. 문법과 규칙은 확정되었고 H2, MariaDB, Oracle에서 프로토타입으로 확인했지만, 코드는 아직 라이브러리에 들어 있지 않습니다.
+> **명시적 조인**(`join`, `leftJoin`, `crossJoin`), **파생 테이블과 CTE**(`qb.from(valueQuery)`, `qb.with(valueQuery)`), **저장 프로시저와 DB 함수**(`@SqlProcedure`, `@SqlFunction`, `qb.call`, `qb.exec`), **4개 언어 메시지와 오류 코드**(`[LQL-xxxx]`)도 구현되어 있습니다(H2, MariaDB, Oracle에서 테스트함. 프로시저는 MariaDB와 Oracle에서 테스트함).
+> 이 트랙의 나머지 내용(예: `SortWhitelist`, SARGable 경고)은 **설계** 단계입니다. 문법과 규칙은 확정되었고 프로토타입으로 확인했지만, 코드는 아직 라이브러리에 들어 있지 않습니다.
 > 아직 Maven Central에 배포된 아티팩트는 없습니다. 사용해 보려면 [소스에서 빌드](02-getting-started.md#build-from-source)하십시오.
 
 [매뉴얼 홈](../README.md) | [Kotlin 트랙](../kotlin/README.md) | 공통 페이지: [1. 개요](../01-overview.md) · [11. 오류와 언어](../11-errors-and-languages.md)
@@ -64,7 +65,7 @@ fetch first ? rows only
 
 > [!NOTE]
 > **예제에 대하여.**
-> 예제는 설계 예제입니다. 기능이 구현되면 해당 예제는 테스트 코드에서 가져온 코드로 바뀌고, 테스트 파일 링크가 붙습니다. [3. 조건](03-where.md), [4. 정렬과 페이징](04-order-paging.md), [5. 서브쿼리](05-subquery.md), [6. 조회, 집계, 그룹화](06-select-group.md), [7. 수정, 삽입, 삭제](07-dml.md), [12. Spring Data JPA](12-spring-data-jpa.md)에서는 이런 예제에 **(테스트됨)** 표시가 있습니다.
+> 예제는 설계 예제입니다. 기능이 구현되면 해당 예제는 테스트 코드에서 가져온 코드로 바뀌고, 테스트 파일 링크가 붙습니다. [3. 조건](03-where.md), [4. 정렬과 페이징](04-order-paging.md), [5. 서브쿼리](05-subquery.md), [6. 조회, 집계, 그룹화](06-select-group.md), [7. 수정, 삽입, 삭제](07-dml.md), [8. 프로시저와 DB 함수](08-procedures-functions.md), [11. 오류와 언어](../11-errors-and-languages.md), [12. Spring Data JPA](12-spring-data-jpa.md)에서는 이런 예제에 **(테스트됨)** 표시가 있습니다.
 
 <a id="contents"></a>
 ## 목차
@@ -78,7 +79,7 @@ fetch first ? rows only
 | 3 | [조건(`where`)](03-where.md) | 연산자, NULL 규칙, 캡처 값, 연관 경로 |
 | 4 | [정렬과 페이징](04-order-paging.md) | `orderBy`, `Direction`, NULL 순서, `limit`, `offset` |
 | 5 | [서브쿼리](05-subquery.md) | `exists`, `contains`(IN), NOT EXISTS, 스칼라 서브쿼리와 상관 서브쿼리 |
-| 6 | [조회, 집계, 그룹화](06-select-group.md) | `select`, 레코드와 DTO, `Agg`, `groupBy`, `having`, 파생 테이블, CTE |
+| 6 | [조회, 집계, 그룹화](06-select-group.md) | `select`, 레코드와 DTO, `Agg`, `groupBy`, `having`, 조인(`join`, `leftJoin`, `crossJoin`), 파생 테이블, CTE |
 | 7 | [수정, 삽입, 삭제](07-dml.md) | `set`, `by.set`, `values`, `all()`, `execute()`, `limit`, `executeOne()` |
 | 7.6 | [업서트(upsert)](07-6-upsert.md) | `upsert`, `onConflict(...).update(...)`, `onConflict(...).ignore()`, 데이터베이스별 행 수 |
 | 8 | [프로시저와 DB 함수](08-procedures-functions.md) | `@SqlProcedure`, `@SqlFunction`, `qb.call`, `qb.exec` |
@@ -97,13 +98,14 @@ fetch first ? rows only
 | getter를 JPA 속성에 매핑 | 구현됨, H2·MariaDB·Oracle에서 테스트함 | [3](03-where.md) |
 | HQL 렌더링과 쿼리 실행(`where`, `toList()`) | 구현됨, H2·MariaDB·Oracle에서 테스트함 | [3](03-where.md) |
 | 결과 함수(`first()`, `one()`, `count()`, `exists()`, `toSet()`) | 구현됨, H2·MariaDB·Oracle에서 테스트함 | [2](02-getting-started.md#getting-the-result) |
-| 정렬과 페이징(`orderBy`, `limit`, `offset`) | 핵심 기능 구현됨, H2·MariaDB·Oracle에서 테스트함, `SortSpec` 포함. `SortWhitelist`, 조인 정렬(`SortSpec`의 조인 형태 포함): 설계됨 | [4](04-order-paging.md) |
+| 정렬과 페이징(`orderBy`, `limit`, `offset`) | 핵심 기능 구현됨, H2·MariaDB·Oracle에서 테스트함. `SortSpec`과 조인 정렬 `(o, c, by)` 포함. `SortWhitelist`, `SortSpec`의 조인 형태: 설계됨 | [4](04-order-paging.md) |
 | 서브쿼리(`exists`, `contains`, 스칼라, 상관) | 구현됨, H2·MariaDB·Oracle에서 테스트함. MariaDB `lateral` 재작성: 아직 구현되지 않음 | [5](05-subquery.md) |
 | 프로젝션, `groupBy`, `having`, 집계(`Agg`) | 구현됨, H2·MariaDB·Oracle에서 테스트함. `distinct()`와 결과 함수 포함. 집계 기준 정렬: v0.2 후보 | [6](06-select-group.md) |
-| 파생 테이블과 CTE(`qb.from(sub -> ...)`, `qb.with(...)`) | 설계됨 | [6](06-select-group.md) |
+| 명시적 조인(`join`, `leftJoin`, `crossJoin`, 엔티티 3개까지) | 구현됨, H2·MariaDB·Oracle에서 테스트함. 모든 엔티티에 대한 `where`, `orderBy`, `select`, 페이징 포함. DML과 서브쿼리 안의 조인: 이후 | [6](06-select-group.md#68-explicit-joins) |
+| 파생 테이블과 CTE(`qb.from(valueQuery)`, `qb.with(valueQuery)`) | 구현됨, H2·MariaDB·Oracle에서 테스트함. 파생 테이블과의 조인, 같은 CTE의 중복 사용: 이후 | [6](06-select-group.md#69-derived-table-subquery-in-from) |
 | `update`, `insert`, `delete`, upsert | 구현됨. H2, MariaDB, Oracle에서 테스트. `limit`과 `executeOne()` 포함. 수정·삭제 `where` 안의 서브쿼리(`sub`)와 `insert ... select`의 집계: 구현됨. `set` 값 안의 서브쿼리: 설계됨 | [7](07-dml.md) |
-| 저장 프로시저와 DB 함수 | 설계됨 | [8](08-procedures-functions.md) |
-| 4개 언어의 오류 코드와 메시지 | 설계됨 | [11](../11-errors-and-languages.md) |
+| 저장 프로시저와 DB 함수 | 구현됨. 쿼리 안의 DB 함수와 단독 호출은 H2·MariaDB·Oracle에서 테스트함. 프로시저(`call`, `exec`, OUT, INOUT, 결과 집합)는 MariaDB와 Oracle에서 테스트함(H2에는 OUT 파라미터가 없음). SARGable 경고, 프로시저 파라미터의 타입·이름 대조, Oracle 패키지 오버로드: 아직 구현되지 않음 | [8](08-procedures-functions.md) |
+| 4개 언어의 오류 코드와 메시지 | 구현됨, 단위 테스트함: `[LQL-xxxx]` 코드, `LambdaQLException`과 하위 클래스, 영어·일본어·중국어·한국어 메시지, `lambdaql.locale`. 경고 `LQL-5001`과 엄격 모드: 아직 구현되지 않음 | [11](../11-errors-and-languages.md) |
 | Spring Data JPA(`LambdaQlExecutor<T>`, Spring `Sort` / `Pageable`, Spring Boot 자동 구성) | 구현됨. H2, MariaDB, Oracle에서 Spring Boot 3.4.2로 테스트. DML 단축 메서드(`deleteAll`, `updateOne` 등)와 수정·삭제·삽입·업서트 빌더 포함. Spring Boot 4: 아직 검증하지 않음 | [12](12-spring-data-jpa.md) |
 
 용어의 뜻:

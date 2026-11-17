@@ -191,7 +191,7 @@ SQL에서 SET 오른쪽의 모든 컬럼은 수정 **이전**의 값을 뜻합�
 // error: price is assigned first, then read again
 ```
 
-**같은 문장에서 컬럼에 할당한 뒤 나중에 그 컬럼을 읽으면** lambdaQL은 `set(...)`을 호출하는 시점에 `LambdaAnalysisException`을 던집니다(규칙 U3).
+**같은 문장에서 컬럼에 할당한 뒤 나중에 그 컬럼을 읽으면** lambdaQL은 `set(...)`을 호출하는 시점에 `TranslationException`(`LQL-3042`)을 던집니다(규칙 U3).
 이유: 이 경우 MariaDB는 **새** 값을 사용하고, H2와 Oracle은 이전 값을 사용합니다. 결과가 다릅니다(실측: MariaDB 200, H2와 Oracle 100).
 
 다음 경우는 세 데이터베이스의 결과가 같으므로 허용합니다.
@@ -213,17 +213,17 @@ SQL에서 SET 오른쪽의 모든 컬럼은 수정 **이전**의 값을 뜻합�
 <a id="rules-checked-at-analysis-time"></a>
 ### 분석 시점의 규칙 검사
 
-lambdaQL은 람다를 읽을 때 규칙 U1, U3, U4, U6을 검사합니다. 아래 테스트는 사용자 API가 아니라 내부 클래스 `AssignmentReader`를 호출합니다. 사용자 API에서는 `set(...)`과 `values(...)`가 같은 `LambdaAnalysisException`을 던집니다.
+lambdaQL은 람다를 읽을 때 규칙 U1, U3, U4, U6을 검사합니다. 아래 테스트는 사용자 API가 아니라 내부 클래스 `AssignmentReader`를 호출합니다. 사용자 API에서는 `set(...)`과 `values(...)`가 같은 `LambdaQLException`을 던집니다(예: U1은 `LQL-3037`, U3은 `LQL-3042`, U4는 `LQL-3041`).
 
 **(테스트됨)** [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java), 영역 `rules`:
 
 ```java
 // U1: only setters; no condition, no local variable
-assertThrows(LambdaAnalysisException.class, () -> setters(o -> { if (o.isActive()) o.setStatus((short) 1); }));
+assertThrows(LambdaQLException.class, () -> setters(o -> { if (o.isActive()) o.setStatus((short) 1); }));
 // U6: an association's other properties belong to another table
-assertThrows(LambdaAnalysisException.class, () -> setters(o -> o.getCustomer().setName("x")));
+assertThrows(LambdaQLException.class, () -> setters(o -> o.getCustomer().setName("x")));
 // U3: a value reads a column written before
-assertThrows(LambdaAnalysisException.class, () -> AssignmentReader.checkRules(
+assertThrows(LambdaQLException.class, () -> AssignmentReader.checkRules(
         AssignmentReader.readSetters(SerializedLambdaExtractor.extract((Assign<Order>) o -> {
             o.setPrice(1);
             o.setTex((float) o.getPrice());
@@ -375,7 +375,7 @@ U11, U12, U15, U20에 대한 lambdaQL의 검사는 아직 구현되지 않았습
 | `returning` | 거부됨 | – |
 | 데이터베이스 시간(`current_timestamp`) | 거부됨 | 애플리케이션 시간을 바인딩(U8) |
 
-현재 규칙을 어기면 `LambdaAnalysisException`이 단순한 메시지(현재는 한국어)와 함께 발생합니다. 예정된 `[LQL-xxxx]` 코드와 `LambdaQLException` 기반 클래스는 [11. 오류와 언어](../11-errors-and-languages.md)에 있습니다.
+규칙을 어기면 코드 `[LQL-xxxx]`가 붙은 `LambdaQLException`이 발생합니다. 대부분의 규칙은 `TranslationException`, 대입 람다 안의 조건이나 지역 변수는 `UnsupportedLambdaShapeException`입니다. [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
 모든 규칙을 한곳에서 보려면: [10. 규칙과 제한](10-rules-and-limits.md).
 
 ---

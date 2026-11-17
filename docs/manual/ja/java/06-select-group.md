@@ -4,7 +4,8 @@
 > [!NOTE]
 > **状況**
 > - **実装済み、テスト済み:** H2 2.3、MariaDB 10.11、Oracle 23.26（Hibernate 6.6.5、マイルストーン M9、決定 D27）。1 つの値、Java の record、DTO の `select`、キーが 1 つまたは複数の `groupBy`、`having`、`Agg` 関数、`distinct()`、`limit`、`offset`、`toList`、`toSet`、`first`、`one`、`orderBy(...).select(...)`、ルール J3、J4、J7 のチェック。
-> - **設計済み、まだ実装されていないもの:** 派生テーブルと CTE（6.8 と 6.9、マイルストーン M8-2）、集約によるソートとグループ化したクエリの `orderBy`（v0.2 の候補）、結合に対する射影 `(o, c) -> ...`。
+> - **こちらも実装済み、テスト済み**（決定 D44、D45、D46）: エンティティ 3 つまでの `join`、`leftJoin`、`crossJoin` による明示的な結合（`select((o, c) -> ...)` も含む、6.8）、`qb.from(valueQuery)` と `qb.with(valueQuery)` による派生テーブルと CTE（6.9 と 6.10、マイルストーン M8-2）。
+> - **まだ実装されていないもの:** 集約によるソートとグループ化したクエリの `orderBy`（v0.2 の候補）、DML とサブクエリの中の結合、派生テーブルとの結合、同じ CTE の 2 回の使用。
 > - **(テスト済み)** と書かれた例は、テストスイートからコピーしたものです。全体の状況は [Java トラックの README](README.md#status) を参照してください。
 
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [5. サブクエリ](05-subquery.md) | 次: [7. 更新、挿入、削除](07-dml.md) | [このページの Kotlin 版](../kotlin/06-select-group.md)
@@ -19,7 +20,8 @@
 - Java の record または DTO クラス
 - `groupBy` と `having` を使った集約（`count`、`sum`、`avg`、...）
 - 値のクエリの `distinct`、ページング、結果のメソッド
-- FROM 句の中のサブクエリ（派生テーブル）と CTE（`with`）: 設計のみ
+- 他のエンティティとの明示的な結合（`join`、`leftJoin`、`crossJoin`）
+- FROM 句の中のサブクエリ（派生テーブル）と CTE（`with`）
 
 <a id="contents"></a>
 ## 目次
@@ -31,10 +33,11 @@
 - [6.5 Group by](#65-group-by)
 - [6.6 Having](#66-having)
 - [6.7 distinct、ページング、結果](#67-distinct-paging-and-results)
-- [6.8 派生テーブル（FROM の中のサブクエリ）](#68-derived-table-subquery-in-from)
-- [6.9 CTE（`with`）](#69-cte-with)
-- [6.10 ルール J1〜J8](#610-rules-j1-to-j8)
-- [6.11 v0.1 に含まれないもの](#611-not-in-v01)
+- [6.8 明示的な結合](#68-explicit-joins)
+- [6.9 派生テーブル（FROM の中のサブクエリ）](#69-derived-table-subquery-in-from)
+- [6.10 CTE（`with`）](#610-cte-with)
+- [6.11 ルール J1〜J8](#611-rules-j1-to-j8)
+- [6.12 v0.1 に含まれないもの](#612-not-in-v01)
 
 ---
 
@@ -142,7 +145,7 @@ lambdaQL は各値をコンストラクターの引数の型に変換します�
 
 返せるもの:
 
-| 結果の型 | 単純な `select` | 派生テーブルまたは CTE の行の型（設計） |
+| 結果の型 | 単純な `select` | 派生テーブルまたは CTE の行の型（[6.9](#69-derived-table-subquery-in-from)） |
 |---|---|---|
 | 1 つの値（`o.getPrice()`） | はい | – |
 | Java の record | はい | はい |
@@ -225,7 +228,7 @@ where o1_0.status=1
 | `count` | `0` |
 
 これは通常の SQL の動作です。
-NULL がプリミティブのコンストラクター引数（`double`、`long`）に入ると、lambdaQL は `IllegalStateException` を投げます。メッセージは引数を示し、ラッパー型（`Double`、`Long`）を使うように伝えます。テスト済みの例は [6.10](#610-rules-j1-to-j8) を参照してください。
+NULL がプリミティブのコンストラクター引数（`double`、`long`）に入ると、lambdaQL は `IllegalStateException` を投げます。メッセージは引数を示し、ラッパー型（`Double`、`Long`）を使うように伝えます。テスト済みの例は [6.11](#611-rules-j1-to-j8) を参照してください。
 
 ---
 
@@ -294,10 +297,10 @@ group by o1_0.customer_id,o1_0.status
 qb.from(Order.class)
   .groupBy(o -> o.getCustomer().getId())
   .select(o -> new KeyCount(o.getCustomer().getId(), o.getStatus(), Agg.count()));
-// → LambdaAnalysisException
+// → TranslationException (LQL-3035)
 ```
 
-テスト済みの例は [6.10](#610-rules-j1-to-j8) にあります。
+テスト済みの例は [6.11](#611-rules-j1-to-j8) にあります。
 
 ---
 
@@ -367,7 +370,7 @@ from orders o1_0
 order by o1_0.price desc
 ```
 
-- `distinct()` を使う場合、ソートキーはすべて選択した値でなければなりません（ルール J7）。そうでなければ、lambdaQL は解析時に `LambdaAnalysisException` を投げます。
+- `distinct()` を使う場合、ソートキーはすべて選択した値でなければなりません（ルール J7）。そうでなければ、lambdaQL は解析時に `TranslationException`（`LQL-3046`）を投げます。
 - 値のクエリの `toSet()` は常に `select distinct` を使います。ここでは値の重複は想定内なので、件数のチェックはありません（エンティティの `toSet()` とは違います。[2. はじめよう](02-getting-started.md#toset) を参照）。
 
 **ページング。** `limit` と `offset` は [4. ソートとページング](04-order-paging.md) と同じように動きます。
@@ -403,39 +406,222 @@ limit ?,?
 
 ---
 
-<a id="68-derived-table-subquery-in-from"></a>
-## 6.8 派生テーブル（FROM の中のサブクエリ）
+<a id="68-explicit-joins"></a>
+## 6.8 明示的な結合
 
-> [!NOTE]
-> **設計済み、まだ実装されていません**（マイルストーン M8-2）。以下の HQL は **予定の** 出力です。
+関連のパス（`o.getCustomer().getName()`）は、to-one の関連を自動で結合します（[3.10](03-where.md#310-association-paths) を参照）。
+別のエンティティを自分の条件で、または条件なしで結合するには、`join`、`leftJoin`、`crossJoin` を使います（決定 D44、D45）。
 
-`qb.from` にラムダを渡します。ラムダはサブクエリのファクトリー（`sub`）を受け取り、内側のクエリを組み立てます。
-内側の `select` が行の型を決めます。外側のクエリでは、その行をエンティティのように使います。
+| メソッド | HQL | 行 |
+|---|---|---|
+| `join(Customer.class, (o, c) -> ...)` | `join Customer e1 on ...` | 内部結合: 一致する行だけ |
+| `leftJoin(Customer.class, (o, c) -> ...)` | `left join Customer e1 on ...` | 一致しない主エンティティの行も残る |
+| `crossJoin(Customer.class)` | `cross join Customer e1` | すべての行の組み合わせ。条件は `where` に書く |
+
+結合のあと、どのラムダも結合した順にすべてのエンティティを受け取ります:
+`where((o, c) -> ...)`、`orderBy((o, c, by) -> ...)`（`by` は最後、ルール S12）、`select((o, c) -> ...)`。
+結合したエンティティには `e1`、`e2` のエイリアスが付きます。
+
+**(テスト済み)** と書かれた例は [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java) からコピーしたものです。
+テストは各クエリを H2、MariaDB、Oracle で実行し、行を Java での同じ計算と比べます。
+
+**(テスト済み)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)、リージョン `join`:
 
 ```java
-record CustomerTotal(Long customerId, long cnt, Double total) {}
-
-List<CustomerTotal> rows = qb.from(sub -> sub.from(Order.class)
-        .groupBy(o -> o.getCustomer().getId())
-        .select(o -> new CustomerTotal(o.getCustomer().getId(), Agg.count(), Agg.sum(o.getPrice()))))
-    .where(r -> r.total() > 100)
-    .toList();
+SelectJoinQuery<Order, Customer> q = qb.from(Order.class)
+        .join(Customer.class, (o, c) -> o.getCustomer().getId() == c.getId())
+        .where((o, c) -> c.getGrade() != null && c.getGrade() >= 5);
+assertEquals("select e0 from Order e0 join Customer e1 on e0.customer.id = e1.id"
+        + " where e1.grade is not null and e1.grade >= 5", q.toHql().hql());
 ```
 
-HQL（select のエイリアス `customerId`、`cnt`、`total` がカラム名になります。ルール J5）:
+**結果は主エンティティです。** `select` がなければ、`toList()` は `List<Order>` を返します。
+結合したエンティティは、条件、ソート、`select` にだけ使います。
+結合したエンティティの値を読むには、`select((o, c) -> ...)` を使います（下を参照）。
 
-```sql
-select r.customerId, r.cnt, r.total
-from (select o.customer.id as customerId, count(*) as cnt, sum(o.price) as total
-      from Order o group by o.customer.id) r
-where r.total > 100
+<a id="left-join-and-null"></a>
+### 左外部結合と NULL
+
+**(テスト済み)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)、リージョン `left-join`:
+
+```java
+// c is missing for an order without a customer: c == null finds those rows
+SelectJoinQuery<Order, Customer> q = qb.from(Order.class)
+        .leftJoin(Customer.class, (o, c) -> o.getCustomer().getId() == c.getId())
+        .where((o, c) -> c == null || c.getName().equals("Kim"));
+assertEquals("select e0 from Order e0 left join Customer e1 on e0.customer.id = e1.id"
+        + " where e1.id is null or e1.name = 'Kim'", q.toHql().hql());
 ```
 
-**予定の SQL ブロックについて。** [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) はこの節と 6.9 の予定の HQL を Hibernate に直接渡し、H2 2.3、MariaDB 10.11、Oracle 23.26（Hibernate 6.6.5）での SQL を記録します。lambdaQL はまだこれらのクエリを作りません。Hibernate の SQL が変わるとテストは失敗します。
+- `c == null` は「一致なし」を意味します。lambdaQL はこれを `e1.id is null`（結合したエンティティの `@Id`）と書きます。
+- `leftJoin` のあと、結合したエンティティのカラムに対する条件は **SQL の意味** を持ちます。一致がないとカラムは NULL になり、条件は true にならず、その行は除かれます。
+  Java では、存在しない `c` に対する `c.getName()` は `NullPointerException` を投げます。lambdaQL はこれをまねしません。
+  一致しない行を残すには、例のように `c == null || ...` と書いてください。
 
-**データベースごとの SQL（予定）** — 予定の HQL を Hibernate が変換したもので、`PlannedSqlTest` が記録しました。lambdaQL はまだこのクエリを作りません。`expected-sql/` の [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)、例 `06-derived`:
+<a id="sort-and-select"></a>
+### ソートと select
+
+**(テスト済み)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)、リージョン `sort`:
+
+```java
+OrderedJoinQuery<Order, Customer> q = qb.from(Order.class)
+        .leftJoin(Customer.class, (o, c) -> o.getCustomer().getId() == c.getId())
+        .orderBy((o, c, by) -> by.asc(c.getName()).asc(o.getId()));
+assertEquals("select e0 from Order e0 left join Customer e1 on e0.customer.id = e1.id"
+        + " order by e1.name asc nulls first, e0.id asc", q.toHql().hql());
+```
+
+[4.4](04-order-paging.md#44-null-ordering-is-the-same-on-every-database) の NULL の順序のルールが適用されます。顧客のない注文は `e1.name` が NULL なので、`asc` では先頭に来ます。
+
+**(テスト済み)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)、リージョン `select`:
+
+```java
+ValueQuery<Row> rows = qb.from(Order.class)
+        .leftJoin(Customer.class, (o, c) -> o.getCustomer().getId() == c.getId())
+        .orderBy((o, c, by) -> by.asc(o.getId()))
+        .select((o, c) -> new Row(o.getId(), c.getName()));
+assertEquals("select e0.id, e1.name from Order e0 left join Customer e1 on e0.customer.id = e1.id"
+        + " order by e0.id asc", rows.toHql().hql());
+```
+
+`Row` は `record Row(Long orderId, String customerName)` です。顧客のない注文では、`customerName` は `null` です。
+`select` は `ValueQuery` を返すので、`distinct()`、`limit`、`offset` と [6.7](#67-distinct-paging-and-results) の結果のメソッドが使えます。
+
+<a id="three-entities-and-repeated-rows"></a>
+### 3 つのエンティティと繰り返される行
+
+結合できるエンティティは 3 つまでです。3 つ目の結合のラムダは 3 つすべてを受け取ります: `(o, c, i) -> ...`。
+
+**(テスト済み)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)、リージョン `three`:
+
+```java
+// orders of a customer with an item of quantity > 10; an order repeats once per matching item
+SelectJoin3Query<Order, Customer, Item> q = qb.from(Order.class)
+        .join(Customer.class, (o, c) -> o.getCustomer().getId() == c.getId())
+        .join(Item.class, (o, c, i) -> i.getOrder().getId() == o.getId())
+        .where((o, c, i) -> i.getQty() > 10);
+assertEquals("select e0 from Order e0 join Customer e1 on e0.customer.id = e1.id"
+        + " join Item e2 on e2.order.id = e0.id where e2.qty > 10", q.toHql().hql());
+```
+
+> [!WARNING]
+> 結合が複数の行に一致すると、**主エンティティの行が繰り返されます**。一致ごとに 1 回です。`toList()` と `count()` は繰り返しもすべて数えます（テスト済み）。
+> 各注文を 1 回だけ得たい場合は、結合の代わりに `exists()` のサブクエリ（[5. サブクエリ](05-subquery.md)）を使うか、`distinct()` で値を選択してください。
+
+<a id="cross-join"></a>
+### クロス結合
+
+`crossJoin` には結合の条件がありません。名前が「すべての行の組み合わせが欲しい」という意図を示します。条件は `where` に書きます。
+
+**(テスト済み)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)、リージョン `cross-join`:
+
+```java
+// every pair of rows; the conditions go in where
+SelectJoinQuery<Order, Customer> q = qb.from(Order.class)
+        .crossJoin(Customer.class)
+        .where((o, c) -> c.getGrade() != null && o.getPrice() > 100);
+assertEquals("select e0 from Order e0 cross join Customer e1 where e1.grade is not null and e0.price > 100.0",
+        q.toHql().hql());
+```
+
+lambdaQL には `from(Order.class, Customer.class)`（カンマ結合）はありません。条件がないと間違ってすべての組み合わせを返し、どのエンティティが結果なのかもはっきりしないからです（決定 D45）。その用途には `crossJoin` を使ってください。
+
+<a id="paging"></a>
+### ページング
+
+ページングでは、lambdaQL は **すべての** エンティティの id を最後のソートキーとして追加するので、ページが重なることはありません（ルール S9）。
+
+**(テスト済み)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)、リージョン `cross-join-paging`:
+
+```java
+// with paging, the id of every entity is added to the order, so pages never overlap (S9)
+ValueQuery<Row> pairs = qb.from(Order.class)
+        .crossJoin(Customer.class)
+        .orderBy((o, c, by) -> by.desc(o.getPrice()))
+        .select((o, c) -> new Row(o.getId(), c.getName()));
+assertEquals("select e0.id, e1.name from Order e0 cross join Customer e1 order by e0.price desc, e0.id asc, e1.id asc",
+        pairs.limit(5).toHql().hql());
+```
+
+<a id="what-a-join-query-has"></a>
+### 結合クエリが持つもの
+
+| 呼び出しの後 | メソッド |
+|---|---|
+| `join`、`leftJoin`、`crossJoin` | `where`、`join` / `leftJoin` / `crossJoin`（エンティティ 3 つまで）、`orderBy`、`select`、`limit`、`toList`、`toSet`、`first`、`count`、`exists`、`toHql` |
+| `orderBy((o, c, by) -> ...)` | `select`、`limit`、`offset`、`toList`、`first`、そのほかソートしたクエリのメソッド（[4. ソートとページング](04-order-paging.md)） |
+
+v0.1 にはまだないもの: update、delete、insert の中の結合、サブクエリの中の結合、4 つ以上のエンティティ、`SortSpec` の結合の形、派生テーブルとの結合。
+
+---
+
+<a id="69-derived-table-subquery-in-from"></a>
+## 6.9 派生テーブル（FROM の中のサブクエリ）
+
+`select` で値のクエリ（record、[6.3](#63-select-a-record-or-dto) を参照）を作ります。そして、それを `qb.from(...)` に渡します。
+その行が外側のクエリのテーブルになります（決定 D46）。
+結果は `DerivedQuery<R>` です。`R` は行の型です。
+
+**(テスト済み)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)、リージョン `derived`:
+
+```java
+// the rows of a group query are the table of the outer query; r.total() reads the column "total"
+DerivedQuery<Stat> q = qb.from(qb.from(Order.class)
+                .where(o -> o.getCustomer() != null)
+                .groupBy(o -> o.getCustomer().getId())
+                .select(o -> new Stat(o.getCustomer().getId(), Agg.count(), Agg.sum(o.getPrice()))))
+        .where(r -> r.total() > 100)
+        .orderBy((r, by) -> by.desc(r.total()));
+assertEquals("select e0.customerId, e0.cnt, e0.total from (select d0.customer.id as customerId, count(*) as cnt,"
+        + " sum(d0.price) as total from Order d0 where d0.customer is not null group by d0.customer.id) e0"
+        + " where e0.total > 100.0 order by e0.total desc nulls last", q.toHql().hql());
+```
+
+このテストの `Stat` は `record Stat(Integer customerId, Long cnt, Double total)` です。
+テストはクエリを H2、MariaDB、Oracle で実行し、行と `count()` を Java での同じ計算と比べます。
+
+- 内側のクエリはエイリアス `d0`（その結合は `dj1`、...）を使います。外側のクエリは `e0` を使います。
+- record の各コンポーネントがカラム名になります: `as customerId`、`as cnt`、`as total`（ルール J5）。
+- 外側のラムダでは、record のアクセサーでカラムを読みます: `r.total()` は `e0.total` です。
+- 外側のクエリには `where`、`orderBy`、`limit`、`offset`、`select`、`toList`、`first`、`count`、`toHql` があります。
+
+行の値を 1 つだけ選択することもできます。内側と外側のキャプチャ値は順番にバインドされます。
+
+**(テスト済み)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)、リージョン `select`:
+
+```java
+// a value of the row; captured values inside and outside are bound in order
+ValueQuery<Integer> ids = qb.from(qb.from(Order.class)
+                .where(o -> o.getCustomer() != null && o.getPrice() > min)
+                .groupBy(o -> o.getCustomer().getId())
+                .select(o -> new Stat(o.getCustomer().getId(), Agg.count(), Agg.sum(o.getPrice()))))
+        .where(r -> r.total() > min * 2)
+        .select(r -> r.customerId());
+```
+
+内側のクエリの `limit` と `offset` は内側のクエリに残ります（HQL の `limit` と `offset`）。そのため、上位の行をもう一度ソートできます。
+
+**(テスト済み)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)、リージョン `inner-limit`:
+
+```java
+// the three most expensive orders, then the cheapest of them
+Optional<Priced> cheapestOfTop = qb.from(qb.from(Order.class)
+                .orderBy((o, by) -> by.desc(o.getPrice()))
+                .limit(3)
+                .select(o -> new Priced(o.getId(), o.getPrice())))
+        .orderBy((r, by) -> by.asc(r.price()))
+        .first();
+```
+
+`Priced` は `record Priced(Long id, Double price)` です。
+
+**SQL ブロックについて。** [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) は同じ形のより単純な HQL を Hibernate に直接渡し、H2 2.3、MariaDB 10.11、Oracle 23.26（Hibernate 6.6.5）での SQL を記録します。Hibernate の SQL が変わるとテストは失敗します。各データベースが派生テーブルをどう書くかが分かります。
+
+**データベースごとの SQL（この形の HQL に対する Hibernate の SQL）** — `expected-sql/` の [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)、例 `06-derived`:
 
 ```sql
+-- HQL: select r.customerId, r.cnt, r.total from (select o.customer.id as customerId, count(*) as cnt, sum(o.price) as total from Order o group by o.customer.id) r where r.total > 100
+
 -- H2
 select r1_0.customerId,r1_0.cnt,r1_0.total
 from (select o1_0.customer_id,count(*),sum(o1_0.price) from orders o1_0 group by o1_0.customer_id) r1_0(customerId,cnt,total)
@@ -451,41 +637,54 @@ H2 はカラムのリストをエイリアスに付けます（`r1_0(customerId,
 
 ルール:
 
-- 行の型は **Java の record** でなければなりません（ルール J5）。
-  lambdaQL は record のコンポーネントの順序からカラムのエイリアスを取ります。
-- 通常の DTO クラスはここでは使えません。lambdaQL はそのコンストラクターのパラメーター名を知ることができません。
-- 外側のラムダでは、record のアクセサーで行を読みます: `r.total()`。
+- 行の型は **Java の record** でなければなりません（Kotlin の data class も使えます）（ルール J5）。
+  lambdaQL は record のコンポーネントから、順番にカラム名を取ります。
+- 通常の DTO クラスや値 1 つは、ここでは使えません。lambdaQL がカラムに名前を付けられないからです。lambdaQL は `TranslationException`（`LQL-3064`）を投げます。
+
+**(テスト済み)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)、リージョン `rules`:
+
+```java
+// J5: the row type must be a record or Kotlin data class (its components name the columns)
+assertEquals("LQL-3064", assertThrows(LambdaQLException.class,
+        () -> qb.from(qb.from(Order.class).select(o -> o.getPrice()))).code());
+```
+
+v0.1 にはまだないもの: 2 つの派生テーブルの結合、派生テーブルとエンティティの結合、update、delete、insert の中の派生テーブル。
 
 ---
 
-<a id="69-cte-with"></a>
-## 6.9 CTE（`with`）
+<a id="610-cte-with"></a>
+## 6.10 CTE（`with`）
 
-> [!NOTE]
-> **設計済み、まだ実装されていません**（マイルストーン M8-2）。以下の HQL は **予定の** 出力です。
+`qb.with(valueQuery)` で `Cte<R>` 型のハンドルを作ります。そして `qb.from(handle)` でそれを読みます。
+内側のクエリは派生テーブル（6.9）と同じです。
 
-`qb.with(...)` でハンドルを作ります。そして、そのハンドルを `qb.from(...)` で使います。
-同じハンドルを複数回使えます。
+**(テスト済み)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)、リージョン `cte`:
 
 ```java
-var t = qb.with(sub -> sub.from(Order.class)
-        .groupBy(o -> o.getCustomer().getId())
-        .select(o -> new CustomerTotal(o.getCustomer().getId(), Agg.count(), Agg.sum(o.getPrice()))));
-
-List<CustomerTotal> rows = qb.from(t).where(r -> r.total() > 100).toList();
+Cte<Stat> t = qb.with(perCustomer());
+DerivedQuery<Stat> q = qb.from(t).where(r -> r.cnt() >= 2);
+assertEquals("with t as (select d0.customer.id as customerId, count(*) as cnt, sum(d0.price) as total"
+        + " from Order d0 where d0.customer is not null group by d0.customer.id)"
+        + " select e0.customerId, e0.cnt, e0.total from t e0 where e0.cnt >= 2L", q.toHql().hql());
 ```
 
-HQL（select のエイリアス `customerId`、`cnt`、`total` がカラム名になります。ルール J5）:
+`perCustomer()` はテストの中のヘルパーです。[6.9](#69-derived-table-subquery-in-from) の内側のクエリと同じ値のクエリを返します。
 
-```sql
-with t as (select o.customer.id as customerId, count(*) as cnt, sum(o.price) as total
-           from Order o group by o.customer.id)
-select x.customerId, x.cnt, x.total from t x where x.total > 100
+```java
+private ValueQuery<Stat> perCustomer() {
+    return qb.from(Order.class)
+            .where(o -> o.getCustomer() != null)
+            .groupBy(o -> o.getCustomer().getId())
+            .select(o -> new Stat(o.getCustomer().getId(), Agg.count(), Agg.sum(o.getPrice())));
+}
 ```
 
-**データベースごとの SQL（予定）** — 予定の HQL を Hibernate が変換したもので、`PlannedSqlTest` が記録しました。lambdaQL はまだこのクエリを作りません。`expected-sql/` の [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)、例 `06-cte`:
+**データベースごとの SQL（この形の HQL に対する Hibernate の SQL）** — `PlannedSqlTest` が記録しました。`expected-sql/` の [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)、例 `06-cte`:
 
 ```sql
+-- HQL: with t as (select o.customer.id as customerId, count(*) as cnt, sum(o.price) as total from Order o group by o.customer.id) select x.customerId, x.cnt, x.total from t x where x.total > 100
+
 -- H2
 select x1_0.customerId,x1_0.cnt,x1_0.total
 from (select o1_0.customer_id,count(*),sum(o1_0.price) from orders o1_0 group by o1_0.customer_id) x1_0(customerId,cnt,total)
@@ -502,25 +701,25 @@ MariaDB と Oracle は本物の `with` を実行します。カラムのリス�
 
 注意:
 
-- lambdaQL は外側のクエリで CTE に必ずエイリアスを付けます（`from t x`）。HQL ではそれが必要です（ルール J6）。
+- CTE の名前は `t` です。外側のクエリでは必ずエイリアス `e0` を付けます（`from t e0`）。HQL ではエイリアスが必要です（ルール J6）。
 - CTE のカラム名は select のエイリアス（`as customerId`）で付けます。HQL は CTE 名の後のカラムリストを受け付けません。カラムリストは Hibernate が SQL に追加します（ルール J6）。
-- MariaDB と Oracle は本物の `with` を実行します。H2 では、Hibernate がそれを派生テーブルに展開します。結果は同じです（確認済み）。
+- MariaDB と Oracle は本物の `with` を実行します。H2 では、Hibernate がそれを派生テーブルに展開します。結果は同じです（3 つのデータベースでテスト済み）。
 - 行の型のルールは派生テーブルと同じで、record です（J5）。
-- ハンドルには `var` を使ってください。その型名は確定していません。
+- v0.1 にはまだないもの: 1 つのクエリで同じ CTE を 2 回使うこと、update、delete、insert の中の CTE。
 
 ---
 
-<a id="610-rules-j1-to-j8"></a>
-## 6.10 ルール J1〜J8
+<a id="611-rules-j1-to-j8"></a>
+## 6.11 ルール J1〜J8
 
 | # | ルール | 状況 |
 |---|---|---|
 | J1 | `select` のラムダは **1 つの値の式** または **1 つのコンストラクター呼び出し** を返す。コンストラクターの各引数は値の式（ルールは [3. 条件](03-where.md)）。`select` だけで使う関連のパスは `left join` のエイリアスになるので、行は失われない。同じパスを `where` が使うと、`select` は `where` の結合を使う（R24）。 | 実装済み（テスト済み） |
 | J2 | コンストラクターの場合、lambdaQL はカラムだけを選択し、コンストラクターを Java で呼び出す。`select new` は書かない。 | 実装済み（テスト済み） |
-| J3 | 集約がある場合、`select` と `having`（と `insert ... select` の値）の中の集約でない値はすべて `groupBy` のキーでなければならない。そうでなければ、解析時にエラー。 | 実装済み（テスト済み）。現在のエラーは `LambdaAnalysisException`。`TranslationException` は設計済み（[11](../11-errors-and-languages.md)） |
+| J3 | 集約がある場合、`select` と `having`（と `insert ... select` の値）の中の集約でない値はすべて `groupBy` のキーでなければならない。そうでなければ、解析時にエラー。 | 実装済み（テスト済み）。エラーは `TranslationException`（`LQL-3035`、[11](../11-errors-and-languages.md) を参照） |
 | J4 | 行がない、またはすべての値が NULL のとき、`sum`/`avg`/`min`/`max` は NULL を返す。`count` は 0 を返す。NULL になりうる値にはボクシング型を使う。プリミティブのコンストラクター引数に NULL が入ると `IllegalStateException` を投げ、その引数を示す。 | 実装済み（テスト済み） |
-| J5 | 派生テーブルまたは CTE の行の型: **Java の record**（Kotlin のコードでは data class も使える）。通常の DTO クラスは単純な `select` でだけ使える。 | 設計済み（M8-2） |
-| J6 | `qb.with(...)` で作った CTE は、select のエイリアスでカラム名を付ける: `with t as (select o.customer.id as customerId, ...) select x.customerId ... from t x`。HQL は名前の後のカラムリストを受け付けない。Hibernate は `with t (col list) as (...)` を `SyntaxException` で拒否する。カラムリストは Hibernate 自身が SQL に書く（MariaDB と Oracle で `with t (customerId,cnt,total) as (...)`）。H2 は CTE を派生テーブルに変える。外側のクエリでは必ずエイリアスを使う（`from t x`）。 | 設計済み（M8-2） |
+| J5 | 派生テーブルまたは CTE の行の型: **Java の record**（Kotlin のコードでは data class も使える）。通常の DTO クラスは単純な `select` でだけ使える。そうでなければ `LQL-3064`。 | 実装済み（テスト済み） |
+| J6 | `qb.with(...)` で作った CTE は、select のエイリアスでカラム名を付ける: `with t as (select d0.customer.id as customerId, ...) select e0.customerId ... from t e0`。HQL は名前の後のカラムリストを受け付けない。Hibernate は `with t (col list) as (...)` を `SyntaxException` で拒否する。カラムリストは Hibernate 自身が SQL に書く（MariaDB と Oracle で `with t (customerId,cnt,total) as (...)`）。H2 は CTE を派生テーブルに変える。外側のクエリでは必ずエイリアスを使う（`from t e0`）。 | 実装済み（テスト済み） |
 | J7 | `distinct()` は `select distinct` を出力する。ソートと一緒に使う場合、ソートキーは select リストに含まれていなければならない（DB のルール）。lambdaQL は解析時にこれをチェックする。 | 実装済み（テスト済み） |
 | J8 | 選択は、ソート（[4. ソートとページング](04-order-paging.md)）、ページング、サブクエリ（[5. サブクエリ](05-subquery.md)）と一緒に使える。集約によるソート（`by.desc(s.total())`）は v0.2 の候補。 | 実装済み（集約によるソートを除く） |
 
@@ -528,14 +727,17 @@ MariaDB と Oracle は本物の `with` を実行します。カラムのリス�
 
 ```java
 // J3: a value without an aggregate must be a group key
-assertThrows(LambdaAnalysisException.class, () -> qb.from(Order.class)
+LambdaQLException j3 = assertThrows(LambdaQLException.class, () -> qb.from(Order.class)
         .groupBy(o -> o.getCustomer().getId())
         .select(o -> new KeyCount(o.getCustomer().getId(), o.getStatus(), Agg.count())));
+assertEquals("LQL-3035", j3.code());
 // aggregates belong in having, not in where
-assertThrows(LambdaAnalysisException.class, () -> qb.from(Order.class).where(o -> Agg.count() > 1));
+LambdaQLException where = assertThrows(LambdaQLException.class, () -> qb.from(Order.class).where(o -> Agg.count() > 1));
+assertEquals("LQL-3005", where.code());
 // J7: with distinct, the sort key must be selected
-assertThrows(LambdaAnalysisException.class, () -> qb.from(Order.class)
+LambdaQLException j7 = assertThrows(LambdaQLException.class, () -> qb.from(Order.class)
         .orderBy((o, by) -> by.asc(o.getId())).select(o -> o.getPrice()).distinct().toHql());
+assertEquals("LQL-3046", j7.code());
 // J4: the group without orders gives NULL; a primitive argument cannot take it
 assertThrows(IllegalStateException.class, () -> qb.from(Order.class)
         .where(o -> o.getStatus() == 9)
@@ -546,17 +748,17 @@ assertThrows(IllegalStateException.class, () -> qb.from(Order.class)
 
 ---
 
-<a id="611-not-in-v01"></a>
-## 6.11 v0.1 に含まれないもの
+<a id="612-not-in-v01"></a>
+## 6.12 v0.1 に含まれないもの
 
 | 項目 | 状況 |
 |---|---|
 | 集約の結果や select のエイリアスによるソート（たとえば `orderBy((s, by) -> by.desc(s.total()))`）と、グループ化したクエリの `orderBy` | v0.2 の候補 |
-| 派生テーブルと CTE（6.8、6.9） | 設計済み、まだ実装されていない（マイルストーン M8-2） |
 | ユーザー定義の集約関数とウィンドウ関数 | v0.2 の候補 |
-| 結合に対する射影 `select((o, c) -> new OrderView(o.getId(), c.getName(), o.getPrice()))` | 予定。結合の構文はまだ確定していない |
+| update、delete、insert の中の結合、サブクエリの中の結合、4 つ以上のエンティティ、派生テーブルとの結合 | 今後 |
+| 1 つのクエリで同じ CTE を 2 回使うこと、DML の中の派生テーブルと CTE | 今後 |
 
-現在、この章のエラー（間違ったグループのキー、`where` の中の `Agg`、`distinct` で選択していないソートキー）は `LambdaAnalysisException` です。`[LQL-xxxx]` コードと `LambdaQLException` のサブクラスは設計済みです。[11. エラーと言語](../11-errors-and-languages.md) を参照してください。
+この章のエラーは、コードを持つ `TranslationException` です: `LQL-3035`（間違ったグループのキー、J3）、`LQL-3005`（`where` の中の `Agg`）、`LQL-3046`（`distinct` で選択していないソートキー、J7）、`LQL-3064`（派生テーブルまたは CTE の行の型、J5）。[11. エラーと言語](../11-errors-and-languages.md) を参照してください。
 
 ---
 

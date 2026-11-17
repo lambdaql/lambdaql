@@ -204,7 +204,7 @@ class ProcedureTest {
         // exec cannot drop OUT values
         assertEquals("LQL-4037", assertThrows(LambdaQLException.class,
                 () -> qb.exec(OrderProcs.class, p -> p.calc(1, 1.0)).execute()).code());
-        // the arguments are values, not entity columns or other calls
+        // only @SqlProcedure methods of the stub can be called
         assertEquals("LQL-3060", assertThrows(LambdaQLException.class,
                 () -> qb.call(OrderProcs.class, p -> p.toString()).execute()).code());
         // @end

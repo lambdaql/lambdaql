@@ -5,8 +5,9 @@
 
 > [!IMPORTANT]
 > **상태:** lambdaQL은 초기 개발 단계입니다.
-> **분석 코어**, **결과 함수를 포함한 `where`**(`toList()`, `toSet()`, `first()`, `one()`, `count()`, `exists()`), 그리고 **정렬과 페이징**(`orderBy`, `limit`, `offset`, `SortSpec`)의 핵심 기능이 구현되어 있습니다. lambdaQL은 람다를 로드하고, 디코딩하고, HQL을 쓰고, 실행합니다. 이 부분은 H2, MariaDB, Oracle에서 테스트했지만, 테스트는 **Java** 람다를 사용합니다. Kotlin 람다는 아직 테스트하지 않았습니다.
-> Kotlin 지원은 **설계** 단계입니다. 이 트랙에 나오는 형태의 Kotlin 바이트코드는 프로토타입으로 컴파일하여 확인했습니다(kotlinc 1.7.22 ~ 2.3.21). **서브쿼리**와 **`select`**(`groupBy`, `having`, `Agg` 포함)는 구현되어 Java 람다로 테스트했습니다. 이 기능의 Kotlin 형태는 빌드 밖에서 kotlinc 2.3.21로 컴파일했고, Java와 같은 HQL을 만듭니다. 파생 테이블, CTE, 프로시저는 Kotlin과 Java 모두 아직 설계 단계입니다. **수정, 삽입, 삭제, 업서트**(`limit`, 1행 보호 `executeOne()` 포함)는 구현되어 Java 람다로 테스트했습니다.
+> **분석 코어**, **결과 함수를 포함한 `where`**(`toList()`, `toSet()`, `first()`, `one()`, `count()`, `exists()`), 그리고 **정렬과 페이징**(`orderBy`, `limit`, `offset`, `SortSpec`)의 핵심 기능이 구현되어 있습니다. lambdaQL은 람다를 로드하고, 디코딩하고, HQL을 쓰고, 실행합니다. 이 부분은 H2, MariaDB, Oracle에서 주로 **Java** 람다로 테스트했습니다.
+> **Kotlin 람다는 빌드 안에서 테스트합니다**(kotlinc 2.3.21, [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)). 대상은 `?.` 경로, `!!`, 캡처 값, `in`, 정렬, 서브쿼리, 데이터 클래스·`Pair`·`Triple`을 쓰는 `select`, `groupBy`와 `having`, update, insert, delete입니다. 나머지 Kotlin 전용 형태(`?:`, 범위, `when`, 속성 참조)는 **설계** 단계입니다. 이 형태의 바이트코드는 프로토타입으로 컴파일하여 확인했습니다(kotlinc 1.7.22 ~ 2.3.21).
+> **서브쿼리**, **`select`**(`groupBy`, `having`, `Agg` 포함), **수정, 삽입, 삭제, 업서트**(`limit`, 1행 보호 `executeOne()` 포함), **명시적 조인**, **파생 테이블과 CTE**, **저장 프로시저와 DB 함수**, **4개 언어의 오류 코드**가 구현되어 있습니다. 조인, 파생 테이블, CTE, 프로시저, DB 함수, 업서트는 Java 람다로만 테스트했습니다.
 > **Spring Data JPA 모듈**(`LambdaQlExecutor<T>`, Spring `Sort`와 `Pageable`, `deleteAll { }`·`updateOne({ }) { }` 같은 DML 단축 메서드, 수정·삭제·삽입·업서트 빌더, Spring Boot 자동 구성)은 구현되어 Java 리포지토리로 테스트했습니다(Spring Boot 3.4.2). DML에는 호출자의 트랜잭션이 필요합니다. Kotlin 리포지토리는 아직 테스트하지 않았습니다.
 > 아직 Maven Central에 배포된 아티팩트는 없습니다. 사용해 보려면 [소스에서 빌드](02-getting-started.md#build-from-source)하십시오.
 
@@ -57,7 +58,7 @@ fetch first ? rows only
 ```
 
 > [!NOTE]
-> **예제에 대하여.** 예제는 설계 예제입니다. 기능이 구현되면 해당 예제는 테스트 코드에서 가져온 코드로 바뀌고, 테스트 파일 링크가 붙습니다.
+> **예제에 대하여.** 예제는 설계 예제입니다. 기능이 구현되면 해당 예제는 테스트 코드에서 가져온 코드로 바뀌고, 테스트 파일 링크가 붙습니다. Kotlin 테스트에서 가져온 예제에는 **(테스트됨)** 표시가 있습니다(3~7장).
 
 <a id="contents"></a>
 ## 목차
@@ -65,17 +66,17 @@ fetch first ? rows only
 | # | 페이지 | 배우는 내용 | 상태 |
 |---|---|---|---|
 | 1 | [개요](../01-overview.md) (공통) | lambdaQL이 무엇인지, 왜 필요한지, 어떻게 동작하는지 | – |
-| 2 | [시작하기](02-getting-started.md) | 요구 사항, Gradle 설정, Kotlin 엔티티, 첫 쿼리 | 소스에서 빌드는 동작함. `where`, `toList()`, 결과 함수 `first()`, `one()`, `count()`, `exists()`, `toSet()`: 구현됨, H2·MariaDB·Oracle에서 테스트함(Java 테스트, Kotlin은 아직 테스트하지 않음) |
-| 3 | [조건(`where`)](03-where.md) | 연산자, null 규칙, `?.` `?:` `!!`, 범위, `when`, 캡처 값 | getter를 JPA 속성에 매핑, HQL 렌더링과 쿼리 실행(`where`, `toList()`): 구현됨, H2·MariaDB·Oracle에서 테스트함(Java 테스트). Kotlin 전용 형태: 설계됨 |
-| 4 | [정렬과 페이징](04-order-paging.md) | `orderBy`, `Direction`, `limit`, `offset` | 핵심 기능 구현됨, H2·MariaDB·Oracle에서 테스트함(Java 테스트, Kotlin은 아직 테스트하지 않음), `SortSpec` 포함. 속성 참조, `SortWhitelist`, 조인 정렬(`SortSpec`의 조인 형태 포함): 설계됨 |
-| 5 | [서브쿼리](05-subquery.md) | `exists()`, `x in sub...`, 스칼라 서브쿼리와 상관 서브쿼리 | 구현됨. H2, MariaDB, Oracle에서 테스트(Java 테스트, Kotlin은 아직 테스트하지 않음). MariaDB `lateral` 재작성: 아직 구현되지 않음 |
-| 6 | [조회, 집계, 그룹화](06-select-group.md) | `select`, data class, `Pair`, `groupBy`, `having`, `Agg`, 파생 테이블, CTE | `select`, `groupBy`, `having`, `Agg`, `distinct()`: 구현됨. H2, MariaDB, Oracle에서 테스트(Java 테스트, Kotlin은 아직 테스트하지 않음). 파생 테이블과 CTE: 설계됨 |
-| 7 | [수정, 삽입, 삭제](07-dml.md) | 속성 대입, `by.set`, `values`, `all()`, `execute()`, `limit`, `executeOne()` | 구현됨. H2, MariaDB, Oracle에서 테스트(Java 테스트, Kotlin은 아직 테스트하지 않음). `limit`과 `executeOne()` 포함. 수정·삭제 `where` 안의 서브쿼리(`sub`)와 `insert ... select`의 집계: 구현됨. `set` 값 안의 서브쿼리: 설계됨 |
+| 2 | [시작하기](02-getting-started.md) | 요구 사항, Gradle 설정, Kotlin 엔티티, 첫 쿼리 | 소스에서 빌드는 동작함. `where`, `toList()`, 결과 함수 `first()`, `one()`, `count()`, `exists()`, `toSet()`: 구현됨, H2·MariaDB·Oracle에서 테스트함(`where`와 `toList()`는 Kotlin 람다로도 테스트함. 결과 함수는 Java 람다로만 테스트함) |
+| 3 | [조건(`where`)](03-where.md) | 연산자, null 규칙, `?.` `?:` `!!`, 범위, `when`, 캡처 값 | getter를 JPA 속성에 매핑, HQL 렌더링과 쿼리 실행(`where`, `toList()`): 구현됨, H2·MariaDB·Oracle에서 테스트함. `?.`, `!!`, 캡처 값, `in`: Kotlin 람다로 테스트함. `?:`, 범위, `when`: 설계됨 |
+| 4 | [정렬과 페이징](04-order-paging.md) | `orderBy`, `Direction`, `limit`, `offset` | 핵심 기능 구현됨, H2·MariaDB·Oracle에서 테스트함(Kotlin 테스트 하나, 나머지는 Java 테스트). `SortSpec`과 조인 정렬 `{ o, c, by -> }` 포함. 속성 참조, `SortWhitelist`, `SortSpec`의 조인 형태: 설계됨 |
+| 5 | [서브쿼리](05-subquery.md) | `exists()`, `x in sub...`, 스칼라 서브쿼리와 상관 서브쿼리 | 구현됨, H2·MariaDB·Oracle에서 테스트함(`exists`, `in`, 스칼라는 Kotlin 람다로도 테스트함). MariaDB `lateral` 재작성: 아직 구현되지 않음 |
+| 6 | [조회, 집계, 그룹화](06-select-group.md) | `select`, data class, `Pair`, `groupBy`, `having`, `Agg`, 조인, 파생 테이블, CTE | `select`, `groupBy`, `having`, `Agg`, `distinct()`: 구현됨, H2·MariaDB·Oracle에서 테스트함(데이터 클래스, `Pair`, `Triple`, `groupBy`, `having`은 Kotlin 람다로도 테스트함). 명시적 조인, 파생 테이블, CTE: 구현됨(Java 테스트, Kotlin은 아직 테스트하지 않음) |
+| 7 | [수정, 삽입, 삭제](07-dml.md) | 속성 대입, `by.set`, `values`, `all()`, `execute()`, `limit`, `executeOne()` | 구현됨, H2·MariaDB·Oracle에서 테스트함. `limit`과 `executeOne()` 포함(속성 대입, `by[column] = value`, insert, delete는 Kotlin 람다로도 테스트함). update와 delete의 `where` 안 서브쿼리(`sub`), `insert ... select`의 집계: 구현됨. `set` 값 안의 서브쿼리: 설계됨 |
 | 7.6 | [업서트](07-6-upsert.md) | `upsert`, `onConflict { ... }.update { ... }`, `onConflict { ... }.ignore()`, 데이터베이스별 행 수 | 구현됨. H2, MariaDB, Oracle에서 테스트(Java 테스트, Kotlin은 아직 테스트하지 않음) |
-| 8 | [프로시저와 DB 함수](08-procedures-functions.md) | `@SqlProcedure`, `companion object` 안의 `@SqlFunction`, `qb.call`, `qb.exec` | 설계됨 |
-| 9 | [Kotlin 노트](09-kotlin-notes.md) | Kotlin에서 특별한 점: `?.` `?:` `!!`, `==`, `in`, `when`, 연산자, 제한 KC1 ~ KC21 | 설계됨 |
-| 10 | [규칙과 제한](10-rules-and-limits.md) | 모든 규칙 표를 한곳에 | 설계됨 |
-| 11 | [오류와 언어](../11-errors-and-languages.md) (공통) | 오류 코드, 예외, 메시지 언어, 로깅 | 설계됨 |
+| 8 | [프로시저와 DB 함수](08-procedures-functions.md) | `@SqlProcedure`, `companion object` 안의 `@SqlFunction`, `qb.call`, `qb.exec` | 구현됨(Java 테스트, Kotlin은 아직 테스트하지 않음): DB 함수는 H2·MariaDB·Oracle, 프로시저는 MariaDB와 Oracle. SARGable 경고, 프로시저 파라미터의 타입·이름 대조: 아직 구현되지 않음 |
+| 9 | [Kotlin 노트](09-kotlin-notes.md) | Kotlin에서 특별한 점: `?.` `?:` `!!`, `==`, `in`, `when`, 연산자, 제한 KC1 ~ KC21 | 일부 테스트함(`?.`, `!!`, `in`, 데이터 클래스, 속성 대입). 나머지 형태: 설계됨 |
+| 10 | [규칙과 제한](10-rules-and-limits.md) | 모든 규칙 표를 한곳에 | 일부 구현됨 |
+| 11 | [오류와 언어](../11-errors-and-languages.md) (공통) | 오류 코드, 예외, 메시지 언어, 로깅 | 구현됨, 단위 테스트함. 경고 `LQL-5001`과 엄격 모드: 아직 구현되지 않음 |
 | 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`, 본문이 있는 리포지토리 메서드, DML 단축 메서드(`deleteAll`, `updateOne` 등), Spring `Sort`와 `Pageable`, 모듈, 트랜잭션, Kotlin 2.2 / `-Xjvm-default=all` | 구현됨. H2, MariaDB, Oracle에서 Spring Boot 3.4.2로 테스트. DML 단축 메서드와 수정·삭제·삽입·업서트 빌더 포함(Java 테스트, Kotlin 리포지토리는 아직 테스트하지 않음) |
 
 용어의 뜻:

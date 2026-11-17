@@ -91,6 +91,48 @@ public final class HqlRenderer {
     }
 
     private List<JoinBound> entityJoins = List.of();
+    private String source;          // a derived table "(select ...)" or a CTE name, instead of the entity name
+    private String withClause;      // "with t as (...)" before the select (CTE)
+    private List<String> aliases = List.of();
+
+    /**
+     * Makes a renderer for the inner query of a derived table or CTE (ROADMAP M8-2). It shares the parameters with this
+     * renderer and uses other alias prefixes ({@code d0}, {@code dj1}), so the names never clash.
+     *
+     * @return the inner renderer
+     */
+    public HqlRenderer nested() {
+        return new HqlRenderer(model, evaluator, params, "d", "dj");
+    }
+
+    /**
+     * Reads from a derived table or a CTE instead of an entity (ROADMAP M8-2).
+     *
+     * @param source     {@code (select ...)} for a derived table, or the CTE name
+     * @param withClause {@code with t as (...)} for a CTE, or null
+     * @return this renderer
+     */
+    public HqlRenderer withSource(String source, String withClause) {
+        this.source = source;
+        this.withClause = withClause;
+        return this;
+    }
+
+    /**
+     * Names the selected values ({@code select a as customerId, ...}), for the inner query of a derived table or CTE (J6).
+     *
+     * @param aliases the names in select order
+     * @return this renderer
+     */
+    public HqlRenderer withAliases(List<String> aliases) {
+        this.aliases = List.copyOf(aliases);
+        return this;
+    }
+
+    private RenderedQuery finish(StringBuilder hql) {
+        String text = withClause == null ? hql.toString() : withClause + " " + hql;
+        return new RenderedQuery(text, new LinkedHashMap<>(params));
+    }
 
     /**
      * Adds the entity joins of an explicit join query (ROADMAP D44). The joined entities are roots 1, 2 ...
@@ -121,7 +163,8 @@ public final class HqlRenderer {
             ons.add(f instanceof Pred.Bool b ? (b.value() ? "1=1" : "1=0") : pred(f));
         }
         leftJoins = saved;
-        StringBuilder from = new StringBuilder(" from ").append(model.entityName(root)).append(' ').append(aliasOf(mainRoot()));
+        StringBuilder from = new StringBuilder(" from ").append(source != null ? source : model.entityName(root))
+                .append(' ').append(aliasOf(mainRoot()));
         pathJoins(from, mainRoot());
         for (int k = 0; k < entityJoins.size(); k++) {
             JoinBound j = entityJoins.get(k);
@@ -280,7 +323,18 @@ public final class HqlRenderer {
         StringBuilder hql = new StringBuilder("select ").append(select).append(fromClause(root));
         if (!parts.isEmpty()) hql.append(" where ").append(String.join(" and ", parts));
         if (!orders.isEmpty()) hql.append(" order by ").append(String.join(", ", orders));
-        return new RenderedQuery(hql.toString(), new LinkedHashMap<>(params));
+        return finish(hql);
+    }
+
+    /**
+     * Renders {@code select count(*) ...}: for a derived table or CTE, where the row has no entity to count.
+     *
+     * @param root   the row type
+     * @param wheres the conditions
+     * @return the HQL and its parameters; the result is one {@code Long}
+     */
+    public RenderedQuery countRows(Class<?> root, List<Bound> wheres) {
+        return render("count(*)", root, wheres, List.of(), false);
     }
 
     /**
@@ -737,6 +791,10 @@ public final class HqlRenderer {
         captured = select.captured();
         List<String> cols = new ArrayList<>();
         for (Expr e : select.exprs()) cols.add(value(e, null));
+        List<String> plainCols = List.copyOf(cols);
+        if (!aliases.isEmpty()) {
+            for (int i = 0; i < cols.size() && i < aliases.size(); i++) cols.set(i, cols.get(i) + " as " + aliases.get(i));
+        }
         List<String> keys = groupKeys(groupBy);
         List<String> having = havingParts(havings);
         leftJoins = false;
@@ -744,7 +802,7 @@ public final class HqlRenderer {
         List<String> orders = orderBy(root, sorts, paged && !grouped && !distinct);
         if (distinct) {
             for (String o : orders) {
-                if (cols.stream().noneMatch(c -> o.startsWith(c + " "))) {
+                if (plainCols.stream().noneMatch(c -> o.startsWith(c + " "))) {
                     throw LqlMessage.DISTINCT_SORT_NOT_SELECTED.exception(o);
                 }
             }
@@ -755,7 +813,7 @@ public final class HqlRenderer {
         if (!keys.isEmpty()) hql.append(" group by ").append(String.join(", ", keys));
         if (!having.isEmpty()) hql.append(" having ").append(String.join(" and ", having));
         if (!orders.isEmpty()) hql.append(" order by ").append(String.join(", ", orders));
-        return new RenderedQuery(hql.toString(), new LinkedHashMap<>(params));
+        return finish(hql);
     }
 
     // ------------------------------------------------------------------ subqueries (ROADMAP M8)

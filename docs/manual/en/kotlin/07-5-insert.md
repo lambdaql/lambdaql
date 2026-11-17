@@ -2,7 +2,7 @@
 # 7.5 Insert (Kotlin)
 
 > [!NOTE]
-> **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10), including `groupBy`, `having` and `Agg` in `insert ... select` (milestone M9). The tests use **Java** lambdas. **Kotlin lambdas in DML are not tested yet.**
+> **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10), including `groupBy`, `having` and `Agg` in `insert ... select` (milestone M9). Most tests use **Java** lambdas. An insert with `values` is tested with a Kotlin lambda too ([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), marked **(tested)**).
 > **Not implemented yet:** the `by.set` form of `insert ... select`.
 > The Kotlin code shows the tested Java statements in Kotlin syntax, and the HQL comes from the Java tests in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) and [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java). Examples without HQL follow the design.
 > See the [track README](README.md) for the full status.
@@ -33,7 +33,17 @@ insert into archive(id,price,customer_name)
 values (100,9.5,'Kim')
 ```
 
-There are no Kotlin tests yet. The same statements written in Java are tested in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/07-5-insert.md) for the tested examples.
+**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `insert-delete`:
+
+```kotlin
+val i = qb.insert(Archive::class.java).values { it.id = 100L; it.price = 9.5; it.customerName = "Kim" }
+assertEquals(1, i.execute())
+val d = qb.delete(Order::class.java).where { o, sub -> !sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
+assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)", d.toHql().hql())
+```
+
+The first two lines insert one row with a Kotlin lambda. The delete part is explained in [7.4](07-4-delete.md).
+More statements written in Java are tested in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/07-5-insert.md) for those examples.
 
 The constants in the lambda stay literals (decision D37). A value cannot read the new row: `it.price = it.price` is an error.
 
@@ -134,7 +144,7 @@ group by o1_0.customer_id
 having count(*)>=2
 ```
 
-- Every value without an aggregate must be a `groupBy` key (rule J3). Otherwise lambdaQL throws `LambdaAnalysisException` at analysis time.
+- Every value without an aggregate must be a `groupBy` key (rule J3). Otherwise lambdaQL throws `TranslationException` (`LQL-3035`) at analysis time.
 - `Agg` is not allowed in `where`. Use `having`.
 
 ---

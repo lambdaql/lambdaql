@@ -3,7 +3,8 @@
 
 > [!NOTE]
 > **상태**
-> - **구현됨, 테스트함:** H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 6.6.5, 마일스톤 M10, 결정 D28·D40). 대상은 update, delete, insert, `insert ... select`, upsert, update와 delete의 `limit`, 1행 보호 `executeOne()`(결정 D41)입니다. 테스트는 **Java** 람다를 사용합니다. **DML의 Kotlin 람다는 아직 테스트하지 않았습니다.**
+> - **구현됨, 테스트함:** H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 6.6.5, 마일스톤 M10, 결정 D28·D40). 대상은 update, delete, insert, `insert ... select`, upsert, update와 delete의 `limit`, 1행 보호 `executeOne()`(결정 D41)입니다. 테스트는 대부분 **Java** 람다를 사용합니다.
+> - **Kotlin 람다로 테스트함**([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 빌드에 포함, H2, MariaDB, Oracle): `set`의 속성 대입, 인덱스 형태 `by[column] = value`, `values`를 쓰는 `insert`, `not exists` 서브쿼리를 쓰는 `delete`. 이 예제에는 **(테스트됨)** 표시가 있습니다.
 > - **함께 구현됨, 테스트함(Java 람다로):** 수정·삭제 `where` 안의 서브쿼리(`sub`)(마일스톤 M8, [7.4](07-4-delete.md) 참고), `insert ... select`의 `groupBy`, `having`, `Agg`(마일스톤 M9, [7.5](07-5-insert.md) 참고).
 > - **아직 구현되지 않음:** `set` 값 안의 서브쿼리(컨텍스트 객체의 `by.from(...)`), 복합 키 엔티티의 `limit` / `executeOne()`.
 > - 이 장의 Kotlin 코드는 테스트된 Java 문장을 Kotlin 문법으로 옮긴 것입니다. HQL은 Java 테스트에서 가져왔습니다. HQL이 없는 예제는 설계를 따릅니다.
@@ -124,7 +125,19 @@ where o1_0.status=2
 
 Oracle은 `set`에 별칭을 씁니다(`set o1_0.status=?`). H2와 MariaDB는 쓰지 않습니다.
 
-아직 Kotlin 테스트는 없습니다. 같은 문장을 Java로 작성한 테스트가 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)에 있습니다(H2, MariaDB, Oracle). 테스트된 예제는 [이 페이지의 Java 버전](../java/07-dml.md)을 참고하십시오.
+Kotlin 인덱스 연산자 `by[column] = value`도 같은 `set` 메서드를 호출합니다. 이 형태는 Kotlin 람다로 테스트했습니다.
+
+**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `update-by`:
+
+```kotlin
+// the builder form, Kotlin index assignment: by[column] = value
+val u = qb.update(Order::class.java)
+    .set { o, by -> by[o.description] = "done" }
+    .where { it.status.toInt() == 2 }
+assertEquals("update Order e0 set e0.description = 'done' where e0.status = 2", u.toHql().hql())
+```
+
+테스트 엔티티의 `status`는 `short`이므로 테스트는 `it.status.toInt() == 2`로 씁니다. 같은 문장을 Java로 작성한 테스트가 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)에 있습니다(영역 `update-by`).
 
 이 장의 모든 예제는 `by.set`으로도 쓸 수 있습니다. 호출을 이어 쓰십시오. 람다는 마지막 `by.set(...)`의 결과를 반환합니다.
 
@@ -138,8 +151,7 @@ qb.update(Order::class.java).set { o, by -> by.set(o.address.city, city) }.where
 qb.update(Order::class.java).set { o, by -> by.set(o.customer?.id, cid) }.where { it.id == id }.execute()   // FK
 ```
 
-Kotlin 인덱스 연산자 `by[o.status] = st`도 같은 `set` 메서드를 호출합니다. 대입 람다는 값을 반환하지 않으므로 이 형태도 동작합니다(kotlinc 2.3.21로 컴파일해 분석기 처리를 확인, 빌드 안의 테스트는 아직 없음).
-현재 lambdaQL은 람다가 반환하는 `by.set(...)` 호출 체인만 읽습니다. 따라서 체인으로 쓰십시오.
+인덱스 연산자로는 컬럼마다 `by[column] = value`를 하나씩 씁니다: `{ o, by -> by[o.status] = st; by[o.price] = o.price!! * 1.1 }`. 컬럼 하나의 형태는 테스트했습니다(위 참고). 문장이 여러 개인 형태는 아직 Kotlin 테스트로 확인하지 않았습니다.
 
 설계에서 두 번째 람다 인자는 **컨텍스트 객체 하나**입니다. 이 객체는 `set(column, value)`와 서브쿼리 함수 `from(...)`을 모두 가집니다.
 이름은 `by`든 `sub`든 자유롭게 지으십시오. 이름은 동작에 영향이 없습니다.
@@ -215,7 +227,7 @@ SQL에서 SET 오른쪽의 모든 컬럼은 수정 **이전**의 값을 뜻합�
 // error: price is assigned first, then read again
 ```
 
-**같은 문장에서 컬럼에 대입한 뒤 나중에 그 컬럼을 읽으면** lambdaQL은 `set(...)`을 호출하는 시점에 `LambdaAnalysisException`을 던집니다(규칙 U3).
+**같은 문장에서 컬럼에 대입한 뒤 나중에 그 컬럼을 읽으면** lambdaQL은 `set(...)`을 호출하는 시점에 `TranslationException`(`LQL-3042`)을 던집니다(규칙 U3).
 이유: 이 경우 MariaDB는 **새** 값을 사용하고, H2와 Oracle은 이전 값을 사용합니다. 결과가 다릅니다(실측: MariaDB 200, H2와 Oracle 100).
 
 다음 경우는 세 데이터베이스의 결과가 같으므로 허용합니다.
@@ -237,8 +249,8 @@ SQL에서 SET 오른쪽의 모든 컬럼은 수정 **이전**의 값을 뜻합�
 <a id="rules-checked-at-analysis-time"></a>
 ### 분석 시점의 규칙 검사
 
-lambdaQL은 람다를 읽을 때 규칙 U1, U3, U4, U6을 검사하고, `set(...)`이나 `values(...)`에서 `LambdaAnalysisException`을 던집니다.
-이 검사는 [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)(영역 `rules`)와 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)에서 Java 람다로 테스트합니다. 아직 Kotlin 테스트는 없습니다.
+lambdaQL은 람다를 읽을 때 규칙 U1, U3, U4, U6을 검사하고, `set(...)`이나 `values(...)`에서 `LambdaQLException`을 던집니다(예: U1은 `LQL-3037`, U3은 `LQL-3042`, U4는 `LQL-3041`).
+이 검사는 [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)(영역 `rules`)와 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)에서 Java 람다로 테스트합니다. 이 검사에 대한 Kotlin 테스트는 아직 없습니다.
 
 <a id="where-or-all-is-required"></a>
 ### `where`나 `all()`의 필수 지정
@@ -386,7 +398,7 @@ U11, U12, U15, U20에 대한 lambdaQL의 검사는 아직 구현되지 않았습
 | `returning` | 거부됨 | DML 후 다시 조회 |
 | 데이터베이스 시간(`current_timestamp`) | 거부됨 | 애플리케이션 시간을 바인드(U8) |
 
-현재 규칙을 어기면 `LambdaAnalysisException`이 단순한 메시지(현재는 한국어)와 함께 발생합니다. 예정된 `[LQL-xxxx]` 코드와 `LambdaQLException` 기반 클래스는 [11. 오류와 언어](../11-errors-and-languages.md)에 있습니다.
+규칙을 어기면 코드 `[LQL-xxxx]`가 붙은 `LambdaQLException`이 발생합니다. 대부분의 규칙은 `TranslationException`, 대입 람다 안의 조건이나 지역 변수는 `UnsupportedLambdaShapeException`입니다. [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
 모든 규칙을 한곳에서 보려면: [10. 규칙과 제한](10-rules-and-limits.md).
 
 ---

@@ -3,10 +3,10 @@
 
 > [!NOTE]
 > **状況**
-> - **実装済み**（マイルストーン M8-1）、H2 2.3、MariaDB 10.11、Oracle 23.26（Hibernate 6.6.5）でテスト済み: select、update、delete の `where { o, sub -> ... }` の中のサブクエリ。`exists` / `!exists`、`in`、`!in`（NOT EXISTS として書かれる）、スカラーの集計、top-1 の形、相関サブクエリと入れ子のサブクエリ、キャプチャ値を含みます。テストは **Java** のラムダを使います。**Kotlin のラムダはまだビルドの中でテストされていません。**
-> - この章の Kotlin の形（`exists`、`in` / `!in`、スカラー、top-1、入れ子）は、ビルドの外で kotlinc 2.3.21 でコンパイルしました。lambdaQL はこれらに対して Java の形と同じ HQL を作ります。
-> - **まだ実装されていないもの:** `from` の中のサブクエリ（派生テーブル）と CTE（マイルストーン M8-2）、`set` の値の中のサブクエリ、MariaDB の `lateral` の書き換え。
-> - Kotlin のコードは、テスト済みの Java のクエリを Kotlin の構文で示したものです。テスト済みの Java の例は [このページの Java 版](../java/05-subquery.md) にあります。
+> - **実装済み**（マイルストーン M8-1）、H2 2.3、MariaDB 10.11、Oracle 23.26（Hibernate 6.6.5）でテスト済み: select、update、delete の `where { o, sub -> ... }` の中のサブクエリ。`exists` / `!exists`、`in`、`!in`（NOT EXISTS として書かれる）、スカラーの集計、top-1 の形、相関サブクエリと入れ子のサブクエリ、キャプチャ値を含みます。ほとんどのテストは **Java** のラムダを使います。
+> - **Kotlin のラムダでテスト済み**（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、ビルドの中、H2、MariaDB、Oracle）: `exists`、`in`、スカラーの `avg`。これらの例には **(テスト済み)** と書いてあります。そのほかの Kotlin の形（`!in`、top-1、入れ子）は、ビルドの外で kotlinc 2.3.21 でコンパイルし、Java の形と同じ HQL になることを確認しました。
+> - **まだ実装されていないもの:** `set` の値の中のサブクエリ、MariaDB の `lateral` の書き換え。（派生テーブルと CTE は別の構文で実装済みです。[6. 選択、集計、グループ化](06-select-group.md#69-derived-table-subquery-in-from) を参照してください。）
+> - そのほかの Kotlin のコードは、テスト済みの Java のクエリを Kotlin の構文で示したものです。テスト済みの Java の例は [このページの Java 版](../java/05-subquery.md) にあります。
 
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [4. ソートとページング](04-order-paging.md) | 次: [6. 選択、集計、グループ化](06-select-group.md) | [このページの Java 版](../java/05-subquery.md)
 
@@ -49,7 +49,7 @@ Kotlin では、`y in values` は `values.contains(y)` にコンパイルされ�
 
 HQL では、サブクエリのルートのエイリアスは `s1`、`s2`、... です（外側のルートは `e0`）。サブクエリの中の結合には `s1j1` のようなエイリアスが付きます。
 
-Kotlin のテストはまだありません。Java で書いた同じクエリは [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) でテストしています（H2、MariaDB、Oracle）。テスト済みの例は [このページの Java 版](../java/05-subquery.md) を見てください。
+**(テスト済み)** と書かれた例は [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt) から取ったものです。このテストは Java のテスト用エンティティを使います: `price` はプリミティブの `double`、`qty` は `int` です。Java で書いたほかのクエリは [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) でテストしています（H2、MariaDB、Oracle）。それらの例は [このページの Java 版](../java/05-subquery.md) を見てください。
 
 ## 5.2 EXISTS
 
@@ -65,6 +65,15 @@ qb.from(Order::class.java)
     .toList()
 // HQL: select e0 from Order e0
 //      where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > 10)
+```
+
+**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `exists`:
+
+```kotlin
+val q = qb.from(Order::class.java)
+    .where { o, sub -> sub.from(Item::class.java).where { i -> i.order?.id == o.id && i.qty > 10 }.exists() }
+assertEquals("select e0 from Order e0 where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > 10)",
+    q.toHql().hql())
 ```
 
 **SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。このテストは Java のラムダを使います。意味が同じ Kotlin のラムダは同じ HQL になるので、SQL も同じです。
@@ -119,6 +128,15 @@ qb.from(Order::class.java)
     .toList()
 // HQL: select e0 from Order e0
 //      where e0.customer.id in (select s1.id from Customer s1 where s1.grade > 3)
+```
+
+**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `in`:
+
+```kotlin
+val q = qb.from(Order::class.java)
+    .where { o, sub -> o.customer?.id in sub.from(Customer::class.java).where { c -> c.grade!! > 3 }.select { c -> c.id } }
+assertEquals("select e0 from Order e0 where e0.customer.id in (select s1.id from Customer s1 where s1.grade > 3)",
+    q.toHql().hql())
 ```
 
 **データベースごとの SQL（この HQL に対する Hibernate の SQL）** — 同じ HQL を Hibernate に直接渡す [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) が記録しました。Java のテスト（リージョン `in`）は null チェック `c.getGrade() != null` も書いています。その SQL は例 `sub-in` です。`expected-sql/` の [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)、例 `05-in-subquery`:
@@ -224,6 +242,13 @@ qb.from(Order::class.java)
 //      where e0.price > (select avg(s1.price) from Order s1)
 ```
 
+**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `scalar`（テストの `price` は `double` なので `!!` はありません）:
+
+```kotlin
+val q = qb.from(Order::class.java).where { o, sub -> o.price > sub.from(Order::class.java).avg { x -> x.price } }
+assertEquals("select e0 from Order e0 where e0.price > (select avg(s1.price) from Order s1)", q.toHql().hql())
+```
+
 **データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sub-scalar`:
 
 ```sql
@@ -240,7 +265,7 @@ where o1_0.price>(select avg(o2_0.price) from orders o2_0)
 | 集計: `count()`、`sum`、`avg`、`min`、`max` | `sub.from(Item::class.java).where { i -> i.order?.id == o.id }.count()` |
 | top-1: `orderBy { ... }.limit(1)...first()` | 下記を参照 |
 
-それ以外の `first()` は解析時にエラー（`LambdaAnalysisException`）になります。
+それ以外の `first()` は解析時にエラー（`TranslationException`、`LQL-3017`）になります。
 
 品目を 2 つ以上持つ注文（`count()`）:
 
@@ -352,7 +377,7 @@ where exists(select 1 from orders o1_0 where o1_0.customer_id=c1_0.id and exists
 
 - **update / delete の中のサブクエリ**: `where` で同じ `sub` の構文を使います。実装済みです（Java のラムダでテスト済み、リージョン `dml-subquery`）。[7.4 削除](07-4-delete.md) と [7.2 更新](07-2-update.md) を参照してください。
 - **`set` の値の中のサブクエリ**（`o.total = sub.from(...).sum { ... }`）: まだ実装されていません。[7.2 更新](07-2-update.md) を参照してください。
-- **`from` の中のサブクエリ（派生テーブル）と CTE**（`qb.from { sub -> ... }`、`qb.with { sub -> ... }`）: 設計済み、まだ実装されていません（マイルストーン M8-2）。[6. 選択、集計、グループ化](06-select-group.md) を参照してください。
+- **`from` の中のサブクエリ（派生テーブル）と CTE**: 実装済みです（マイルストーン M8-2）。`sub` は使いません: 値のクエリを `qb.from(...)` か `qb.with(...)` に渡します。[6.9 派生テーブル](06-select-group.md#69-derived-table-subquery-in-from) と [6.10 CTE](06-select-group.md#610-cte-with) を参照してください。
 
 <a id="512-rules-summary-q1-to-q6"></a>
 ## 5.12 ルールのまとめ（Q1〜Q6）

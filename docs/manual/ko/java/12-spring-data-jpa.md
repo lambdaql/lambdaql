@@ -228,8 +228,6 @@ default List<Member> topGraded(int n) {
 }
 ```
 
-`query()`를 호출한 메서드 안에서 결과 함수(여기서는 `toList()`)까지 호출하십시오. 완성되지 않은 쿼리는 반환하지 않습니다. [12.9](#129-routing-datasource)를 참고하십시오.
-
 다음 예제에서 `repository`는 `MemberRepository`입니다.
 
 **(테스트됨)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), 영역 `find-all-sort`:
@@ -456,7 +454,7 @@ DML을 자체 트랜잭션에서 실행하는 빌더는 `new QueryBuilder(entity
 | Spring `Sort`에 없는 속성 | `PropertyReferenceException`(테스트함) |
 | Spring `Sort`의 `ignoreCase()` | `UnsupportedOperationException`(테스트함) |
 | 리포지토리 호출(단축 메서드, 또는 default 메서드 안의 `execute()`)에서 트랜잭션 없이 수정, 삭제, 삽입, 업서트 실행 | `InvalidDataAccessApiUsageException`(테스트함). Spring이 JPA `TransactionRequiredException`을 변환한 예외입니다. 리포지토리 메서드 밖(`QueryBuilder` 빈)에서는 JPA `TransactionRequiredException` |
-| 규칙(U1, U3, U4, U6)을 어긴 대입 람다 | `LambdaAnalysisException`. 변환하지 않음([7.8](07-dml.md#rules-checked-at-analysis-time) 참고) |
+| 규칙(U1, U3, U4, U6)을 어긴 대입 람다 | `LambdaQLException`(예: `TranslationException`, `LQL-3042`). 변환하지 않음([7.8](07-dml.md#rules-checked-at-analysis-time) 참고) |
 
 `QueryBuilder` 빈(12.8)은 리포지토리가 아니므로 Spring의 예외 변환을 거치지 않습니다. 이 빈에서 `one()`과 `executeOne()`의 조건에 맞는 행이 2개 이상이면 `NonUniqueResultException`이 발생합니다.
 
@@ -517,37 +515,14 @@ Spring 애플리케이션에서는 `new QueryBuilder(entityManagerFactory)`를 �
 **`@DataJpaTest` 테스트.** `@DataJpaTest` 슬라이스 테스트는 일부 자동 구성만 로드합니다. 리포지토리 메서드는 동작하지만 `QueryBuilder` 빈은 생성되지 않습니다.
 테스트에 이 빈이 필요하면 테스트 클래스에 `@ImportAutoConfiguration(LambdaQlAutoConfiguration.class)`를 추가하십시오(아직 테스트하지 않음).
 
-<a id="129-routing-datasource"></a>
-## 12.9 라우팅 DataSource
-
-> [!WARNING]
-> **설계 참고 사항, 미측정.** 이 절의 내용은 라우팅 DataSource로 테스트하지 않았습니다.
-
-일부 애플리케이션은 메서드 이름에 대한 AOP 규칙으로 데이터베이스를 선택합니다. 예를 들어 `find*` 메서드를 읽기 전용 복제본(replica)으로 보내는 규칙을 둡니다.
-이런 규칙은 규칙에 맞는 메서드 **안에서** 실행되는 SQL에만 적용됩니다.
-
-- `findAll`, `findOne` 등 짧은 메서드는 리포지토리 default 메서드 안이나 같은 서비스 메서드 안에서 호출하십시오.
-- `repo.query().where(...).toList()`에서 SQL은 `query()`가 아니라 `toList()`를 호출할 때 실행됩니다. `toList()`가 리포지토리 메서드 밖에서 실행되면 리포지토리 메서드에 대한 규칙이 적용되지 않습니다.
-
-```java
-// a rule on repository methods applies: the SQL runs inside findActive()
-default List<Member> findActive() {
-    return query().where(m -> m.isActive()).toList();
-}
-
-// a rule on repository methods does not apply: the SQL runs in toList(), after query() has returned
-// (a rule on the calling service method still applies)
-List<Member> rows = repository.query().where(m -> m.isActive()).toList();
-```
-
-<a id="1210-kotlin-repositories"></a>
-## 12.10 Kotlin 리포지토리
+<a id="129-kotlin-repositories"></a>
+## 12.9 Kotlin 리포지토리
 
 Kotlin으로 작성한 리포지토리에는 컴파일러 설정이 필요합니다. Kotlin 2.2 이상은 기본 설정으로 동작하고, 2.2 미만은 `-Xjvm-default=all`이 필요합니다. Spring Data에는 `kotlin-reflect`도 필요합니다.
-자세한 내용은 [이 페이지의 Kotlin 버전](../kotlin/12-spring-data-jpa.md#1210-kotlin-compile-settings)을 참고하십시오.
+자세한 내용은 [이 페이지의 Kotlin 버전](../kotlin/12-spring-data-jpa.md#129-kotlin-compile-settings)을 참고하십시오.
 
-<a id="1211-not-implemented-yet"></a>
-## 12.11 미구현 기능
+<a id="1210-not-implemented-yet"></a>
+## 12.10 미구현 기능
 
 - **Spring Boot 4.** 자동 구성에는 Spring Boot 4의 클래스 이름도 지정되어 있지만, 테스트한 버전은 Spring Boot 3.4.2뿐입니다.
 - Spring `Sort`의 **`ignoreCase()`**.

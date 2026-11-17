@@ -320,6 +320,9 @@ public enum LqlMessage {
     /** LQL-3063: A function call lambda must be one &#64;SqlFunction call, for example () -&gt; OrderFns.discount(price). */
     FUNCTION_CALL_SHAPE("LQL-3063", 0),
 
+    /** LQL-3064: The row type of a derived table or CTE must be a Java record or a Kotlin data class (J5): &#123;0&#125; */
+    DERIVED_ROW_TYPE("LQL-3064", 1),
+
     /** LQL-4001: limit and the one-row protection are not supported yet for an entity with a composite key: &#123;0&#125; */
     COMPOSITE_KEY_LIMIT("LQL-4001", 1),
 

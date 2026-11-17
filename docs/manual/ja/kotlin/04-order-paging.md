@@ -3,10 +3,11 @@
 
 > [!NOTE]
 > **状況**
-> - **中核部分は実装済み**、H2、MariaDB 10.11、Oracle 23.26（Hibernate 6.6.5）でテスト済み: `by.asc`、`by.desc`、`by.sort` を使う `orderBy { o, by -> ... }`、キーが 1 つの書き方 `orderBy { it.key }` と `orderBy({ it.key }, Direction)`、`Direction.parse` / `reversed`、`limit` / `offset`、`orderBy` の後の `first()`、再利用できるソート `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。Spring の `Sort` と `Pageable` は Spring Data JPA モジュールで使えます（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。テストは **Java** のラムダを使います。**Kotlin のラムダはまだテストされていません。**
-> - **まだ実装されていないもの:** Kotlin のプロパティ参照（`orderBy(Order::price)`）、`SortWhitelist`、結合の書き方 `{ o, c, by -> }`（`SortSpec` でも）。
+> - **中核部分は実装済み**、H2、MariaDB 10.11、Oracle 23.26（Hibernate 6.6.5）でテスト済み: `by.asc`、`by.desc`、`by.sort` を使う `orderBy { o, by -> ... }`、キーが 1 つの書き方 `orderBy { it.key }` と `orderBy({ it.key }, Direction)`、`Direction.parse` / `reversed`、`limit` / `offset`、`orderBy` の後の `first()`、再利用できるソート `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。Spring の `Sort` と `Pageable` は Spring Data JPA モジュールで使えます（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。ほとんどのテストは **Java** のラムダを使います。`limit` を使う Kotlin のソートもテストしています（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、**(テスト済み)** と表示）。
+> - **こちらも実装済み（Java のラムダでテスト済み）:** `join`、`leftJoin`、`crossJoin` の後の結合の書き方 `{ o, c, by -> ... }`（[6.8 明示的な結合](06-select-group.md#68-explicit-joins) を参照）。
+> - **まだ実装されていないもの:** Kotlin のプロパティ参照（`orderBy(Order::price)`）、`SortWhitelist`、`SortSpec` の結合の書き方。
 > - Kotlin の構文はコンパイルできます（プロトタイプで確認、kotlinc 2.3.21）。nullable なキー、`?.` のキー、プロパティ参照はコンパイルできます。エンティティのキーはコンパイルできません。
-> - この章の HQL はライブラリのルールに従いますが、Kotlin のラムダではテストされていません。
+> - この章のそのほかの HQL はライブラリのルールに従いますが、Kotlin のラムダではテストされていません。
 
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [3. 条件](03-where.md) | 次: [5. サブクエリ](05-subquery.md) | [このページの Java 版](../java/04-order-paging.md)
 
@@ -71,7 +72,19 @@ fetch first ? rows only
 - キーとその方向は一緒に書きます。順番がずれることはありません。
 - lambdaQL はラムダを読み取ります。実行はしません。`by` のメソッドは順序を記述するだけです。
 
-Kotlin のテストはまだありません。同じソートを Java で書いたものは [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java) でテストされています（H2、MariaDB、Oracle）。テスト済みの例は [このページの Java 版](../java/04-order-paging.md) を参照してください。
+**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `sort`:
+
+```kotlin
+val q = qb.from(Order::class.java)
+    .where { it.isActive }
+    .orderBy { o, by -> by.desc(o.price).asc(o.customer?.name) }
+    .limit(3)
+assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.active = true"
+    + " order by e0.price desc, j1.name asc nulls first, e0.id asc", q.toHql().hql())
+```
+
+このテストは Java のテスト用エンティティを使います: `price` はプリミティブの `double`（そのため `nulls` の部分がありません）、`active` の getter は `isActive()`（Kotlin では `it.isActive`）です。テストはクエリを H2、MariaDB、Oracle で実行し、行を Kotlin での同じソートと比べます。
+Java で書いたほかのソートは [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java) でテストされています。それらの例は [このページの Java 版](../java/04-order-paging.md) を参照してください。
 
 <a id="42-the-short-forms-one-key"></a>
 ## 4.2 短い書き方（キーが 1 つ）
@@ -246,7 +259,7 @@ SQL で NULL のポリシーを確認できます。H2 と MariaDB は、自分�
 // 拒否: ループ、ローカルの val/var、2 つ以上の文
 ```
 
-lambdaQL は `orderBy` を呼んだときにこれをチェックし、`LambdaAnalysisException` を投げます。
+lambdaQL は `orderBy` を呼んだときにこれをチェックし、`LambdaQLException` を投げます（たとえば条件なら `LQL-2023`、エンティティを使わないキーなら `LQL-3031`）。
 どのキーもエンティティを使わなければなりません。定数やキャプチャした値だけのキーは拒否されます。
 
 実行時に方向を変える必要があるなら、変数として渡します: `by.sort(key, dir)`。キー自体を変える必要があるなら、普通の Kotlin のコードで 2 つの分岐に分けてクエリを組み立ててください。
@@ -376,7 +389,8 @@ fetch first ? rows only
 
 - 追加されるのは 1 回だけです。キーにすでに id が含まれていれば（たとえば `by.desc(o.id)`）、追加されません。
 - `limit` と `offset` がなければ、何も追加されません。
-- **まだ実装されていません**（join がまだ実装されていないため）: to-many の join がある場合は、join したエンティティの id も追加されます。コレクションの fetch join と `limit`/`offset` を一緒に使うと拒否されます。
+- 明示的な結合（`join`、`leftJoin`、`crossJoin`）では、結合したすべてのエンティティの id も結合の順に追加されます（Java のラムダでテスト済み、[6.8](06-select-group.md#68-explicit-joins) を参照）。
+- まだ実装されていないもの: コレクションの fetch join と `limit`/`offset` を一緒に使うと拒否されます。
 
 <a id="49-strings-and-special-values"></a>
 ## 4.9 文字列と特殊な値
@@ -490,7 +504,7 @@ qb.from(Order::class.java).orderBy(byName).toList()
 **まだ実装されていないもの:**
 
 - 外部の文字列（`"price,desc_nulls_last"` のようなリクエストパラメーター）をソートに変える `SortWhitelist<T>`。リストにある名前だけを受け付けます。それまでは、`Direction.parse` と `by.sort(key, dir)` で実行時に方向を決められます（[4.3](#43-direction) を参照）。キーは普通の Kotlin のコードで選ぶか、テキストを自分の許可リストと照らし合わせてから `SortSpec.ofPath` を使ってください。
-- **予定:** `{ o, c, by -> ... }` による join（`SortSpec` でも）、キーセットページング。
+- **予定:** `SortSpec` の結合の書き方、キーセットページング。（結合のためのラムダの書き方 `{ o, c, by -> ... }` は実装済みです。[6.8](06-select-group.md#68-explicit-joins) を参照。）
 
 <a id="411-sorting-inside-subqueries"></a>
 ## 4.11 サブクエリの中のソート
@@ -506,18 +520,18 @@ qb.from(Order::class.java).orderBy(byName).toList()
 
 | # | ルール | 状況 |
 |---|---|---|
-| S1 | ソートは 1 つのラムダ: `{ o, by -> by... }`。キーが 1 つなら `{ it.key }` と、省略可能な `Direction`。join では `{ o, c, by -> by... }`（`by` は常に最後） | 実装済み（結合の書き方を除く） |
+| S1 | ソートは 1 つのラムダ: `{ o, by -> by... }`。キーが 1 つなら `{ it.key }` と、省略可能な `Direction`。join では `{ o, c, by -> by... }`（`by` は常に最後） | 実装済み。結合の書き方 `{ o, c, by -> }` も（Java のラムダでテスト済み） |
 | S2 | キーは `Comparable`（Kotlin の nullable なキーは使える）。エンティティはキーにできない（コンパイルエラー）。キーはエンティティを使わなければならない | 実装済み |
 | S3 | 方向は `asc` / `desc` または `sort(key, Direction)` で決まる。`asc(key)`/`desc(key)`（`ASC`/`DESC`）は NULL のポリシーを使い、`asc(key, nullsFirst)`、`desc(key, nullsFirst)`、`*_NULLS_*` は書いたとおりに使われる | 実装済み |
 | S4 | 本体は `by` の呼び出しをまっすぐつなげたものだけ。`if`、`when`、ループは使えない | 実装済み |
 | S5 | `orderBy` はクエリごとに 1 回。`orderBy` の後に `where` は使えない。`limit` の後に `orderBy` は使えない（コンパイルエラー） | 実装済み |
-| S6 | 再利用には `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。外部の文字列は `SortWhitelist` を通してのみ | `SortSpec` は実装済み（Java のラムダでテスト済み）。`SortWhitelist` と結合の書き方はまだ実装されていない |
+| S6 | 再利用には `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。外部の文字列は `SortWhitelist` を通してのみ | `SortSpec` は実装済み（Java のラムダでテスト済み）。`SortWhitelist` と `SortSpec` の結合の書き方はまだ実装されていない |
 | S7 | キー: カラム、to-one のパス、`+ - *`、拡大変換。値の分岐は使えない。Kotlin の `?.` はパスとして読まれる | 実装済み（Kotlin のラムダではテストされていない） |
 | S8 | `orderBy` だけで使う関連のパスは `left join` を使うので、関連のない行も残る。同じパスを `where` が使うと、ソートは `where` の結合を使う | 実装済み |
-| S9 | ページングでは、キーに id が含まれていなければルートの `@Id asc` が追加される。コレクションの fetch join + ページングは拒否される | ルートの id については実装済み。結合の部分はまだ実装されていない |
+| S9 | ページングでは、キーに id が含まれていなければルートの `@Id asc` が追加される。コレクションの fetch join + ページングは拒否される | ルートの id と、明示的に結合したエンティティの id については実装済み（Java のラムダでテスト済み）。fetch join のチェックはまだ実装されていない |
 | S10 | 解析結果はラムダごとにキャッシュされる。キャプチャした `Direction` は呼び出しのたびに読まれる | 実装済み |
 | S11 | Spring の `Sort.Order` は `Direction` に 1:1 で対応（Spring モジュール。[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) を参照）。`SortWhitelist.parse("price,desc_nulls_last")` | Spring の `Sort` は実装済み、Java でテスト済み（`ignoreCase` はまだサポートしていない）。`SortWhitelist` はまだ実装されていない |
-| S12 | join のクエリも同じ形: `{ o, c, by -> }`、`{ o, c, i, by -> }` | まだ実装されていない |
+| S12 | join のクエリも同じ形: `{ o, c, by -> }`、`{ o, c, i, by -> }` | 実装済み（Java のラムダでテスト済み、[6.8](06-select-group.md#68-explicit-joins) を参照） |
 | S13 | プロパティ参照はキーが 1 つの短い書き方（`orderBy(Order::price)`）でのみ。コンパイルできても意味が違う参照は拒否される | まだ実装されていない（Kotlin のプロパティ参照） |
 | S14 | サブクエリのソート: `limit` があれば残り、`limit` がなければ警告付きで取り除かれる。データベースの違いは自動で処理される（5 章を参照） | 実装済み（テスト済み）。MariaDB の `lateral` の書き換えはまだ実装されていない |
 

@@ -2,7 +2,7 @@
 # 7.4 删除（Kotlin）
 
 > [!NOTE]
-> **状态：已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（里程碑 M10）。测试使用 **Java** Lambda。**DML 中的 Kotlin Lambda 尚未测试。** 这也包括 `limit` 和 `executeOne()`（决定 D41）。
+> **状态：已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（里程碑 M10）。大多数测试使用 **Java** Lambda。带 `not exists` 子查询的 delete 也已用 Kotlin Lambda 测试（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，标记为 **(已测试)**）。 这也包括 `limit` 和 `executeOne()`（决定 D41）。
 > `where` 中的子查询（`sub`）同样已实现，并已用 Java Lambda 测试（里程碑 M8）。
 > **尚未实现：** 复合键实体上的 `limit` / `executeOne()`。
 > Kotlin 代码用 Kotlin 语法展示已测试的 Java 语句，HQL 来自 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 和 [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) 中的 Java 测试。没有 HQL 的示例遵循设计。
@@ -51,7 +51,17 @@ where (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id) is n
 
 MariaDB 写成 `delete o1_0 from orders o1_0`。H2 和 Oracle 写成 `delete from orders o1_0`。
 
-目前还没有 Kotlin 测试。用 Java 写的相同语句在 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中测试（H2、MariaDB 和 Oracle）。已测试的示例见[本页的 Java 版本](../java/07-4-delete.md)。
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `insert-delete`：
+
+```kotlin
+val i = qb.insert(Archive::class.java).values { it.id = 100L; it.price = 9.5; it.customerName = "Kim" }
+assertEquals(1, i.execute())
+val d = qb.delete(Order::class.java).where { o, sub -> !sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
+assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)", d.toHql().hql())
+```
+
+测试先插入一行 `Archive`，然后删除没有商品的订单，并把剩下的行与用 Kotlin 进行的同样过滤作比较。
+更多用 Java 写的语句在 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中测试（H2、MariaDB 和 Oracle）。这些示例见[本页的 Java 版本](../java/07-4-delete.md)。
 
 第二条语句删除的行与 `qb.from(Order::class.java).where { it.customer?.name == null }` 返回的**行相同**：客户没有名字的订单。Java 测试会把删除的行与这个查询进行比较。
 **没有**客户的订单不会被删除（规则 U9，决策 D36）。要把它们也删除，请写 `it.customer == null || it.customer?.name == null`。有了这个 null 守卫，lambdaQL 不会加上 `e0.customer.id is not null`。

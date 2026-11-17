@@ -6,7 +6,7 @@
 > Java 与 SQL 的差异、各数据库之间的差异，以及哪些内容不受支持。
 > 这些规则已在 H2 2.3、MariaDB 10.11 和 Oracle 23ai（Hibernate 6.6.5）上用原型检查过。
 > 目前分析核心、`where`、结果函数（`toList()`、`toSet()`、`first()`、`one()`、`count()`、`exists()`）、排序与分页的核心部分、`SortSpec`、update/insert/delete/upsert（[7](07-dml.md)）以及 Spring Data JPA 模块（[12](12-spring-data-jpa.md)）可以工作（已在 H2、MariaDB 和 Oracle 上测试）。
-> 子查询（[5](05-subquery.md)）和带聚合的 `select`（[6](06-select-group.md)）的规则同样已实现，在 DML 中也是如此。下面关于派生表、CTE 和存储过程的规则**尚未实现**。一部分排序规则也尚未实现（见 [4.12](04-order-paging.md#412-rules-summary-s1-to-s14)）。
+> 子查询（[5](05-subquery.md)）和带聚合的 `select`（[6](06-select-group.md)）的规则同样已实现，在 DML 中也是如此。显式 join、派生表、CTE（[6](06-select-group.md)）以及存储过程与数据库函数（[8](08-procedures-functions.md)）的规则同样已实现。列上的数据库函数的警告（[10.2](#db-functions-on-a-column)）**尚未实现**。一部分排序规则也尚未实现（见 [4.12](04-order-paging.md#412-rules-summary-s1-to-s14)）。
 > 完整状态请参见 [Java 路线 README](README.md#status)。
 
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[9. Java 说明](09-java-notes.md) | 下一章：[11. 错误与语言](../11-errors-and-languages.md) | [本页的 Kotlin 版本](../kotlin/10-rules-and-limits.md)
@@ -123,14 +123,16 @@ MariaDB 10.11 和 Oracle 23ai，20,000 到 50,000 行：
 | 日期函数，如"`updateAt` 的年份是 2024" | `e0.updateAt >= :from and e0.updateAt < :to` |
 | 按函数键排序（`lower(name)`） | 先检查访问路径，如果没有则 WARN |
 
+<a id="db-functions-on-a-column"></a>
 ### 列上的数据库函数
 
 列一侧的数据库函数（`OrderFns.discount(o.getPrice()) > 10`）无法使用普通索引。
-lambdaQL 会记录 **WARN**（严格模式下为错误）。例外：在 Oracle 上，如果函数是
+lambdaQL 将记录 **WARN**（严格模式下为错误）。例外：在 Oracle 上，如果函数是
 `DETERMINISTIC` 的，并且存在表达式相同的函数索引，则不发出 WARN。在 MariaDB 上，
 `NOT DETERMINISTIC`（默认）的函数即使参数只有参数值（`o.getPrice() > OrderFns.discount(rate)`），
 也会导致全表扫描，因此 lambdaQL 在这种情况下也会发出警告。
 参见 [8. 存储过程与数据库函数](08-procedures-functions.md)。
+此警告**尚未实现**。
 
 <a id="103-null-rules"></a>
 ## 10.3 NULL 规则
@@ -418,7 +420,7 @@ DML 语句需要事务：`QueryBuilder(EntityManagerFactory)` 会打开自己的
 | Lambda 中除一次占位方法调用之外的任何内容（日志、嵌套调用、分支） | 一次调用。事先计算好参数 |
 | 对有 OUT 参数的存储过程使用 `exec` | `call` |
 | 参数的数据库默认值 | 传入所有参数 |
-| Oracle 包重载、动态存储过程名 | 计划中 |
+| Oracle 包重载（尚不能检测）、动态存储过程名 | 计划中 |
 | Oracle 隐式结果（`DBMS_SQL.RETURN_RESULT`）、MariaDB 包、存储过程结果的分页 | 不支持 |
 
 <a id="108-caching-a-lambda-is-analyzed-once"></a>

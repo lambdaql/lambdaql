@@ -3,7 +3,8 @@
 
 > [!NOTE]
 > **状況**
-> - **実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、Hibernate 6.6.5、マイルストーン M10、決定 D28 と D40）: 更新、削除、挿入、`insert ... select`、upsert、および（決定 D41）更新と削除の `limit` と 1 行保護 `executeOne()`。テストは **Java** のラムダを使っています。**DML での Kotlin のラムダはまだテストしていません。**
+> - **実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、Hibernate 6.6.5、マイルストーン M10、決定 D28 と D40）: 更新、削除、挿入、`insert ... select`、upsert、および（決定 D41）更新と削除の `limit` と 1 行保護 `executeOne()`。ほとんどのテストは **Java** のラムダを使っています。
+> - **Kotlin のラムダでテスト済み**（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、ビルドの中、H2、MariaDB、Oracle）: `set` の中のプロパティへの代入、インデックスの書き方 `by[column] = value`、`values` を使う `insert`、`not exists` のサブクエリを使う `delete`。これらの例には **(テスト済み)** と書いてあります。
 > - **これも実装済み、テスト済み（Java のラムダで）:** 更新と削除の `where` の中のサブクエリ（`sub`）（マイルストーン M8、[7.4](07-4-delete.md) を参照）、`insert ... select` の `groupBy`、`having`、`Agg`（マイルストーン M9、[7.5](07-5-insert.md) を参照）。
 > - **まだ実装されていません:** `set` の値の中のサブクエリ（コンテキストオブジェクトの `by.from(...)`）、複合キーのエンティティでの `limit` / `executeOne()`。
 > - この章の Kotlin コードは、テスト済みの Java の文を Kotlin の構文で書いたものです。HQL は Java のテストから取っています。HQL のない例は設計に従っています。
@@ -124,7 +125,19 @@ where o1_0.status=2
 
 Oracle は `set` にエイリアスを書きます（`set o1_0.status=?`）。H2 と MariaDB は書きません。
 
-Kotlin のテストはまだありません。Java で書いた同じ文は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) でテストしています（H2、MariaDB、Oracle）。テスト済みの例は [このページの Java 版](../java/07-dml.md) を見てください。
+Kotlin のインデックス演算子 `by[column] = value` も同じ `set` メソッドを呼びます。これは Kotlin のラムダでテストしています。
+
+**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `update-by`:
+
+```kotlin
+// the builder form, Kotlin index assignment: by[column] = value
+val u = qb.update(Order::class.java)
+    .set { o, by -> by[o.description] = "done" }
+    .where { it.status.toInt() == 2 }
+assertEquals("update Order e0 set e0.description = 'done' where e0.status = 2", u.toHql().hql())
+```
+
+テストのエンティティの `status` は `short` なので、テストは `it.status.toInt() == 2` と書きます。同じ文を Java で書いたものは [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) でテストしています（リージョン `update-by`）。
 
 この章の例は、すべて `by.set` でも書けます。呼び出しはつなげて書きます。ラムダは最後の `by.set(...)` を返します。
 
@@ -138,8 +151,7 @@ qb.update(Order::class.java).set { o, by -> by.set(o.address.city, city) }.where
 qb.update(Order::class.java).set { o, by -> by.set(o.customer?.id, cid) }.where { it.id == id }.execute()   // FK
 ```
 
-Kotlin のインデックス演算子 `by[o.status] = st` も同じ `set` メソッドを呼びます。代入ラムダは値を返さないので、この書き方も動きます（kotlinc 2.3.21 でコンパイルし、解析器の処理を確認。ビルド内のテストはまだありません）。
-現在の lambdaQL が読むのは、ラムダが返す `by.set(...)` 呼び出しのつながりだけです。そのため、つなげた形で書いてください。
+インデックス演算子では、カラムごとに `by[column] = value` を 1 つずつ書きます: `{ o, by -> by[o.status] = st; by[o.price] = o.price!! * 1.1 }`。カラム 1 つの書き方はテスト済みです（上を参照）。複数の文の書き方は、まだ Kotlin のテストで確認していません。
 
 設計では、ラムダの 2 つ目の引数は **1 つのコンテキストオブジェクト** です。`set(column, value)` とサブクエリ関数 `from(...)` の両方を持っています。
 名前は `by` でも `sub` でも好きに付けてください。名前は関係ありません。
@@ -215,7 +227,7 @@ SQL では、SET の右辺にあるすべてのカラムは、更新 **前** の
 // error: price is assigned first, then read again
 ```
 
-**同じ文の中で、カラムに代入したあとにそのカラムを読む** と、lambdaQL は `set(...)` を呼んだときに `LambdaAnalysisException` を投げます（ルール U3）。
+**同じ文の中で、カラムに代入したあとにそのカラムを読む** と、lambdaQL は `set(...)` を呼んだときに `TranslationException`（`LQL-3042`）を投げます（ルール U3）。
 理由: この場合 MariaDB は **新しい** 値を使い、H2 と Oracle は古い値を使います。結果が異なります（確認結果: MariaDB は 200、H2 と Oracle は 100）。
 
 次のケースは問題ありません。3 つのデータベースの結果が一致するからです。
@@ -237,8 +249,8 @@ SQL では、SET の右辺にあるすべてのカラムは、更新 **前** の
 <a id="rules-checked-at-analysis-time"></a>
 ### 解析時に確認するルール
 
-lambdaQL は、ラムダを読むときにルール U1、U3、U4、U6 を確認し、`set(...)` や `values(...)` から `LambdaAnalysisException` を投げます。
-これらの確認は、Java のラムダを使って [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)（リージョン `rules`）と [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) でテストしています。Kotlin のテストはまだありません。
+lambdaQL は、ラムダを読むときにルール U1、U3、U4、U6 を確認し、`set(...)` や `values(...)` から `LambdaQLException` を投げます（たとえば U1 は `LQL-3037`、U3 は `LQL-3042`、U4 は `LQL-3041`）。
+これらの確認は、Java のラムダを使って [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)（リージョン `rules`）と [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) でテストしています。これらの確認の Kotlin のテストはまだありません。
 
 <a id="where-or-all-is-required"></a>
 ### `where` か `all()` が必要
@@ -385,7 +397,7 @@ upsert のルール（決定 D40）は [7.6 Upsert](07-6-upsert.md#rules) にあ
 | `returning` | 拒否 | DML のあとにもう一度クエリする |
 | データベースの時刻（`current_timestamp`） | 拒否 | アプリケーションの時刻をバインドする（U8） |
 
-現在、ルールに違反すると、簡単なメッセージ（今は韓国語）付きの `LambdaAnalysisException` が投げられます。予定している `[LQL-xxxx]` コードと基底クラス `LambdaQLException` は [11. エラーと言語](../11-errors-and-languages.md) にあります。
+ルールに違反すると、`[LQL-xxxx]` コード付きの `LambdaQLException` が投げられます（ほとんどのルールは `TranslationException`、代入ラムダの中の条件やローカル変数は `UnsupportedLambdaShapeException`）。[11. エラーと言語](../11-errors-and-languages.md) を参照してください。
 すべてのルールを 1 か所にまとめたもの: [10. ルールと制限](10-rules-and-limits.md)。
 
 ---

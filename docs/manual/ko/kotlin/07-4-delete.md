@@ -2,7 +2,7 @@
 # 7.4 삭제 (Kotlin)
 
 > [!NOTE]
-> **상태: 구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, 마일스톤 M10). 테스트는 **Java** 람다를 사용합니다. **DML의 Kotlin 람다는 아직 테스트하지 않았습니다.** `limit`과 `executeOne()`(결정 D41)도 같습니다.
+> **상태: 구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, 마일스톤 M10). 테스트는 대부분 **Java** 람다를 사용합니다. `not exists` 서브쿼리를 쓰는 delete는 Kotlin 람다로도 테스트했습니다([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), **(테스트됨)** 표시). `limit`과 `executeOne()`(결정 D41)도 같습니다.
 > `where` 안의 서브쿼리(`sub`)도 구현되어 Java 람다로 테스트했습니다(마일스톤 M8).
 > **아직 구현되지 않음:** 복합 키 엔티티의 `limit` / `executeOne()`.
 > Kotlin 코드는 테스트된 Java 문장을 Kotlin 문법으로 옮긴 것이고, HQL은 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)와 [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)의 Java 테스트에서 가져왔습니다. HQL이 없는 예제는 설계를 따릅니다.
@@ -51,7 +51,17 @@ where (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id) is n
 
 MariaDB는 `delete o1_0 from orders o1_0`로 씁니다. H2와 Oracle은 `delete from orders o1_0`로 씁니다.
 
-아직 Kotlin 테스트는 없습니다. 같은 문장을 Java로 작성한 테스트가 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)에 있습니다(H2, MariaDB, Oracle). 테스트된 예제는 [이 페이지의 Java 버전](../java/07-4-delete.md)을 참고하십시오.
+**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `insert-delete`:
+
+```kotlin
+val i = qb.insert(Archive::class.java).values { it.id = 100L; it.price = 9.5; it.customerName = "Kim" }
+assertEquals(1, i.execute())
+val d = qb.delete(Order::class.java).where { o, sub -> !sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
+assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)", d.toHql().hql())
+```
+
+테스트는 먼저 `Archive` 행 하나를 삽입하고, 품목이 없는 주문을 삭제한 뒤, 남은 행을 Kotlin으로 같은 조건을 적용한 결과와 비교합니다.
+더 많은 문장을 Java로 작성한 테스트가 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)에 있습니다(H2, MariaDB, Oracle). 그 예제는 [이 페이지의 Java 버전](../java/07-4-delete.md)을 참고하십시오.
 
 두 번째 문장은 `qb.from(Order::class.java).where { it.customer?.name == null }`이 반환하는 것과 **같은 행**, 즉 고객의 이름이 없는 주문을 삭제합니다. Java 테스트는 삭제된 행을 이 조회 결과와 비교합니다.
 고객이 **없는** 주문은 삭제되지 않습니다(규칙 U9, 결정 D36). 그런 주문도 삭제하려면 `it.customer == null || it.customer?.name == null`이라고 쓰십시오. 이 null 가드가 있으면 lambdaQL은 `e0.customer.id is not null`을 더하지 않습니다.

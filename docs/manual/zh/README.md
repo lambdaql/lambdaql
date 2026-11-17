@@ -8,7 +8,8 @@
 > **更新、插入、删除和 upsert** 也已实现，包括 `limit` 和单行保护 `executeOne()`（已在 H2、MariaDB 和 Oracle 上用 Java Lambda 测试）。
 > **Spring Data JPA 模块**也已实现：repository 执行器 `LambdaQlExecutor<T>`（支持 Spring `Sort`、`Pageable`、`deleteAll(where)` 和 `updateOne(where, set)` 等 DML 快捷方法，以及更新、删除、插入和 upsert 构建器）以及 Spring Boot 自动配置（已用 Spring Boot 3.4.2 测试）。DML 需要调用方的事务。
 > **子查询**（`where((o, sub) -> ...)`，也可用于 update 和 delete）和 **`select`**（record 和 DTO、`groupBy`、`having`、`Agg` 聚合，也可用于 `insert ... select`）同样已实现（已在 H2、MariaDB 和 Oracle 上用 Java Lambda 测试）。
-> 本手册中的其他内容（派生表、CTE、存储过程）都处于**已设计**状态：语法和规则已经确定，并已在 H2、MariaDB 和 Oracle 上用原型验证过，但代码还没有进入库中。
+> **显式 join**（`join`、`leftJoin`、`crossJoin`）、**派生表和 CTE**（`qb.from(valueQuery)`、`qb.with(valueQuery)`）、**存储过程与数据库函数**（`@SqlProcedure`、`@SqlFunction`、`qb.call`、`qb.exec`）以及**带四种语言消息的错误码**（`[LQL-xxxx]`）同样已实现（用 Java Lambda 测试；存储过程在 MariaDB 和 Oracle 上测试）。
+> **Kotlin Lambda** 已在构建中对一部分写法进行测试（`?.`、`!!`、`in`、子查询、data class、`groupBy`、update、insert、delete）。其他 Kotlin 特有的写法处于**已设计**状态：语法和规则已经确定，并已用原型验证过，但还没有在构建中测试。
 > 目前还没有任何构件发布到 Maven Central。如果想试用，请从源码构建（[Java](java/02-getting-started.md#build-from-source) | [Kotlin](kotlin/02-getting-started.md#build-from-source)）。
 
 lambdaQL 是一个面向 Java 和 Kotlin 的查询库。
@@ -107,7 +108,7 @@ fetch first ? rows only
 | 3 | 条件（`where`）：运算符、null 规则、捕获的值 | [Java](java/03-where.md) | [Kotlin](kotlin/03-where.md) |
 | 4 | 排序与分页：`orderBy`、`Direction`、`limit`、`offset` | [Java](java/04-order-paging.md) | [Kotlin](kotlin/04-order-paging.md) |
 | 5 | 子查询：`exists`、`contains`、标量子查询和关联子查询 | [Java](java/05-subquery.md) | [Kotlin](kotlin/05-subquery.md) |
-| 6 | 查询列、聚合与分组：`select`、`groupBy`、`having`、`Agg` | [Java](java/06-select-group.md) | [Kotlin](kotlin/06-select-group.md) |
+| 6 | 查询列、聚合与分组：`select`、`groupBy`、`having`、`Agg`、join（`join`、`leftJoin`、`crossJoin`）、派生表与 CTE（`with`） | [Java](java/06-select-group.md) | [Kotlin](kotlin/06-select-group.md) |
 | 7 | 更新、插入、删除：`set`、`values`、`all()`、`execute()`、`limit`、`executeOne()` | [Java](java/07-dml.md) | [Kotlin](kotlin/07-dml.md) |
 | 7.6 | Upsert：`upsert`、`onConflict(...).update(...)`、`onConflict(...).ignore()` | [Java](java/07-6-upsert.md) | [Kotlin](kotlin/07-6-upsert.md) |
 | 8 | 存储过程与数据库函数：`@SqlProcedure`、`@SqlFunction`、`qb.call`、`qb.exec` | [Java](java/08-procedures-functions.md) | [Kotlin](kotlin/08-procedures-functions.md) |
@@ -125,14 +126,15 @@ fetch first ? rows only
 | 将 getter 映射到 JPA 属性，计算捕获的值 | 已实现，已在 H2、MariaDB、Oracle 上测试 | [03](java/03-where.md) | [03](kotlin/03-where.md) |
 | HQL 生成与查询执行（`where`、`toList()`） | 已实现，已在 H2、MariaDB、Oracle 上测试 | [03](java/03-where.md) | [03](kotlin/03-where.md) |
 | 结果函数（`first()`、`one()`、`count()`、`exists()`、`toSet()`） | 已实现，已在 H2、MariaDB、Oracle 上测试（Java Lambda） | [02](java/02-getting-started.md#getting-the-result) | [02](kotlin/02-getting-started.md#getting-the-result) |
-| 排序与分页（`orderBy`、`limit`、`offset`） | 核心部分已实现，已在 H2、MariaDB、Oracle 上测试（Java Lambda），包括 `SortSpec`。`SortWhitelist` 和 join 排序（包括 `SortSpec` 的 join 写法）：已设计 | [04](java/04-order-paging.md) | [04](kotlin/04-order-paging.md) |
+| 排序与分页（`orderBy`、`limit`、`offset`） | 核心部分已实现，已在 H2、MariaDB、Oracle 上测试，包括 `SortSpec` 和 join 排序 `(o, c, by)`。`SortWhitelist` 和 `SortSpec` 的 join 写法：已设计 | [04](java/04-order-paging.md) | [04](kotlin/04-order-paging.md) |
 | 子查询（`exists`、`contains`、标量、关联） | 已实现，已在 H2、MariaDB、Oracle 上测试（Java Lambda）。MariaDB 的 `lateral` 改写：尚未实现 | [05](java/05-subquery.md) | [05](kotlin/05-subquery.md) |
 | 投影、`groupBy`、`having`、聚合（`Agg`） | 已实现，已在 H2、MariaDB、Oracle 上测试（Java Lambda），包括 `distinct()` 和结果函数。按聚合排序：v0.2 候选 | [06](java/06-select-group.md) | [06](kotlin/06-select-group.md) |
-| 派生表与 CTE | 已设计 | [06](java/06-select-group.md) | [06](kotlin/06-select-group.md) |
+| 显式 join（`join`、`leftJoin`、`crossJoin`，最多三个实体） | 已实现，已在 H2、MariaDB、Oracle 上测试（Java Lambda），包括所有实体上的 `where`、`orderBy`、`select` 和分页。DML 中和子查询中的 join：以后 | [06](java/06-select-group.md#68-explicit-joins) | [06](kotlin/06-select-group.md#68-explicit-joins) |
+| 派生表与 CTE（`qb.from(valueQuery)`、`qb.with(valueQuery)`） | 已实现，已在 H2、MariaDB、Oracle 上测试（Java Lambda）。与派生表的 join 以及两次使用同一个 CTE：以后 | [06](java/06-select-group.md#69-derived-table-subquery-in-from) | [06](kotlin/06-select-group.md#69-derived-table-subquery-in-from) |
 | `update`、`insert`、`delete`、upsert | 已实现，已在 H2、MariaDB、Oracle 上测试（Java Lambda），包括 `limit` 和 `executeOne()`。update 和 delete 的 `where` 中的子查询（`sub`）以及 `insert ... select` 中的聚合：已实现。`set` 值中的子查询：已设计 | [07](java/07-dml.md) | [07](kotlin/07-dml.md) |
-| 存储过程与数据库函数 | 已设计 | [08](java/08-procedures-functions.md) | [08](kotlin/08-procedures-functions.md) |
-| Kotlin 写法（`?.`、`?:`、`!!`、区间、`when`、`in`） | 已设计（解码器的部分功能已就绪） | – | [09](kotlin/09-kotlin-notes.md) |
-| 4 种语言的错误码和消息 | 已设计 | [11](11-errors-and-languages.md) | [11](11-errors-and-languages.md) |
+| 存储过程与数据库函数 | 已实现：查询中的数据库函数和单独调用，已在 H2、MariaDB、Oracle 上测试；存储过程（`call`、`exec`、OUT、INOUT、结果集）已在 MariaDB 和 Oracle 上测试（H2 没有 OUT 参数）。SARGable 警告、存储过程参数的类型和名字检查、Oracle 包重载：尚未实现 | [08](java/08-procedures-functions.md) | [08](kotlin/08-procedures-functions.md) |
+| Kotlin 写法（`?.`、`?:`、`!!`、区间、`when`、`in`） | `?.`、`!!`、对捕获集合使用 `in`、data class、`Pair`/`Triple`、属性赋值：已在 H2、MariaDB、Oracle 上用 Kotlin Lambda 测试。`?:`、区间、`when`、属性引用：已设计 | – | [09](kotlin/09-kotlin-notes.md) |
+| 4 种语言的错误码和消息 | 已实现，已做单元测试：`[LQL-xxxx]` 错误码、`LambdaQLException` 及其子类、英文、日文、中文和韩文消息、`lambdaql.locale`。警告 `LQL-5001` 和严格模式：尚未实现 | [11](11-errors-and-languages.md) | [11](11-errors-and-languages.md) |
 | Spring Data JPA（`LambdaQlExecutor<T>`、Spring `Sort` / `Pageable`、Spring Boot 自动配置） | 已实现，已在 H2、MariaDB、Oracle 上用 Spring Boot 3.4.2 测试（Java），包括 DML 快捷方法（`deleteAll`、`updateOne` 等）以及更新、删除、插入和 upsert 构建器。Spring Boot 4：尚未验证 | [12](java/12-spring-data-jpa.md) | [12](kotlin/12-spring-data-jpa.md) |
 
 术语含义：
@@ -144,7 +146,7 @@ fetch first ? rows only
 | 已设计 | 语法和规则已经确定。原型已测试。库中还没有这部分代码。 |
 | 计划中 | 思路已知，但细节尚未确定。 |
 
-测试在这里。`SelectQueryTest`、`SortQueryTest`、`SubqueryTest`、`ProjectionTest`、`DmlQueryTest`、`ExecutorTest` 和 `AutoConfigurationTest` 使用用户 API，其他测试检查内部类。
+测试在这里。`SelectQueryTest`、`SortQueryTest`、`SubqueryTest`、`ProjectionTest`、`JoinQueryTest`、`DerivedQueryTest`、`DmlQueryTest`、`FunctionTest`、`ProcedureTest`、`KotlinSelectTest`、`KotlinQueryTest`、`LqlMessagesTest`、`ExecutorTest` 和 `AutoConfigurationTest` 使用用户 API，其他测试检查内部类。
 
 | 测试 | 检查内容 |
 |---|---|
@@ -152,7 +154,14 @@ fetch first ? rows only
 | [SortQueryTest.java](../../../query/src/test/java/org/lambdaql/query/SortQueryTest.java) | `orderBy`、`limit`、`offset`：在 H2、MariaDB 和 Oracle 上的 HQL 和行的顺序 |
 | [SubqueryTest.java](../../../query/src/test/java/org/lambdaql/query/SubqueryTest.java) | `where` 中的子查询：`exists`、`contains`（IN）、NOT EXISTS、标量、top-1、嵌套，以及带子查询的删除：在 H2、MariaDB 和 Oracle 上的 HQL 和行 |
 | [ProjectionTest.java](../../../query/src/test/java/org/lambdaql/query/ProjectionTest.java) | `select`、record、`groupBy`、`having`、`Agg`、`distinct`、分页以及带 `groupBy` 的 `insert ... select`：在 H2、MariaDB 和 Oracle 上的 HQL 和值 |
+| [JoinQueryTest.java](../../../query/src/test/java/org/lambdaql/query/JoinQueryTest.java) | 最多三个实体的 `join`、`leftJoin`、`crossJoin`：在 H2、MariaDB 和 Oracle 上的条件、排序、`select`、重复的行、`count` 以及覆盖所有实体的分页 |
+| [DerivedQueryTest.java](../../../query/src/test/java/org/lambdaql/query/DerivedQueryTest.java) | 派生表和 CTE（`qb.from(valueQuery)`、`qb.with(valueQuery)`）：在 H2、MariaDB 和 Oracle 上的 HQL 和行、内层 `limit`，以及行类型规则 J5 |
 | [DmlQueryTest.java](../../../query/src/test/java/org/lambdaql/query/DmlQueryTest.java) | `update`、`delete`、`insert`、upsert：在 H2、MariaDB 和 Oracle 上的 HQL 和执行后的行，并与使用相同条件的查询进行比较 |
+| [FunctionTest.java](../../../query/src/test/java/org/lambdaql/query/FunctionTest.java) | `where`、`select`、`orderBy` 和 update `set` 中的 `@SqlFunction` 数据库函数、Boolean 函数、已注册的函数以及规则检查，在 H2、MariaDB 和 Oracle 上 |
+| [ProcedureTest.java](../../../query/src/test/java/org/lambdaql/query/ProcedureTest.java) | 在 MariaDB 和 Oracle 上用 `qb.call` 和 `qb.exec` 调用 `@SqlProcedure`（OUT、多个 OUT、INOUT、结果集和 REF CURSOR）以及存根检查；在 H2、MariaDB 和 Oracle 上单独调用数据库函数 |
+| [KotlinSelectTest.kt](../../../query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt) | `where` 中的 Kotlin Lambda：`?.` 路径、捕获值、对捕获集合使用 `in` |
+| [KotlinQueryTest.kt](../../../query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt) | Kotlin Lambda：排序、子查询、data class、`Pair` 和 `Triple` 结果、`groupBy` 和 `having`、update（属性赋值和 `by[column] = value`）、insert 和 delete |
+| [LqlMessagesTest.java](../../../query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java) | 消息错误码和四种消息语言：每个资源包中的键和参数都相同、错误码唯一、locale 的选择、按错误码范围决定的异常类 |
 | [ExecutorTest.java](../../../spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java) | Spring Boot 应用中的 `LambdaQlExecutor<T>`：repository 方法、Spring `Sort` 和 `Pageable`、事务 |
 | [AutoConfigurationTest.java](../../../spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java) | Spring Boot 自动配置提供的 `QueryBuilder` bean |
 | [LoadExamplesTest.java](../../../query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java) | 找到 Lambda 主体，读取捕获的值，拒绝不可序列化的 Lambda |
@@ -165,7 +174,7 @@ fetch first ? rows only
 
 ## 关于示例
 
-示例均为设计示例。某个功能实现后，其示例将替换为取自测试套件的代码，并附上测试文件的链接。在 3. 条件、4. 排序与分页、5. 子查询、6. 查询列、聚合与分组、7. 更新、插入、删除和 12. Spring Data JPA（Java）中，这些示例标记为 **(已测试)**。
+示例均为设计示例。某个功能实现后，其示例将替换为取自测试套件的代码，并附上测试文件的链接。在 3. 条件、4. 排序与分页、5. 子查询、6. 查询列、聚合与分组、7. 更新、插入、删除、8. 存储过程与数据库函数、11. 错误与语言和 12. Spring Data JPA（Java）中，这些示例标记为 **(已测试)**。Kotlin 路线中取自 Kotlin 测试的示例也同样标记。
 
 ## 示例实体
 

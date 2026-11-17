@@ -190,7 +190,7 @@ qb.update(Order.class)
 // error: price is assigned first, then read again
 ```
 
-如果你**在同一条语句中先给某列赋值、之后又读取它**，lambdaQL 会在你调用 `set(...)` 时抛出 `LambdaAnalysisException`（规则 U3）。
+如果你**在同一条语句中先给某列赋值、之后又读取它**，lambdaQL 会在你调用 `set(...)` 时抛出 `TranslationException`（`LQL-3042`）（规则 U3）。
 原因：这种情况下 MariaDB 使用**新**值，而 H2 和 Oracle 使用旧值。结果不同（已检查：MariaDB 为 200，H2 和 Oracle 为 100）。
 
 以下情况没有问题，因为三种数据库的结果一致：
@@ -212,17 +212,17 @@ qb.update(Order.class)
 <a id="rules-checked-at-analysis-time"></a>
 ### 在分析时检查的规则
 
-lambdaQL 在读取 Lambda 时检查规则 U1、U3、U4 和 U6。下面的测试调用的是内部类 `AssignmentReader`，而不是用户 API。用户 API 会从 `set(...)` 和 `values(...)` 抛出同样的 `LambdaAnalysisException`。
+lambdaQL 在读取 Lambda 时检查规则 U1、U3、U4 和 U6。下面的测试调用的是内部类 `AssignmentReader`，而不是用户 API。用户 API 会从 `set(...)` 和 `values(...)` 抛出同样的 `LambdaQLException`（例如 U1 为 `LQL-3037`，U3 为 `LQL-3042`，U4 为 `LQL-3041`）。
 
 **(已测试)** [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)，region `rules`：
 
 ```java
 // U1: only setters; no condition, no local variable
-assertThrows(LambdaAnalysisException.class, () -> setters(o -> { if (o.isActive()) o.setStatus((short) 1); }));
+assertThrows(LambdaQLException.class, () -> setters(o -> { if (o.isActive()) o.setStatus((short) 1); }));
 // U6: an association's other properties belong to another table
-assertThrows(LambdaAnalysisException.class, () -> setters(o -> o.getCustomer().setName("x")));
+assertThrows(LambdaQLException.class, () -> setters(o -> o.getCustomer().setName("x")));
 // U3: a value reads a column written before
-assertThrows(LambdaAnalysisException.class, () -> AssignmentReader.checkRules(
+assertThrows(LambdaQLException.class, () -> AssignmentReader.checkRules(
         AssignmentReader.readSetters(SerializedLambdaExtractor.extract((Assign<Order>) o -> {
             o.setPrice(1);
             o.setTex((float) o.getPrice());
@@ -373,7 +373,7 @@ Upsert 的规则（决定 D40）见 [7.6 Upsert](07-6-upsert.md#rules)。
 | `returning` | 不支持 | – |
 | 数据库时间（`current_timestamp`） | 不支持 | 绑定应用程序时间（U8） |
 
-目前违反规则时会抛出带普通消息的 `LambdaAnalysisException`（目前消息是韩语）。计划中的 `[LQL-xxxx]` 代码和 `LambdaQLException` 基类见 [11. 错误与语言](../11-errors-and-languages.md)。
+违反规则时会抛出带 `[LQL-xxxx]` 错误码的 `LambdaQLException`（大多数规则为 `TranslationException`，赋值 Lambda 中的条件或局部变量为 `UnsupportedLambdaShapeException`）。见 [11. 错误与语言](../11-errors-and-languages.md)。
 所有规则汇总在一处：[10. 规则与限制](10-rules-and-limits.md)。
 
 ---

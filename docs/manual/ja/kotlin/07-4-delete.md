@@ -2,7 +2,7 @@
 # 7.4 削除（Kotlin）
 
 > [!NOTE]
-> **状況: 実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、マイルストーン M10）。テストは **Java** のラムダを使っています。**DML での Kotlin のラムダはまだテストしていません。** `limit` と `executeOne()` も同じです（決定 D41）。
+> **状況: 実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、マイルストーン M10）。ほとんどのテストは **Java** のラムダを使っています。`not exists` のサブクエリを使う delete は Kotlin のラムダでもテストしています（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、**(テスト済み)** と表示）。 `limit` と `executeOne()` も同じです（決定 D41）。
 > `where` の中のサブクエリ（`sub`）も実装済みで、Java のラムダでテスト済みです（マイルストーン M8）。
 > **まだ実装されていません:** 複合キーのエンティティでの `limit` / `executeOne()`。
 > Kotlin コードはテスト済みの Java の文を Kotlin の構文で書いたもので、HQL は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) と [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) の Java のテストから取っています。HQL のない例は設計に従っています。
@@ -51,7 +51,17 @@ where (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id) is n
 
 MariaDB は `delete o1_0 from orders o1_0` と書きます。H2 と Oracle は `delete from orders o1_0` と書きます。
 
-Kotlin のテストはまだありません。Java で書いた同じ文は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) でテストしています（H2、MariaDB、Oracle）。テスト済みの例は [このページの Java 版](../java/07-4-delete.md) を見てください。
+**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `insert-delete`:
+
+```kotlin
+val i = qb.insert(Archive::class.java).values { it.id = 100L; it.price = 9.5; it.customerName = "Kim" }
+assertEquals(1, i.execute())
+val d = qb.delete(Order::class.java).where { o, sub -> !sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
+assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)", d.toHql().hql())
+```
+
+テストはまず `Archive` の行を 1 つ挿入し、次に明細のない注文を削除して、残った行を Kotlin での同じ絞り込みと比べます。
+Java で書いたほかの文は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) でテストしています（H2、MariaDB、Oracle）。それらの例は [このページの Java 版](../java/07-4-delete.md) を見てください。
 
 2 つ目の文は、`qb.from(Order::class.java).where { it.customer?.name == null }` が返すのと **同じ行** を削除します。つまり、顧客に名前がない注文です。Java のテストでは、削除した行をこの選択の結果と比べています。
 顧客の **いない** 注文は削除されません（ルール U9、決定 D36）。それらも削除するには、`it.customer == null || it.customer?.name == null` と書いてください。この null ガードがあると、lambdaQL は `e0.customer.id is not null` を加えません。

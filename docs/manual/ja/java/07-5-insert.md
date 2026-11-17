@@ -143,7 +143,7 @@ group by o1_0.customer_id
 having count(*)>=2
 ```
 
-- 集約のない値はすべて `groupBy` のキーでなければなりません（ルール J3）。そうでなければ、lambdaQL は解析時に `LambdaAnalysisException` を投げます。
+- 集約のない値はすべて `groupBy` のキーでなければなりません（ルール J3）。そうでなければ、lambdaQL は解析時に `TranslationException`（`LQL-3035`）を投げます。
 - `where` では `Agg` を使えません。`having` を使ってください。
 - テストは文を実行し、`Summary` の行を読み戻します。それらは Java で同じグループ化をした結果と一致します。
 

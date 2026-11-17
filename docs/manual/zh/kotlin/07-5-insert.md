@@ -2,7 +2,7 @@
 # 7.5 插入（Kotlin）
 
 > [!NOTE]
-> **状态：已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（里程碑 M10），包括 `insert ... select` 中的 `groupBy`、`having` 和 `Agg`（里程碑 M9）。测试使用 **Java** Lambda。**DML 中的 Kotlin Lambda 尚未测试。**
+> **状态：已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（里程碑 M10），包括 `insert ... select` 中的 `groupBy`、`having` 和 `Agg`（里程碑 M9）。大多数测试使用 **Java** Lambda。使用 `values` 的 insert 也已用 Kotlin Lambda 测试（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，标记为 **(已测试)**）。
 > **尚未实现：** `insert ... select` 的 `by.set` 写法。
 > Kotlin 代码用 Kotlin 语法展示已测试的 Java 语句，HQL 来自 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 和 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) 中的 Java 测试。没有 HQL 的示例遵循设计。
 > 完整状态见[路线 README](README.md)。
@@ -34,7 +34,17 @@ insert into archive(id,price,customer_name)
 values (100,9.5,'Kim')
 ```
 
-目前还没有 Kotlin 测试。用 Java 写的相同语句在 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中测试（H2、MariaDB 和 Oracle）。已测试的示例见[本页的 Java 版本](../java/07-5-insert.md)。
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `insert-delete`：
+
+```kotlin
+val i = qb.insert(Archive::class.java).values { it.id = 100L; it.price = 9.5; it.customerName = "Kim" }
+assertEquals(1, i.execute())
+val d = qb.delete(Order::class.java).where { o, sub -> !sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
+assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)", d.toHql().hql())
+```
+
+前两行用 Kotlin Lambda 插入一行。delete 部分在 [7.4](07-4-delete.md) 中说明。
+更多用 Java 写的语句在 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中测试（H2、MariaDB 和 Oracle）。这些示例见[本页的 Java 版本](../java/07-5-insert.md)。
 
 Lambda 中的常量仍是字面量（决定 D37）。值不能读取新行：`it.price = it.price` 是错误。
 
@@ -139,7 +149,7 @@ group by o1_0.customer_id
 having count(*)>=2
 ```
 
-- 每个不带聚合的值都必须是 `groupBy` 的键（规则 J3）。否则 lambdaQL 会在分析时抛出 `LambdaAnalysisException`。
+- 每个不带聚合的值都必须是 `groupBy` 的键（规则 J3）。否则 lambdaQL 会在分析时抛出 `TranslationException`（`LQL-3035`）。
 - `where` 中不允许使用 `Agg`。请使用 `having`。
 
 ---

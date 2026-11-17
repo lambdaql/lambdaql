@@ -41,7 +41,7 @@ public final class QueryContext {
 
     private final EntityManagerFactory emf;
     private final EntityManager sharedEntityManager;
-    private final EntityModel model;
+    private final org.lambdaql.engine.sem.RowModel model;
     private final Map<Class<?>, Pred> whereCache = new ConcurrentHashMap<>();
     private final Map<Class<?>, List<SortItem>> sortCache = new ConcurrentHashMap<>();
     private final Map<Class<?>, Expr> sortKeyCache = new ConcurrentHashMap<>();
@@ -59,7 +59,8 @@ public final class QueryContext {
     QueryContext(EntityManagerFactory emf, EntityManager sharedEntityManager) {
         this.emf = emf;
         this.sharedEntityManager = sharedEntityManager;
-        this.model = new JpaEntityModel(sharedEntityManager != null ? sharedEntityManager.getMetamodel() : emf.getMetamodel());
+        this.model = new org.lambdaql.engine.sem.RowModel(
+                new JpaEntityModel(sharedEntityManager != null ? sharedEntityManager.getMetamodel() : emf.getMetamodel()));
     }
 
     /**
@@ -116,6 +117,11 @@ public final class QueryContext {
         var evaluator = new org.lambdaql.engine.sem.HostEvaluator(ref.classLoader());
         Object[] captured = ref.capturedArgs();
         return args.stream().map(a -> evaluator.eval(a, captured)).toArray();
+    }
+
+    /** Registers the row type of a derived table or CTE, so lambdas can read its columns (ROADMAP M8-2). */
+    void registerRow(Class<?> row) {
+        model.register(row);
     }
 
     private <R> R procedureWork(Function<EntityManager, R> work) {

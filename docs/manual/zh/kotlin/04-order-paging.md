@@ -3,10 +3,11 @@
 
 > [!NOTE]
 > **状态**
-> - **核心部分已实现**，并在 H2、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上测试：带有 `by.asc`、`by.desc` 和 `by.sort` 的 `orderBy { o, by -> ... }`，一个排序键的写法 `orderBy { it.key }` 和 `orderBy({ it.key }, Direction)`，`Direction.parse` / `reversed`，`limit` / `offset`，`orderBy` 之后的 `first()`，以及可重用排序 `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。Spring `Sort` 和 `Pageable` 可以在 Spring Data JPA 模块中使用（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。这些测试使用的是 **Java** Lambda。**Kotlin Lambda 尚未测试。**
-> - **尚未实现：** Kotlin 属性引用（`orderBy(Order::price)`）、`SortWhitelist` 和 join 写法 `{ o, c, by -> }`（`SortSpec` 也是）。
+> - **核心部分已实现**，并在 H2、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上测试：带有 `by.asc`、`by.desc` 和 `by.sort` 的 `orderBy { o, by -> ... }`，一个排序键的写法 `orderBy { it.key }` 和 `orderBy({ it.key }, Direction)`，`Direction.parse` / `reversed`，`limit` / `offset`，`orderBy` 之后的 `first()`，以及可重用排序 `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。Spring `Sort` 和 `Pageable` 可以在 Spring Data JPA 模块中使用（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。大多数测试使用 **Java** Lambda。带 `limit` 的 Kotlin 排序也已测试（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，标记为 **(已测试)**）。
+> - **也已实现（用 Java Lambda 测试）：** 在 `join`、`leftJoin` 或 `crossJoin` 之后使用的 join 写法 `{ o, c, by -> ... }`（见 [6.8 显式 join](06-select-group.md#68-explicit-joins)）。
+> - **尚未实现：** Kotlin 属性引用（`orderBy(Order::price)`）、`SortWhitelist` 和 `SortSpec` 的 join 写法。
 > - 该 Kotlin 语法可以编译（已用原型检查，kotlinc 2.3.21）。可空排序键、`?.` 排序键和属性引用可以编译；实体排序键不能编译。
-> - 本章中的 HQL 遵循库的规则，但没有用 Kotlin Lambda 测试过。
+> - 本章中的其他 HQL 遵循库的规则，但没有用 Kotlin Lambda 测试过。
 
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[3. 条件](03-where.md) | 下一章：[5. 子查询](05-subquery.md) | [本页的 Java 版本](../java/04-order-paging.md)
 
@@ -71,7 +72,19 @@ fetch first ? rows only
 - 排序键和它的方向写在一起。它们的顺序永远不会错乱。
 - lambdaQL 读取 Lambda，但从不执行它。`by` 的方法只是描述顺序。
 
-目前还没有 Kotlin 测试。用 Java 写的同样的排序在 [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java) 中测试过（H2、MariaDB 和 Oracle）。已测试的示例请看[本页的 Java 版本](../java/04-order-paging.md)。
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `sort`：
+
+```kotlin
+val q = qb.from(Order::class.java)
+    .where { it.isActive }
+    .orderBy { o, by -> by.desc(o.price).asc(o.customer?.name) }
+    .limit(3)
+assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.active = true"
+    + " order by e0.price desc, j1.name asc nulls first, e0.id asc", q.toHql().hql())
+```
+
+测试使用 Java 测试实体：`price` 是基本类型 `double`（所以没有 `nulls` 部分），`active` 的 getter 是 `isActive()`（Kotlin 中为 `it.isActive`）。测试在 H2、MariaDB 和 Oracle 上执行查询，并把结果行与用 Kotlin 进行的同样排序作比较。
+更多用 Java 写的排序在 [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java) 中测试过。这些示例请看[本页的 Java 版本](../java/04-order-paging.md)。
 
 <a id="42-the-short-forms-one-key"></a>
 ## 4.2 简短写法（一个排序键）
@@ -247,7 +260,7 @@ order by c1_0.name asc nulls first,o1_0.id
 // 会被拒绝：循环、局部 val/var、多于一条语句
 ```
 
-lambdaQL 在你调用 `orderBy` 时检查这一点，并抛出 `LambdaAnalysisException`。
+lambdaQL 在你调用 `orderBy` 时检查这一点，并抛出 `LambdaQLException`（例如条件为 `LQL-2023`，不含实体的排序键为 `LQL-3031`）。
 每个排序键都必须使用实体。只有常量或捕获值的排序键会被拒绝。
 
 如果方向必须在运行时改变，请把它作为变量传入：`by.sort(key, dir)`。如果排序键本身必须改变，请在普通 Kotlin 代码中用两个分支分别构建查询。
@@ -377,7 +390,8 @@ fetch first ? rows only
 
 - 它只会添加一次。如果你的排序键已经包含 id（例如 `by.desc(o.id)`），就不会添加。
 - 没有 `limit` 和 `offset` 时，不会添加任何东西。
-- **尚未实现**（join 尚未实现）：有对多 join 时，也会添加被 join 实体的 id。集合的 fetch join 与 `limit`/`offset` 一起使用会被拒绝。
+- 使用显式 join（`join`、`leftJoin`、`crossJoin`）时，也会按 join 的顺序添加每个被 join 实体的 id（已用 Java Lambda 测试，见 [6.8](06-select-group.md#68-explicit-joins)）。
+- 尚未实现：集合的 fetch join 与 `limit`/`offset` 一起使用时拒绝。
 
 <a id="49-strings-and-special-values"></a>
 ## 4.9 字符串与特殊值
@@ -491,7 +505,7 @@ qb.from(Order::class.java).orderBy(byName).toList()
 **尚未实现：**
 
 - `SortWhitelist<T>`，用于把外部字符串（例如 `"price,desc_nulls_last"` 这样的请求参数）转换为排序。它只接受列表中的名称。在此之前，`Direction.parse` 和 `by.sort(key, dir)` 可以提供运行时的方向（见 [4.3](#43-direction)）。排序键请在普通 Kotlin 代码中选择，或者先用你自己的列表检查文本，再使用 `SortSpec.ofPath`。
-- **计划中：** 使用 `{ o, c, by -> ... }` 的 join（`SortSpec` 中也是）、键集分页（keyset paging）。
+- **计划中：** `SortSpec` 的 join 写法、键集分页（keyset paging）。（join 的 Lambda 写法 `{ o, c, by -> ... }` 已实现，见 [6.8](06-select-group.md#68-explicit-joins)。）
 
 <a id="411-sorting-inside-subqueries"></a>
 ## 4.11 子查询内部的排序
@@ -507,18 +521,18 @@ qb.from(Order::class.java).orderBy(byName).toList()
 
 | # | 规则 | 状态 |
 |---|---|---|
-| S1 | 排序是一个 Lambda：`{ o, by -> by... }`。一个排序键时：`{ it.key }`，可选 `Direction`。join 时：`{ o, c, by -> by... }`（`by` 总是最后一个） | 已实现，join 写法除外 |
+| S1 | 排序是一个 Lambda：`{ o, by -> by... }`。一个排序键时：`{ it.key }`，可选 `Direction`。join 时：`{ o, c, by -> by... }`（`by` 总是最后一个） | 已实现，join 写法 `{ o, c, by -> }` 也已实现（用 Java Lambda 测试） |
 | S2 | 排序键是 `Comparable`（允许 Kotlin 可空排序键）。实体不能作为排序键（编译错误）。排序键必须使用实体 | 已实现 |
 | S3 | 方向来自 `asc` / `desc` 或 `sort(key, Direction)`。`asc(key)`/`desc(key)`（`ASC`/`DESC`）使用 NULL 策略；`asc(key, nullsFirst)`、`desc(key, nullsFirst)` 和 `*_NULLS_*` 按写法使用 | 已实现 |
 | S4 | 主体只能是一条直接的 `by` 调用链。不能有 `if`、`when` 或循环 | 已实现 |
 | S5 | 每个查询只调用一次 `orderBy`。`orderBy` 之后不能调用 `where`。`limit` 之后不能调用 `orderBy`（编译错误） | 已实现 |
-| S6 | 用 `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）重用。外部字符串只能通过 `SortWhitelist` | `SortSpec` 已实现（用 Java Lambda 测试）。`SortWhitelist` 和 join 写法尚未实现 |
+| S6 | 用 `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）重用。外部字符串只能通过 `SortWhitelist` | `SortSpec` 已实现（用 Java Lambda 测试）。`SortWhitelist` 和 `SortSpec` 的 join 写法尚未实现 |
 | S7 | 排序键：列、对一路径、`+ - *`、拓宽转换。不能有值分支。Kotlin 的 `?.` 被当作路径读取 | 已实现（未用 Kotlin Lambda 测试） |
 | S8 | 只在 `orderBy` 中使用的关联路径使用 `left join`，因此没有关联的行会被保留。如果 `where` 使用同一条路径，排序会使用 `where` 的 join | 已实现 |
-| S9 | 分页时，如果排序键不包含根实体的 `@Id`，会添加 `@Id asc`。集合 fetch join + 分页会被拒绝 | 根实体 id 部分已实现。join 相关部分尚未实现 |
+| S9 | 分页时，如果排序键不包含根实体的 `@Id`，会添加 `@Id asc`。集合 fetch join + 分页会被拒绝 | 根实体 id 和显式 join 实体的 id 部分已实现（用 Java Lambda 测试）。fetch join 检查尚未实现 |
 | S10 | 分析结果按 Lambda 缓存。捕获的 `Direction` 每次调用都会读取 | 已实现 |
 | S11 | Spring `Sort.Order` 与 `Direction` 一一对应（Spring 模块，见 [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。`SortWhitelist.parse("price,desc_nulls_last")` | Spring `Sort` 已实现，并用 Java 测试（尚不支持 `ignoreCase`）。`SortWhitelist` 尚未实现 |
-| S12 | join 查询使用相同的形式：`{ o, c, by -> }`、`{ o, c, i, by -> }` | 尚未实现 |
+| S12 | join 查询使用相同的形式：`{ o, c, by -> }`、`{ o, c, i, by -> }` | 已实现（用 Java Lambda 测试，见 [6.8](06-select-group.md#68-explicit-joins)） |
 | S13 | 属性引用只能用于一个排序键的简短写法（`orderBy(Order::price)`）。能编译但含义错误的引用会被拒绝 | 尚未实现（Kotlin 属性引用） |
 | S14 | 子查询的排序：有 `limit` 时保留，没有 `limit` 时移除并发出警告。数据库差异由 lambdaQL 替你处理（见第 5 章） | 已实现（已测试）。MariaDB 的 `lateral` 改写尚未实现 |
 

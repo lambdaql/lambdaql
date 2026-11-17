@@ -153,4 +153,46 @@ public class QueryBuilder {
     public <R> ProcedureCall<R> call(FunctionCall<R> call) {
         return new ProcedureCall<>(() -> (R) context.function(call));
     }
+
+    /**
+     * Reads from a derived table: the rows of another query (ROADMAP M8-2), for example
+     * {@code qb.from(qb.from(Order.class).groupBy(...).select(o -> new Stat(...))).where(r -> r.total() > 100)}.
+     * The row type must be a Java record or a Kotlin data class (J5); its components name the columns.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java">DerivedQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.DerivedQueryTest" region="derived"}
+     *
+     * @param rows the inner query (a {@code select} that builds a record or data class)
+     * @param <R>  the row type
+     * @return the query over the rows
+     * @throws org.lambdaql.LambdaQLException if the row type is not a record or data class (LQL-3064)
+     */
+    public <R> DerivedQuery<R> from(ValueQuery<R> rows) {
+        return new DerivedQuery<>(new DerivedSource(rows, null), context);
+    }
+
+    /**
+     * Makes a CTE handle from a query (ROADMAP M8-2, J6); read it with {@link #from(Cte)}.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java">DerivedQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.DerivedQueryTest" region="cte"}
+     *
+     * @param rows the inner query (a {@code select} that builds a record or data class)
+     * @param <R>  the row type
+     * @return the CTE handle
+     */
+    public <R> Cte<R> with(ValueQuery<R> rows) {
+        return new Cte<>(rows, "t");
+    }
+
+    /**
+     * Reads from a CTE: {@code with t as (...) select ... from t e0}.
+     *
+     * @param cte the CTE handle
+     * @param <R> the row type
+     * @return the query over the rows
+     */
+    public <R> DerivedQuery<R> from(Cte<R> cte) {
+        return new DerivedQuery<>(cte.source, context);
+    }
 }

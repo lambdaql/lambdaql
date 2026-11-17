@@ -180,7 +180,7 @@ In SQL, every column on the right side of SET means the value **before** the upd
 // error: price is assigned first, then read again
 ```
 
-If you **assign a column and then read it later in the same statement**, lambdaQL throws `LambdaAnalysisException` when you call `set(...)` (rule U3).
+If you **assign a column and then read it later in the same statement**, lambdaQL throws `TranslationException` (`LQL-3042`) when you call `set(...)` (rule U3).
 The reason: MariaDB uses the **new** value in this case, while H2 and Oracle use the old value. The results differ (checked: MariaDB 200, H2 and Oracle 100).
 
 These cases are fine, because all three databases agree:
@@ -200,17 +200,17 @@ or `setCustomer(...)` and then `getCustomer().setId(...)`.
 
 ### Rules checked at analysis time
 
-lambdaQL checks rules U1, U3, U4 and U6 when it reads the lambda. This test calls the internal class `AssignmentReader`, not the user API. The user API throws the same `LambdaAnalysisException` from `set(...)` and `values(...)`.
+lambdaQL checks rules U1, U3, U4 and U6 when it reads the lambda. This test calls the internal class `AssignmentReader`, not the user API. The user API throws the same `LambdaQLException` from `set(...)` and `values(...)` (for example `LQL-3037` for U1, `LQL-3042` for U3, `LQL-3041` for U4).
 
 **(tested)** [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java), region `rules`:
 
 ```java
 // U1: only setters; no condition, no local variable
-assertThrows(LambdaAnalysisException.class, () -> setters(o -> { if (o.isActive()) o.setStatus((short) 1); }));
+assertThrows(LambdaQLException.class, () -> setters(o -> { if (o.isActive()) o.setStatus((short) 1); }));
 // U6: an association's other properties belong to another table
-assertThrows(LambdaAnalysisException.class, () -> setters(o -> o.getCustomer().setName("x")));
+assertThrows(LambdaQLException.class, () -> setters(o -> o.getCustomer().setName("x")));
 // U3: a value reads a column written before
-assertThrows(LambdaAnalysisException.class, () -> AssignmentReader.checkRules(
+assertThrows(LambdaQLException.class, () -> AssignmentReader.checkRules(
         AssignmentReader.readSetters(SerializedLambdaExtractor.extract((Assign<Order>) o -> {
             o.setPrice(1);
             o.setTex((float) o.getPrice());
@@ -352,7 +352,7 @@ The upsert rules (decision D40) are in [7.6 Upsert](07-6-upsert.md#rules).
 | `returning` | rejected | – |
 | Database time (`current_timestamp`) | rejected | bind an application time (U8) |
 
-Today a broken rule throws `LambdaAnalysisException` with a plain message (in Korean for now). The planned `[LQL-xxxx]` codes and the `LambdaQLException` base class are in [11. Errors and languages](../11-errors-and-languages.md).
+A broken rule throws a `LambdaQLException` with a `[LQL-xxxx]` code (`TranslationException` for most rules, `UnsupportedLambdaShapeException` for a condition or a local variable in an assignment lambda). See [11. Errors and languages](../11-errors-and-languages.md).
 All rules in one place: [10. Rules and limits](10-rules-and-limits.md).
 
 ---

@@ -33,6 +33,9 @@ public class ValueQuery<R> {
     private final List<HqlRenderer.Bound> havings;
     private final List<HqlRenderer.SortBound> sorts;
     private final Projector projector;
+    private final org.lambdaql.engine.sem.SelectReader.Projection projection;
+    private final ClassLoader loader;
+    private DerivedSource source;
     private boolean distinct;
     private Integer limit;
     private int offset;
@@ -48,6 +51,8 @@ public class ValueQuery<R> {
         this.havings = List.copyOf(havings);
         this.sorts = List.copyOf(sorts);
         this.projector = new Projector(projection, loader);
+        this.projection = projection;
+        this.loader = loader;
         this.limit = limit;
         this.offset = offset;
     }
@@ -166,6 +171,42 @@ public class ValueQuery<R> {
     }
 
     private HqlRenderer renderer() {
-        return new HqlRenderer(context.model(), root.getClassLoader()).withJoins(joins);
+        HqlRenderer r = new HqlRenderer(context.model(), root.getClassLoader()).withJoins(joins);
+        if (source != null) source.apply(r);
+        return r;
+    }
+
+    /** Reads from a derived table or CTE instead of the entity (ROADMAP M8-2). Not public API. */
+    ValueQuery<R> withSource(DerivedSource source) {
+        this.source = source;
+        return this;
+    }
+
+    /**
+     * Writes this query as the inner query of a derived table or CTE: the values are named after the row type (J6),
+     * and limit and offset are written in the HQL. Not public API.
+     */
+    String renderInner(HqlRenderer inner, List<String> names) {
+        inner.withJoins(joins).withAliases(names);
+        if (source != null) source.apply(inner);
+        StringBuilder hql = new StringBuilder(inner.values(root, wheres, select, groupBy, havings, sorts, distinct,
+                limit != null || offset > 0).hql());
+        if (limit != null) hql.append(" limit ").append(limit);
+        if (offset > 0) hql.append(" offset ").append(offset);
+        return hql.toString();
+    }
+
+    /** The row type that select builds (a record or Kotlin data class), or null for one value. Not public API. */
+    Class<?> rowClass() {
+        if (!projection.constructs()) return null;
+        try {
+            return Class.forName(projection.className().replace('/', '.'), false, loader);
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException(org.lambdaql.i18n.LqlMessage.RESULT_CONSTRUCTOR_NOT_FOUND.format(projection.className()), e);
+        }
+    }
+
+    QueryContext context() {
+        return context;
     }
 }

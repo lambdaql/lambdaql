@@ -3,9 +3,11 @@
 
 > [!NOTE]
 > **状況**
-> - **実装済み、H2・MariaDB・Oracle でテスト済み:** `where` の条件と `toList()`（カラムへのマッピング、HQL の出力、クエリの実行）。テストは **Java** のラムダを使っています。**Kotlin のラムダはまだテストしていません。**
-> - **設計済み、まだ実装されていないもの:** この章の Kotlin 固有の書き方（`?.`、`?:`、`!!`、範囲、`when`、`in`）。そのバイトコードはコンパイルしてプロトタイプで確認しました（kotlinc 1.7.22 から 2.3.21）。また、多くの条件を H2 で 1 行ずつ確認しました。派生テーブル、CTE、プロシージャも設計だけです。ソートとページングの中核部分（[4. ソートとページング](04-order-paging.md)）、サブクエリ（[5. サブクエリ](05-subquery.md)）、`groupBy`、`having`、`Agg` を使う `select`（[6. 選択、集計、グループ化](06-select-group.md)）、update/insert/delete/upsert（[7. 更新、挿入、削除](07-dml.md)）、Spring Data JPA モジュール（[12. Spring Data JPA](12-spring-data-jpa.md)）は実装済みです。
-> - この章の HQL は **予定の** 出力です。細かい部分（たとえば `e0`、`j1` のようなエイリアス名）はまだ変わることがあります。
+> - **実装済み、H2・MariaDB・Oracle でテスト済み:** `where` の条件と `toList()`（カラムへのマッピング、HQL の出力、クエリの実行）。ほとんどのテストは **Java** のラムダを使っています。
+> - **Kotlin のラムダでテスト済み**（[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、ビルドの中、kotlinc 2.3.21）: `?.` のパス、キャプチャ値、キャプチャしたコレクションに対する `in`。`!!` は [5. サブクエリ](05-subquery.md) の Kotlin のテストで確認しています。これらの例には **(テスト済み)** と書いてあります。
+> - **設計済み、まだテストしていないもの:** この章のそのほかの Kotlin 固有の書き方（`?:`、範囲、`when`）。そのバイトコードはコンパイルしてプロトタイプで確認しました（kotlinc 1.7.22 から 2.3.21）。また、多くの条件を H2 で 1 行ずつ確認しました。
+> - **これも実装済み:** ソートとページングの中核部分（[4. ソートとページング](04-order-paging.md)）、サブクエリ（[5. サブクエリ](05-subquery.md)）、`groupBy`、`having`、`Agg` を使う `select`、結合、派生テーブル、CTE（[6. 選択、集計、グループ化](06-select-group.md)）、update/insert/delete/upsert（[7. 更新、挿入、削除](07-dml.md)）、プロシージャと DB 関数（[8. プロシージャと DB 関数](08-procedures-functions.md)）、Spring Data JPA モジュール（[12. Spring Data JPA](12-spring-data-jpa.md)）。
+> - この章のそのほかの HQL は **予定の** 出力です。細かい部分（たとえば `e0`、`j1` のようなエイリアス名）はまだ変わることがあります。
 
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [2. はじめよう](02-getting-started.md) | 次: [4. ソートとページング](04-order-paging.md) | [このページの Java 版](../java/03-where.md)
 
@@ -67,7 +69,15 @@ from orders o1_0
 where o1_0.status=1 and o1_0.price>100.0
 ```
 
-Kotlin のテストはまだありません。同じクエリを Java で書いたものは [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java) でテストしています（H2、MariaDB、Oracle）。テスト済みの例は [このページの Java 版](../java/03-where.md) を参照してください。
+**(テスト済み)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、リージョン `captured`:
+
+```kotlin
+val q = qb.from(Order::class.java).where { it.price > min && it.status.toInt() == 1 }
+assertEquals("select e0 from Order e0 where e0.price > :p1 and e0.status = 1", q.toHql().hql())
+```
+
+`min` はキャプチャしたローカルの `val`（`100.0`）なので、バインドパラメーターになります。Kotlin のテストは Java のテスト用エンティティを使います: `price` はプリミティブの `double`（`!!` は不要）で、`status` は `short` です（そのためテストは `it.status.toInt() == 1` と書きます。lambdaQL はこの変換を無視します）。
+Java で書いたほかのクエリは [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java) でテストしています（H2、MariaDB、Oracle）。それらの例は [このページの Java 版](../java/03-where.md) を参照してください。
 
 `where()` は何回でも呼べます。条件は `AND` でつながります。
 
@@ -396,6 +406,15 @@ from orders o1_0
 where o1_0.id not in (?,?)
 ```
 
+**(テスト済み)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、リージョン `in`:
+
+```kotlin
+val q = qb.from(Order::class.java).where { it.status in statuses }
+assertEquals("select e0 from Order e0 where e0.status in (:p1)", q.toHql().hql())
+```
+
+`statuses` はキャプチャした `listOf<Short>(1, 3)` です。
+
 `!in` は `not in` になります。id は NULL にならないので、`is null` の部分はありません。NULL になりうるカラムでは、lambdaQL は `x is null or` を加えます。リストに `null` がなければ、Kotlin の `!in` は NULL の値に対して true になるからです。
 
 | ケース | 結果 |
@@ -432,6 +451,14 @@ qb.from(Order::class.java)
     .where { it.customer?.name == name }
     .toList()
 // HQL: select e0 from Order e0 join e0.customer j1 where j1.name = :p1
+```
+
+**(テスト済み)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、リージョン `safe-call`（`name` の代わりに定数）:
+
+```kotlin
+// it.customer?.name reads as the path customer.name (inner join: orders without a customer are left out)
+val q = qb.from(Order::class.java).where { it.customer?.name == "Kim" }
+assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim'", q.toHql().hql())
 ```
 
 **データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `inner-join`:
@@ -482,7 +509,7 @@ where c1_0.id is not null and c1_0.name=?
 
 - `||` の他の部分も注文を残すことがあります。`it.status == 1 || it.customer?.name == name` も `left join` を使います。Kotlin では、status が 1 の注文は customer がなくても条件に合うからです。
 - 別の `where` 呼び出しがその注文をどのみち除く場合（たとえば `.where { it.customer?.name != null }`）、結合は内部結合のままです。
-- これについての Kotlin のテストはまだありません。同じ条件を Java で書いたものはテスト済みです。[このページの Java 版](../java/03-where.md#310-association-paths) を参照してください。
+- null ガードについての Kotlin のテストはまだありません。同じ条件を Java で書いたものはテスト済みです。[このページの Java 版](../java/03-where.md#310-association-paths) を参照してください。
 
 customer の **ない** 注文を探すには、関連そのものを比較してください。これは外部キーのカラムをチェックし、結合はしません。
 

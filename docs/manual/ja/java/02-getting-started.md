@@ -9,7 +9,7 @@
 > Spring Data JPA モジュール（リポジトリ用の実行器と Spring Boot の自動構成）も動きます（[12. Spring Data JPA](12-spring-data-jpa.md) を参照）。
 > 更新、挿入、削除、upsert も動きます（[7. 更新、挿入、削除](07-dml.md) を参照）。
 > サブクエリと `select`（`groupBy`、`having`、`Agg` を含む）も動きます（[5. サブクエリ](05-subquery.md) と [6. 選択、集計、グループ化](06-select-group.md) を参照）。
-> 派生テーブル、CTE、プロシージャは **設計済みで、まだ実装されていません**。
+> 明示的な結合、派生テーブル、CTE も動きます（[6. 選択、集計、グループ化](06-select-group.md#68-explicit-joins) を参照）。ストアドプロシージャと DB 関数も動きます（[8. プロシージャと DB 関数](08-procedures-functions.md) を参照）。
 > 成果物（アーティファクト）はまだ Maven Central に公開していません。下のとおりソースからビルドしてください。
 
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [1. 概要](../01-overview.md) | 次: [3. 条件](03-where.md) | [このページの Kotlin 版](../kotlin/02-getting-started.md)

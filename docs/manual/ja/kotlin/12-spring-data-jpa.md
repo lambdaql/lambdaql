@@ -64,7 +64,7 @@ Maven:
 </dependency>
 ```
 
-Maven では `kotlin-reflect` も追加してください（[12.10](#1210-kotlin-compile-settings) を参照）。
+Maven では `kotlin-reflect` も追加してください（[12.9](#129-kotlin-compile-settings) を参照）。
 
 Spring Boot を使わない場合は、自分の Spring Data JPA の構成（Hibernate と JDBC ドライバー）に `lambdaql-spring-data-jpa` を追加します。これは `lambdaql-core` と Spring Data JPA を持ち込みます。
 
@@ -91,7 +91,7 @@ dependencies {
 | Spring Boot | 3.4 以降（3.4.2 でテスト済み）。Spring Boot 4 はまだ検証していません |
 | Spring Data JPA | 3.4 以降 |
 | Hibernate | 6.6（Spring Boot 3.4 にすでに含まれています） |
-| Kotlin | 2.2 以降。それより古い Kotlin については [12.10](#1210-kotlin-compile-settings) を参照 |
+| Kotlin | 2.2 以降。それより古い Kotlin については [12.9](#129-kotlin-compile-settings) を参照 |
 | `kotlin-reflect` | Kotlin のために Spring Data が必要とします |
 
 Spring Data JPA 3.3 以前は **サポートしません**。lambdaQL は実行器を `META-INF/spring.factories` に登録しますが、Spring Data がこのファイルからリポジトリのフラグメントを読むのは 3.4 からです。
@@ -138,7 +138,7 @@ interface MemberRepository : JpaRepository<Member, Long>, LambdaQlExecutor<Membe
 
 仕組み:
 
-- **本体を持つインターフェースメソッドは、Spring Data 自身が実行します。** Spring Data はそれらからクエリを作ろうとしません。本体を呼び出すだけです。lambdaQL はこの動きを変えません。古い Kotlin については [12.10](#1210-kotlin-compile-settings) を参照してください。
+- **本体を持つインターフェースメソッドは、Spring Data 自身が実行します。** Spring Data はそれらからクエリを作ろうとしません。本体を呼び出すだけです。lambdaQL はこの動きを変えません。古い Kotlin については [12.9](#129-kotlin-compile-settings) を参照してください。
 - **`LambdaQlExecutor<T>` は Spring Data のリポジトリのフラグメントです。** その実装は `lambdaql-spring-data-jpa` の `META-INF/spring.factories` に書かれています。Spring Data はこのファイルを読み、`LambdaQlExecutor<T>` を継承するすべてのリポジトリに実装を追加します。
 - **実行器のオブジェクトは 1 つで、すべてのリポジトリが共有します。** それでも、各呼び出しは自分のリポジトリのエンティティを使います。たとえば `TeamRepository` の `teams.count { ... }` は `Team` の行を数えます（Java でテスト済み、[`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)）。
 
@@ -190,7 +190,7 @@ interface MemberRepository : JpaRepository<Member, Long>, LambdaQlExecutor<Membe
 `findAll { ... }` と `count { ... }` は、`JpaRepository` の `findAll(Sort)`、`findAll(Example)`、`count()` とぶつかりません。引数の型が違うからです。
 メソッドは Java の `Optional` を返します。nullable な値がほしい場合は `.orElse(null)` を使ってください。
 
-**`query()`: 完全なクエリ。** 12.3 の `topGraded` がこれを使っています。結果の関数（そこでは `toList()`）は、`query()` を呼んだのと同じメソッドの中で呼んでください。完成していないクエリを返さないでください。[12.9](#129-routing-datasource) を参照してください。
+**`query()`: 完全なクエリ。** 12.3 の `topGraded` がこれを使っています。
 
 次の例では、`repository` は `MemberRepository` です。同じ呼び出しを Java で [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java) でテストしています（リージョン `find-all-sort`、`find-first`、`find-one`、`count-exists`、`find-set`）。
 
@@ -358,7 +358,7 @@ val page: Page<Member> = repository.findAll({ it.active }, PageRequest.of(1, 2, 
 | Spring の `Sort` に知らないプロパティがある | `PropertyReferenceException`（Java でテスト済み） |
 | Spring の `Sort` で `ignoreCase()` を使う | `UnsupportedOperationException`（Java でテスト済み） |
 | リポジトリの呼び出し（短縮メソッド、または本体を持つメソッドの中の `execute()`）で、トランザクションなしに更新、削除、挿入、upsert を実行する | `InvalidDataAccessApiUsageException`（Java でテスト済み）。JPA の `TransactionRequiredException` から Spring が作ります。リポジトリのメソッドの外（`QueryBuilder` の Bean）では JPA の `TransactionRequiredException` |
-| ルールに違反する代入のラムダ（U1、U3、U4、U6） | `LambdaAnalysisException`。変換されません（[7.8](07-dml.md#rules-checked-at-analysis-time) を参照） |
+| ルールに違反する代入のラムダ（U1、U3、U4、U6） | `LambdaQLException`（例: `TranslationException`、`LQL-3042`）。変換されません（[7.8](07-dml.md#rules-checked-at-analysis-time) を参照） |
 
 `QueryBuilder` の Bean（12.8）はリポジトリではないので、Spring はそのエラーを変換しません。そこでは、2 行以上に一致する `one()` と `executeOne()` は `NonUniqueResultException` を投げます。
 
@@ -419,30 +419,8 @@ fun queryBuilder(entityManagerFactory: EntityManagerFactory) =
 
 **`@DataJpaTest` を使うテスト。** `@DataJpaTest` のスライステストは、一部の自動構成だけを読み込みます。そこでもリポジトリのメソッドは動きますが、`QueryBuilder` の Bean は作られません。テストで必要な場合は、テストクラスに `@ImportAutoConfiguration(LambdaQlAutoConfiguration::class)` を付けてください（まだテストしていません）。
 
-<a id="129-routing-datasource"></a>
-## 12.9 ルーティング DataSource
-
-> [!WARNING]
-> **設計上の注意で、実測していません。** この節は、ルーティング DataSource ではテストしていません。
-
-アプリケーションによっては、メソッド名に対する AOP のルールでデータベースを選びます。たとえば、`find*` のメソッドを読み取り用のレプリカに送るルールです。
-このようなルールが当てはまるのは、ルールに一致したメソッドの **中で** 実行される SQL です。
-
-- `findAll`、`findOne` などの短いメソッドは、本体を持つリポジトリのメソッドの中か、同じサービスメソッドの中で呼んでください。
-- `repo.query().where { ... }.toList()` では、SQL は `query()` を呼んだときではなく、`toList()` を呼んだときに実行されます。`toList()` がリポジトリのメソッドの外で実行されると、リポジトリのメソッドに対するルールはそれに当てはまりません。
-
-```kotlin
-// a rule on repository methods applies: the SQL runs inside findActive()
-fun findActive(): List<Member> =
-    query().where { it.active }.toList()
-
-// a rule on repository methods does not apply: the SQL runs in toList(), after query() has returned
-// (a rule on the calling service method still applies)
-val rows = repository.query().where { it.active }.toList()
-```
-
-<a id="1210-kotlin-compile-settings"></a>
-## 12.10 Kotlin のコンパイル設定
+<a id="129-kotlin-compile-settings"></a>
+## 12.9 Kotlin のコンパイル設定
 
 Spring Data が本体を持つリポジトリのメソッドを実行するのは、それがインターフェースの JVM の default メソッドになっている場合だけです。
 
@@ -463,8 +441,8 @@ kotlin {
 
 これらの設定はプロトタイプで確認しました。kotlinc 2.3.21 と、2.2 より前の Kotlin の動きを再現する `-jvm-default=disable` です。lambdaQL のテストスイートには、まだ Kotlin のリポジトリがありません。
 
-<a id="1211-not-implemented-yet"></a>
-## 12.11 まだ実装されていないもの
+<a id="1210-not-implemented-yet"></a>
+## 12.10 まだ実装されていないもの
 
 - **Spring Boot 4。** 自動構成は Spring Boot 4 のクラス名も書いていますが、テストしたのは Spring Boot 3.4.2 だけです。
 - Spring の `Sort` の **`ignoreCase()`**。

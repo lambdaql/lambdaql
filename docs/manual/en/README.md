@@ -8,7 +8,8 @@
 > **Update, insert, delete and upsert** are implemented too, with `limit` and the one-row protection `executeOne()` (tested on H2, MariaDB and Oracle with Java lambdas).
 > The **Spring Data JPA module** is implemented too: the repository executor `LambdaQlExecutor<T>` (with Spring `Sort`, `Pageable`, the DML shortcuts such as `deleteAll(where)` and `updateOne(where, set)`, and the update, delete, insert and upsert builders) and the Spring Boot auto-configuration (tested with Spring Boot 3.4.2). DML needs the caller's transaction.
 > **Subqueries** (`where((o, sub) -> ...)`, also in update and delete) and **`select`** (records and DTOs, `groupBy`, `having`, the `Agg` aggregates, also in `insert ... select`) are implemented too (tested on H2, MariaDB and Oracle with Java lambdas).
-> Everything else in this manual (derived tables, CTEs, procedures) is **designed**: the syntax and rules are decided and were checked with prototypes on H2, MariaDB and Oracle, but the code is not in the library yet.
+> **Explicit joins** (`join`, `leftJoin`, `crossJoin`), **derived tables and CTEs** (`qb.from(valueQuery)`, `qb.with(valueQuery)`), **stored procedures and DB functions** (`@SqlProcedure`, `@SqlFunction`, `qb.call`, `qb.exec`) and **error codes with messages in four languages** (`[LQL-xxxx]`) are implemented too (tested with Java lambdas; procedures on MariaDB and Oracle).
+> **Kotlin lambdas** are tested in the build for a part of the forms (`?.`, `!!`, `in`, subqueries, data classes, `groupBy`, update, insert, delete). The other Kotlin-only forms are **designed**: the syntax and rules are decided and were checked with prototypes, but they are not tested in the build yet.
 > No artifact is published to Maven Central yet. To try it, build from source ([Java](java/02-getting-started.md#build-from-source) | [Kotlin](kotlin/02-getting-started.md#build-from-source)).
 
 lambdaQL is a query library for Java and Kotlin.
@@ -107,7 +108,7 @@ These pages are for both languages. They show code in separate Java and Kotlin s
 | 3 | Conditions (`where`): operators, null rules, captured values | [Java](java/03-where.md) | [Kotlin](kotlin/03-where.md) |
 | 4 | Sorting and paging: `orderBy`, `Direction`, `limit`, `offset` | [Java](java/04-order-paging.md) | [Kotlin](kotlin/04-order-paging.md) |
 | 5 | Subqueries: `exists`, `contains`, scalar and correlated subqueries | [Java](java/05-subquery.md) | [Kotlin](kotlin/05-subquery.md) |
-| 6 | Select, aggregates and group by: `select`, `groupBy`, `having`, `Agg` | [Java](java/06-select-group.md) | [Kotlin](kotlin/06-select-group.md) |
+| 6 | Select, aggregates and group by: `select`, `groupBy`, `having`, `Agg`, joins (`join`, `leftJoin`, `crossJoin`), derived tables and CTE (`with`) | [Java](java/06-select-group.md) | [Kotlin](kotlin/06-select-group.md) |
 | 7 | Update, insert, delete: `set`, `values`, `all()`, `execute()`, `limit`, `executeOne()` | [Java](java/07-dml.md) | [Kotlin](kotlin/07-dml.md) |
 | 7.6 | Upsert: `upsert`, `onConflict(...).update(...)`, `onConflict(...).ignore()` | [Java](java/07-6-upsert.md) | [Kotlin](kotlin/07-6-upsert.md) |
 | 8 | Procedures and DB functions: `@SqlProcedure`, `@SqlFunction`, `qb.call`, `qb.exec` | [Java](java/08-procedures-functions.md) | [Kotlin](kotlin/08-procedures-functions.md) |
@@ -125,14 +126,15 @@ These pages are for both languages. They show code in separate Java and Kotlin s
 | Mapping getters to JPA attributes, evaluating captured values | Implemented, tested on H2, MariaDB, Oracle | [03](java/03-where.md) | [03](kotlin/03-where.md) |
 | HQL rendering and running queries (`where`, `toList()`) | Implemented, tested on H2, MariaDB, Oracle | [03](java/03-where.md) | [03](kotlin/03-where.md) |
 | Result functions (`first()`, `one()`, `count()`, `exists()`, `toSet()`) | Implemented, tested on H2, MariaDB, Oracle (Java lambdas) | [02](java/02-getting-started.md#getting-the-result) | [02](kotlin/02-getting-started.md#getting-the-result) |
-| Sorting and paging (`orderBy`, `limit`, `offset`) | Core implemented, tested on H2, MariaDB, Oracle (Java lambdas), including `SortSpec`. `SortWhitelist` and join sorts (also the join form of `SortSpec`): designed | [04](java/04-order-paging.md) | [04](kotlin/04-order-paging.md) |
+| Sorting and paging (`orderBy`, `limit`, `offset`) | Core implemented, tested on H2, MariaDB, Oracle, including `SortSpec` and join sorts `(o, c, by)`. `SortWhitelist` and the join form of `SortSpec`: designed | [04](java/04-order-paging.md) | [04](kotlin/04-order-paging.md) |
 | Subqueries (`exists`, `contains`, scalar, correlated) | Implemented, tested on H2, MariaDB, Oracle (Java lambdas). The MariaDB `lateral` rewrite: not implemented yet | [05](java/05-subquery.md) | [05](kotlin/05-subquery.md) |
 | Projection, `groupBy`, `having`, aggregates (`Agg`) | Implemented, tested on H2, MariaDB, Oracle (Java lambdas), including `distinct()` and the result functions. Sorting by an aggregate: v0.2 candidate | [06](java/06-select-group.md) | [06](kotlin/06-select-group.md) |
-| Derived tables and CTE | Designed | [06](java/06-select-group.md) | [06](kotlin/06-select-group.md) |
+| Explicit joins (`join`, `leftJoin`, `crossJoin`, up to three entities) | Implemented, tested on H2, MariaDB, Oracle (Java lambdas), including `where`, `orderBy`, `select` and paging over all entities. Joins in DML and in subqueries: later | [06](java/06-select-group.md#68-explicit-joins) | [06](kotlin/06-select-group.md#68-explicit-joins) |
+| Derived tables and CTE (`qb.from(valueQuery)`, `qb.with(valueQuery)`) | Implemented, tested on H2, MariaDB, Oracle (Java lambdas). Joins with a derived table and the same CTE twice: later | [06](java/06-select-group.md#69-derived-table-subquery-in-from) | [06](kotlin/06-select-group.md#69-derived-table-subquery-in-from) |
 | `update`, `insert`, `delete`, upsert | Implemented, tested on H2, MariaDB, Oracle (Java lambdas), including `limit` and `executeOne()`. Subqueries (`sub`) in the `where` of update and delete and aggregates in `insert ... select`: implemented. Subqueries in `set` values: designed | [07](java/07-dml.md) | [07](kotlin/07-dml.md) |
-| Stored procedures and DB functions | Designed | [08](java/08-procedures-functions.md) | [08](kotlin/08-procedures-functions.md) |
-| Kotlin forms (`?.`, `?:`, `!!`, ranges, `when`, `in`) | Designed (parts of the decoder are ready) | – | [09](kotlin/09-kotlin-notes.md) |
-| Error codes and messages in 4 languages | Designed | [11](11-errors-and-languages.md) | [11](11-errors-and-languages.md) |
+| Stored procedures and DB functions | Implemented: DB functions in queries and alone, tested on H2, MariaDB, Oracle; procedures (`call`, `exec`, OUT, INOUT, result sets) tested on MariaDB and Oracle (H2 has no OUT parameters). SARGable warnings, type and name checks of procedure parameters, Oracle package overloads: not implemented yet | [08](java/08-procedures-functions.md) | [08](kotlin/08-procedures-functions.md) |
+| Kotlin forms (`?.`, `?:`, `!!`, ranges, `when`, `in`) | `?.`, `!!`, `in` with a captured collection, data classes, `Pair`/`Triple`, property assignment: tested with Kotlin lambdas on H2, MariaDB, Oracle. `?:`, ranges, `when`, property references: designed | – | [09](kotlin/09-kotlin-notes.md) |
+| Error codes and messages in 4 languages | Implemented, unit tested: `[LQL-xxxx]` codes, `LambdaQLException` and its subclasses, English, Japanese, Chinese and Korean messages, `lambdaql.locale`. The warning `LQL-5001` and strict mode: not implemented yet | [11](11-errors-and-languages.md) | [11](11-errors-and-languages.md) |
 | Spring Data JPA (`LambdaQlExecutor<T>`, Spring `Sort` / `Pageable`, Spring Boot auto-configuration) | Implemented, tested on H2, MariaDB, Oracle with Spring Boot 3.4.2 (Java), including the DML shortcuts (`deleteAll`, `updateOne`, ...) and the update, delete, insert and upsert builders. Spring Boot 4: not verified yet | [12](java/12-spring-data-jpa.md) | [12](kotlin/12-spring-data-jpa.md) |
 
 What the words mean:
@@ -144,7 +146,7 @@ What the words mean:
 | Designed | The syntax and rules are decided. Prototypes were tested. The library does not have the code yet. |
 | Planned | The idea is known, but the details are not decided. |
 
-The tests are here. `SelectQueryTest`, `SortQueryTest`, `SubqueryTest`, `ProjectionTest`, `DmlQueryTest`, `ExecutorTest` and `AutoConfigurationTest` use the user API; the other tests check internal classes.
+The tests are here. `SelectQueryTest`, `SortQueryTest`, `SubqueryTest`, `ProjectionTest`, `JoinQueryTest`, `DerivedQueryTest`, `DmlQueryTest`, `FunctionTest`, `ProcedureTest`, `KotlinSelectTest`, `KotlinQueryTest`, `LqlMessagesTest`, `ExecutorTest` and `AutoConfigurationTest` use the user API; the other tests check internal classes.
 
 | Test | What it checks |
 |---|---|
@@ -152,7 +154,14 @@ The tests are here. `SelectQueryTest`, `SortQueryTest`, `SubqueryTest`, `Project
 | [SortQueryTest.java](../../../query/src/test/java/org/lambdaql/query/SortQueryTest.java) | `orderBy`, `limit`, `offset`: the HQL and the row order on H2, MariaDB and Oracle |
 | [SubqueryTest.java](../../../query/src/test/java/org/lambdaql/query/SubqueryTest.java) | Subqueries in `where`: `exists`, `contains` (IN), NOT EXISTS, scalar, top-1, nested, and a delete with a subquery: the HQL and the rows on H2, MariaDB and Oracle |
 | [ProjectionTest.java](../../../query/src/test/java/org/lambdaql/query/ProjectionTest.java) | `select`, records, `groupBy`, `having`, `Agg`, `distinct`, paging and `insert ... select` with `groupBy`: the HQL and the values on H2, MariaDB and Oracle |
+| [JoinQueryTest.java](../../../query/src/test/java/org/lambdaql/query/JoinQueryTest.java) | `join`, `leftJoin`, `crossJoin` with up to three entities: conditions, sorting, `select`, repeated rows, `count` and paging over all entities, on H2, MariaDB and Oracle |
+| [DerivedQueryTest.java](../../../query/src/test/java/org/lambdaql/query/DerivedQueryTest.java) | Derived tables and CTEs (`qb.from(valueQuery)`, `qb.with(valueQuery)`): the HQL and the rows on H2, MariaDB and Oracle, the inner `limit`, and the row type rule J5 |
 | [DmlQueryTest.java](../../../query/src/test/java/org/lambdaql/query/DmlQueryTest.java) | `update`, `delete`, `insert`, upsert: the HQL and the rows after the run on H2, MariaDB and Oracle, compared with a select with the same condition |
+| [FunctionTest.java](../../../query/src/test/java/org/lambdaql/query/FunctionTest.java) | `@SqlFunction` DB functions in `where`, `select`, `orderBy` and update `set`, a Boolean function, a registered function and the rule checks, on H2, MariaDB and Oracle |
+| [ProcedureTest.java](../../../query/src/test/java/org/lambdaql/query/ProcedureTest.java) | `@SqlProcedure` calls with `qb.call` and `qb.exec` (OUT, many OUT, INOUT, result set and REF CURSOR) and the stub check on MariaDB and Oracle; a DB function called alone on H2, MariaDB and Oracle |
+| [KotlinSelectTest.kt](../../../query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt) | Kotlin lambdas in `where`: `?.` paths, captured values, `in` with a captured collection |
+| [KotlinQueryTest.kt](../../../query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt) | Kotlin lambdas: a sort, subqueries, data class, `Pair` and `Triple` results, `groupBy` and `having`, update (property assignment and `by[column] = value`), insert and delete |
+| [LqlMessagesTest.java](../../../query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java) | Message codes and the four message languages: the same keys and arguments in every bundle, unique codes, the locale choice, exception classes by code range |
 | [ExecutorTest.java](../../../spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java) | `LambdaQlExecutor<T>` in a Spring Boot application: the repository methods, Spring `Sort` and `Pageable`, transactions |
 | [AutoConfigurationTest.java](../../../spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java) | The `QueryBuilder` bean of the Spring Boot auto-configuration |
 | [LoadExamplesTest.java](../../../query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java) | Find the lambda body, read captured values, reject a lambda that is not serializable |
@@ -165,7 +174,7 @@ The tests are here. `SelectQueryTest`, `SortQueryTest`, `SubqueryTest`, `Project
 
 ## About the examples
 
-Examples are design examples. When a feature is implemented, its examples are replaced by code taken from the test suite, with a link to the test file. In 3. Conditions, 4. Sorting and paging, 5. Subqueries, 6. Select, aggregates and group by, 7. Update, insert, delete and 12. Spring Data JPA (Java), these examples are marked **(tested)**.
+Examples are design examples. When a feature is implemented, its examples are replaced by code taken from the test suite, with a link to the test file. In 3. Conditions, 4. Sorting and paging, 5. Subqueries, 6. Select, aggregates and group by, 7. Update, insert, delete, 8. Procedures and DB functions, 11. Errors and languages and 12. Spring Data JPA (Java), these examples are marked **(tested)**. The Kotlin track marks the examples from the Kotlin tests the same way.
 
 ## Example entities
 

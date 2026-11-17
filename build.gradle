@@ -68,9 +68,6 @@ subprojects { subproject ->
         }
         sourceCompatibility = javaVersion
         targetCompatibility = javaVersion
-//      compileJava {
-//           options.compilerArgs << "-Ajavadoc.packages=com.hunet"
-//      }
     }
 
     // a module can choose its artifact name with lql.artifactName in its gradle.properties

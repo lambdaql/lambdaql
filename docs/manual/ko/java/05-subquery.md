@@ -4,7 +4,7 @@
 > [!NOTE]
 > **상태**
 > - **구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, Hibernate 6.6.5, 마일스톤 M8-1): 조회, 수정, 삭제의 `where((o, sub) -> ...)` 안의 서브쿼리. `exists` / `not exists`, `contains`(IN), `!contains`(NOT EXISTS로 작성), 스칼라 집계(`count`, `sum`, `avg`, `min`, `max`), top-1 형태 `orderBy(...).limit(1)...first()`, 상관 서브쿼리와 중첩 서브쿼리, 캡처 값을 포함합니다.
-> - **아직 구현되지 않음:** `from` 안의 서브쿼리(파생 테이블)와 CTE(마일스톤 M8-2), `set` 값 안의 서브쿼리, MariaDB `lateral` 재작성.
+> - **아직 구현되지 않음:** `set` 값 안의 서브쿼리, MariaDB `lateral` 재작성. (파생 테이블과 CTE는 다른 문법으로 구현했습니다. [6. 조회, 집계, 그룹화](06-select-group.md#69-derived-table-subquery-in-from)를 참고하십시오.)
 > - **(테스트됨)** 표시가 있는 예제는 테스트 코드에서 그대로 가져온 것입니다. 나머지 예제는 같은 규칙을 따르지만 테스트가 없습니다.
 
 [Java 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [4. 정렬과 페이징](04-order-paging.md) | 다음: [6. 조회, 집계, 그룹화](06-select-group.md) | [이 페이지의 Kotlin 버전](../kotlin/05-subquery.md)
@@ -231,7 +231,7 @@ where o1_0.price>(select avg(o2_0.price) from orders o2_0)
 | 집계: `count()`, `sum`, `avg`, `min`, `max` | `sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).count()` |
 | top-1: `orderBy(...).limit(1)...first()` | 아래 참고 |
 
-그 밖의 `first()`는 분석 시점에 오류(`LambdaAnalysisException`)가 됩니다.
+그 밖의 `first()`는 분석 시점에 오류(`TranslationException`, `LQL-3017`)가 됩니다.
 
 품목이 두 개 이상인 주문(`count()`):
 
@@ -268,7 +268,7 @@ SelectQuery<Order> q = qb.from(Order.class)
 assertEquals("select e0 from Order e0 where e0.id = (select s1.id from Order s1 where s1.customer.id = e0.customer.id"
         + " order by s1.price desc, s1.id asc limit 1)", q.toHql().hql());
 // first() without limit(1) is rejected
-assertThrows(LambdaAnalysisException.class, () -> qb.from(Order.class)
+assertThrows(LambdaQLException.class, () -> qb.from(Order.class)
         .where((o, sub) -> o.getId().equals(sub.from(Order.class).select(x -> x.getId()).first())));
 ```
 
@@ -353,7 +353,7 @@ Java는 중첩된 람다에서 같은 이름을 두 번 쓰는 것을 허용하�
 
 - **UPDATE / DELETE 안의 서브쿼리**: `where`에서 같은 `sub` 문법을 씁니다. 구현되어 테스트했습니다(영역 `dml-subquery`). [7.4 삭제(delete)](07-4-delete.md)와 [7.2 수정(update)](07-2-update.md)을 참고하십시오.
 - **`set` 값 안의 서브쿼리**(`o.setTotal(sub.from(...).sum(...))`): 아직 구현되지 않았습니다. [7.2 수정(update)](07-2-update.md)을 참고하십시오.
-- **`from` 안의 서브쿼리(파생 테이블)와 CTE**(`qb.from(sub -> ...)`, `qb.with(sub -> ...)`): 설계됨, 아직 구현되지 않음(마일스톤 M8-2). [6. 조회, 집계, 그룹화](06-select-group.md)를 참고하십시오.
+- **`from` 안의 서브쿼리(파생 테이블)와 CTE**: 구현됨(마일스톤 M8-2). `sub`를 쓰지 않고 값 쿼리를 `qb.from(...)`이나 `qb.with(...)`에 전달합니다. [6.9 파생 테이블](06-select-group.md#69-derived-table-subquery-in-from)과 [6.10 CTE](06-select-group.md#610-cte-with)를 참고하십시오.
 
 <a id="512-rules-summary-q1-to-q6"></a>
 ## 5.12 규칙 요약(Q1~Q6)

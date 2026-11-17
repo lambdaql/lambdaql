@@ -144,7 +144,7 @@ group by o1_0.customer_id
 having count(*)>=2
 ```
 
-- 每个不带聚合的值都必须是 `groupBy` 的键（规则 J3）。否则 lambdaQL 会在分析时抛出 `LambdaAnalysisException`。
+- 每个不带聚合的值都必须是 `groupBy` 的键（规则 J3）。否则 lambdaQL 会在分析时抛出 `TranslationException`（`LQL-3035`）。
 - `where` 中不允许使用 `Agg`。请使用 `having`。
 - 测试执行该语句并读回 `Summary` 的行。它们与在 Java 中进行同样分组的结果一致。
 

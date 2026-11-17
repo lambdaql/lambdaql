@@ -62,7 +62,6 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 //	testImplementation 'org.springframework.boot:spring-boot-logging'
 
-	//testImplementation("com.hunet.common:core-datasource:1.0.0")
 	testImplementation("org.springframework.boot:spring-boot-starter-jdbc")
 	testImplementation("ch.qos.logback:logback-core:1.5.17")
 	testImplementation("com.h2database:h2:2.3.230")

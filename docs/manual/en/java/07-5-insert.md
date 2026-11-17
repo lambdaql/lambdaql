@@ -139,7 +139,7 @@ group by o1_0.customer_id
 having count(*)>=2
 ```
 
-- Every value without an aggregate must be a `groupBy` key (rule J3). Otherwise lambdaQL throws `LambdaAnalysisException` at analysis time.
+- Every value without an aggregate must be a `groupBy` key (rule J3). Otherwise lambdaQL throws `TranslationException` (`LQL-3035`) at analysis time.
 - `Agg` is not allowed in `where`. Use `having`.
 - The test runs the statement and reads the `Summary` rows back. They match the same grouping in Java.
 

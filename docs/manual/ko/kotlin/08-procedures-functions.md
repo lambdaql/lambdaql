@@ -2,11 +2,13 @@
 # 8. 저장 프로시저와 DB 함수 (Kotlin)
 
 > [!NOTE]
-> **상태: 설계됨, 아직 구현되지 않음.**
-> 이 장은 확정된 설계입니다(결정 D30, D31, 마일스톤 M11).
-> Kotlin 문법은 컴파일되며(kotlinc 2.3.21), 호출은 Hibernate 6.6.5로 H2, MariaDB, Oracle 23ai에서 확인했습니다.
-> 현재 lambdaQL에서는 동작하지 **않습니다**. 지금은 분석 코어와 `where` + `toList()`만 동작합니다
-> (H2, MariaDB, Oracle에서 테스트함). 전체 상태는 [트랙 README](README.md)를 참고하십시오.
+> **상태**
+> - **구현됨**(결정 D30, D31, 마일스톤 M11, Hibernate 6.6.5). 테스트는 **Java** 람다로 작성했습니다.
+>   쿼리 안의 DB 함수(`@SqlFunction`)는 H2 2.3, MariaDB 10.11, Oracle 23.26에서 테스트했습니다([`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)).
+>   프로시저 호출(`@SqlProcedure`, `@InOut`, `qb.call`, `qb.exec`)은 MariaDB와 Oracle에서, DB 함수 단독 호출은 세 데이터베이스 모두에서 테스트했습니다([`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)).
+>   lambdaQL은 Kotlin 형태(`@JvmStatic`을 붙인 `companion object` 함수, 결과로 쓰는 Kotlin data class)도 읽습니다. 이 장의 Kotlin 테스트는 아직 없습니다.
+> - **아직 구현되지 않음:** 컬럼에 적용한 함수의 SARGable 경고(규칙 PR8, FN7), 데이터베이스와의 파라미터 **타입**·**이름** 대조(규칙 PR2의 일부와 그 WARN), Oracle 패키지 오버로드 검출.
+> - 이 장의 Kotlin 코드는 테스트한 Java 호출을 Kotlin 문법으로 옮긴 것입니다. 테스트한 Java 코드는 [이 페이지의 Java 버전](../java/08-procedures-functions.md)에 있습니다. 전체 상태는 [트랙 README](README.md)를 참고하십시오.
 
 [Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [7. 수정, 삽입, 삭제](07-dml.md) | 다음: [9. Kotlin 노트](09-kotlin-notes.md) | [이 페이지의 Java 버전](../java/08-procedures-functions.md)
 
@@ -64,7 +66,8 @@ data class AdjOut(val balance: Int?, val msg: String?)
 - `@SqlProcedure`(또는 `@SqlFunction`)는 **필수**입니다. 이 함수가 무엇인지 lambdaQL에 알려 줍니다.
   (`@Procedure`와 `@Function`이라는 이름은 쓰지 않았습니다. `@Procedure`는 Spring Data JPA 어노테이션이기도 하고, `@Function`은 Kotlin의 `kotlin.Function`과 충돌합니다.)
 - 값이 비어 있으면 이름은 함수 이름에서 만듭니다: `calcTotal` → `CALC_TOTAL`.
-- **nullable 반환 타입**(`Double?`)을 사용하십시오. 프로시저가 non-null 타입에 NULL을 반환하면 lambdaQL은 이름이 있는 예외를 던집니다.
+- `@SqlProcedure`에는 `schema`와 `pkg`(Oracle 패키지)도 있습니다: `@SqlProcedure(value = "CALC", schema = "LQL", pkg = "SQ_PKG")`.
+- **nullable 반환 타입**(`Double?`)을 사용하십시오. 프로시저가 non-null 타입에 NULL을 반환하면 lambdaQL은 코드 `LQL-4039`가 붙은 `IllegalStateException`을 던집니다.
 - 인터페이스와 결과 데이터 클래스는 DB 시그니처의 복사본입니다. 타입 안전성을 위한 대가입니다. lambdaQL은 그 일부를 데이터베이스와 대조하여 검사합니다(규칙 PR2).
 - 프로시저(추상 함수)와 DB 함수(`companion object` 안)를 **같은 인터페이스**에 둘 수 있습니다.
 
@@ -109,8 +112,9 @@ qb.exec(OrderProcs::class.java) { it.purge(30) }.execute()
 
 그 밖의 사항:
 
-- OUT 파라미터가 있는 프로시저에 `exec`을 쓰면 오류입니다. 실수로 OUT 값을 잃지 않도록 막습니다.
-- **기본 인자**가 있는 스텁 함수(`fun calc(id: Long, rate: Double = 1.0)`)는 오류입니다(규칙 PR11). Kotlin은 DB 기본값이 아니라 Kotlin 기본값을 채워 넣기 때문입니다.
+- OUT 파라미터가 있는 프로시저에 `exec`을 쓰면 오류입니다(`LQL-4037`, Java로 테스트함). 실수로 OUT 값을 잃지 않도록 막습니다.
+- `@SqlProcedure`가 없는 함수를 호출하면 오류입니다(`LQL-3060`, Java로 테스트함).
+- 스텁 함수의 **기본 인자**(`fun calc(id: Long, rate: Double = 1.0)`)를 쓰는 호출은 오류입니다(`LQL-3062`, 규칙 PR11). Kotlin은 DB 기본값이 아니라 Kotlin 기본값을 채워 넣기 때문입니다.
 - 파라미터의 데이터베이스 기본값은 사용할 수 없습니다. 모든 IN 파라미터를 전달하십시오.
 - IN 값으로 `null`을 쓰는 것은 괜찮습니다.
 - non-null `Long`/`Double` 파라미터와 nullable `Long?`/`Double?` 파라미터 모두 동작합니다(규칙 PR13).
@@ -135,7 +139,7 @@ qb.exec(OrderProcs::class.java) { it.purge(30) }.execute()
 
 - **스칼라 속성** ← OUT과 INOUT 파라미터(커서 제외), DB 순서대로.
 - **`List` 속성** ← 결과 집합, 순서대로(Oracle: 커서 OUT 파라미터의 순서, MariaDB: 반환된 결과 집합의 순서).
-- 개수가 맞지 않으면 lambdaQL은 오류를 던집니다.
+- 개수가 맞지 않으면 lambdaQL은 오류를 던집니다(`LQL-4038`).
 - IN, OUT, IN, INOUT처럼 섞인 위치도 괜찮습니다. lambdaQL은 DB 메타데이터에서 위치를 읽습니다.
 
 ### INOUT
@@ -149,15 +153,19 @@ val a = qb.call(OrderProcs::class.java) { it.adjust(id, 100) }.execute()
 // a.balance는 새 잔액
 ```
 
+`@InOut`은 데이터베이스에서 INOUT인 인자에만 정확히 붙여야 합니다. 그렇지 않으면 첫 호출이 실패합니다(`LQL-4036`).
+
 <a id="result-set-element-type-t"></a>
 ### 결과 집합의 요소 타입 `T`
 
 | `T`가 | lambdaQL이 읽는 방법 |
 |---|---|
-| 엔티티 | Hibernate 결과 클래스 |
-| 데이터 클래스, record, DTO | JDBC `CallableStatement`, 컬럼은 **레이블로** 매칭(`camelCase` ↔ `snake_case`, 대소문자 무시) |
+| 엔티티 | Hibernate 결과 클래스(`StoredProcedureQuery`) |
+| Kotlin 데이터 클래스나 Java record | JDBC `CallableStatement`, 컬럼은 **레이블로** 매칭. `_`를 빼고 대소문자를 무시하므로 `customer_id`가 `customerId`에 대응(Java에서 record로 테스트함) |
+| 값 하나(`Long?`, `String?`, ...) | 각 행의 첫 컬럼 |
 
-MariaDB와 Oracle은 `SELECT *`의 컬럼을 서로 다른 순서로 반환하므로, lambdaQL은 절대 위치로 컬럼을 매핑하지 않습니다.
+일반 클래스는 여기서 행 타입으로 쓸 수 없습니다. 데이터 클래스를 사용하십시오.
+MariaDB와 Oracle은 `SELECT *`의 컬럼을 서로 다른 순서로 반환하므로, lambdaQL은 절대 위치로 속성을 매핑하지 않습니다.
 흔한 타입은 변환합니다(예: 숫자를 `Long`/`Int`로, 타임스탬프를 `LocalDateTime`으로).
 
 제한:
@@ -170,7 +178,7 @@ MariaDB와 Oracle은 `SELECT *`의 컬럼을 서로 다른 순서로 반환하�
 
 - 프로시저 안의 DML은 호출한 쪽 트랜잭션의 일부입니다. 함께 롤백됩니다.
 - 호출 전에 lambdaQL은 영속성 컨텍스트를 플러시합니다. 단, 트랜잭션이 활성 상태이고 변경이 있을 때만 플러시합니다.
-- 트랜잭션 밖에서는 호출이 자동 커밋됩니다.
+- `QueryBuilder(EntityManagerFactory)`는 호출을 자체 트랜잭션에서 실행합니다. `EntityManager`를 받은 `QueryBuilder`(Spring의 공유 `EntityManager` 포함)는 호출자의 트랜잭션을 사용합니다. 트랜잭션이 없으면 호출은 자동 커밋됩니다.
 - 호출 후에는 로드된 엔티티가 오래된 상태일 수 있습니다. 해당 엔티티에 `refresh`나 `evict`를 사용하십시오.
 - 프로시저 안의 `COMMIT`이나 DDL은 트랜잭션을 깨뜨립니다. lambdaQL은 이를 막을 수 없습니다.
 
@@ -195,14 +203,16 @@ MariaDB와 H2 드라이버는 이름 있는 파라미터를 지원하지 않습�
 
 Kotlin의 이름 있는 인자(`calc(rate = rate, id = id)`)는 이를 바꾸지 **않습니다**. 컴파일러가 인자를 스텁 함수의 순서로 되돌려 놓습니다. 스텁 함수의 순서만 중요합니다.
 
-첫 호출 때 lambdaQL이 검사하는 것(JDBC 메타데이터에서):
+첫 호출 때 lambdaQL이 JDBC 메타데이터(`getProcedureColumns`)로 검사하는 항목입니다. 결과는 프로시저 이름별로 캐시합니다.
 
-| 검사 | 발견하는가? |
+| 검사 | 발견 여부 |
 |---|---|
-| 파라미터 개수 | 예, 오류 |
-| 모드(IN / OUT / INOUT / 커서) | 예, 오류 |
-| 타입 | 예, 오류 |
-| **같은 타입**의 두 파라미터가 뒤바뀜 | **파라미터 이름을 얻을 수 있을 때만** |
+| 프로시저의 존재 | 예, 오류 `LQL-4035` |
+| IN·INOUT 파라미터 개수 = 스텁 인자 개수 | 예, 오류 `LQL-4036`(Java로 테스트함) |
+| INOUT 파라미터 = `@InOut`을 붙인 인자 | 예, 오류 `LQL-4036` |
+| OUT 값과 결과 집합의 개수 = 반환 타입의 구성 요소 수 | 예, 오류 `LQL-4038` |
+| 타입 | **아직 구현되지 않음** |
+| **같은 타입**의 두 파라미터가 뒤바뀜 | **아직 구현되지 않음**(계획: 파라미터 이름을 얻을 수 있을 때만) |
 
 위험한 경우의 예:
 
@@ -212,35 +222,36 @@ Kotlin의 이름 있는 인자(`calc(rate = rate, id = id)`)는 이를 바꾸지
 ```
 
 개수, 모드, 타입이 모두 맞습니다. 이름만이 실수를 드러낼 수 있습니다.
-lambdaQL은 이름을 얻을 수 있으면 이름을 비교합니다. Kotlin `-java-parameters`(또는 kotlin-reflect), 또는 `@Param`으로 얻습니다.
-`p_` 접두사와 대소문자는 무시합니다. 이름을 얻을 수 없고 이웃한 두 파라미터의 타입이 같으면 lambdaQL은 WARN을 기록합니다.
+lambdaQL은 아직 이름을 **비교하지 않습니다**.
 
-**권장:** `-java-parameters`로 컴파일하고([Kotlin 컴파일러 설정](02-getting-started.md#kotlin-compiler-settings) 참고), 데이터베이스와 같은 이름을 사용하십시오.
+계획은 다음과 같습니다. 이름을 얻을 수 있으면(Kotlin `-java-parameters` 또는 kotlin-reflect, 또는 `@Param`) `p_` 접두사와 대소문자를 무시하고 비교합니다. 이름을 얻을 수 없고 이웃한 두 파라미터의 타입이 같으면 WARN을 기록합니다.
 
-Oracle에서는 lambdaQL이 실제 이름 바인딩도 사용할 수 있습니다(`pass_procedure_paramater_names=true`와 스텁 파라미터 이름을 함께 사용).
+**권장:** 스텁 인자의 순서를 직접 확인하십시오. `-java-parameters`로 컴파일하고([Kotlin 컴파일러 설정](02-getting-started.md#kotlin-compiler-settings) 참고) 데이터베이스와 같은 이름을 사용하면, 계획된 검사가 구현된 뒤 실수를 검출할 수 있습니다.
+
+Oracle의 실제 이름 바인딩(`pass_procedure_paramater_names=true`와 스텁 파라미터 이름을 함께 사용)도 계획되어 있습니다.
 
 ---
 
 <a id="85-procedure-rules-pr1-to-pr15-summary"></a>
 ## 8.5 프로시저 규칙 PR1 ~ PR15(요약)
 
-| # | 규칙 |
-|---|---|
-| PR1 | 이름: 어노테이션 값을 그대로 사용. 값이 비어 있으면 함수 이름을 UPPER_SNAKE로. 패키지나 스키마 이름(`SQ_PKG.CALC`, `LQL.SQ_CALC`)도 동작함. 혼동을 피하려면 `@SqlProcedure(schema = ..., pkg = ..., value = ...)`로 쓸 수도 있음. |
-| PR2 | 인자는 **위치로** 바인딩됨. 첫 호출 때 개수, 모드, 타입을 DB 메타데이터와 대조하여 검사함. 같은 타입의 인자가 뒤바뀐 경우는 파라미터 이름이 있을 때만 발견함([8.4](#84-warning-argument-order) 참고). 패키지 안의 Oracle 오버로드는 v0.1에서 오류. |
-| PR3 | OUT 1개 → 반환 값. OUT/INOUT 여러 개 → 데이터 클래스 또는 record. `@InOut`은 INOUT 파라미터를 표시함. |
-| PR4 | 결과 집합 1개 → `List<T>`. 엔티티는 Hibernate로, 데이터 클래스/record/DTO는 레이블 매칭을 사용하는 JDBC로. 페이징 없음. |
-| PR5 | 결과 집합 여러 개 → 데이터 클래스의 `List` 속성, 순서대로. Oracle 암시적 결과는 거부됨. |
-| PR6 | 단독으로 호출한 DB 함수는 데이터베이스마다 다른 경로를 사용함([8.8](#88-call-a-db-function-alone) 참고). |
-| PR7 | 쿼리 안의 DB 함수: [8.6](#86-declare-db-functions)과 규칙 FN1 ~ FN11 참고. |
-| PR8 | 조건에서 컬럼에 DB 함수를 적용하면 인덱스를 사용할 수 없으므로 WARN이 나옴([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). |
-| PR9 | 프로시저는 호출한 쪽 트랜잭션에서 실행됨. lambdaQL은 필요할 때 호출 전에 플러시함. 호출 후에는 로드된 엔티티가 오래된 상태일 수 있음. |
-| PR10 | 공통된 영향받은 행 수가 없음. OUT 파라미터를 사용. |
-| PR11 | `null` IN 값은 괜찮음. DB 파라미터 기본값은 사용할 수 없음. 스텁 함수의 Kotlin 기본 인자는 오류. |
-| PR12 | 람다는 스텁 호출 하나. 인자는 캡처 값, 상수, 또는 그 값들의 계산. 이름 있는 인자는 단순한 값만. OUT 파라미터가 있는데 `exec`을 쓰면 오류. |
-| PR13 | non-null `Long`/`Double`과 nullable `Long?`/`Double?` 모두 동작함. Boolean 파라미터는 MariaDB와 Oracle 23ai 이상에서 동작함. |
-| PR14 | 각 람다는 한 번만 분석됨. 프로시저 메타데이터는 이름마다 한 번만 읽음. |
-| PR15 | H2에는 OUT, INOUT, 여러 결과 집합, 패키지가 없음. 프로시저는 MariaDB나 Oracle에서 테스트하십시오(예: Testcontainers 사용). |
+| # | 규칙 | 상태 |
+|---|---|---|
+| PR1 | 이름: 어노테이션 값을 그대로 사용. 값이 비어 있으면 함수 이름을 UPPER_SNAKE로. 패키지나 스키마 이름(`SQ_PKG.CALC`, `LQL.SQ_CALC`)도 동작함. 혼동을 피하려면 `@SqlProcedure(schema = ..., pkg = ..., value = ...)`로 쓸 수도 있음. | 구현됨. 스키마·패키지 이름은 테스트로 확인하지 않음 |
+| PR2 | 인자는 **위치로** 바인딩됨. 첫 호출 때 IN/INOUT 파라미터 개수와 `@InOut` 위치를 DB 메타데이터와 대조함. 타입과 이름의 대조는 계획됨([8.4](#84-warning-argument-order) 참고). | 개수와 `@InOut` 대조는 구현됨(Java로 테스트함). 타입·이름 대조, Oracle 패키지 오버로드 검출은 아직 구현되지 않음 |
+| PR3 | OUT 1개 → 반환 값. OUT/INOUT 여러 개 → 데이터 클래스 또는 record. `@InOut`은 INOUT 파라미터를 표시함. | 구현됨(Java로 테스트함) |
+| PR4 | 결과 집합 1개 → `List<T>`. 엔티티는 Hibernate로, 데이터 클래스/record는 레이블 매칭을 사용하는 JDBC로. 페이징 없음. | 구현됨(Java에서 record로 테스트함) |
+| PR5 | 결과 집합 여러 개 → 데이터 클래스의 `List` 속성, 순서대로. Oracle 암시적 결과는 지원하지 않음. | 구현됨, 테스트로 확인하지 않음 |
+| PR6 | 단독으로 호출한 DB 함수는 데이터베이스마다 다른 경로를 사용함([8.8](#88-call-a-db-function-alone) 참고). | 구현됨(Java로 테스트함) |
+| PR7 | 쿼리 안의 DB 함수: [8.6](#86-declare-db-functions)과 규칙 FN1 ~ FN11 참고. | 구현됨(Java로 테스트함) |
+| PR8 | 조건에서 컬럼에 DB 함수를 적용하면 인덱스를 사용할 수 없으므로 WARN을 기록함([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). | 아직 구현되지 않음 |
+| PR9 | 프로시저는 호출한 쪽 트랜잭션에서 실행됨. lambdaQL은 필요할 때 호출 전에 플러시함. 호출 후에는 로드된 엔티티가 오래된 상태일 수 있음. | 구현됨 |
+| PR10 | 공통된 영향받은 행 수가 없음. OUT 파라미터를 사용. | – |
+| PR11 | `null` IN 값은 괜찮음. DB 파라미터 기본값은 사용할 수 없음. 스텁 함수의 Kotlin 기본 인자는 오류(`LQL-3062`). | 구현됨 |
+| PR12 | 람다는 스텁 호출 하나. 인자는 캡처 값, 상수, 또는 그 값들의 계산. 이름 있는 인자는 단순한 값만. OUT 파라미터가 있는데 `exec`을 쓰면 오류. | 구현됨(Java로 테스트함). 이름 있는 인자는 테스트로 확인하지 않음 |
+| PR13 | non-null `Long`/`Double`과 nullable `Long?`/`Double?` 모두 동작함. Boolean 파라미터는 MariaDB와 Oracle 23ai 이상에서 동작함. | 테스트로 확인하지 않음 |
+| PR14 | 각 람다는 한 번만 분석됨. 프로시저 메타데이터는 이름마다 한 번만 읽음. | 구현됨 |
+| PR15 | H2에는 OUT, INOUT, 여러 결과 집합, 패키지가 없음. 프로시저는 MariaDB나 Oracle에서 테스트하십시오(예: Testcontainers 사용). | lambdaQL 테스트도 이 방식을 따름 |
 
 ---
 
@@ -263,7 +274,16 @@ interface OrderFns {
 }
 ```
 
-lambdaQL 람다 **밖에서** `OrderFns.discount(...)`를 호출하면 예외가 발생합니다. 의도한 동작입니다.
+lambdaQL 람다 **밖에서** `OrderFns.discount(...)`를 호출하면 `DbOnlyException`(`LQL-4034`)이 발생합니다. 의도한 동작입니다.
+
+`@SqlFunction`의 값은 두 가지입니다.
+
+| 값 | 의미 |
+|---|---|
+| `value` | 쿼리에 쓰는 함수 이름. 비어 있으면 함수 이름을 UPPER_SNAKE로(`isVip` → `IS_VIP`). 스키마 이름도 허용(`PUBLIC.SQ_FN`) |
+| `sql` | `value`와 다를 때의 SQL 이름. 이런 함수는 등록이 필요함([등록](#registration-optional) 참고) |
+
+Java 테스트는 함수를 Java 인터페이스의 static 메서드로 선언합니다([이 페이지의 Java 버전](../java/08-procedures-functions.md#86-declare-db-functions) 참고). Kotlin `companion object` 함수도 같은 방식으로 읽지만, 아직 테스트로 확인하지 않았습니다.
 
 왜 `@JvmStatic`일까요? 그러면 Java 코드가 `OrderFns.discount(...)`를 정적 함수로 호출할 수 있고, Java와 Kotlin 호출자에게 함수가 똑같이 보입니다.
 lambdaQL은 `companion object` 함수에 붙은 어노테이션을 읽습니다.
@@ -272,15 +292,15 @@ lambdaQL은 `companion object` 함수에 붙은 어노테이션을 읽습니다.
 
 | 선언 | 상태 |
 |---|---|
-| 인터페이스 `companion object` + `@JvmStatic` | **권장** |
-| Kotlin `object` + `@JvmStatic` | 지원 |
-| Java 인터페이스 정적 메서드(Kotlin에서 호출) | 지원 |
-| Kotlin 최상위 함수 | 지원, **권장하지 않음**: import를 잊으면 같은 이름의 표준 라이브러리 함수(예: `maxOf`)가 조용히 사용될 수 있음 |
-| 인터페이스 기본 함수 + 싱글턴 상수 | 지원, 하지만 작성할 코드가 더 김 |
+| 인터페이스 `companion object` + `@JvmStatic` | **권장**(구현됨, 아직 테스트로 확인하지 않음) |
+| Kotlin `object` + `@JvmStatic` | 설계됨, 테스트로 확인하지 않음 |
+| Java 인터페이스 정적 메서드(Kotlin에서 호출) | 지원(Java 형태는 테스트함) |
+| Kotlin 최상위 함수 | 설계됨, **권장하지 않음**: import를 잊으면 같은 이름의 표준 라이브러리 함수(예: `maxOf`)가 조용히 사용될 수 있음 |
+| 인터페이스 기본 함수 + 싱글턴 상수 | 설계됨, 테스트로 확인하지 않음 |
 | 리포지토리가 함수 인터페이스를 구현(믹스인) | 거부 |
 | 함수형 인터페이스 상수(`DISCOUNT.apply(x)`), 함수 타입 속성 | 거부 |
 | 확장 함수 | v0.1에서 거부(KC11) |
-| 기본 인자, `inline`, `vararg`가 있는 `@SqlFunction` | 거부(FN9) |
+| 기본 인자, `inline`, `vararg`가 있는 `@SqlFunction` | 거부(FN9: 기본 인자는 `LQL-3056`, `vararg`는 `LQL-3057`) |
 
 함수는 **인터페이스 이름과 함께** 호출하십시오(`OrderFns.discount`). 함수를 import해도 동작하지만, 같은 이름의 멤버 함수가 그 함수를 가릴 수 있습니다.
 
@@ -289,14 +309,14 @@ lambdaQL은 `companion object` 함수에 붙은 어노테이션을 읽습니다.
 <a id="87-use-db-functions-in-queries"></a>
 ## 8.7 쿼리에서 DB 함수 사용
 
-함수를 직접 호출하십시오. 컨텍스트 인자는 필요 없습니다. 모든 람다에서 동작합니다:
-`where`, `select`, `orderBy`, `groupBy`, `having`, `set`, 그리고 서브쿼리 안.
+함수를 직접 호출하십시오. 컨텍스트 인자는 필요 없습니다.
+`where`, `select`, `orderBy`, `set`에서 동작합니다([`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)에서 Java 람다로 테스트함). `groupBy`, `having`, 서브쿼리에서도 동작하도록 설계했지만 테스트로 확인하지는 않았습니다.
 
 ```kotlin
 qb.from(Order::class.java).where { OrderFns.discount(it.price)!! > 10 }.toList()
-// → where function('FN_DISCOUNT' as Double, o.price) > 10
+// → where function('FN_DISCOUNT' as Double, e0.price) > 10
 
-qb.from(Order::class.java).where { OrderFns.isVip(it.customer?.id)!! }.toList()     // Boolean 함수 단독
+qb.from(Order::class.java).where { OrderFns.isVip(it.customer?.id)!! }.toList()     // Boolean 함수 단독: ... = true
 
 qb.from(Order::class.java).where { it.price!! > OrderFns.discount(base)!! }.toList()  // 컬럼 쪽은 깨끗하게 유지됨
 
@@ -309,18 +329,22 @@ qb.from(Order::class.java)
 qb.update(Order::class.java).set { it.price = OrderFns.discount(it.price) }.all().execute()
 ```
 
-**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)는 이 페이지의 HQL을 Hibernate에 직접 넘기고, H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 6.6.5)에서 나온 SQL을 기록합니다. lambdaQL은 아직 이 쿼리들을 만들지 않습니다. Hibernate의 SQL이 바뀌면 테스트가 실패합니다.
+Java 테스트는 같은 형태를 이름 `SQ_FN_DISCOUNT`로 확인합니다. 예: `select e0 from Order e0 where function('SQ_FN_DISCOUNT' as Double, e0.price) > 100.0`. 테스트는 각 쿼리를 실행하고, 결과 행을 Java로 같은 계산을 한 결과와 비교합니다.
 
-**데이터베이스별 SQL (예정)** — 예정된 HQL을 Hibernate가 번역한 것으로, `PlannedSqlTest`가 기록했습니다. lambdaQL은 아직 이 쿼리를 만들지 않습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `08-function`:
+**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)는 같은 형태의 HQL(이름 `FN_DISCOUNT`)을 Hibernate에 직접 넘기고, H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 6.6.5)에서 나온 SQL을 기록합니다. Hibernate의 SQL이 바뀌면 테스트가 실패합니다.
+
+**데이터베이스별 SQL(이 형태의 HQL에 대한 Hibernate SQL)** — `PlannedSqlTest`가 기록했습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `08-function`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
+-- HQL: select o from Order o where function('FN_DISCOUNT' as Double, o.price) > 10
 select …
 from orders o1_0
-where fn_discount(o1_0.price)>10
+where FN_DISCOUNT(o1_0.price)>10
 ```
 
-함수를 등록하지 않으면 함수 이름은 소문자로 나옵니다(`fn_discount`). 아래 “등록”을 참고하십시오.
+테스트 설정에는 `lambdaql.functions.classes` 설정이 있습니다. 이 설정이 있으면 Hibernate는 등록하지 않은 함수에도 이름의 대소문자(`FN_DISCOUNT`)를 유지합니다(세 데이터베이스에서 관찰함, 원인은 아직 확인하지 않음).
+등록이 전혀 없으면 Hibernate가 이름을 소문자로 쓸 수 있습니다. 따옴표 없는 이름은 어느 쪽이든 동작합니다.
 
 `!!`는 컴파일러를 위한 것일 뿐입니다(함수가 `Double?`을 반환하므로). lambdaQL은 이를 건너뜁니다(규칙 FN6).
 
@@ -348,7 +372,7 @@ Kotlin `Double?`, `Int?`, `Long?`, `Boolean?`과 그 non-null 형태는 이 이�
 `function('FN_DISCOUNT' as Double, ...)` 형태에는 등록이 필요 없습니다(세 데이터베이스에서 확인함).
 함수 인터페이스를 등록하면 Hibernate가 이름의 대소문자도 유지하고 인자 개수와 타입도 검사합니다.
 
-lambdaQL은 `FunctionContributor`(ServiceLoader로 발견됨)를 계획하고 있습니다. 인터페이스는 Hibernate 속성에 나열합니다.
+lambdaQL에는 Hibernate `FunctionContributor`인 `org.lambdaql.hibernate.LambdaQlFunctionContributor`가 있습니다(ServiceLoader로 발견함). 인터페이스는 Hibernate 속성에 나열합니다.
 
 ```properties
 # 일반 Hibernate
@@ -360,18 +384,18 @@ spring.jpa.properties.lambdaql.functions.classes=com.acme.OrderFns
 
 속성을 설정하지 않으면 아무것도 등록되지 않습니다. 패키지 스캔은 v0.1에 없습니다.
 
-<a id="mixed-case-names-need-registration"></a>
-### 대소문자가 섞인 이름은 등록이 필요
+<a id="a-different-sql-name-needs-registration"></a>
+### SQL 이름이 다른 함수의 등록
 
-따옴표로 감싸 대소문자를 섞어 만든 함수 이름(`"SQ_Fn_Mixed"`)은 등록하지 않으면 실패합니다(H2와 Oracle에서 이름이 소문자가 됨).
-키와 SQL 이름을 나누고 인터페이스를 등록하십시오.
+`value`는 쿼리의 이름이고 `sql`은 SQL의 이름입니다. 두 이름이 다르면 함수를 등록해야 합니다.
+따옴표로 감싸 대소문자를 섞어 만든 함수 이름(`"SQ_Fn_Mixed"`)에 유용합니다. 등록하지 않으면 H2와 Oracle에서 이름이 소문자가 될 수 있습니다.
 
 ```kotlin
-@JvmStatic @SqlFunction(key = "SQ_Fn_Mixed", sql = "\"SQ_Fn_Mixed\"")
+@JvmStatic @SqlFunction(value = "SQ_Fn_Mixed", sql = "\"SQ_Fn_Mixed\"")
 fun mixed(v: Double?): Double? = throw DbOnlyException()
 ```
 
-이런 함수가 등록되어 있지 않으면 lambdaQL은 처음 사용할 때 실패합니다.
+이런 함수가 등록되어 있지 않으면 lambdaQL은 람다를 읽을 때 실패합니다(`LQL-3058`). Java 테스트는 등록한 함수(`value = "SQ_TAX"`, `sql = "SQ_FN_DISCOUNT"`, 영역 `registered`)를 확인합니다.
 
 ---
 
@@ -384,14 +408,17 @@ fun mixed(v: Double?): Double? = throw DbOnlyException()
 val v: Double? = qb.call { OrderFns.discount(price) }.execute()
 ```
 
-**데이터베이스별 SQL (예정)** — 예정된 HQL을 Hibernate가 번역한 것으로, `PlannedSqlTest`가 기록했습니다. lambdaQL은 아직 이 쿼리를 만들지 않습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `08-function-alone`:
+Java 형태는 H2, MariaDB, Oracle에서 테스트했습니다(`ProcedureTest`, 영역 `function`). 람다는 `@SqlFunction` 호출 하나여야 합니다(`LQL-3063`).
+
+**데이터베이스별 SQL(이 형태의 HQL에 대한 Hibernate SQL)** — `PlannedSqlTest`가 이름 `FN_DISCOUNT`로 기록했습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `08-function-alone`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
-select fn_discount(?)
+-- HQL: select function('FN_DISCOUNT' as Double, :p1)
+select FN_DISCOUNT(?)
 ```
 
-이 쿼리는 FROM 없이 `select fn_discount(?)`로 실행됩니다. Oracle은 23ai부터만 이를 받아들입니다. Oracle에서는 lambdaQL이 대신 JDBC 함수 호출을 사용합니다(아래 표 참고).
+이 쿼리는 FROM 없이 `select FN_DISCOUNT(?)`로 실행됩니다. Oracle은 23ai부터만 이를 받아들입니다. Oracle에서는 lambdaQL이 대신 JDBC 함수 호출을 사용합니다(아래 표 참고).
 
 인자 개수가 다르므로 `qb.call(OrderProcs::class.java) { ... }`와 충돌하지 않습니다.
 
@@ -409,24 +436,27 @@ lambdaQL은 먼저 대기 중인 변경을 플러시하므로(PR9와 같음) 함
 <a id="89-warning-functions-on-columns-and-indexes-sargable"></a>
 ## 8.9 주의: 컬럼에 적용한 함수와 인덱스(SARGable)
 
+> [!NOTE]
+> 이 절의 경고는 **아직 구현되지 않았습니다**(규칙 PR8, FN7). 현재 lambdaQL은 이런 쿼리를 경고 없이 만듭니다.
+
 lambdaQL은 **인덱스를 사용할 수 있는** SQL을 만들려고 합니다([10. 규칙과 제한](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql) 참고).
 컬럼을 감싼 함수는 보통 일반 인덱스를 사용할 수 **없습니다**.
 
 ```kotlin
 .where { OrderFns.discount(it.price)!! > 10 }
-// → function('FN_DISCOUNT' as Double, o.price) > 10   -- price의 인덱스가 사용되지 않음
+// → function('FN_DISCOUNT' as Double, e0.price) > 10   -- price의 인덱스가 사용되지 않음
 ```
 
-**데이터베이스별 SQL (예정)** — 예정된 HQL을 Hibernate가 번역한 것으로, `PlannedSqlTest`가 기록했습니다. lambdaQL은 아직 이 쿼리를 만들지 않습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `08-function`:
+**데이터베이스별 SQL(이 형태의 HQL에 대한 Hibernate SQL)** — `PlannedSqlTest`가 기록했습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `08-function`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-where fn_discount(o1_0.price)>10
+where FN_DISCOUNT(o1_0.price)>10
 ```
 
-그래서 lambdaQL은 이 형태에 **WARN**을 기록합니다. strict 모드에서는 오류입니다(규칙 PR8, FN7).
+그래서 lambdaQL은 이 형태에 **WARN**을 기록할 예정입니다. strict 모드에서는 오류입니다(규칙 PR8, FN7).
 
 | 경우 | MariaDB | Oracle |
 |---|---|---|
@@ -444,19 +474,21 @@ where fn_discount(o1_0.price)>10
 <a id="810-function-rules-fn1-to-fn11-summary"></a>
 ## 8.10 함수 규칙 FN1 ~ FN11(요약)
 
-| # | 규칙 |
-|---|---|
-| FN1 | `@SqlFunction`은 함수 어노테이션. 값이 비어 있으면 함수 이름을 UPPER_SNAKE로. |
-| FN2 | lambdaQL은 호출된 함수를 찾아 그 어노테이션을 읽음. Kotlin에서는 `Companion` 수신 객체를 건너뜀. 본문은 예외를 던지기만 해야 함(`= throw ...`). 애플리케이션과 데이터베이스가 다른 값을 낼 수 있으므로 실제 본문이 있는 함수는 오류. |
-| FN3 | 같은 이름의 모든 오버로드는 같은 DB 함수에 대응해야 함. 그렇지 않으면 오류. (Kotlin `Double?` 인자는 `Double?` 오버로드를 고름. Kotlin에서 본 Java 엔티티 getter는 기본형 `double` 오버로드를 고를 수 있음.) |
-| FN4 | 어노테이션이 없는 호출이나 lambdaQL이 식별할 수 없는 호출은 오류. 절대 조용히 건너뛰지 않음. |
-| FN5 | 인자는 [3. 조건](03-where.md)의 값 규칙을 따름. 캡처 값만으로 만든 인자도 바인딩되어 **데이터베이스에서** 평가됨. |
-| FN6 | `!!`와 박싱 호출은 건너뜀. 반환 타입은 선언된 함수에서 옴. |
-| FN7 | 컬럼에 적용한 함수는 WARN을 냄([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). |
-| FN8 | Hibernate 내장 함수(`COALESCE`, `ROUND`, `SYSDATE`, ...)와 같은 이름은 오류. Hibernate가 조용히 내장 함수를 사용하기 때문. 접두사나 스키마 이름(`PUBLIC.SQ_FN`)을 사용. |
-| FN9 | Kotlin: 기본 인자, `inline`, `vararg`는 오류. |
-| FN10 | v0.1은 스칼라 함수만 지원. 사용자 집계 함수와 윈도 함수는 v0.2에 계획됨. 인자가 없는 함수는 `fn()`으로 출력됨. |
-| FN11 | 알려진 DB 차이: MariaDB에서 VARCHAR를 반환하는 함수는 문자열 리터럴과 콜레이션 충돌이 날 수 있음. `BigDecimal` 결과의 스케일이 다름(MariaDB와 Oracle은 0, H2는 1). Boolean 결과는 Oracle 23ai 이상이 필요. |
+| # | 규칙 | 상태 |
+|---|---|---|
+| FN1 | `@SqlFunction`은 함수 어노테이션. 값이 비어 있으면 함수 이름을 UPPER_SNAKE로. | 구현됨 |
+| FN2 | lambdaQL은 호출된 함수를 찾아 그 어노테이션을 읽음. Kotlin에서는 `Companion` 수신 객체를 건너뜀. 본문은 예외를 던지기만 해야 함(`= throw ...`). 애플리케이션과 데이터베이스가 다른 값을 낼 수 있으므로 실제 본문이 있는 함수는 오류(`LQL-3052`). | 구현됨(Java로 테스트함) |
+| FN3 | 같은 이름의 모든 오버로드는 같은 DB 함수에 대응해야 함. 그렇지 않으면 오류(`LQL-3053`). (Kotlin `Double?` 인자는 `Double?` 오버로드를 고름. Kotlin에서 본 Java 엔티티 getter는 기본형 `double` 오버로드를 고를 수 있음.) | 구현됨 |
+| FN4 | 어노테이션이 없는 호출이나 lambdaQL이 식별할 수 없는 호출은 오류. 절대 조용히 건너뛰지 않음. | 구현됨 |
+| FN5 | 인자는 [3. 조건](03-where.md)의 값 규칙을 따름. 캡처 값만으로 만든 인자도 바인딩되어 **데이터베이스에서** 평가됨. | 구현됨(Java로 테스트함) |
+| FN6 | `!!`와 박싱 호출은 건너뜀. 반환 타입은 선언된 함수에서 옴. `Double`, `Integer`, `Long`, `BigDecimal`, `String`, `LocalDate`, `LocalDateTime`, `Boolean` 중 하나에 대응해야 함(`LQL-3055`). | 구현됨(Java로 테스트함) |
+| FN7 | 컬럼에 적용한 함수는 WARN을 냄([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). | 아직 구현되지 않음 |
+| FN8 | Hibernate 내장 함수(`COALESCE`, `ROUND`, `SYSDATE`, ...)와 같은 이름은 오류(`LQL-3054`). Hibernate가 조용히 내장 함수를 사용하기 때문. 접두사나 스키마 이름(`PUBLIC.SQ_FN`)을 사용. | 구현됨(Java로 테스트함) |
+| FN9 | Kotlin: 기본 인자(`LQL-3056`), `vararg`(`LQL-3057`), `inline`은 오류. | 기본 인자와 `vararg`는 구현됨. `inline`은 설계됨 |
+| FN10 | v0.1은 스칼라 함수만 지원. 사용자 집계 함수와 윈도 함수는 v0.2에 계획됨. 인자가 없는 함수는 `fn()`으로 출력됨. | 스칼라 함수 구현됨 |
+| FN11 | 알려진 DB 차이: MariaDB에서 VARCHAR를 반환하는 함수는 문자열 리터럴과 콜레이션 충돌이 날 수 있음. `BigDecimal` 결과의 스케일이 다름(MariaDB와 Oracle은 0, H2는 1). Boolean 결과는 Oracle 23ai 이상이 필요. | 프로토타입으로 실측 |
+
+규칙 검사(`LQL-4034`, `LQL-3052`, `LQL-3054`, `LQL-3058`, `LQL-3055`)는 Java로 테스트했습니다([`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `rules`, [이 페이지의 Java 버전](../java/08-procedures-functions.md#810-function-rules-fn1-to-fn11-summary) 참고).
 
 ---
 
@@ -471,12 +503,14 @@ where fn_discount(o1_0.price)>10
 | 결과 집합 여러 개 | 아니요 | 예 | 예(커서 OUT 파라미터 여러 개) |
 | OUT 값과 결과 집합을 함께 | 아니요 | 예 | 예 |
 | 패키지 이름(`PKG.PROC`) | 아니요 | 아니요(`sql_mode=ORACLE` 필요) | 예 |
-| 쿼리 안의 DB 함수 | 예 | 예 | 예 |
+| 쿼리 안의 DB 함수 | 예(테스트함) | 예(테스트함) | 예(테스트함) |
+| DB 함수 단독 호출 | 예(테스트함) | 예(테스트함) | 예(테스트함) |
+| lambdaQL의 프로시저 호출 | – | 예(테스트함) | 예(테스트함) |
 | Boolean 파라미터 / 결과 | – | 예 | 예(23ai 이상) |
 
 v0.1에 계획되지 않은 것: 동적 프로시저 이름을 위한 문자열 빌더(v0.2 후보), Oracle 패키지 오버로드, 테이블 값 함수, 프로시저 결과의 페이징.
 
-이 장의 오류는 `[LQL-xxxx]` 코드가 있는 `LambdaQLException` 하위 클래스입니다. [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
+이 장의 오류는 `[LQL-xxxx]` 코드가 있는 `LambdaQLException`(또는 그 하위 클래스)입니다. 람다를 읽을 때는 `LQL-3052`~`LQL-3063`, 호출을 실행할 때는 `LQL-4034`~`LQL-4039`입니다. [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
 
 ---
 

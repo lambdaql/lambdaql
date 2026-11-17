@@ -9,7 +9,8 @@
 > **更新、挿入、削除、upsert** も実装済みで、`limit` と 1 行保護 `executeOne()` も使えます（H2、MariaDB、Oracle で Java のラムダを使ってテスト済み）。
 > **Spring Data JPA モジュール** も実装済みです。リポジトリ用の実行器 `LambdaQlExecutor<T>`（Spring の `Sort`、`Pageable`、`deleteAll(where)` や `updateOne(where, set)` のような DML の短縮メソッド、および更新、削除、挿入、upsert のビルダーに対応）と Spring Boot の自動構成です（Spring Boot 3.4.2 でテスト済み）。DML には呼び出し側のトランザクションが必要です。
 > **サブクエリ**（`where((o, sub) -> ...)`、更新と削除でも）と **`select`**（record と DTO、`groupBy`、`having`、`Agg` の集計、`insert ... select` でも）も実装済みです（H2、MariaDB、Oracle で Java のラムダを使ってテスト済み）。
-> このマニュアルのそれ以外の内容（派生テーブル、CTE、プロシージャ）は **設計済み** です。構文とルールは決まっていて、H2、MariaDB、Oracle でプロトタイプによる確認もしましたが、コードはまだライブラリに入っていません。
+> **明示的な結合**（`join`、`leftJoin`、`crossJoin`）、**派生テーブルと CTE**（`qb.from(valueQuery)`、`qb.with(valueQuery)`）、**ストアドプロシージャと DB 関数**（`@SqlProcedure`、`@SqlFunction`、`qb.call`、`qb.exec`）、**4 つの言語のメッセージを持つエラーコード**（`[LQL-xxxx]`）も実装済みです（Java のラムダでテスト済み。プロシージャは MariaDB と Oracle）。
+> **Kotlin のラムダ** は、書き方の一部（`?.`、`!!`、`in`、サブクエリ、data class、`groupBy`、更新、挿入、削除）をビルドの中でテストしています。そのほかの Kotlin だけの書き方は **設計済み** です。構文とルールは決まっていてプロトタイプで確認しましたが、まだビルドの中ではテストしていません。
 > 成果物（アーティファクト）はまだ Maven Central に公開していません。試すには、ソースからビルドしてください（[Java](java/02-getting-started.md#build-from-source) | [Kotlin](kotlin/02-getting-started.md#build-from-source)）。
 
 lambdaQL は Java と Kotlin のためのクエリライブラリです。
@@ -113,7 +114,7 @@ fetch first ? rows only
 | 3 | 条件（`where`）: 演算子、null のルール、キャプチャした値 | [Java](java/03-where.md) | [Kotlin](kotlin/03-where.md) |
 | 4 | ソートとページング: `orderBy`、`Direction`、`limit`、`offset` | [Java](java/04-order-paging.md) | [Kotlin](kotlin/04-order-paging.md) |
 | 5 | サブクエリ: `exists`、`contains`、スカラーサブクエリと相関サブクエリ | [Java](java/05-subquery.md) | [Kotlin](kotlin/05-subquery.md) |
-| 6 | 選択、集計、グループ化: `select`、`groupBy`、`having`、`Agg` | [Java](java/06-select-group.md) | [Kotlin](kotlin/06-select-group.md) |
+| 6 | 選択、集計、グループ化: `select`、`groupBy`、`having`、`Agg`、結合（`join`、`leftJoin`、`crossJoin`）、派生テーブルと CTE（`with`） | [Java](java/06-select-group.md) | [Kotlin](kotlin/06-select-group.md) |
 | 7 | 更新、挿入、削除: `set`、`values`、`all()`、`execute()`、`limit`、`executeOne()` | [Java](java/07-dml.md) | [Kotlin](kotlin/07-dml.md) |
 | 7.6 | Upsert: `upsert`、`onConflict(...).update(...)`、`onConflict(...).ignore()` | [Java](java/07-6-upsert.md) | [Kotlin](kotlin/07-6-upsert.md) |
 | 8 | プロシージャと DB 関数: `@SqlProcedure`、`@SqlFunction`、`qb.call`、`qb.exec` | [Java](java/08-procedures-functions.md) | [Kotlin](kotlin/08-procedures-functions.md) |
@@ -132,14 +133,15 @@ fetch first ? rows only
 | getter から JPA 属性へのマッピング、キャプチャした値の評価 | 実装済み、H2・MariaDB・Oracle でテスト済み | [03](java/03-where.md) | [03](kotlin/03-where.md) |
 | HQL の生成とクエリの実行（`where`、`toList()`） | 実装済み、H2・MariaDB・Oracle でテスト済み | [03](java/03-where.md) | [03](kotlin/03-where.md) |
 | 結果の関数（`first()`、`one()`、`count()`、`exists()`、`toSet()`） | 実装済み、H2・MariaDB・Oracle でテスト済み（Java のラムダ） | [02](java/02-getting-started.md#getting-the-result) | [02](kotlin/02-getting-started.md#getting-the-result) |
-| ソートとページング（`orderBy`、`limit`、`offset`） | 中核部分は実装済み、H2・MariaDB・Oracle でテスト済み（Java のラムダ）。`SortSpec` も含みます。`SortWhitelist`、結合のソート（`SortSpec` の結合の書き方も）: 設計済み | [04](java/04-order-paging.md) | [04](kotlin/04-order-paging.md) |
+| ソートとページング（`orderBy`、`limit`、`offset`） | 中核部分は実装済み、H2・MariaDB・Oracle でテスト済み。`SortSpec` と結合のソート `(o, c, by)` も含みます。`SortWhitelist` と `SortSpec` の結合の書き方: 設計済み | [04](java/04-order-paging.md) | [04](kotlin/04-order-paging.md) |
 | サブクエリ（`exists`、`contains`、スカラー、相関） | 実装済み、H2・MariaDB・Oracle でテスト済み（Java のラムダ）。MariaDB の `lateral` の書き換え: まだ実装されていない | [05](java/05-subquery.md) | [05](kotlin/05-subquery.md) |
 | 射影、`groupBy`、`having`、集計（`Agg`） | 実装済み、H2・MariaDB・Oracle でテスト済み（Java のラムダ）。`distinct()` と結果の関数も含みます。集約によるソート: v0.2 の候補 | [06](java/06-select-group.md) | [06](kotlin/06-select-group.md) |
-| 派生テーブルと CTE | 設計済み | [06](java/06-select-group.md) | [06](kotlin/06-select-group.md) |
+| 明示的な結合（`join`、`leftJoin`、`crossJoin`、エンティティ 3 つまで） | 実装済み、H2・MariaDB・Oracle でテスト済み（Java のラムダ）。すべてのエンティティに対する `where`、`orderBy`、`select`、ページングを含みます。DML とサブクエリの中の結合: 今後 | [06](java/06-select-group.md#68-explicit-joins) | [06](kotlin/06-select-group.md#68-explicit-joins) |
+| 派生テーブルと CTE（`qb.from(valueQuery)`、`qb.with(valueQuery)`） | 実装済み、H2・MariaDB・Oracle でテスト済み（Java のラムダ）。派生テーブルとの結合と、同じ CTE の 2 回の使用: 今後 | [06](java/06-select-group.md#69-derived-table-subquery-in-from) | [06](kotlin/06-select-group.md#69-derived-table-subquery-in-from) |
 | `update`、`insert`、`delete`、upsert | 実装済み、H2・MariaDB・Oracle でテスト済み（Java のラムダ）。`limit` と `executeOne()` も含みます。更新と削除の `where` の中のサブクエリ（`sub`）と `insert ... select` の集計: 実装済み。`set` の値の中のサブクエリ: 設計済み | [07](java/07-dml.md) | [07](kotlin/07-dml.md) |
-| ストアドプロシージャと DB 関数 | 設計済み | [08](java/08-procedures-functions.md) | [08](kotlin/08-procedures-functions.md) |
-| Kotlin の書き方（`?.`、`?:`、`!!`、範囲、`when`、`in`） | 設計済み（デコーダーの一部は完成） | – | [09](kotlin/09-kotlin-notes.md) |
-| 4 言語のエラーコードとメッセージ | 設計済み | [11](11-errors-and-languages.md) | [11](11-errors-and-languages.md) |
+| ストアドプロシージャと DB 関数 | 実装済み: クエリの中の DB 関数と単独呼び出しは H2・MariaDB・Oracle でテスト済み。プロシージャ（`call`、`exec`、OUT、INOUT、結果セット）は MariaDB と Oracle でテスト済み（H2 には OUT パラメーターがありません）。SARGable 警告、プロシージャのパラメーターの型と名前の照合、Oracle パッケージのオーバーロード: まだ実装されていません | [08](java/08-procedures-functions.md) | [08](kotlin/08-procedures-functions.md) |
+| Kotlin の書き方（`?.`、`?:`、`!!`、範囲、`when`、`in`） | `?.`、`!!`、キャプチャしたコレクションに対する `in`、data class、`Pair`/`Triple`、プロパティへの代入: H2・MariaDB・Oracle で Kotlin のラムダを使ってテスト済み。`?:`、範囲、`when`、プロパティ参照: 設計済み | – | [09](kotlin/09-kotlin-notes.md) |
+| 4 言語のエラーコードとメッセージ | 実装済み、ユニットテスト済み: `[LQL-xxxx]` コード、`LambdaQLException` とそのサブクラス、英語・日本語・中国語・韓国語のメッセージ、`lambdaql.locale`。警告 `LQL-5001` と厳格モード: まだ実装されていません | [11](11-errors-and-languages.md) | [11](11-errors-and-languages.md) |
 | Spring Data JPA（`LambdaQlExecutor<T>`、Spring の `Sort` / `Pageable`、Spring Boot の自動構成） | 実装済み、Spring Boot 3.4.2 で H2・MariaDB・Oracle でテスト済み（Java）。DML の短縮メソッド（`deleteAll`、`updateOne` など）と、更新、削除、挿入、upsert のビルダーも含みます。Spring Boot 4: まだ検証していません | [12](java/12-spring-data-jpa.md) | [12](kotlin/12-spring-data-jpa.md) |
 
 用語の意味:
@@ -151,7 +153,7 @@ fetch first ? rows only
 | 設計済み | 構文とルールは決まっています。プロトタイプでテストしました。ライブラリにはまだコードがありません。 |
 | 予定 | アイデアはありますが、詳細は決まっていません。 |
 
-テストは次のとおりです。`SelectQueryTest`、`SortQueryTest`、`SubqueryTest`、`ProjectionTest`、`DmlQueryTest`、`ExecutorTest`、`AutoConfigurationTest` はユーザー向け API を使い、その他のテストは内部クラスをチェックします。
+テストは次のとおりです。`SelectQueryTest`、`SortQueryTest`、`SubqueryTest`、`ProjectionTest`、`JoinQueryTest`、`DerivedQueryTest`、`DmlQueryTest`、`FunctionTest`、`ProcedureTest`、`KotlinSelectTest`、`KotlinQueryTest`、`LqlMessagesTest`、`ExecutorTest`、`AutoConfigurationTest` はユーザー向け API を使い、その他のテストは内部クラスをチェックします。
 
 | テスト | 確認すること |
 |---|---|
@@ -159,7 +161,14 @@ fetch first ? rows only
 | [SortQueryTest.java](../../../query/src/test/java/org/lambdaql/query/SortQueryTest.java) | `orderBy`、`limit`、`offset`: H2、MariaDB、Oracle での HQL と行の順序 |
 | [SubqueryTest.java](../../../query/src/test/java/org/lambdaql/query/SubqueryTest.java) | `where` の中のサブクエリ: `exists`、`contains`（IN）、NOT EXISTS、スカラー、top-1、入れ子、サブクエリ付きの削除。H2、MariaDB、Oracle での HQL と行 |
 | [ProjectionTest.java](../../../query/src/test/java/org/lambdaql/query/ProjectionTest.java) | `select`、record、`groupBy`、`having`、`Agg`、`distinct`、ページング、`groupBy` 付きの `insert ... select`。H2、MariaDB、Oracle での HQL と値 |
+| [JoinQueryTest.java](../../../query/src/test/java/org/lambdaql/query/JoinQueryTest.java) | エンティティ 3 つまでの `join`、`leftJoin`、`crossJoin`: 条件、ソート、`select`、繰り返される行、`count`、すべてのエンティティに対するページング（H2、MariaDB、Oracle） |
+| [DerivedQueryTest.java](../../../query/src/test/java/org/lambdaql/query/DerivedQueryTest.java) | 派生テーブルと CTE（`qb.from(valueQuery)`、`qb.with(valueQuery)`）: H2、MariaDB、Oracle での HQL と行、内側の `limit`、行の型のルール J5 |
 | [DmlQueryTest.java](../../../query/src/test/java/org/lambdaql/query/DmlQueryTest.java) | `update`、`delete`、`insert`、upsert: H2、MariaDB、Oracle での HQL と実行後の行。同じ条件の選択と比べます |
+| [FunctionTest.java](../../../query/src/test/java/org/lambdaql/query/FunctionTest.java) | `where`、`select`、`orderBy`、update の `set` の中の `@SqlFunction` の DB 関数、Boolean の関数、登録した関数、ルールのチェック（H2、MariaDB、Oracle） |
+| [ProcedureTest.java](../../../query/src/test/java/org/lambdaql/query/ProcedureTest.java) | `qb.call` と `qb.exec` による `@SqlProcedure` の呼び出し（OUT、複数の OUT、INOUT、結果セットと REF CURSOR）とスタブの照合（MariaDB と Oracle）。DB 関数の単独呼び出し（H2、MariaDB、Oracle） |
+| [KotlinSelectTest.kt](../../../query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt) | `where` の中の Kotlin のラムダ: `?.` のパス、キャプチャ値、キャプチャしたコレクションに対する `in` |
+| [KotlinQueryTest.kt](../../../query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt) | Kotlin のラムダ: ソート、サブクエリ、data class・`Pair`・`Triple` の結果、`groupBy` と `having`、update（プロパティへの代入と `by[column] = value`）、insert、delete |
+| [LqlMessagesTest.java](../../../query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java) | メッセージのコードと 4 つのメッセージ言語: すべてのバンドルで同じキーと引数、コードの重複なし、ロケールの選び方、コードの範囲による例外クラス |
 | [ExecutorTest.java](../../../spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java) | Spring Boot アプリケーションの中の `LambdaQlExecutor<T>`: リポジトリのメソッド、Spring の `Sort` と `Pageable`、トランザクション |
 | [AutoConfigurationTest.java](../../../spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java) | Spring Boot の自動構成が作る `QueryBuilder` の Bean |
 | [LoadExamplesTest.java](../../../query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java) | ラムダ本体を見つける、キャプチャした値を読む、シリアライズ可能でないラムダを拒否する |
@@ -173,7 +182,7 @@ fetch first ? rows only
 <a id="about-the-examples"></a>
 ## 例について
 
-例は設計上の例です。機能が実装されると、その例はテストスイートから取ったコードに置き換えられ、テストファイルへのリンクが付きます。3. 条件、4. ソートとページング、5. サブクエリ、6. 選択、集計、グループ化、7. 更新、挿入、削除、12. Spring Data JPA（Java）では、それらの例に **(テスト済み)** と書いてあります。
+例は設計上の例です。機能が実装されると、その例はテストスイートから取ったコードに置き換えられ、テストファイルへのリンクが付きます。3. 条件、4. ソートとページング、5. サブクエリ、6. 選択、集計、グループ化、7. 更新、挿入、削除、8. プロシージャと DB 関数、11. エラーと言語、12. Spring Data JPA（Java）では、それらの例に **(テスト済み)** と書いてあります。Kotlin トラックも、Kotlin のテストから取った例に同じように書いています。
 
 <a id="example-entities"></a>
 ## 例で使うエンティティ

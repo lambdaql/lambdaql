@@ -2,12 +2,12 @@
 # 9. Kotlin の注意点
 
 > [!NOTE]
-> **状況: 設計済み、まだ実装されていません。**
+> **状況: 一部実装済み。**
 > Kotlin のサポートは決定済みの設計です（決定 D17、D20 から D25、D27、D28、D31）。
 > この章のすべての書き方のバイトコードは、kotlinc
 > 1.7.22、2.1.10、2.2.21、2.3.0、2.3.21 でコンパイルして確認しました。また、多くの条件を H2 で 1 行ずつ確認しました。
-> 現在の lambdaQL ではまだ **動きません**。いま動くのは解析コアと `where` + `toList()` だけです
-> （H2、MariaDB、Oracle で Java のラムダを使ってテスト済み）。全体の状況は [トラックの README](README.md) を参照してください。
+> **Kotlin のラムダでテスト済み**（ビルドの中、kotlinc 2.3.21、H2、MariaDB、Oracle）: `?.` のパス、`!!`、キャプチャ値、キャプチャしたコレクションに対する `in`、サブクエリ（`exists`、`in`、スカラー）、`limit` を使うソート、data class、`Pair`、`Triple` を使う `select`、`listOf` のキーを使う `groupBy`、`having`、update でのプロパティへの代入と `by[column] = value`、insert、delete（[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)）。
+> **設計済み、まだテストしていないもの:** このページのそのほかの書き方（たとえば `?:`、範囲、`when`、プロパティ参照、文字列テンプレート）。コンパイラーのバージョンの組み合わせ（kotlinc 1.7.22 から 2.3.0）はまだビルドに入っていません。全体の状況は [トラックの README](README.md) を参照してください。
 
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [8. プロシージャと DB 関数](08-procedures-functions.md) | 次: [10. ルールと制限](10-rules-and-limits.md) | [このページの Java 版: 9. Java の注意点](../java/09-java-notes.md)
 

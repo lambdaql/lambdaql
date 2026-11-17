@@ -2,7 +2,7 @@
 # 7.4 Delete (Kotlin)
 
 > [!NOTE]
-> **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10). The tests use **Java** lambdas. **Kotlin lambdas in DML are not tested yet.** This includes `limit` and `executeOne()` (decision D41).
+> **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10). Most tests use **Java** lambdas. A delete with a `not exists` subquery is tested with a Kotlin lambda too ([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), marked **(tested)**). This includes `limit` and `executeOne()` (decision D41).
 > Subqueries (`sub`) in `where` are implemented and tested with Java lambdas too (milestone M8).
 > **Not implemented yet:** `limit` / `executeOne()` on entities with a composite key.
 > The Kotlin code shows the tested Java statements in Kotlin syntax, and the HQL comes from the Java tests in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) and [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java). Examples without HQL follow the design.
@@ -51,7 +51,17 @@ where (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id) is n
 
 MariaDB writes `delete o1_0 from orders o1_0`. H2 and Oracle write `delete from orders o1_0`.
 
-There are no Kotlin tests yet. The same statements written in Java are tested in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/07-4-delete.md) for the tested examples.
+**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `insert-delete`:
+
+```kotlin
+val i = qb.insert(Archive::class.java).values { it.id = 100L; it.price = 9.5; it.customerName = "Kim" }
+assertEquals(1, i.execute())
+val d = qb.delete(Order::class.java).where { o, sub -> !sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
+assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)", d.toHql().hql())
+```
+
+The test first inserts one `Archive` row, then deletes the orders without items, and compares the rows left with the same filter in Kotlin.
+More statements written in Java are tested in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/07-4-delete.md) for those examples.
 
 The second statement deletes **the same rows** that `qb.from(Order::class.java).where { it.customer?.name == null }` returns: orders whose customer has no name. The Java test compares the deleted rows with this select.
 Orders **without** a customer are not deleted (rule U9, decision D36). To delete them too, write `it.customer == null || it.customer?.name == null`. With this null guard, lambdaQL does not add `e0.customer.id is not null`.

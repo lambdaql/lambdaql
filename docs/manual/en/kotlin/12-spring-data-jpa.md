@@ -61,7 +61,7 @@ Maven:
 </dependency>
 ```
 
-With Maven, add `kotlin-reflect` too (see [12.10](#1210-kotlin-compile-settings)).
+With Maven, add `kotlin-reflect` too (see [12.9](#129-kotlin-compile-settings)).
 
 Without Spring Boot, add `lambdaql-spring-data-jpa` next to your own Spring Data JPA setup (Hibernate and a JDBC driver). It brings `lambdaql-core` and Spring Data JPA.
 
@@ -88,7 +88,7 @@ Requirements:
 | Spring Boot | 3.4 or newer (tested with 3.4.2). Spring Boot 4 is not verified yet |
 | Spring Data JPA | 3.4 or newer |
 | Hibernate | 6.6 (Spring Boot 3.4 already brings it) |
-| Kotlin | 2.2 or newer. For older Kotlin, see [12.10](#1210-kotlin-compile-settings) |
+| Kotlin | 2.2 or newer. For older Kotlin, see [12.9](#129-kotlin-compile-settings) |
 | `kotlin-reflect` | Required by Spring Data for Kotlin |
 
 Spring Data JPA 3.3 and older are **not supported**. lambdaQL registers its executor in `META-INF/spring.factories`, and Spring Data reads repository fragments from this file only from 3.4.
@@ -134,7 +134,7 @@ The last three methods run update, delete and insert statements. They need a tra
 
 How it works:
 
-- **Spring Data runs interface methods with a body by itself.** It does not try to make a query from them. It just calls the body. lambdaQL does not change this. For older Kotlin, see [12.10](#1210-kotlin-compile-settings).
+- **Spring Data runs interface methods with a body by itself.** It does not try to make a query from them. It just calls the body. lambdaQL does not change this. For older Kotlin, see [12.9](#129-kotlin-compile-settings).
 - **`LambdaQlExecutor<T>` is a Spring Data repository fragment.** Its implementation is listed in `META-INF/spring.factories` of `lambdaql-spring-data-jpa`. Spring Data reads this file and adds the implementation to every repository that extends `LambdaQlExecutor<T>`.
 - **One executor object is shared by all repositories.** Each call still uses the entity of its own repository. For example, `teams.count { ... }` on a `TeamRepository` counts `Team` rows (tested in Java, [`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)).
 
@@ -185,7 +185,7 @@ The short methods are the same as `query()` with a result function: `findAll(w)`
 `findAll { ... }` and `count { ... }` do not clash with `findAll(Sort)`, `findAll(Example)` or `count()` from `JpaRepository`, because the argument types are different.
 The methods return Java `Optional`. Use `.orElse(null)` if you want a nullable value.
 
-**`query()`: the full query.** `topGraded` in 12.3 uses it. Call the result function (`toList()` there) in the same method that called `query()`. Do not return the unfinished query. See [12.9](#129-routing-datasource).
+**`query()`: the full query.** `topGraded` in 12.3 uses it.
 
 In the next examples, `repository` is a `MemberRepository`. The same calls are tested in Java in [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java) (regions `find-all-sort`, `find-first`, `find-one`, `count-exists`, `find-set`).
 
@@ -347,7 +347,7 @@ Errors go through Spring's exception translation, the same as for other reposito
 | An unknown property in a Spring `Sort` | `PropertyReferenceException` (tested in Java) |
 | `ignoreCase()` in a Spring `Sort` | `UnsupportedOperationException` (tested in Java) |
 | An update, delete, insert or upsert without a transaction, in a repository call (a shortcut, or `execute()` inside a method with a body) | `InvalidDataAccessApiUsageException` (tested in Java), made by Spring from JPA's `TransactionRequiredException`. Outside a repository method (the `QueryBuilder` bean), JPA's `TransactionRequiredException` |
-| An assignment lambda that breaks a rule (U1, U3, U4, U6) | `LambdaAnalysisException`, not translated (see [7.8](07-dml.md#rules-checked-at-analysis-time)) |
+| An assignment lambda that breaks a rule (U1, U3, U4, U6) | `LambdaQLException` (for example `TranslationException`, `LQL-3042`), not translated (see [7.8](07-dml.md#rules-checked-at-analysis-time)) |
 
 The `QueryBuilder` bean (12.8) is not a repository, so Spring does not translate its errors. There, `one()` and `executeOne()` with 2 or more rows throw `NonUniqueResultException`.
 
@@ -406,28 +406,7 @@ fun queryBuilder(entityManagerFactory: EntityManagerFactory) =
 
 **Tests with `@DataJpaTest`.** A `@DataJpaTest` slice test loads only some auto-configurations. The repository methods work there, but the `QueryBuilder` bean is not made. If a test needs it, add `@ImportAutoConfiguration(LambdaQlAutoConfiguration::class)` to the test class (not tested yet).
 
-## 12.9 Routing DataSource
-
-> [!WARNING]
-> **Design note, not measured.** This section was not tested with a routing DataSource.
-
-Some applications choose the database with AOP rules on method names. For example, a rule sends `find*` methods to a read replica.
-Such a rule applies to the SQL that runs **inside** the method it matches.
-
-- Call `findAll`, `findOne` and the other short methods inside a repository method with a body, or in the same service method.
-- With `repo.query().where { ... }.toList()`, the SQL runs when `toList()` is called, not when `query()` is called. If `toList()` runs outside the repository method, a rule on repository methods does not apply to it.
-
-```kotlin
-// a rule on repository methods applies: the SQL runs inside findActive()
-fun findActive(): List<Member> =
-    query().where { it.active }.toList()
-
-// a rule on repository methods does not apply: the SQL runs in toList(), after query() has returned
-// (a rule on the calling service method still applies)
-val rows = repository.query().where { it.active }.toList()
-```
-
-## 12.10 Kotlin compile settings
+## 12.9 Kotlin compile settings
 
 Spring Data runs a repository method with a body only when it is a JVM default method in the interface.
 
@@ -448,7 +427,7 @@ kotlin {
 
 These settings were checked with a prototype: kotlinc 2.3.21, and `-jvm-default=disable` for the behavior of Kotlin older than 2.2. The lambdaQL test suite has no Kotlin repository yet.
 
-## 12.11 Not implemented yet
+## 12.10 Not implemented yet
 
 - **Spring Boot 4.** The auto-configuration names the Spring Boot 4 classes too, but only Spring Boot 3.4.2 is tested.
 - **`ignoreCase()`** in a Spring `Sort`.

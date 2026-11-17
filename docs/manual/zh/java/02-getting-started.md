@@ -8,7 +8,7 @@
 > Spring Data JPA 模块（repository 执行器和 Spring Boot 自动配置）也可以运行（见 [12. Spring Data JPA](12-spring-data-jpa.md)）。
 > 更新、插入、删除和 upsert 也可以运行（见 [7. 更新、插入、删除](07-dml.md)）。
 > 子查询和 `select`（带 `groupBy`、`having` 和 `Agg`）同样可以使用（见 [5. 子查询](05-subquery.md) 和 [6. 查询列、聚合与分组](06-select-group.md)）。
-> 派生表、CTE 和存储过程**已设计，尚未实现**。
+> 显式 join、派生表和 CTE 同样可以使用（见 [6. 查询列、聚合与分组](06-select-group.md#68-explicit-joins)）。存储过程与数据库函数同样可以使用（见 [8. 存储过程与数据库函数](08-procedures-functions.md)）。
 > 目前还没有任何构件发布到 Maven Central。请按下文从源码构建。
 
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[1. 概述](../01-overview.md) | 下一章：[3. 条件](03-where.md) | [本页的 Kotlin 版本](../kotlin/02-getting-started.md)

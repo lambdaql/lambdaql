@@ -2,7 +2,8 @@
 
 > [!NOTE]
 > **Status**
-> - **Implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5, milestone M10, decisions D28 and D40): update, delete, insert, `insert ... select`, upsert, and (decision D41) `limit` for update and delete and the one-row protection `executeOne()`. The tests use **Java** lambdas. **Kotlin lambdas in DML are not tested yet.**
+> - **Implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5, milestone M10, decisions D28 and D40): update, delete, insert, `insert ... select`, upsert, and (decision D41) `limit` for update and delete and the one-row protection `executeOne()`. Most tests use **Java** lambdas.
+> - **Tested with Kotlin lambdas** ([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), in the build, H2, MariaDB and Oracle): property assignment in `set`, the index form `by[column] = value`, `insert` with `values`, and `delete` with a `not exists` subquery. These examples are marked **(tested)**.
 > - **Also implemented and tested (with Java lambdas):** subqueries (`sub`) in the `where` of update and delete (milestone M8, see [7.4](07-4-delete.md)), and `groupBy`, `having` and `Agg` in `insert ... select` (milestone M9, see [7.5](07-5-insert.md)).
 > - **Not implemented yet:** subqueries in the values of `set` (the context object `by.from(...)`), and `limit` / `executeOne()` on entities with a composite key.
 > - The Kotlin code in this chapter shows the tested Java statements in Kotlin syntax. The HQL comes from the Java tests. Examples without HQL follow the design.
@@ -119,7 +120,19 @@ where o1_0.status=2
 
 Oracle writes the alias in `set` (`set o1_0.status=?`); H2 and MariaDB do not.
 
-There are no Kotlin tests yet. The same statement written in Java is tested in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/07-dml.md) for the tested examples.
+The Kotlin index operator `by[column] = value` calls the same `set` method. It is tested with a Kotlin lambda:
+
+**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `update-by`:
+
+```kotlin
+// the builder form, Kotlin index assignment: by[column] = value
+val u = qb.update(Order::class.java)
+    .set { o, by -> by[o.description] = "done" }
+    .where { it.status.toInt() == 2 }
+assertEquals("update Order e0 set e0.description = 'done' where e0.status = 2", u.toHql().hql())
+```
+
+The test entity's `status` is a `short`, so the test writes `it.status.toInt() == 2`. The same statement written in Java is tested in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) (region `update-by`).
 
 Every example in this chapter can also be written with `by.set`. Chain the calls: the lambda returns the last `by.set(...)`.
 
@@ -133,8 +146,7 @@ qb.update(Order::class.java).set { o, by -> by.set(o.address.city, city) }.where
 qb.update(Order::class.java).set { o, by -> by.set(o.customer?.id, cid) }.where { it.id == id }.execute()   // FK
 ```
 
-The Kotlin index operator `by[o.status] = st` calls the same `set` method. The assignment lambda returns nothing, so this form works too (compiled with kotlinc 2.3.21 and read by the analyzer; not yet a test in the build).
-Today lambdaQL reads only a chain of `by.set(...)` calls that the lambda returns. So write the chain.
+With the index operator, write one `by[column] = value` per column: `{ o, by -> by[o.status] = st; by[o.price] = o.price!! * 1.1 }`. The one-column form is tested (see above); the form with many statements is not covered by a Kotlin test yet.
 
 In the design, the second lambda argument is **one context object**. It has both `set(column, value)` and the subquery function `from(...)`.
 Name it `by` or `sub` as you like. The name does not matter.
@@ -204,7 +216,7 @@ In SQL, every column on the right side of SET means the value **before** the upd
 // error: price is assigned first, then read again
 ```
 
-If you **assign a column and then read it later in the same statement**, lambdaQL throws `LambdaAnalysisException` when you call `set(...)` (rule U3).
+If you **assign a column and then read it later in the same statement**, lambdaQL throws `TranslationException` (`LQL-3042`) when you call `set(...)` (rule U3).
 The reason: MariaDB uses the **new** value in this case, while H2 and Oracle use the old value. The results differ (checked: MariaDB 200, H2 and Oracle 100).
 
 These cases are fine, because all three databases agree:
@@ -224,8 +236,8 @@ or `it.customer = ...` and then `it.customer?.id = ...`.
 
 ### Rules checked at analysis time
 
-lambdaQL checks rules U1, U3, U4 and U6 when it reads the lambda, and throws `LambdaAnalysisException` from `set(...)` or `values(...)`.
-These checks are tested with Java lambdas in [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java) (region `rules`) and [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java). There are no Kotlin tests yet.
+lambdaQL checks rules U1, U3, U4 and U6 when it reads the lambda, and throws a `LambdaQLException` from `set(...)` or `values(...)` (for example `LQL-3037` for U1, `LQL-3042` for U3, `LQL-3041` for U4).
+These checks are tested with Java lambdas in [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java) (region `rules`) and [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java). There are no Kotlin tests for these checks yet.
 
 ### `where` or `all()` is required
 
@@ -363,7 +375,7 @@ The upsert rules (decision D40) are in [7.6 Upsert](07-6-upsert.md#rules).
 | `returning` | rejected | query again after the DML |
 | Database time (`current_timestamp`) | rejected | bind an application time (U8) |
 
-Today a broken rule throws `LambdaAnalysisException` with a plain message (in Korean for now). The planned `[LQL-xxxx]` codes and the `LambdaQLException` base class are in [11. Errors and languages](../11-errors-and-languages.md).
+A broken rule throws a `LambdaQLException` with a `[LQL-xxxx]` code (`TranslationException` for most rules, `UnsupportedLambdaShapeException` for a condition or a local variable in an assignment lambda). See [11. Errors and languages](../11-errors-and-languages.md).
 All rules in one place: [10. Rules and limits](10-rules-and-limits.md).
 
 ---

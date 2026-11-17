@@ -2,7 +2,8 @@
 
 > [!NOTE]
 > **状态**
-> - **已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（Hibernate 6.6.5，里程碑 M10，决定 D28 和 D40）：更新、删除、插入、`insert ... select`、upsert，以及（决定 D41）更新和删除的 `limit` 与单行保护 `executeOne()`。测试使用 **Java** Lambda。**DML 中的 Kotlin Lambda 尚未测试。**
+> - **已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（Hibernate 6.6.5，里程碑 M10，决定 D28 和 D40）：更新、删除、插入、`insert ... select`、upsert，以及（决定 D41）更新和删除的 `limit` 与单行保护 `executeOne()`。大多数测试使用 **Java** Lambda。
+> - **已用 Kotlin Lambda 测试**（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，在构建中，H2、MariaDB 和 Oracle）：`set` 中的属性赋值、索引写法 `by[column] = value`、使用 `values` 的 `insert`，以及带 `not exists` 子查询的 `delete`。这些示例标记为 **(已测试)**。
 > - **同样已实现并测试（使用 Java Lambda）：** update 和 delete 的 `where` 中的子查询（`sub`）（里程碑 M8，见 [7.4](07-4-delete.md)），以及 `insert ... select` 中的 `groupBy`、`having` 和 `Agg`（里程碑 M9，见 [7.5](07-5-insert.md)）。
 > - **尚未实现：** `set` 值中的子查询（上下文对象的 `by.from(...)`），以及复合键实体上的 `limit` / `executeOne()`。
 > - 本章的 Kotlin 代码用 Kotlin 语法展示已测试的 Java 语句。HQL 来自 Java 测试。没有 HQL 的示例遵循设计。
@@ -123,7 +124,19 @@ where o1_0.status=2
 
 Oracle 在 `set` 中写出别名（`set o1_0.status=?`）；H2 和 MariaDB 不写。
 
-目前还没有 Kotlin 测试。用 Java 写的相同语句在 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中测试（H2、MariaDB 和 Oracle）。已测试的示例见[本页的 Java 版本](../java/07-dml.md)。
+Kotlin 的索引运算符 `by[column] = value` 调用的是同一个 `set` 方法。它已用 Kotlin Lambda 测试：
+
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `update-by`：
+
+```kotlin
+// the builder form, Kotlin index assignment: by[column] = value
+val u = qb.update(Order::class.java)
+    .set { o, by -> by[o.description] = "done" }
+    .where { it.status.toInt() == 2 }
+assertEquals("update Order e0 set e0.description = 'done' where e0.status = 2", u.toHql().hql())
+```
+
+测试实体的 `status` 是 `short`，所以测试写成 `it.status.toInt() == 2`。用 Java 写的相同语句在 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中测试（region `update-by`）。
 
 本章的每个示例也都可以用 `by.set` 来写。把调用串起来：Lambda 返回最后一个 `by.set(...)`。
 
@@ -137,8 +150,7 @@ qb.update(Order::class.java).set { o, by -> by.set(o.address.city, city) }.where
 qb.update(Order::class.java).set { o, by -> by.set(o.customer?.id, cid) }.where { it.id == id }.execute()   // FK
 ```
 
-Kotlin 的索引运算符 `by[o.status] = st` 调用的是同一个 `set` 方法。赋值 Lambda 不返回值，所以这种写法也可以使用（已用 kotlinc 2.3.21 编译并确认分析器能读取；构建中还没有对应测试）。
-目前 lambdaQL 只读取 Lambda 返回的 `by.set(...)` 调用链。因此请写调用链。
+使用索引运算符时，每列写一个 `by[column] = value`：`{ o, by -> by[o.status] = st; by[o.price] = o.price!! * 1.1 }`。单列的写法已测试（见上文）；多条语句的写法还没有 Kotlin 测试覆盖。
 
 在设计中，第二个 Lambda 参数是**一个上下文对象**。它同时有 `set(column, value)` 和子查询函数 `from(...)`。
 你可以随意把它命名为 `by` 或 `sub`。名字并不重要。
@@ -214,7 +226,7 @@ qb.update(Order::class.java)
 // error: price is assigned first, then read again
 ```
 
-如果你**先给某列赋值，然后在同一条语句中又读取它**，lambdaQL 会在你调用 `set(...)` 时抛出 `LambdaAnalysisException`（规则 U3）。
+如果你**先给某列赋值，然后在同一条语句中又读取它**，lambdaQL 会在你调用 `set(...)` 时抛出 `TranslationException`（`LQL-3042`）（规则 U3）。
 原因：在这种情况下，MariaDB 使用**新**值，而 H2 和 Oracle 使用旧值。结果会不同（已检查：MariaDB 为 200，H2 和 Oracle 为 100）。
 
 以下情况没有问题，因为三种数据库的结果一致：
@@ -236,8 +248,8 @@ qb.update(Order::class.java)
 <a id="rules-checked-at-analysis-time"></a>
 ### 在分析时检查的规则
 
-lambdaQL 在读取 Lambda 时检查规则 U1、U3、U4 和 U6，并从 `set(...)` 或 `values(...)` 抛出 `LambdaAnalysisException`。
-这些检查已用 Java Lambda 在 [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)（region `rules`）和 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中测试。目前还没有 Kotlin 测试。
+lambdaQL 在读取 Lambda 时检查规则 U1、U3、U4 和 U6，并从 `set(...)` 或 `values(...)` 抛出 `LambdaQLException`（例如 U1 为 `LQL-3037`，U3 为 `LQL-3042`，U4 为 `LQL-3041`）。
+这些检查已用 Java Lambda 在 [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)（region `rules`）和 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中测试。这些检查目前还没有 Kotlin 测试。
 
 <a id="where-or-all-is-required"></a>
 ### 必须有 `where` 或 `all()`
@@ -384,7 +396,7 @@ Upsert 的规则（决定 D40）见 [7.6 Upsert](07-6-upsert.md#rules)。
 | `returning` | 拒绝 | DML 之后再查询一次 |
 | 数据库时间（`current_timestamp`） | 拒绝 | 绑定应用程序时间（U8） |
 
-目前违反规则时会抛出带普通消息的 `LambdaAnalysisException`（目前消息是韩语）。计划中的 `[LQL-xxxx]` 代码和 `LambdaQLException` 基类见 [11. 错误与语言](../11-errors-and-languages.md)。
+违反规则时会抛出带 `[LQL-xxxx]` 错误码的 `LambdaQLException`（大多数规则为 `TranslationException`，赋值 Lambda 中的条件或局部变量为 `UnsupportedLambdaShapeException`）。见 [11. 错误与语言](../11-errors-and-languages.md)。
 所有规则集中在一处：[10. 规则与限制](10-rules-and-limits.md)。
 
 ---

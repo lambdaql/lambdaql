@@ -2,7 +2,7 @@
 # 7.2 更新（Kotlin）
 
 > [!NOTE]
-> **状态：已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（里程碑 M10）。测试使用 **Java** Lambda。**DML 中的 Kotlin Lambda 尚未测试。** 这也包括 `limit` 和 `executeOne()`（决定 D41）。
+> **状态：已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（里程碑 M10）。大多数测试使用 **Java** Lambda。属性赋值和索引写法 `by[column] = value` 也已用 Kotlin Lambda 测试（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，标记为 **(已测试)**）。 这也包括 `limit` 和 `executeOne()`（决定 D41）。
 > `where` 中的子查询（`sub`）同样已实现（里程碑 M8）。delete 写法已用 Java Lambda 测试；见 [7.4](07-4-delete.md)。
 > **尚未实现：** `set` 值中的 `sub` 子查询，以及复合键实体上的 `limit` / `executeOne()`。
 > Kotlin 代码用 Kotlin 语法展示已测试的 Java 语句，HQL 来自 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中的 Java 测试。没有 HQL 的示例遵循设计。
@@ -47,7 +47,19 @@ where o1_0.status=1
 
 Oracle 在 `set` 中写出别名（`set o1_0.status=?`）；H2 和 MariaDB 不写。
 
-目前还没有 Kotlin 测试。用 Java 写的相同语句在 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中测试（H2、MariaDB 和 Oracle）。已测试的示例见[本页的 Java 版本](../java/07-2-update.md)。
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `update`：
+
+```kotlin
+val u = qb.update(Order::class.java)
+    .set { it.status = st; it.price = it.price * 2 }
+    .where { it.customer?.name == "Kim" }
+assertEquals("update Order e0 set e0.status = :p1, e0.price = (e0.price * 2.0)"
+    + " where (select s1.name from Customer s1 where s1.id = e0.customer.id) = 'Kim' and e0.customer.id is not null",
+    u.toHql().hql())
+```
+
+`st` 是捕获的 `Short`（`7`）。测试实体的 `price` 是基本类型 `double`，所以没有 `!!`。update 的 `where` 中的路径 `it.customer?.name` 会变成子查询（见下面的[带路径和子查询的 where](#where-with-paths-and-subqueries)）。测试执行语句并读回结果行。
+更多用 Java 写的语句在 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中测试（H2、MariaDB 和 Oracle）。这些示例见[本页的 Java 版本](../java/07-2-update.md)。
 
 <a id="values-null-date-boolean"></a>
 ## 值：null、日期、布尔值
@@ -269,9 +281,9 @@ var u = qb.update(Order::class.java).set { it.description = memo }
 if (newStatus != null) u = u.set { it.status = newStatus }
 val changed = u.where { it.id == id }.execute()
 
-// reading a column that an earlier assignment wrote is an error (U3): LambdaAnalysisException
+// reading a column that an earlier assignment wrote is an error (U3): TranslationException (LQL-3042)
 qb.update(Order::class.java).set { it.price = 1.0; it.total = it.price }
-// the same column twice is an error (U4), also across set() calls: LambdaAnalysisException
+// the same column twice is an error (U4), also across set() calls: TranslationException (LQL-3041)
 qb.update(Order::class.java).set { it.status = 1 }.set { it.status = 2 }
 ```
 

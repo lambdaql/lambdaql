@@ -2,7 +2,7 @@
 # 7.6 Upsert（Kotlin）
 
 > [!NOTE]
-> **状況: 実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、マイルストーン M10、決定 D40）。テストは **Java** のラムダを使っています。**DML での Kotlin のラムダはまだテストしていません。**
+> **状況: 実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、マイルストーン M10、決定 D40）。テストは **Java** のラムダを使っています。**upsert での Kotlin のラムダはまだテストしていません**（update、insert、delete はテスト済みです。[7. 更新、挿入、削除](07-dml.md) を参照）。
 > Kotlin コードはテスト済みの Java の文を Kotlin の構文で書いたもので、HQL は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) の Java のテストから取っています。HQL のない例は設計に従っています。
 > 全体の状況は [トラックの README](README.md) を見てください。
 

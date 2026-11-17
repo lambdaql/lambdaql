@@ -2,9 +2,11 @@
 
 > [!NOTE]
 > **状态**
-> - **已实现，并在 H2、MariaDB 和 Oracle 上测试：** `where` 条件和 `toList()`（映射到列、HQL 输出、执行查询）。这些测试使用的是 **Java** Lambda。**Kotlin Lambda 尚未测试。**
-> - **已设计，尚未实现：** 本章中 Kotlin 特有的写法（`?.`、`?:`、`!!`、区间、`when`、`in`）。它们的字节码已经编译，并用原型检查过（kotlinc 1.7.22 到 2.3.21），许多条件已在 H2 上逐行检查。派生表、CTE 和存储过程也都只是设计。排序与分页的核心部分（[4. 排序与分页](04-order-paging.md)）、子查询（[5. 子查询](05-subquery.md)）、带 `groupBy`、`having` 和 `Agg` 的 `select`（[6. 查询列、聚合与分组](06-select-group.md)）、update/insert/delete/upsert（[7. 更新、插入、删除](07-dml.md)）和 Spring Data JPA 模块（[12. Spring Data JPA](12-spring-data-jpa.md)）已经实现。
-> - 本章中的 HQL 是**计划**的输出。一些小细节（例如 `e0`、`j1` 这样的别名）仍可能变化。
+> - **已实现，并在 H2、MariaDB 和 Oracle 上测试：** `where` 条件和 `toList()`（映射到列、HQL 输出、执行查询）。大多数测试使用 **Java** Lambda。
+> - **已用 Kotlin Lambda 测试**（[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)，在构建中，kotlinc 2.3.21）：`?.` 路径、捕获值，以及对捕获集合使用 `in`。`!!` 在 [5. 子查询](05-subquery.md)的 Kotlin 测试中测试。这些示例标记为 **(已测试)**。
+> - **已设计，尚未测试：** 本章中其他 Kotlin 特有的写法（`?:`、区间、`when`）。它们的字节码已经编译，并用原型检查过（kotlinc 1.7.22 到 2.3.21），许多条件已在 H2 上逐行检查。
+> - **也已实现：** 排序与分页的核心部分（[4. 排序与分页](04-order-paging.md)）、子查询（[5. 子查询](05-subquery.md)）、带 `groupBy`、`having` 和 `Agg` 的 `select`、join、派生表和 CTE（[6. 查询列、聚合与分组](06-select-group.md)）、update/insert/delete/upsert（[7. 更新、插入、删除](07-dml.md)）、存储过程与数据库函数（[8. 存储过程与数据库函数](08-procedures-functions.md)）和 Spring Data JPA 模块（[12. Spring Data JPA](12-spring-data-jpa.md)）。
+> - 本章中的其他 HQL 是**计划**的输出。一些小细节（例如 `e0`、`j1` 这样的别名）仍可能变化。
 
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[2. 入门](02-getting-started.md) | 下一章：[4. 排序与分页](04-order-paging.md) | [本页的 Java 版本](../java/03-where.md)
 
@@ -64,7 +66,15 @@ from orders o1_0
 where o1_0.status=1 and o1_0.price>100.0
 ```
 
-目前还没有 Kotlin 测试。用 Java 写的相同查询在 [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java) 中测试（H2、MariaDB 和 Oracle）。已测试的示例见[本页的 Java 版本](../java/03-where.md)。
+**(已测试)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)，region `captured`：
+
+```kotlin
+val q = qb.from(Order::class.java).where { it.price > min && it.status.toInt() == 1 }
+assertEquals("select e0 from Order e0 where e0.price > :p1 and e0.status = 1", q.toHql().hql())
+```
+
+`min` 是捕获的局部 `val`（`100.0`），所以它是绑定参数。Kotlin 测试使用 Java 测试实体：`price` 是基本类型 `double`（不需要 `!!`），`status` 是 `short`（所以测试写成 `it.status.toInt() == 1`；lambdaQL 会忽略这个转换）。
+更多用 Java 写的查询在 [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java) 中测试（H2、MariaDB 和 Oracle）。这些示例见[本页的 Java 版本](../java/03-where.md)。
 
 你可以多次调用 `where()`。这些条件以 `AND` 连接：
 
@@ -388,6 +398,15 @@ from orders o1_0
 where o1_0.id not in (?,?)
 ```
 
+**(已测试)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)，region `in`：
+
+```kotlin
+val q = qb.from(Order::class.java).where { it.status in statuses }
+assertEquals("select e0 from Order e0 where e0.status in (:p1)", q.toHql().hql())
+```
+
+`statuses` 是捕获的 `listOf<Short>(1, 3)`。
+
 `!in` 会变成 `not in`。id 不可能为 NULL，所以没有 `is null` 部分。对于可能为 NULL 的列，lambdaQL 会加上 `x is null or`，因为当列表中没有 `null` 时，Kotlin 的 `!in` 对 NULL 值返回 true。
 
 | 情况 | 结果 |
@@ -424,6 +443,14 @@ qb.from(Order::class.java)
     .where { it.customer?.name == name }
     .toList()
 // HQL: select e0 from Order e0 join e0.customer j1 where j1.name = :p1
+```
+
+**(已测试)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)，region `safe-call`（用常量代替 `name`）：
+
+```kotlin
+// it.customer?.name reads as the path customer.name (inner join: orders without a customer are left out)
+val q = qb.from(Order::class.java).where { it.customer?.name == "Kim" }
+assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim'", q.toHql().hql())
 ```
 
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `inner-join`：
@@ -474,7 +501,7 @@ where c1_0.id is not null and c1_0.name=?
 
 - `||` 的其他部分也可能保留订单。`it.status == 1 || it.customer?.name == name` 也会使用 `left join`，因为在 Kotlin 中，状态为 1 的订单即使没有客户也会匹配。
 - 如果另一个 `where` 调用无论如何都会去掉这些订单（例如 `.where { it.customer?.name != null }`），join 仍然是内连接。
-- 这一点目前还没有 Kotlin 测试。用 Java 写的同样的条件已经测试过；见[本页的 Java 版本](../java/03-where.md#310-association-paths)。
+- null 守卫目前还没有 Kotlin 测试。用 Java 写的同样的条件已经测试过；见[本页的 Java 版本](../java/03-where.md#310-association-paths)。
 
 要查找**没有**客户的订单，请比较关联本身。这会检查外键列，不需要 join：
 

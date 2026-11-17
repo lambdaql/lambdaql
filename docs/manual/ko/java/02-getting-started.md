@@ -9,7 +9,7 @@
 > Spring Data JPA 모듈(리포지토리 실행기와 Spring Boot 자동 구성)도 동작합니다([12. Spring Data JPA](12-spring-data-jpa.md) 참고).
 > 수정, 삽입, 삭제, 업서트도 동작합니다([7. 수정, 삽입, 삭제](07-dml.md) 참고).
 > 서브쿼리와 `select`(`groupBy`, `having`, `Agg` 포함)도 동작합니다([5. 서브쿼리](05-subquery.md), [6. 조회, 집계, 그룹화](06-select-group.md) 참고).
-> 파생 테이블, CTE, 프로시저는 **설계되었지만 아직 구현되지 않았습니다**.
+> 명시적 조인, 파생 테이블, CTE도 동작합니다([6. 조회, 집계, 그룹화](06-select-group.md#68-explicit-joins) 참고). 저장 프로시저와 DB 함수도 동작합니다([8. 프로시저와 DB 함수](08-procedures-functions.md) 참고).
 > 아직 Maven Central에 배포된 아티팩트는 없습니다. 아래 절차대로 소스에서 빌드하십시오.
 
 [Java 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [1. 개요](../01-overview.md) | 다음: [3. 조건](03-where.md) | [이 페이지의 Kotlin 버전](../kotlin/02-getting-started.md)

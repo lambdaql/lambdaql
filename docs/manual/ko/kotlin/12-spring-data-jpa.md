@@ -64,7 +64,7 @@ Maven:
 </dependency>
 ```
 
-Maven에서도 `kotlin-reflect`를 추가하십시오([12.10](#1210-kotlin-compile-settings) 참고).
+Maven에서도 `kotlin-reflect`를 추가하십시오([12.9](#129-kotlin-compile-settings) 참고).
 
 Spring Boot 없이 사용할 때는 기존 Spring Data JPA 구성(Hibernate, JDBC 드라이버)에 `lambdaql-spring-data-jpa`를 추가하십시오. 이 아티팩트는 `lambdaql-core`와 Spring Data JPA를 함께 가져옵니다.
 
@@ -91,7 +91,7 @@ dependencies {
 | Spring Boot | 3.4 이상(3.4.2로 테스트). Spring Boot 4는 아직 검증하지 않음 |
 | Spring Data JPA | 3.4 이상 |
 | Hibernate | 6.6(Spring Boot 3.4에 포함) |
-| Kotlin | 2.2 이상. 이전 버전은 [12.10](#1210-kotlin-compile-settings) 참고 |
+| Kotlin | 2.2 이상. 이전 버전은 [12.9](#129-kotlin-compile-settings) 참고 |
 | `kotlin-reflect` | Spring Data의 Kotlin 지원에 필요 |
 
 Spring Data JPA 3.3 이하는 **지원하지 않습니다**. lambdaQL은 실행기를 `META-INF/spring.factories`에 등록하며, Spring Data는 3.4부터 이 파일에서 리포지토리 프래그먼트를 읽습니다.
@@ -138,7 +138,7 @@ interface MemberRepository : JpaRepository<Member, Long>, LambdaQlExecutor<Membe
 
 동작 방식:
 
-- **본문이 있는 인터페이스 메서드는 Spring Data가 직접 실행합니다.** Spring Data는 이 메서드에서 쿼리를 만들지 않고 본문을 호출합니다. lambdaQL은 이 동작을 변경하지 않습니다. Kotlin 2.2 미만은 [12.10](#1210-kotlin-compile-settings)을 참고하십시오.
+- **본문이 있는 인터페이스 메서드는 Spring Data가 직접 실행합니다.** Spring Data는 이 메서드에서 쿼리를 만들지 않고 본문을 호출합니다. lambdaQL은 이 동작을 변경하지 않습니다. Kotlin 2.2 미만은 [12.9](#129-kotlin-compile-settings)을 참고하십시오.
 - **`LambdaQlExecutor<T>`는 Spring Data 리포지토리 프래그먼트입니다.** 구현 클래스는 `lambdaql-spring-data-jpa`의 `META-INF/spring.factories`에 등록되어 있습니다. Spring Data는 이 파일을 읽고, `LambdaQlExecutor<T>`를 상속하는 모든 리포지토리에 구현을 추가합니다.
 - **실행기 객체 하나를 모든 리포지토리가 공유합니다.** 호출마다 해당 리포지토리의 엔티티를 사용합니다. 예를 들어 `TeamRepository`에서 `teams.count { ... }`는 `Team` 행의 수를 반환합니다(Java로 테스트함, [`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)).
 
@@ -191,7 +191,7 @@ interface MemberRepository : JpaRepository<Member, Long>, LambdaQlExecutor<Membe
 `findAll { ... }`와 `count { ... }`는 인자 타입이 다르므로 `JpaRepository`의 `findAll(Sort)`, `findAll(Example)`, `count()`와 충돌하지 않습니다.
 메서드는 Java `Optional`을 반환합니다. nullable 값이 필요하면 `.orElse(null)`을 사용하십시오.
 
-**`query()`: 전체 쿼리.** 12.3의 `topGraded`가 이 메서드를 사용합니다. `query()`를 호출한 메서드 안에서 결과 함수(여기서는 `toList()`)까지 호출하십시오. 완성되지 않은 쿼리는 반환하지 않습니다. [12.9](#129-routing-datasource)를 참고하십시오.
+**`query()`: 전체 쿼리.** 12.3의 `topGraded`가 이 메서드를 사용합니다.
 
 다음 예제에서 `repository`는 `MemberRepository`입니다. 같은 호출을 Java로 작성한 코드는 [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)에서 테스트합니다(영역 `find-all-sort`, `find-first`, `find-one`, `count-exists`, `find-set`).
 
@@ -365,7 +365,7 @@ DML을 자체 트랜잭션에서 실행하는 빌더는 `QueryBuilder(entityMana
 | Spring `Sort`에 없는 속성 | `PropertyReferenceException`(Java로 테스트함) |
 | Spring `Sort`의 `ignoreCase()` | `UnsupportedOperationException`(Java로 테스트함) |
 | 리포지토리 호출(단축 메서드, 또는 본문이 있는 메서드 안의 `execute()`)에서 트랜잭션 없이 수정, 삭제, 삽입, 업서트 실행 | `InvalidDataAccessApiUsageException`(Java로 테스트함). Spring이 JPA `TransactionRequiredException`을 변환한 예외입니다. 리포지토리 메서드 밖(`QueryBuilder` 빈)에서는 JPA `TransactionRequiredException` |
-| 규칙(U1, U3, U4, U6)을 어긴 대입 람다 | `LambdaAnalysisException`. 변환하지 않음([7.8](07-dml.md#rules-checked-at-analysis-time) 참고) |
+| 규칙(U1, U3, U4, U6)을 어긴 대입 람다 | `LambdaQLException`(예: `TranslationException`, `LQL-3042`). 변환하지 않음([7.8](07-dml.md#rules-checked-at-analysis-time) 참고) |
 
 `QueryBuilder` 빈(12.8)은 리포지토리가 아니므로 Spring의 예외 변환을 거치지 않습니다. 이 빈에서 `one()`과 `executeOne()`의 조건에 맞는 행이 2개 이상이면 `NonUniqueResultException`이 발생합니다.
 
@@ -428,30 +428,8 @@ Spring 애플리케이션에서는 `QueryBuilder(entityManagerFactory)`를 사�
 **`@DataJpaTest` 테스트.** `@DataJpaTest` 슬라이스 테스트는 일부 자동 구성만 로드합니다. 리포지토리 메서드는 동작하지만 `QueryBuilder` 빈은 생성되지 않습니다.
 테스트에 이 빈이 필요하면 테스트 클래스에 `@ImportAutoConfiguration(LambdaQlAutoConfiguration::class)`를 추가하십시오(아직 테스트하지 않음).
 
-<a id="129-routing-datasource"></a>
-## 12.9 라우팅 DataSource
-
-> [!WARNING]
-> **설계 참고 사항, 미측정.** 이 절의 내용은 라우팅 DataSource로 테스트하지 않았습니다.
-
-일부 애플리케이션은 메서드 이름에 대한 AOP 규칙으로 데이터베이스를 선택합니다. 예를 들어 `find*` 메서드를 읽기 전용 복제본(replica)으로 보내는 규칙을 둡니다.
-이런 규칙은 규칙에 맞는 메서드 **안에서** 실행되는 SQL에만 적용됩니다.
-
-- `findAll`, `findOne` 등 짧은 메서드는 본문이 있는 리포지토리 메서드 안이나 같은 서비스 메서드 안에서 호출하십시오.
-- `repo.query().where { ... }.toList()`에서 SQL은 `query()`가 아니라 `toList()`를 호출할 때 실행됩니다. `toList()`가 리포지토리 메서드 밖에서 실행되면 리포지토리 메서드에 대한 규칙이 적용되지 않습니다.
-
-```kotlin
-// a rule on repository methods applies: the SQL runs inside findActive()
-fun findActive(): List<Member> =
-    query().where { it.active }.toList()
-
-// a rule on repository methods does not apply: the SQL runs in toList(), after query() has returned
-// (a rule on the calling service method still applies)
-val rows = repository.query().where { it.active }.toList()
-```
-
-<a id="1210-kotlin-compile-settings"></a>
-## 12.10 Kotlin 컴파일 설정
+<a id="129-kotlin-compile-settings"></a>
+## 12.9 Kotlin 컴파일 설정
 
 Spring Data는 본문이 있는 리포지토리 메서드가 인터페이스의 JVM default 메서드일 때만 그 본문을 실행합니다.
 
@@ -472,8 +450,8 @@ kotlin {
 
 이 설정은 프로토타입으로 확인했습니다(실측). kotlinc 2.3.21을 사용했고, Kotlin 2.2 미만의 동작은 `-jvm-default=disable`로 재현했습니다. lambdaQL 테스트 코드에는 아직 Kotlin 리포지토리가 없습니다.
 
-<a id="1211-not-implemented-yet"></a>
-## 12.11 미구현 기능
+<a id="1210-not-implemented-yet"></a>
+## 12.10 미구현 기능
 
 - **Spring Boot 4.** 자동 구성에는 Spring Boot 4의 클래스 이름도 지정되어 있지만, 테스트한 버전은 Spring Boot 3.4.2뿐입니다.
 - Spring `Sort`의 **`ignoreCase()`**.

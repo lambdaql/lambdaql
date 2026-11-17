@@ -1,12 +1,12 @@
 # 9. Kotlin notes
 
 > [!NOTE]
-> **Status: designed, not implemented yet.**
+> **Status: partly implemented.**
 > Kotlin support is a decided design (decisions D17, D20 to D25, D27, D28, D31).
 > The bytecode of every form in this chapter was compiled and checked with kotlinc
 > 1.7.22, 2.1.10, 2.2.21, 2.3.0 and 2.3.21. Many conditions were also checked row by row on H2.
-> It does **not** run in lambdaQL today. Today only the analysis core and `where` + `toList()` work
-> (tested on H2, MariaDB and Oracle with Java lambdas). See the [track README](README.md) for the full status.
+> **Tested with Kotlin lambdas** in the build (kotlinc 2.3.21, H2, MariaDB and Oracle): `?.` paths, `!!`, captured values, `in` with a captured collection, subqueries (`exists`, `in`, scalar), a sort with `limit`, `select` with a data class, `Pair` and `Triple`, `groupBy` with `listOf` keys, `having`, property assignment and `by[column] = value` in update, insert, and delete ([`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)).
+> **Designed, not tested yet:** the other forms on this page (for example `?:`, ranges, `when`, property references, string templates). The compiler version matrix (kotlinc 1.7.22 to 2.3.0) is not in the build yet. See the [track README](README.md) for the full status.
 
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [8. Procedures and DB functions](08-procedures-functions.md) | Next: [10. Rules and limits](10-rules-and-limits.md) | [Java version of this page: 9. Java notes](../java/09-java-notes.md)
 

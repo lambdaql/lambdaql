@@ -144,7 +144,7 @@ group by o1_0.customer_id
 having count(*)>=2
 ```
 
-- 집계가 아닌 값은 모두 `groupBy` 키여야 합니다(규칙 J3). 그렇지 않으면 lambdaQL은 분석 시점에 `LambdaAnalysisException`을 던집니다.
+- 집계가 아닌 값은 모두 `groupBy` 키여야 합니다(규칙 J3). 그렇지 않으면 lambdaQL은 분석 시점에 `TranslationException`(`LQL-3035`)을 던집니다.
 - `where`에는 `Agg`를 쓸 수 없습니다. `having`을 사용하십시오.
 - 테스트는 문장을 실행한 뒤 `Summary` 행을 다시 읽습니다. 결과는 Java에서 같은 기준으로 그룹화한 값과 일치합니다.
 

@@ -3,8 +3,7 @@
 > [!NOTE]
 > **状态**
 > - **已实现，并在 H2、MariaDB 和 Oracle 上测试：** `where` 条件和 `toList()`。lambdaQL 把 getter 映射到列，生成 HQL 并执行它。
-> - **同样已实现：** 排序与分页的核心部分（[4. 排序与分页](04-order-paging.md)）、子查询（[5. 子查询](05-subquery.md)）、带 `groupBy`、`having` 和 `Agg` 的 `select`（[6. 查询列、聚合与分组](06-select-group.md)）、update/insert/delete/upsert（[7. 更新、插入、删除](07-dml.md)）以及 Spring Data JPA 模块（[12. Spring Data JPA](12-spring-data-jpa.md)）。
-> - **已设计，尚未实现：** 派生表和 CTE（第 6 章）以及存储过程（第 8 章）。
+> - **同样已实现：** 排序与分页的核心部分（[4. 排序与分页](04-order-paging.md)）、子查询（[5. 子查询](05-subquery.md)）、带 `groupBy`、`having` 和 `Agg` 的 `select`、显式 join、派生表和 CTE（[6. 查询列、聚合与分组](06-select-group.md)）、update/insert/delete/upsert（[7. 更新、插入、删除](07-dml.md)）、存储过程与数据库函数（[8. 存储过程与数据库函数](08-procedures-functions.md)）以及 Spring Data JPA 模块（[12. Spring Data JPA](12-spring-data-jpa.md)）。
 > - 标记为 **(已测试)** 的示例是从测试代码中复制的。本章中的其他 HQL 是设计中**计划**的输出。一些小细节仍可能变化（例如 `e0`、`j1` 这样的别名）。
 
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[2. 入门](02-getting-started.md) | 下一章：[4. 排序与分页](04-order-paging.md) | [本页的 Kotlin 版本](../kotlin/03-where.md)

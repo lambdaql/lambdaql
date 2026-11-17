@@ -3,7 +3,7 @@
 > [!NOTE]
 > **状态**
 > - **已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（Hibernate 6.6.5，里程碑 M8-1）：select、update 和 delete 的 `where((o, sub) -> ...)` 中的子查询。包括 `exists` / `not exists`、`contains`（IN）、`!contains`（写成 NOT EXISTS）、标量聚合（`count`、`sum`、`avg`、`min`、`max`）、top-1 写法 `orderBy(...).limit(1)...first()`、关联子查询和嵌套子查询，以及捕获值。
-> - **尚未实现：** `from` 中的子查询（派生表）和 CTE（里程碑 M8-2）、`set` 值中的子查询，以及 MariaDB 的 `lateral` 改写。
+> - **尚未实现：** `set` 值中的子查询，以及 MariaDB 的 `lateral` 改写。（派生表和 CTE 已用另一种语法实现，见 [6. 查询列、聚合与分组](06-select-group.md#69-derived-table-subquery-in-from)。）
 > - 标记为 **(已测试)** 的示例是从测试代码中复制的。其他示例遵循相同的规则，但没有被测试覆盖。
 
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[4. 排序与分页](04-order-paging.md) | 下一章：[6. 查询列、聚合与分组](06-select-group.md) | [本页的 Kotlin 版本](../kotlin/05-subquery.md)
@@ -229,7 +229,7 @@ where o1_0.price>(select avg(o2_0.price) from orders o2_0)
 | 聚合：`count()`、`sum`、`avg`、`min`、`max` | `sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).count()` |
 | Top-1：`orderBy(...).limit(1)...first()` | 见下文 |
 
-其他任何 `first()` 都会在分析时报错（`LambdaAnalysisException`）。
+其他任何 `first()` 都会在分析时报错（`TranslationException`，`LQL-3017`）。
 
 有两个或更多明细的订单（`count()`）：
 
@@ -266,7 +266,7 @@ SelectQuery<Order> q = qb.from(Order.class)
 assertEquals("select e0 from Order e0 where e0.id = (select s1.id from Order s1 where s1.customer.id = e0.customer.id"
         + " order by s1.price desc, s1.id asc limit 1)", q.toHql().hql());
 // first() without limit(1) is rejected
-assertThrows(LambdaAnalysisException.class, () -> qb.from(Order.class)
+assertThrows(LambdaQLException.class, () -> qb.from(Order.class)
         .where((o, sub) -> o.getId().equals(sub.from(Order.class).select(x -> x.getId()).first())));
 ```
 
@@ -351,7 +351,7 @@ Java 不允许在嵌套的 Lambda 中重复使用同一个名字。请在每一�
 
 - **UPDATE / DELETE 中的子查询**：`where` 中使用同样的 `sub` 语法。已实现并测试（region `dml-subquery`）。见 [7.4 删除](07-4-delete.md) 和 [7.2 更新](07-2-update.md)。
 - **`set` 值中的子查询**（`o.setTotal(sub.from(...).sum(...))`）：尚未实现。见 [7.2 更新](07-2-update.md)。
-- **`from` 中的子查询（派生表）和 CTE**（`qb.from(sub -> ...)`、`qb.with(sub -> ...)`）：已设计，尚未实现（里程碑 M8-2）。见 [6. 查询列、聚合与分组](06-select-group.md)。
+- **`from` 中的子查询（派生表）和 CTE**：已实现（里程碑 M8-2）。它们不使用 `sub`：把值查询传给 `qb.from(...)` 或 `qb.with(...)`。见 [6.9 派生表](06-select-group.md#69-derived-table-subquery-in-from) 和 [6.10 CTE](06-select-group.md#610-cte-with)。
 
 <a id="512-rules-summary-q1-to-q6"></a>
 ## 5.12 规则汇总（Q1 至 Q6）

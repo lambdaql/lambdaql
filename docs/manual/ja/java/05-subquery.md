@@ -4,7 +4,7 @@
 > [!NOTE]
 > **状況**
 > - **実装済み、テスト済み:** H2 2.3、MariaDB 10.11、Oracle 23.26（Hibernate 6.6.5、マイルストーン M8-1）。select、update、delete の `where((o, sub) -> ...)` の中のサブクエリ。`exists` / `not exists`、`contains`（IN）、`!contains`（NOT EXISTS として書かれる）、スカラーの集計（`count`、`sum`、`avg`、`min`、`max`）、top-1 の形 `orderBy(...).limit(1)...first()`、相関サブクエリと入れ子のサブクエリ、キャプチャ値を含みます。
-> - **まだ実装されていないもの:** `from` の中のサブクエリ（派生テーブル）と CTE（マイルストーン M8-2）、`set` の値の中のサブクエリ、MariaDB の `lateral` の書き換え。
+> - **まだ実装されていないもの:** `set` の値の中のサブクエリ、MariaDB の `lateral` の書き換え。（派生テーブルと CTE は別の構文で実装済みです。[6. 選択、集計、グループ化](06-select-group.md#69-derived-table-subquery-in-from) を参照してください。）
 > - **(テスト済み)** と書かれた例は、テストスイートからコピーしたものです。それ以外の例も同じルールに従いますが、テストではカバーされていません。
 
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [4. ソートとページング](04-order-paging.md) | 次: [6. 選択、集計、グループ化](06-select-group.md) | [このページの Kotlin 版](../kotlin/05-subquery.md)
@@ -231,7 +231,7 @@ where o1_0.price>(select avg(o2_0.price) from orders o2_0)
 | 集計: `count()`、`sum`、`avg`、`min`、`max` | `sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).count()` |
 | top-1: `orderBy(...).limit(1)...first()` | 下記を参照 |
 
-それ以外の `first()` は解析時にエラー（`LambdaAnalysisException`）になります。
+それ以外の `first()` は解析時にエラー（`TranslationException`、`LQL-3017`）になります。
 
 品目を 2 つ以上持つ注文（`count()`）:
 
@@ -268,7 +268,7 @@ SelectQuery<Order> q = qb.from(Order.class)
 assertEquals("select e0 from Order e0 where e0.id = (select s1.id from Order s1 where s1.customer.id = e0.customer.id"
         + " order by s1.price desc, s1.id asc limit 1)", q.toHql().hql());
 // first() without limit(1) is rejected
-assertThrows(LambdaAnalysisException.class, () -> qb.from(Order.class)
+assertThrows(LambdaQLException.class, () -> qb.from(Order.class)
         .where((o, sub) -> o.getId().equals(sub.from(Order.class).select(x -> x.getId()).first())));
 ```
 
@@ -353,7 +353,7 @@ Java では、入れ子のラムダで同じ名前を 2 回使えません。階
 
 - **UPDATE / DELETE の中のサブクエリ**: `where` で同じ `sub` の構文を使います。実装済みで、テスト済みです（リージョン `dml-subquery`）。[7.4 削除](07-4-delete.md) と [7.2 更新](07-2-update.md) を参照してください。
 - **`set` の値の中のサブクエリ**（`o.setTotal(sub.from(...).sum(...))`）: まだ実装されていません。[7.2 更新](07-2-update.md) を参照してください。
-- **`from` の中のサブクエリ（派生テーブル）と CTE**（`qb.from(sub -> ...)`、`qb.with(sub -> ...)`）: 設計済み、まだ実装されていません（マイルストーン M8-2）。[6. 選択、集計、グループ化](06-select-group.md) を参照してください。
+- **`from` の中のサブクエリ（派生テーブル）と CTE**: 実装済みです（マイルストーン M8-2）。`sub` は使いません: 値のクエリを `qb.from(...)` か `qb.with(...)` に渡します。[6.9 派生テーブル](06-select-group.md#69-derived-table-subquery-in-from) と [6.10 CTE](06-select-group.md#610-cte-with) を参照してください。
 
 <a id="512-rules-summary-q1-to-q6"></a>
 ## 5.12 ルールのまとめ（Q1〜Q6）

@@ -8,7 +8,8 @@
 > The Spring Data JPA module (`LambdaQlExecutor<T>` and the Spring Boot auto-configuration) is implemented and tested with Spring Boot 3.4.2.
 > Update, insert, delete and upsert are implemented and tested too, with `limit` and the one-row protection `executeOne()`, also in the Spring Data JPA module (the shortcuts `deleteAll`, `updateOne` and so on). They need the caller's transaction there.
 > Subqueries in `where` and `select` (with `groupBy`, `having` and the `Agg` functions) are implemented and tested too.
-> Derived tables, CTEs and procedures are designed but **not implemented yet**.
+> Explicit joins (`join`, `leftJoin`, `crossJoin`), derived tables and CTEs, stored procedures and DB functions, and error codes with messages in four languages are implemented and tested too.
+> Kotlin lambdas are tested for a part of the forms (`?.`, `!!`, `in`, subqueries, data classes, `groupBy`, update, insert and delete).
 > The HQL shown on this page is the output that the design defines. The examples are design examples.
 
 This page is for both languages. Code is shown in separate **Java** and **Kotlin** sections.
@@ -96,7 +97,7 @@ But they are a **query language** written with Java or Kotlin syntax.
 |---|---|---|
 | 1. Find the lambda body | The lambda is `Serializable`. lambdaQL gets its `SerializedLambda` through a serialization hook (no `setAccessible`). This tells lambdaQL which method holds the lambda body and which values are captured. | Implemented |
 | 2. Read the bytecode | lambdaQL reads only that one method with ASM. It reads the class file. It does not run the code. | Implemented |
-| 3. Rebuild the condition | Java and Kotlin compile `&&`, `\|\|` and `!` into jumps. lambdaQL rebuilds the original logic tree from these jumps. | Implemented for Java lambdas. Kotlin-only forms are designed. |
+| 3. Rebuild the condition | Java and Kotlin compile `&&`, `\|\|` and `!` into jumps. lambdaQL rebuilds the original logic tree from these jumps. | Implemented for Java lambdas. Kotlin: `?.`, `!!` and `in` are tested; the other Kotlin-only forms (`?:`, ranges, `when`) are designed. |
 | 4. Build HQL | Getters and properties become JPA attribute paths (`o.getPrice()` or `it.price` → `e0.price`). Constants in the lambda become literals; captured values become parameters (`:p1`). | Implemented for `where` and `orderBy`, tested on H2, MariaDB, Oracle |
 | 5. Run | lambdaQL binds the parameters and runs the HQL with Hibernate. The analysis result of each lambda is cached, so the bytecode is read only once. | Implemented for `toList()` and `toSet()` (also with `limit` / `offset`), `first()`, `one()`, `count()` and `exists()` |
 

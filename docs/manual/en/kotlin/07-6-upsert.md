@@ -2,7 +2,7 @@
 # 7.6 Upsert (Kotlin)
 
 > [!NOTE]
-> **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10, decision D40). The tests use **Java** lambdas. **Kotlin lambdas in DML are not tested yet.**
+> **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10, decision D40). The tests use **Java** lambdas. **Kotlin lambdas for upsert are not tested yet** (update, insert and delete are, see [7. Update, insert, delete](07-dml.md)).
 > The Kotlin code shows the tested Java statements in Kotlin syntax, and the HQL comes from the Java tests in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java). Examples without HQL follow the design.
 > See the [track README](README.md) for the full status.
 

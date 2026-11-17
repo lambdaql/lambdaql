@@ -2,7 +2,7 @@
 # 7.5 挿入（Kotlin）
 
 > [!NOTE]
-> **状況: 実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、マイルストーン M10）。`insert ... select` の `groupBy`、`having`、`Agg`（マイルストーン M9）も含みます。テストは **Java** のラムダを使っています。**DML での Kotlin のラムダはまだテストしていません。**
+> **状況: 実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、マイルストーン M10）。`insert ... select` の `groupBy`、`having`、`Agg`（マイルストーン M9）も含みます。ほとんどのテストは **Java** のラムダを使っています。`values` を使う insert は Kotlin のラムダでもテストしています（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、**(テスト済み)** と表示）。
 > **まだ実装されていません:** `insert ... select` の `by.set` の書き方。
 > Kotlin コードはテスト済みの Java の文を Kotlin の構文で書いたもので、HQL は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) と [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) の Java のテストから取っています。HQL のない例は設計に従っています。
 > 全体の状況は [トラックの README](README.md) を見てください。
@@ -34,7 +34,17 @@ insert into archive(id,price,customer_name)
 values (100,9.5,'Kim')
 ```
 
-Kotlin のテストはまだありません。Java で書いた同じ文は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) でテストしています（H2、MariaDB、Oracle）。テスト済みの例は [このページの Java 版](../java/07-5-insert.md) を見てください。
+**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `insert-delete`:
+
+```kotlin
+val i = qb.insert(Archive::class.java).values { it.id = 100L; it.price = 9.5; it.customerName = "Kim" }
+assertEquals(1, i.execute())
+val d = qb.delete(Order::class.java).where { o, sub -> !sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
+assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)", d.toHql().hql())
+```
+
+最初の 2 行が、Kotlin のラムダで 1 行を挿入します。delete の部分は [7.4](07-4-delete.md) で説明しています。
+Java で書いたほかの文は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) でテストしています（H2、MariaDB、Oracle）。それらの例は [このページの Java 版](../java/07-5-insert.md) を見てください。
 
 ラムダの中の定数はリテラルのままです（決定 D37）。値から新しい行を読むことはできません。`it.price = it.price` はエラーです。
 
@@ -138,7 +148,7 @@ group by o1_0.customer_id
 having count(*)>=2
 ```
 
-- 集約のない値はすべて `groupBy` のキーでなければなりません（ルール J3）。そうでなければ、lambdaQL は解析時に `LambdaAnalysisException` を投げます。
+- 集約のない値はすべて `groupBy` のキーでなければなりません（ルール J3）。そうでなければ、lambdaQL は解析時に `TranslationException`（`LQL-3035`）を投げます。
 - `where` では `Agg` を使えません。`having` を使ってください。
 
 ---

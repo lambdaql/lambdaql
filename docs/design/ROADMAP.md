@@ -596,6 +596,7 @@ lambdaql은 현재 캐시가 없으므로, 호출할 때마다 클래스 파일�
 | D43 | 외부 정렬 입력 허용 목록 (M5.5, M12, S6·S11 개정) | `SortWhitelist`를 실행기 인자로 받음 / 전역 등록. 전역 범위: JVM / 커넥션·풀 / EntityManagerFactory | **2026-11-17 작성자 결정**: 실행기 인자 방식은 쓰지 않는다(`findAll(where, Sort/Pageable)`은 그대로 둠). 정렬 정책은 **EntityManagerFactory(persistence unit) 단위로 전역 등록**하고, 규칙은 **엔티티 타입별**로 둔다. JVM static 전역은 persistence unit이 여럿이면 규칙이 섞이고, 커넥션·풀 단위는 복제본·routing datasource에서 같은 엔티티의 규칙이 달라져 맞지 않는다. EMF 단위는 메타모델·`QueryContext`·분석 캐시와 수명이 같다(Spring Boot는 `QueryBuilder` 빈과 같음). **적용 대상은 외부 문자열에서 만든 정렬만**(Spring `Sort`/`Pageable`, `SortSpec.ofPath`). 람다 정렬은 개발자 코드라 검사하지 않는다. 등록은 **설정 빈·프로퍼티 우선**(허용 경로, 외부 이름 별칭), 엔티티 애너테이션(`@Sortable`)은 보조. 모드는 `off`·`warn`·`strict`, **기본 `warn`**. 세부(규칙 없는 엔티티의 처리, 연관 경로 정렬 기본 제한, 위반 예외 코드·Spring 400 변환)는 구현 때 정한다. 미구현 | 확정 |
 | D44 | 명시적 조인 (D18 후속) | 조인 종류 · 결과 · 왼쪽 조인 엔티티의 NULL 의미 · 범위 | **2026-11-17 작성자 결정**: ① `join`(inner)과 `leftJoin` 둘 다, HQL 엔티티 조인 `join Customer e1 on …`. ② `select` 없는 `toList()`는 **루트 엔티티만**(`List<Order>`). 조인 엔티티는 조건·정렬에만 쓰고, 여러 행이 맞으면 루트 행이 반복됨을 문서화(`distinct()` 선택), 조인 값은 `select((o, c) -> …)`. ③ `leftJoin` 뒤 where에서 조인 엔티티 열 조건은 **SQL 의미**(매칭이 없으면 unknown → 행 제외), `c == null`은 `e1.id is null`. Java NPE와의 차이는 D36처럼 문서화. ④ 첫 범위는 **엔티티 3개까지·조회만**: `(o, c)`, `(o, c, i)`의 on·where·orderBy(D18 `(o, c, by)`)·select·limit·first·count. DML·서브쿼리 안 조인은 이후. **구현(2026-11-17)**: `SelectQuery.join`/`leftJoin` → `SelectJoinQuery<T, U>`, 세 번째 엔티티 `SelectJoin3Query<T, U, V>`, 정렬 뒤 `OrderedJoinQuery`/`OrderedJoin3Query`(select 포함). 렌더러는 `from 루트 e0 [e0 경로 조인] [left] join 엔티티 e1 on … [e1 경로 조인] …` 순서로 쓰고, ON 안의 경로는 left join. `c == null`은 조인 엔티티의 `@Id is null`. 세 DB 실측 `JoinQueryTest` 4개(inner·left·정렬·select·엔티티 3개, 반복 행 수와 count) | 확정 |
 | D45 | FROM 절의 여러 엔티티 (D44 후속) | `from(A.class, B.class)` 콤마 조인 / `crossJoin(B.class)`만 / 둘 다 | **2026-11-17 작성자 결정: `crossJoin`만 추가**. 조건 있는 조인은 D44 `join`/`leftJoin` 한 가지 표기로 유지(엔티티 조인이 연관 없는 ON 조건도 받으므로 콤마 조인만의 용도는 조건 없는 곱집합뿐). `from(A, B)`는 연결 조건 누락 시 곱집합 사고, 주 엔티티 모호, 표기 이원화로 도입하지 않음. `crossJoin(B.class)` → `cross join B e1`, 조건은 where, 조건 없는 곱집합도 허용(이름이 의도를 표시). 엔티티 3개 한도·select·정렬은 D44와 같음. 페이징 보조 정렬(S9)은 조인한 모든 엔티티의 id를 덧붙임(D44 조인에도 적용). **구현(2026-11-17)**: `SelectQuery.crossJoin`, `SelectJoinQuery.crossJoin`, `JoinQueryTest` region `cross-join`·`cross-join-paging`, 세 DB 실측 | 확정 |
+| D46 | 파생 테이블·CTE 진입 형태 (M8-2, J5·J6 개정) | `qb.from(sub -> sub.from(…)…select(…))` 람다 / 기존 `ValueQuery`를 받음 | **2026-11-17 작성자 결정: `ValueQuery`를 받는다**. `qb.from(qb.from(Order.class).groupBy(…).select(o -> new Stat(…)))`, CTE는 `Cte<R> t = qb.with(valueQuery)` 뒤 `qb.from(t)`. M9 API를 그대로 재사용하므로 `sub.from(…)`에 `groupBy`를 더하지 않는다. 바깥 쿼리 범위는 where·orderBy·select·limit·offset·toList·first·count. 파생 테이블끼리·엔티티와의 조인, 같은 CTE 두 번 참조, DML 안 사용은 이후. **구현(2026-11-17)**: `DerivedQuery<R>`, `Cte<R>`, 행 타입 모델 `RowModel`(record 구성 요소·Kotlin data class 필드를 열로), 안쪽 쿼리는 별칭 `d0`·`dj1`과 `as <구성 요소 이름>`, 바깥은 `e0`. 안쪽 limit·offset은 HQL `limit`·`offset`. 행 타입 위반은 LQL-3064. 세 DB 실측 `DerivedQueryTest` 5개(파생 테이블, CTE, 값 select·캡처 값 순서, 안쪽 limit, J5 오류) | 확정 |
 | D8 | 라이선스와 특허 | (A/A'일 때) LGPL 의존 허용 여부. ExTree `LICENSE`(2.1)와 `pom.xml:30-35`(3.0) 불일치. FluentJPA `pom.xml:31-34`는 LGPL-3.0만 선언해 `LICENSE`(AGPL-3.0 소스 / LGPL-3.0 바이너리)와 불일치. FluentJPA `README.md:1`의 'Patent Pending' 표기는 (B) clean-room이라도 특허 여부 확인 필요 | 법무 확인 | D1과 함께 |
 
 ### 2.6 바이트코드 읽기 계층: ASM, `java.lang.classfile`, Babylon Code Reflection
@@ -1315,7 +1316,7 @@ public class LambdaQLException extends RuntimeException {   // 모든 lambdaQL �
 > - (1) 부정 최소화에서 원자에 붙은 NOT의 비용을 0으로 했다. `!(a && b)`를 `!a || !b`로 내려 그룹 바깥 NOT을 만들지 않는다(3.9).
 > - (2) 디코더가 상수끼리의 비교(Kotlin이 계산한 boolean을 0/1로 다시 검사하는 형태)를 그 자리에서 결정한다.
 >
-> M8-2(FROM 서브쿼리·CTE)는 M9 projection 위에서 진행한다(2026-11-16 기준 미구현).
+> M8-2(FROM 서브쿼리·CTE)는 2026-11-17 구현했다(D46: `ValueQuery`를 받는 형태).
 
 #### 8.1 문법: 람다 인자로 받는 서브쿼리 팩토리 `sub`
 
@@ -1390,7 +1391,7 @@ interface Values<R> { boolean contains(R value); R first(); }   // Kotlin `x in 
 
 ### Milestone 9. Projection(`select`)·집계 (D27) **(2026-11-10 확정)**
 
-> **구현 현황(2026-11-16)**: M9 조회 projection과 집계를 구현했다. 파생 테이블·CTE(M8-2, J5·J6)는 미구현이다.
+> **구현 현황(2026-11-16)**: M9 조회 projection과 집계를 구현했다. 파생 테이블·CTE(M8-2, J5·J6)는 2026-11-17 D46 형태로 구현했다.
 >
 > - `select(값)` → `ValueQuery<R>`: 값 하나, Java record·DTO 생성자, Kotlin data class·`Pair`·`Triple`
 > - `groupBy(키)` → `GroupedQuery<T>`: 키 하나, `List.of(…)`/`listOf(…)`, Kotlin `a to b`, `Triple`
@@ -2019,7 +2020,7 @@ interface OrderRepository : JpaRepository<Order, Long>, LambdaQlExecutor<Order> 
 | SD6 | Java default 메서드 안의 람다는 repository interface의 private static `lambda$…`로 컴파일된다. `BytecodeLoader`가 interface 클래스 파일을 읽는지 M12 테스트로 확인한다(미실측) |
 | SD7 | **Kotlin**: 2.2 이상은 몸체가 있는 interface 메서드가 Java default 메서드로 컴파일되어 동작(kotlinc 2.3.21 실측). 2.2 미만은 `-Xjvm-default=all`이 필요(없으면 `No property … found` 기동 실패, `-jvm-default=disable` 실측). Spring Data Kotlin 지원에는 `kotlin-reflect`가 필요(`ClassNotFoundException: ReflectJvmMapping`, 실측). 문서화 |
 | SD8 | 지원 범위: **Spring Boot 3.4+ / Spring Data JPA 3.4+**와 Boot 4(Spring Data 4는 `RepositoryFragmentsContributor`가 생겼지만 spring.factories 방식도 문서에 남아 있음 — Boot 4 실측은 M12에서). 3.3 이하는 지원하지 않는다 |
-| SD9 | **정리 완료(2026-11-16, D39 ①)**: 옛 `org.lambdaql.jpa`(`DefaultMethodSupportJpaRepositoryFactoryBean` 등 4개 클래스)는 삭제했다. 목적이던 "Impl 클래스 대신 interface default 메서드로 커스텀 구현"은 Spring Data가 직접 지원한다(SD1, Boot 3.4.2 실측: FactoryBean이 교체한 `QueryLookupStrategy`에는 default 메서드가 전달되지 않음). Kotlin은 2.2 이상 기본 설정, 2.2 미만은 `-Xjvm-default=all`(SD7). 같은 결론이 hunet core `datasource/README.md`("JPA Repository를 default method로 구현하기")에도 정리되어 있다 |
+| SD9 | **정리 완료(2026-11-16, D39 ①)**: 옛 `org.lambdaql.jpa`(`DefaultMethodSupportJpaRepositoryFactoryBean` 등 4개 클래스)는 삭제했다. 목적이던 "Impl 클래스 대신 interface default 메서드로 커스텀 구현"은 Spring Data가 직접 지원한다(SD1, Boot 3.4.2 실측: FactoryBean이 교체한 `QueryLookupStrategy`에는 default 메서드가 전달되지 않음). Kotlin은 2.2 이상 기본 설정, 2.2 미만은 `-Xjvm-default=all`(SD7).  |
 | SD10 | `@DataJpaTest`에서는 자동 구성을 import하는 방법을 문서화한다 |
 
 #### 12.4 의존 관계와 완료 기준
@@ -2035,7 +2036,6 @@ interface OrderRepository : JpaRepository<Order, Long>, LambdaQlExecutor<Order> 
 남은 항목:
 - Boot 4 실측(미측정)
 - Kotlin repository 실측(미측정, Kotlin 테스트 소스 없음)
-- 라우팅 데이터소스와의 조합 안내(매뉴얼 12장)
 
 - M5(조회 실행) 뒤. 모듈 분리(12.1)는 M5 전에 해도 된다(core 의존성 정리가 D33 I8과 같은 작업).
 - **완료 기준**: Boot 3.4와 Boot 4 샘플에서 12.2의 Java·Kotlin repository가 H2·MariaDB·Oracle에서 동작. 사용자 커스텀 구현과 함께 쓸 때 기동 성공. 트랜잭션 전파(SD4) 테스트. Kotlin 2.2 미만 + `-Xjvm-default=all` 안내가 매뉴얼에 있음.
@@ -2238,7 +2238,7 @@ critic 보고서에서 채택한 이슈 전부와 이번 비교·실측에서 �
 | 45 | 의존성 scope: starter-jdbc와 validation이 `implementation`(`query/build.gradle:12-13`). ~~ASM은 공개 타입으로 노출되는데 `implementation`~~(M0에서 `api`로 변경, 9.11.1로 상향 완료). `asm-util`은 디버그용. jakarta.persistence와 Hibernate가 `compileOnly`인데 런타임에 필요. `aj.org.objectweb.asm`은 aspectjweaver가 없으면 `NoClassDefFoundError`. MyBatis 미사용 | `query/build.gradle:8-20`, `A/LambdaFieldExtractor.java:3-6` | M0(import), M7 |
 | 46 | Java toolchain이 주석 처리되어 있는데, 코드는 `List.getFirst()`(Java 21)를 씀 | `build.gradle:64-66` | M7 |
 | 47 | `mavenLocal()`이 첫 순서이고 `cacheDynamicVersionsFor 0`이라 빌드가 재현되지 않음 | `build.gradle:27,36` | M7 |
-| 48 | 테스트 스키마가 엔티티와 맞지 않음. `ddl-auto: none`, `format_sql` 접두사 중복, `route.*`/`com.hunet` 잔여 설정. 전체 실행 시 14건 실패 [실측] | `table.sql:9-15`, `application-test.yaml:5,7` | M0 |
+| 48 | 테스트 스키마가 엔티티와 맞지 않음. `ddl-auto: none`, `format_sql` 접두사 중복, 별개 프로젝트에서 온 잔여 설정(2026-11-17 제거). 전체 실행 시 14건 실패 [실측] | `table.sql:9-15`, `application-test.yaml:5,7` | M0 |
 | 49 | 테스트로 분석기를 검증할 수 없음(`condition` getter 없음). 테스트마다 `@SpringBootTest` | `Q/SelectQuery.java`, `QBT` | M0 |
 | 50 | 컴파일러 의존(javac 형태 가정). ECJ와 Kotlin은 다른 형태를 냄 | – | M7 문서화 |
 | 51 | 단언이 있는 두 테스트(`QBT:62,167`)도 `toString` 미구현으로 실패 [실측] | `QBT:62,167` | M5 |

@@ -63,7 +63,7 @@ Maven：
 </dependency>
 ```
 
-使用 Maven 时，也请添加 `kotlin-reflect`（见 [12.10](#1210-kotlin-compile-settings)）。
+使用 Maven 时，也请添加 `kotlin-reflect`（见 [12.9](#129-kotlin-compile-settings)）。
 
 不使用 Spring Boot 时，在你自己的 Spring Data JPA 配置（Hibernate 和 JDBC 驱动）之外添加 `lambdaql-spring-data-jpa`。它会带入 `lambdaql-core` 和 Spring Data JPA。
 
@@ -90,7 +90,7 @@ dependencies {
 | Spring Boot | 3.4 或更高版本（已用 3.4.2 测试）。Spring Boot 4 尚未验证 |
 | Spring Data JPA | 3.4 或更高版本 |
 | Hibernate | 6.6（Spring Boot 3.4 已经带入） |
-| Kotlin | 2.2 或更高版本。较旧的 Kotlin 见 [12.10](#1210-kotlin-compile-settings) |
+| Kotlin | 2.2 或更高版本。较旧的 Kotlin 见 [12.9](#129-kotlin-compile-settings) |
 | `kotlin-reflect` | Spring Data 在 Kotlin 中需要它 |
 
 **不支持** Spring Data JPA 3.3 及更早版本。lambdaQL 在 `META-INF/spring.factories` 中注册其执行器，而 Spring Data 从 3.4 起才从这个文件读取 repository fragment。
@@ -137,7 +137,7 @@ interface MemberRepository : JpaRepository<Member, Long>, LambdaQlExecutor<Membe
 
 工作原理：
 
-- **带主体的接口方法由 Spring Data 自身执行。** Spring Data 不会尝试从这些方法生成查询，它只是调用方法主体。lambdaQL 不改变这一点。较旧的 Kotlin 见 [12.10](#1210-kotlin-compile-settings)。
+- **带主体的接口方法由 Spring Data 自身执行。** Spring Data 不会尝试从这些方法生成查询，它只是调用方法主体。lambdaQL 不改变这一点。较旧的 Kotlin 见 [12.9](#129-kotlin-compile-settings)。
 - **`LambdaQlExecutor<T>` 是一个 Spring Data repository fragment。** 它的实现登记在 `lambdaql-spring-data-jpa` 的 `META-INF/spring.factories` 中。Spring Data 读取该文件，并把实现添加到每个继承了 `LambdaQlExecutor<T>` 的 repository 中。
 - **所有 repository 共享一个执行器对象。** 每次调用仍然使用它自己的 repository 的实体。例如，在 `TeamRepository` 上调用 `teams.count { ... }` 统计的是 `Team` 的行（已用 Java 测试，[`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)）。
 
@@ -189,7 +189,7 @@ interface MemberRepository : JpaRepository<Member, Long>, LambdaQlExecutor<Membe
 `findAll { ... }` 和 `count { ... }` 与 `JpaRepository` 的 `findAll(Sort)`、`findAll(Example)` 或 `count()` 不冲突，因为参数类型不同。
 这些方法返回 Java 的 `Optional`。如果想要可空的值，请使用 `.orElse(null)`。
 
-**`query()`：完整的查询。** 12.3 中的 `topGraded` 使用了它。请在调用 `query()` 的同一个方法中调用结果函数（那里是 `toList()`）。不要返回未完成的查询。见 [12.9](#129-routing-datasource)。
+**`query()`：完整的查询。** 12.3 中的 `topGraded` 使用了它。
 
 在下面的示例中，`repository` 是一个 `MemberRepository`。同样的调用已在 Java 的 [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java) 中测试（region `find-all-sort`、`find-first`、`find-one`、`count-exists`、`find-set`）。
 
@@ -357,7 +357,7 @@ val page: Page<Member> = repository.findAll({ it.active }, PageRequest.of(1, 2, 
 | Spring `Sort` 中有未知属性 | `PropertyReferenceException`（已用 Java 测试） |
 | Spring `Sort` 中使用 `ignoreCase()` | `UnsupportedOperationException`（已用 Java 测试） |
 | 在 repository 调用中（快捷方法，或带方法体的方法内部的 `execute()`）没有事务时执行更新、删除、插入或 upsert | `InvalidDataAccessApiUsageException`（已用 Java 测试），由 Spring 从 JPA 的 `TransactionRequiredException` 转换而来。在 repository 方法外部（`QueryBuilder` bean）则是 JPA 的 `TransactionRequiredException` |
-| 违反规则（U1、U3、U4、U6）的赋值 Lambda | `LambdaAnalysisException`，不做转换（见 [7.8](07-dml.md#rules-checked-at-analysis-time)） |
+| 违反规则（U1、U3、U4、U6）的赋值 Lambda | `LambdaQLException`（例如 `TranslationException`，`LQL-3042`），不做转换（见 [7.8](07-dml.md#rules-checked-at-analysis-time)） |
 
 `QueryBuilder` bean（12.8）不是 repository，因此 Spring 不会转换它的错误。在那里，`one()` 和 `executeOne()` 遇到 2 行或更多行时会抛出 `NonUniqueResultException`。
 
@@ -418,30 +418,8 @@ fun queryBuilder(entityManagerFactory: EntityManagerFactory) =
 
 **使用 `@DataJpaTest` 的测试。** `@DataJpaTest` 切片测试只加载部分自动配置。repository 方法在那里可以使用，但不会创建 `QueryBuilder` bean。如果测试需要它，请在测试类上加 `@ImportAutoConfiguration(LambdaQlAutoConfiguration::class)`（尚未测试）。
 
-<a id="129-routing-datasource"></a>
-## 12.9 路由 DataSource
-
-> [!WARNING]
-> **设计说明，未经实测。** 本节没有用路由 DataSource 测试过。
-
-有些应用按方法名用 AOP 规则选择数据库。例如，某条规则把 `find*` 方法发送到只读副本。
-这样的规则作用于在它所匹配的方法**内部**执行的 SQL。
-
-- 请在带主体的 repository 方法中，或在同一个服务方法中调用 `findAll`、`findOne` 以及其他简短方法。
-- 对于 `repo.query().where { ... }.toList()`，SQL 在调用 `toList()` 时执行，而不是在调用 `query()` 时执行。如果 `toList()` 在 repository 方法之外执行，作用于 repository 方法的规则就不会作用于它。
-
-```kotlin
-// a rule on repository methods applies: the SQL runs inside findActive()
-fun findActive(): List<Member> =
-    query().where { it.active }.toList()
-
-// a rule on repository methods does not apply: the SQL runs in toList(), after query() has returned
-// (a rule on the calling service method still applies)
-val rows = repository.query().where { it.active }.toList()
-```
-
-<a id="1210-kotlin-compile-settings"></a>
-## 12.10 Kotlin 编译设置
+<a id="129-kotlin-compile-settings"></a>
+## 12.9 Kotlin 编译设置
 
 只有当 repository 中带主体的方法是接口中的 JVM 默认方法时，Spring Data 才会执行它。
 
@@ -462,8 +440,8 @@ kotlin {
 
 这些设置已用原型检查过：kotlinc 2.3.21，以及用 `-jvm-default=disable` 模拟低于 2.2 的 Kotlin 的行为。lambdaQL 的测试代码中还没有 Kotlin repository。
 
-<a id="1211-not-implemented-yet"></a>
-## 12.11 尚未实现
+<a id="1210-not-implemented-yet"></a>
+## 12.10 尚未实现
 
 - **Spring Boot 4。** 自动配置也写出了 Spring Boot 4 的类名，但只测试了 Spring Boot 3.4.2。
 - Spring `Sort` 中的 **`ignoreCase()`**。

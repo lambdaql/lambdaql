@@ -3,13 +3,13 @@
 
 > [!NOTE]
 > **상태:** 현재 lambdaQL을 소스에서 빌드하고 테스트를 실행할 수 있습니다.
-> `where` 조건과 `toList()`는 처음부터 끝까지 동작합니다. H2, MariaDB, Oracle에서 **Java** 람다로 테스트했습니다. Kotlin 람다는 아직 테스트하지 않았습니다.
+> `where` 조건과 `toList()`는 처음부터 끝까지 동작합니다. H2, MariaDB, Oracle에서 주로 **Java** 람다로 테스트했습니다. Kotlin 람다는 `?.` 경로, 캡처 값, `in`, 서브쿼리, 데이터 클래스와 `groupBy`를 쓰는 `select`, update, insert, delete를 테스트했습니다([`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)).
 > 결과 함수 `first()`, `one()`, `count()`, `exists()`, `toSet()`도 동작합니다([결과 가져오기](#getting-the-result) 참고, 이것도 Java 람다로만 테스트함).
-> 정렬과 페이징(`orderBy`, `limit`, `offset`, `SortSpec`)의 핵심 기능도 동작합니다(이것도 Java 람다로만 테스트함).
+> 정렬과 페이징(`orderBy`, `limit`, `offset`, `SortSpec`)의 핵심 기능도 동작합니다(Kotlin 정렬 하나를 테스트했고, 나머지는 Java 람다로 테스트함).
 > Spring Data JPA 모듈(리포지토리 실행기와 Spring Boot 자동 구성)도 동작합니다([12. Spring Data JPA](12-spring-data-jpa.md) 참고, Java 리포지토리로만 테스트함).
-> 수정, 삽입, 삭제, 업서트도 동작합니다([7. 수정, 삽입, 삭제](07-dml.md) 참고, 이것도 Java 람다로만 테스트함).
-> 서브쿼리와 `select`(`groupBy`, `having`, `Agg` 포함)도 동작합니다([5. 서브쿼리](05-subquery.md), [6. 조회, 집계, 그룹화](06-select-group.md) 참고. 역시 Java 람다로만 테스트함).
-> 파생 테이블, CTE, 프로시저는 **설계되었지만 아직 구현되지 않았습니다**.
+> 수정, 삽입, 삭제, 업서트도 동작합니다([7. 수정, 삽입, 삭제](07-dml.md) 참고, 업서트는 Java 람다로만 테스트함).
+> 서브쿼리와 `select`(`groupBy`, `having`, `Agg` 포함)도 동작합니다([5. 서브쿼리](05-subquery.md), [6. 조회, 집계, 그룹화](06-select-group.md) 참고).
+> 명시적 조인, 파생 테이블, CTE, 저장 프로시저, DB 함수도 동작합니다([6](06-select-group.md#68-explicit-joins), [8](08-procedures-functions.md) 참고, Java 람다로만 테스트함).
 > 아직 Maven Central에 배포된 아티팩트는 없습니다. 아래 절차대로 소스에서 빌드하십시오.
 
 [Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [1. 개요](../01-overview.md) | 다음: [3. 조건](03-where.md) | [이 페이지의 Java 버전](../java/02-getting-started.md)

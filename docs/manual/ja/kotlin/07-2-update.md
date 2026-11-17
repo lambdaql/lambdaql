@@ -2,7 +2,7 @@
 # 7.2 更新（Kotlin）
 
 > [!NOTE]
-> **状況: 実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、マイルストーン M10）。テストは **Java** のラムダを使っています。**DML での Kotlin のラムダはまだテストしていません。** `limit` と `executeOne()` も同じです（決定 D41）。
+> **状況: 実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、マイルストーン M10）。ほとんどのテストは **Java** のラムダを使っています。プロパティへの代入とインデックスの書き方 `by[column] = value` は Kotlin のラムダでもテストしています（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、**(テスト済み)** と表示）。 `limit` と `executeOne()` も同じです（決定 D41）。
 > `where` の中のサブクエリ（`sub`）も実装済みです（マイルストーン M8）。削除の形は Java のラムダでテスト済みです。[7.4](07-4-delete.md) を参照してください。
 > **まだ実装されていません:** `set` の値の中の `sub` サブクエリ、複合キーのエンティティでの `limit` / `executeOne()`。
 > Kotlin コードはテスト済みの Java の文を Kotlin の構文で書いたもので、HQL は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) の Java のテストから取っています。HQL のない例は設計に従っています。
@@ -47,7 +47,19 @@ where o1_0.status=1
 
 Oracle は `set` にエイリアスを書きます（`set o1_0.status=?`）。H2 と MariaDB は書きません。
 
-Kotlin のテストはまだありません。Java で書いた同じ文は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) でテストしています（H2、MariaDB、Oracle）。テスト済みの例は [このページの Java 版](../java/07-2-update.md) を見てください。
+**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `update`:
+
+```kotlin
+val u = qb.update(Order::class.java)
+    .set { it.status = st; it.price = it.price * 2 }
+    .where { it.customer?.name == "Kim" }
+assertEquals("update Order e0 set e0.status = :p1, e0.price = (e0.price * 2.0)"
+    + " where (select s1.name from Customer s1 where s1.id = e0.customer.id) = 'Kim' and e0.customer.id is not null",
+    u.toHql().hql())
+```
+
+`st` はキャプチャした `Short`（`7`）です。テストのエンティティの `price` はプリミティブの `double` なので、`!!` はありません。update の `where` の中のパス `it.customer?.name` はサブクエリになります（下の [パスとサブクエリを使った where](#where-with-paths-and-subqueries) を参照）。テストは文を実行し、行を読み直します。
+Java で書いたほかの文は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) でテストしています（H2、MariaDB、Oracle）。それらの例は [このページの Java 版](../java/07-2-update.md) を見てください。
 
 <a id="values-null-date-boolean"></a>
 ## 値: null、日付、boolean
@@ -269,9 +281,9 @@ var u = qb.update(Order::class.java).set { it.description = memo }
 if (newStatus != null) u = u.set { it.status = newStatus }
 val changed = u.where { it.id == id }.execute()
 
-// reading a column that an earlier assignment wrote is an error (U3): LambdaAnalysisException
+// reading a column that an earlier assignment wrote is an error (U3): TranslationException (LQL-3042)
 qb.update(Order::class.java).set { it.price = 1.0; it.total = it.price }
-// the same column twice is an error (U4), also across set() calls: LambdaAnalysisException
+// the same column twice is an error (U4), also across set() calls: TranslationException (LQL-3041)
 qb.update(Order::class.java).set { it.status = 1 }.set { it.status = 2 }
 ```
 

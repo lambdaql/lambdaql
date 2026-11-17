@@ -2,10 +2,10 @@
 
 > [!NOTE]
 > **状态**
-> - **已实现**（里程碑 M8-1），并在 H2 2.3、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上测试：select、update 和 delete 的 `where { o, sub -> ... }` 中的子查询。包括 `exists` / `!exists`、`in`、`!in`（写成 NOT EXISTS）、标量聚合、top-1 写法、关联子查询和嵌套子查询，以及捕获值。这些测试使用的是 **Java** Lambda。**Kotlin Lambda 尚未在构建中测试。**
-> - 本章中的 Kotlin 写法（`exists`、`in` / `!in`、标量、top-1、嵌套）已在构建之外用 kotlinc 2.3.21 编译。对这些写法，lambdaQL 生成与 Java 写法相同的 HQL。
-> - **尚未实现：** `from` 中的子查询（派生表）和 CTE（里程碑 M8-2）、`set` 值中的子查询，以及 MariaDB 的 `lateral` 改写。
-> - Kotlin 代码用 Kotlin 语法展示已测试的 Java 查询。已测试的 Java 示例见[本页的 Java 版本](../java/05-subquery.md)。
+> - **已实现**（里程碑 M8-1），并在 H2 2.3、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上测试：select、update 和 delete 的 `where { o, sub -> ... }` 中的子查询。包括 `exists` / `!exists`、`in`、`!in`（写成 NOT EXISTS）、标量聚合、top-1 写法、关联子查询和嵌套子查询，以及捕获值。大多数测试使用 **Java** Lambda。
+> - **已用 Kotlin Lambda 测试**（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，在构建中，H2、MariaDB 和 Oracle）：`exists`、`in` 和标量 `avg`。这些示例标记为 **(已测试)**。其他 Kotlin 写法（`!in`、top-1、嵌套）已在构建之外用 kotlinc 2.3.21 编译，生成与 Java 写法相同的 HQL。
+> - **尚未实现：** `set` 值中的子查询，以及 MariaDB 的 `lateral` 改写。（派生表和 CTE 已用另一种语法实现，见 [6. 查询列、聚合与分组](06-select-group.md#69-derived-table-subquery-in-from)。）
+> - 其他 Kotlin 代码用 Kotlin 语法展示已测试的 Java 查询。已测试的 Java 示例见[本页的 Java 版本](../java/05-subquery.md)。
 
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[4. 排序与分页](04-order-paging.md) | 下一章：[6. 查询列、聚合与分组](06-select-group.md) | [本页的 Java 版本](../java/05-subquery.md)
 
@@ -47,7 +47,7 @@ lambdaQL 根据参数的个数区分这两种写法。Kotlin 会选择正确的�
 
 在 HQL 中，子查询的根别名是 `s1`、`s2` 等（外层的根是 `e0`）。子查询内部的 join 使用 `s1j1` 这样的别名。
 
-目前还没有 Kotlin 测试。用 Java 写的同样的查询在 [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) 中测试过（H2、MariaDB 和 Oracle）。已测试的示例请看[本页的 Java 版本](../java/05-subquery.md)。
+标记为 **(已测试)** 的示例来自 [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)。它使用 Java 测试实体：`price` 是基本类型 `double`，`qty` 是 `int`。更多用 Java 写的查询在 [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) 中测试过（H2、MariaDB 和 Oracle）。这些示例请看[本页的 Java 版本](../java/05-subquery.md)。
 
 ## 5.2 EXISTS
 
@@ -63,6 +63,15 @@ qb.from(Order::class.java)
     .toList()
 // HQL: select e0 from Order e0
 //      where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > 10)
+```
+
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `exists`：
+
+```kotlin
+val q = qb.from(Order::class.java)
+    .where { o, sub -> sub.from(Item::class.java).where { i -> i.order?.id == o.id && i.qty > 10 }.exists() }
+assertEquals("select e0 from Order e0 where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > 10)",
+    q.toHql().hql())
 ```
 
 **关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。该测试使用 Java Lambda。含义相同的 Kotlin Lambda 生成相同的 HQL，因此得到相同的 SQL。
@@ -117,6 +126,15 @@ qb.from(Order::class.java)
     .toList()
 // HQL: select e0 from Order e0
 //      where e0.customer.id in (select s1.id from Customer s1 where s1.grade > 3)
+```
+
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `in`：
+
+```kotlin
+val q = qb.from(Order::class.java)
+    .where { o, sub -> o.customer?.id in sub.from(Customer::class.java).where { c -> c.grade!! > 3 }.select { c -> c.id } }
+assertEquals("select e0 from Order e0 where e0.customer.id in (select s1.id from Customer s1 where s1.grade > 3)",
+    q.toHql().hql())
 ```
 
 **各数据库的 SQL（Hibernate 为此 HQL 生成的 SQL）** — 由 [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) 记录，它把同样的 HQL 直接交给 Hibernate。Java 测试（region `in`）还写了 null 检查 `c.getGrade() != null`；它的 SQL 是示例 `sub-in`。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `05-in-subquery`：
@@ -222,6 +240,13 @@ qb.from(Order::class.java)
 //      where e0.price > (select avg(s1.price) from Order s1)
 ```
 
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `scalar`（测试的 `price` 是 `double`，所以没有 `!!`）：
+
+```kotlin
+val q = qb.from(Order::class.java).where { o, sub -> o.price > sub.from(Order::class.java).avg { x -> x.price } }
+assertEquals("select e0 from Order e0 where e0.price > (select avg(s1.price) from Order s1)", q.toHql().hql())
+```
+
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sub-scalar`：
 
 ```sql
@@ -238,7 +263,7 @@ where o1_0.price>(select avg(o2_0.price) from orders o2_0)
 | 聚合：`count()`、`sum`、`avg`、`min`、`max` | `sub.from(Item::class.java).where { i -> i.order?.id == o.id }.count()` |
 | Top-1：`orderBy { ... }.limit(1)...first()` | 见下文 |
 
-其他任何 `first()` 都会在分析时报错（`LambdaAnalysisException`）。
+其他任何 `first()` 都会在分析时报错（`TranslationException`，`LQL-3017`）。
 
 有两个或更多订单项的订单（`count()`）：
 
@@ -350,7 +375,7 @@ where exists(select 1 from orders o1_0 where o1_0.customer_id=c1_0.id and exists
 
 - **update / delete 中的子查询**：`where` 中使用同样的 `sub` 语法。已实现（用 Java Lambda 测试，region `dml-subquery`）。见 [7.4 删除](07-4-delete.md) 和 [7.2 更新](07-2-update.md)。
 - **`set` 值中的子查询**（`o.total = sub.from(...).sum { ... }`）：尚未实现。见 [7.2 更新](07-2-update.md)。
-- **`from` 中的子查询（派生表）和 CTE**（`qb.from { sub -> ... }`、`qb.with { sub -> ... }`）：已设计，尚未实现（里程碑 M8-2）。见 [6. 查询列、聚合与分组](06-select-group.md)。
+- **`from` 中的子查询（派生表）和 CTE**：已实现（里程碑 M8-2）。它们不使用 `sub`：把值查询传给 `qb.from(...)` 或 `qb.with(...)`。见 [6.9 派生表](06-select-group.md#69-derived-table-subquery-in-from) 和 [6.10 CTE](06-select-group.md#610-cte-with)。
 
 <a id="512-rules-summary-q1-to-q6"></a>
 ## 5.12 规则汇总（Q1 至 Q6）

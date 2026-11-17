@@ -2,7 +2,7 @@
 # 7.2 수정 (Kotlin)
 
 > [!NOTE]
-> **상태: 구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, 마일스톤 M10). 테스트는 **Java** 람다를 사용합니다. **DML의 Kotlin 람다는 아직 테스트하지 않았습니다.** `limit`과 `executeOne()`(결정 D41)도 같습니다.
+> **상태: 구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, 마일스톤 M10). 테스트는 대부분 **Java** 람다를 사용합니다. 속성 대입과 인덱스 형태 `by[column] = value`는 Kotlin 람다로도 테스트했습니다([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), **(테스트됨)** 표시). `limit`과 `executeOne()`(결정 D41)도 같습니다.
 > `where` 안의 서브쿼리(`sub`)도 구현되었습니다(마일스톤 M8). 삭제 형태는 Java 람다로 테스트했습니다. [7.4](07-4-delete.md)를 참고하십시오.
 > **아직 구현되지 않음:** `set` 값 안의 `sub` 서브쿼리, 복합 키 엔티티의 `limit` / `executeOne()`.
 > Kotlin 코드는 테스트된 Java 문장을 Kotlin 문법으로 옮긴 것이고, HQL은 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)의 Java 테스트에서 가져왔습니다. HQL이 없는 예제는 설계를 따릅니다.
@@ -47,7 +47,19 @@ where o1_0.status=1
 
 Oracle은 `set`에 별칭을 씁니다(`set o1_0.status=?`). H2와 MariaDB는 쓰지 않습니다.
 
-아직 Kotlin 테스트는 없습니다. 같은 문장을 Java로 작성한 테스트가 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)에 있습니다(H2, MariaDB, Oracle). 테스트된 예제는 [이 페이지의 Java 버전](../java/07-2-update.md)을 참고하십시오.
+**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `update`:
+
+```kotlin
+val u = qb.update(Order::class.java)
+    .set { it.status = st; it.price = it.price * 2 }
+    .where { it.customer?.name == "Kim" }
+assertEquals("update Order e0 set e0.status = :p1, e0.price = (e0.price * 2.0)"
+    + " where (select s1.name from Customer s1 where s1.id = e0.customer.id) = 'Kim' and e0.customer.id is not null",
+    u.toHql().hql())
+```
+
+`st`는 캡처한 `Short`(`7`)입니다. 테스트 엔티티의 `price`는 기본형 `double`이므로 `!!`가 없습니다. update의 `where`에 쓴 경로 `it.customer?.name`은 서브쿼리가 됩니다(아래 [경로와 서브쿼리를 사용한 where](#where-with-paths-and-subqueries) 참고). 테스트는 문장을 실행한 뒤 행을 다시 읽어 확인합니다.
+더 많은 문장을 Java로 작성한 테스트가 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)에 있습니다(H2, MariaDB, Oracle). 그 예제는 [이 페이지의 Java 버전](../java/07-2-update.md)을 참고하십시오.
 
 <a id="values-null-date-boolean"></a>
 ## 값: null, 날짜, boolean
@@ -269,9 +281,9 @@ var u = qb.update(Order::class.java).set { it.description = memo }
 if (newStatus != null) u = u.set { it.status = newStatus }
 val changed = u.where { it.id == id }.execute()
 
-// reading a column that an earlier assignment wrote is an error (U3): LambdaAnalysisException
+// reading a column that an earlier assignment wrote is an error (U3): TranslationException (LQL-3042)
 qb.update(Order::class.java).set { it.price = 1.0; it.total = it.price }
-// the same column twice is an error (U4), also across set() calls: LambdaAnalysisException
+// the same column twice is an error (U4), also across set() calls: TranslationException (LQL-3041)
 qb.update(Order::class.java).set { it.status = 1 }.set { it.status = 2 }
 ```
 

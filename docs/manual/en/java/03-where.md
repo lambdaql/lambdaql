@@ -3,8 +3,7 @@
 > [!NOTE]
 > **Status**
 > - **Implemented and tested on H2, MariaDB and Oracle:** `where` conditions and `toList()`. lambdaQL maps getters to columns, writes the HQL and runs it.
-> - **Also implemented:** the core of sorting and paging ([4. Sorting and paging](04-order-paging.md)), subqueries ([5. Subqueries](05-subquery.md)), `select` with `groupBy`, `having` and `Agg` ([6. Select, aggregates and group by](06-select-group.md)), update/insert/delete/upsert ([7. Update, insert, delete](07-dml.md)) and the Spring Data JPA module ([12. Spring Data JPA](12-spring-data-jpa.md)).
-> - **Designed, not implemented yet:** derived tables and CTEs (chapter 6) and procedures (chapter 8).
+> - **Also implemented:** the core of sorting and paging ([4. Sorting and paging](04-order-paging.md)), subqueries ([5. Subqueries](05-subquery.md)), `select` with `groupBy`, `having` and `Agg`, explicit joins, derived tables and CTEs ([6. Select, aggregates and group by](06-select-group.md)), update/insert/delete/upsert ([7. Update, insert, delete](07-dml.md)), procedures and DB functions ([8. Procedures and DB functions](08-procedures-functions.md)) and the Spring Data JPA module ([12. Spring Data JPA](12-spring-data-jpa.md)).
 > - Examples marked **(tested)** are copied from the test suite. The other HQL in this chapter is the **planned** output from the design. It can still change in small details (for example alias names like `e0`, `j1`).
 
 [Java track](README.md) | [Manual home](../README.md) | Previous: [2. Getting started](02-getting-started.md) | Next: [4. Sorting and paging](04-order-paging.md) | [Kotlin version of this page](../kotlin/03-where.md)

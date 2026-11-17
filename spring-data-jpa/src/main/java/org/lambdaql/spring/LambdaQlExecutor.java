@@ -44,10 +44,6 @@ public interface LambdaQlExecutor<T> {
     /**
      * Starts a query on the repository's entity, for everything the short methods cannot do
      * (many {@code where} calls, {@code limit}/{@code offset}, run-time sort directions).
-     * <p>
-     * Keep the returned query inside the method that made it. With a routing data source
-     * that picks the database by method (AOP), the query runs when you call {@code toList()},
-     * so call it in the same repository or service method.
      *
      * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java">MemberRepository</a>):
      * {@snippet class="org.lambdaql.spring.sample.MemberRepository" region="query"}

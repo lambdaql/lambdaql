@@ -3,7 +3,7 @@
 > [!NOTE]
 > **Status**
 > - **Implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5, milestone M8-1): subqueries in `where((o, sub) -> ...)` of a select, an update and a delete. This covers `exists` / `not exists`, `contains` (IN), `!contains` (written as NOT EXISTS), scalar aggregates (`count`, `sum`, `avg`, `min`, `max`), the top-1 form `orderBy(...).limit(1)...first()`, correlated and nested subqueries, and captured values.
-> - **Not implemented yet:** subqueries in `from` (derived tables) and CTEs (milestone M8-2), subqueries in the values of `set`, and the MariaDB `lateral` rewrite.
+> - **Not implemented yet:** subqueries in the values of `set`, and the MariaDB `lateral` rewrite. (Derived tables and CTEs are implemented with another syntax, see [6. Select, aggregates and group by](06-select-group.md#69-derived-table-subquery-in-from).)
 > - Examples marked **(tested)** are copied from the test suite. The other examples follow the same rules, but they are not covered by a test.
 
 [Java track](README.md) | [Manual home](../README.md) | Previous: [4. Sorting and paging](04-order-paging.md) | Next: [6. Select, aggregates and group by](06-select-group.md) | [Kotlin version of this page](../kotlin/05-subquery.md)
@@ -226,7 +226,7 @@ A scalar subquery must **always give one row**. Two shapes are allowed (rule Q3)
 | An aggregate: `count()`, `sum`, `avg`, `min`, `max` | `sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).count()` |
 | Top-1: `orderBy(...).limit(1)...first()` | see below |
 
-Any other `first()` is an error at analysis time (`LambdaAnalysisException`).
+Any other `first()` is an error at analysis time (`TranslationException`, `LQL-3017`).
 
 Orders with two or more items (`count()`):
 
@@ -263,7 +263,7 @@ SelectQuery<Order> q = qb.from(Order.class)
 assertEquals("select e0 from Order e0 where e0.id = (select s1.id from Order s1 where s1.customer.id = e0.customer.id"
         + " order by s1.price desc, s1.id asc limit 1)", q.toHql().hql());
 // first() without limit(1) is rejected
-assertThrows(LambdaAnalysisException.class, () -> qb.from(Order.class)
+assertThrows(LambdaQLException.class, () -> qb.from(Order.class)
         .where((o, sub) -> o.getId().equals(sub.from(Order.class).select(x -> x.getId()).first())));
 ```
 
@@ -344,7 +344,7 @@ Inside a subquery, conditions, paths and NULL work **exactly like the outer quer
 
 - **Subqueries in UPDATE / DELETE**: the same `sub` syntax in `where`. This is implemented and tested (region `dml-subquery`). See [7.4 Delete](07-4-delete.md) and [7.2 Update](07-2-update.md).
 - **Subqueries in the values of `set`** (`o.setTotal(sub.from(...).sum(...))`): not implemented yet. See [7.2 Update](07-2-update.md).
-- **Subqueries in `from` (derived tables) and CTEs** (`qb.from(sub -> ...)`, `qb.with(sub -> ...)`): designed, not implemented yet (milestone M8-2). See [6. Select, aggregates and group by](06-select-group.md).
+- **Subqueries in `from` (derived tables) and CTEs**: implemented (milestone M8-2). They do not use `sub`: pass a value query to `qb.from(...)` or `qb.with(...)`. See [6.9 Derived table](06-select-group.md#69-derived-table-subquery-in-from) and [6.10 CTE](06-select-group.md#610-cte-with).
 
 ## 5.12 Rules summary (Q1 to Q6)
 
