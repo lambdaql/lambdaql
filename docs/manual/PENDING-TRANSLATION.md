@@ -30,14 +30,13 @@
 | DML의 null guard | null guard가 있으면 `is not null` 검사를 생략 | null guard가 있어도 `e0.customer.id is not null` 검사 유지 |
 | `@Convert` 속성과 리터럴 비교 | 서술 없음 | Hibernate 6.6이 리터럴도 변환함(새 절 3.6.5) |
 | 캡처 컬렉션의 `!contains` / Kotlin `!in` | `(x is null or x not in (...))` | `x not in (:p1)`. NULL 행은 맞지 않음. DEBUG `LQL-5009` |
-| null 수신자 `p.equals(col)` | 예외 `LQL-4011` | `col = :p1`에 NULL 바인딩, 맞는 행 없음. 실행 시 WARN `LQL-4045` |
-| null 캡처 값과의 크기 비교·언박싱(`o.getPrice() > min`) | 예외 | `e0.price > :p1`에 NULL 바인딩, 맞는 행 없음. 실행 시 WARN `LQL-4045` |
-| 가드의 위치(`o.getPrice() > min \|\| min == null`) | 가드가 뒤에 있으면 Java처럼 예외 | 위치와 관계없이 `min == null \|\| ...`과 같은 결과(필터 없음) |
+| null 수신자 `p.equals(col)` | 예외 `LQL-4011` | `col.equals(p)`와 같은 비교. `col = :p1`에 NULL 바인딩, 맞는 행 없음, 실행 시 WARN `LQL-4045`(예외 없음). 이 형태는 권장하지 않음(엔티티 값을 앞에) |
+| null 캡처 값과 크기 비교(언박싱 없는 경우, 예: `String.compareTo`) | 예외 `LQL-4009` | NULL 바인딩, 맞는 행 없음. 실행 시 WARN `LQL-4045` |
 
 다음 규칙은 바뀌지 않았습니다.
 
-- 캡처 값만 쓰는 부분의 사전 결정(`min == null || o.getPrice() > min`).
-- 캡처 값에 대한 비교 외 메서드 실행(`p.trim()` 등, 값 준비 단계). null이면 예외 `LQL-4012`.
+- 캡처 값만 쓰는 부분의 사전 결정과 가드 순서(`min == null || o.getPrice() > min`은 필터 없음, `o.getPrice() > min || min == null`은 예외 `LQL-4012`).
+- 캡처 값만으로 된 식은 Java에서 계산한 값(javac 언박싱 `min.doubleValue()`, Kotlin `min!!`, `p.trim()`). null 수신자는 예외 `LQL-4012`.
 - 캡처 값끼리의 크기 비교에서 한쪽이 null이면 예외 `LQL-4009`.
 - 캡처 컬렉션의 null 원소, `NaN`·`Infinity` 캡처 값, 가드 아래의 나눗셈 거부(D13).
 
@@ -105,14 +104,14 @@ D48의 1단계(엔티티 값의 SQL 의미)는 아래 페이지에 반영되어 
 | `java/10-rules-and-limits.md`, `kotlin/10-rules-and-limits.md` | 10.1 null guard 문장. 10.2 `NOT IN` 문장과 캡처 null 문장. 10.3 표의 캡처 null 행, null guard 행, 서브쿼리 `!contains` 행. 캡처 null 표. R2·R11, R24. G3·G4 |
 | `kotlin/README.md` | 연관 경로 예시 표의 null guard 문장 |
 
-### 3단계: 캡처 컬렉션 `NOT IN`, null 수신자, 크기 비교, 가드 위치 (en·ja·zh 모두 미반영)
+### 3단계: 캡처 컬렉션 `NOT IN`, null 수신자 (en·ja·zh 모두 미반영)
 
 | 페이지 | 남은 절과 내용 |
 |---|---|
-| `java/03-where.md`, `kotlin/03-where.md` | 3.6 원칙 2(비교 외 메서드만 예외). 3.6.4 표(`p.equals`, 크기 비교 행)와 소제목 "null 가드로 필터 생략", 가드 위치 문장. 3.9 `!contains`/`!in` 서술과 `not-in#2` SQL. 3.12 끝 메모(가드 위치 무관). 3.13 도입과 "수신 객체인 null 캡처 값" 행 삭제 |
-| `java/09-java-notes.md`, `kotlin/09-kotlin-notes.md` | 9.2 `o.getPrice() > p`·`i.getQty() == q` 행과 아래 문장. 9.4 `p.equals`·`compareTo` 행과 equals 항목. Kotlin 9.6 `!in` 행과 "유일한 예외" 문단, 캡처 null 문단 |
-| `java/10-rules-and-limits.md`, `kotlin/10-rules-and-limits.md` | 10.3 캡처 컬렉션 `!contains` 행, 가드 위치 행. 캡처 null 표(메서드 호출만 오류 `LQL-4012`). Kotlin R19 |
-| `11-errors-and-languages.md` | `name.equals(...)`, 크기 비교, Kotlin `minPrice!!` 행을 "실행됨"으로. `name.trim()` 행(`LQL-4012`) 추가 |
+| `java/03-where.md`, `kotlin/03-where.md` | 3.6 원칙 2(캡처 값만으로 된 식은 Java 계산, `LQL-4012`). 3.6.4 표의 `p.equals` 행(예외 없음)과 그 아래 "`p.equals` 형태 비권장" 문단, 언박싱 비교 예외 행(`LQL-4012`). 3.9 `!contains`/`!in` 서술과 `not-in#2` SQL. 3.13의 "수신 객체인 null 캡처 값" 행을 "언박싱하는 null 캡처 값" 행으로 교체 |
+| `java/09-java-notes.md`, `kotlin/09-kotlin-notes.md` | 9.4 `p.equals`·`compareTo` 행과 equals 항목. Kotlin 9.6 `!in` 행과 "유일한 예외" 문단 |
+| `java/10-rules-and-limits.md`, `kotlin/10-rules-and-limits.md` | 10.3 캡처 컬렉션 `!contains` 행. 캡처 null 표(`p.equals`는 허용, 언박싱·`!!`·메서드 호출은 `LQL-4012`). Kotlin R19 |
+| `11-errors-and-languages.md` | `name.equals(...)` 행을 "실행됨"으로, `name.trim()` 행(`LQL-4012`) 추가, 크기 비교·`minPrice!!` 행은 `LQL-4012` |
 | `java/04-order-paging.md`, `kotlin/04-order-paging.md` | "대부분은 inner join" → "이 조인은 inner join" |
 
 영어판에서 한국어판과 다르게 남은 문장(에이전트 확인):

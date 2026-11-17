@@ -446,7 +446,7 @@ class OrderRepo(private val qb: QueryBuilder) {
 
 `==`, `!=`에 쓰인 캡처 값 `null`은 NULL로 바인딩되므로 일치하는 행이 없습니다(`WARN` 수준 `LQL-4045`).
 캡처 값 `null`은 같은 값에 대한 null 가드 아래(`lo == null || ...`)에서 허용됩니다. 가드는 쿼리가 실행될 때 애플리케이션에서 결정하므로 `lo == null`이면 이 `where`는 필터를 추가하지 않습니다.
-크기 비교(`lo == null`일 때 `it.status!! > lo!!`)도 NULL을 바인딩하므로 일치하는 행이 없습니다(`WARN` 수준 `LQL-4045`). 캡처 값에 대한 메서드 호출(`text.trim()` 등)만 `null`이면 오류(`LQL-4012`)를 던집니다.
+다른 곳(`lo == null`일 때 `it.status!! > lo!!`)에서는 캡처 값의 `lo!!`를 계산할 때 오류(`LQL-4012`)를 던집니다.
 캡처한 `NaN`이나 `Infinity`는 항상 오류입니다.
 
 <a id="99-property-references-and-scope-functions"></a>

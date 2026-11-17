@@ -214,8 +214,9 @@ class SelectQueryTest {
         assertEquals(javaIds(o -> true), ids(qb.from(Order.class).where(o -> min == null || o.getPrice() > min).toList()));
         assertEquals(javaIds(o -> o.getPrice() > min2),
                 ids(qb.from(Order.class).where(o -> min2 == null || o.getPrice() > min2).toList()));
-        // the order does not matter in SQL (D48): with the guard last, the result is the same (no filter)
-        assertEquals("select e0 from Order e0", qb.from(Order.class).where(o -> o.getPrice() > min || min == null).toHql().hql());
+        // the captured value is computed in Java (min.doubleValue()), so the guard must come first, as in Java
+        assertThrows(LambdaQLException.class,
+                () -> qb.from(Order.class).where(o -> o.getPrice() > min || min == null).toHql());
         // the guard with AND: no rows, and the compare is never rendered
         assertEquals("select e0 from Order e0 where 1=0",
                 qb.from(Order.class).where(o -> min != null && o.getPrice() > min).toHql().hql());

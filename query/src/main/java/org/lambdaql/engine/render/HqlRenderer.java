@@ -1263,7 +1263,7 @@ public final class HqlRenderer {
 
     private Object eval(Expr e) {
         if (e instanceof Expr.Host h) {
-            // D48: x.equals(column) with a null x is compared as SQL (= NULL), with a WARN where it is rendered
+            // p.equals(column) is a comparison, the same as column.equals(p): a null p is bound as NULL (D48)
             return evaluator.eval(h, captured);
         }
         return evaluator.eval(e, captured);

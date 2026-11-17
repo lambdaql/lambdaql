@@ -191,6 +191,7 @@ val wanted = if (flag) 1 else 2
    결과가 Kotlin과 다를 수 있으면 lambdaQL은 `LQL-5009`를 `DEBUG` 수준으로 기록합니다.
 3. **캡처 값은 먼저 계산하고, 비교는 역시 SQL 의미를 따릅니다.** 캡처 값 `null`은 NULL로 바인딩되므로 `= :p1`과 `<> :p1`은 어떤 행에도 일치하지 않습니다.
    이 경우 lambdaQL은 실행 시점에 `LQL-4045`를 `WARN` 수준으로 기록합니다. NULL을 찾으려면 `x == null`이라고 쓰십시오(`is null`이 됨).
+   캡처 값만으로 된 식(`min!!`, 언박싱, `text.trim()`)은 먼저 계산하므로 `null`이면 Kotlin처럼 예외(`LQL-4012`)를 던집니다.
 
 Kotlin 컴파일러는 바이트코드에 **숨겨진** null 검사를 추가합니다(예: `status`가 `Int?`일 때 `it.status == 1`). lambdaQL은 이를 **무시합니다**(결정 D22). 소스 코드에 있는 null 검사만 의미가 있습니다.
 그래서 의미가 같은 Kotlin 람다와 Java 람다는 같은 SQL을 만듭니다.
@@ -313,15 +314,16 @@ qb.from(Coded::class.java).where { it.vip == false }.toList()                   
 | 형태 | 캡처 값이 `null`일 때 |
 |---|---|
 | 캡처 값과의 `==`, `!=`: `it.status == q`, `it.description != text` | 실행됨: NULL을 바인딩한 `= :p1` / `<> :p1`이므로 일치하는 행이 **없음**. `WARN` 수준 `LQL-4045` |
-| 크기 비교: `it.price!! > min!!`, 모든 `<`, `<=`, `>`, `>=` | 위와 같음: `e0.price > :p1`(NULL), 일치하는 행 **없음**. `WARN` 수준 `LQL-4045`(`!!`는 무시됨) |
+| 크기 비교: `it.price!! > min!!`, 모든 `<`, `<=`, `>`, `>=` | 쿼리가 실행될 때 **예외**(`LQL-4012`). 캡처 값의 `min!!`과 언박싱을 먼저 계산하기 때문 |
 | `in`에 사용하는 컬렉션 안의 null 요소 | 쿼리가 실행될 때 **예외** |
 
-이유: 람다 안의 비교는 모두 SQL 의미를 따릅니다(결정 D48). SQL에서 NULL과의 `=`, `<>`, `<`, `>`는 참이 되지 않습니다.
+이유: 람다 안의 비교는 SQL 의미를 따릅니다(결정 D48). SQL에서 NULL과의 `=`, `<>`는 참이 되지 않습니다.
 캡처 값이 null인지는 쿼리가 실행될 때만 알 수 있으므로, lambdaQL은 실행할 때 경고를 기록합니다.
 
-NULL 행을 찾으려면 `x == null`이라고 쓰십시오. 캡처 값에 대한 메서드 호출(`text.trim()` 등)은 쿼리 전에 값을 준비하는 단계이므로 `null`이면 Kotlin처럼 예외(`LQL-4012`)를 던집니다.
+캡처 값만으로 된 식은 쿼리 전에 계산하는 값입니다. 캡처 값의 `!!`, 언박싱, `text.trim()` 같은 메서드 호출이 이에 해당하며, `null`이면 Kotlin처럼 예외(`LQL-4012`)를 던집니다.
+NULL 행을 찾으려면 `x == null`이라고 쓰십시오.
 
-**null 가드로 필터 생략.** 같은 캡처 값을 null 검사하면, 값이 null일 때 그 조건이 필터 없이 사라집니다.
+**규칙의 예외: null 가드.** 같은 캡처 값을 먼저 null 검사하면 언박싱 비교에도 null을 쓸 수 있습니다.
 
 ```kotlin
 val min: Double? = request.minPrice   // null일 수 있음
@@ -353,7 +355,7 @@ where o1_0.price>?
 - `min == null`이면 가드가 참이므로 조건 전체가 참입니다. 필터가 없습니다. `min`과의 비교는 HQL에 쓰지 않습니다(Kotlin도 이 비교를 실행하지 않습니다).
 - `min = 100.0`이면 가드가 거짓이므로 `e0.price > :p1`만 남습니다.
 - 람다는 여전히 한 번만 분석합니다. 값에 따라 달라지는 것은 HQL 텍스트뿐입니다.
-- 가드의 위치는 결과에 영향을 주지 않습니다. `min == null`일 때 `it.price!! > min!! || min == null`도 필터가 없습니다. SQL에는 평가 순서가 없고 `!!`는 무시되므로 예외가 나지 않습니다(Kotlin이라면 `NullPointerException`).
+- 가드가 먼저 와야 합니다. `min == null`일 때 `it.price!! > min!! || min == null`은 쿼리가 실행될 때 예외(`LQL-4012`)를 던집니다. 비교 부분의 `min!!`을 먼저 계산하기 때문이며, Kotlin의 `NullPointerException`과 같습니다.
 
 이에 대한 Kotlin 테스트는 아직 없습니다. 같은 가드를 Java로 쓴 것은 테스트했습니다. [이 페이지의 Java 버전](../java/03-where.md#364-captured-null-values)을 참고하십시오.
 
@@ -611,13 +613,11 @@ qb.from(Item::class.java)
 
 가드 아래의 `/`, `%`, 캐스트는 거부됩니다. 나눗셈 없이 조건을 작성하십시오. 예: `it.qty > 0 && it.price!! > 2.0 * it.qty`(`qty`가 양수일 때 같은 행).
 
-null 캡처 값과의 비교는 평가 순서와 상관없습니다. `it.price!! > min!! || min == null`과 `min == null || it.price!! > min`은 같은 결과를 냅니다([3.6.4](#364-captured-null-values) 참고).
-
 <a id="313-what-is-rejected"></a>
 ## 3.13 거부되는 것
 
 lambdaQL은 코드 `[LQL-xxxx]`와 소스 줄 번호가 담긴 예외를 던집니다. 추측하지 않습니다.
-대부분의 모양은 람다를 분석할 때(처음 사용할 때) 발견됩니다. 잘못된 캡처 값(NaN, `null` 요소가 있는 컬렉션, 메서드를 호출한 `null` 값)은 쿼리가 실행될 때 발견됩니다.
+대부분의 모양은 람다를 분석할 때(처음 사용할 때) 발견됩니다. 잘못된 캡처 값(언박싱하거나 메서드를 호출한 `null`, NaN)은 쿼리가 실행될 때 발견됩니다.
 [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
 
 | 형태 | 예 | 해결 방법 |

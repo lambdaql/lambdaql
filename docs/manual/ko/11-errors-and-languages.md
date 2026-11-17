@@ -241,7 +241,7 @@ null 규칙 전체는 3. 조건([Java](java/03-where.md) | [Kotlin](kotlin/03-wh
 | `Objects.equals(o.getDescription(), name)` | 실행됨 | 위와 같음 |
 | `o.getDescription().equals(name)` | 실행됨 | 위와 같음 |
 | `name.equals(o.getDescription())` | 실행됨 | 위와 같음 |
-| `o.getStatus() > minStatus`(`minStatus`가 `null`) | 실행됨 | NULL을 바인딩한 `e0.status > :p1`: 일치하는 행 없음. `WARN` 수준 `LQL-4045` |
+| `o.getStatus() > minStatus`(`minStatus`가 `null`) | 오류(`LQL-4012`) | javac가 추가한 언박싱(`minStatus.intValue()`)을 Java에서 계산하므로 `NullPointerException`에 해당합니다. |
 | `name.trim()` 같은 캡처 값의 메서드 호출 | 오류(`LQL-4012`) | 쿼리 전에 Java에서 값을 준비하는 단계이므로 Java처럼 `NullPointerException`에 해당합니다. |
 
 NULL을 찾으려면 `o.getDescription() == null`이라고 씁니다.
@@ -253,7 +253,7 @@ NULL을 찾으려면 `o.getDescription() == null`이라고 씁니다.
 |---|---|---|
 | `it.description == name` | 실행됨 | NULL을 바인딩한 `e0.description = :p1`: 일치하는 행 없음. `WARN` 수준 `LQL-4045` |
 | `minPrice == null \|\| it.price!! > minPrice` | 허용 | null 검사를 직접 작성했으므로 lambdaQL이 이를 사용합니다. |
-| `it.price!! > minPrice!!`(`minPrice`가 `null`) | 실행됨 | NULL을 바인딩한 `e0.price > :p1`: 일치하는 행 없음. `WARN` 수준 `LQL-4045`(`!!`는 무시됨) |
+| `it.price!! > minPrice!!`(`minPrice`가 `null`) | 오류(`LQL-4012`) | 캡처 값의 `minPrice!!`를 먼저 계산하므로 `NullPointerException`에 해당합니다. |
 | `it.id in ids`(`ids`에 `null` 요소가 있음) | 바인딩 시 오류 | null 요소가 있는 `IN`은 SQL의 함정입니다. |
 
 <a id="placeholders-called-outside-a-lambda"></a>

@@ -86,12 +86,18 @@ class SqlMeaningTest {
             assertEquals(List.of("f"), qb.from(Coded.class).where(c -> !c.getVip()).toList().stream().map(Coded::getCode).toList());
             // @end
             assertTrue(appender.list.stream().anyMatch(e -> e.getFormattedMessage().startsWith("[LQL-5009]")), String.valueOf(appender.list));
-            // a null captured value in a size comparison or as the equals receiver: bound as NULL, no row, WARN when it runs
+            // a value made only from captured values runs in Java: min.doubleValue() with a null min throws like Java (LQL-4012)
             Double min = null;
             String none = null;
-            assertEquals("select e0 from Order e0 where e0.price > :p1", qb.from(Order.class).where(o -> o.getPrice() > min).toHql().hql());
-            assertEquals(List.of(), qb.from(Order.class).where(o -> o.getPrice() > min).toList());
+            assertEquals("LQL-4012", org.junit.jupiter.api.Assertions.assertThrows(org.lambdaql.LambdaQLException.class,
+                    () -> qb.from(Order.class).where(o -> o.getPrice() > min).toHql()).code());
+            // p.equals(column) is a comparison like column.equals(p): a null p is bound as NULL, no row, WARN (no exception)
+            assertEquals("select e0 from Order e0 where e0.description = :p1",
+                    qb.from(Order.class).where(o -> none.equals(o.getDescription())).toHql().hql());
             assertEquals(List.of(), qb.from(Order.class).where(o -> none.equals(o.getDescription())).toList());
+            // a comparison with a null value (no Java method on it): bound as NULL, no row, WARN when it runs
+            String d = null;
+            assertEquals(List.of(), qb.from(Order.class).where(o -> Objects.equals(o.getDescription(), d)).toList());
             assertTrue(appender.list.stream().anyMatch(e -> e.getFormattedMessage().startsWith("[LQL-4045]")), String.valueOf(appender.list));
         } finally {
             log.setLevel(old);
