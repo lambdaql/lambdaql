@@ -471,7 +471,16 @@ public enum LqlMessage {
     PROC_METADATA_UNAVAILABLE("LQL-5005", 2),
 
     /** LQL-5006: The overloads of &#123;0&#125; could not be checked (&#123;1&#125;); the call goes on without the check. */
-    PROC_OVERLOAD_CHECK_SKIPPED("LQL-5006", 2);
+    PROC_OVERLOAD_CHECK_SKIPPED("LQL-5006", 2),
+
+    /** LQL-5001: The function &#123;0&#125; is applied to the column &#123;1&#125;, so a normal index on the column cannot be used and the query may scan the whole table. Compare the column with a value instead, or (Oracle) create a function-based index: &#123;2&#125; */
+    SARGABLE_COLUMN_FUNCTION("LQL-5001", 3),
+
+    /** LQL-5007: The MariaDB function &#123;0&#125; is NOT DETERMINISTIC, so it is computed for every row and an index on the compared column is not used for a range. Declare it DETERMINISTIC if it is: &#123;1&#125; */
+    SARGABLE_NONDETERMINISTIC("LQL-5007", 2),
+
+    /** LQL-5008: The index or function metadata for &#123;0&#125; could not be read (&#123;1&#125;); the SARGable check goes on without it. */
+    SARGABLE_CHECK_SKIPPED("LQL-5008", 2);
 
     private final String code;
     private final int argCount;

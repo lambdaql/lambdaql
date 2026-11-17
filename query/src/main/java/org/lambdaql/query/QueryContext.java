@@ -157,7 +157,13 @@ public final class QueryContext {
         return whereCache.computeIfAbsent(ref.lambdaClass(), k -> {
             var graph = Decoder.decodePredicate(ref, BytecodeLoader.load(ref));
             Pred pred = ConditionReducer.reduce(graph, ref.describe());
-            return checked(Normalizer.normalize(pred, roots, model, ref.classLoader(), ref.describe()));
+            Pred normalized = checked(Normalizer.normalize(pred, roots, model, ref.classLoader(), ref.describe()));
+            // PR8: functions that keep the condition from using an index (once per lambda)
+            withEntityManager(em -> {
+                SargableCheck.check(em, normalized, roots, ref.describe());
+                return null;
+            });
+            return normalized;
         });
     }
 

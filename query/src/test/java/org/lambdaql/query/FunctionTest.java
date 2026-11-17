@@ -48,6 +48,12 @@ class FunctionTest {
             throw new DbOnlyException();
         }
 
+        /** {@code SQ_FN_NONDET(value)}: on MariaDB declared NOT DETERMINISTIC (SARGable test). */
+        @SqlFunction("SQ_FN_NONDET")
+        static Double nondet(Double value) {
+            throw new DbOnlyException();
+        }
+
         /** A query name with its own SQL name; registered with lambdaql.functions.classes. */
         @SqlFunction(value = "SQ_TAX", sql = "SQ_FN_DISCOUNT")
         static Double tax(Double price) {
@@ -220,6 +226,39 @@ class FunctionTest {
         assertEquals("select e0 from Order e0 where function('SQ_TAX' as Double, e0.price) > 100.0", q.toHql().hql());
         // @end
         assertEquals(java(o -> o.getPrice() * 0.9 > 100), idsOf(q.toList()));
+    }
+
+    @Test
+    void sargableWarnings() {
+        ch.qos.logback.classic.Logger log = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(SargableCheck.class);
+        var appender = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        appender.start();
+        log.addAppender(appender);
+        EntityManager em = emf.createEntityManager();
+        em.getTransaction().begin();
+        if (DB.equals("oracle")) em.createNativeQuery("CREATE INDEX SQ_IX_DISCOUNT ON SQ_orders (SQ_FN_DISCOUNT(price))").executeUpdate();
+        if (DB.equals("mariadb")) em.createNativeQuery("CREATE OR REPLACE FUNCTION SQ_FN_NONDET(p DOUBLE) RETURNS DOUBLE NOT DETERMINISTIC RETURN p").executeUpdate();
+        em.getTransaction().commit();
+        try {
+            double base = 100;
+            // @start region="sargable"
+            // the function wraps the column: an index on price cannot be used (LQL-5001 at WARN),
+            // unless Oracle has a function-based index on SQ_FN_DISCOUNT(price)
+            qb.from(Order.class).where(o -> OrderFns.discount(o.getPrice()) > 100).toHql();
+            // the function is on the value side: fine, unless MariaDB says NOT DETERMINISTIC (LQL-5007 at WARN)
+            qb.from(Order.class).where(o -> o.getPrice() > OrderFns.nondet(base)).toHql();
+            // @end
+            List<String> codes = appender.list.stream().map(e -> e.getFormattedMessage().substring(1, 9)).toList();
+            assertEquals(DB.equals("oracle") ? List.of() : DB.equals("mariadb") ? List.of("LQL-5001", "LQL-5007") : List.of("LQL-5001"),
+                    codes, String.valueOf(appender.list));
+        } finally {
+            log.detachAppender(appender);
+            em.getTransaction().begin();
+            if (DB.equals("oracle")) em.createNativeQuery("DROP INDEX SQ_IX_DISCOUNT").executeUpdate();
+            if (DB.equals("mariadb")) em.createNativeQuery("DROP FUNCTION IF EXISTS SQ_FN_NONDET").executeUpdate();
+            em.getTransaction().commit();
+            em.close();
+        }
     }
 
     @Test

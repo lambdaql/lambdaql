@@ -24,4 +24,26 @@ final class HibernateFunctions {
             return false;
         }
     }
+
+    /**
+     * Finds the table and column of an entity property (for the Oracle function-based index check, PR8).
+     *
+     * @param sf     the session factory
+     * @param entity the entity class
+     * @param path   the property path, for example {@code price}
+     * @return {table, column}, or null when it cannot be found
+     */
+    static String[] tableAndColumn(org.hibernate.SessionFactory sf, Class<?> entity, String path) {
+        try {
+            var persister = sf.unwrap(org.hibernate.engine.spi.SessionFactoryImplementor.class)
+                    .getMappingMetamodel().getEntityDescriptor(entity);
+            if (!(persister instanceof org.hibernate.persister.entity.AbstractEntityPersister p)) return null;
+            String[] cols = p.getPropertyColumnNames(path);
+            if (cols == null || cols.length != 1) return null;
+            String table = p.getTableName();
+            return new String[]{table.substring(table.lastIndexOf('.') + 1), cols[0]};
+        } catch (RuntimeException | LinkageError e) {
+            return null;
+        }
+    }
 }
