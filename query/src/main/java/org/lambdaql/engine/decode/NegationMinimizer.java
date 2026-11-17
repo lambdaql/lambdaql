@@ -16,8 +16,10 @@ import java.util.List;
  * }</pre>
  * De Morgan's laws are also true in SQL three-valued logic (TRUE / FALSE / UNKNOWN),
  * and flipping a compare operator is free, so the SQL result does not change.
- * When both forms have the same number of NOTs, the form with the outer NOT is kept,
- * because that is closer to code like {@code !(a && b)}.
+ * A NOT on a single condition is free too, because it has its own SQL form ({@code is not null}, {@code not exists},
+ * {@code not in}, {@code = false}). So a NOT around a group is always moved inside:
+ * {@code !(active && status > 1)} becomes {@code !active || status <= 1}. SQL then has no NOT around a group,
+ * which keeps the conditions simple for the optimizer (SARGable rule, ROADMAP 3.9).
  *
  * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/NegationMinimizerTest.java">NegationMinimizerTest</a>):
  * {@snippet class="org.lambdaql.engine.decode.NegationMinimizerTest" region="de-morgan"}
@@ -50,7 +52,7 @@ public final class NegationMinimizer {
      *
      * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/NegationMinimizerTest.java">NegationMinimizerTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.NegationMinimizerTest" region="de-morgan"}
-     * {@snippet class="org.lambdaql.engine.decode.NegationMinimizerTest" region="keep-outer-not"}
+     * {@snippet class="org.lambdaql.engine.decode.NegationMinimizerTest" region="push-not"}
      *
      * @param p the condition
      * @return the rewritten condition
@@ -67,7 +69,8 @@ public final class NegationMinimizer {
             return new Pair(new Form(b, 0), new Form(Pred.not(b), 0));
         }
         if (p instanceof Pred.IsNull || p instanceof Pred.Truth || p instanceof Pred.In) {
-            return new Pair(new Form(p, 0), new Form(new Pred.Not(p), 1));
+            // a negated atom has its own form (is not null, not exists, not in, = false): no NOT around a group
+            return new Pair(new Form(p, 0), new Form(new Pred.Not(p), 0));
         }
         if (p instanceof Pred.Not n) {
             Pair inner = best(n.operand());

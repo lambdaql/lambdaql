@@ -2,7 +2,7 @@ package org.lambdaql.engine.sem;
 
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.Test;
-import org.lambdaql.analyzer.LambdaAnalysisException;
+import org.lambdaql.LambdaQLException;
 import org.lambdaql.engine.ir.Assignment;
 import org.lambdaql.engine.load.LambdaRef;
 import org.lambdaql.engine.load.SerializedLambdaExtractor;
@@ -74,11 +74,11 @@ class AssignmentReaderTest {
     void rules() {
         // @start region="rules"
         // U1: only setters; no condition, no local variable
-        assertThrows(LambdaAnalysisException.class, () -> setters(o -> { if (o.isActive()) o.setStatus((short) 1); }));
+        assertThrows(LambdaQLException.class, () -> setters(o -> { if (o.isActive()) o.setStatus((short) 1); }));
         // U6: an association's other properties belong to another table
-        assertThrows(LambdaAnalysisException.class, () -> setters(o -> o.getCustomer().setName("x")));
+        assertThrows(LambdaQLException.class, () -> setters(o -> o.getCustomer().setName("x")));
         // U3: a value reads a column written before
-        assertThrows(LambdaAnalysisException.class, () -> AssignmentReader.checkRules(
+        assertThrows(LambdaQLException.class, () -> AssignmentReader.checkRules(
                 AssignmentReader.readSetters(SerializedLambdaExtractor.extract((Assign<Order>) o -> {
                     o.setPrice(1);
                     o.setTex((float) o.getPrice());

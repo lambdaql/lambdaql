@@ -4,8 +4,8 @@
 > [!NOTE]
 > **상태**
 > - **구현됨, H2·MariaDB·Oracle에서 테스트함:** `where` 조건과 `toList()`. lambdaQL이 getter를 컬럼에 매핑하고, HQL을 쓰고, 실행합니다.
-> - **함께 구현됨:** 정렬과 페이징의 핵심 기능([4. 정렬과 페이징](04-order-paging.md)), update/insert/delete/upsert([7. 수정, 삽입, 삭제](07-dml.md)), Spring Data JPA 모듈([12. Spring Data JPA](12-spring-data-jpa.md)).
-> - **설계됨, 아직 구현되지 않음:** 서브쿼리, `select`, 프로시저(5장, 6장, 8장).
+> - **함께 구현됨:** 정렬과 페이징의 핵심 기능([4. 정렬과 페이징](04-order-paging.md)), 서브쿼리([5. 서브쿼리](05-subquery.md)), `groupBy`·`having`·`Agg`를 포함한 `select`([6. 조회, 집계, 그룹화](06-select-group.md)), update/insert/delete/upsert([7. 수정, 삽입, 삭제](07-dml.md)), Spring Data JPA 모듈([12. Spring Data JPA](12-spring-data-jpa.md)).
+> - **설계됨, 아직 구현되지 않음:** 파생 테이블과 CTE(6장), 프로시저(8장).
 > - **(테스트됨)** 표시가 있는 예제는 테스트 코드에서 그대로 가져온 것입니다. 이 장의 나머지 HQL은 설계에 따른 **예정된** 출력입니다. 세부 사항(예: `e0`, `j1` 같은 별칭 이름)은 아직 조금 바뀔 수 있습니다.
 
 [Java 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [2. 시작하기](02-getting-started.md) | 다음: [4. 정렬과 페이징](04-order-paging.md) | [이 페이지의 Kotlin 버전](../kotlin/03-where.md)

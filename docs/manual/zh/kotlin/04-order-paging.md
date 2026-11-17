@@ -4,7 +4,7 @@
 > [!NOTE]
 > **状态**
 > - **核心部分已实现**，并在 H2、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上测试：带有 `by.asc`、`by.desc` 和 `by.sort` 的 `orderBy { o, by -> ... }`，一个排序键的写法 `orderBy { it.key }` 和 `orderBy({ it.key }, Direction)`，`Direction.parse` / `reversed`，`limit` / `offset`，`orderBy` 之后的 `first()`，以及可重用排序 `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。Spring `Sort` 和 `Pageable` 可以在 Spring Data JPA 模块中使用（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。这些测试使用的是 **Java** Lambda。**Kotlin Lambda 尚未测试。**
-> - **尚未实现：** Kotlin 属性引用（`orderBy(Order::price)`）、`SortWhitelist`、join 写法 `{ o, c, by -> }`（`SortSpec` 也是）以及子查询内部的排序。
+> - **尚未实现：** Kotlin 属性引用（`orderBy(Order::price)`）、`SortWhitelist` 和 join 写法 `{ o, c, by -> }`（`SortSpec` 也是）。
 > - 该 Kotlin 语法可以编译（已用原型检查，kotlinc 2.3.21）。可空排序键、`?.` 排序键和属性引用可以编译；实体排序键不能编译。
 > - 本章中的 HQL 遵循库的规则，但没有用 Kotlin Lambda 测试过。
 
@@ -496,7 +496,7 @@ qb.from(Order::class.java).orderBy(byName).toList()
 <a id="411-sorting-inside-subqueries"></a>
 ## 4.11 子查询内部的排序
 
-**尚未实现**（子查询尚未实现）。
+**已实现**（里程碑 M8-1，随 [5. 子查询](05-subquery.md) 的子查询一起实现）。MariaDB 的 `lateral` 改写尚未实现。
 
 子查询内部的排序只有在与 `limit` 一起使用时（top-1 或 top-N）才会保留。
 没有 `limit` 时，它不会改变结果，因此 lambdaQL 会移除它并记录一条警告日志。
@@ -520,7 +520,7 @@ qb.from(Order::class.java).orderBy(byName).toList()
 | S11 | Spring `Sort.Order` 与 `Direction` 一一对应（Spring 模块，见 [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。`SortWhitelist.parse("price,desc_nulls_last")` | Spring `Sort` 已实现，并用 Java 测试（尚不支持 `ignoreCase`）。`SortWhitelist` 尚未实现 |
 | S12 | join 查询使用相同的形式：`{ o, c, by -> }`、`{ o, c, i, by -> }` | 尚未实现 |
 | S13 | 属性引用只能用于一个排序键的简短写法（`orderBy(Order::price)`）。能编译但含义错误的引用会被拒绝 | 尚未实现（Kotlin 属性引用） |
-| S14 | 子查询的排序：有 `limit` 时保留，没有 `limit` 时移除并发出警告。数据库差异由 lambdaQL 替你处理（见第 5 章） | 尚未实现 |
+| S14 | 子查询的排序：有 `limit` 时保留，没有 `limit` 时移除并发出警告。数据库差异由 lambdaQL 替你处理（见第 5 章） | 已实现（已测试）。MariaDB 的 `lateral` 改写尚未实现 |
 
 ---
 

@@ -3,7 +3,8 @@
 
 > [!NOTE]
 > **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10), including `limit` and `executeOne()` (decision D41).
-> **Not implemented yet:** `sub` subqueries in `set` and `where` (milestone M8), and `limit` / `executeOne()` on entities with a composite key.
+> Subqueries (`sub`) in `where` are implemented too (milestone M8). The delete form is tested; see [7.4](07-4-delete.md).
+> **Not implemented yet:** `sub` subqueries in the values of `set`, and `limit` / `executeOne()` on entities with a composite key.
 > Examples marked **(tested)** are copied from [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java). The other examples follow the design and are not covered by a test yet.
 > See the [Java track README](README.md#status) for the full status.
 
@@ -148,7 +149,7 @@ In `where`, lambdaQL adds `e0.customer.id is not null`, so the update changes th
 
 Use a two-argument lambda. The second argument is the context object (`sub`).
 `Agg` is not needed here; the subquery has `sum`, `avg`, ... as in [5. Subqueries](05-subquery.md).
-This form is **not implemented yet** (milestone M8).
+This form is **not implemented yet**. Only subqueries in `where` work today.
 
 ```java
 qb.update(Order.class)
@@ -186,10 +187,12 @@ qb.update(Order.class).set(o -> o.setStatus(9))
   .execute();
 ```
 
-The first example works today: the path becomes a scalar subquery, as in the tested example above.
-The second one needs `sub` (not implemented yet, milestone M8).
+Both examples work today.
+In the first one, the path becomes a scalar subquery, as in the tested example above.
+The second one uses `sub`, as in [5. Subqueries](05-subquery.md). Its HQL is `update Order e0 set e0.status = 9 where not exists (select 1 from Item s1 where s1.order.id = e0.id)`.
+The same `where` on a delete is tested (region `dml-subquery`, see [7.4](07-4-delete.md)). The update form is not covered by its own test yet.
 
-**SQL by database (planned)** — Hibernate's translation of the planned HQL, recorded by `PlannedSqlTest`; lambdaQL does not make this query yet. From `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql), example `07-update-not-exists`:
+**SQL by database (Hibernate's SQL for this HQL)** — recorded by [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java), which gives the same statement to Hibernate directly. From `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql), example `07-update-not-exists`:
 
 ```sql
 -- H2, MariaDB

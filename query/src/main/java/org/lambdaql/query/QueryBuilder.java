@@ -101,4 +101,56 @@ public class QueryBuilder {
     public <T> UpsertQuery<T> upsert(Class<T> entityClass) {
         return new UpsertQuery<>(entityClass, context);
     }
+
+    /**
+     * Calls a stored procedure that gives a result: {@code qb.call(OrderProcs.class, p -> p.calc(id, rate)).execute()}
+     * (ROADMAP M11, D30). The stub method needs {@link org.lambdaql.SqlProcedure}.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java">ProcedureTest</a>):
+     * {@snippet class="org.lambdaql.query.ProcedureTest" region="call"}
+     *
+     * @param procs the stub interface
+     * @param call  one stub call; the arguments are captured values or constants
+     * @param <P>   the stub type
+     * @param <R>   the result type
+     * @return the call, run it with {@code execute()}
+     */
+    @SuppressWarnings("unchecked")
+    public <P, R> ProcedureCall<R> call(Class<P> procs, Call<P, R> call) {
+        return new ProcedureCall<>(() -> (R) context.procedure(procs, call, true));
+    }
+
+    /**
+     * Calls a stored procedure without a result: {@code qb.exec(OrderProcs.class, p -> p.purge(30)).execute()}.
+     * A procedure with OUT parameters is rejected, because their values would be lost (PR12).
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java">ProcedureTest</a>):
+     * {@snippet class="org.lambdaql.query.ProcedureTest" region="exec"}
+     *
+     * @param procs the stub interface
+     * @param call  one stub call
+     * @param <P>   the stub type
+     * @return the call, run it with {@code execute()}
+     */
+    public <P> ProcedureCall<Void> exec(Class<P> procs, Exec<P> call) {
+        return new ProcedureCall<>(() -> {
+            context.procedure(procs, call, false);
+            return null;
+        });
+    }
+
+    /**
+     * Calls a database function on its own: {@code qb.call(() -> OrderFns.discount(price)).execute()} (PR6).
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java">ProcedureTest</a>):
+     * {@snippet class="org.lambdaql.query.ProcedureTest" region="function"}
+     *
+     * @param call one {@code @SqlFunction} call; the arguments are captured values or constants
+     * @param <R>  the result type
+     * @return the call, run it with {@code execute()}
+     */
+    @SuppressWarnings("unchecked")
+    public <R> ProcedureCall<R> call(FunctionCall<R> call) {
+        return new ProcedureCall<>(() -> (R) context.function(call));
+    }
 }

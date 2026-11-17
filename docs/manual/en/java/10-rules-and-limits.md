@@ -6,7 +6,7 @@
 > where Java and SQL differ, where databases differ, and what is not supported.
 > The rules were checked with prototypes on H2 2.3, MariaDB 10.11 and Oracle 23ai (Hibernate 6.6.5).
 > Today the analysis core, `where`, the result functions (`toList()`, `toSet()`, `first()`, `one()`, `count()`, `exists()`), the core of sorting and paging, `SortSpec`, update/insert/delete/upsert ([7](07-dml.md)) and the Spring Data JPA module ([12](12-spring-data-jpa.md)) work (tested on H2, MariaDB and Oracle).
-> The rules for subqueries, `select` and procedures below are **not implemented yet**, and neither are subqueries and aggregates in DML. Some sorting rules are not implemented yet either (see [4.12](04-order-paging.md#412-rules-summary-s1-to-s14)).
+> The rules for subqueries ([5](05-subquery.md)) and `select` with aggregates ([6](06-select-group.md)) are implemented too, also in DML. The rules for derived tables, CTEs and procedures below are **not implemented yet**. Some sorting rules are not implemented yet either (see [4.12](04-order-paging.md#412-rules-summary-s1-to-s14)).
 > See the [Java track README](README.md#status) for the full status.
 
 [Java track](README.md) | [Manual home](../README.md) | Previous: [9. Java notes](09-java-notes.md) | Next: [11. Errors and languages](../11-errors-and-languages.md) | [Kotlin version of this page](../kotlin/10-rules-and-limits.md)
@@ -270,7 +270,7 @@ needed there; only Oracle gets a `NULLS` clause. To change the NULL position, us
 |---|---|---|
 | Subquery `order by` without `limit` | Oracle: syntax error (ORA-00907). MariaDB: ignored | Removed, with a WARN |
 | MariaDB `IN (... limit n)` | Not supported (error 1235) | Wrapped automatically: `in (select x.id from (... limit n) x)` |
-| MariaDB `lateral` | Wrong results (emulation) | Rewritten with `row_number() over (...)` |
+| MariaDB `lateral` | Wrong results (emulation) | Rewritten with `row_number() over (...)` (not implemented yet) |
 
 ### Update, insert, delete
 
@@ -278,7 +278,7 @@ needed there; only Oracle gets a `NULLS` clause. To change the NULL position, us
 |---|---|---|
 | `SET a = ..., b = a + 1` (read a column after you set it) | MariaDB reads the **new** value, H2 and Oracle the old value | Error at analysis time (U3) |
 | Association path in DML (`o.getCustomer().getName()`) | Hibernate makes different joins per DB and **loses rows** with no customer | lambdaQL writes a correlated scalar subquery (in `where` and in SET). In `where`, a path that a select would inner join also gets `customer.id is not null`, so DML hits the same rows as the query (U9, tested) |
-| `DELETE` with a subquery on the same table | MariaDB error 1093 | Wrapped in a derived table (U17; comes with subqueries, milestone M8) |
+| `DELETE` with a subquery on the same table | MariaDB error 1093 | Wrapped in a derived table (U17; not implemented yet) |
 | The same enum value bound once for a STRING and an ORDINAL column | H2 and MariaDB store a **wrong value without error** | One parameter per place, never shared (U7) |
 | Many rows in `values(list, ...)` | Oracle: hard limit 65,535 binds (ORA-01745), very slow long before | Split: at most 500 values per statement, all in one transaction (U13) |
 | `update` / `delete` with `order by ... limit` | MariaDB rejects `limit` in an `in` subquery (error 1235) and a subquery on the target table (error 1093) | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: the derived table `t` works on all three databases. The inner select uses the select joins (D36), so the rows are the same as the select (tested) |

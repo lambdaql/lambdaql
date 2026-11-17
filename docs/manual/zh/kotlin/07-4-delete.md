@@ -3,8 +3,9 @@
 
 > [!NOTE]
 > **状态：已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（里程碑 M10）。测试使用 **Java** Lambda。**DML 中的 Kotlin Lambda 尚未测试。** 这也包括 `limit` 和 `executeOne()`（决定 D41）。
-> **尚未实现：** `where` 中的 `sub` 子查询（里程碑 M8），以及复合键实体上的 `limit` / `executeOne()`。
-> Kotlin 代码用 Kotlin 语法展示已测试的 Java 语句，HQL 来自 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中的 Java 测试。没有 HQL 的示例遵循设计。
+> `where` 中的子查询（`sub`）同样已实现，并已用 Java Lambda 测试（里程碑 M8）。
+> **尚未实现：** 复合键实体上的 `limit` / `executeOne()`。
+> Kotlin 代码用 Kotlin 语法展示已测试的 Java 语句，HQL 来自 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 和 [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) 中的 Java 测试。没有 HQL 的示例遵循设计。
 > 完整状态见[路线 README](README.md)。
 
 [7. 更新、插入、删除（Kotlin）](07-dml.md) | [7.2 更新](07-2-update.md) | **7.4 删除** | [7.5 插入](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Java](../java/07-4-delete.md)
@@ -22,7 +23,7 @@ val byName = qb.delete(Order::class.java).where { it.customer?.name == null }
 // HQL: delete from Order e0 where (select s1.name from Customer s1 where s1.id = e0.customer.id) is null and e0.customer.id is not null
 ```
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。 该测试使用 Java Lambda。含义相同的 Kotlin Lambda 生成相同的 HQL，因此 SQL 也相同。 标记为 **（计划中）** 的块来自 [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)。由于 lambdaQL 目前还不会生成这些语句，该测试把计划中的 HQL 直接交给 Hibernate。
+**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。 该测试使用 Java Lambda。含义相同的 Kotlin Lambda 生成相同的 HQL，因此 SQL 也相同。
 
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `delete`：
 
@@ -68,15 +69,19 @@ qb.delete(Order::class.java).execute()           // compile error: no execute()
 qb.delete(Item::class.java).where { it.id in ids }.execute()
 ```
 
-`where` 中的子查询需要 `sub`（尚未实现，里程碑 M8）：
+`where` 中的子查询使用第二个 Lambda 参数 `sub`，与 [5. 子查询](05-subquery.md) 相同。
+删除没有任何订单项的订单：
 
 ```kotlin
 qb.delete(Order::class.java)
     .where { o, sub -> !sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
     .execute()
+// HQL: delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)
 ```
 
-**各数据库的 SQL（计划中）** — Hibernate 对计划中 HQL 的翻译，由 `PlannedSqlTest` 记录；lambdaQL 目前还不会生成此查询。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `07-delete-not-exists`：
+同样的语句已在 [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) 中用 Java 测试（region `dml-subquery`）。
+
+**各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `dml-subquery`：
 
 ```sql
 -- H2, Oracle

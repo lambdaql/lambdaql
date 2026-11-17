@@ -1,5 +1,6 @@
 package org.lambdaql.query;
 
+import org.lambdaql.i18n.LqlMessage;
 import jakarta.persistence.NonUniqueResultException;
 import org.lambdaql.engine.ir.Expr;
 import org.lambdaql.engine.ir.Pred;
@@ -106,9 +107,27 @@ public class SelectQuery<T> {
      *
      * @param condition the condition lambda
      * @return this query
-     * @throws org.lambdaql.analyzer.LambdaAnalysisException if the lambda cannot become a condition
+     * @throws org.lambdaql.LambdaAnalysisException if the lambda cannot become a condition
      */
     public SelectQuery<T> where(Where<T> condition) {
+        LambdaRef ref = QueryContext.read(condition);
+        Pred pred = context.analyzeWhere(ref, List.of(entityClass));
+        wheres.add(new HqlRenderer.Bound(pred, ref.capturedArgs()));
+        return this;
+    }
+
+    /**
+     * Adds a condition that can use subqueries: {@code (o, sub) -> sub.from(Item.class).where(i -> ...).exists()}
+     * (ROADMAP M8). Several calls are joined with AND.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java">SubqueryTest</a>):
+     * {@snippet class="org.lambdaql.query.SubqueryTest" region="exists"}
+     *
+     * @param condition the condition lambda
+     * @return this query
+     * @throws org.lambdaql.LambdaAnalysisException if the lambda cannot become a condition
+     */
+    public SelectQuery<T> where(WhereSub<T> condition) {
         LambdaRef ref = QueryContext.read(condition);
         Pred pred = context.analyzeWhere(ref, List.of(entityClass));
         wheres.add(new HqlRenderer.Bound(pred, ref.capturedArgs()));
@@ -166,7 +185,7 @@ public class SelectQuery<T> {
     public Optional<T> one() {
         List<T> rows = context.resultList(entityClass, toHql(), 0, 2);
         if (rows.size() > 1) {
-            throw new NonUniqueResultException("one()의 조건에 맞는 행이 2개 이상입니다. 조건을 좁히거나 first()를 쓰세요: " + toHql().hql());
+            throw new NonUniqueResultException(LqlMessage.MORE_THAN_ONE_ROW.format(toHql().hql()));
         }
         return rows.stream().findFirst();
     }
@@ -223,7 +242,7 @@ public class SelectQuery<T> {
      *
      * @param spec the sort lambda
      * @return the sorted query (only paging and running are left)
-     * @throws org.lambdaql.analyzer.LambdaAnalysisException if the lambda is not a chain of {@code by} calls,
+     * @throws org.lambdaql.LambdaAnalysisException if the lambda is not a chain of {@code by} calls,
      *                                                       or a key cannot become SQL
      */
     public OrderedSelectQuery<T> orderBy(SortBy<T> spec) {
@@ -242,12 +261,12 @@ public class SelectQuery<T> {
      * @return the sorted query
      * @throws IllegalArgumentException                      if the spec is for another entity class,
      *                                                       or a path part ({@link SortSpec#ofPath}) is not a property
-     * @throws org.lambdaql.analyzer.LambdaAnalysisException if a lambda of the spec cannot become SQL
+     * @throws org.lambdaql.LambdaAnalysisException if a lambda of the spec cannot become SQL
      */
     public OrderedSelectQuery<T> orderBy(SortSpec<T> spec) {
         Objects.requireNonNull(spec, "spec");
         if (!spec.type().isAssignableFrom(entityClass)) {
-            throw new IllegalArgumentException("SortSpec is for " + spec.type().getName() + ", not " + entityClass.getName());
+            throw new IllegalArgumentException(LqlMessage.SORT_SPEC_TYPE.format(spec.type().getName(), entityClass.getName()));
         }
         return new OrderedSelectQuery<>(entityClass, context, wheres, spec.bind(context, entityClass));
     }
@@ -260,7 +279,7 @@ public class SelectQuery<T> {
      *
      * @param key the key lambda or a getter reference
      * @return the sorted query
-     * @throws org.lambdaql.analyzer.LambdaAnalysisException if the key cannot become SQL
+     * @throws org.lambdaql.LambdaAnalysisException if the key cannot become SQL
      */
     public OrderedSelectQuery<T> orderBy(SortKey<T> key) {
         return orderBy(key, Direction.ASC);
@@ -277,7 +296,7 @@ public class SelectQuery<T> {
      * @param direction the direction (and NULL position)
      * @return the sorted query
      * @throws NullPointerException                          if {@code direction} is null
-     * @throws org.lambdaql.analyzer.LambdaAnalysisException if the key cannot become SQL
+     * @throws org.lambdaql.LambdaAnalysisException if the key cannot become SQL
      */
     public OrderedSelectQuery<T> orderBy(SortKey<T> key, Direction direction) {
         Objects.requireNonNull(direction, "direction");
@@ -318,15 +337,41 @@ public class SelectQuery<T> {
     }
 
     /**
-     * Planned (milestone M9): select values or DTOs. Not implemented yet; it does nothing now.
+     * Selects values instead of entities: one value {@code o -> o.getPrice()}, or a record/DTO
+     * {@code o -> new OrderView(o.getId(), o.getCustomer().getName())} (ROADMAP M9). Aggregates over all rows
+     * ({@code o -> new Total(Agg.count(), Agg.avg(o.getPrice()))}) are allowed.
      *
-     * @param clause the value lambda
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+     * {@snippet class="org.lambdaql.query.ProjectionTest" region="record"}
+     *
+     * @param clause the select lambda
      * @param <R>    the value type
-     * @return this query
+     * @return the value query
+     * @throws org.lambdaql.LambdaAnalysisException if the lambda is not a value or one constructor call, or mixes
+     *                                                       aggregates with other values (J3)
      */
-    @Deprecated
-    public <R> SelectQuery<T> select(Select<T, R> clause) {
-        return this;
+    public <R> ValueQuery<R> select(Select<T, R> clause) {
+        LambdaRef ref = QueryContext.read(clause);
+        var projection = context.analyzeSelect(ref, List.of(entityClass));
+        org.lambdaql.engine.sem.SelectReader.checkGrouping(projection.columns(), List.of(), List.of(), ref.describe());
+        return new ValueQuery<>(entityClass, context, wheres, projection, ref.capturedArgs(), ref.classLoader(), null, List.of(),
+                List.of(), null, 0);
+    }
+
+    /**
+     * Groups the rows: one key {@code o -> o.getCustomer().getId()} or many keys
+     * {@code o -> List.of(o.getCustomer().getId(), o.getStatus())} (ROADMAP D27).
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+     * {@snippet class="org.lambdaql.query.ProjectionTest" region="group-by"}
+     *
+     * @param keys the key lambda
+     * @return the grouped query: {@code having}, then {@code select}
+     */
+    public GroupedQuery<T> groupBy(GroupBy<T> keys) {
+        LambdaRef ref = QueryContext.read(keys);
+        return new GroupedQuery<>(entityClass, context, wheres,
+                new HqlRenderer.ValueBound(context.analyzeGroupKeys(ref, List.of(entityClass)), ref.capturedArgs()));
     }
 
     /**

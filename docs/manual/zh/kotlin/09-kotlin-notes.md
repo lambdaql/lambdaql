@@ -38,7 +38,7 @@ lambdaQL 用**同一个引擎**和同一套 API 支持 Kotlin 和 Java。
 
 - 示例下方的注释给出 lambdaQL 生成的 HQL（当设计中有明确说明时）。
 - 写在 Lambda 中的常量（数字、字符串、布尔值、`null`、enum 常量、`const val`）作为字面量写入 HQL。捕获的值和计算出的值始终是绑定参数（`:p1`、`:p2`、...）（D37）。
-- `e0` 是根实体的别名，`j1` 是 lambdaQL 为关联路径添加的 join 的别名：在 `where` 中默认是内连接 `join`（当 null 保护保留没有关联的行时是 `left join`），路径只在 `orderBy` 或 `select` 中使用时是 `left join`（D36）。计划中功能（`select`、update、子查询）的示例仍使用计划中的别名 `o` 和 `c1`。
+- `e0` 是根实体的别名，`j1` 是 lambdaQL 为关联路径添加的 join 的别名：在 `where` 中默认是内连接 `join`（当 null 保护保留没有关联的行时是 `left join`），路径只在 `orderBy` 或 `select` 中使用时是 `left join`（D36）。子查询的根是 `s1`、`s2` 等（见 [5. 子查询](05-subquery.md)）。计划中功能（派生表、CTE、存储过程）的示例仍使用计划中的别名 `o` 和 `c1`。
 - 实体来自 [2. 入门](02-getting-started.md#example-entities)。有些示例在 `Order` 上使用了两个额外属性：`var flag: Boolean? = null` 和 `var kind: OrderKind? = null`（其中 `enum class OrderKind { NORMAL, EXPRESS, GIFT }`）。
 
 ---

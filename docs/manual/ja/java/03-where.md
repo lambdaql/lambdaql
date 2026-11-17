@@ -4,8 +4,8 @@
 > [!NOTE]
 > **状況**
 > - **実装済み、H2・MariaDB・Oracle でテスト済み:** `where` の条件と `toList()`。lambdaQL は getter をカラムにマッピングし、HQL を書いて実行します。
-> - **これも実装済み:** ソートとページングの中核部分（[4. ソートとページング](04-order-paging.md)）、update/insert/delete/upsert（[7. 更新、挿入、削除](07-dml.md)）、Spring Data JPA モジュール（[12. Spring Data JPA](12-spring-data-jpa.md)）。
-> - **設計済み、まだ実装されていないもの:** サブクエリ、`select`、プロシージャ（5、6、8 章）。
+> - **これも実装済み:** ソートとページングの中核部分（[4. ソートとページング](04-order-paging.md)）、サブクエリ（[5. サブクエリ](05-subquery.md)）、`groupBy`、`having`、`Agg` を使う `select`（[6. 選択、集計、グループ化](06-select-group.md)）、update/insert/delete/upsert（[7. 更新、挿入、削除](07-dml.md)）、Spring Data JPA モジュール（[12. Spring Data JPA](12-spring-data-jpa.md)）。
+> - **設計済み、まだ実装されていないもの:** 派生テーブルと CTE（6 章）、プロシージャ（8 章）。
 > - **(テスト済み)** と書かれた例は、テストスイートからコピーしたものです。この章のそれ以外の HQL は、設計で定めた **予定の** 出力です。細かい部分（たとえば `e0`、`j1` のようなエイリアス名）はまだ変わることがあります。
 
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [2. はじめよう](02-getting-started.md) | 次: [4. ソートとページング](04-order-paging.md) | [このページの Kotlin 版](../kotlin/03-where.md)

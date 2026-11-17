@@ -1,6 +1,39 @@
 plugins {
  	id 'java-library'
 	id 'maven-publish'
+	// Kotlin is used only for tests (ROADMAP D17, KOTLIN.md 7). The published jar has no Kotlin dependency:
+	// kotlin.stdlib.default.dependency=false in gradle.properties keeps kotlin-stdlib out of the main scope.
+	id 'org.jetbrains.kotlin.jvm' version '2.3.21'
+}
+
+// the Spring Boot BOM would pin Kotlin 1.9; the Kotlin tests use the compiler version
+ext['kotlin.version'] = '2.3.21'
+
+// Kotlin tests live in src/test/kotlin as their own source set. They see the compiled Java test classes
+// (the Lombok entities in src/test/java), the same way a user project sees compiled entities.
+sourceSets {
+	// the Kotlin plugin adds src/test/kotlin to the test source set by default; it belongs to kotlinTest here
+	test {
+		kotlin.srcDirs = []
+	}
+	kotlinTest {
+		kotlin.srcDir 'src/test/kotlin'
+		java.srcDirs = []
+		resources.srcDirs = []
+		compileClasspath += sourceSets.main.output + sourceSets.test.output
+		runtimeClasspath += sourceSets.main.output + sourceSets.test.output
+	}
+}
+
+configurations {
+	kotlinTestImplementation.extendsFrom testImplementation
+	kotlinTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+kotlin {
+	compilerOptions {
+		jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+	}
 }
 
 dependencies {
@@ -15,11 +48,11 @@ dependencies {
 
 	// lambdaql-core has no Spring dependency (ROADMAP D34). JPA and Hibernate are given by the user at run time.
 	compileOnly 'jakarta.persistence:jakarta.persistence-api'
+	// Hibernate 6.6 is given by the user at run time; core uses it only for DB function registration (ROADMAP M11)
+	compileOnly 'org.hibernate.orm:hibernate-core'
 	implementation 'org.slf4j:slf4j-api'
 
-	// only the old org.lambdaql.function package uses Lombok (it is replaced by @SqlFunction in M11, ROADMAP D31)
-	compileOnly 'org.projectlombok:lombok:1.18.36'
-	annotationProcessor 'org.projectlombok:lombok:1.18.36'
+	// Lombok only for the test entities (main code has none since the old org.lambdaql.function package was removed)
 	testAnnotationProcessor 'org.projectlombok:lombok:1.18.36'
 
 	//test
@@ -38,10 +71,16 @@ dependencies {
 	testRuntimeOnly 'org.mariadb.jdbc:mariadb-java-client:3.5.6'
 	testRuntimeOnly 'com.oracle.database.jdbc:ojdbc11:23.26.0.0.0'
 
+	// Kotlin tests (src/test/kotlin)
+	kotlinTestImplementation 'org.jetbrains.kotlin:kotlin-stdlib:2.3.21'
+
 }
 
 test{
 	useJUnitPlatform()
+	// the Kotlin tests run in the same task, so -Dlql.db and the SQL files work the same way
+	testClassesDirs += sourceSets.kotlinTest.output.classesDirs
+	classpath += sourceSets.kotlinTest.runtimeClasspath
 	// -Dlql.db=mariadb|oracle makes application-test.yaml import src/test/resources/lql-db-<name>.yaml
 	// (DatabaseSelectionTest fails if the connected database is not the chosen one)
 	systemProperty 'lql.db', System.getProperty('lql.db', 'h2')

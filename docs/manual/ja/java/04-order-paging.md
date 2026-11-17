@@ -4,7 +4,7 @@
 > [!NOTE]
 > **状況**
 > - **中核部分は実装済み、テスト済み**（H2、MariaDB 10.11、Oracle 23.26、Hibernate 6.6.5）: `by.asc`、`by.desc`、`by.sort` を使う `orderBy((o, by) -> ...)`、キーが 1 つの書き方 `orderBy(o -> key)` と `orderBy(key, Direction)`（`Order::getPrice` のような getter のメソッド参照も可）、`Direction.parse` / `reversed`、`limit` / `offset`、`orderBy` の後の `first()`、再利用できるソート `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。Spring の `Sort` と `Pageable` は Spring Data JPA モジュールで使えます（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。
-> - **まだ実装されていないもの:** `SortWhitelist`、結合の書き方 `(o, c, by)`（`SortSpec` でも）、サブクエリの中のソート。
+> - **まだ実装されていないもの:** `SortWhitelist` と結合の書き方 `(o, c, by)`（`SortSpec` でも）。
 > - **(テスト済み)** と書かれた例は、テストスイートからコピーしたものです。この章のそれ以外の HQL も同じルールに従いますが、テストはされていません。
 
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [3. 条件](03-where.md) | 次: [5. サブクエリ](05-subquery.md) | [このページの Kotlin 版](../kotlin/04-order-paging.md)
@@ -749,7 +749,7 @@ assertThrows(IllegalArgumentException.class,
 <a id="411-sorting-inside-subqueries"></a>
 ## 4.11 サブクエリの中のソート
 
-**まだ実装されていません**（サブクエリがまだ実装されていないため）。
+**実装済み**（マイルストーン M8-1、[5. サブクエリ](05-subquery.md) のサブクエリとともに）。MariaDB の `lateral` の書き換えはまだ実装されていません。
 
 サブクエリの中のソートは、`limit`（top-1 または top-N）と一緒に使ったときだけ残ります。
 `limit` がなければ結果は変わらないので、lambdaQL はそのソートを削除し、警告をログに出します。
@@ -773,7 +773,7 @@ assertThrows(IllegalArgumentException.class,
 | S11 | Spring の `Sort.Order` は `Direction` に 1:1 で対応（Spring モジュール。[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) を参照）。`SortWhitelist.parse("price,desc_nulls_last")` | Spring の `Sort` は実装済み、テスト済み（`ignoreCase` はまだサポートしていない）。`SortWhitelist` はまだ実装されていない |
 | S12 | 結合クエリも同じ形: `(o, c, by)`、`(o, c, i, by)` | まだ実装されていない |
 | S13 | メソッド参照は、キーが 1 つの短い書き方でだけ使える。コンパイルはできるが意味が間違っているメソッド参照は拒否される（[9. Java の注意点](09-java-notes.md#99-method-references) を参照） | 実装済み（getter の参照） |
-| S14 | サブクエリのソート: `limit` があれば残し、`limit` がなければ警告を出して削除。データベースの違いは lambdaQL が処理する（5 章を参照） | まだ実装されていない |
+| S14 | サブクエリのソート: `limit` があれば残し、`limit` がなければ警告を出して削除。データベースの違いは lambdaQL が処理する（5 章を参照） | 実装済み（テスト済み）。MariaDB の `lateral` の書き換えはまだ実装されていない |
 
 ---
 

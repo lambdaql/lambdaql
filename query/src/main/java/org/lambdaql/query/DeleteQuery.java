@@ -30,6 +30,16 @@ public class DeleteQuery<T> {
     }
 
     /**
+     * Limits the rows with a condition that can use subqueries: {@code (o, sub) -> ...} (ROADMAP M8).
+     *
+     * @param condition the condition
+     * @return the runnable statement
+     */
+    public ExecutableDelete<T> where(WhereSub<T> condition) {
+        return new ExecutableDelete<>(entityClass, context).where(condition);
+    }
+
+    /**
      * Deletes every row. You must call this on purpose (U5).
      *
      * @return the runnable DELETE

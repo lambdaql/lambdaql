@@ -3,7 +3,7 @@
 > [!NOTE]
 > **Status**
 > - **Core implemented and tested** on H2, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5): `orderBy((o, by) -> ...)` with `by.asc`, `by.desc` and `by.sort`, the one-key forms `orderBy(o -> key)` and `orderBy(key, Direction)` (also with a getter method reference like `Order::getPrice`), `Direction.parse` / `reversed`, `limit` / `offset`, `first()` after `orderBy`, and the reusable sort `SortSpec` (`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`). Spring `Sort` and `Pageable` work in the Spring Data JPA module ([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)).
-> - **Not implemented yet:** `SortWhitelist`, the join forms `(o, c, by)` (also for `SortSpec`) and sorting inside subqueries.
+> - **Not implemented yet:** `SortWhitelist` and the join forms `(o, c, by)` (also for `SortSpec`).
 > - Examples marked **(tested)** are copied from the test suite. The other HQL in this chapter follows the same rules, but it is not tested.
 
 [Java track](README.md) | [Manual home](../README.md) | Previous: [3. Conditions](03-where.md) | Next: [5. Subqueries](05-subquery.md) | [Kotlin version of this page](../kotlin/04-order-paging.md)
@@ -737,7 +737,7 @@ assertThrows(IllegalArgumentException.class,
 
 ## 4.11 Sorting inside subqueries
 
-**Not implemented yet** (subqueries are not implemented yet).
+**Implemented** (milestone M8-1, with the subqueries of [5. Subqueries](05-subquery.md)). The MariaDB `lateral` rewrite is not implemented yet.
 
 A sort inside a subquery is only kept when it is used with `limit` (top-1 or top-N).
 Without `limit`, it does not change the result, so lambdaQL removes it and logs a warning.
@@ -760,7 +760,7 @@ See [5. Subqueries](05-subquery.md#59-sorting-inside-a-subquery).
 | S11 | Spring `Sort.Order` maps 1:1 to `Direction` (Spring module, see [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)). `SortWhitelist.parse("price,desc_nulls_last")` | Spring `Sort` implemented and tested (`ignoreCase` not supported yet). `SortWhitelist` not implemented yet |
 | S12 | Join queries use the same shape: `(o, c, by)`, `(o, c, i, by)` | Not implemented yet |
 | S13 | Method references only in the one-key short form. A method reference that compiles but has the wrong meaning is rejected (see [9. Java notes](09-java-notes.md#99-method-references)) | Implemented (getter references) |
-| S14 | Subquery sorts: kept with `limit`, removed with a warning without `limit`. Database differences are handled for you (see chapter 5) | Not implemented yet |
+| S14 | Subquery sorts: kept with `limit`, removed with a warning without `limit`. Database differences are handled for you (see chapter 5) | Implemented (tested). The MariaDB `lateral` rewrite is not implemented yet |
 
 ---
 

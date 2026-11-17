@@ -1,5 +1,6 @@
 package org.lambdaql.spring;
 
+import org.lambdaql.i18n.LqlMessage;
 import org.lambdaql.query.Direction;
 import org.lambdaql.query.SortSpec;
 import org.springframework.data.domain.Sort;
@@ -39,7 +40,7 @@ public final class SpringSorts {
         SortSpec<T> spec = null;
         for (Sort.Order order : sort) {
             if (order.isIgnoreCase()) {
-                throw new UnsupportedOperationException("ignoreCase sort is not supported yet: " + order.getProperty());
+                throw new UnsupportedOperationException(LqlMessage.IGNORE_CASE_NOT_SUPPORTED.format(order.getProperty()));
             }
             String path = PropertyPath.from(order.getProperty(), type).toDotPath();
             SortSpec<T> part = SortSpec.ofPath(type, path, direction(order));

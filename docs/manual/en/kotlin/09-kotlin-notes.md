@@ -38,7 +38,7 @@ How to read the examples:
 
 - The comment under an example shows the HQL that lambdaQL makes, when the design states it.
 - Constants written in the lambda (numbers, strings, booleans, `null`, enum constants, `const val`) are written into the HQL as literals. Captured and computed values are always bind parameters (`:p1`, `:p2`, ...) (D37).
-- `e0` is the alias of the root entity, and `j1` is the alias of the join that lambdaQL adds for an association path: an inner `join` in `where` by default (a `left join` when a null guard keeps rows without the association), and a `left join` when the path is used only in `orderBy` or `select` (D36). Examples of planned features (`select`, update, subqueries) still use the planned aliases `o` and `c1`.
+- `e0` is the alias of the root entity, and `j1` is the alias of the join that lambdaQL adds for an association path: an inner `join` in `where` by default (a `left join` when a null guard keeps rows without the association), and a `left join` when the path is used only in `orderBy` or `select` (D36). A subquery root is `s1`, `s2`, ... (see [5. Subqueries](05-subquery.md)). Examples of planned features (derived tables, CTEs, procedures) still use the planned aliases `o` and `c1`.
 - Entities are the ones from [2. Getting started](02-getting-started.md#example-entities). Some examples use two extra properties on `Order`: `var flag: Boolean? = null` and `var kind: OrderKind? = null` (with `enum class OrderKind { NORMAL, EXPRESS, GIFT }`).
 
 ---

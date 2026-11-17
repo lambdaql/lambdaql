@@ -1,7 +1,7 @@
 package org.lambdaql.engine.load;
 
 import org.junit.jupiter.api.Test;
-import org.lambdaql.analyzer.LambdaAnalysisException;
+import org.lambdaql.LambdaQLException;
 import org.lambdaql.query.Order;
 import org.lambdaql.query.SelectQuery.Where;
 import org.objectweb.asm.Type;
@@ -57,8 +57,9 @@ class LoadExamplesTest {
     void notSerializable() {
         // @start region="not-serializable"
         java.util.function.Predicate<Order> notSerializable = o -> o.isActive();
-        assertThrows(LambdaAnalysisException.class,
+        LambdaQLException e = assertThrows(LambdaQLException.class,
                 () -> SerializedLambdaExtractor.extract(notSerializable));
+        assertEquals("LQL-1002", e.code());   // check the code, not the text (the text depends on the language)
         // @end
     }
 
@@ -88,7 +89,7 @@ class LoadExamplesTest {
     @Test
     void loadUnknownMethod() {
         // @start region="load-missing"
-        assertThrows(LambdaAnalysisException.class, () -> BytecodeLoader.load(
+        assertThrows(LambdaQLException.class, () -> BytecodeLoader.load(
                 getClass().getClassLoader(), "org/lambdaql/query/Order", "noSuchMethod", "()V"));
         // @end
     }

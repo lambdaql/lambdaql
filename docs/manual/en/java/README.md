@@ -7,7 +7,8 @@
 > The **analysis core**, **`where` with the result functions** (`toList()`, `toSet()`, `first()`, `one()`, `count()`, `exists()`) and the core of **sorting and paging** (`orderBy`, `limit`, `offset`, `SortSpec`) are implemented: lambdaQL loads a lambda, decodes it, writes the HQL and runs it. This is tested on H2, MariaDB and Oracle.
 > **Update, insert, delete and upsert** are implemented too, with `limit` and the one-row protection `executeOne()` (tested on H2, MariaDB and Oracle).
 > The **Spring Data JPA module** is implemented too: the repository executor `LambdaQlExecutor<T>` (with Spring `Sort`, `Pageable`, the DML shortcuts such as `deleteAll(where)` and `updateOne(where, set)`, and the update, delete, insert and upsert builders) and the Spring Boot auto-configuration (tested with Spring Boot 3.4.2). DML needs the caller's transaction.
-> Everything else in this track (subqueries, `select`, procedures, and subqueries and aggregates in update/insert) is **designed**: the syntax and rules are decided and were checked with prototypes on H2, MariaDB and Oracle, but the code is not in the library yet.
+> **Subqueries** (`where((o, sub) -> ...)`, also in update and delete) and **`select`** (records and DTOs, `groupBy`, `having`, the `Agg` aggregates, also in `insert ... select`) are implemented too (tested on H2, MariaDB and Oracle).
+> Everything else in this track (derived tables, CTEs, procedures) is **designed**: the syntax and rules are decided and were checked with prototypes on H2, MariaDB and Oracle, but the code is not in the library yet.
 > No artifact is published to Maven Central yet. To try it, [build from source](02-getting-started.md#build-from-source).
 
 [Manual home](../README.md) | [Kotlin track](../kotlin/README.md) | Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -62,7 +63,7 @@ fetch first ? rows only
 
 > [!NOTE]
 > **About the examples.**
-> Examples are design examples. When a feature is implemented, its examples are replaced by code taken from the test suite, with a link to the test file. In [3. Conditions](03-where.md), [4. Sorting and paging](04-order-paging.md), [7. Update, insert, delete](07-dml.md) and [12. Spring Data JPA](12-spring-data-jpa.md), these examples are marked **(tested)**.
+> Examples are design examples. When a feature is implemented, its examples are replaced by code taken from the test suite, with a link to the test file. In [3. Conditions](03-where.md), [4. Sorting and paging](04-order-paging.md), [5. Subqueries](05-subquery.md), [6. Select, aggregates and group by](06-select-group.md), [7. Update, insert, delete](07-dml.md) and [12. Spring Data JPA](12-spring-data-jpa.md), these examples are marked **(tested)**.
 
 ## Contents
 
@@ -94,10 +95,10 @@ The pages marked "common" are shared by the Java and Kotlin tracks. They have sm
 | HQL rendering and running queries (`where`, `toList()`) | Implemented, tested on H2, MariaDB, Oracle | [3](03-where.md) |
 | Result functions (`first()`, `one()`, `count()`, `exists()`, `toSet()`) | Implemented, tested on H2, MariaDB, Oracle | [2](02-getting-started.md#getting-the-result) |
 | Sorting and paging (`orderBy`, `limit`, `offset`) | Core implemented, tested on H2, MariaDB, Oracle, including `SortSpec`. `SortWhitelist` and join sorts (also the join form of `SortSpec`): designed | [4](04-order-paging.md) |
-| Subqueries (`exists`, `contains`, scalar, correlated) | Designed | [5](05-subquery.md) |
-| Projection, `groupBy`, `having`, aggregates (`Agg`) | Designed | [6](06-select-group.md) |
+| Subqueries (`exists`, `contains`, scalar, correlated) | Implemented, tested on H2, MariaDB, Oracle. The MariaDB `lateral` rewrite: not implemented yet | [5](05-subquery.md) |
+| Projection, `groupBy`, `having`, aggregates (`Agg`) | Implemented, tested on H2, MariaDB, Oracle, including `distinct()` and the result functions. Sorting by an aggregate: v0.2 candidate | [6](06-select-group.md) |
 | Derived tables and CTE (`qb.from(sub -> ...)`, `qb.with(...)`) | Designed | [6](06-select-group.md) |
-| `update`, `insert`, `delete`, upsert | Implemented, tested on H2, MariaDB, Oracle, including `limit` and `executeOne()`. Subqueries (`sub`) in DML and aggregates in `insert ... select`: designed | [7](07-dml.md) |
+| `update`, `insert`, `delete`, upsert | Implemented, tested on H2, MariaDB, Oracle, including `limit` and `executeOne()`. Subqueries (`sub`) in the `where` of update and delete and aggregates in `insert ... select`: implemented. Subqueries in `set` values: designed | [7](07-dml.md) |
 | Stored procedures and DB functions | Designed | [8](08-procedures-functions.md) |
 | Error codes and messages in 4 languages | Designed | [11](../11-errors-and-languages.md) |
 | Spring Data JPA (`LambdaQlExecutor<T>`, Spring `Sort` / `Pageable`, Spring Boot auto-configuration) | Implemented, tested on H2, MariaDB, Oracle with Spring Boot 3.4.2, including the DML shortcuts (`deleteAll`, `updateOne`, ...) and the update, delete, insert and upsert builders. Spring Boot 4: not verified yet | [12](12-spring-data-jpa.md) |

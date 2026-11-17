@@ -33,7 +33,7 @@ public class UpdateQuery<T> {
      *
      * @param assign the assignment lambda
      * @return the next step: more {@code set}, then {@code where} or {@code all}
-     * @throws org.lambdaql.analyzer.LambdaAnalysisException if the lambda breaks a rule (U1, U3, U4, U6)
+     * @throws org.lambdaql.LambdaAnalysisException if the lambda breaks a rule (U1, U3, U4, U6)
      */
     public UpdateSet<T> set(Assign<T> assign) {
         return new UpdateSet<>(entityClass, context).set(assign);
@@ -47,7 +47,7 @@ public class UpdateQuery<T> {
      *
      * @param assign the assignment lambda
      * @return the next step
-     * @throws org.lambdaql.analyzer.LambdaAnalysisException if the lambda breaks a rule
+     * @throws org.lambdaql.LambdaAnalysisException if the lambda breaks a rule
      */
     public UpdateSet<T> set(AssignBy<T> assign) {
         return new UpdateSet<>(entityClass, context).set(assign);

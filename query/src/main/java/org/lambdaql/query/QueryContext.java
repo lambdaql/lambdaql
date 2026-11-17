@@ -1,5 +1,6 @@
 package org.lambdaql.query;
 
+import org.lambdaql.i18n.LqlMessage;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.lambdaql.engine.decode.ConditionReducer;
@@ -45,6 +46,9 @@ public final class QueryContext {
     private final Map<Class<?>, List<SortItem>> sortCache = new ConcurrentHashMap<>();
     private final Map<Class<?>, Expr> sortKeyCache = new ConcurrentHashMap<>();
     private final Map<Class<?>, List<Assignment>> assignCache = new ConcurrentHashMap<>();
+    private final Map<Class<?>, org.lambdaql.engine.sem.SelectReader.Projection> selectCache = new ConcurrentHashMap<>();
+    private final Map<Class<?>, List<Expr>> groupCache = new ConcurrentHashMap<>();
+    private final Map<Class<?>, Pred> havingCache = new ConcurrentHashMap<>();
 
     /**
      * Creates a context.
@@ -56,6 +60,67 @@ public final class QueryContext {
         this.emf = emf;
         this.sharedEntityManager = sharedEntityManager;
         this.model = new JpaEntityModel(sharedEntityManager != null ? sharedEntityManager.getMetamodel() : emf.getMetamodel());
+    }
+
+    /**
+     * Checks the database functions in an analysis result once, when it goes into the cache:
+     * a function with its own SQL name must be registered, and a name must not be a Hibernate built-in (FN8).
+     */
+    private <X> X checked(X analyzed) {
+        for (Expr.Func f : org.lambdaql.engine.sem.SqlFunctions.calls(analyzed)) {
+            if (org.lambdaql.engine.sem.SqlFunctions.isRegistered(f.key())) continue;
+            if (!f.sql().equals(f.key())) throw LqlMessage.FUNCTION_NOT_REGISTERED.exception(f.key());
+            if (HibernateFunctions.isKnown(factory(), f.key())) throw LqlMessage.FUNCTION_BUILTIN_NAME.exception(f.key());
+        }
+        return analyzed;
+    }
+
+    private EntityManagerFactory factory() {
+        return emf != null ? emf : sharedEntityManager.getEntityManagerFactory();
+    }
+
+    private final Map<Class<?>, org.lambdaql.engine.sem.ProcedureReader.ProcCall> procCache = new ConcurrentHashMap<>();
+    private final Map<Class<?>, org.lambdaql.engine.sem.ProcedureReader.FnCall> fnCache = new ConcurrentHashMap<>();
+
+    /**
+     * Runs a procedure call (ROADMAP M11, D30): analysis is cached per lambda class, the argument values are computed
+     * on every run. With an {@code EntityManagerFactory} the call gets its own transaction; with a shared entity
+     * manager it runs in the caller's transaction, or with auto-commit when there is none (PR9).
+     *
+     * @param procs   the stub interface
+     * @param lambda  the call lambda
+     * @param returns {@code true} for {@code call}, {@code false} for {@code exec}
+     * @return the result
+     */
+    Object procedure(Class<?> procs, Object lambda, boolean returns) {
+        LambdaRef ref = read(lambda);
+        var call = procCache.computeIfAbsent(ref.lambdaClass(), k -> org.lambdaql.engine.sem.ProcedureReader.readCall(ref, procs, returns));
+        Object[] values = hostValues(call.args(), ref);
+        return procedureWork(em -> ProcedureRunner.call(em, model, call, values, !returns));
+    }
+
+    /**
+     * Runs a database function on its own (ROADMAP M11, PR6).
+     *
+     * @param lambda the call lambda {@code () -> Fns.f(x)}
+     * @return the function value
+     */
+    Object function(Object lambda) {
+        LambdaRef ref = read(lambda);
+        var call = fnCache.computeIfAbsent(ref.lambdaClass(), k -> checked(org.lambdaql.engine.sem.ProcedureReader.readFunction(ref)));
+        Object[] values = hostValues(call.args(), ref);
+        return procedureWork(em -> ProcedureRunner.function(em, call, values));
+    }
+
+    private static Object[] hostValues(List<Expr> args, LambdaRef ref) {
+        var evaluator = new org.lambdaql.engine.sem.HostEvaluator(ref.classLoader());
+        Object[] captured = ref.capturedArgs();
+        return args.stream().map(a -> evaluator.eval(a, captured)).toArray();
+    }
+
+    private <R> R procedureWork(Function<EntityManager, R> work) {
+        if (sharedEntityManager != null) return work.apply(sharedEntityManager);
+        return inTransaction(work);
     }
 
     /**
@@ -76,13 +141,12 @@ public final class QueryContext {
      */
     Pred analyzeWhere(LambdaRef ref, List<Class<?>> roots) {
         if (!ref.isLambdaBody()) {
-            throw new org.lambdaql.analyzer.LambdaAnalysisException(
-                    "메서드 레퍼런스는 아직 지원하지 않습니다(M7). 람다로 쓰세요: " + ref.describe());
+            throw LqlMessage.METHOD_REFERENCE_IN_WHERE.exceptionAt(ref.describe());
         }
         return whereCache.computeIfAbsent(ref.lambdaClass(), k -> {
             var graph = Decoder.decodePredicate(ref, BytecodeLoader.load(ref));
             Pred pred = ConditionReducer.reduce(graph, ref.describe());
-            return Normalizer.normalize(pred, roots, model, ref.classLoader(), ref.describe());
+            return checked(Normalizer.normalize(pred, roots, model, ref.classLoader(), ref.describe()));
         });
     }
 
@@ -95,7 +159,7 @@ public final class QueryContext {
      * @return the sort keys
      */
     List<SortItem> analyzeSortBy(LambdaRef ref, List<Class<?>> roots) {
-        return sortCache.computeIfAbsent(ref.lambdaClass(), k -> SortReader.readSortBy(ref, roots, model));
+        return sortCache.computeIfAbsent(ref.lambdaClass(), k -> checked(SortReader.readSortBy(ref, roots, model)));
     }
 
     /**
@@ -106,7 +170,63 @@ public final class QueryContext {
      * @return the normalized key
      */
     Expr analyzeSortKey(LambdaRef ref, Class<?> root) {
-        return sortKeyCache.computeIfAbsent(ref.lambdaClass(), k -> SortReader.readSortKey(ref, root, model));
+        return sortKeyCache.computeIfAbsent(ref.lambdaClass(), k -> checked(SortReader.readSortKey(ref, root, model)));
+    }
+
+    /**
+     * Analyzes a select lambda (cached per lambda class).
+     *
+     * @param ref   the lambda
+     * @param roots entity class of each entity parameter
+     * @return the projection
+     */
+    org.lambdaql.engine.sem.SelectReader.Projection analyzeSelect(LambdaRef ref, List<Class<?>> roots) {
+        return selectCache.computeIfAbsent(ref.lambdaClass(), k -> checked(org.lambdaql.engine.sem.SelectReader.readSelect(ref, roots, model)));
+    }
+
+    /**
+     * Analyzes a groupBy lambda (cached per lambda class).
+     *
+     * @param ref   the lambda
+     * @param roots entity class of each entity parameter
+     * @return the group keys
+     */
+    List<Expr> analyzeGroupKeys(LambdaRef ref, List<Class<?>> roots) {
+        return groupCache.computeIfAbsent(ref.lambdaClass(), k -> checked(org.lambdaql.engine.sem.SelectReader.readGroupKeys(ref, roots, model)));
+    }
+
+    /**
+     * Analyzes a having lambda: a condition where {@code Agg} calls are allowed (cached per lambda class).
+     *
+     * @param ref   the lambda
+     * @param roots entity class of each entity parameter
+     * @return the condition
+     */
+    Pred analyzeHaving(LambdaRef ref, List<Class<?>> roots) {
+        return havingCache.computeIfAbsent(ref.lambdaClass(), k -> {
+            var graph = Decoder.decodePredicate(ref, BytecodeLoader.load(ref));
+            Pred pred = ConditionReducer.reduce(graph, ref.describe());
+            return checked(Normalizer.normalize(pred, roots, model, ref.classLoader(), ref.describe(), true));
+        });
+    }
+
+    /**
+     * Runs a rendered query without a result class: one column gives values, many columns give {@code Object[]}.
+     *
+     * @param query  the HQL and parameters
+     * @param offset rows to skip
+     * @param limit  most rows, or null
+     * @return the rows
+     */
+    List<?> rows(RenderedQuery query, int offset, Integer limit) {
+        if (limit != null && limit == 0) return List.of();
+        return withEntityManager(em -> {
+            var q = em.createQuery(query.hql());
+            query.parameters().forEach(q::setParameter);
+            if (offset > 0) q.setFirstResult(offset);
+            if (limit != null) q.setMaxResults(limit);
+            return q.getResultList();
+        });
     }
 
     /**
@@ -118,7 +238,22 @@ public final class QueryContext {
      * @return the assignments
      */
     List<Assignment> analyzeSetters(LambdaRef ref, List<Class<?>> roots, int hostParam) {
-        return assignCache.computeIfAbsent(ref.lambdaClass(), k -> AssignmentReader.readSetters(ref, roots, hostParam, model));
+        return analyzeSetters(ref, roots, hostParam, false);
+    }
+
+    /**
+     * Analyzes a setter-form assignment lambda; {@code Agg} calls are allowed when {@code aggregates} is true
+     * (cached per lambda class).
+     *
+     * @param ref        the lambda
+     * @param roots      entity class of each entity parameter (parameter 0 is the target)
+     * @param hostParam  a parameter read in Java (the list element), or -1
+     * @param aggregates {@code true} for INSERT ... SELECT with aggregates
+     * @return the assignments
+     */
+    List<Assignment> analyzeSetters(LambdaRef ref, List<Class<?>> roots, int hostParam, boolean aggregates) {
+        return assignCache.computeIfAbsent(ref.lambdaClass(),
+                k -> checked(AssignmentReader.readSetters(ref, roots, hostParam, model, aggregates)));
     }
 
     /**
@@ -129,7 +264,7 @@ public final class QueryContext {
      * @return the assignments
      */
     List<Assignment> analyzeBuilder(LambdaRef ref, List<Class<?>> roots) {
-        return assignCache.computeIfAbsent(ref.lambdaClass(), k -> AssignmentReader.readBuilder(ref, roots, model));
+        return assignCache.computeIfAbsent(ref.lambdaClass(), k -> checked(AssignmentReader.readBuilder(ref, roots, model)));
     }
 
     /**
@@ -162,7 +297,7 @@ public final class QueryContext {
             q.setMaxResults(2);
             List<?> found = q.getResultList();
             if (found.size() > 1) {
-                throw new NonUniqueResultException("조건에 맞는 행이 2개 이상이라 아무것도 바꾸지 않았습니다(1행 보호): " + ids.hql());
+                throw new NonUniqueResultException(LqlMessage.MORE_THAN_ONE_ROW_CHANGED.format(ids.hql()));
             }
             if (found.isEmpty()) return 0;
             return run(em, List.of(byId.apply(found.get(0))));
@@ -191,7 +326,7 @@ public final class QueryContext {
     private <R> R inTransaction(Function<EntityManager, R> work) {
         if (sharedEntityManager != null) {
             if (!inTransaction(sharedEntityManager)) {
-                throw new TransactionRequiredException("UPDATE·INSERT·DELETE에는 트랜잭션이 필요합니다(@Transactional 안에서 실행하세요)");
+                throw new TransactionRequiredException(LqlMessage.TRANSACTION_REQUIRED.format());
             }
             return work.apply(sharedEntityManager);
         }

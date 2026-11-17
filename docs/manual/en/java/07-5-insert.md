@@ -2,9 +2,9 @@
 # 7.5 Insert (Java)
 
 > [!NOTE]
-> **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10).
-> **Not implemented yet:** aggregates in `insert ... select` (milestone M9) and the `by.set` form of `insert ... select`.
-> Examples marked **(tested)** are copied from [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java). The other examples follow the design and are not covered by a test yet.
+> **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10), including `groupBy`, `having` and `Agg` in `insert ... select` (milestone M9).
+> **Not implemented yet:** the `by.set` form of `insert ... select`.
+> Examples marked **(tested)** are copied from [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) and [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java). The other examples follow the design and are not covered by a test yet.
 > See the [Java track README](README.md#status) for the full status.
 
 [7. Update, insert, delete (Java)](07-dml.md) | [7.2 Update](07-2-update.md) | [7.4 Delete](07-4-delete.md) | **7.5 Insert** | [7.6 Upsert](07-6-upsert.md) | [Kotlin](../kotlin/07-5-insert.md)
@@ -25,7 +25,7 @@ int inserted = i.execute();
 int generated = qb.insert(IdOrder.class).values(o -> { o.setPrice(1.0); o.setStatus(1); }).execute();
 ```
 
-**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 6.6.5, and it fails if Hibernate's SQL changes. Blocks marked **(planned)** come from [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) instead. It gives the planned HQL to Hibernate directly, because lambdaQL does not make these statements yet.
+**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 6.6.5, and it fails if Hibernate's SQL changes.
 
 **SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `insert`:
 
@@ -110,24 +110,38 @@ qb.insert(Archive.class).from(Order.class).where(o -> o.getStatus() == 9)
 
 ## Insert ... select with aggregates
 
-Use `groupBy` and the `Agg` functions from [6. Select, aggregates and group by](06-select-group.md).
-This form is **not implemented yet** (milestone M9):
+Use `groupBy`, `having` and the `Agg` functions from [6. Select, aggregates and group by](06-select-group.md).
+The order is `from(...)`, `where(...)`, `groupBy(...)`, `having(...)`, `select(...)`. `where`, `groupBy` and `having` are optional.
+
+**(tested)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), region `insert-group`:
 
 ```java
-qb.insert(Summary.class).from(Order.class).groupBy(o -> o.getCustomer().getId())
-  .select((s, o) -> { s.setCustomerId(o.getCustomer().getId()); s.setTotal(Agg.sum(o.getPrice())); s.setCnt(Agg.count()); })
-  .execute();
+// INSERT ... SELECT with groupBy: one summary row per customer
+ExecutableInsert<Summary> i = qb.insert(Summary.class)
+        .from(Order.class)
+        .where(o -> o.getCustomer() != null)
+        .groupBy(o -> o.getCustomer().getId())
+        .having(o -> Agg.count() >= 2)
+        .select((s, o) -> { s.setCustomerId(o.getCustomer().getId()); s.setTotal(Agg.sum(o.getPrice())); s.setCnt(Agg.count()); });
+assertEquals("insert into Summary (customerId, total, cnt) select e0.customer.id, sum(e0.price), count(*) from Order e0"
+        + " where e0.customer is not null group by e0.customer.id having count(*) >= 2L", i.toHql().get(0).hql());
 ```
 
-**SQL by database (planned)** — Hibernate's translation of the planned HQL, recorded by `PlannedSqlTest`; lambdaQL does not make this query yet. From `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql), example `07-insert-group`:
+**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `insert-group`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
 insert into summary(customer_id,total,cnt)
 select o1_0.customer_id,sum(o1_0.price),count(*)
 from orders o1_0
+where o1_0.customer_id is not null
 group by o1_0.customer_id
+having count(*)>=2
 ```
+
+- Every value without an aggregate must be a `groupBy` key (rule J3). Otherwise lambdaQL throws `LambdaAnalysisException` at analysis time.
+- `Agg` is not allowed in `where`. Use `having`.
+- The test runs the statement and reads the `Summary` rows back. They match the same grouping in Java.
 
 ---
 

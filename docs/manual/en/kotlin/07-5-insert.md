@@ -2,9 +2,9 @@
 # 7.5 Insert (Kotlin)
 
 > [!NOTE]
-> **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10). The tests use **Java** lambdas. **Kotlin lambdas in DML are not tested yet.**
-> **Not implemented yet:** aggregates in `insert ... select` (milestone M9) and the `by.set` form of `insert ... select`.
-> The Kotlin code shows the tested Java statements in Kotlin syntax, and the HQL comes from the Java tests in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java). Examples without HQL follow the design.
+> **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10), including `groupBy`, `having` and `Agg` in `insert ... select` (milestone M9). The tests use **Java** lambdas. **Kotlin lambdas in DML are not tested yet.**
+> **Not implemented yet:** the `by.set` form of `insert ... select`.
+> The Kotlin code shows the tested Java statements in Kotlin syntax, and the HQL comes from the Java tests in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) and [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java). Examples without HQL follow the design.
 > See the [track README](README.md) for the full status.
 
 [7. Update, insert, delete (Kotlin)](07-dml.md) | [7.2 Update](07-2-update.md) | [7.4 Delete](07-4-delete.md) | **7.5 Insert** | [7.6 Upsert](07-6-upsert.md) | [Java](../java/07-5-insert.md)
@@ -23,7 +23,7 @@ val inserted = i.execute()
 val generated = qb.insert(IdOrder::class.java).values { it.price = 1.0; it.status = 1 }.execute()
 ```
 
-**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 6.6.5, and it fails if Hibernate's SQL changes. The test uses Java lambdas. A Kotlin lambda with the same meaning gives the same HQL, so it gets the same SQL. Blocks marked **(planned)** come from [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) instead. It gives the planned HQL to Hibernate directly, because lambdaQL does not make these statements yet.
+**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 6.6.5, and it fails if Hibernate's SQL changes. The test uses Java lambdas. A Kotlin lambda with the same meaning gives the same HQL, so it gets the same SQL.
 
 **SQL by database (from the Java test run; Kotlin gives the same HQL)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `insert`:
 
@@ -105,24 +105,37 @@ qb.insert(Archive::class.java).from(Order::class.java).where { it.status == 9 }
 
 ## Insert ... select with aggregates
 
-Use `groupBy` and the `Agg` functions from [6. Select, aggregates and group by](06-select-group.md).
-This form is **not implemented yet** (milestone M9):
+Use `groupBy`, `having` and the `Agg` functions from [6. Select, aggregates and group by](06-select-group.md).
+The order is `from(...)`, `where { }`, `groupBy { }`, `having { }`, `select { }`. `where`, `groupBy` and `having` are optional.
 
 ```kotlin
-qb.insert(Summary::class.java).from(Order::class.java).groupBy { it.customer?.id }
+// INSERT ... SELECT with groupBy: one summary row per customer
+val i = qb.insert(Summary::class.java)
+    .from(Order::class.java)
+    .where { it.customer != null }
+    .groupBy { it.customer?.id }
+    .having { Agg.count() >= 2 }
     .select { s, o -> s.customerId = o.customer?.id; s.total = Agg.sum(o.price); s.cnt = Agg.count() }
-    .execute()
+// HQL: insert into Summary (customerId, total, cnt) select e0.customer.id, sum(e0.price), count(*) from Order e0
+//      where e0.customer is not null group by e0.customer.id having count(*) >= 2L
 ```
 
-**SQL by database (planned)** — Hibernate's translation of the planned HQL, recorded by `PlannedSqlTest`; lambdaQL does not make this query yet. From `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql), example `07-insert-group`:
+The same statement is tested in Java in [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) (region `insert-group`).
+
+**SQL by database (from the Java test run; Kotlin gives the same HQL)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `insert-group`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
 insert into summary(customer_id,total,cnt)
 select o1_0.customer_id,sum(o1_0.price),count(*)
 from orders o1_0
+where o1_0.customer_id is not null
 group by o1_0.customer_id
+having count(*)>=2
 ```
+
+- Every value without an aggregate must be a `groupBy` key (rule J3). Otherwise lambdaQL throws `LambdaAnalysisException` at analysis time.
+- `Agg` is not allowed in `where`. Use `having`.
 
 ---
 

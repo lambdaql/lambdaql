@@ -3,8 +3,9 @@
 
 > [!NOTE]
 > **状況: 実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、マイルストーン M10）。`limit` と `executeOne()` も含みます（決定 D41）。
-> **まだ実装されていません:** `where` の中の `sub` サブクエリ（マイルストーン M8）、複合キーのエンティティでの `limit` / `executeOne()`。
-> **(テスト済み)** と書かれた例は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) からコピーしたものです。それ以外の例は設計に従っており、まだテストで確認していません。
+> `where` の中のサブクエリ（`sub`）も実装済み、テスト済みです（マイルストーン M8）。
+> **まだ実装されていません:** 複合キーのエンティティでの `limit` / `executeOne()`。
+> **(テスト済み)** と書かれた例は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) と [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) からコピーしたものです。それ以外の例は設計に従っており、まだテストで確認していません。
 > 全体の状況は [Java トラックの README](README.md#status) を参照してください。
 
 [7. 更新、挿入、削除（Java）](07-dml.md) | [7.2 更新](07-2-update.md) | **7.4 削除** | [7.5 挿入](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Kotlin](../kotlin/07-4-delete.md)
@@ -24,7 +25,7 @@ assertEquals("delete from Order e0 where (select s1.name from Customer s1 where 
         + " and e0.customer.id is not null", byName.toHql().hql());
 ```
 
-**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。 **（予定）** と書かれたブロックは [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) から取っています。lambdaQL はまだこれらの文を作らないので、このテストが予定の HQL を Hibernate に直接渡します。
+**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。
 
 **データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `delete`:
 
@@ -68,15 +69,18 @@ id のリストで削除する（キャプチャしたコレクション、決�
 qb.delete(Item.class).where(i -> ids.contains(i.getId())).execute();
 ```
 
-`where` の中のサブクエリには `sub` が必要です（まだ実装されていません、マイルストーン M8）。
+`where` の中のサブクエリは、[5. サブクエリ](05-subquery.md) と同じように 2 つ目のラムダ引数 `sub` を使います。
+品目を持たない注文を削除します。
+
+**(テスト済み)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)、リージョン `dml-subquery`:
 
 ```java
-qb.delete(Order.class)
-  .where((o, sub) -> !sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists())
-  .execute();
+ExecutableDelete<Order> d = qb.delete(Order.class)
+        .where((o, sub) -> !sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists());
+assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)", d.toHql().hql());
 ```
 
-**データベースごとの SQL（予定）** — 予定の HQL を Hibernate が変換したもので、`PlannedSqlTest` が記録しました。lambdaQL はまだこのクエリを作りません。`expected-sql/` の [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)、例 `07-delete-not-exists`:
+**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `dml-subquery`:
 
 ```sql
 -- H2, Oracle

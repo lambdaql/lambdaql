@@ -1,5 +1,6 @@
 package org.lambdaql.query;
 
+import org.lambdaql.i18n.LqlMessage;
 import org.lambdaql.engine.render.HqlRenderer;
 import org.lambdaql.engine.render.RenderedQuery;
 
@@ -58,7 +59,7 @@ public class OrderedSelectQuery<T> {
      * @throws IllegalArgumentException if {@code count} is negative
      */
     public OrderedSelectQuery<T> limit(int count) {
-        if (count < 0) throw new IllegalArgumentException("limit must be 0 or more: " + count);
+        if (count < 0) throw new IllegalArgumentException(LqlMessage.LIMIT_NEGATIVE.format(count));
         this.limit = count;
         return this;
     }
@@ -74,7 +75,7 @@ public class OrderedSelectQuery<T> {
      * @throws IllegalArgumentException if {@code count} is negative
      */
     public OrderedSelectQuery<T> offset(int count) {
-        if (count < 0) throw new IllegalArgumentException("offset must be 0 or more: " + count);
+        if (count < 0) throw new IllegalArgumentException(LqlMessage.OFFSET_NEGATIVE.format(count));
         this.offset = count;
         return this;
     }
@@ -139,5 +140,23 @@ public class OrderedSelectQuery<T> {
      */
     public SequencedSet<T> toSet() {
         return DmlParts.toSet(toList());
+    }
+
+    /**
+     * Selects values in this order: {@code orderBy(...).select(o -> o.getPrice())}.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+     * {@snippet class="org.lambdaql.query.ProjectionTest" region="value"}
+     *
+     * @param clause the select lambda
+     * @param <R>    the value type
+     * @return the value query (with this order, limit and offset)
+     */
+    public <R> ValueQuery<R> select(SelectQuery.Select<T, R> clause) {
+        var ref = QueryContext.read(clause);
+        var projection = context.analyzeSelect(ref, List.of(entityClass));
+        org.lambdaql.engine.sem.SelectReader.checkGrouping(projection.columns(), List.of(), List.of(), ref.describe());
+        return new ValueQuery<>(entityClass, context, wheres, projection, ref.capturedArgs(), ref.classLoader(), null, List.of(),
+                sorts, limit, offset);
     }
 }

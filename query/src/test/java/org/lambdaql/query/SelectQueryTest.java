@@ -4,7 +4,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.lambdaql.analyzer.LambdaAnalysisException;
+import org.lambdaql.LambdaQLException;
 import org.lambdaql.engine.render.RenderedQuery;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -211,7 +211,7 @@ class SelectQueryTest {
         assertEquals(javaIds(o -> o.getPrice() > min2),
                 ids(qb.from(Order.class).where(o -> min2 == null || o.getPrice() > min2).toList()));
         // without the guard first, Java throws NullPointerException, so lambdaQL throws too
-        assertThrows(LambdaAnalysisException.class,
+        assertThrows(LambdaQLException.class,
                 () -> qb.from(Order.class).where(o -> o.getPrice() > min || min == null).toHql());
         // the guard with AND: no rows, and the compare is never rendered
         assertEquals("select e0 from Order e0 where 1=0",
@@ -315,7 +315,7 @@ class SelectQueryTest {
     @Test
     void unsupportedCallIsRejected() {
         // @start region="rejected"
-        assertThrows(LambdaAnalysisException.class,
+        assertThrows(LambdaQLException.class,
                 () -> qb.from(Order.class).where(o -> o.getDescription().trim().equals("a")));
         // @end
     }

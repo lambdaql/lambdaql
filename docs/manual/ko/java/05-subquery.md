@@ -3,9 +3,9 @@
 
 > [!NOTE]
 > **상태**
-> - **설계됨, 아직 구현되지 않음**(마일스톤 M8).
-> - 문법은 Java에서 컴파일되며, 바이트코드는 프로토타입으로 확인했습니다. SQL 형태는 Hibernate 6.6.5로 H2 2.3, MariaDB 10.11, Oracle 23ai에서 확인했습니다.
-> - 이 장의 HQL은 **예정된** 출력입니다.
+> - **구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, Hibernate 6.6.5, 마일스톤 M8-1): 조회, 수정, 삭제의 `where((o, sub) -> ...)` 안의 서브쿼리. `exists` / `not exists`, `contains`(IN), `!contains`(NOT EXISTS로 작성), 스칼라 집계(`count`, `sum`, `avg`, `min`, `max`), top-1 형태 `orderBy(...).limit(1)...first()`, 상관 서브쿼리와 중첩 서브쿼리, 캡처 값을 포함합니다.
+> - **아직 구현되지 않음:** `from` 안의 서브쿼리(파생 테이블)와 CTE(마일스톤 M8-2), `set` 값 안의 서브쿼리, MariaDB `lateral` 재작성.
+> - **(테스트됨)** 표시가 있는 예제는 테스트 코드에서 그대로 가져온 것입니다. 나머지 예제는 같은 규칙을 따르지만 테스트가 없습니다.
 
 [Java 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [4. 정렬과 페이징](04-order-paging.md) | 다음: [6. 조회, 집계, 그룹화](06-select-group.md) | [이 페이지의 Kotlin 버전](../kotlin/05-subquery.md)
 
@@ -44,23 +44,29 @@ lambdaQL은 인자의 개수로 두 형태를 구분합니다.
 
 안쪽 람다(`sub.from(...).where(...)` 안의 `i -> ...`)는 따로 `Serializable`일 필요가 없습니다. lambdaQL은 바깥 람다의 바이트코드에서 이를 찾습니다.
 
+HQL에서 서브쿼리 루트의 별칭은 `s1`, `s2`, ...입니다(바깥 루트는 `e0`). 서브쿼리 안의 조인은 `s1j1` 같은 별칭을 받습니다.
+
+**(테스트됨)** 표시가 있는 예제는 [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)에서 그대로 가져온 것입니다.
+이 테스트는 HQL을 확인하고, 쿼리를 실행하고, 같은 필터를 Java로 적용한 결과와 행을 비교합니다. H2, MariaDB, Oracle에서 통과합니다.
+테스트는 [3.3](03-where.md#33-basic-form)의 테스트 엔티티를 사용합니다. `price`는 `double`, `status`는 `short`, `Customer.id`는 `int`이고, `Customer.grade`는 `Integer`입니다. 테스트 데이터에는 등급 5, 2, NULL과 고객이 없는 주문 하나가 있습니다.
+
 ## 5.2 EXISTS
 
 `qty > 10`인 품목이 하나 이상 있는 주문:
 
+**(테스트됨)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java), 영역 `exists`:
+
 ```java
-qb.from(Order.class)
-  .where((o, sub) -> sub.from(Item.class)
-                        .where(i -> i.getOrder().getId() == o.getId() && i.getQty() > 10)
-                        .exists())
-  .toList();
-// HQL: select o from Order o
-//      where exists (select 1 from Item i where i.order.id = o.id and i.qty > 10)
+// correlated: the inner lambda uses the outer order o
+SelectQuery<Order> q = qb.from(Order.class)
+        .where((o, sub) -> sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId() && i.getQty() > 10).exists());
+assertEquals("select e0 from Order e0 where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > 10)",
+        q.toHql().hql());
 ```
 
-**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)는 이 페이지의 HQL을 Hibernate에 직접 넘기고, H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 6.6.5)에서 나온 SQL을 기록합니다. lambdaQL은 아직 이 쿼리들을 만들지 않습니다. Hibernate의 SQL이 바뀌면 테스트가 실패합니다.
+**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 6.6.5로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다.
 
-**데이터베이스별 SQL (예정)** — 예정된 HQL을 Hibernate가 번역한 것으로, `PlannedSqlTest`가 기록했습니다. lambdaQL은 아직 이 쿼리를 만들지 않습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `05-exists`:
+**데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `sub-exists`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -74,19 +80,18 @@ where exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id and i1_0.qty>1
 ## 5.3 NOT EXISTS
 
 `!`를 사용하십시오. 다른 조건과 결합할 수 있습니다.
+status가 1인 주문, 또는 품목이 없는 주문:
+
+**(테스트됨)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java), 영역 `not-exists`:
 
 ```java
-// status가 1인 주문, 또는 품목이 없는 주문
-qb.from(Order.class)
-  .where((o, sub) -> o.getStatus() == 1
-         || !sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists())
-  .toList();
-// HQL: select o from Order o
-//      where o.status = 1
-//         or not exists (select 1 from Item i where i.order.id = o.id)
+SelectQuery<Order> q = qb.from(Order.class)
+        .where((o, sub) -> o.getStatus() == 1 || !sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists());
+assertEquals("select e0 from Order e0 where e0.status = 1 or not exists (select 1 from Item s1 where s1.order.id = e0.id)",
+        q.toHql().hql());
 ```
 
-**데이터베이스별 SQL (예정)** — 예정된 HQL을 Hibernate가 번역한 것으로, `PlannedSqlTest`가 기록했습니다. lambdaQL은 아직 이 쿼리를 만들지 않습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `05-not-exists-or`:
+**데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `sub-not-exists`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -99,59 +104,58 @@ where o1_0.status=1 or not exists(select 1 from items i1_0 where i1_0.order_id=o
 
 `grade > 3`인 고객의 주문:
 
+**(테스트됨)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java), 영역 `in`:
+
 ```java
-qb.from(Order.class)
-  .where((o, sub) -> sub.from(Customer.class)
-                        .where(c -> c.getGrade() > 3)
-                        .select(c -> c.getId())
-                        .contains(o.getCustomer().getId()))
-  .toList();
-// HQL: select o from Order o
-//      where o.customer.id in (select c.id from Customer c where c.grade > 3)
+SelectQuery<Order> q = qb.from(Order.class)
+        .where((o, sub) -> sub.from(Customer.class).where(c -> c.getGrade() != null && c.getGrade() > 3)
+                .select(c -> c.getId()).contains(o.getCustomer().getId()));
+assertEquals("select e0 from Order e0 where e0.customer.id in"
+        + " (select s1.id from Customer s1 where s1.grade is not null and s1.grade > 3)", q.toHql().hql());
 ```
 
-**데이터베이스별 SQL (예정)** — 예정된 HQL을 Hibernate가 번역한 것으로, `PlannedSqlTest`가 기록했습니다. lambdaQL은 아직 이 쿼리를 만들지 않습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `05-in-subquery`:
+**데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `sub-in`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-where o1_0.customer_id in (select c2_0.id from customers c2_0 where c2_0.grade>3)
+where o1_0.customer_id in (select c2_0.id from customers c2_0 where c2_0.grade is not null and c2_0.grade>3)
 ```
 
-`o.getCustomer().getId()`는 고객의 `@Id`로 끝나므로 외래 키 컬럼 `o.customer.id`입니다. 조인이 필요 없습니다.
+`o.getCustomer().getId()`는 고객의 `@Id`로 끝나므로 외래 키 컬럼 `e0.customer.id`입니다. 조인이 필요 없습니다.
+직접 작성한 null 검사(`c.getGrade() != null`)는 HQL에 `s1.grade is not null`로 남습니다.
 
 <a id="55-not-in-is-written-as-not-exists"></a>
 ## 5.5 NOT IN은 NOT EXISTS로 작성됨
 
 `!values.contains(x)`는 `NOT IN`으로 렌더링되지 **않습니다**. lambdaQL은 `NOT EXISTS`를 씁니다.
 
+**(테스트됨)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java), 영역 `not-in`:
+
 ```java
-qb.from(Order.class)
-  .where((o, sub) -> !sub.from(Customer.class)
-                         .where(c -> c.getGrade() > 3)
-                         .select(c -> c.getId())
-                         .contains(o.getCustomer().getId()))
-  .toList();
-// HQL: select o from Order o
-//      where not exists (select 1 from Customer c
-//                        where c.grade > 3 and c.id = o.customer.id)
+// the grades are 5, 2 and NULL. SQL "not in" would give no rows because of the NULL;
+// lambdaQL writes NOT EXISTS, which gives the same rows as Java (rule Q2)
+SelectQuery<Order> q = qb.from(Order.class)
+        .where((o, sub) -> !sub.from(Customer.class).select(c -> c.getGrade()).contains((int) o.getStatus()));
+assertEquals("select e0 from Order e0 where not exists (select 1 from Customer s1 where s1.grade = e0.status)",
+        q.toHql().hql());
 ```
 
-**데이터베이스별 SQL (예정)** — 예정된 HQL을 Hibernate가 번역한 것으로, `PlannedSqlTest`가 기록했습니다. lambdaQL은 아직 이 쿼리를 만들지 않습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `05-not-in`:
+**데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `sub-not-in`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-where not exists(select 1 from customers c2_0 where c2_0.grade>3 and c2_0.id=o1_0.customer_id)
+where not exists(select 1 from customers c2_0 where c2_0.grade=o1_0.status)
 ```
 
 이유:
 
 - `x NOT IN (subquery)`는 서브쿼리가 NULL을 하나라도 반환하면 **행을 하나도 반환하지 않습니다**. 흔한 SQL 함정입니다.
 - `NOT EXISTS`에는 이런 문제가 없습니다. 데이터베이스도 이를 잘 실행합니다(안티 조인으로).
-- 결과: 고객이 없는 주문은 위 쿼리에서 반환됩니다. 그 주문과 일치하는 고객이 없기 때문입니다.
+- 결과: 이 쿼리는 Java의 `!grades.contains(status)`와 같은 행을 줍니다. 테스트는 NULL 등급이 있는 데이터로 이를 확인합니다.
 
 <a id="56-correlated-subqueries"></a>
 ## 5.6 상관 서브쿼리
@@ -168,7 +172,7 @@ lambdaQL이 안쪽 람다의 캡처 값을 읽는 방법:
 
 | 안쪽 람다에서 캡처한 것 | 변환 결과 |
 |---|---|
-| 바깥 엔티티(`o`) | 바깥 별칭에 대한 참조(`o.id`) |
+| 바깥 엔티티(`o`) | 바깥 별칭에 대한 참조(`e0.id`) |
 | 그 밖의 값(지역 변수, 필드, ...) | [3.11](03-where.md#311-captured-values)과 같은 바인드 파라미터 |
 
 ```java
@@ -176,10 +180,14 @@ int minQty = 10;
 .where((o, sub) -> sub.from(Item.class)
                       .where(i -> i.getOrder().getId() == o.getId() && i.getQty() > minQty)
                       .exists())
-// HQL: exists (select 1 from Item i where i.order.id = o.id and i.qty > :p1)
+// HQL: select e0 from Order e0
+//      where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > :p1)
+// 파라미터: {p1=10}
 ```
 
-**데이터베이스별 SQL (예정)** — 예정된 HQL을 Hibernate가 번역한 것으로, `PlannedSqlTest`가 기록했습니다. lambdaQL은 아직 이 쿼리를 만들지 않습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `05-correlated-param`:
+[`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)의 테스트 메서드 `capturedValueInside`가 이 HQL, 파라미터, 행을 확인합니다.
+
+**데이터베이스별 SQL (이 HQL에 대한 Hibernate의 SQL)** — [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)가 같은 HQL을 Hibernate에 직접 넘겨 기록했습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `05-correlated-param`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -199,15 +207,15 @@ where exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id and i1_0.qty>?
 
 평균 가격보다 비싼 주문:
 
+**(테스트됨)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java), 영역 `scalar`:
+
 ```java
-qb.from(Order.class)
-  .where((o, sub) -> o.getPrice() > sub.from(Order.class).avg(x -> x.getPrice()))
-  .toList();
-// HQL: select o from Order o
-//      where o.price > (select avg(x.price) from Order x)
+SelectQuery<Order> q = qb.from(Order.class)
+        .where((o, sub) -> o.getPrice() > sub.from(Order.class).avg(x -> x.getPrice()));
+assertEquals("select e0 from Order e0 where e0.price > (select avg(s1.price) from Order s1)", q.toHql().hql());
 ```
 
-**데이터베이스별 SQL (예정)** — 예정된 HQL을 Hibernate가 번역한 것으로, `PlannedSqlTest`가 기록했습니다. lambdaQL은 아직 이 쿼리를 만들지 않습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `05-scalar-avg`:
+**데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `sub-scalar`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -216,28 +224,70 @@ from orders o1_0
 where o1_0.price>(select avg(o2_0.price) from orders o2_0)
 ```
 
-스칼라 서브쿼리는 **항상 한 행을 주어야** 합니다. 허용되는 형태는 두 가지입니다.
+스칼라 서브쿼리는 **항상 한 행을 주어야** 합니다. 허용되는 형태는 두 가지입니다(규칙 Q3).
 
 | 형태 | 예 |
 |---|---|
 | 집계: `count()`, `sum`, `avg`, `min`, `max` | `sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).count()` |
 | top-1: `orderBy(...).limit(1)...first()` | 아래 참고 |
 
-그 밖의 `first()`는 분석 시점에 오류가 됩니다.
+그 밖의 `first()`는 분석 시점에 오류(`LambdaAnalysisException`)가 됩니다.
 
-top-1 예: 같은 고객의 가장 최근 주문.
+품목이 두 개 이상인 주문(`count()`):
+
+**(테스트됨)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java), 영역 `count`:
 
 ```java
-qb.from(Order.class)
-  .where((o, sub) -> o.getId().equals(
-          sub.from(Order.class)
-             .where(x -> x.getCustomer().getId() == o.getCustomer().getId())
-             .orderBy((x, by) -> by.desc(x.getUpdateAt()))
-             .limit(1)
-             .select(x -> x.getId())
-             .first()))
-  .toList();
+SelectQuery<Order> q = qb.from(Order.class)
+        .where((o, sub) -> sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).count() >= 2);
+assertEquals("select e0 from Order e0 where (select count(s1) from Item s1 where s1.order.id = e0.id) >= 2L", q.toHql().hql());
 ```
+
+**데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `sub-count`:
+
+```sql
+-- H2, MariaDB, Oracle (same)
+select …
+from orders o1_0
+where (select count(i1_0.id) from items i1_0 where i1_0.order_id=o1_0.id)>=2
+```
+
+top-1: 고객별로 가장 비싼 주문.
+
+**(테스트됨)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java), 영역 `top-one`:
+
+```java
+// the most expensive order of each customer: a correlated scalar subquery with order + limit 1 (rule Q3)
+SelectQuery<Order> q = qb.from(Order.class)
+        .where((o, sub) -> o.getId().equals(sub.from(Order.class)
+                .where(x -> x.getCustomer().getId() == o.getCustomer().getId())
+                .orderBy((x, by) -> by.desc(x.getPrice()))
+                .limit(1)
+                .select(x -> x.getId())
+                .first()));
+assertEquals("select e0 from Order e0 where e0.id = (select s1.id from Order s1 where s1.customer.id = e0.customer.id"
+        + " order by s1.price desc, s1.id asc limit 1)", q.toHql().hql());
+// first() without limit(1) is rejected
+assertThrows(LambdaAnalysisException.class, () -> qb.from(Order.class)
+        .where((o, sub) -> o.getId().equals(sub.from(Order.class).select(x -> x.getId()).first())));
+```
+
+**데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `sub-top-one`:
+
+```sql
+-- H2, Oracle
+select …
+from orders o1_0
+where o1_0.id=(select o2_0.id from orders o2_0 where o2_0.customer_id=o1_0.customer_id order by o2_0.price desc,o2_0.id fetch first 1 rows only)
+
+-- MariaDB
+select …
+from orders o1_0
+where o1_0.id=(select o2_0.id from orders o2_0 where o2_0.customer_id=o1_0.customer_id order by o2_0.price desc,o2_0.id limit 1)
+```
+
+lambdaQL은 마지막 정렬 키로 `id`(`s1.id asc`)를 더하므로 맨 위 행이 항상 같습니다(규칙 S9).
+상관 조건은 고객 엔티티가 아니라 외래 키(`getCustomer().getId()`)를 비교합니다. [5.10](#510-paths-and-null-inside-subqueries)을 참고하십시오.
 
 집계의 NULL은 SQL을 따릅니다. `sum`, `avg`, `min`, `max`는 행이 없으면 NULL을 줍니다. `count`는 0을 줍니다.
 
@@ -248,23 +298,18 @@ qb.from(Order.class)
 
 큰 품목이 있는 주문을 가진 고객:
 
+**(테스트됨)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java), 영역 `nested`:
+
 ```java
-qb.from(Customer.class)
-  .where((c, sub) -> sub.from(Order.class)
-      .where((o, sub2) -> o.getCustomer().getId() == c.getId()
-             && sub2.from(Item.class)
-                    .where(i -> i.getOrder().getId() == o.getId() && i.getQty() > 10)
-                    .exists())
-      .exists())
-  .toList();
-// HQL: select c from Customer c
-//      where exists (select 1 from Order o
-//                    where o.customer.id = c.id
-//                      and exists (select 1 from Item i
-//                                  where i.order.id = o.id and i.qty > 10))
+// customers that have an order with an item of quantity > 10: a subquery inside a subquery
+SelectQuery<Customer> q = qb.from(Customer.class)
+        .where((c, sub) -> sub.from(Order.class).where((o, sub2) -> o.getCustomer().getId() == c.getId()
+                && sub2.from(Item.class).where(i -> i.getOrder().getId() == o.getId() && i.getQty() > 10).exists()).exists());
+assertEquals("select e0 from Customer e0 where exists (select 1 from Order s1 where s1.customer.id = e0.id"
+        + " and exists (select 1 from Item s2 where s2.order.id = s1.id and s2.qty > 10))", q.toHql().hql());
 ```
 
-**데이터베이스별 SQL (예정)** — 예정된 HQL을 Hibernate가 번역한 것으로, `PlannedSqlTest`가 기록했습니다. lambdaQL은 아직 이 쿼리를 만들지 않습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `05-nested`:
+**데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `sub-nested`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -280,10 +325,10 @@ Java는 중첩된 람다에서 같은 이름을 두 번 쓰는 것을 허용하�
 
 | 경우 | lambdaQL의 동작 |
 |---|---|
-| `limit`이 있는 `orderBy`(top-1, top-N) | 유지 |
+| `limit`이 있는 `orderBy`(top-1, top-N) | `id` 동순위 처리와 함께 유지 |
 | `limit`이 없는 `orderBy` | **제거**하고 경고를 로그에 남김(결과에 영향이 없음. Oracle에서는 구문 오류 ORA-00907까지 발생) |
-| MariaDB: `IN (... limit n)`(MariaDB에서 지원하지 않음) | 자동으로 감쌈: `in (select x.id from (... limit n) x)` |
-| MariaDB: `lateral`(MariaDB에서 결과가 틀림) | `row_number() over (partition by ... order by ...)`로 다시 씀 |
+| `limit`이 있는 서브쿼리에 대한 `contains`(MariaDB는 `IN (... limit n)`을 지원하지 않음, 오류 1235) | 모든 데이터베이스에서 파생 테이블로 감쌈: `in (select t1.v from (select s1.id as v ... limit n) t1)` |
+| MariaDB: `lateral`(MariaDB에서 결과가 틀림) | `row_number() over (partition by ... order by ...)`로 재작성: **아직 구현되지 않음** |
 
 [4. 정렬과 페이징](04-order-paging.md)의 NULL 정책과 자동 `id` 동순위 처리도 서브쿼리 안에 적용됩니다.
 
@@ -293,8 +338,9 @@ Java는 중첩된 람다에서 같은 이름을 두 번 쓰는 것을 허용하�
 서브쿼리 안에서 조건, 경로, NULL은 **바깥 쿼리와 똑같이** 동작합니다([3. 조건(`where`)](03-where.md)).
 
 - 객체에 대한 `==`는 null-safe 값 비교입니다.
-- 서브쿼리 조건 안의 연관 경로는 바깥 `where`와 같은 조인 규칙을 따릅니다(결정 D36). 기본은 inner `join`이고, null 가드가 연관이 없는 행을 남기면 `left join`입니다.
+- 서브쿼리 자신의 엔티티에 대한 연관 경로는 바깥 `where`와 같은 조인 규칙을 따릅니다(결정 D36). 기본은 inner `join`이고, null 가드가 연관이 없는 행을 남기면 `left join`입니다.
 - `@Id`로 끝나는 경로는 외래 키 컬럼입니다(조인 없음).
+- **바깥 엔티티**는 자신의 컬럼과 외래 키 id(`o.getId()`, `o.getCustomer().getId()`)만 사용할 수 있습니다. 조인이 필요한 바깥 엔티티의 경로(`o.getCustomer().getName()`)는 분석 시점에 오류가 됩니다. 대신 외래 키 id를 비교하십시오.
 - 컬렉션 경로(`o.getItems()`)는 거부됩니다. 컬렉션에 대해 물으려면 서브쿼리를 사용하십시오.
 
 ```java
@@ -305,18 +351,19 @@ Java는 중첩된 람다에서 같은 이름을 두 번 쓰는 것을 허용하�
 <a id="511-subqueries-in-other-places"></a>
 ## 5.11 다른 위치의 서브쿼리
 
-- **`from` 안의 서브쿼리(파생 테이블)와 CTE**(`qb.from(sub -> ...)`, `qb.with(sub -> ...)`): [6. 조회, 집계, 그룹화](06-select-group.md)를 참고하십시오.
-- **UPDATE / DELETE 안의 서브쿼리**: 같은 `sub` 문법입니다. [7. 수정, 삽입, 삭제](07-dml.md)를 참고하십시오.
+- **UPDATE / DELETE 안의 서브쿼리**: `where`에서 같은 `sub` 문법을 씁니다. 구현되어 테스트했습니다(영역 `dml-subquery`). [7.4 삭제(delete)](07-4-delete.md)와 [7.2 수정(update)](07-2-update.md)을 참고하십시오.
+- **`set` 값 안의 서브쿼리**(`o.setTotal(sub.from(...).sum(...))`): 아직 구현되지 않았습니다. [7.2 수정(update)](07-2-update.md)을 참고하십시오.
+- **`from` 안의 서브쿼리(파생 테이블)와 CTE**(`qb.from(sub -> ...)`, `qb.with(sub -> ...)`): 설계됨, 아직 구현되지 않음(마일스톤 M8-2). [6. 조회, 집계, 그룹화](06-select-group.md)를 참고하십시오.
 
 <a id="512-rules-summary-q1-to-q6"></a>
 ## 5.12 규칙 요약(Q1~Q6)
 
 | # | 규칙 |
 |---|---|
-| Q1 | 서브쿼리 안의 조건, 경로, NULL 규칙은 바깥과 같습니다. 조건 안의 연관 경로도 같은 조인 규칙(기본은 inner `join`)을 따릅니다 |
+| Q1 | 서브쿼리 안의 조건, 경로, NULL 규칙은 바깥과 같습니다. 조건 안의 연관 경로도 같은 조인 규칙(기본은 inner `join`)을 따릅니다. 조인이 필요한 바깥 엔티티의 경로는 오류이고, 외래 키 id는 허용됩니다 |
 | Q2 | **NOT IN은 NOT EXISTS로 렌더링됩니다**: `!values.contains(x)`는 `not exists (select 1 from C c where <condition> and c.sel = x)`가 됩니다. `NOT IN` + NULL 함정을 피합니다 |
 | Q3 | 스칼라 서브쿼리는 한 행을 주어야 합니다: 집계(`max`, `min`, `avg`, `sum`, `count`)나 `orderBy(...).limit(1)...first()`. 그 밖의 `first()`는 오류입니다 |
-| Q4 | 서브쿼리 정렬: `limit`이 있으면 유지, 없으면 경고와 함께 제거. MariaDB `IN (... limit)`은 감싸고, `lateral`은 `row_number()`로 다시 씁니다 |
+| Q4 | 서브쿼리 정렬: `limit`이 있으면 유지, 없으면 경고와 함께 제거. `IN (... limit)`은 파생 테이블로 감쌉니다. `row_number()`를 쓰는 MariaDB `lateral` 재작성은 아직 구현되지 않았습니다 |
 | Q5 | 상관 조건에서 한쪽이 절대 NULL이 될 수 없으면(`@Id`, `nullable = false`, 기본형) `==`를 `=`로 씁니다. `!=`는 `(a <> b or a is null)`이 됩니다. 인덱스 사용을 유지합니다 |
 | Q6 | 서브쿼리의 `where`는 자신의 `sub` 인자를 받을 수 있습니다: `where((i, sub2) -> ...)`. 모든 단계에서 같은 규칙이 적용됩니다 |
 

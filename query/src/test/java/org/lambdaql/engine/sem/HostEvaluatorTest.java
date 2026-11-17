@@ -1,7 +1,7 @@
 package org.lambdaql.engine.sem;
 
 import org.junit.jupiter.api.Test;
-import org.lambdaql.analyzer.LambdaAnalysisException;
+import org.lambdaql.LambdaQLException;
 import org.lambdaql.engine.ir.ArithOp;
 import org.lambdaql.engine.ir.Expr;
 import org.lambdaql.engine.ir.MethodRef;
@@ -46,7 +46,7 @@ class HostEvaluatorTest {
         // captured0.trim()   with captured0 = null  -> Java would throw NullPointerException
         MethodRef trim = new MethodRef("java/lang/String", "trim", "()Ljava/lang/String;", false, false);
         Expr e = new Expr.Invoke(new Expr.Captured(0, Type.getType(String.class)), trim, List.of());
-        assertThrows(LambdaAnalysisException.class, () -> evaluator.eval(e, new Object[]{null}));
+        assertThrows(LambdaQLException.class, () -> evaluator.eval(e, new Object[]{null}));
         // @end
     }
 

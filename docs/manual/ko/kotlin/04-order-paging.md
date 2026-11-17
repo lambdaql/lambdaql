@@ -4,7 +4,7 @@
 > [!NOTE]
 > **상태**
 > - **핵심 기능 구현됨**, Hibernate 6.6.5로 H2, MariaDB 10.11, Oracle 23.26에서 테스트함: `by.asc`, `by.desc`, `by.sort`를 사용하는 `orderBy { o, by -> ... }`, 키 하나의 형태 `orderBy { it.key }`와 `orderBy({ it.key }, Direction)`, `Direction.parse` / `reversed`, `limit` / `offset`, `orderBy` 뒤의 `first()`, 그리고 재사용 정렬 `SortSpec`(`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`). Spring `Sort`와 `Pageable`은 Spring Data JPA 모듈에서 동작합니다([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)). 테스트는 **Java** 람다를 사용합니다. **Kotlin 람다는 아직 테스트하지 않았습니다.**
-> - **아직 구현되지 않음:** Kotlin 속성 참조(`orderBy(Order::price)`), `SortWhitelist`, 조인 형태 `{ o, c, by -> }`(`SortSpec`에서도), 서브쿼리 안의 정렬.
+> - **아직 구현되지 않음:** Kotlin 속성 참조(`orderBy(Order::price)`), `SortWhitelist`, 조인 형태 `{ o, c, by -> }`(`SortSpec`에서도).
 > - Kotlin 문법은 컴파일됩니다(프로토타입으로 확인, kotlinc 2.3.21). nullable 키, `?.` 키, 속성 참조는 컴파일되며, 엔티티 키는 컴파일되지 않습니다.
 > - 이 장의 HQL은 라이브러리의 규칙을 따르지만, Kotlin 람다로 테스트하지는 않았습니다.
 
@@ -495,7 +495,7 @@ qb.from(Order::class.java).orderBy(byName).toList()
 <a id="411-sorting-inside-subqueries"></a>
 ## 4.11 서브쿼리 안의 정렬
 
-**아직 구현되지 않음**(서브쿼리가 아직 구현되지 않음).
+**구현됨**(마일스톤 M8-1, [5. 서브쿼리](05-subquery.md)의 서브쿼리와 함께). MariaDB `lateral` 재작성은 아직 구현되지 않았습니다.
 
 서브쿼리 안의 정렬은 `limit`과 함께 쓸 때(top-1 또는 top-N)만 유지됩니다.
 `limit`이 없으면 결과를 바꾸지 않으므로 lambdaQL은 정렬을 제거하고 경고를 로그에 남깁니다.
@@ -519,7 +519,7 @@ qb.from(Order::class.java).orderBy(byName).toList()
 | S11 | Spring `Sort.Order`는 `Direction`에 1:1로 대응합니다(Spring 모듈, [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) 참고). `SortWhitelist.parse("price,desc_nulls_last")` | Spring `Sort`는 구현되고 Java로 테스트됨(`ignoreCase`는 아직 지원하지 않음). `SortWhitelist`는 아직 구현되지 않음 |
 | S12 | 조인 쿼리도 같은 모양을 사용합니다: `{ o, c, by -> }`, `{ o, c, i, by -> }` | 아직 구현되지 않음 |
 | S13 | 속성 참조는 키 하나의 짧은 형태(`orderBy(Order::price)`)에서만 사용합니다. 컴파일되지만 의미가 틀린 참조는 거부됩니다 | 아직 구현되지 않음(Kotlin 속성 참조) |
-| S14 | 서브쿼리 정렬: `limit`이 있으면 유지, 없으면 경고와 함께 제거. 데이터베이스 차이는 lambdaQL이 처리합니다(5장 참고) | 아직 구현되지 않음 |
+| S14 | 서브쿼리 정렬: `limit`이 있으면 유지, 없으면 경고와 함께 제거. 데이터베이스 차이는 lambdaQL이 처리합니다(5장 참고) | 구현됨(테스트함). MariaDB `lateral` 재작성은 아직 구현되지 않음 |
 
 ---
 

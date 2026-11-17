@@ -1,6 +1,7 @@
 package org.lambdaql.engine.load;
 
-import org.lambdaql.analyzer.LambdaAnalysisException;
+import org.lambdaql.i18n.LqlMessage;
+import org.lambdaql.LambdaAnalysisException;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
@@ -41,7 +42,7 @@ public final class BytecodeLoader {
         String resource = internalClassName + ".class";
         try (InputStream in = loader.getResourceAsStream(resource)) {
             if (in == null) {
-                throw new LambdaAnalysisException("클래스 파일을 찾을 수 없습니다: " + resource);
+                throw LqlMessage.CLASS_FILE_NOT_FOUND.exception(resource);
             }
             ClassReader reader = new ClassReader(in);
             MethodNode[] found = new MethodNode[1];
@@ -56,12 +57,11 @@ public final class BytecodeLoader {
                 }
             }, ClassReader.SKIP_FRAMES);
             if (found[0] == null) {
-                throw new LambdaAnalysisException("메서드를 찾을 수 없습니다: "
-                        + internalClassName.replace('/', '.') + "." + methodName + descriptor);
+                throw LqlMessage.METHOD_NOT_FOUND.exception(internalClassName.replace('/', '.') + "." + methodName + descriptor);
             }
             return found[0];
         } catch (IOException e) {
-            throw new LambdaAnalysisException("클래스 파일을 읽을 수 없습니다: " + resource, e);
+            throw LqlMessage.CLASS_FILE_UNREADABLE.exceptionCausedBy(null, e, resource);
         }
     }
 

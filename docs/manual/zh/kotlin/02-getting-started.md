@@ -7,7 +7,8 @@
 > 排序与分页的核心部分（`orderBy`、`limit`、`offset`、`SortSpec`）也可以运行（同样只用 Java Lambda 测试过）。
 > Spring Data JPA 模块（repository 执行器和 Spring Boot 自动配置）也可以运行（见 [12. Spring Data JPA](12-spring-data-jpa.md)；只用 Java repository 测试过）。
 > 更新、插入、删除和 upsert 也可以运行（见 [7. 更新、插入、删除](07-dml.md)；同样只用 Java Lambda 测试过）。
-> 子查询、`select` 和存储过程**已设计，尚未实现**。
+> 子查询和 `select`（带 `groupBy`、`having` 和 `Agg`）同样可以使用（见 [5. 子查询](05-subquery.md) 和 [6. 查询列、聚合与分组](06-select-group.md)；同样只用 Java Lambda 测试过）。
+> 派生表、CTE 和存储过程**已设计，尚未实现**。
 > 目前还没有任何构件发布到 Maven Central。请按下文从源码构建。
 
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[1. 概述](../01-overview.md) | 下一章：[3. 条件](03-where.md) | [本页的 Java 版本](../java/02-getting-started.md)
@@ -494,7 +495,7 @@ SQL 与 `toList()` 相同。lambdaQL **不会**添加 `distinct`：
 - lambdaQL 只 join to-one 关联。集合会变成 `exists` 子查询。因此 join 永远不会让行重复。
 - 所以 `distinct` 不会改变结果，只会增加开销。（这与数据库的限制无关：Oracle 23.26 也接受 LOB 列上的 `distinct`。这是实测结果。）
 
-值查询（`select`）的 `distinct` 在里程碑 M9 中处理。
+对于值查询（`select`），`distinct()` 和 `toSet()` 使用 `select distinct`（见 [6.7](06-select-group.md#67-distinct-paging-and-results)）。
 
 **大小检查。** 如果 Set 比行数小，`toSet()` 抛出 `IllegalStateException`。以下情况会发生这种问题：
 

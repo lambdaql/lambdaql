@@ -3,7 +3,8 @@
 
 > [!NOTE]
 > **状态：已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（里程碑 M10），包括 `limit` 和 `executeOne()`（决定 D41）。
-> **尚未实现：** `set` 和 `where` 中的 `sub` 子查询（里程碑 M8），以及复合键实体上的 `limit` / `executeOne()`。
+> `where` 中的子查询（`sub`）同样已实现（里程碑 M8）。delete 写法已经测试；见 [7.4](07-4-delete.md)。
+> **尚未实现：** `set` 值中的 `sub` 子查询，以及复合键实体上的 `limit` / `executeOne()`。
 > 标记为 **(已测试)** 的示例是从 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中复制的。其他示例遵循设计，还没有测试覆盖。
 > 完整状态见 [Java 路线 README](README.md#status)。
 
@@ -155,7 +156,7 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 
 使用两个参数的 Lambda。第二个参数是上下文对象（`sub`）。
 这里不需要 `Agg`；子查询本身有 `sum`、`avg` 等方法，与 [5. 子查询](05-subquery.md)相同。
-这种写法**尚未实现**（里程碑 M8）。
+这种写法**尚未实现**。目前只有 `where` 中的子查询可以使用。
 
 ```java
 qb.update(Order.class)
@@ -194,10 +195,12 @@ qb.update(Order.class).set(o -> o.setStatus(9))
   .execute();
 ```
 
-第一个示例现在就能工作：路径会变成标量子查询，与上面已测试的示例相同。
-第二个示例需要 `sub`（尚未实现，里程碑 M8）。
+两个示例现在都能工作。
+第一个示例中，路径会变成标量子查询，与上面已测试的示例相同。
+第二个示例使用 `sub`，与 [5. 子查询](05-subquery.md) 相同。它的 HQL 是 `update Order e0 set e0.status = 9 where not exists (select 1 from Item s1 where s1.order.id = e0.id)`。
+同样的 `where` 在 delete 上已经测试（region `dml-subquery`，见 [7.4](07-4-delete.md)）。update 写法还没有自己的测试。
 
-**各数据库的 SQL（计划中）** — Hibernate 对计划中 HQL 的翻译，由 `PlannedSqlTest` 记录；lambdaQL 目前还不会生成此查询。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `07-update-not-exists`：
+**各数据库的 SQL（Hibernate 为此 HQL 生成的 SQL）** — 由 [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) 记录，它把同样的语句直接交给 Hibernate。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `07-update-not-exists`：
 
 ```sql
 -- H2, MariaDB

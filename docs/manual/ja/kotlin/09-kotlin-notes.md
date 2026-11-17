@@ -40,7 +40,7 @@ lambdaQL は Kotlin と Java を **同じエンジン**、同じ API でサポ�
 
 - 例の下のコメントは、設計で決まっている場合に、lambdaQL が作る HQL を示します。
 - ラムダの中に書いた定数（数値、文字列、真偽値、`null`、enum 定数、`const val`）は、リテラルとして HQL に書き込まれます。キャプチャした値と計算した値は常にバインドパラメーター（`:p1`、`:p2`、...）になります（D37）。
-- `e0` はルートエンティティのエイリアス、`j1` は関連のパスのために lambdaQL が追加する結合のエイリアスです。`where` の中ではデフォルトで内部結合の `join`（null ガードが関連のない行を残すときは `left join`）、パスを `orderBy` か `select` だけで使うときは `left join` です（D36）。予定の機能（`select`、update、サブクエリ）の例は、まだ予定のエイリアス `o` と `c1` を使います。
+- `e0` はルートエンティティのエイリアス、`j1` は関連のパスのために lambdaQL が追加する結合のエイリアスです。`where` の中ではデフォルトで内部結合の `join`（null ガードが関連のない行を残すときは `left join`）、パスを `orderBy` か `select` だけで使うときは `left join` です（D36）。サブクエリのルートは `s1`、`s2`、... です（[5. サブクエリ](05-subquery.md) を参照）。予定の機能（派生テーブル、CTE、プロシージャ）の例は、まだ予定のエイリアス `o` と `c1` を使います。
 - エンティティは [2. はじめよう](02-getting-started.md#example-entities) のものです。一部の例では `Order` に 2 つのプロパティを追加して使います: `var flag: Boolean? = null` と `var kind: OrderKind? = null`（`enum class OrderKind { NORMAL, EXPRESS, GIFT }`）。
 
 ---

@@ -3,7 +3,8 @@
 
 > [!NOTE]
 > **状況: 実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、マイルストーン M10）。テストは **Java** のラムダを使っています。**DML での Kotlin のラムダはまだテストしていません。** `limit` と `executeOne()` も同じです（決定 D41）。
-> **まだ実装されていません:** `set` と `where` の中の `sub` サブクエリ（マイルストーン M8）、複合キーのエンティティでの `limit` / `executeOne()`。
+> `where` の中のサブクエリ（`sub`）も実装済みです（マイルストーン M8）。削除の形は Java のラムダでテスト済みです。[7.4](07-4-delete.md) を参照してください。
+> **まだ実装されていません:** `set` の値の中の `sub` サブクエリ、複合キーのエンティティでの `limit` / `executeOne()`。
 > Kotlin コードはテスト済みの Java の文を Kotlin の構文で書いたもので、HQL は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) の Java のテストから取っています。HQL のない例は設計に従っています。
 > 全体の状況は [トラックの README](README.md) を見てください。
 
@@ -156,7 +157,7 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 
 引数が 2 つのラムダを使います。2 つ目の引数はコンテキストオブジェクト（`sub`）です。
 ここでは `Agg` は必要ありません。[5. サブクエリ](05-subquery.md) と同じく、サブクエリに `sum`、`avg`、... があります。
-この書き方は **まだ実装されていません**（マイルストーン M8）。
+この書き方は **まだ実装されていません**。現在動くのは `where` の中のサブクエリだけです。
 
 ```kotlin
 qb.update(Order::class.java)
@@ -198,10 +199,12 @@ qb.update(Order::class.java).set { it.status = 9 }
     .execute()
 ```
 
+どちらの例も現在動きます。
 1 つ目の例は、上のテスト済みのルールに従います。パスはスカラーサブクエリになります。
-2 つ目の例には `sub` が必要です（まだ実装されていません、マイルストーン M8）。
+2 つ目の例は [5. サブクエリ](05-subquery.md) と同じように `sub` を使います。その HQL は `update Order e0 set e0.status = 9 where not exists (select 1 from Item s1 where s1.order.id = e0.id)` です。
+同じ `where` を削除で使う形は Java のラムダでテスト済みです（リージョン `dml-subquery`、[7.4](07-4-delete.md) を参照）。更新の形は、まだ専用のテストでカバーされていません。
 
-**データベースごとの SQL（予定）** — 予定の HQL を Hibernate が変換したもので、`PlannedSqlTest` が記録しました。lambdaQL はまだこのクエリを作りません。`expected-sql/` の [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)、例 `07-update-not-exists`:
+**データベースごとの SQL（この HQL に対する Hibernate の SQL）** — 同じ文を Hibernate に直接渡す [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) が記録しました。`expected-sql/` の [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)、例 `07-update-not-exists`:
 
 ```sql
 -- H2, MariaDB

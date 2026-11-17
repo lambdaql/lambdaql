@@ -7,7 +7,8 @@
 > The core of sorting and paging (`orderBy`, `limit`, `offset`, `SortSpec`) is also implemented and tested.
 > The Spring Data JPA module (`LambdaQlExecutor<T>` and the Spring Boot auto-configuration) is implemented and tested with Spring Boot 3.4.2.
 > Update, insert, delete and upsert are implemented and tested too, with `limit` and the one-row protection `executeOne()`, also in the Spring Data JPA module (the shortcuts `deleteAll`, `updateOne` and so on). They need the caller's transaction there.
-> Subqueries, `select` and procedures are designed but **not implemented yet**.
+> Subqueries in `where` and `select` (with `groupBy`, `having` and the `Agg` functions) are implemented and tested too.
+> Derived tables, CTEs and procedures are designed but **not implemented yet**.
 > The HQL shown on this page is the output that the design defines. The examples are design examples.
 
 This page is for both languages. Code is shown in separate **Java** and **Kotlin** sections.

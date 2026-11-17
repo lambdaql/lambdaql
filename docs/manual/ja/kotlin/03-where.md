@@ -4,7 +4,7 @@
 > [!NOTE]
 > **状況**
 > - **実装済み、H2・MariaDB・Oracle でテスト済み:** `where` の条件と `toList()`（カラムへのマッピング、HQL の出力、クエリの実行）。テストは **Java** のラムダを使っています。**Kotlin のラムダはまだテストしていません。**
-> - **設計済み、まだ実装されていないもの:** この章の Kotlin 固有の書き方（`?.`、`?:`、`!!`、範囲、`when`、`in`）。そのバイトコードはコンパイルしてプロトタイプで確認しました（kotlinc 1.7.22 から 2.3.21）。また、多くの条件を H2 で 1 行ずつ確認しました。サブクエリ、`select`、プロシージャも設計だけです。ソートとページングの中核部分（[4. ソートとページング](04-order-paging.md)）、update/insert/delete/upsert（[7. 更新、挿入、削除](07-dml.md)）、Spring Data JPA モジュール（[12. Spring Data JPA](12-spring-data-jpa.md)）は実装済みです。
+> - **設計済み、まだ実装されていないもの:** この章の Kotlin 固有の書き方（`?.`、`?:`、`!!`、範囲、`when`、`in`）。そのバイトコードはコンパイルしてプロトタイプで確認しました（kotlinc 1.7.22 から 2.3.21）。また、多くの条件を H2 で 1 行ずつ確認しました。派生テーブル、CTE、プロシージャも設計だけです。ソートとページングの中核部分（[4. ソートとページング](04-order-paging.md)）、サブクエリ（[5. サブクエリ](05-subquery.md)）、`groupBy`、`having`、`Agg` を使う `select`（[6. 選択、集計、グループ化](06-select-group.md)）、update/insert/delete/upsert（[7. 更新、挿入、削除](07-dml.md)）、Spring Data JPA モジュール（[12. Spring Data JPA](12-spring-data-jpa.md)）は実装済みです。
 > - この章の HQL は **予定の** 出力です。細かい部分（たとえば `e0`、`j1` のようなエイリアス名）はまだ変わることがあります。
 
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [2. はじめよう](02-getting-started.md) | 次: [4. ソートとページング](04-order-paging.md) | [このページの Java 版](../java/03-where.md)

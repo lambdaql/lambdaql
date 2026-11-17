@@ -1,6 +1,6 @@
 package org.lambdaql.query;
 
-import org.lambdaql.analyzer.LambdaAnalysisException;
+import org.lambdaql.i18n.LqlMessage;
 import org.lambdaql.engine.ir.Assignment;
 import org.lambdaql.engine.ir.Expr;
 import org.lambdaql.engine.load.LambdaRef;
@@ -31,7 +31,7 @@ final class DmlParts {
         return new HqlRenderer.AssignBound(context.analyzeBuilder(ref, List.of(type)), ref.capturedArgs());
     }
 
-    static HqlRenderer.Bound where(QueryContext context, Class<?> type, SelectQuery.Where<?> where) {
+    static HqlRenderer.Bound where(QueryContext context, Class<?> type, Object where) {
         LambdaRef ref = QueryContext.read(where);
         return new HqlRenderer.Bound(context.analyzeWhere(ref, List.of(type)), ref.capturedArgs());
     }
@@ -62,7 +62,7 @@ final class DmlParts {
         for (Assignment a : row.items()) {
             for (Expr.Column c : AssignmentReader.columns(a.value())) {
                 if (c.root() == 0) {
-                    throw new LambdaAnalysisException("insert 값에서 대상 엔티티를 읽을 수 없습니다: " + String.join(".", c.path()));
+                    throw LqlMessage.INSERT_READS_TARGET.exception(String.join(".", c.path()));
                 }
             }
         }
@@ -71,7 +71,7 @@ final class DmlParts {
     /** The @Id column of an entity, the default upsert key. */
     static Expr.Column idColumn(QueryContext context, Class<?> type) {
         String id = context.model().idName(type)
-                .orElseThrow(() -> new IllegalArgumentException("복합 키 엔티티의 upsert는 onConflict(키)를 쓰세요: " + type.getName()));
+                .orElseThrow(() -> new IllegalArgumentException(LqlMessage.UPSERT_COMPOSITE_KEY.format(type.getName())));
         return new Expr.Column(0, List.of(id), List.of(false), Object.class, true, false);
     }
 
@@ -86,8 +86,7 @@ final class DmlParts {
     static <T> java.util.SequencedSet<T> toSet(List<T> rows) {
         java.util.LinkedHashSet<T> set = new java.util.LinkedHashSet<>(rows);
         if (set.size() < rows.size()) {
-            throw new IllegalStateException("toSet/findSet: 행 " + rows.size() + "개가 Set에서 " + set.size()
-                    + "개로 줄었습니다. 엔티티의 equals/hashCode가 서로 다른 행을 같게 보거나 @Id가 유일하지 않습니다. toList()를 쓰세요");
+            throw new IllegalStateException(LqlMessage.SET_SIZE_MISMATCH.format(rows.size(), set.size()));
         }
         return set;
     }

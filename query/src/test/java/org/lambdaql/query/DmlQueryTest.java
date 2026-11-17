@@ -4,7 +4,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.lambdaql.analyzer.LambdaAnalysisException;
+import org.lambdaql.LambdaQLException;
 import org.lambdaql.engine.render.RenderedQuery;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -143,16 +143,16 @@ class DmlQueryTest {
         int changed = u.where(o -> o.getId() == id).execute();
 
         // reading a column that an earlier assignment wrote is an error (U3): the databases disagree on its value
-        assertThrows(LambdaAnalysisException.class,
+        assertThrows(LambdaQLException.class,
                 () -> qb.update(Order.class).set(o -> { o.setPrice(1); o.setTex((float) o.getPrice()); }));
         // the same column twice is an error (U4), also across set() calls
-        assertThrows(LambdaAnalysisException.class,
+        assertThrows(LambdaQLException.class,
                 () -> qb.update(Order.class).set(o -> o.setStatus((short) 1)).set(o -> o.setStatus((short) 2)));
         // @end
         assertEquals(1, changed);
         assertEquals("checked", find(Order.class, id).getDescription());
         // null into a column that can never be NULL (U6)
-        assertThrows(LambdaAnalysisException.class,
+        assertThrows(LambdaQLException.class,
                 () -> qb.update(Archive.class).set(a -> a.setId(null)).all());
     }
 
@@ -224,7 +224,7 @@ class DmlQueryTest {
         assertEquals(1, generated);
         assertEquals("Kim", find(Archive.class, 100L).getCustomerName());
         // values cannot read the new row
-        assertThrows(LambdaAnalysisException.class,
+        assertThrows(LambdaQLException.class,
                 () -> qb.insert(Archive.class).values(a -> { a.setId(1L); a.setPrice(a.getPrice()); }));
     }
 

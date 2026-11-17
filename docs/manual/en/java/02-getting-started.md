@@ -7,7 +7,8 @@
 > The core of sorting and paging (`orderBy`, `limit`, `offset`, `SortSpec`) works too.
 > The Spring Data JPA module (repository executor and Spring Boot auto-configuration) works too (see [12. Spring Data JPA](12-spring-data-jpa.md)).
 > Update, insert, delete and upsert work too (see [7. Update, insert, delete](07-dml.md)).
-> Subqueries, `select` and procedures are **designed, not implemented yet**.
+> Subqueries and `select` (with `groupBy`, `having` and `Agg`) work too (see [5. Subqueries](05-subquery.md) and [6. Select, aggregates and group by](06-select-group.md)).
+> Derived tables, CTEs and procedures are **designed, not implemented yet**.
 > No artifact is published to Maven Central yet. Build from source as shown below.
 
 [Java track](README.md) | [Manual home](../README.md) | Previous: [1. Overview](../01-overview.md) | Next: [3. Conditions](03-where.md) | [Kotlin version of this page](../kotlin/02-getting-started.md)
@@ -537,7 +538,7 @@ The SQL is the same as for `toList()`. lambdaQL does **not** add `distinct`:
 - lambdaQL joins only to-one associations. A collection becomes an `exists` subquery. So a join never repeats a row.
 - So `distinct` would not change the result. It would only add cost. (This is not about a database limit: Oracle 23.26 accepts `distinct` on LOB columns too. This was measured.)
 
-`distinct` for value results (`select`) comes with milestone M9.
+For value results (`select`), `distinct()` and `toSet()` use `select distinct` (see [6.7](06-select-group.md#67-distinct-paging-and-results)).
 
 **Size check.** If the set is smaller than the number of rows, `toSet()` throws `IllegalStateException`. This happens when:
 

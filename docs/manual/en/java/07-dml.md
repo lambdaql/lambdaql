@@ -3,7 +3,8 @@
 > [!NOTE]
 > **Status**
 > - **Implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5, milestone M10, decisions D28 and D40): update (setters, `by.set`, many `set()` calls, `@Version`), delete, insert (one row, a list, a generated id, `insert ... select`), upsert, the checks for rules U1, U3, U4 and U6, and (decision D41) `limit` for update and delete and the one-row protection `executeOne()`.
-> - **Not implemented yet:** `sub` subqueries in DML (milestone M8), aggregates in `insert ... select` (milestone M9), and `limit` / `executeOne()` on entities with a composite key.
+> - **Also implemented and tested:** subqueries (`sub`) in the `where` of update and delete (milestone M8, see [7.4](07-4-delete.md)), and `groupBy`, `having` and `Agg` in `insert ... select` (milestone M9, see [7.5](07-5-insert.md)).
+> - **Not implemented yet:** subqueries in the values of `set` (the context object `by.from(...)`), and `limit` / `executeOne()` on entities with a composite key.
 > - Examples marked **(tested)** are copied from the test suite. The other examples follow the design. They are not covered by a test yet, and their HQL can differ in small details (for example alias names like `e0`).
 > - See the [Java track README](README.md#status) for the full status.
 
@@ -120,7 +121,7 @@ qb.update(Order.class).set((o, by) -> by.set(o.getCustomer().getId(), cid)).wher
 
 In the design, the second lambda argument is **one context object**. It has both `set(column, value)` and the subquery method `from(...)`.
 Name it `by` or `sub` as you like. The name does not matter.
-The subquery part is **not implemented yet** (milestone M8). Today the object has only `set`.
+The subquery part of this object is **not implemented yet**. Today the object has only `set`. (Subqueries in `where` work: `where((o, sub) -> ...)`, see [5. Subqueries](05-subquery.md).)
 
 ```java
 qb.update(Order.class)
@@ -310,7 +311,7 @@ Bulk DML does not go through the JPA persistence context (rule U16):
 ## 7.9 All rules U1 to U21 (summary)
 
 Checked when lambdaQL reads the lambda: U1, U3, U4, U6 (tested). Checked by the compiler: U5.
-The lambdaQL checks of U11, U12, U15 and U20 are not implemented yet. U17 needs subqueries (milestone M8).
+The lambdaQL checks of U11, U12, U15 and U20 are not implemented yet. U17 (the MariaDB wrap for a subquery on the same table) is not implemented yet.
 
 | # | Rule |
 |---|---|

@@ -1,7 +1,7 @@
 package org.lambdaql.engine.decode;
 
 import org.junit.jupiter.api.Test;
-import org.lambdaql.analyzer.LambdaAnalysisException;
+import org.lambdaql.LambdaQLException;
 import org.lambdaql.engine.ir.Pred;
 import org.lambdaql.engine.load.BytecodeLoader;
 import org.lambdaql.engine.load.LambdaRef;
@@ -61,7 +61,7 @@ class ConditionDecodeTest {
     @Test
     void notSerializableIsRejected() {
         java.util.function.Predicate<Order> p = o -> true;
-        assertThrows(LambdaAnalysisException.class, () -> SerializedLambdaExtractor.extract(p));
+        assertThrows(LambdaQLException.class, () -> SerializedLambdaExtractor.extract(p));
     }
 
     @Test
@@ -119,7 +119,7 @@ class ConditionDecodeTest {
     @Test
     void notOfComposite() {
         // @start region="not-composite"
-        assertEquals("!(truth(param0.isActive[]) && param0.getTex[] > 1.0)",
+        assertEquals("(!truth(param0.isActive[]) || param0.getTex[] <= 1.0)",
                 cond(o -> !(o.isActive() && o.getTex() > 1f)));
         // @end
         assertEquals("!truth(param0.isActive[])", cond(o -> !o.isActive()));
@@ -212,7 +212,8 @@ class ConditionDecodeTest {
     void valueTernaryIsRejected() {
         // @start region="value-ternary"
         boolean flag = true;
-        assertThrows(LambdaAnalysisException.class, () -> cond(o -> o.getStatus() == (flag ? 1 : 2)));
+        LambdaQLException e = assertThrows(LambdaQLException.class, () -> cond(o -> o.getStatus() == (flag ? 1 : 2)));
+        assertEquals("LQL-2021", e.code());
         // @end
     }
 

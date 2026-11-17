@@ -1,6 +1,7 @@
 package org.lambdaql.engine.sem;
 
-import org.lambdaql.analyzer.LambdaAnalysisException;
+import org.lambdaql.i18n.LqlMessage;
+import org.lambdaql.LambdaAnalysisException;
 import org.lambdaql.engine.ir.Expr;
 import org.lambdaql.engine.ir.MethodRef;
 import org.objectweb.asm.Type;
@@ -64,7 +65,7 @@ public final class HostEvaluator {
             }
             case Expr.NewObject n -> construct(n, captured);
             case Expr.ArrayLength a -> java.lang.reflect.Array.getLength(eval(a.array(), captured));
-            default -> throw new LambdaAnalysisException("앱에서 계산할 수 없는 식입니다: " + e);
+            default -> throw LqlMessage.HOST_NOT_EVALUABLE.exception(e);
         };
     }
 
@@ -112,7 +113,7 @@ public final class HostEvaluator {
         try {
             return Class.forName(name, false, loader);
         } catch (ClassNotFoundException ex) {
-            throw new LambdaAnalysisException("클래스를 찾을 수 없습니다: " + name, ex);
+            throw LqlMessage.CLASS_NOT_FOUND.exceptionCausedBy(null, ex, name);
         }
     }
 
@@ -126,7 +127,7 @@ public final class HostEvaluator {
             }
             return field.get(target);
         } catch (ReflectiveOperationException ex) {
-            throw new LambdaAnalysisException("필드를 읽을 수 없습니다: " + f, ex);
+            throw LqlMessage.FIELD_UNREADABLE.exceptionCausedBy(null, ex, f);
         }
     }
 
@@ -145,7 +146,7 @@ public final class HostEvaluator {
         MethodRef m = inv.method();
         Object target = inv.receiver() == null ? null : eval(inv.receiver(), captured);
         if (target == null && !m.isStatic()) {
-            throw new LambdaAnalysisException("null 값에 메서드를 호출합니다(Java에서는 NullPointerException): " + inv);
+            throw LqlMessage.NULL_METHOD_CALL.exception(inv);
         }
         Object[] args = new Object[inv.args().size()];
         Type[] types = m.argumentTypes();
@@ -162,9 +163,9 @@ public final class HostEvaluator {
             }
             return method.invoke(target, args);
         } catch (InvocationTargetException ex) {
-            throw new LambdaAnalysisException("앱 값 계산 중 예외: " + inv, ex.getCause());
+            throw LqlMessage.HOST_METHOD_FAILED.exceptionCausedBy(null, ex.getCause(), inv);
         } catch (ReflectiveOperationException ex) {
-            throw new LambdaAnalysisException("메서드를 호출할 수 없습니다: " + inv, ex);
+            throw LqlMessage.HOST_METHOD_UNCALLABLE.exceptionCausedBy(null, ex, inv);
         }
     }
 
@@ -193,14 +194,14 @@ public final class HostEvaluator {
             ctor.trySetAccessible();
             return ctor.newInstance(args);
         } catch (InvocationTargetException ex) {
-            throw new LambdaAnalysisException("앱 값 계산 중 예외: " + n, ex.getCause());
+            throw LqlMessage.HOST_METHOD_FAILED.exceptionCausedBy(null, ex.getCause(), n);
         } catch (ReflectiveOperationException ex) {
-            throw new LambdaAnalysisException("객체를 만들 수 없습니다: " + n, ex);
+            throw LqlMessage.HOST_OBJECT_UNCREATABLE.exceptionCausedBy(null, ex, n);
         }
     }
 
     private static Object arith(Expr.Arith a, Object l, Object r) {
-        if (l == null || r == null) throw new LambdaAnalysisException("null 값으로 계산합니다: " + a);
+        if (l == null || r == null) throw LqlMessage.NULL_ARITHMETIC.exception(a);
         Number x = (Number) toNumber(l), y = (Number) toNumber(r);
         return switch (a.type().getSort()) {
             case Type.LONG -> switch (a.op()) {

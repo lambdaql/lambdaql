@@ -1,5 +1,6 @@
 package org.lambdaql.query;
 
+import org.lambdaql.i18n.LqlMessage;
 import java.util.Locale;
 
 /**
@@ -76,7 +77,7 @@ public enum Direction {
      * <p>Example: {@code Direction.parse("desc-nulls-last")} is {@code DESC_NULLS_LAST}.
      */
     public static Direction parse(String text) {
-        if (text == null) throw new IllegalArgumentException("direction is null");
+        if (text == null) throw new IllegalArgumentException(LqlMessage.DIRECTION_NULL.format());
         String norm = text.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
         return valueOf(norm);
     }

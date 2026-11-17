@@ -7,7 +7,7 @@
 > Java와 SQL이 다른 점, 데이터베이스마다 다른 점, 그리고 지원하지 않는 것을 다룹니다.
 > 규칙은 H2 2.3, MariaDB 10.11, Oracle 23ai(Hibernate 6.6.5)에서 프로토타입으로 확인했습니다.
 > 현재는 분석 코어, `where`, 결과 함수(`toList()`, `toSet()`, `first()`, `one()`, `count()`, `exists()`), 정렬과 페이징의 핵심 기능, `SortSpec`, update/insert/delete/upsert([7](07-dml.md)), Spring Data JPA 모듈([12](12-spring-data-jpa.md))이 동작합니다(H2, MariaDB, Oracle에서 테스트함).
-> 아래의 서브쿼리, `select`, 프로시저 규칙과 DML 안의 서브쿼리·집계는 **아직 구현되지 않았습니다**. 정렬 규칙 중에도 아직 구현되지 않은 것이 있습니다([4.12](04-order-paging.md#412-rules-summary-s1-to-s14) 참고).
+> 서브쿼리([5](05-subquery.md))와 집계를 포함한 `select`([6](06-select-group.md)) 규칙도 DML을 포함해 구현되었습니다. 아래의 파생 테이블, CTE, 프로시저 규칙은 **아직 구현되지 않았습니다**. 정렬 규칙 중에도 아직 구현되지 않은 것이 있습니다([4.12](04-order-paging.md#412-rules-summary-s1-to-s14) 참고).
 > 전체 상태는 [Java 트랙 README](README.md#status)를 참고하십시오.
 
 [Java 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [9. Java 노트](09-java-notes.md) | 다음: [11. 오류와 언어](../11-errors-and-languages.md) | [이 페이지의 Kotlin 버전](../kotlin/10-rules-and-limits.md)
@@ -286,7 +286,7 @@ lambdaQL은 NULL이 될 수 있는 모든 키에 대해 HQL에 `nulls first` / `
 |---|---|---|
 | `limit` 없는 서브쿼리 `order by` | Oracle: 문법 오류(ORA-00907). MariaDB: 무시됨 | WARN과 함께 제거 |
 | MariaDB `IN (... limit n)` | 지원 안 됨(오류 1235) | 자동으로 감쌈: `in (select x.id from (... limit n) x)` |
-| MariaDB `lateral` | 잘못된 결과(흉내 구현) | `row_number() over (...)`로 다시 씀 |
+| MariaDB `lateral` | 잘못된 결과(흉내 구현) | `row_number() over (...)`로 다시 씀(아직 구현되지 않음) |
 
 <a id="update-insert-delete"></a>
 ### 수정, 삽입, 삭제
@@ -295,7 +295,7 @@ lambdaQL은 NULL이 될 수 있는 모든 키에 대해 HQL에 `nulls first` / `
 |---|---|---|
 | `SET a = ..., b = a + 1`(설정한 뒤 컬럼을 읽음) | MariaDB는 **새** 값을, H2와 Oracle은 이전 값을 읽음 | 분석 시점에 오류(U3) |
 | DML 안의 연관 경로(`o.getCustomer().getName()`) | Hibernate가 DB마다 다른 조인을 만들고 고객이 없는 **행을 잃음** | lambdaQL은 상관 스칼라 서브쿼리를 씀(`where`와 SET). `where`에서 조회라면 inner join할 경로에는 `customer.id is not null`도 더함. 그래서 DML이 쿼리와 같은 행에 적용됨(U9, 테스트함) |
-| 같은 테이블에 대한 서브쿼리가 있는 `DELETE` | MariaDB 오류 1093 | 파생 테이블로 감쌈(U17. 서브쿼리와 함께 구현 예정, 마일스톤 M8) |
+| 같은 테이블에 대한 서브쿼리가 있는 `DELETE` | MariaDB 오류 1093 | 파생 테이블로 감쌈(U17. 아직 구현되지 않음) |
 | STRING 컬럼과 ORDINAL 컬럼에 같은 enum 값을 한 번만 바인딩 | H2와 MariaDB는 **오류 없이 잘못된 값**을 저장 | 위치마다 파라미터 하나, 절대 공유하지 않음(U7) |
 | `values(list, ...)`의 많은 행 | Oracle: 바인드 65,535개의 고정 제한(ORA-01745), 그보다 훨씬 전부터 매우 느림 | 문장당 값 500개 이하로 나누고, 모든 문장을 한 트랜잭션에서 실행(U13) |
 | `order by ... limit`이 있는 `update` / `delete` | MariaDB는 `in` 서브쿼리의 `limit`(오류 1235)과 대상 테이블을 읽는 서브쿼리(오류 1093)를 거부 | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: 파생 테이블 `t`로 세 데이터베이스 모두에서 동작. 안쪽 select가 조회의 조인(D36)을 사용하므로 조회와 같은 행을 대상으로 함(테스트함) |

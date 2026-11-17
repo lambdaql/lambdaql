@@ -3,8 +3,9 @@
 
 > [!NOTE]
 > **状況: 実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、マイルストーン M10）。テストは **Java** のラムダを使っています。**DML での Kotlin のラムダはまだテストしていません。** `limit` と `executeOne()` も同じです（決定 D41）。
-> **まだ実装されていません:** `where` の中の `sub` サブクエリ（マイルストーン M8）、複合キーのエンティティでの `limit` / `executeOne()`。
-> Kotlin コードはテスト済みの Java の文を Kotlin の構文で書いたもので、HQL は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) の Java のテストから取っています。HQL のない例は設計に従っています。
+> `where` の中のサブクエリ（`sub`）も実装済みで、Java のラムダでテスト済みです（マイルストーン M8）。
+> **まだ実装されていません:** 複合キーのエンティティでの `limit` / `executeOne()`。
+> Kotlin コードはテスト済みの Java の文を Kotlin の構文で書いたもので、HQL は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) と [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) の Java のテストから取っています。HQL のない例は設計に従っています。
 > 全体の状況は [トラックの README](README.md) を見てください。
 
 [7. 更新、挿入、削除（Kotlin）](07-dml.md) | [7.2 更新](07-2-update.md) | **7.4 削除** | [7.5 挿入](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Java](../java/07-4-delete.md)
@@ -22,7 +23,7 @@ val byName = qb.delete(Order::class.java).where { it.customer?.name == null }
 // HQL: delete from Order e0 where (select s1.name from Customer s1 where s1.id = e0.customer.id) is null and e0.customer.id is not null
 ```
 
-**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。 このテストは Java のラムダを使います。意味が同じ Kotlin のラムダは同じ HQL になるので、SQL も同じです。 **（予定）** と書かれたブロックは [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) から取っています。lambdaQL はまだこれらの文を作らないので、このテストが予定の HQL を Hibernate に直接渡します。
+**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。 このテストは Java のラムダを使います。意味が同じ Kotlin のラムダは同じ HQL になるので、SQL も同じです。
 
 **データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `delete`:
 
@@ -68,15 +69,19 @@ id のリストで削除する（キャプチャしたコレクション、決�
 qb.delete(Item::class.java).where { it.id in ids }.execute()
 ```
 
-`where` の中のサブクエリには `sub` が必要です（まだ実装されていません、マイルストーン M8）。
+`where` の中のサブクエリは、[5. サブクエリ](05-subquery.md) と同じように 2 つ目のラムダ引数 `sub` を使います。
+品目を持たない注文を削除します。
 
 ```kotlin
 qb.delete(Order::class.java)
     .where { o, sub -> !sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
     .execute()
+// HQL: delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)
 ```
 
-**データベースごとの SQL（予定）** — 予定の HQL を Hibernate が変換したもので、`PlannedSqlTest` が記録しました。lambdaQL はまだこのクエリを作りません。`expected-sql/` の [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)、例 `07-delete-not-exists`:
+同じ文を Java で書いたものは [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) でテストしています（リージョン `dml-subquery`）。
+
+**データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `dml-subquery`:
 
 ```sql
 -- H2, Oracle

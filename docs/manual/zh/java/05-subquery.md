@@ -2,9 +2,9 @@
 
 > [!NOTE]
 > **状态**
-> - **已设计，尚未实现**（里程碑 M8）。
-> - 该语法在 Java 中可以编译，字节码已用原型检查过。SQL 形式已在 H2 2.3、MariaDB 10.11 和 Oracle 23ai 上使用 Hibernate 6.6.5 检查过。
-> - 本章中的 HQL 是**计划**的输出。
+> - **已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（Hibernate 6.6.5，里程碑 M8-1）：select、update 和 delete 的 `where((o, sub) -> ...)` 中的子查询。包括 `exists` / `not exists`、`contains`（IN）、`!contains`（写成 NOT EXISTS）、标量聚合（`count`、`sum`、`avg`、`min`、`max`）、top-1 写法 `orderBy(...).limit(1)...first()`、关联子查询和嵌套子查询，以及捕获值。
+> - **尚未实现：** `from` 中的子查询（派生表）和 CTE（里程碑 M8-2）、`set` 值中的子查询，以及 MariaDB 的 `lateral` 改写。
+> - 标记为 **(已测试)** 的示例是从测试代码中复制的。其他示例遵循相同的规则，但没有被测试覆盖。
 
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[4. 排序与分页](04-order-paging.md) | 下一章：[6. 查询列、聚合与分组](06-select-group.md) | [本页的 Kotlin 版本](../kotlin/05-subquery.md)
 
@@ -42,23 +42,29 @@ lambdaQL 根据参数个数区分这两种写法。
 
 内部 Lambda（`sub.from(...).where(...)` 里的 `i -> ...`）本身不需要是 `Serializable`。lambdaQL 会在外层 Lambda 的字节码中找到它们。
 
+在 HQL 中，子查询的根别名是 `s1`、`s2` 等（外层的根是 `e0`）。子查询内部的 join 使用 `s1j1` 这样的别名。
+
+标记为 **(已测试)** 的示例是从 [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) 中复制的。
+该测试检查 HQL，执行查询，并把返回的行与在 Java 中用同一条件过滤的结果进行比较。它在 H2、MariaDB 和 Oracle 上都能通过。
+它使用 [3.3](03-where.md#33-basic-form) 中的测试实体：`price` 是 `double`，`status` 是 `short`，`Customer.id` 是 `int`。`Customer.grade` 是 `Integer`。测试数据中的等级为 5、2 和 NULL，并且有一个没有客户的订单。
+
 ## 5.2 EXISTS
 
 至少有一个 `qty > 10` 的明细的订单：
 
+**(已测试)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)，region `exists`：
+
 ```java
-qb.from(Order.class)
-  .where((o, sub) -> sub.from(Item.class)
-                        .where(i -> i.getOrder().getId() == o.getId() && i.getQty() > 10)
-                        .exists())
-  .toList();
-// HQL: select o from Order o
-//      where exists (select 1 from Item i where i.order.id = o.id and i.qty > 10)
+// correlated: the inner lambda uses the outer order o
+SelectQuery<Order> q = qb.from(Order.class)
+        .where((o, sub) -> sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId() && i.getQty() > 10).exists());
+assertEquals("select e0 from Order e0 where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > 10)",
+        q.toHql().hql());
 ```
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。[`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) 把本页的 HQL 直接交给 Hibernate，并记录在 H2 2.3、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上得到的 SQL。lambdaQL 目前还不会生成这些查询。如果 Hibernate 的 SQL 发生变化，测试就会失败。
+**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
 
-**各数据库的 SQL（计划中）** — Hibernate 对计划中 HQL 的翻译，由 `PlannedSqlTest` 记录；lambdaQL 目前还不会生成此查询。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `05-exists`：
+**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sub-exists`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -71,20 +77,19 @@ where exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id and i1_0.qty>1
 
 ## 5.3 NOT EXISTS
 
-使用 `!`。它可以与其他条件组合：
+使用 `!`。它可以与其他条件组合。
+状态为 1 的订单，或者没有任何明细的订单：
+
+**(已测试)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)，region `not-exists`：
 
 ```java
-// 状态为 1 的订单，或者没有任何明细的订单
-qb.from(Order.class)
-  .where((o, sub) -> o.getStatus() == 1
-         || !sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists())
-  .toList();
-// HQL: select o from Order o
-//      where o.status = 1
-//         or not exists (select 1 from Item i where i.order.id = o.id)
+SelectQuery<Order> q = qb.from(Order.class)
+        .where((o, sub) -> o.getStatus() == 1 || !sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists());
+assertEquals("select e0 from Order e0 where e0.status = 1 or not exists (select 1 from Item s1 where s1.order.id = e0.id)",
+        q.toHql().hql());
 ```
 
-**各数据库的 SQL（计划中）** — Hibernate 对计划中 HQL 的翻译，由 `PlannedSqlTest` 记录；lambdaQL 目前还不会生成此查询。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `05-not-exists-or`：
+**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sub-not-exists`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -97,58 +102,58 @@ where o1_0.status=1 or not exists(select 1 from items i1_0 where i1_0.order_id=o
 
 `grade > 3` 的客户的订单：
 
+**(已测试)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)，region `in`：
+
 ```java
-qb.from(Order.class)
-  .where((o, sub) -> sub.from(Customer.class)
-                        .where(c -> c.getGrade() > 3)
-                        .select(c -> c.getId())
-                        .contains(o.getCustomer().getId()))
-  .toList();
-// HQL: select o from Order o
-//      where o.customer.id in (select c.id from Customer c where c.grade > 3)
+SelectQuery<Order> q = qb.from(Order.class)
+        .where((o, sub) -> sub.from(Customer.class).where(c -> c.getGrade() != null && c.getGrade() > 3)
+                .select(c -> c.getId()).contains(o.getCustomer().getId()));
+assertEquals("select e0 from Order e0 where e0.customer.id in"
+        + " (select s1.id from Customer s1 where s1.grade is not null and s1.grade > 3)", q.toHql().hql());
 ```
 
-**各数据库的 SQL（计划中）** — Hibernate 对计划中 HQL 的翻译，由 `PlannedSqlTest` 记录；lambdaQL 目前还不会生成此查询。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `05-in-subquery`：
+**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sub-in`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-where o1_0.customer_id in (select c2_0.id from customers c2_0 where c2_0.grade>3)
+where o1_0.customer_id in (select c2_0.id from customers c2_0 where c2_0.grade is not null and c2_0.grade>3)
 ```
 
-`o.getCustomer().getId()` 以客户的 `@Id` 结尾，所以它就是外键列 `o.customer.id`。不需要 join。
+`o.getCustomer().getId()` 以客户的 `@Id` 结尾，所以它就是外键列 `e0.customer.id`。不需要 join。
+你写的 null 检查（`c.getGrade() != null`）会作为 `s1.grade is not null` 保留在 HQL 中。
 
+<a id="55-not-in-is-written-as-not-exists"></a>
 ## 5.5 NOT IN 被写成 NOT EXISTS
 
 `!values.contains(x)` **不会**被渲染为 `NOT IN`。lambdaQL 会写成 `NOT EXISTS`：
 
+**(已测试)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)，region `not-in`：
+
 ```java
-qb.from(Order.class)
-  .where((o, sub) -> !sub.from(Customer.class)
-                         .where(c -> c.getGrade() > 3)
-                         .select(c -> c.getId())
-                         .contains(o.getCustomer().getId()))
-  .toList();
-// HQL: select o from Order o
-//      where not exists (select 1 from Customer c
-//                        where c.grade > 3 and c.id = o.customer.id)
+// the grades are 5, 2 and NULL. SQL "not in" would give no rows because of the NULL;
+// lambdaQL writes NOT EXISTS, which gives the same rows as Java (rule Q2)
+SelectQuery<Order> q = qb.from(Order.class)
+        .where((o, sub) -> !sub.from(Customer.class).select(c -> c.getGrade()).contains((int) o.getStatus()));
+assertEquals("select e0 from Order e0 where not exists (select 1 from Customer s1 where s1.grade = e0.status)",
+        q.toHql().hql());
 ```
 
-**各数据库的 SQL（计划中）** — Hibernate 对计划中 HQL 的翻译，由 `PlannedSqlTest` 记录；lambdaQL 目前还不会生成此查询。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `05-not-in`：
+**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sub-not-in`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-where not exists(select 1 from customers c2_0 where c2_0.grade>3 and c2_0.id=o1_0.customer_id)
+where not exists(select 1 from customers c2_0 where c2_0.grade=o1_0.status)
 ```
 
 原因：
 
 - 只要子查询返回哪怕一个 NULL，`x NOT IN (subquery)` 就**一行也不返回**。这是一个常见的 SQL 陷阱。
 - `NOT EXISTS` 没有这个问题。数据库也能很好地执行它（作为反连接）。
-- 结果：没有客户的订单会被上面的查询返回，因为没有任何客户与它匹配。
+- 结果：该查询返回的行与 Java 中 `!grades.contains(status)` 的结果相同。测试用数据中的 NULL 等级检查了这一点。
 
 <a id="56-correlated-subqueries"></a>
 ## 5.6 关联子查询
@@ -165,7 +170,7 @@ lambdaQL 如何读取内部 Lambda 的捕获值：
 
 | 内部 Lambda 中捕获的内容 | 变成 |
 |---|---|
-| 外层实体（`o`） | 对外层别名的引用（`o.id`） |
+| 外层实体（`o`） | 对外层别名的引用（`e0.id`） |
 | 其他任何值（局部变量、字段等） | 绑定参数，与 [3.11](03-where.md#311-captured-values) 相同 |
 
 ```java
@@ -173,10 +178,14 @@ int minQty = 10;
 .where((o, sub) -> sub.from(Item.class)
                       .where(i -> i.getOrder().getId() == o.getId() && i.getQty() > minQty)
                       .exists())
-// HQL: exists (select 1 from Item i where i.order.id = o.id and i.qty > :p1)
+// HQL: select e0 from Order e0
+//      where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > :p1)
+// 参数：{p1=10}
 ```
 
-**各数据库的 SQL（计划中）** — Hibernate 对计划中 HQL 的翻译，由 `PlannedSqlTest` 记录；lambdaQL 目前还不会生成此查询。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `05-correlated-param`：
+[`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) 中的测试方法 `capturedValueInside` 检查了这个 HQL、参数和返回的行。
+
+**各数据库的 SQL（Hibernate 为此 HQL 生成的 SQL）** — 由 [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) 记录，它把同样的 HQL 直接交给 Hibernate。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `05-correlated-param`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -189,21 +198,22 @@ where exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id and i1_0.qty>?
 但 `o.id` 是 `@Id`，永远不会是 NULL。这种情况下 lambdaQL 会写成简单的 `=`（`!=` 则写成 `(a <> b or a is null)`）。
 结果相同，而且数据库可以使用索引。在 Oracle 上，`is not distinct from` 会变成 `decode(...)`，无法使用索引。
 
+<a id="57-scalar-subqueries"></a>
 ## 5.7 标量子查询
 
 返回**一个值**的子查询可以用在比较中。
 
 价格高于平均价格的订单：
 
+**(已测试)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)，region `scalar`：
+
 ```java
-qb.from(Order.class)
-  .where((o, sub) -> o.getPrice() > sub.from(Order.class).avg(x -> x.getPrice()))
-  .toList();
-// HQL: select o from Order o
-//      where o.price > (select avg(x.price) from Order x)
+SelectQuery<Order> q = qb.from(Order.class)
+        .where((o, sub) -> o.getPrice() > sub.from(Order.class).avg(x -> x.getPrice()));
+assertEquals("select e0 from Order e0 where e0.price > (select avg(s1.price) from Order s1)", q.toHql().hql());
 ```
 
-**各数据库的 SQL（计划中）** — Hibernate 对计划中 HQL 的翻译，由 `PlannedSqlTest` 记录；lambdaQL 目前还不会生成此查询。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `05-scalar-avg`：
+**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sub-scalar`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -212,54 +222,92 @@ from orders o1_0
 where o1_0.price>(select avg(o2_0.price) from orders o2_0)
 ```
 
-标量子查询必须**始终返回一行**。允许两种形式：
+标量子查询必须**始终返回一行**。允许两种形式（规则 Q3）：
 
 | 形式 | 示例 |
 |---|---|
 | 聚合：`count()`、`sum`、`avg`、`min`、`max` | `sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).count()` |
 | Top-1：`orderBy(...).limit(1)...first()` | 见下文 |
 
-其他任何 `first()` 都会在分析时报错。
+其他任何 `first()` 都会在分析时报错（`LambdaAnalysisException`）。
 
-Top-1 示例：同一客户的最新订单。
+有两个或更多明细的订单（`count()`）：
+
+**(已测试)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)，region `count`：
 
 ```java
-qb.from(Order.class)
-  .where((o, sub) -> o.getId().equals(
-          sub.from(Order.class)
-             .where(x -> x.getCustomer().getId() == o.getCustomer().getId())
-             .orderBy((x, by) -> by.desc(x.getUpdateAt()))
-             .limit(1)
-             .select(x -> x.getId())
-             .first()))
-  .toList();
+SelectQuery<Order> q = qb.from(Order.class)
+        .where((o, sub) -> sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).count() >= 2);
+assertEquals("select e0 from Order e0 where (select count(s1) from Item s1 where s1.order.id = e0.id) >= 2L", q.toHql().hql());
 ```
+
+**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sub-count`：
+
+```sql
+-- H2, MariaDB, Oracle (same)
+select …
+from orders o1_0
+where (select count(i1_0.id) from items i1_0 where i1_0.order_id=o1_0.id)>=2
+```
+
+Top-1：每个客户最贵的订单。
+
+**(已测试)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)，region `top-one`：
+
+```java
+// the most expensive order of each customer: a correlated scalar subquery with order + limit 1 (rule Q3)
+SelectQuery<Order> q = qb.from(Order.class)
+        .where((o, sub) -> o.getId().equals(sub.from(Order.class)
+                .where(x -> x.getCustomer().getId() == o.getCustomer().getId())
+                .orderBy((x, by) -> by.desc(x.getPrice()))
+                .limit(1)
+                .select(x -> x.getId())
+                .first()));
+assertEquals("select e0 from Order e0 where e0.id = (select s1.id from Order s1 where s1.customer.id = e0.customer.id"
+        + " order by s1.price desc, s1.id asc limit 1)", q.toHql().hql());
+// first() without limit(1) is rejected
+assertThrows(LambdaAnalysisException.class, () -> qb.from(Order.class)
+        .where((o, sub) -> o.getId().equals(sub.from(Order.class).select(x -> x.getId()).first())));
+```
+
+**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sub-top-one`：
+
+```sql
+-- H2, Oracle
+select …
+from orders o1_0
+where o1_0.id=(select o2_0.id from orders o2_0 where o2_0.customer_id=o1_0.customer_id order by o2_0.price desc,o2_0.id fetch first 1 rows only)
+
+-- MariaDB
+select …
+from orders o1_0
+where o1_0.id=(select o2_0.id from orders o2_0 where o2_0.customer_id=o1_0.customer_id order by o2_0.price desc,o2_0.id limit 1)
+```
+
+lambdaQL 把 `id` 作为最后一个排序键（`s1.id asc`）加上，所以排在最前面的行总是相同的（规则 S9）。
+关联比较的是外键（`getCustomer().getId()`），而不是客户实体。见 [5.10](#510-paths-and-null-inside-subqueries)。
 
 聚合的 NULL 遵循 SQL：没有行时，`sum`、`avg`、`min`、`max` 返回 NULL，`count` 返回 0。
 
+<a id="58-nested-subqueries"></a>
 ## 5.8 嵌套子查询
 
 子查询的 `where` 也可以接收 `sub` 参数。同样的规则在每一层都适用。
 
 有订单包含大数量明细的客户：
 
+**(已测试)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)，region `nested`：
+
 ```java
-qb.from(Customer.class)
-  .where((c, sub) -> sub.from(Order.class)
-      .where((o, sub2) -> o.getCustomer().getId() == c.getId()
-             && sub2.from(Item.class)
-                    .where(i -> i.getOrder().getId() == o.getId() && i.getQty() > 10)
-                    .exists())
-      .exists())
-  .toList();
-// HQL: select c from Customer c
-//      where exists (select 1 from Order o
-//                    where o.customer.id = c.id
-//                      and exists (select 1 from Item i
-//                                  where i.order.id = o.id and i.qty > 10))
+// customers that have an order with an item of quantity > 10: a subquery inside a subquery
+SelectQuery<Customer> q = qb.from(Customer.class)
+        .where((c, sub) -> sub.from(Order.class).where((o, sub2) -> o.getCustomer().getId() == c.getId()
+                && sub2.from(Item.class).where(i -> i.getOrder().getId() == o.getId() && i.getQty() > 10).exists()).exists());
+assertEquals("select e0 from Customer e0 where exists (select 1 from Order s1 where s1.customer.id = e0.id"
+        + " and exists (select 1 from Item s2 where s2.order.id = s1.id and s2.qty > 10))", q.toHql().hql());
 ```
 
-**各数据库的 SQL（计划中）** — Hibernate 对计划中 HQL 的翻译，由 `PlannedSqlTest` 记录；lambdaQL 目前还不会生成此查询。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `05-nested`：
+**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sub-nested`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -275,20 +323,22 @@ Java 不允许在嵌套的 Lambda 中重复使用同一个名字。请在每一�
 
 | 情况 | lambdaQL 的处理 |
 |---|---|
-| 带 `limit` 的 `orderBy`（top-1、top-N） | 保留 |
+| 带 `limit` 的 `orderBy`（top-1、top-N） | 保留，并加上 `id` 决胜键 |
 | 不带 `limit` 的 `orderBy` | **删除它**并记录警告（它不会改变结果；Oracle 甚至会报语法错误 ORA-00907） |
-| MariaDB：`IN (... limit n)`（MariaDB 不支持） | 自动包装：`in (select x.id from (... limit n) x)` |
-| MariaDB：`lateral`（在 MariaDB 上结果错误） | 用 `row_number() over (partition by ... order by ...)` 改写 |
+| 对带 `limit` 的子查询使用 `contains`（MariaDB 不支持 `IN (... limit n)`，错误 1235） | 在所有数据库上都包装成派生表：`in (select t1.v from (select s1.id as v ... limit n) t1)` |
+| MariaDB：`lateral`（在 MariaDB 上结果错误） | 用 `row_number() over (partition by ... order by ...)` 改写：**尚未实现** |
 
 [4. 排序与分页](04-order-paging.md)中的 NULL 策略和自动 `id` 决胜键在子查询内部同样适用。
 
+<a id="510-paths-and-null-inside-subqueries"></a>
 ## 5.10 子查询内部的路径与 NULL
 
 在子查询内部，条件、路径和 NULL 的行为与外层查询**完全相同**（[3. 条件](03-where.md)）：
 
 - 对象上的 `==` 是 null 安全的值比较。
-- 子查询条件中的关联路径遵循与外层 `where` 相同的 join 规则（决策 D36）：默认是内连接 `join`，当 null 守卫保留没有关联的行时是 `left join`。
+- 子查询自身实体的关联路径遵循与外层 `where` 相同的 join 规则（决策 D36）：默认是内连接 `join`，当 null 守卫保留没有关联的行时是 `left join`。
 - 以 `@Id` 结尾的路径是外键列（不需要 join）。
+- **外层实体**只能使用它自己的列和外键 id（`o.getId()`、`o.getCustomer().getId()`）。需要 join 的外层实体路径（`o.getCustomer().getName()`）会在分析时报错。请改为比较外键 id。
 - 集合路径（`o.getItems()`）会被拒绝。要对集合进行判断，请使用子查询：
 
 ```java
@@ -296,19 +346,22 @@ Java 不允许在嵌套的 Lambda 中重复使用同一个名字。请在每一�
 .where((o, sub) -> sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists())
 ```
 
+<a id="511-subqueries-in-other-places"></a>
 ## 5.11 其他位置的子查询
 
-- **`from` 中的子查询（派生表）和 CTE**（`qb.from(sub -> ...)`、`qb.with(sub -> ...)`）：见 [6. 查询列、聚合与分组](06-select-group.md)。
-- **UPDATE / DELETE 中的子查询**：同样的 `sub` 语法。见 [7. 更新、插入、删除](07-dml.md)。
+- **UPDATE / DELETE 中的子查询**：`where` 中使用同样的 `sub` 语法。已实现并测试（region `dml-subquery`）。见 [7.4 删除](07-4-delete.md) 和 [7.2 更新](07-2-update.md)。
+- **`set` 值中的子查询**（`o.setTotal(sub.from(...).sum(...))`）：尚未实现。见 [7.2 更新](07-2-update.md)。
+- **`from` 中的子查询（派生表）和 CTE**（`qb.from(sub -> ...)`、`qb.with(sub -> ...)`）：已设计，尚未实现（里程碑 M8-2）。见 [6. 查询列、聚合与分组](06-select-group.md)。
 
+<a id="512-rules-summary-q1-to-q6"></a>
 ## 5.12 规则汇总（Q1 至 Q6）
 
 | # | 规则 |
 |---|---|
-| Q1 | 子查询内部的条件、路径和 NULL 规则与外部相同。条件中的关联路径使用相同的 join 规则（默认是内连接 `join`） |
+| Q1 | 子查询内部的条件、路径和 NULL 规则与外部相同。条件中的关联路径使用相同的 join 规则（默认是内连接 `join`）。需要 join 的外层实体路径会报错；允许外键 id |
 | Q2 | **NOT IN 被渲染为 NOT EXISTS**：`!values.contains(x)` 变成 `not exists (select 1 from C c where <condition> and c.sel = x)`。这样可以避开 `NOT IN` + NULL 的陷阱 |
 | Q3 | 标量子查询必须返回一行：聚合（`max`、`min`、`avg`、`sum`、`count`）或 `orderBy(...).limit(1)...first()`。其他任何 `first()` 都是错误 |
-| Q4 | 子查询排序：带 `limit` 时保留，不带 `limit` 时删除并发出警告。MariaDB 的 `IN (... limit)` 会被包装，`lateral` 会用 `row_number()` 改写 |
+| Q4 | 子查询排序：带 `limit` 时保留，不带 `limit` 时删除并发出警告。`IN (... limit)` 会被包装成派生表。MariaDB 用 `row_number()` 改写 `lateral` 尚未实现 |
 | Q5 | 在关联中，当一侧永远不会是 NULL（`@Id`、`nullable = false`、基本类型）时，`==` 写成 `=`。`!=` 变成 `(a <> b or a is null)`。这样可以保留索引的使用 |
 | Q6 | 子查询的 `where` 可以接收自己的 `sub` 参数：`where((i, sub2) -> ...)`。同样的规则在每一层都适用 |
 

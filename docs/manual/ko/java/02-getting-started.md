@@ -8,7 +8,8 @@
 > 정렬과 페이징(`orderBy`, `limit`, `offset`, `SortSpec`)의 핵심 기능도 동작합니다.
 > Spring Data JPA 모듈(리포지토리 실행기와 Spring Boot 자동 구성)도 동작합니다([12. Spring Data JPA](12-spring-data-jpa.md) 참고).
 > 수정, 삽입, 삭제, 업서트도 동작합니다([7. 수정, 삽입, 삭제](07-dml.md) 참고).
-> 서브쿼리, `select`, 프로시저는 **설계되었지만 아직 구현되지 않았습니다**.
+> 서브쿼리와 `select`(`groupBy`, `having`, `Agg` 포함)도 동작합니다([5. 서브쿼리](05-subquery.md), [6. 조회, 집계, 그룹화](06-select-group.md) 참고).
+> 파생 테이블, CTE, 프로시저는 **설계되었지만 아직 구현되지 않았습니다**.
 > 아직 Maven Central에 배포된 아티팩트는 없습니다. 아래 절차대로 소스에서 빌드하십시오.
 
 [Java 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [1. 개요](../01-overview.md) | 다음: [3. 조건](03-where.md) | [이 페이지의 Kotlin 버전](../kotlin/02-getting-started.md)
@@ -556,7 +557,7 @@ SQL은 `toList()`와 같습니다. lambdaQL은 `distinct`를 **추가하지 않�
 - lambdaQL은 to-one 연관만 조인합니다. 컬렉션은 `exists` 서브쿼리로 바뀝니다. 따라서 조인으로 행이 중복되지 않습니다.
 - 그러므로 `distinct`는 결과를 바꾸지 못하고 비용만 늘립니다. (데이터베이스 제약과는 무관합니다. Oracle 23.26은 LOB 열의 `distinct`도 허용합니다. 실측 결과입니다.)
 
-값 조회(`select`)의 `distinct`는 마일스톤 M9에서 다룹니다.
+값 조회(`select`)에서는 `distinct()`와 `toSet()`이 `select distinct`를 사용합니다([6.7](06-select-group.md#67-distinct-paging-and-results) 참고).
 
 **크기 검사.** Set의 크기가 행 수보다 작으면 `toSet()`은 `IllegalStateException`을 던집니다. 다음 경우가 해당합니다.
 

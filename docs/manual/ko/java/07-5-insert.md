@@ -2,9 +2,9 @@
 # 7.5 삽입(insert) (Java)
 
 > [!NOTE]
-> **상태: 구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, 마일스톤 M10).
-> **아직 구현되지 않음:** `insert ... select`의 집계(마일스톤 M9), `insert ... select`의 `by.set` 형태.
-> **(테스트됨)** 표시가 있는 예제는 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)에서 그대로 가져온 것입니다. 나머지 예제는 설계를 따르며 아직 테스트가 없습니다.
+> **상태: 구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, 마일스톤 M10). `insert ... select`의 `groupBy`, `having`, `Agg`(마일스톤 M9)도 포함합니다.
+> **아직 구현되지 않음:** `insert ... select`의 `by.set` 형태.
+> **(테스트됨)** 표시가 있는 예제는 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)와 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)에서 그대로 가져온 것입니다. 나머지 예제는 설계를 따르며 아직 테스트가 없습니다.
 > 전체 상태는 [Java 트랙 README](README.md#status)를 참고하십시오.
 
 [7. 수정, 삽입, 삭제 (Java)](07-dml.md) | [7.2 수정(update)](07-2-update.md) | [7.4 삭제(delete)](07-4-delete.md) | **7.5 삽입(insert)** | [7.6 업서트(upsert)](07-6-upsert.md) | [Kotlin](../kotlin/07-5-insert.md)
@@ -26,7 +26,7 @@ int inserted = i.execute();
 int generated = qb.insert(IdOrder.class).values(o -> { o.setPrice(1.0); o.setStatus(1); }).execute();
 ```
 
-**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 6.6.5로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다. **(예정)** 표시가 있는 블록은 [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)에서 나옵니다. lambdaQL이 아직 이 문장을 만들지 않으므로, 이 테스트가 예정된 HQL을 Hibernate에 직접 넘깁니다.
+**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 6.6.5로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다.
 
 **데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `insert`:
 
@@ -115,24 +115,38 @@ qb.insert(Archive.class).from(Order.class).where(o -> o.getStatus() == 9)
 <a id="insert--select-with-aggregates"></a>
 ## 집계를 사용한 insert ... select
 
-[6. 조회, 집계, 그룹화](06-select-group.md)의 `groupBy`와 `Agg` 함수를 사용합니다.
-이 형태는 **아직 구현되지 않았습니다**(마일스톤 M9).
+[6. 조회, 집계, 그룹화](06-select-group.md)의 `groupBy`, `having`, `Agg` 함수를 사용합니다.
+호출 순서는 `from(...)`, `where(...)`, `groupBy(...)`, `having(...)`, `select(...)`입니다. `where`, `groupBy`, `having`은 생략할 수 있습니다.
+
+**(테스트됨)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), 영역 `insert-group`:
 
 ```java
-qb.insert(Summary.class).from(Order.class).groupBy(o -> o.getCustomer().getId())
-  .select((s, o) -> { s.setCustomerId(o.getCustomer().getId()); s.setTotal(Agg.sum(o.getPrice())); s.setCnt(Agg.count()); })
-  .execute();
+// INSERT ... SELECT with groupBy: one summary row per customer
+ExecutableInsert<Summary> i = qb.insert(Summary.class)
+        .from(Order.class)
+        .where(o -> o.getCustomer() != null)
+        .groupBy(o -> o.getCustomer().getId())
+        .having(o -> Agg.count() >= 2)
+        .select((s, o) -> { s.setCustomerId(o.getCustomer().getId()); s.setTotal(Agg.sum(o.getPrice())); s.setCnt(Agg.count()); });
+assertEquals("insert into Summary (customerId, total, cnt) select e0.customer.id, sum(e0.price), count(*) from Order e0"
+        + " where e0.customer is not null group by e0.customer.id having count(*) >= 2L", i.toHql().get(0).hql());
 ```
 
-**데이터베이스별 SQL (예정)** — 예정된 HQL을 Hibernate가 번역한 것으로, `PlannedSqlTest`가 기록했습니다. lambdaQL은 아직 이 쿼리를 만들지 않습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `07-insert-group`:
+**데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `insert-group`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
 insert into summary(customer_id,total,cnt)
 select o1_0.customer_id,sum(o1_0.price),count(*)
 from orders o1_0
+where o1_0.customer_id is not null
 group by o1_0.customer_id
+having count(*)>=2
 ```
+
+- 집계가 아닌 값은 모두 `groupBy` 키여야 합니다(규칙 J3). 그렇지 않으면 lambdaQL은 분석 시점에 `LambdaAnalysisException`을 던집니다.
+- `where`에는 `Agg`를 쓸 수 없습니다. `having`을 사용하십시오.
+- 테스트는 문장을 실행한 뒤 `Summary` 행을 다시 읽습니다. 결과는 Java에서 같은 기준으로 그룹화한 값과 일치합니다.
 
 ---
 

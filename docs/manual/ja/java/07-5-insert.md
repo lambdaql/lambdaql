@@ -2,9 +2,9 @@
 # 7.5 挿入（Java）
 
 > [!NOTE]
-> **状況: 実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、マイルストーン M10）。
-> **まだ実装されていません:** `insert ... select` の集計（マイルストーン M9）と、`insert ... select` の `by.set` の書き方。
-> **(テスト済み)** と書かれた例は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) からコピーしたものです。それ以外の例は設計に従っており、まだテストで確認していません。
+> **状況: 実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、マイルストーン M10）。`insert ... select` の `groupBy`、`having`、`Agg`（マイルストーン M9）も含みます。
+> **まだ実装されていません:** `insert ... select` の `by.set` の書き方。
+> **(テスト済み)** と書かれた例は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) と [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) からコピーしたものです。それ以外の例は設計に従っており、まだテストで確認していません。
 > 全体の状況は [Java トラックの README](README.md#status) を参照してください。
 
 [7. 更新、挿入、削除（Java）](07-dml.md) | [7.2 更新](07-2-update.md) | [7.4 削除](07-4-delete.md) | **7.5 挿入** | [7.6 Upsert](07-6-upsert.md) | [Kotlin](../kotlin/07-5-insert.md)
@@ -26,7 +26,7 @@ int inserted = i.execute();
 int generated = qb.insert(IdOrder.class).values(o -> { o.setPrice(1.0); o.setStatus(1); }).execute();
 ```
 
-**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。 **（予定）** と書かれたブロックは [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) から取っています。lambdaQL はまだこれらの文を作らないので、このテストが予定の HQL を Hibernate に直接渡します。
+**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。
 
 **データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `insert`:
 
@@ -114,24 +114,38 @@ qb.insert(Archive.class).from(Order.class).where(o -> o.getStatus() == 9)
 <a id="insert--select-with-aggregates"></a>
 ## 集約を使う insert ... select
 
-[6. 選択、集計、グループ化](06-select-group.md) の `groupBy` と `Agg` 関数を使います。
-この書き方は **まだ実装されていません**（マイルストーン M9）。
+[6. 選択、集計、グループ化](06-select-group.md) の `groupBy`、`having`、`Agg` 関数を使います。
+順序は `from(...)`、`where(...)`、`groupBy(...)`、`having(...)`、`select(...)` です。`where`、`groupBy`、`having` は省略できます。
+
+**(テスト済み)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)、リージョン `insert-group`:
 
 ```java
-qb.insert(Summary.class).from(Order.class).groupBy(o -> o.getCustomer().getId())
-  .select((s, o) -> { s.setCustomerId(o.getCustomer().getId()); s.setTotal(Agg.sum(o.getPrice())); s.setCnt(Agg.count()); })
-  .execute();
+// INSERT ... SELECT with groupBy: one summary row per customer
+ExecutableInsert<Summary> i = qb.insert(Summary.class)
+        .from(Order.class)
+        .where(o -> o.getCustomer() != null)
+        .groupBy(o -> o.getCustomer().getId())
+        .having(o -> Agg.count() >= 2)
+        .select((s, o) -> { s.setCustomerId(o.getCustomer().getId()); s.setTotal(Agg.sum(o.getPrice())); s.setCnt(Agg.count()); });
+assertEquals("insert into Summary (customerId, total, cnt) select e0.customer.id, sum(e0.price), count(*) from Order e0"
+        + " where e0.customer is not null group by e0.customer.id having count(*) >= 2L", i.toHql().get(0).hql());
 ```
 
-**データベースごとの SQL（予定）** — 予定の HQL を Hibernate が変換したもので、`PlannedSqlTest` が記録しました。lambdaQL はまだこのクエリを作りません。`expected-sql/` の [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)、例 `07-insert-group`:
+**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `insert-group`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
 insert into summary(customer_id,total,cnt)
 select o1_0.customer_id,sum(o1_0.price),count(*)
 from orders o1_0
+where o1_0.customer_id is not null
 group by o1_0.customer_id
+having count(*)>=2
 ```
+
+- 集約のない値はすべて `groupBy` のキーでなければなりません（ルール J3）。そうでなければ、lambdaQL は解析時に `LambdaAnalysisException` を投げます。
+- `where` では `Agg` を使えません。`having` を使ってください。
+- テストは文を実行し、`Summary` の行を読み戻します。それらは Java で同じグループ化をした結果と一致します。
 
 ---
 

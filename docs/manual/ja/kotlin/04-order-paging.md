@@ -4,7 +4,7 @@
 > [!NOTE]
 > **状況**
 > - **中核部分は実装済み**、H2、MariaDB 10.11、Oracle 23.26（Hibernate 6.6.5）でテスト済み: `by.asc`、`by.desc`、`by.sort` を使う `orderBy { o, by -> ... }`、キーが 1 つの書き方 `orderBy { it.key }` と `orderBy({ it.key }, Direction)`、`Direction.parse` / `reversed`、`limit` / `offset`、`orderBy` の後の `first()`、再利用できるソート `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。Spring の `Sort` と `Pageable` は Spring Data JPA モジュールで使えます（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。テストは **Java** のラムダを使います。**Kotlin のラムダはまだテストされていません。**
-> - **まだ実装されていないもの:** Kotlin のプロパティ参照（`orderBy(Order::price)`）、`SortWhitelist`、結合の書き方 `{ o, c, by -> }`（`SortSpec` でも）、サブクエリの中のソート。
+> - **まだ実装されていないもの:** Kotlin のプロパティ参照（`orderBy(Order::price)`）、`SortWhitelist`、結合の書き方 `{ o, c, by -> }`（`SortSpec` でも）。
 > - Kotlin の構文はコンパイルできます（プロトタイプで確認、kotlinc 2.3.21）。nullable なキー、`?.` のキー、プロパティ参照はコンパイルできます。エンティティのキーはコンパイルできません。
 > - この章の HQL はライブラリのルールに従いますが、Kotlin のラムダではテストされていません。
 
@@ -495,7 +495,7 @@ qb.from(Order::class.java).orderBy(byName).toList()
 <a id="411-sorting-inside-subqueries"></a>
 ## 4.11 サブクエリの中のソート
 
-**まだ実装されていません**（サブクエリがまだ実装されていないため）。
+**実装済み**（マイルストーン M8-1、[5. サブクエリ](05-subquery.md) のサブクエリとともに）。MariaDB の `lateral` の書き換えはまだ実装されていません。
 
 サブクエリの中のソートは、`limit`（top-1 または top-N）と一緒に使うときだけ残ります。
 `limit` がなければ結果は変わらないので、lambdaQL はソートを取り除き、警告をログに出します。
@@ -519,7 +519,7 @@ qb.from(Order::class.java).orderBy(byName).toList()
 | S11 | Spring の `Sort.Order` は `Direction` に 1:1 で対応（Spring モジュール。[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) を参照）。`SortWhitelist.parse("price,desc_nulls_last")` | Spring の `Sort` は実装済み、Java でテスト済み（`ignoreCase` はまだサポートしていない）。`SortWhitelist` はまだ実装されていない |
 | S12 | join のクエリも同じ形: `{ o, c, by -> }`、`{ o, c, i, by -> }` | まだ実装されていない |
 | S13 | プロパティ参照はキーが 1 つの短い書き方（`orderBy(Order::price)`）でのみ。コンパイルできても意味が違う参照は拒否される | まだ実装されていない（Kotlin のプロパティ参照） |
-| S14 | サブクエリのソート: `limit` があれば残り、`limit` がなければ警告付きで取り除かれる。データベースの違いは自動で処理される（5 章を参照） | まだ実装されていない |
+| S14 | サブクエリのソート: `limit` があれば残り、`limit` がなければ警告付きで取り除かれる。データベースの違いは自動で処理される（5 章を参照） | 実装済み（テスト済み）。MariaDB の `lateral` の書き換えはまだ実装されていない |
 
 ---
 

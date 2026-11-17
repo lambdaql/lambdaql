@@ -3,7 +3,7 @@
 > [!NOTE]
 > **Status**
 > - **Core implemented** and tested on H2, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5): `orderBy { o, by -> ... }` with `by.asc`, `by.desc` and `by.sort`, the one-key forms `orderBy { it.key }` and `orderBy({ it.key }, Direction)`, `Direction.parse` / `reversed`, `limit` / `offset`, `first()` after `orderBy`, and the reusable sort `SortSpec` (`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`). Spring `Sort` and `Pageable` work in the Spring Data JPA module ([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)). The tests use **Java** lambdas. **Kotlin lambdas are not tested yet.**
-> - **Not implemented yet:** Kotlin property references (`orderBy(Order::price)`), `SortWhitelist`, the join forms `{ o, c, by -> }` (also for `SortSpec`) and sorting inside subqueries.
+> - **Not implemented yet:** Kotlin property references (`orderBy(Order::price)`), `SortWhitelist` and the join forms `{ o, c, by -> }` (also for `SortSpec`).
 > - The Kotlin syntax compiles (checked with prototypes, kotlinc 2.3.21). Nullable keys, `?.` keys and property references compile; an entity key does not.
 > - The HQL in this chapter follows the rules of the library, but it is not tested with Kotlin lambdas.
 
@@ -483,7 +483,7 @@ qb.from(Order::class.java).orderBy(byName).toList()
 
 ## 4.11 Sorting inside subqueries
 
-**Not implemented yet** (subqueries are not implemented yet).
+**Implemented** (milestone M8-1, with the subqueries of [5. Subqueries](05-subquery.md)). The MariaDB `lateral` rewrite is not implemented yet.
 
 A sort inside a subquery is only kept when it is used with `limit` (top-1 or top-N).
 Without `limit`, it does not change the result, so lambdaQL removes it and logs a warning.
@@ -506,7 +506,7 @@ See [5. Subqueries](05-subquery.md#59-sorting-inside-a-subquery).
 | S11 | Spring `Sort.Order` maps 1:1 to `Direction` (Spring module, see [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)). `SortWhitelist.parse("price,desc_nulls_last")` | Spring `Sort` implemented and tested with Java (`ignoreCase` not supported yet). `SortWhitelist` not implemented yet |
 | S12 | Join queries use the same shape: `{ o, c, by -> }`, `{ o, c, i, by -> }` | Not implemented yet |
 | S13 | Property references only in the one-key short form (`orderBy(Order::price)`). A reference that compiles but has the wrong meaning is rejected | Not implemented yet (Kotlin property references) |
-| S14 | Subquery sorts: kept with `limit`, removed with a warning without `limit`. Database differences are handled for you (see chapter 5) | Not implemented yet |
+| S14 | Subquery sorts: kept with `limit`, removed with a warning without `limit`. Database differences are handled for you (see chapter 5) | Implemented (tested). The MariaDB `lateral` rewrite is not implemented yet |
 
 ---
 

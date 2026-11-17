@@ -37,13 +37,13 @@ class NegationMinimizerTest {
     }
 
     @Test
-    void keepOuterNot() {
-        // @start region="keep-outer-not"
-        // !(active && status > 1): both forms have one NOT, so the outer NOT is kept
+    void pushNotIntoConditions() {
+        // @start region="push-not"
+        // !(active && status > 1)  ==>  !active || status <= 1 : a NOT on one condition has its own SQL form
         Pred source = Pred.not(new Pred.And(List.of(
                 new Pred.Truth(ACTIVE),
                 new Pred.Cmp(CmpOp.GT, STATUS, num(1), false))));
-        assertEquals(source, NegationMinimizer.minimize(source));
+        assertEquals("(!truth(param1) || param0 <= 1)", NegationMinimizer.minimize(source).toString());
         // @end
     }
 }

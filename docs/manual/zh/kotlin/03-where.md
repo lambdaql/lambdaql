@@ -3,7 +3,7 @@
 > [!NOTE]
 > **状态**
 > - **已实现，并在 H2、MariaDB 和 Oracle 上测试：** `where` 条件和 `toList()`（映射到列、HQL 输出、执行查询）。这些测试使用的是 **Java** Lambda。**Kotlin Lambda 尚未测试。**
-> - **已设计，尚未实现：** 本章中 Kotlin 特有的写法（`?.`、`?:`、`!!`、区间、`when`、`in`）。它们的字节码已经编译，并用原型检查过（kotlinc 1.7.22 到 2.3.21），许多条件已在 H2 上逐行检查。子查询、`select` 和存储过程也都只是设计。排序与分页的核心部分（[4. 排序与分页](04-order-paging.md)）、update/insert/delete/upsert（[7. 更新、插入、删除](07-dml.md)）和 Spring Data JPA 模块（[12. Spring Data JPA](12-spring-data-jpa.md)）已经实现。
+> - **已设计，尚未实现：** 本章中 Kotlin 特有的写法（`?.`、`?:`、`!!`、区间、`when`、`in`）。它们的字节码已经编译，并用原型检查过（kotlinc 1.7.22 到 2.3.21），许多条件已在 H2 上逐行检查。派生表、CTE 和存储过程也都只是设计。排序与分页的核心部分（[4. 排序与分页](04-order-paging.md)）、子查询（[5. 子查询](05-subquery.md)）、带 `groupBy`、`having` 和 `Agg` 的 `select`（[6. 查询列、聚合与分组](06-select-group.md)）、update/insert/delete/upsert（[7. 更新、插入、删除](07-dml.md)）和 Spring Data JPA 模块（[12. Spring Data JPA](12-spring-data-jpa.md)）已经实现。
 > - 本章中的 HQL 是**计划**的输出。一些小细节（例如 `e0`、`j1` 这样的别名）仍可能变化。
 
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[2. 入门](02-getting-started.md) | 下一章：[4. 排序与分页](04-order-paging.md) | [本页的 Java 版本](../java/03-where.md)

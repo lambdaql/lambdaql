@@ -30,7 +30,7 @@ public class UpdateSet<T> {
      *
      * @param assign the assignment lambda
      * @return this
-     * @throws org.lambdaql.analyzer.LambdaAnalysisException if the lambda breaks a rule, also together with earlier
+     * @throws org.lambdaql.LambdaAnalysisException if the lambda breaks a rule, also together with earlier
      *                                                       {@code set} calls (U3, U4)
      */
     public UpdateSet<T> set(Assign<T> assign) {
@@ -44,7 +44,7 @@ public class UpdateSet<T> {
      *
      * @param assign the assignment lambda
      * @return this
-     * @throws org.lambdaql.analyzer.LambdaAnalysisException if the lambda breaks a rule
+     * @throws org.lambdaql.LambdaAnalysisException if the lambda breaks a rule
      */
     public UpdateSet<T> set(AssignBy<T> assign) {
         sets.add(DmlParts.builder(context, entityClass, assign));
@@ -60,6 +60,16 @@ public class UpdateSet<T> {
      * @return the runnable UPDATE
      */
     public ExecutableUpdate<T> where(SelectQuery.Where<T> condition) {
+        return new ExecutableUpdate<>(entityClass, context, sets).where(condition);
+    }
+
+    /**
+     * Limits the rows with a condition that can use subqueries: {@code (o, sub) -> ...} (ROADMAP M8).
+     *
+     * @param condition the condition
+     * @return the runnable statement
+     */
+    public ExecutableUpdate<T> where(WhereSub<T> condition) {
         return new ExecutableUpdate<>(entityClass, context, sets).where(condition);
     }
 

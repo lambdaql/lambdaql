@@ -510,6 +510,10 @@
 **공통 기반**
 
 - **Kotlin 테스트 소스**: Kotlin 테스트 코퍼스는 `query/src/test/kotlin`에 둔다. 케이스는 `/tmp` 실측 소스를 참고해 새로 작성한다.
+  - **구현(2026-11-16)**: Kotlin Gradle 플러그인 2.3.21을 `query` 모듈에 적용했다. `src/test/kotlin`은 별도 source set `kotlinTest`이고, 컴파일된 Java 테스트 클래스(Lombok 엔티티)를 classpath로 본다. 실행은 기존 `test` 작업에 합쳐 `-Dlql.db`와 SQL 정답 파일 규칙을 그대로 쓴다.
+  - 배포 의존성에는 Kotlin이 없다(`kotlin.stdlib.default.dependency=false`, `runtimeClasspath` 확인). Spring Boot BOM의 Kotlin 1.9 고정은 `ext['kotlin.version']`으로 2.3.21에 맞춘다.
+  - `KotlinSelectTest` 3개(`?.` 경로, 캡처 값, `in`), `KotlinQueryTest` 11개(정렬, `exists`·`in`·스칼라 서브쿼리, data class·`Pair`·`Triple` projection, `groupBy`·`having`, 속성 대입·`by[열]` 대입, insert, `not exists` delete). H2·MariaDB 10.11·Oracle 23.26 통과(실측).
+  - 컴파일러 버전 매트릭스(1.7.22~2.3.0)는 아직 두지 않았다.
 - **컴파일러 버전 매트릭스**: Gradle 캐시의 `kotlin-compiler-embeddable`(1.7.22, 2.1.10, 2.2.21, 2.3.0, 2.3.21)로 같은 코퍼스를 별도 출력 디렉터리에 컴파일하는 테스트 전용 작업을 둔다(제안).
   - 버전별 classpath 조건은 3.8.2를 따른다.
 - **런타임 의존**: main scope에 kotlin-stdlib나 kotlin-reflect 의존을 추가하지 않는다. KP15는 리플렉션 `Class.forName(…, false, loader)`로, KP18은 ASM 정적 분석으로 처리한다.

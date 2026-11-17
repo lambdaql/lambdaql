@@ -3,6 +3,7 @@ package org.lambdaql.query;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.Test;
+import org.lambdaql.Agg;
 import org.lambdaql.engine.render.RenderedQuery;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -188,9 +189,47 @@ class SqlByDatabaseTest {
                 .onConflict(a -> a.getId()).ignore();
         record("insert-ignore", ignore.toHql().get(0), () -> List.of(ignore.execute()), false);
 
+        // ---- SubqueryTest
+        ex("sub-exists", qb.from(Order.class).where((o, sub) -> sub.from(Item.class)
+                .where(i -> i.getOrder().getId() == o.getId() && i.getQty() > 10).exists()));
+        ex("sub-not-exists", qb.from(Order.class).where((o, sub) -> o.getStatus() == 1
+                || !sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists()));
+        ex("sub-in", qb.from(Order.class).where((o, sub) -> sub.from(Customer.class).where(c -> c.getGrade() != null && c.getGrade() > 3)
+                .select(c -> c.getId()).contains(o.getCustomer().getId())));
+        ex("sub-not-in", qb.from(Order.class).where((o, sub) -> !sub.from(Customer.class).select(c -> c.getGrade()).contains((int) o.getStatus())));
+        ex("sub-scalar", qb.from(Order.class).where((o, sub) -> o.getPrice() > sub.from(Order.class).avg(x -> x.getPrice())));
+        ex("sub-count", qb.from(Order.class).where((o, sub) -> sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).count() >= 2));
+        ex("sub-top-one", qb.from(Order.class).where((o, sub) -> o.getId().equals(sub.from(Order.class)
+                .where(x -> x.getCustomer().getId() == o.getCustomer().getId())
+                .orderBy((x, by) -> by.desc(x.getPrice())).limit(1).select(x -> x.getId()).first())));
+        ex("sub-nested", qb.from(Customer.class).where((c, sub) -> sub.from(Order.class).where((o, sub2) -> o.getCustomer().getId() == c.getId()
+                && sub2.from(Item.class).where(i -> i.getOrder().getId() == o.getId() && i.getQty() > 10).exists()).exists()));
+
+        // ---- ProjectionTest (the select list is the point, so it is kept)
+        val("value", qb.from(Order.class).where(o -> o.getStatus() == 1).orderBy((o, by) -> by.asc(o.getPrice()))
+                .select(o -> o.getPrice()));
+        val("record", qb.from(Order.class).select(o -> new ProjectionTest.OrderView(o.getId(), o.getCustomer().getName(), o.getPrice())));
+        val("group-by", qb.from(Order.class).groupBy(o -> o.getCustomer().getId()).having(o -> Agg.sum(o.getPrice()) > 200)
+                .select(o -> new ProjectionTest.Stat(o.getCustomer().getId(), Agg.count(), Agg.sum(o.getPrice()))));
+        val("group-many", qb.from(Order.class).where(o -> o.getCustomer() != null)
+                .groupBy(o -> List.of(o.getCustomer().getId(), o.getStatus()))
+                .select(o -> new ProjectionTest.KeyCount(o.getCustomer().getId(), o.getStatus(), Agg.count())));
+        val("total", qb.from(Order.class).where(o -> o.getStatus() == 1)
+                .select(o -> new ProjectionTest.Total(Agg.count(), Agg.avg(o.getPrice()))));
+        val("distinct", qb.from(Order.class).orderBy((o, by) -> by.desc(o.getPrice())).select(o -> o.getPrice()).distinct());
+        ValueQuery<Double> paged = qb.from(Order.class).orderBy((o, by) -> by.desc(o.getPrice())).select(o -> o.getPrice()).limit(2).offset(1);
+        record("value-page", paged.toHql(), paged::toList, false);
+        ExecutableInsert<Summary> insertGroup = qb.insert(Summary.class).from(Order.class).where(o -> o.getCustomer() != null)
+                .groupBy(o -> o.getCustomer().getId()).having(o -> Agg.count() >= 2)
+                .select((s, o) -> { s.setCustomerId(o.getCustomer().getId()); s.setTotal(Agg.sum(o.getPrice())); s.setCnt(Agg.count()); });
+        record("insert-group", insertGroup.toHql().get(0), () -> List.of(insertGroup.execute()), false);
+
         ExecutableDelete<Order> deleteLimit = qb.delete(Order.class).where(o -> o.getStatus() == 1)
                 .orderBy((o, by) -> by.asc(o.getPrice())).limit(1);
         record("delete-limit", deleteLimit.toHql(), () -> List.of(deleteLimit.execute()), false);
+        ExecutableDelete<Order> deleteSub = qb.delete(Order.class)
+                .where((o, sub) -> !sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists());
+        record("dml-subquery", deleteSub.toHql(), () -> List.of(deleteSub.execute()), false);
         ExecutableUpdate<Order> updateLimit = qb.update(Order.class).set(o -> o.setDescription("top"))
                 .where(o -> o.getCustomer().getName().equals("Kim")).orderBy((o, by) -> by.desc(o.getPrice())).limit(1);
         record("update-limit", updateLimit.toHql(), () -> List.of(updateLimit.execute()), false);
@@ -199,6 +238,10 @@ class SqlByDatabaseTest {
     }
 
     // ------------------------------------------------------------------ helpers
+
+    private void val(String id, ValueQuery<?> q) {
+        record(id, q.toHql(), q::toList, false);
+    }
 
     private void ex(String id, SelectQuery<?> q) {
         record(id, q.toHql(), q::toList);

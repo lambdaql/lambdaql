@@ -1,5 +1,6 @@
 package org.lambdaql.query;
 
+import org.lambdaql.i18n.LqlMessage;
 import org.lambdaql.engine.ir.Expr;
 import org.lambdaql.engine.render.HqlRenderer;
 import org.lambdaql.engine.render.RenderedQuery;
@@ -62,7 +63,7 @@ public class InsertValues<T> extends ExecutableInsert<T> {
     public OnConflict<T> onConflict(ConflictKey<T> key) {
         Expr k = context.analyzeSortKey(QueryContext.read(key), entityClass);
         if (!(k instanceof Expr.Column c) || c.root() != 0 || c.association().contains(true)) {
-            throw new org.lambdaql.analyzer.LambdaAnalysisException("충돌 키는 엔티티의 열이어야 합니다: " + k);
+            throw LqlMessage.CONFLICT_KEY_NOT_COLUMN.exception(k);
         }
         return new OnConflict<>(entityClass, context, rows, c);
     }

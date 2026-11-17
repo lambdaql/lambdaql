@@ -1,6 +1,7 @@
 package org.lambdaql.engine.load;
 
-import org.lambdaql.analyzer.LambdaAnalysisException;
+import org.lambdaql.i18n.LqlMessage;
+import org.lambdaql.LambdaAnalysisException;
 
 import java.io.IOException;
 import java.io.ObjectOutputStream;
@@ -38,20 +39,19 @@ public final class SerializedLambdaExtractor {
      */
     public static LambdaRef extract(Object lambda) {
         if (lambda == null) {
-            throw new LambdaAnalysisException("람다가 null입니다");
+            throw LqlMessage.LAMBDA_NULL.exception();
         }
         if (!(lambda instanceof Serializable)) {
-            throw new LambdaAnalysisException("Serializable 람다만 분석할 수 있습니다: " + lambda.getClass().getName());
+            throw LqlMessage.LAMBDA_NOT_SERIALIZABLE.exception(lambda.getClass().getName());
         }
         try (Capture out = new Capture()) {
             out.writeObject(lambda);
         } catch (Found found) {
             return new LambdaRef(lambda.getClass(), found.lambda);
         } catch (IOException e) {
-            throw new LambdaAnalysisException("SerializedLambda를 얻지 못했습니다: " + lambda.getClass().getName(), e);
+            throw LqlMessage.SERIALIZED_LAMBDA_FAILED.exceptionCausedBy(null, e, lambda.getClass().getName());
         }
-        throw new LambdaAnalysisException(
-                "람다가 아닌 Serializable 객체입니다(익명 클래스 등): " + lambda.getClass().getName());
+        throw LqlMessage.NOT_A_LAMBDA.exception(lambda.getClass().getName());
     }
 
     /** Thrown inside {@link Capture} to stop serialization as soon as the lambda is found. */

@@ -4,7 +4,7 @@
 > [!NOTE]
 > **상태**
 > - **핵심 기능 구현됨, 테스트함**(Hibernate 6.6.5로 H2, MariaDB 10.11, Oracle 23.26): `by.asc`, `by.desc`, `by.sort`를 사용하는 `orderBy((o, by) -> ...)`, 키 하나의 형태 `orderBy(o -> key)`와 `orderBy(key, Direction)`(`Order::getPrice` 같은 getter 메서드 참조도 가능), `Direction.parse` / `reversed`, `limit` / `offset`, `orderBy` 뒤의 `first()`, 그리고 재사용 정렬 `SortSpec`(`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`). Spring `Sort`와 `Pageable`은 Spring Data JPA 모듈에서 동작합니다([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)).
-> - **아직 구현되지 않음:** `SortWhitelist`, 조인 형태 `(o, c, by)`(`SortSpec`에서도), 서브쿼리 안의 정렬.
+> - **아직 구현되지 않음:** `SortWhitelist`, 조인 형태 `(o, c, by)`(`SortSpec`에서도).
 > - **(테스트됨)** 표시가 있는 예제는 테스트 코드에서 그대로 가져온 것입니다. 이 장의 나머지 HQL도 같은 규칙을 따르지만 테스트하지는 않았습니다.
 
 [Java 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [3. 조건(`where`)](03-where.md) | 다음: [5. 서브쿼리](05-subquery.md) | [이 페이지의 Kotlin 버전](../kotlin/04-order-paging.md)
@@ -749,7 +749,7 @@ assertThrows(IllegalArgumentException.class,
 <a id="411-sorting-inside-subqueries"></a>
 ## 4.11 서브쿼리 안의 정렬
 
-**아직 구현되지 않음**(서브쿼리가 아직 구현되지 않음).
+**구현됨**(마일스톤 M8-1, [5. 서브쿼리](05-subquery.md)의 서브쿼리와 함께). MariaDB `lateral` 재작성은 아직 구현되지 않았습니다.
 
 서브쿼리 안의 정렬은 `limit`과 함께 사용할 때(top-1 또는 top-N)만 유지됩니다.
 `limit`이 없으면 결과에 영향을 주지 않으므로 lambdaQL은 정렬을 제거하고 경고를 로그에 남깁니다.
@@ -773,7 +773,7 @@ assertThrows(IllegalArgumentException.class,
 | S11 | Spring `Sort.Order`는 `Direction`에 1:1로 대응합니다(Spring 모듈, [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) 참고). `SortWhitelist.parse("price,desc_nulls_last")` | Spring `Sort`는 구현되고 테스트됨(`ignoreCase`는 아직 지원하지 않음). `SortWhitelist`는 아직 구현되지 않음 |
 | S12 | 조인 쿼리도 같은 형태를 사용합니다: `(o, c, by)`, `(o, c, i, by)` | 아직 구현되지 않음 |
 | S13 | 메서드 참조는 키 하나의 짧은 형태에서만 사용합니다. 컴파일은 되지만 의미가 틀린 메서드 참조는 거부됩니다([9. Java 노트](09-java-notes.md#99-method-references) 참고) | 구현됨(getter 참조) |
-| S14 | 서브쿼리 정렬: `limit`이 있으면 유지, 없으면 경고와 함께 제거. 데이터베이스별 차이는 lambdaQL이 처리합니다(5장 참고) | 아직 구현되지 않음 |
+| S14 | 서브쿼리 정렬: `limit`이 있으면 유지, 없으면 경고와 함께 제거. 데이터베이스별 차이는 lambdaQL이 처리합니다(5장 참고) | 구현됨(테스트함). MariaDB `lateral` 재작성은 아직 구현되지 않음 |
 
 ---
 

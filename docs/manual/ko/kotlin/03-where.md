@@ -4,7 +4,7 @@
 > [!NOTE]
 > **상태**
 > - **구현됨, H2·MariaDB·Oracle에서 테스트함:** `where` 조건과 `toList()`(컬럼 매핑, HQL 출력, 쿼리 실행). 테스트는 **Java** 람다를 사용합니다. **Kotlin 람다는 아직 테스트하지 않았습니다.**
-> - **설계됨, 아직 구현되지 않음:** 이 장의 Kotlin 전용 형태(`?.`, `?:`, `!!`, 범위, `when`, `in`). 이 형태들의 바이트코드는 프로토타입으로 컴파일하여 확인했고(kotlinc 1.7.22 ~ 2.3.21), 많은 조건을 H2에서 행 단위로 확인했습니다. 서브쿼리, `select`, 프로시저도 아직 설계 단계입니다. 정렬과 페이징의 핵심 기능([4. 정렬과 페이징](04-order-paging.md)), update/insert/delete/upsert([7. 수정, 삽입, 삭제](07-dml.md)), Spring Data JPA 모듈([12. Spring Data JPA](12-spring-data-jpa.md))은 구현되었습니다.
+> - **설계됨, 아직 구현되지 않음:** 이 장의 Kotlin 전용 형태(`?.`, `?:`, `!!`, 범위, `when`, `in`). 이 형태들의 바이트코드는 프로토타입으로 컴파일하여 확인했고(kotlinc 1.7.22 ~ 2.3.21), 많은 조건을 H2에서 행 단위로 확인했습니다. 파생 테이블, CTE, 프로시저도 아직 설계 단계입니다. 정렬과 페이징의 핵심 기능([4. 정렬과 페이징](04-order-paging.md)), 서브쿼리([5. 서브쿼리](05-subquery.md)), `groupBy`·`having`·`Agg`를 포함한 `select`([6. 조회, 집계, 그룹화](06-select-group.md)), update/insert/delete/upsert([7. 수정, 삽입, 삭제](07-dml.md)), Spring Data JPA 모듈([12. Spring Data JPA](12-spring-data-jpa.md))은 구현되었습니다.
 > - 이 장의 HQL은 **예정된** 출력입니다. 세부 사항(예: `e0`, `j1` 같은 별칭 이름)은 아직 조금 바뀔 수 있습니다.
 
 [Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [2. 시작하기](02-getting-started.md) | 다음: [4. 정렬과 페이징](04-order-paging.md) | [이 페이지의 Java 버전](../java/03-where.md)

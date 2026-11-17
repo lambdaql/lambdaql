@@ -8,7 +8,8 @@
 > ソートとページング（`orderBy`、`limit`、`offset`、`SortSpec`）の中核部分も実装済みで、テストしています。
 > Spring Data JPA モジュール（`LambdaQlExecutor<T>` と Spring Boot の自動構成）も実装済みで、Spring Boot 3.4.2 でテストしています。
 > 更新、挿入、削除、upsert も実装済みで、テストしています。`limit` と 1 行保護 `executeOne()` も使えます。Spring Data JPA モジュールでも使えます（短縮メソッド `deleteAll`、`updateOne` など）。そこでは呼び出し側のトランザクションが必要です。
-> サブクエリ、`select`、プロシージャは設計済みですが、**まだ実装されていません**。
+> `where` の中のサブクエリと `select`（`groupBy`、`having`、`Agg` 関数を含む）も実装済みで、テスト済みです。
+> 派生テーブル、CTE、プロシージャは設計済みですが、**まだ実装されていません**。
 > このページの HQL は、設計で定めた出力です。例は設計上の例です。
 
 このページは両方の言語向けです。コードは **Java** と **Kotlin** の別々のセクションに分けて載せています。

@@ -1,6 +1,7 @@
 package org.lambdaql.engine.sem;
 
-import org.lambdaql.analyzer.LambdaAnalysisException;
+import org.lambdaql.i18n.LqlMessage;
+import org.lambdaql.LambdaAnalysisException;
 import org.lambdaql.engine.decode.Decoder;
 import org.lambdaql.engine.ir.Assignment;
 import org.lambdaql.engine.ir.Expr;
@@ -45,20 +46,40 @@ public final class AssignmentReader {
      * @throws LambdaAnalysisException if the lambda breaks a rule
      */
     public static List<Assignment> readSetters(LambdaRef ref, List<Class<?>> roots, int hostParam, EntityModel model) {
-        if (!ref.isLambdaBody()) throw new LambdaAnalysisException("대입에는 람다를 쓰세요(메서드 레퍼런스 불가) — " + ref.describe());
+        return readSetters(ref, roots, hostParam, model, false);
+    }
+
+    /**
+     * Reads a setter-form lambda, and allows aggregate functions ({@code Agg}) in the values when {@code aggregates}
+     * is true (INSERT ... SELECT with groupBy, ROADMAP M9).
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+     * {@snippet class="org.lambdaql.query.ProjectionTest" region="insert-group"}
+     *
+     * @param ref        the lambda
+     * @param roots      entity class of each entity parameter; parameter 0 is the target
+     * @param hostParam  index of a parameter read in Java, or -1
+     * @param model      entity information
+     * @param aggregates {@code true} to allow {@code Agg} calls in the values
+     * @return the assignments in source order
+     * @throws LambdaAnalysisException if the lambda breaks a rule
+     */
+    public static List<Assignment> readSetters(LambdaRef ref, List<Class<?>> roots, int hostParam, EntityModel model,
+                                               boolean aggregates) {
+        if (!ref.isLambdaBody()) throw LqlMessage.METHOD_REFERENCE_IN_ASSIGNMENT.exceptionAt(ref.describe());
         List<Expr.Invoke> calls = Decoder.decodeStatements(ref, BytecodeLoader.load(ref));
         List<Assignment> out = new ArrayList<>();
         for (Expr.Invoke call : calls) {
             if (call.receiver() == null || call.args().size() != 1) {
-                throw new LambdaAnalysisException("대입 람다에는 setter 호출만 쓸 수 있습니다(U1): "
-                        + call.method().ownerSimpleName() + "." + call.method().name() + " — " + ref.describe());
+                throw LqlMessage.ASSIGN_ONLY_SETTERS.exceptionAt(ref.describe(), call.method().ownerSimpleName() + "." + call.method().name());
             }
             Expr receiver = asHost(call.receiver(), hostParam, ref);
             Expr.Column target = Normalizer.assignTarget(receiver, call.method().name(), roots, model, ref.classLoader(), ref.describe());
-            Expr value = Normalizer.normalizeValue(asHost(call.args().get(0), hostParam, ref), roots, model, ref.classLoader(), ref.describe());
+            Expr value = Normalizer.normalizeValue(asHost(call.args().get(0), hostParam, ref), roots, model, ref.classLoader(),
+                    ref.describe(), aggregates);
             out.add(checkTarget(new Assignment(target, value), ref));
         }
-        if (out.isEmpty()) throw new LambdaAnalysisException("대입이 하나도 없습니다(U1) — " + ref.describe());
+        if (out.isEmpty()) throw LqlMessage.ASSIGN_NONE.exceptionAt(ref.describe());
         return List.copyOf(out);
     }
 
@@ -76,7 +97,7 @@ public final class AssignmentReader {
      * @throws LambdaAnalysisException if the body has anything other than {@code by.set} calls, or a rule is broken
      */
     public static List<Assignment> readBuilder(LambdaRef ref, List<Class<?>> roots, EntityModel model) {
-        if (!ref.isLambdaBody()) throw new LambdaAnalysisException("대입에는 람다를 쓰세요(메서드 레퍼런스 불가) — " + ref.describe());
+        if (!ref.isLambdaBody()) throw LqlMessage.METHOD_REFERENCE_IN_ASSIGNMENT.exceptionAt(ref.describe());
         int byIndex = roots.size();
         List<Assignment> out = new ArrayList<>();
         // each statement is one chain by.set(..).set(..) whose result is dropped (Java chain, Java/Kotlin statements,
@@ -91,19 +112,18 @@ public final class AssignmentReader {
                         && inv.method().name().equals("set") && inv.args().size() == 2) {
                     Expr col = Normalizer.normalizeValue(inv.args().get(0), roots, model, ref.classLoader(), ref.describe());
                     if (!(col instanceof Expr.Column target) || target.root() != 0) {
-                        throw new LambdaAnalysisException("by.set의 첫째 인자는 대상 엔티티의 속성이어야 합니다: " + inv.args().get(0)
-                                + " — " + ref.describe());
+                        throw LqlMessage.BY_SET_TARGET.exceptionAt(ref.describe(), inv.args().get(0));
                     }
                     Expr value = Normalizer.normalizeValue(inv.args().get(1), roots, model, ref.classLoader(), ref.describe());
                     chain.add(0, checkTarget(new Assignment(target, value), ref));
                     e = inv.receiver();
                     continue;
                 }
-                throw new LambdaAnalysisException("대입 람다는 by.set(열, 값)만 쓸 수 있습니다: " + e + " — " + ref.describe());
+                throw LqlMessage.BY_SET_ONLY.exceptionAt(ref.describe(), e);
             }
             out.addAll(chain);
         }
-        if (out.isEmpty()) throw new LambdaAnalysisException("대입이 하나도 없습니다(U1) — " + ref.describe());
+        if (out.isEmpty()) throw LqlMessage.ASSIGN_NONE.exceptionAt(ref.describe());
         return List.copyOf(out);
     }
 
@@ -123,13 +143,11 @@ public final class AssignmentReader {
             for (int j = 0; j < i; j++) {
                 Expr.Column earlier = all.get(j).target();
                 if (overlaps(earlier, a.target())) {
-                    throw new LambdaAnalysisException("같은 열을 두 번 대입합니다(U4): " + String.join(".", a.target().path())
-                            + " — " + where);
+                    throw LqlMessage.ASSIGN_TWICE.exceptionAt(where, String.join(".", a.target().path()));
                 }
                 for (Expr.Column read : columns(a.value())) {
                     if (read.root() == earlier.root() && overlaps(earlier, read)) {
-                        throw new LambdaAnalysisException("앞에서 대입한 열을 뒤의 값에서 읽습니다(U3). SQL에서는 갱신 전 값이라 "
-                                + "DB마다 결과가 다릅니다: " + String.join(".", read.path()) + " — " + where);
+                        throw LqlMessage.ASSIGN_READS_WRITTEN.exceptionAt(where, String.join(".", read.path()));
                     }
                 }
             }
@@ -152,6 +170,8 @@ public final class AssignmentReader {
             case Expr.Arith a -> new Expr.Arith(a.op(), reroot(a.left(), from, to), reroot(a.right(), from, to), a.type());
             case Expr.Neg n -> new Expr.Neg(reroot(n.operand(), from, to), n.type());
             case Expr.Coalesce c -> new Expr.Coalesce(reroot(c.first(), from, to), reroot(c.second(), from, to), c.type());
+            case Expr.Aggregate a -> a.arg() == null ? a : new Expr.Aggregate(a.fn(), reroot(a.arg(), from, to), a.type());
+            case Expr.Func f -> new Expr.Func(f.key(), f.sql(), f.asType(), f.args().stream().map(x -> reroot(x, from, to)).toList(), f.type());
             default -> e;
         };
     }
@@ -172,11 +192,10 @@ public final class AssignmentReader {
 
     private static Assignment checkTarget(Assignment a, LambdaRef ref) {
         if (a.target().root() != 0) {
-            throw new LambdaAnalysisException("대입 대상은 람다의 첫째 인자(대상 엔티티)여야 합니다: " + a.target() + " — " + ref.describe());
+            throw LqlMessage.ASSIGN_TARGET_NOT_FIRST.exceptionAt(ref.describe(), a.target());
         }
         if (a.value() instanceof Expr.Const c && c.isNull() && a.target().nonNull()) {
-            throw new LambdaAnalysisException("NULL이 될 수 없는 열에 null을 대입합니다(U6): "
-                    + String.join(".", a.target().path()) + " — " + ref.describe());
+            throw LqlMessage.ASSIGN_NULL_NOT_NULL.exceptionAt(ref.describe(), String.join(".", a.target().path()));
         }
         return a;
     }
@@ -222,6 +241,10 @@ public final class AssignmentReader {
                 collect(c.first(), out);
                 collect(c.second(), out);
             }
+            case Expr.Aggregate a -> {
+                if (a.arg() != null) collect(a.arg(), out);
+            }
+            case Expr.Func f -> f.args().forEach(x -> collect(x, out));
             default -> { }
         }
     }

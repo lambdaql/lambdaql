@@ -402,10 +402,118 @@ insert into archive(id,price)
 select 300,1.0
 where not exists(select 1 from archive a2_0 where a2_0.id=300)
 
+-- @example sub-exists
+-- HQL: select e0 from Order e0 where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > 10)
+select …
+from orders o1_0
+where exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id and i1_0.qty>10)
+
+-- @example sub-not-exists
+-- HQL: select e0 from Order e0 where e0.status = 1 or not exists (select 1 from Item s1 where s1.order.id = e0.id)
+select …
+from orders o1_0
+where o1_0.status=1 or not exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id)
+
+-- @example sub-in
+-- HQL: select e0 from Order e0 where e0.customer.id in (select s1.id from Customer s1 where s1.grade is not null and s1.grade > 3)
+select …
+from orders o1_0
+where o1_0.customer_id in (select c2_0.id from customers c2_0 where c2_0.grade is not null and c2_0.grade>3)
+
+-- @example sub-not-in
+-- HQL: select e0 from Order e0 where not exists (select 1 from Customer s1 where s1.grade = e0.status)
+select …
+from orders o1_0
+where not exists(select 1 from customers c2_0 where c2_0.grade=o1_0.status)
+
+-- @example sub-scalar
+-- HQL: select e0 from Order e0 where e0.price > (select avg(s1.price) from Order s1)
+select …
+from orders o1_0
+where o1_0.price>(select avg(o2_0.price) from orders o2_0)
+
+-- @example sub-count
+-- HQL: select e0 from Order e0 where (select count(s1) from Item s1 where s1.order.id = e0.id) >= 2L
+select …
+from orders o1_0
+where (select count(i1_0.id) from items i1_0 where i1_0.order_id=o1_0.id)>=2
+
+-- @example sub-top-one
+-- HQL: select e0 from Order e0 where e0.id = (select s1.id from Order s1 where s1.customer.id = e0.customer.id order by s1.price desc, s1.id asc limit 1)
+select …
+from orders o1_0
+where o1_0.id=(select o2_0.id from orders o2_0 where o2_0.customer_id=o1_0.customer_id order by o2_0.price desc,o2_0.id limit 1)
+
+-- @example sub-nested
+-- HQL: select e0 from Customer e0 where exists (select 1 from Order s1 where s1.customer.id = e0.id and exists (select 1 from Item s2 where s2.order.id = s1.id and s2.qty > 10))
+select …
+from customers c1_0
+where exists(select 1 from orders o1_0 where o1_0.customer_id=c1_0.id and exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id and i1_0.qty>10))
+
+-- @example value
+-- HQL: select e0.price from Order e0 where e0.status = 1 order by e0.price asc
+select o1_0.price
+from orders o1_0
+where o1_0.status=1
+order by o1_0.price
+
+-- @example record
+-- HQL: select e0.id, j1.name, e0.price from Order e0 left join e0.customer j1
+select o1_0.id,c1_0.name,o1_0.price
+from orders o1_0
+left join customers c1_0 on c1_0.id=o1_0.customer_id
+
+-- @example group-by
+-- HQL: select e0.customer.id, count(*), sum(e0.price) from Order e0 group by e0.customer.id having sum(e0.price) > 200.0
+select o1_0.customer_id,count(*),sum(o1_0.price)
+from orders o1_0
+group by o1_0.customer_id
+having sum(o1_0.price)>200.0
+
+-- @example group-many
+-- HQL: select e0.customer.id, e0.status, count(*) from Order e0 where e0.customer is not null group by e0.customer.id, e0.status
+select o1_0.customer_id,o1_0.status,count(*)
+from orders o1_0
+where o1_0.customer_id is not null
+group by o1_0.customer_id,o1_0.status
+
+-- @example total
+-- HQL: select count(*), avg(e0.price) from Order e0 where e0.status = 1
+select count(*),avg(o1_0.price)
+from orders o1_0
+where o1_0.status=1
+
+-- @example distinct
+-- HQL: select distinct e0.price from Order e0 order by e0.price desc
+select distinct o1_0.price
+from orders o1_0
+order by o1_0.price desc
+
+-- @example value-page
+-- HQL: select e0.price from Order e0 order by e0.price desc, e0.id asc
+select o1_0.price
+from orders o1_0
+order by o1_0.price desc,o1_0.id
+limit ?,?
+
+-- @example insert-group
+-- HQL: insert into Summary (customerId, total, cnt) select e0.customer.id, sum(e0.price), count(*) from Order e0 where e0.customer is not null group by e0.customer.id having count(*) >= 2L
+insert into summary(customer_id,total,cnt)
+select o1_0.customer_id,sum(o1_0.price),count(*)
+from orders o1_0
+where o1_0.customer_id is not null
+group by o1_0.customer_id
+having count(*)>=2
+
 -- @example delete-limit
 -- HQL: delete from Order e0 where e0.id in (select t.id from (select x0.id as id from Order x0 where x0.status = 1 order by x0.price asc, x0.id asc limit 1) t)
 delete o1_0 from orders o1_0
 where o1_0.id in (select t1_0.id from (select o2_0.id id from orders o2_0 where o2_0.status=1 order by o2_0.price,o2_0.id limit 1) t1_0)
+
+-- @example dml-subquery
+-- HQL: delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)
+delete o1_0 from orders o1_0
+where not exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id)
 
 -- @example update-limit
 -- HQL: update Order e0 set e0.description = 'top' where e0.id in (select t.id from (select x0.id as id from Order x0 join x0.customer k1 where k1.name = 'Kim' order by x0.price desc, x0.id asc limit 1) t)

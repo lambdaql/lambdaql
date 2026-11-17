@@ -2,9 +2,9 @@
 # 7.5 插入（Java）
 
 > [!NOTE]
-> **状态：已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（里程碑 M10）。
-> **尚未实现：** `insert ... select` 中的聚合（里程碑 M9）以及 `insert ... select` 的 `by.set` 写法。
-> 标记为 **(已测试)** 的示例是从 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中复制的。其他示例遵循设计，还没有测试覆盖。
+> **状态：已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（里程碑 M10），包括 `insert ... select` 中的 `groupBy`、`having` 和 `Agg`（里程碑 M9）。
+> **尚未实现：** `insert ... select` 的 `by.set` 写法。
+> 标记为 **(已测试)** 的示例是从 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 和 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) 中复制的。其他示例遵循设计，还没有测试覆盖。
 > 完整状态见 [Java 路线 README](README.md#status)。
 
 [7. 更新、插入、删除（Java）](07-dml.md) | [7.2 更新](07-2-update.md) | [7.4 删除](07-4-delete.md) | **7.5 插入** | [7.6 Upsert](07-6-upsert.md) | [Kotlin](../kotlin/07-5-insert.md)
@@ -26,7 +26,7 @@ int inserted = i.execute();
 int generated = qb.insert(IdOrder.class).values(o -> { o.setPrice(1.0); o.setStatus(1); }).execute();
 ```
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。 标记为 **（计划中）** 的块来自 [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)。由于 lambdaQL 目前还不会生成这些语句，该测试把计划中的 HQL 直接交给 Hibernate。
+**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
 
 **各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `insert`：
 
@@ -115,24 +115,38 @@ qb.insert(Archive.class).from(Order.class).where(o -> o.getStatus() == 9)
 <a id="insert--select-with-aggregates"></a>
 ## 带聚合的 Insert ... select
 
-使用 [6. 查询列、聚合与分组](06-select-group.md)中的 `groupBy` 和 `Agg` 函数。
-这种写法**尚未实现**（里程碑 M9）：
+使用 [6. 查询列、聚合与分组](06-select-group.md) 中的 `groupBy`、`having` 和 `Agg` 函数。
+顺序是 `from(...)`、`where(...)`、`groupBy(...)`、`having(...)`、`select(...)`。`where`、`groupBy` 和 `having` 都是可选的。
+
+**(已测试)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `insert-group`：
 
 ```java
-qb.insert(Summary.class).from(Order.class).groupBy(o -> o.getCustomer().getId())
-  .select((s, o) -> { s.setCustomerId(o.getCustomer().getId()); s.setTotal(Agg.sum(o.getPrice())); s.setCnt(Agg.count()); })
-  .execute();
+// INSERT ... SELECT with groupBy: one summary row per customer
+ExecutableInsert<Summary> i = qb.insert(Summary.class)
+        .from(Order.class)
+        .where(o -> o.getCustomer() != null)
+        .groupBy(o -> o.getCustomer().getId())
+        .having(o -> Agg.count() >= 2)
+        .select((s, o) -> { s.setCustomerId(o.getCustomer().getId()); s.setTotal(Agg.sum(o.getPrice())); s.setCnt(Agg.count()); });
+assertEquals("insert into Summary (customerId, total, cnt) select e0.customer.id, sum(e0.price), count(*) from Order e0"
+        + " where e0.customer is not null group by e0.customer.id having count(*) >= 2L", i.toHql().get(0).hql());
 ```
 
-**各数据库的 SQL（计划中）** — Hibernate 对计划中 HQL 的翻译，由 `PlannedSqlTest` 记录；lambdaQL 目前还不会生成此查询。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `07-insert-group`：
+**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `insert-group`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
 insert into summary(customer_id,total,cnt)
 select o1_0.customer_id,sum(o1_0.price),count(*)
 from orders o1_0
+where o1_0.customer_id is not null
 group by o1_0.customer_id
+having count(*)>=2
 ```
+
+- 每个不带聚合的值都必须是 `groupBy` 的键（规则 J3）。否则 lambdaQL 会在分析时抛出 `LambdaAnalysisException`。
+- `where` 中不允许使用 `Agg`。请使用 `having`。
+- 测试执行该语句并读回 `Summary` 的行。它们与在 Java 中进行同样分组的结果一致。
 
 ---
 

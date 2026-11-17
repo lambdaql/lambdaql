@@ -4,7 +4,8 @@
 > [!NOTE]
 > **상태**
 > - **구현됨, 테스트함:** H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 6.6.5, 마일스톤 M10, 결정 D28·D40). 대상은 update, delete, insert, `insert ... select`, upsert, update와 delete의 `limit`, 1행 보호 `executeOne()`(결정 D41)입니다. 테스트는 **Java** 람다를 사용합니다. **DML의 Kotlin 람다는 아직 테스트하지 않았습니다.**
-> - **아직 구현되지 않음:** DML 안의 `sub` 서브쿼리(마일스톤 M8), `insert ... select`의 집계(마일스톤 M9), 복합 키 엔티티의 `limit` / `executeOne()`.
+> - **함께 구현됨, 테스트함(Java 람다로):** 수정·삭제 `where` 안의 서브쿼리(`sub`)(마일스톤 M8, [7.4](07-4-delete.md) 참고), `insert ... select`의 `groupBy`, `having`, `Agg`(마일스톤 M9, [7.5](07-5-insert.md) 참고).
+> - **아직 구현되지 않음:** `set` 값 안의 서브쿼리(컨텍스트 객체의 `by.from(...)`), 복합 키 엔티티의 `limit` / `executeOne()`.
 > - 이 장의 Kotlin 코드는 테스트된 Java 문장을 Kotlin 문법으로 옮긴 것입니다. HQL은 Java 테스트에서 가져왔습니다. HQL이 없는 예제는 설계를 따릅니다.
 > - 전체 상태는 [트랙 README](README.md)를 참고하십시오.
 
@@ -142,7 +143,7 @@ Kotlin 인덱스 연산자 `by[o.status] = st`도 같은 `set` 메서드를 호�
 
 설계에서 두 번째 람다 인자는 **컨텍스트 객체 하나**입니다. 이 객체는 `set(column, value)`와 서브쿼리 함수 `from(...)`을 모두 가집니다.
 이름은 `by`든 `sub`든 자유롭게 지으십시오. 이름은 동작에 영향이 없습니다.
-서브쿼리 부분은 **아직 구현되지 않았습니다**(마일스톤 M8). 현재 이 객체에는 `set`만 있습니다.
+이 객체의 서브쿼리 부분은 **아직 구현되지 않았습니다**. 현재 이 객체에는 `set`만 있습니다. (`where` 안의 서브쿼리는 동작합니다: `where { o, sub -> ... }`. [5. 서브쿼리](05-subquery.md) 참고.)
 
 ```kotlin
 qb.update(Order::class.java)
@@ -342,7 +343,7 @@ qb.delete(Order::class.java).where { it.status == 1 }.orderBy { o, by -> by.asc(
 ## 7.9 모든 규칙 U1 ~ U21(요약)
 
 lambdaQL이 람다를 읽을 때 검사하는 규칙: U1, U3, U4, U6(Java 람다로 테스트함). 컴파일러가 검사하는 규칙: U5.
-U11, U12, U15, U20에 대한 lambdaQL의 검사는 아직 구현되지 않았습니다. U17에는 서브쿼리(마일스톤 M8)가 필요합니다.
+U11, U12, U15, U20에 대한 lambdaQL의 검사는 아직 구현되지 않았습니다. U17(같은 테이블을 읽는 서브쿼리에 대한 MariaDB용 감싸기)도 아직 구현되지 않았습니다.
 
 | # | 규칙 |
 |---|---|

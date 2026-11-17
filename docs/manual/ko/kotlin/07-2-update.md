@@ -3,7 +3,8 @@
 
 > [!NOTE]
 > **상태: 구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, 마일스톤 M10). 테스트는 **Java** 람다를 사용합니다. **DML의 Kotlin 람다는 아직 테스트하지 않았습니다.** `limit`과 `executeOne()`(결정 D41)도 같습니다.
-> **아직 구현되지 않음:** `set`과 `where` 안의 `sub` 서브쿼리(마일스톤 M8), 복합 키 엔티티의 `limit` / `executeOne()`.
+> `where` 안의 서브쿼리(`sub`)도 구현되었습니다(마일스톤 M8). 삭제 형태는 Java 람다로 테스트했습니다. [7.4](07-4-delete.md)를 참고하십시오.
+> **아직 구현되지 않음:** `set` 값 안의 `sub` 서브쿼리, 복합 키 엔티티의 `limit` / `executeOne()`.
 > Kotlin 코드는 테스트된 Java 문장을 Kotlin 문법으로 옮긴 것이고, HQL은 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)의 Java 테스트에서 가져왔습니다. HQL이 없는 예제는 설계를 따릅니다.
 > 전체 상태는 [트랙 README](README.md)를 참고하십시오.
 
@@ -156,7 +157,7 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 
 인자가 둘인 람다를 사용하십시오. 두 번째 인자는 컨텍스트 객체(`sub`)입니다.
 여기서는 `Agg`가 필요 없습니다. 서브쿼리에는 [5. 서브쿼리](05-subquery.md)처럼 `sum`, `avg`, ...가 있습니다.
-이 형태는 **아직 구현되지 않았습니다**(마일스톤 M8).
+이 형태는 **아직 구현되지 않았습니다**. 현재는 `where` 안의 서브쿼리만 동작합니다.
 
 ```kotlin
 qb.update(Order::class.java)
@@ -198,10 +199,12 @@ qb.update(Order::class.java).set { it.status = 9 }
     .execute()
 ```
 
+두 예제 모두 현재 동작합니다.
 첫 번째 예제는 위에서 테스트한 규칙을 따릅니다. 경로가 스칼라 서브쿼리가 됩니다.
-두 번째 예제에는 `sub`가 필요합니다(아직 구현되지 않음, 마일스톤 M8).
+두 번째 예제는 [5. 서브쿼리](05-subquery.md)처럼 `sub`를 사용합니다. HQL은 `update Order e0 set e0.status = 9 where not exists (select 1 from Item s1 where s1.order.id = e0.id)`입니다.
+같은 `where`를 쓰는 삭제는 Java 람다로 테스트했습니다(영역 `dml-subquery`, [7.4](07-4-delete.md) 참고). 수정 형태에는 아직 별도 테스트가 없습니다.
 
-**데이터베이스별 SQL (예정)** — 예정된 HQL을 Hibernate가 번역한 것으로, `PlannedSqlTest`가 기록했습니다. lambdaQL은 아직 이 쿼리를 만들지 않습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `07-update-not-exists`:
+**데이터베이스별 SQL (이 HQL에 대한 Hibernate의 SQL)** — [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)가 같은 문장을 Hibernate에 직접 넘겨 기록했습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `07-update-not-exists`:
 
 ```sql
 -- H2, MariaDB

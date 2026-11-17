@@ -1,5 +1,6 @@
 package org.lambdaql.query;
 
+import org.lambdaql.i18n.LqlMessage;
 import org.lambdaql.engine.render.HqlRenderer;
 import org.lambdaql.engine.render.RenderedQuery;
 
@@ -34,6 +35,17 @@ public class ExecutableDelete<T> {
      * @return this
      */
     public ExecutableDelete<T> where(SelectQuery.Where<T> condition) {
+        wheres.add(DmlParts.where(context, entityClass, condition));
+        return this;
+    }
+
+    /**
+     * Adds a condition that can use subqueries (joined with AND).
+     *
+     * @param condition the condition
+     * @return this
+     */
+    public ExecutableDelete<T> where(WhereSub<T> condition) {
         wheres.add(DmlParts.where(context, entityClass, condition));
         return this;
     }
@@ -99,7 +111,7 @@ public class ExecutableDelete<T> {
      * @throws IllegalArgumentException if {@code count} is negative
      */
     public ExecutableDelete<T> limit(int count) {
-        if (count < 0) throw new IllegalArgumentException("limit must be 0 or more: " + count);
+        if (count < 0) throw new IllegalArgumentException(LqlMessage.LIMIT_NEGATIVE.format(count));
         this.limit = count;
         return this;
     }
@@ -117,13 +129,13 @@ public class ExecutableDelete<T> {
      * @throws IllegalStateException                        if {@code limit} or {@code orderBy} was set
      */
     public int executeOne() {
-        if (limit != null || !sorts.isEmpty()) throw new IllegalStateException("executeOne() cannot be used with limit/orderBy");
+        if (limit != null || !sorts.isEmpty()) throw new IllegalStateException(LqlMessage.EXECUTE_ONE_WITH_LIMIT.format());
         HqlRenderer ids = DmlParts.renderer(context, entityClass);
         return context.executeOne(ids.ids(entityClass, wheres), id -> render(new HqlRenderer.DmlScope(List.of(), null, id)));
     }
 
     private HqlRenderer.DmlScope scope() {
-        if (!sorts.isEmpty() && limit == null) throw new IllegalStateException("orderBy() needs limit()");
+        if (!sorts.isEmpty() && limit == null) throw new IllegalStateException(LqlMessage.ORDER_BY_NEEDS_LIMIT.format());
         return new HqlRenderer.DmlScope(List.copyOf(sorts), limit, null);
     }
 }

@@ -7,7 +7,7 @@
 > Kotlin と SQL がどこで違うか、データベースがどこで違うか、何がサポートされないか、です。
 > ルールは H2 2.3、MariaDB 10.11、Oracle 23ai（Hibernate 6.6.5）のプロトタイプで、Kotlin のバイトコードは kotlinc 1.7.22 から 2.3.21 で確認しました。
 > 現在動作するのは解析コア、`where`、結果の関数（`toList()`、`toSet()`、`first()`、`one()`、`count()`、`exists()`）、ソートとページングの中核部分、`SortSpec`、update/insert/delete/upsert（[7](07-dml.md)）、そして Spring Data JPA モジュール（[12](12-spring-data-jpa.md)）です（H2、MariaDB、Oracle で Java のラムダを使ってテスト済み）。
-> 以下のサブクエリ、`select`、プロシージャのルールは **まだ実装されていません**。DML の中のサブクエリと集計もまだです。ソートのルールにも、まだ実装されていないものがあります（[4.12](04-order-paging.md#412-rules-summary-s1-to-s14) を参照）。
+> サブクエリ（[5](05-subquery.md)）と集計を含む `select`（[6](06-select-group.md)）のルールも実装済みで、DML の中でも使えます。以下の派生テーブル、CTE、プロシージャのルールは **まだ実装されていません**。ソートのルールにも、まだ実装されていないものがあります（[4.12](04-order-paging.md#412-rules-summary-s1-to-s14) を参照）。
 > 全体の状況は [トラックの README](README.md) を参照してください。
 
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [9. Kotlin の注意点](09-kotlin-notes.md) | 次: [11. エラーと言語](../11-errors-and-languages.md) | [このページの Java 版](../java/10-rules-and-limits.md)
@@ -307,7 +307,7 @@ lambdaQL は、NULL になりうるすべてのキーについて HQL に `nulls
 |---|---|---|
 | `limit` のないサブクエリの `order by` | Oracle: 構文エラー（ORA-00907）。MariaDB: 無視される | WARN を出して削除する |
 | MariaDB の `IN (... limit n)` | サポートされない（エラー 1235） | 自動で包む: `in (select x.id from (... limit n) x)` |
-| MariaDB の `lateral` | 結果が間違う（エミュレーション） | `row_number() over (...)` で書き換える |
+| MariaDB の `lateral` | 結果が間違う（エミュレーション） | `row_number() over (...)` で書き換える（まだ実装されていない） |
 
 <a id="update-insert-delete"></a>
 ### 更新、挿入、削除
@@ -316,7 +316,7 @@ lambdaQL は、NULL になりうるすべてのキーについて HQL に `nulls
 |---|---|---|
 | `SET a = ..., b = a + 1`（設定した後でカラムを読む） | MariaDB は **新しい** 値を読み、H2 と Oracle は古い値を読む | 解析時にエラー（U3） |
 | DML の中の関連のパス（`it.customer?.name`） | Hibernate は DB ごとに違う結合を作り、customer のない **行が失われる** | lambdaQL は相関スカラーサブクエリ（`where` の中と SET の中）を書く。`where` では、選択が内部結合するパスに `customer.id is not null` も加えるので、DML はクエリと同じ行に当たる（U9、テスト済み） |
-| 同じテーブルに対するサブクエリを使う `DELETE` | MariaDB のエラー 1093 | 派生テーブルで包む（U17。サブクエリとともに実装、マイルストーン M8） |
+| 同じテーブルに対するサブクエリを使う `DELETE` | MariaDB のエラー 1093 | 派生テーブルで包む（U17。まだ実装されていない） |
 | 同じ enum の値を STRING と ORDINAL のカラムに 1 回だけバインドする | H2 と MariaDB は **エラーなしで間違った値** を保存する | 場所ごとに 1 つのパラメーター。共有しない（U7） |
 | `values(list) { }` の多くの行 | Oracle: バインド数の上限は 65,535（ORA-01745）で、それよりずっと前からとても遅い | 分割する: 1 文あたり最大 500 個の値、すべて 1 つのトランザクションで実行（U13） |
 | `order by ... limit` を使う `update` / `delete` | MariaDB は `in` サブクエリの中の `limit`（エラー 1235）と、対象テーブルへのサブクエリ（エラー 1093）を拒否する | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: 派生テーブル `t` は 3 つのデータベースすべてで動く。内側の select は select の結合を使う（D36）ので、行は select と同じ（Java でテスト済み） |

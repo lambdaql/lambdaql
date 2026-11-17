@@ -7,7 +7,8 @@
 > 排序与分页的核心部分（`orderBy`、`limit`、`offset`、`SortSpec`）也已实现并测试。
 > Spring Data JPA 模块（`LambdaQlExecutor<T>` 和 Spring Boot 自动配置）已实现，并已用 Spring Boot 3.4.2 测试。
 > 更新、插入、删除和 upsert 也已实现并测试，包括 `limit` 和单行保护 `executeOne()`，在 Spring Data JPA 模块中同样可用（快捷方法 `deleteAll`、`updateOne` 等）。在那里它们需要调用方的事务。
-> 子查询、`select` 和存储过程已设计，但**尚未实现**。
+> `where` 中的子查询和 `select`（带 `groupBy`、`having` 和 `Agg` 函数）同样已实现并测试。
+> 派生表、CTE 和存储过程已设计，但**尚未实现**。
 > 本页展示的 HQL 是设计所定义的输出。示例均为设计示例。
 
 本页适用于两种语言。代码分别展示在 **Java** 和 **Kotlin** 两个小节中。

@@ -1,6 +1,8 @@
 package org.lambdaql.engine.decode;
 
-import org.lambdaql.analyzer.LambdaAnalysisException;
+import org.lambdaql.i18n.LqlMessage;
+import org.lambdaql.LambdaQLException;
+import org.lambdaql.LambdaAnalysisException;
 import org.lambdaql.engine.ir.ArithOp;
 import org.lambdaql.engine.ir.CmpOp;
 import org.lambdaql.engine.ir.Expr;
@@ -192,7 +194,7 @@ public final class Decoder implements Opcodes {
         int line = lineIn;
         int i = pc;
         while (true) {
-            if (i >= insns.length) throw error("메서드 끝을 지나쳤습니다", line);
+            if (i >= insns.length) throw error(line, LqlMessage.END_OF_METHOD);
             AbstractInsnNode n = insns[i];
             int op = n.getOpcode();
             if (n instanceof LineNumberNode ln) {
@@ -232,11 +234,11 @@ public final class Decoder implements Opcodes {
                 case ILOAD, LLOAD, FLOAD, DLOAD, ALOAD -> {
                     int v = ((VarInsnNode) n).var;
                     Expr e = v < locals.size() ? locals.get(v) : null;
-                    if (e == null) throw error("초기화되지 않은 지역 변수 " + v, line);
+                    if (e == null) throw error(line, LqlMessage.UNINITIALIZED_LOCAL, v);
                     stack.add(e);
                 }
                 case ISTORE, LSTORE, FSTORE, DSTORE, ASTORE -> {
-                    if (statements != null) throw error("대입 람다에서는 지역 변수를 쓸 수 없습니다(U1). 값을 대입문에 직접 쓰세요", line);
+                    if (statements != null) throw error(line, LqlMessage.LOCAL_IN_ASSIGNMENT);
                     set(locals, ((VarInsnNode) n).var, popExpr(stack, line));
                 }
                 case IINC -> {
@@ -249,7 +251,10 @@ public final class Decoder implements Opcodes {
                 case POP -> {
                     Object popped = pop(stack, line);
                     // a setter that returns this (builder style), and the result is dropped
-                    if (statements != null && popped instanceof Expr.Invoke inv && isSetterCall(inv)) statements.add(inv);
+                    // a call whose result is dropped: a setter (by.set, Kotlin setters) or a call on a lambda parameter
+                    // (a procedure stub call in exec), so it is checked instead of silently ignored
+                    if (statements != null && popped instanceof Expr.Invoke inv
+                            && (isSetterCall(inv) || inv.receiver() instanceof Expr.Param)) statements.add(inv);
                 }
                 case POP2 -> {
                     Object top = pop(stack, line);
@@ -316,8 +321,38 @@ public final class Decoder implements Opcodes {
                     stack.add(new Expr.GetField(null, f.owner, f.name, Type.getType(f.desc)));
                 }
                 case ARRAYLENGTH -> stack.add(new Expr.ArrayLength(popExpr(stack, line)));
+                case ANEWARRAY -> {
+                    // an array literal, for example the vararg of Kotlin listOf(a, b): the size must be a constant
+                    Expr size = popExpr(stack, line);
+                    if (!(size instanceof Expr.Const c) || !(c.value() instanceof Integer count)) throw error(line, LqlMessage.ARRAY_SIZE_NOT_CONSTANT);
+                    List<Expr> items = new ArrayList<>();
+                    for (int k = 0; k < count; k++) items.add(null);
+                    stack.add(new Expr.ArrayOf(Type.getType("[" + Type.getObjectType(((TypeInsnNode) n).desc).getDescriptor()), items));
+                }
+                case AASTORE -> {
+                    Expr value = popExpr(stack, line), index = popExpr(stack, line), array = popExpr(stack, line);
+                    if (!(array instanceof Expr.ArrayOf arr) || !(index instanceof Expr.Const c) || !(c.value() instanceof Integer k)) {
+                        throw error(line, LqlMessage.ARRAY_INDEX_NOT_CONSTANT);
+                    }
+                    List<Expr> items = new ArrayList<>(arr.items());
+                    items.set(k, value);
+                    Expr.ArrayOf updated = new Expr.ArrayOf(arr.type(), items);
+                    for (int q = 0; q < stack.size(); q++) if (stack.get(q) == arr) stack.set(q, updated);
+                    // Kotlin keeps the array in a local when an element has a branch (listOf(it.customer?.id, ...))
+                    for (int q = 0; q < locals.size(); q++) if (locals.get(q) == arr) locals.set(q, updated);
+                }
                 case INVOKEVIRTUAL, INVOKEINTERFACE, INVOKESTATIC, INVOKESPECIAL -> invoke((MethodInsnNode) n, stack, line);
-                case INVOKEDYNAMIC -> throw error(indyMessage((InvokeDynamicInsnNode) n), line);
+                case INVOKEDYNAMIC -> {
+                    InvokeDynamicInsnNode indy = (InvokeDynamicInsnNode) n;
+                    if (!indy.bsm.getOwner().equals("java/lang/invoke/LambdaMetafactory")) throw indyError(indy, line);
+                    // an inner lambda (for example the where lambda of a subquery): keep its body handle and captured values
+                    Handle impl = (Handle) indy.bsmArgs[1];
+                    Type[] capturedTypes = Type.getArgumentTypes(indy.desc);
+                    List<Expr> capturedValues = new ArrayList<>();
+                    for (int k = 0; k < capturedTypes.length; k++) capturedValues.add(0, popExpr(stack, line));
+                    stack.add(new Expr.Lambda(impl.getOwner(), impl.getName(), impl.getDesc(),
+                            impl.getTag() == org.objectweb.asm.Opcodes.H_INVOKESTATIC, capturedValues, Type.getReturnType(indy.desc)));
+                }
 
                 // ---- jumps
                 case GOTO -> {
@@ -328,12 +363,16 @@ public final class Decoder implements Opcodes {
                      IF_ICMPLE, IF_ACMPEQ, IF_ACMPNE, IFNULL, IFNONNULL -> {
                     JumpInsnNode j = (JumpInsnNode) n;
                     if (statements != null) {
-                        throw error("대입 람다에서는 조건(if, ?:)을 쓸 수 없습니다(U1). 조건은 where에 쓰세요", line);
+                        throw error(line, LqlMessage.CONDITION_IN_ASSIGNMENT);
                     }
                     Pred atom = jumpAtom(op, stack, line);
                     int target = target(j.label, i, line);
                     List<Object> st = snapshot(stack);
                     List<Expr> lc = snapshot(locals);
+                    // a test of two constants (Kotlin keeps a computed boolean as 0/1 and tests it again):
+                    // the branch is known now, so only that path is followed
+                    Boolean known = constantTruth(atom);
+                    if (known != null) return remember(key, explore(known ? target : i + 1, st, lc, line));
                     Node onTrue = explore(target, st, lc, line);
                     Node onFalse = explore(i + 1, st, lc, line);
                     return remember(key, new Node.Test(atom, onTrue, onFalse, line));
@@ -345,13 +384,13 @@ public final class Decoder implements Opcodes {
                     return remember(key, leaf(v, line));
                 }
 
-                case TABLESWITCH, LOOKUPSWITCH -> throw error("switch(Kotlin when 등)는 아직 지원하지 않습니다", line);
-                case ATHROW -> throw error("예외를 던지는 경로는 지원하지 않습니다", line);
+                case TABLESWITCH, LOOKUPSWITCH -> throw error(line, LqlMessage.SWITCH_NOT_SUPPORTED);
+                case ATHROW -> throw error(line, LqlMessage.THROW_NOT_SUPPORTED);
                 case RETURN -> {
                     if (statements != null) return remember(key, Node.Leaf.TRUE);
-                    throw error("값을 반환하지 않는 람다는 조건/값 람다가 아닙니다", line);
+                    throw error(line, LqlMessage.NO_RETURN_VALUE);
                 }
-                default -> throw error("지원하지 않는 명령어: " + opName(op), line);
+                default -> throw error(line, LqlMessage.UNSUPPORTED_INSTRUCTION, opName(op));
             }
             i++;
         }
@@ -388,7 +427,7 @@ public final class Decoder implements Opcodes {
                 if (k == 0) return Node.Leaf.FALSE;
                 if (k == 1) return Node.Leaf.TRUE;
             }
-            if (v instanceof Expr.CmpResult) throw error("비교 결과(-1/0/1)를 그대로 반환할 수 없습니다", line);
+            if (v instanceof Expr.CmpResult) throw error(line, LqlMessage.COMPARE_RESULT_RETURNED);
             return new Node.Test(new Pred.Truth(v), Node.Leaf.TRUE, Node.Leaf.FALSE, line);
         }
         return new Node.Value(v);
@@ -528,7 +567,7 @@ public final class Decoder implements Opcodes {
             case 3 -> CmpOp.GE;
             case 4 -> CmpOp.GT;
             case 5 -> CmpOp.LE;
-            default -> throw new IllegalArgumentException("cmp " + k);
+            default -> throw new IllegalStateException(LqlMessage.INTERNAL_ERROR.format("cmp " + k));
         };
     }
 
@@ -549,7 +588,7 @@ public final class Decoder implements Opcodes {
 
         if (m.getOpcode() == INVOKESPECIAL && m.name.equals("<init>")) {
             Object target = pop(stack, line);
-            if (!(target instanceof Uninit u)) throw error("생성자 호출 대상이 NEW가 아닙니다", line);
+            if (!(target instanceof Uninit u)) throw error(line, LqlMessage.CONSTRUCTOR_TARGET_NOT_NEW);
             Expr created = new Expr.NewObject(u.type(), mref, args);
             for (int k = 0; k < stack.size(); k++) {
                 if (stack.get(k).equals(u)) stack.set(k, created);
@@ -566,9 +605,29 @@ public final class Decoder implements Opcodes {
                 statements.add(new Expr.Invoke(receiver, mref, args));
                 return;
             }
-            throw error("반환값이 없는 호출은 조건 람다에서 쓸 수 없습니다: " + m.owner.replace('/', '.') + "." + m.name, line);
+            throw error(line, LqlMessage.VOID_CALL_IN_CONDITION, m.owner.replace('/', '.') + "." + m.name);
         }
         stack.add(new Expr.Invoke(receiver, mref, args));
+    }
+
+    /**
+     * Decides a compare of two number constants, such as {@code 0 = 0}.
+     *
+     * @param atom a jump condition
+     * @return the result, or {@code null} if the condition is not two constants
+     */
+    private static Boolean constantTruth(Pred atom) {
+        if (!(atom instanceof Pred.Cmp c) || !(c.left() instanceof Expr.Const a) || !(c.right() instanceof Expr.Const b)) return null;
+        if (!(a.value() instanceof Integer x) || !(b.value() instanceof Integer y)) return null;
+        int r = Integer.compare(x, y);
+        return switch (c.op()) {
+            case EQ -> r == 0;
+            case NE -> r != 0;
+            case LT -> r < 0;
+            case LE -> r <= 0;
+            case GT -> r > 0;
+            case GE -> r >= 0;
+        };
     }
 
     private static boolean isSetterCall(Expr.Invoke inv) {
@@ -591,7 +650,7 @@ public final class Decoder implements Opcodes {
         if (cst instanceof Double v) return new Expr.Const(v, Type.DOUBLE_TYPE);
         if (cst instanceof String v) return new Expr.Const(v, Type.getType(String.class));
         if (cst instanceof Type t) return new Expr.Const(t, Type.getType(Class.class));
-        throw error("지원하지 않는 상수: " + cst, line);
+        throw error(line, LqlMessage.UNSUPPORTED_CONSTANT, cst);
     }
 
     private void arith(List<Object> stack, ArithOp op, int line) {
@@ -619,7 +678,7 @@ public final class Decoder implements Opcodes {
      */
     private int target(LabelNode label, int from, int line) {
         int t = labelIndex.get(label);
-        if (t <= from) throw error("반복문(뒤로 가는 점프)은 지원하지 않습니다", line);
+        if (t <= from) throw error(line, LqlMessage.LOOP_NOT_SUPPORTED);
         return t;
     }
 
@@ -637,19 +696,19 @@ public final class Decoder implements Opcodes {
     }
 
     private static Object pop(List<Object> stack, int line) {
-        if (stack.isEmpty()) throw new LambdaAnalysisException("스택이 비었습니다(line " + line + ")");
+        if (stack.isEmpty()) throw LqlMessage.STACK_EMPTY.exceptionAt("line " + line);
         return stack.remove(stack.size() - 1);
     }
 
     private static Object peek(List<Object> stack, int line) {
-        if (stack.isEmpty()) throw new LambdaAnalysisException("스택이 비었습니다(line " + line + ")");
+        if (stack.isEmpty()) throw LqlMessage.STACK_EMPTY.exceptionAt("line " + line);
         return stack.get(stack.size() - 1);
     }
 
     private Expr popExpr(List<Object> stack, int line) {
         Object o = pop(stack, line);
         if (o instanceof Expr e) return e;
-        throw error("초기화되지 않은 객체를 값으로 썼습니다", line);
+        throw error(line, LqlMessage.UNINITIALIZED_OBJECT);
     }
 
     private static boolean isWide(Object o) {
@@ -662,27 +721,22 @@ public final class Decoder implements Opcodes {
      * @param n the instruction
      * @return the message
      */
-    private String indyMessage(InvokeDynamicInsnNode n) {
+    private LambdaQLException indyError(InvokeDynamicInsnNode n, int line) {
         Handle bsm = n.bsm;
-        if (bsm.getOwner().equals("java/lang/invoke/StringConcatFactory")) {
-            return "문자열 결합(+)은 아직 지원하지 않습니다(v0.2)";
-        }
-        if (bsm.getOwner().equals("java/lang/invoke/LambdaMetafactory")) {
-            return "람다 안의 람다(서브쿼리 등)는 아직 지원하지 않습니다(M8)";
-        }
-        return "invokedynamic은 지원하지 않습니다: " + bsm.getOwner() + "." + bsm.getName();
+        if (bsm.getOwner().equals("java/lang/invoke/StringConcatFactory")) return error(line, LqlMessage.STRING_CONCAT_NOT_SUPPORTED);
+        return error(line, LqlMessage.INVOKEDYNAMIC_NOT_SUPPORTED, bsm.getOwner() + "." + bsm.getName());
     }
 
     /**
      * Makes an error with the lambda body name and source line.
      *
-     * @param message what went wrong
-     * @param line    source line, or -1
+     * @param line source line, or -1
+     * @param key  the message
+     * @param args the message arguments
      * @return the exception (the caller throws it)
      */
-    private LambdaAnalysisException error(String message, int line) {
-        String where = ref.describe() + (line > 0 ? " (line " + line + ")" : "");
-        return new LambdaAnalysisException(message + " — " + where);
+    private LambdaQLException error(int line, LqlMessage key, Object... args) {
+        return key.exceptionAt(ref.describe() + (line > 0 ? " (line " + line + ")" : ""), args);
     }
 
     private static String opName(int op) {

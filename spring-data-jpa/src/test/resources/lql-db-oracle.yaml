@@ -6,6 +6,10 @@ spring:
     username: ${LQL_ORACLE_USER:LQL}
     password: ${LQL_DB_PASSWORD:}
     driver-class-name: oracle.jdbc.OracleDriver
+    # Oracle Free allows few sessions; each cached test context keeps its own pool (ORA-12516 otherwise)
+    hikari:
+      maximum-pool-size: 2
+      minimum-idle: 0
   jpa:
     properties:
       hibernate.physical_naming_strategy: org.lambdaql.spring.sample.SqPrefixNamingStrategy

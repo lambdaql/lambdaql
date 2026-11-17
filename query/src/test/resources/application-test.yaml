@@ -9,6 +9,8 @@ spring:
       hibernate.format_sql: true
       # records the SQL for SqlByDatabaseTest (expected SQL per database in the manual)
       hibernate.session_factory.statement_inspector: org.lambdaql.query.SqlCapture
+      # DB functions registered at start-up (ROADMAP M11, D31): FunctionTest uses a function with its own SQL name
+      lambdaql.functions.classes: org.lambdaql.query.FunctionTest$OrderFns
     hibernate:
       # 엔티티 기준으로 스키마를 생성/삭제한다. (table.sql 수동 DDL은 엔티티 컬럼과 맞지 않고,
       # @BeforeEach 에서 반복 실행되어 두 번째 테스트부터 "Table already exists"로 실패했음)

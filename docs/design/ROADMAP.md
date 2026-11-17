@@ -593,6 +593,7 @@ lambdaql은 현재 캐시가 없으므로, 호출할 때마다 클래스 파일�
 | D40 | UPSERT 문법 (M10) | `upsert(X)` 단축형 / `insert…onConflict` 명시형 / 둘 다 · do nothing 지원 여부 · 영향 행 수 | **2026-11-16 작성자 결정**: **둘 다 지원**. `qb.upsert(X).values(o -> …)`는 키가 @Id이고 충돌 시 대입한 열(키 제외)을 갱신한다. `qb.insert(X).values(…).onConflict(o -> 키).update(o -> …)`는 갱신 식을 따로 적는다(예: `o.setCnt(o.getCnt() + 1)`). **`onConflict(키).ignore()`(do nothing)는 lambdaQL이 에뮬레이션**한다: `insert … select … where not exists (…)`. 동시 삽입에는 원자적이지 않아 키 중복 오류가 날 수 있음을 문서화한다. 근거(2026-11-16 실측, Hibernate 6.6.5): HQL `on conflict(id) do update`는 H2·Oracle에서 `merge`, MariaDB에서 `on duplicate key update`로 세 DB 모두 동작. `on conflict … do nothing`은 H2·Oracle에서 일반 insert로 렌더링되어 PK 위반, MariaDB만 동작. **영향 행 수는 JDBC 값을 그대로 반환**(MariaDB는 갱신 시 2, H2·Oracle은 1)하고 문서화 | 확정 |
 | D41 | 실행기 DML 단축 메서드·보호·limit (M10, M12) | 이름: `delete(Where)` / `deleteAll`·`deleteOne` · 트랜잭션: `@Transactional` / 호출자 트랜잭션 필수 · limit: v0.2 / 지금 | **2026-11-16 작성자 결정**: ① 이름은 `deleteAll`/`deleteOne`, `updateAll`/`updateOne`, `insertAll`/`insertOne`, `upsertAll`/`upsertOne`. `All`은 조건에 맞는 행 전부(delete·update) 또는 목록의 행 전부(insert·upsert), `One`은 delete·update에서 **1행 보호**, insert·upsert에서 한 행. `deleteAll(Where)`는 bulk 삭제라 Spring `deleteAll()`(엔티티를 불러와 하나씩 삭제, cascade 적용)과 동작이 다르며 문서에 명시. 오버로드 충돌 없음(kotlinc 2.3.21·javac 바이트코드 확인). ② **`@Transactional`을 붙이지 않는다. 트랜잭션 없이는 동작하지 않는다**: 공유 `EntityManager`에서 트랜잭션이 없으면 SQL을 보내기 전에 `TransactionRequiredException`(Spring에서는 `InvalidDataAccessApiUsageException`). ③ **1행 보호**(`executeOne()`, `deleteOne`, `updateOne`): 조건에 맞는 id를 최대 2개 읽고, 2개면 아무것도 바꾸지 않고 `NonUniqueResultException`(Spring `IncorrectResultSizeDataAccessException`), 1개면 `id = :p and (조건)`으로 그 행만 변경. 롤백에 기대지 않고 2행 이상을 바꾸지 않는다. ④ **DML limit**: `where(…).orderBy(…).limit(n)`(정렬 없으면 id 순, S9). `e0.id in (select t.id from (select x0.id as id from X x0 … order by … limit n) t)`로 렌더링. 안쪽 select는 조회 규칙(조인, D36)을 그대로 써서 같은 행을 대상으로 한다. 파생 테이블 `t`로 MariaDB 1093·1235를 피한다. 구현·세 DB 확인(`DmlQueryTest`, `ExecutorTest`) | 확정 |
 | D42 | 순서 보장 Set 결과 (M5.5, M12) | `findAllAsSet` / `findSet` · 자동 distinct · 크기 검사 · DML offset | **2026-11-16 작성자 결정**: 쿼리 `toSet()`, 실행기 `findSet(Where[, SortSpec \| Sort])`, 반환 `SequencedSet<T>`(`LinkedHashSet`, 정렬 순서 유지). **자동 `distinct`는 넣지 않는다**: 엔티티 행은 기본 키가 있고 lambdaQL은 to-one만 조인하므로(컬렉션은 `exists`) 같은 행이 두 번 나오지 않아 결과가 같고 비용만 는다(Oracle 23.26은 LOB에도 distinct 허용, 실측). 값 조회의 distinct는 M9에서 다룬다. **크기 검사**: Set 크기가 행 수보다 작으면 `IllegalStateException`(엔티티 `equals`/`hashCode`가 다른 행을 같게 보거나 `@Id`가 유일하지 않은 경우의 조용한 유실 방지). **DML offset은 두지 않는다**(limit만). 구현·세 DB 확인(`ResultQueryTest`, `ExecutorTest`) | 확정 |
+| D43 | 외부 정렬 입력 허용 목록 (M5.5, M12, S6·S11 개정) | `SortWhitelist`를 실행기 인자로 받음 / 전역 등록. 전역 범위: JVM / 커넥션·풀 / EntityManagerFactory | **2026-11-17 작성자 결정**: 실행기 인자 방식은 쓰지 않는다(`findAll(where, Sort/Pageable)`은 그대로 둠). 정렬 정책은 **EntityManagerFactory(persistence unit) 단위로 전역 등록**하고, 규칙은 **엔티티 타입별**로 둔다. JVM static 전역은 persistence unit이 여럿이면 규칙이 섞이고, 커넥션·풀 단위는 복제본·routing datasource에서 같은 엔티티의 규칙이 달라져 맞지 않는다. EMF 단위는 메타모델·`QueryContext`·분석 캐시와 수명이 같다(Spring Boot는 `QueryBuilder` 빈과 같음). **적용 대상은 외부 문자열에서 만든 정렬만**(Spring `Sort`/`Pageable`, `SortSpec.ofPath`). 람다 정렬은 개발자 코드라 검사하지 않는다. 등록은 **설정 빈·프로퍼티 우선**(허용 경로, 외부 이름 별칭), 엔티티 애너테이션(`@Sortable`)은 보조. 모드는 `off`·`warn`·`strict`, **기본 `warn`**. 세부(규칙 없는 엔티티의 처리, 연관 경로 정렬 기본 제한, 위반 예외 코드·Spring 400 변환)는 구현 때 정한다. 미구현 | 확정 |
 | D8 | 라이선스와 특허 | (A/A'일 때) LGPL 의존 허용 여부. ExTree `LICENSE`(2.1)와 `pom.xml:30-35`(3.0) 불일치. FluentJPA `pom.xml:31-34`는 LGPL-3.0만 선언해 `LICENSE`(AGPL-3.0 소스 / LGPL-3.0 바이너리)와 불일치. FluentJPA `README.md:1`의 'Patent Pending' 표기는 (B) clean-room이라도 특허 여부 확인 필요 | 법무 확인 | D1과 함께 |
 
 ### 2.6 바이트코드 읽기 계층: ASM, `java.lang.classfile`, Babylon Code Reflection
@@ -1037,6 +1038,19 @@ qb.from(Order.class).leftJoin(Customer.class, (o, c) -> o.getCustomer().getId() 
 
 근거: 코드 조사(`/tmp/lql-i18n/a`), 라이브러리 사례 조사(`/tmp/lql-i18n/b`), 프로토타입 실측(`/tmp/lql-i18n/c/final`).
 
+> **구현 현황(2026-11-16)**: I1~I5, I7~I9를 구현했다. I10(native-image 메타데이터)은 v0.2 항목으로 남긴다.
+>
+> - 메시지 124개: `org.lambdaql.i18n.LqlMessage`(코드·인자 개수), 번들 `org/lambdaql/i18n/LqlMessages{,_ja,_zh,_ko}.properties`(UTF-8)
+> - 예외: `org.lambdaql.LambdaQLException`과 하위 `LambdaAnalysisException`(1xxx), `UnsupportedLambdaShapeException`(2xxx), `TranslationException`(3xxx). 4xxx는 `LambdaQLException` 자체다. 클래스는 코드 범위로 정한다(`LambdaQLException.of`).
+> - 구 패키지 `org.lambdaql.analyzer`는 삭제했다. 테스트는 `LambdaQLException`과 `code()`로 검사한다.
+> - JDK·JPA 표준 예외(`IllegalArgumentException`, `NonUniqueResultException`, `TransactionRequiredException` 등)는 타입을 유지하고 메시지만 코드가 붙은 `LqlMessage.format(...)`으로 만든다.
+> - 람다 위치(구현 메서드, 줄 번호)는 `where()` 필드로 두고 메시지 끝에 ` — 위치` 형식으로 붙인다. 조건 복원 실패의 결정 그래프 덤프는 번역하지 않는 추가 줄로 붙인다.
+> - 번들은 `PropertyResourceBundle`을 UTF-8 `Reader`로 직접 읽는다. `ResourceBundle.getBundle`의 기본 로케일 fallback은 거치지 않는다(`LqlMessagesTest.englishOnKoreanJvm`).
+> - 경고 로그(`LQL-5002`, 서브쿼리 정렬 제거)는 SLF4J `isWarnEnabled()` 안에서 만든다.
+> - `LqlMessagesTest` 8개: 네 번들의 키 일치, `{n}` 개수, 코드 중복, 로케일 선택, 예외 클래스, 다른 언어 메시지.
+>
+> 일본어·중국어 문구는 작성자 측 번역이다. 원어민 검토 전까지 매뉴얼에 기여 환영을 적는다(I7). `LQL-5001`(non-SARGable 경고)은 해당 검사 구현 때 추가한다.
+
 **대상**: 사용자에게 보이는 예외 메시지와 경고 로그. Javadoc·주석은 대상이 아니다(쉬운 영어 고정). 새 엔진에는 현재 예외 메시지 37개가 있고 로그 호출은 0개다. 메시지 문구를 검사하는 테스트는 없다(실측). 구 코드(`analyzer`, `query` 일부, `function`, `jpa`)는 M2~M7에서 삭제·교체되므로 옮기지 않는다.
 
 **구조**
@@ -1279,6 +1293,28 @@ public class LambdaQLException extends RuntimeException {   // 모든 lambdaQL �
 
 ### Milestone 8. 서브쿼리 (D19, D26) **(문법 확정 2026-11-10)**
 
+> **구현 현황(2026-11-16)**: M8-1(조건 서브쿼리)을 구현했다. `where((o, sub) -> …)`(조회·UPDATE·DELETE)에서 다음이 동작한다.
+>
+> - `exists`/`not exists`, `contains` → `in`, `!contains` → `not exists … and 값 = x`(Q2)
+> - 집계 스칼라 `count`/`max`/`min`/`avg`/`sum`, `orderBy(…).limit(1)…first()` 상관 top-1(Q3)
+> - `where((o, sub2) -> …)` 중첩(Q6), 캡처 값 바인딩
+>
+> 세 DB 실측: `SubqueryTest` 10개, SQL 정답 파일(`sub-*`).
+>
+> 렌더링 규칙:
+> - 안쪽 람다는 `invokedynamic` bootstrap의 구현 메서드를 읽어 재귀 분석한다. 캡처 값은 바깥 식으로 치환하고, 바깥 엔티티는 query root로 바꾼다.
+> - 서브쿼리 별칭은 `s<root>`, 서브쿼리 안의 조인은 `s<root>j<n>`이다.
+> - 서브쿼리 안에서 바깥 엔티티의 연관 경로(조인 필요)는 분석 시점 오류다. 외래 키 id 비교는 허용한다.
+> - limit 없는 정렬은 제거하고 WARN(Q4). IN 안의 limit은 파생 테이블로 감싼다(MariaDB 1235).
+>
+> Kotlin 6형태(exists, `in`/`!in`, 스칼라, top-1, 중첩)는 kotlinc 2.3.21로 컴파일해 Java와 같은 HQL을 확인했다(빌드 밖 실측).
+>
+> 함께 바꾼 것:
+> - (1) 부정 최소화에서 원자에 붙은 NOT의 비용을 0으로 했다. `!(a && b)`를 `!a || !b`로 내려 그룹 바깥 NOT을 만들지 않는다(3.9).
+> - (2) 디코더가 상수끼리의 비교(Kotlin이 계산한 boolean을 0/1로 다시 검사하는 형태)를 그 자리에서 결정한다.
+>
+> M8-2(FROM 서브쿼리·CTE)는 M9 projection 위에서 진행한다(2026-11-16 기준 미구현).
+
 #### 8.1 문법: 람다 인자로 받는 서브쿼리 팩토리 `sub`
 
 정렬의 `by`와 같은 방식이다. 조건 람다가 마지막 인자로 서브쿼리 팩토리를 받고(인자 이름은 자유, 문서는 `sub`를 관례로 씀), 그 안에서 서브쿼리를 **같은 람다 문법**으로 적는다. 서브쿼리가 없으면 기존 1-인자 람다를 그대로 쓴다(인자 개수로 오버로드 구분 — Java·Kotlin 실측).
@@ -1351,6 +1387,26 @@ interface Values<R> { boolean contains(R value); R first(); }   // Kotlin `x in 
 - **완료 기준**(M8-1): 8.1의 Java·Kotlin 예제가 golden HQL과 일치하고 H2·MariaDB·Oracle에서 Java·Kotlin 규칙(3.6) 기준 기대 행을 반환. NOT EXISTS 렌더링이 서브쿼리 결과에 NULL이 있어도 정확. 상관 조건이 세 DB EXPLAIN에서 인덱스를 사용(Q5). 안쪽 람다 재귀 분석이 Java·Kotlin 양쪽에서 동작.
 
 ### Milestone 9. Projection(`select`)·집계 (D27) **(2026-11-10 확정)**
+
+> **구현 현황(2026-11-16)**: M9 조회 projection과 집계를 구현했다. 파생 테이블·CTE(M8-2, J5·J6)는 미구현이다.
+>
+> - `select(값)` → `ValueQuery<R>`: 값 하나, Java record·DTO 생성자, Kotlin data class·`Pair`·`Triple`
+> - `groupBy(키)` → `GroupedQuery<T>`: 키 하나, `List.of(…)`/`listOf(…)`, Kotlin `a to b`, `Triple`
+> - `having(조건)`(집계 허용), `Agg.count()`·`count(x)`·`countDistinct`·`sum`·`avg`·`min`·`max`
+> - `ValueQuery`: `distinct()`·`limit`·`offset`·`toList`·`toSet`(항상 `select distinct`)·`first`·`one`
+> - `orderBy(…).select(…)`: 정렬·페이징 뒤의 projection. 페이징이면 id 보조 정렬(S9)을 붙인다. 그룹·distinct에는 붙이지 않는다.
+> - INSERT … SELECT의 `groupBy`·`having`과 대입 값의 `Agg`(`ProjectionTest` region `insert-group`)
+>
+> 세 DB 실측: `ProjectionTest` 9개, SQL 정답 파일(`value`, `record`, `group-by`, `group-many`, `total`, `distinct`, `value-page`, `insert-group`).
+>
+> 구현 규칙:
+> - 생성자는 HQL `select new`를 쓰지 않고 열만 선택한 뒤 Java에서 호출한다(J2). 값은 생성자 인자 타입으로 변환한다(Hibernate `Long` → `Integer` 등).
+> - 기본형 생성자 인자에 NULL이 오면 인자 위치와 래퍼 타입 안내를 담은 `IllegalStateException`(J4).
+> - J3 검사는 select·having·INSERT … SELECT 대입 값에 모두 적용한다. where의 `Agg`는 분석 시점 오류다.
+> - `distinct()`의 정렬 키가 select 값이 아니면 분석 시점 오류(J7).
+> - 집계 정렬(J8의 별칭 정렬)과 그룹 쿼리의 `orderBy`는 v0.2 후보로 남긴다.
+>
+> 함께 고친 것: Kotlin `listOf(it.customer?.id, …)`는 원소에 분기가 있으면 배열을 지역 변수에 두고 채운다. 디코더가 `aastore` 뒤 지역 변수의 배열도 갱신하도록 고쳤다. Kotlin 7형태(data class, `to`, 집계 select, 키 1개, `listOf`, `to`, `Triple`, having)는 kotlinc 2.3.21로 컴파일해 Java와 같은 HQL을 확인했다(빌드 밖 실측).
 
 #### 9.1 문법
 
@@ -1455,7 +1511,7 @@ qb.from(Order::class.java).groupBy { listOf(it.customer?.id, it.status) }       
 > - DML limit·1행 보호·트랜잭션 필수(D41)를 구현했다. 실행기 단축 메서드는 `deleteAll`/`deleteOne` 등 8개다.
 > - NULL이 될 수 없는 열(id, 기본형, `nullable = false`)의 `is null`은 거짓으로 접는다. 단, 연관 경로가 없는 열에 한한다. Kotlin `it.id == id`(`Long?`)가 `not (e0.id is null or e0.id <> :p)` 대신 `e0.id = :p`로 렌더링된다(3.9 SARGable, `SelectQueryTest` region `never-null`).
 >
-> 미구현: `sub` 서브쿼리(M8), INSERT … SELECT 집계(M9), U9의 EXISTS 최적화, 빌드 안의 Kotlin 테스트 소스, 캡처 엔티티의 transient 검사(U11, 현재 Hibernate 바인딩 오류로 나타남), 복합 키 엔티티의 limit·1행 보호.
+> 미구현: U9의 EXISTS 최적화, 캡처 엔티티의 transient 검사(U11, 현재 Hibernate 바인딩 오류로 나타남), 복합 키 엔티티의 limit·1행 보호.
 
 진입점은 `qb.from` / `qb.update` / `qb.insert` / `qb.delete`다(D28, 이름 확정). 조회와 같은 원칙을 따른다. 람다는 한 번만 쓰고, 정적 헬퍼는 두지 않으며, 서브쿼리는 람다 인자 `sub`로 받는다(M8). **대입은 setter 호출로 적고, Kotlin은 프로퍼티 대입으로 적는다.** 람다 본문은 실행되지 않고 `SET 열 = 식` 목록으로 번역된다.
 
@@ -1686,6 +1742,28 @@ qb.insert(Archive::class.java).from(Order::class.java).where { it.status == 9 }
 ### Milestone 11. 스토어드 프로시저·DB 함수 (D30, D31) **(2026-11-10 확정: D30 프로시저 표기, D31 DB 함수는 인터페이스 static 메서드)**
 
 근거: 세 DB 실측 `/tmp/lql-proc/probe/out-*.txt`(Hibernate 6.6.5, H2 2.3.230, MariaDB 10.11.18, Oracle 23ai), 문법 컴파일 `/tmp/lql-proc/syntax`(JDK 21, kotlinc 2.3.21), 조사(Hibernate 6.6 문서, Spring Data JPA, jOOQ, Exposed, QueryDSL, Kotlin JDSL, FluentJPA, MyBatis).
+
+> **구현 현황(2026-11-17)**: 쿼리 안 DB 함수(D31, PR7, 11.4), 프로시저 호출(D30), 함수 단독 호출(PR6)을 구현했다. SARGable 경고(PR8), 이름 대조(PR2의 인자 이름 비교와 WARN), Oracle 패키지 오버로드 구분은 미구현이다.
+>
+> 프로시저(2026-11-17):
+> - API: `@SqlProcedure(value, schema, pkg)`, `@InOut`, `qb.call(Procs.class, p -> p.calc(id, rate)).execute()`, `qb.exec(Procs.class, p -> p.purge(30)).execute()`, `qb.call(() -> Fns.f(x)).execute()`
+> - 분석(PR12): 람다 본문은 스텁 호출 하나, 인자는 캡처 값·상수·그 계산. Kotlin `$default` 호출은 오류. 결과를 버리는 Java `exec` 람다(POP)도 호출로 읽어 OUT 무시를 검출한다.
+> - PR2: 첫 호출 때 `getProcedures`·`getProcedureColumns`로 IN·INOUT 수와 `@InOut` 위치를 대조한다(이름별 캐시, URL·사용자 포함). Oracle은 catalog `""`(독립 프로시저)·패키지 이름, 이름은 대문자. MariaDB는 catalog = 현재 DB.
+> - PR3·PR4: OUT·INOUT은 DB 순서로 스칼라 구성 요소, REF CURSOR·암시적 결과 집합은 `List` 구성 요소. 반환은 값 하나, record, Kotlin data class(필드 선언 순서), `List<T>`. 결과 행은 열 라벨을 `_` 제거·소문자로 맞춰 매핑한다. 엔티티 목록은 Hibernate `StoredProcedureQuery` 경로.
+> - 실행: JDBC `CallableStatement`(`Session.doReturningWork`). PR9: 트랜잭션 참여 중이고 변경이 있을 때만 flush. `QueryBuilder(emf)`는 자체 트랜잭션, 공유 EntityManager는 호출자 트랜잭션(없으면 auto-commit).
+> - PR6: Oracle은 JDBC `{? = call f(?)}`, MariaDB·H2는 HQL `select function('키' as T, :p…)`.
+> - 세 DB 실측: `ProcedureTest` 4개(IN·OUT, OUT 2개 → record, INOUT, 결과 집합·REF CURSOR, void exec, 함수 단독 호출, PR2·exec OUT·비프로시저 오류). H2는 함수 단독 호출만(PR15).
+>
+> 2026-11-16 기록:
+>
+> - 선언: `org.lambdaql.SqlFunction`(`value` = 쿼리 이름, `sql` = SQL 이름), 본문 가드 `org.lambdaql.DbOnlyException`(LQL-4034)
+> - 분석: `SqlFunctions`가 호출 대상 메서드의 애너테이션을 읽어 `Expr.Func`로 바꾼다. Kotlin Companion 호출과 `@JvmStatic` 브리지(본문이 Companion 메서드 호출)도 판별한다.
+> - 렌더링: 항상 `function('<이름>' as <T>, …)`. 캡처 값뿐인 인자도 바인딩해 DB에서 계산한다(FN5). where·select·order by·update set에서 동작한다.
+> - 검사: FN1(이름 기본값 UPPER_SNAKE), FN2(본문은 예외만, LQL-3052), FN3(오버로드 이름 일치, LQL-3053), FN8(Hibernate 내장 이름, LQL-3054), FN9(Kotlin `$default`·vararg, LQL-3056·3057), 반환 타입 허용 목록(LQL-3055)
+> - 등록(선택): `org.lambdaql.hibernate.LambdaQlFunctionContributor`(ServiceLoader), 설정 `lambdaql.functions.classes`. SQL 이름이 따로 있는 함수는 등록이 없으면 분석 시점 오류(LQL-3058).
+> - 세 DB 실측: `FunctionTest` 7개(`SQ_FN_DISCOUNT`, `SQ_FN_IS_GOLD`를 테스트 안에서 만들고 지움). Boolean 함수 단독 조건은 `function(…) = true`로 렌더링되며 Oracle 23.26에서도 동작한다.
+> - 관찰(실측, H2·MariaDB·Oracle): 등록 설정이 있으면 Hibernate가 미등록 `function('FN_DISCOUNT' …)`의 이름도 소문자로 바꾸지 않는다(`planned-*.sql`의 `fn_discount` → `FN_DISCOUNT`). 원인은 미조사다.
+> - 옛 `org.lambdaql.function` 패키지(`JpqlFunction`, Lombok 사용)는 삭제했다. core 메인 코드의 Lombok 의존도 없어졌다.
 
 #### 11.1 선언: 스텁 인터페이스 (실행하지 않음)
 

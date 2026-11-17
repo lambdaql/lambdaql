@@ -4,7 +4,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.lambdaql.analyzer.LambdaAnalysisException;
+import org.lambdaql.LambdaQLException;
 import org.lambdaql.engine.render.RenderedQuery;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -296,10 +296,10 @@ class SortQueryTest {
     void rejected() {
         // @start region="sort-rejected"
         // a condition inside the sort lambda (rule S4)
-        assertThrows(LambdaAnalysisException.class, () -> qb.from(Order.class)
+        assertThrows(LambdaQLException.class, () -> qb.from(Order.class)
                 .orderBy((o, by) -> o.isActive() ? by.asc(o.getPrice()) : by.desc(o.getPrice())));
         // a key without the entity
-        assertThrows(LambdaAnalysisException.class, () -> qb.from(Order.class).orderBy((o, by) -> by.asc(1)));
+        assertThrows(LambdaQLException.class, () -> qb.from(Order.class).orderBy((o, by) -> by.asc(1)));
         // @end
     }
 

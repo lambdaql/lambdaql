@@ -3,7 +3,8 @@
 > [!NOTE]
 > **状态**
 > - **已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（Hibernate 6.6.5，里程碑 M10，决定 D28 和 D40）：更新、删除、插入、`insert ... select`、upsert，以及（决定 D41）更新和删除的 `limit` 与单行保护 `executeOne()`。测试使用 **Java** Lambda。**DML 中的 Kotlin Lambda 尚未测试。**
-> - **尚未实现：** DML 中的 `sub` 子查询（里程碑 M8）、`insert ... select` 中的聚合（里程碑 M9），以及复合键实体上的 `limit` / `executeOne()`。
+> - **同样已实现并测试（使用 Java Lambda）：** update 和 delete 的 `where` 中的子查询（`sub`）（里程碑 M8，见 [7.4](07-4-delete.md)），以及 `insert ... select` 中的 `groupBy`、`having` 和 `Agg`（里程碑 M9，见 [7.5](07-5-insert.md)）。
+> - **尚未实现：** `set` 值中的子查询（上下文对象的 `by.from(...)`），以及复合键实体上的 `limit` / `executeOne()`。
 > - 本章的 Kotlin 代码用 Kotlin 语法展示已测试的 Java 语句。HQL 来自 Java 测试。没有 HQL 的示例遵循设计。
 > - 完整状态见[路线 README](README.md)。
 
@@ -141,7 +142,7 @@ Kotlin 的索引运算符 `by[o.status] = st` 调用的是同一个 `set` 方法
 
 在设计中，第二个 Lambda 参数是**一个上下文对象**。它同时有 `set(column, value)` 和子查询函数 `from(...)`。
 你可以随意把它命名为 `by` 或 `sub`。名字并不重要。
-子查询部分**尚未实现**（里程碑 M8）。目前这个对象只有 `set`。
+这个对象的子查询部分**尚未实现**。目前这个对象只有 `set`。（`where` 中的子查询可以使用：`where { o, sub -> ... }`，见 [5. 子查询](05-subquery.md)。）
 
 ```kotlin
 qb.update(Order::class.java)
@@ -340,7 +341,7 @@ qb.delete(Order::class.java).where { it.status == 1 }.orderBy { o, by -> by.asc(
 ## 7.9 全部规则 U1 到 U21（总结）
 
 lambdaQL 读取 Lambda 时检查：U1、U3、U4、U6（已用 Java Lambda 测试）。由编译器检查：U5。
-U11、U12、U15 和 U20 的 lambdaQL 检查尚未实现。U17 需要子查询（里程碑 M8）。
+U11、U12、U15 和 U20 的 lambdaQL 检查尚未实现。U17（MariaDB 中对同一张表的子查询的包装）尚未实现。
 
 | # | 规则 |
 |---|---|

@@ -1,6 +1,8 @@
 package org.lambdaql.engine.sem;
 
-import org.lambdaql.analyzer.LambdaAnalysisException;
+import org.lambdaql.i18n.LqlMessage;
+import org.lambdaql.LambdaQLException;
+import org.lambdaql.LambdaAnalysisException;
 import org.lambdaql.engine.decode.Decoder;
 import org.lambdaql.engine.decode.Node;
 import org.lambdaql.engine.ir.Expr;
@@ -59,7 +61,7 @@ public final class SortReader {
      */
     public static List<SortItem> readSortBy(LambdaRef ref, List<Class<?>> roots, EntityModel model) {
         if (!ref.isLambdaBody()) {
-            throw new LambdaAnalysisException("정렬 빌더 람다에는 메서드 레퍼런스를 쓸 수 없습니다(S13). 람다로 쓰세요 — " + ref.describe());
+            throw LqlMessage.METHOD_REFERENCE_IN_SORT_BUILDER.exceptionAt(ref.describe());
         }
         return new SortReader(ref, roots, model).chain(body(ref));
     }
@@ -100,8 +102,7 @@ public final class SortReader {
         Type desc = Type.getMethodType(ref.implMethodDescriptor());
         if (!instance || ref.capturedCount() != 0 || desc.getArgumentTypes().length != 0
                 || desc.getReturnType().getSort() == Type.VOID) {
-            throw new LambdaAnalysisException("메서드 레퍼런스는 엔티티의 getter만 쓸 수 있습니다(예: Order::getPrice, S13) — "
-                    + ref.describe());
+            throw LqlMessage.METHOD_REFERENCE_NOT_GETTER.exceptionAt(ref.describe());
         }
         MethodRef m = new MethodRef(ref.implClass(), ref.implMethodName(), ref.implMethodDescriptor(), false,
                 kind == MethodHandleInfo.REF_invokeInterface);
@@ -124,7 +125,7 @@ public final class SortReader {
      * @throws IllegalArgumentException if a part is not a property, or the path does not end at a basic value
      */
     public static Expr.Column readPath(String path, Class<?> root, EntityModel model) {
-        if (path == null || path.isBlank()) throw new IllegalArgumentException("sort path is empty");
+        if (path == null || path.isBlank()) throw new IllegalArgumentException(LqlMessage.SORT_PATH_EMPTY.format());
         String[] parts = path.split("\\.", -1);
         List<String> names = new ArrayList<>();
         List<Boolean> assoc = new ArrayList<>();
@@ -133,13 +134,12 @@ public final class SortReader {
         for (int i = 0; i < parts.length; i++) {
             String name = parts[i];
             String ownerName = owner.getSimpleName();
-            EntityModel.Property prop = model.property(owner, name).orElseThrow(() -> new IllegalArgumentException(
-                    "정렬 경로에 없는 속성이 있습니다: " + ownerName + "." + name + " (경로 " + path + ")"));
+            EntityModel.Property prop = model.property(owner, name).orElseThrow(() -> new IllegalArgumentException(LqlMessage.SORT_PATH_UNKNOWN.format(ownerName + "." + name, path)));
             names.add(prop.name());
             boolean last = i == parts.length - 1;
             if (last) {
                 if (prop.kind() != EntityModel.Kind.BASIC) {
-                    throw new IllegalArgumentException("정렬 경로는 값 속성으로 끝나야 합니다: " + path);
+                    throw new IllegalArgumentException(LqlMessage.SORT_PATH_NOT_VALUE.format(path));
                 }
                 assoc.add(false);
                 return new Expr.Column(0, names, assoc, prop.javaType(), prop.nonNull(), prop.id() && parentIsAssociation);
@@ -147,13 +147,12 @@ public final class SortReader {
             switch (prop.kind()) {
                 case ASSOCIATION -> assoc.add(true);
                 case EMBEDDED -> assoc.add(false);
-                default -> throw new IllegalArgumentException(
-                        "정렬 경로의 중간은 to-one 연관이나 값 객체여야 합니다: " + name + " (경로 " + path + ")");
+                default -> throw new IllegalArgumentException(LqlMessage.SORT_PATH_MIDDLE.format(name, path));
             }
             parentIsAssociation = prop.kind() == EntityModel.Kind.ASSOCIATION;
             owner = prop.javaType();
         }
-        throw new IllegalArgumentException("sort path is empty");
+        throw new IllegalArgumentException(LqlMessage.SORT_PATH_EMPTY.format());
     }
 
     // ------------------------------------------------------------------ chain
@@ -161,8 +160,7 @@ public final class SortReader {
     private static Expr body(LambdaRef ref) {
         Node node = Decoder.decodeValue(ref, BytecodeLoader.load(ref));
         if (node instanceof Node.Value v) return v.value();
-        throw new LambdaAnalysisException(
-                "정렬 람다에는 조건(if, ?:)을 쓸 수 없습니다. by 호출을 이어 쓰세요(S4) — " + ref.describe());
+        throw LqlMessage.CONDITION_IN_SORT.exceptionAt(ref.describe());
     }
 
     private List<SortItem> chain(Expr top) {
@@ -177,9 +175,9 @@ public final class SortReader {
                 e = inv.receiver();
                 continue;
             }
-            throw error("정렬 람다는 by.asc(...).desc(...)처럼 by 호출을 이어 쓴 형태만 됩니다(S4): " + e);
+            throw error(LqlMessage.SORT_NOT_CHAIN, e);
         }
-        if (items.isEmpty()) throw error("정렬 키가 없습니다. by.asc(...) 또는 by.desc(...)를 쓰세요");
+        if (items.isEmpty()) throw error(LqlMessage.SORT_NO_KEY);
         return List.copyOf(items);
     }
 
@@ -190,7 +188,7 @@ public final class SortReader {
             case "asc" -> SortItem.Kind.ASC;
             case "desc" -> SortItem.Kind.DESC;
             case "sort" -> SortItem.Kind.SORT;
-            default -> throw error("지원하지 않는 정렬 메서드입니다: by." + name);
+            default -> throw error(LqlMessage.SORT_UNSUPPORTED_METHOD, name);
         };
         Expr key = key(args.get(0));
         Expr arg = args.size() > 1 ? direction(args.get(1)) : null;
@@ -200,10 +198,10 @@ public final class SortReader {
     private Expr key(Expr raw) {
         Expr key = Normalizer.normalizeValue(raw, roots, model, ref.classLoader(), ref.describe());
         if (!Normalizer.usesEntity(key)) {
-            throw error("정렬 키에 엔티티 값이 없습니다(상수나 캡처 값으로는 정렬할 수 없음): " + raw);
+            throw error(LqlMessage.SORT_KEY_NO_ENTITY, raw);
         }
         if (key instanceof Expr.Column c && model.isEntity(c.javaType())) {
-            throw error("엔티티로 정렬할 수 없습니다. id 등 속성으로 정렬하세요: " + c);
+            throw error(LqlMessage.SORT_BY_ENTITY, c);
         }
         return key;
     }
@@ -211,12 +209,12 @@ public final class SortReader {
     private Expr direction(Expr raw) {
         Expr v = Normalizer.normalizeValue(raw, roots, model, ref.classLoader(), ref.describe());
         if (Normalizer.usesEntity(v)) {
-            throw error("정렬 방향과 NULL 위치는 엔티티 값으로 정할 수 없습니다: " + raw);
+            throw error(LqlMessage.SORT_DIRECTION_FROM_ENTITY, raw);
         }
         return v;
     }
 
-    private LambdaAnalysisException error(String message) {
-        return new LambdaAnalysisException(message + " — " + ref.describe());
+    private LambdaQLException error(LqlMessage key, Object... args) {
+        return key.exceptionAt(ref.describe(), args);
     }
 }

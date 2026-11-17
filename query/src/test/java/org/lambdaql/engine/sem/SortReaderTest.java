@@ -2,7 +2,7 @@ package org.lambdaql.engine.sem;
 
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.Test;
-import org.lambdaql.analyzer.LambdaAnalysisException;
+import org.lambdaql.LambdaQLException;
 import org.lambdaql.engine.ir.Expr;
 import org.lambdaql.engine.ir.SortItem;
 import org.lambdaql.engine.load.LambdaRef;
@@ -87,8 +87,8 @@ class SortReaderTest {
 
     @Test
     void notAChain() {
-        assertThrows(LambdaAnalysisException.class, () -> items((o, by) -> by));
-        assertThrows(LambdaAnalysisException.class,
+        assertThrows(LambdaQLException.class, () -> items((o, by) -> by));
+        assertThrows(LambdaQLException.class,
                 () -> items((o, by) -> by.asc(o.getPrice(), o.isActive())));   // NULL position from the entity
     }
 

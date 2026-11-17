@@ -40,7 +40,7 @@ lambdaQL은 **같은 엔진**과 같은 API로 Kotlin과 Java를 지원합니다
 
 - 예제 아래의 주석은 설계에 명시된 경우 lambdaQL이 만드는 HQL을 보여 줍니다.
 - 람다에 직접 쓴 상수(숫자, 문자열, boolean, `null`, enum 상수, `const val`)는 HQL에 리터럴로 씁니다. 캡처 값과 계산한 값은 항상 바인드 파라미터(`:p1`, `:p2`, ...)입니다(D37).
-- `e0`은 루트 엔티티의 별칭이고, `j1`은 lambdaQL이 연관 경로에 대해 추가하는 조인의 별칭입니다. `where`에서는 기본적으로 inner `join`(null 가드가 연관이 없는 행을 남기면 `left join`), 경로를 `orderBy`나 `select`에만 쓰면 `left join`입니다(D36). 예정된 기능(`select`, update, 서브쿼리)의 예제는 아직 예정된 별칭 `o`와 `c1`을 사용합니다.
+- `e0`은 루트 엔티티의 별칭이고, `j1`은 lambdaQL이 연관 경로에 대해 추가하는 조인의 별칭입니다. `where`에서는 기본적으로 inner `join`(null 가드가 연관이 없는 행을 남기면 `left join`), 경로를 `orderBy`나 `select`에만 쓰면 `left join`입니다(D36). 서브쿼리 루트는 `s1`, `s2`, ...입니다([5. 서브쿼리](05-subquery.md) 참고). 예정된 기능(파생 테이블, CTE, 프로시저)의 예제는 아직 예정된 별칭 `o`와 `c1`을 사용합니다.
 - 엔티티는 [2. 시작하기](02-getting-started.md#example-entities)의 엔티티입니다. 몇몇 예제는 `Order`에 추가 속성 두 개를 사용합니다: `var flag: Boolean? = null`과 `var kind: OrderKind? = null`(`enum class OrderKind { NORMAL, EXPRESS, GIFT }`와 함께).
 
 ---

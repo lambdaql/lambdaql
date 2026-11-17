@@ -145,11 +145,11 @@ where o1_0.status=9
 -- HQL: select o from Order o where function('FN_DISCOUNT' as Double, o.price) > 10
 select …
 from orders o1_0
-where fn_discount(o1_0.price)>10
+where FN_DISCOUNT(o1_0.price)>10
 
 -- @example 08-function-alone
 -- HQL: select function('FN_DISCOUNT' as Double, :p1)
-select fn_discount(?)
+select FN_DISCOUNT(?)
 
 -- ---- The examples below have no HQL in the manual (it shows only the Java code).
 -- ---- PlannedSqlTest wrote their HQL from that code and the rules of the manual.
@@ -232,15 +232,15 @@ group by o1_0.customer_id
 -- HQL: select o from Order o where o.price > function('FN_DISCOUNT' as Double, :p1)
 select …
 from orders o1_0
-where o1_0.price>fn_discount(?)
+where o1_0.price>FN_DISCOUNT(?)
 
 -- @example 08-function-select
 -- HQL: select o.id, c1.name, function('FN_DISCOUNT' as Double, o.price) from Order o left join o.customer c1
-select o1_0.id,c1_0.name,fn_discount(o1_0.price)
+select o1_0.id,c1_0.name,FN_DISCOUNT(o1_0.price)
 from orders o1_0
 left join customers c1_0 on c1_0.id=o1_0.customer_id
 
 -- @example 08-function-update
 -- HQL: update Order o set o.price = function('FN_DISCOUNT' as Double, o.price)
 update orders o1_0
-set price=fn_discount(o1_0.price)
+set price=FN_DISCOUNT(o1_0.price)

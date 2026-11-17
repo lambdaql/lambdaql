@@ -1,6 +1,7 @@
 package org.lambdaql.engine.render;
 
-import org.lambdaql.analyzer.LambdaAnalysisException;
+import org.lambdaql.i18n.LqlMessage;
+import org.lambdaql.LambdaAnalysisException;
 import org.lambdaql.engine.ir.ArithOp;
 import org.lambdaql.engine.ir.Assignment;
 import org.lambdaql.engine.ir.CmpOp;
@@ -56,6 +57,10 @@ public final class HqlRenderer {
     private final String rootPrefix;
     /** Alias prefix of joins ({@code j1}); a nested select of a DML statement uses {@code k1}. */
     private final String joinPrefix;
+    /** The renderer of the outer query when this one renders a subquery (ROADMAP M8), else null. */
+    private HqlRenderer parent;
+    /** The query root of the subquery this renderer renders, or -1. */
+    private int ownRoot = -1;
     private Object[] captured = new Object[0];
     private boolean leftJoins;
     /** The target entity while rendering UPDATE/DELETE (association paths become subqueries), else null. */
@@ -210,7 +215,7 @@ public final class HqlRenderer {
         List<String> parts = whereParts(wheres);
         List<String> orders = orderBy(root, sorts, paged);
         StringBuilder hql = new StringBuilder("select ").append(select).append(" from ")
-                .append(model.entityName(root)).append(' ').append(rootPrefix).append('0');
+                .append(model.entityName(root)).append(' ').append(aliasOf(mainRoot()));
         joins.forEach((path, j) -> hql.append(j.left() ? " left join " : " join ").append(path).append(' ').append(j.alias()));
         if (!parts.isEmpty()) hql.append(" where ").append(String.join(" and ", parts));
         if (!orders.isEmpty()) hql.append(" order by ").append(String.join(", ", orders));
@@ -363,8 +368,7 @@ public final class HqlRenderer {
     }
 
     private String idOf(Class<?> root) {
-        return model.idName(root).orElseThrow(() -> new LambdaAnalysisException(
-                "복합 키 엔티티에는 limit과 1행 보호를 아직 지원하지 않습니다: " + root.getName()));
+        return model.idName(root).orElseThrow(() -> LqlMessage.COMPOSITE_KEY_LIMIT.exception(root.getName()));
     }
 
     private String scopedWhere(Class<?> root, List<Bound> wheres, DmlScope scope) {
@@ -474,25 +478,72 @@ public final class HqlRenderer {
      * @return the HQL and its parameters
      */
     public RenderedQuery insertSelect(Class<?> target, Class<?> source, AssignBound assigns, List<Bound> wheres) {
+        return insertSelect(target, source, assigns, wheres, null, List.of());
+    }
+
+    /**
+     * Renders INSERT ... SELECT with group keys and having conditions (ROADMAP M9):
+     * {@code insert into Summary (customerId, total) select e0.customer.id, sum(e0.price) from Order e0 group by e0.customer.id}.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+     * {@snippet class="org.lambdaql.query.ProjectionTest" region="insert-group"}
+     *
+     * @param target  the target entity class
+     * @param source  the source entity class
+     * @param assigns target columns and values; the values use the source as root 0
+     * @param wheres  conditions on the source
+     * @param groupBy the group keys, or null
+     * @param havings conditions on the groups
+     * @return the HQL and its parameters
+     */
+    public RenderedQuery insertSelect(Class<?> target, Class<?> source, AssignBound assigns, List<Bound> wheres,
+                                      ValueBound groupBy, List<Bound> havings) {
         List<String> parts = whereParts(wheres);
         captured = assigns.captured();
         leftJoins = true;
         List<String> select = new ArrayList<>();
         for (Assignment a : assigns.items()) select.add(value(a.value(), a.target().javaType()));
+        List<String> keys = groupKeys(groupBy);
+        List<String> having = havingParts(havings);
         leftJoins = false;
         StringBuilder hql = new StringBuilder("insert into ").append(model.entityName(target)).append(" (")
                 .append(targetList(assigns)).append(") select ").append(String.join(", ", select))
                 .append(" from ").append(model.entityName(source)).append(" e0");
         joins.forEach((path, j) -> hql.append(j.left() ? " left join " : " join ").append(path).append(' ').append(j.alias()));
         if (!parts.isEmpty()) hql.append(" where ").append(String.join(" and ", parts));
+        if (!keys.isEmpty()) hql.append(" group by ").append(String.join(", ", keys));
+        if (!having.isEmpty()) hql.append(" having ").append(String.join(" and ", having));
         return new RenderedQuery(hql.toString(), new LinkedHashMap<>(params));
+    }
+
+    private List<String> groupKeys(ValueBound groupBy) {
+        List<String> keys = new ArrayList<>();
+        if (groupBy == null) return keys;
+        captured = groupBy.captured();
+        for (Expr e : groupBy.exprs()) keys.add(value(e, null));
+        return keys;
+    }
+
+    private List<String> havingParts(List<Bound> havings) {
+        List<String> having = new ArrayList<>();
+        for (Bound h : havings) {
+            captured = h.captured();
+            Pred f = fold(h.pred());
+            if (f instanceof Pred.Bool b) {
+                if (!b.value()) having.add("1=0");
+                continue;
+            }
+            String x = pred(f);
+            having.add(havings.size() > 1 && isComposite(f) ? "(" + x + ")" : x);
+        }
+        return having;
     }
 
     private Assignment requireKey(AssignBound row, Expr.Column key) {
         for (Assignment a : row.items()) {
             if (a.target().path().equals(key.path())) return a;
         }
-        throw new LambdaAnalysisException("충돌 키 " + String.join(".", key.path()) + "에 값을 대입해야 합니다(D40)");
+        throw LqlMessage.CONFLICT_KEY_MISSING.exception(String.join(".", key.path()));
     }
 
     private String targetList(AssignBound row) {
@@ -524,7 +575,7 @@ public final class HqlRenderer {
             Object x = eval(v);
             if (x == null) {
                 if (a.target().nonNull()) {
-                    throw new LambdaAnalysisException("NULL이 될 수 없는 열에 null 값을 대입합니다(U6): " + String.join(".", a.target().path()));
+                    throw LqlMessage.ASSIGN_NULL_NOT_NULL.exception(String.join(".", a.target().path()));
                 }
                 return "null";
             }
@@ -560,7 +611,7 @@ public final class HqlRenderer {
         List<String> names = c.path();
         Class<?> owner = dmlRoot;
         for (int i = 0; i <= hop; i++) owner = model.property(owner, names.get(i)).orElseThrow().javaType();
-        String id = model.idName(owner).orElseThrow(() -> new LambdaAnalysisException("복합 키 연관 경로는 DML에서 아직 지원하지 않습니다"));
+        String id = model.idName(owner).orElseThrow(() -> LqlMessage.COMPOSITE_KEY_DML_PATH.exception());
         String alias = "s" + (++subqueries);
         List<String> prefix = names.subList(0, hop + 1);
         String fk = "e" + c.root() + "." + String.join(".", prefix) + "." + id;
@@ -588,6 +639,123 @@ public final class HqlRenderer {
         return "(select " + expr + " from " + from + " where " + alias + "." + id + " = " + fk + ")";
     }
 
+    // ------------------------------------------------------------------ projection (ROADMAP M9)
+
+    /**
+     * Values from one lambda (select values or group keys), with the captured values of that lambda.
+     *
+     * @param exprs    the normalized values
+     * @param captured the captured values of the lambda
+     */
+    public record ValueBound(List<Expr> exprs, Object[] captured) {
+    }
+
+    /**
+     * Renders {@code select [distinct] a, b from Entity e0 [joins] [where] [group by] [having] [order by]} (ROADMAP M9).
+     * Paths in select, group by and having use left joins (rule J1), so rows without the association stay.
+     * The id tie-breaker for paging (S9) is added only without grouping and distinct.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+     * {@snippet class="org.lambdaql.query.ProjectionTest" region="group-by"}
+     *
+     * @param root     the entity class
+     * @param wheres   the conditions
+     * @param select   the selected values
+     * @param groupBy  the group keys, or null
+     * @param havings  the having conditions
+     * @param sorts    the order
+     * @param distinct {@code true} for {@code select distinct}
+     * @param paged    {@code true} when the query uses limit or offset
+     * @return the HQL and its parameters
+     * @throws LambdaAnalysisException if {@code distinct} sorts by a value that is not selected (rule J7)
+     */
+    public RenderedQuery values(Class<?> root, List<Bound> wheres, ValueBound select, ValueBound groupBy, List<Bound> havings,
+                                List<SortBound> sorts, boolean distinct, boolean paged) {
+        List<String> parts = whereParts(wheres);
+        leftJoins = true;
+        captured = select.captured();
+        List<String> cols = new ArrayList<>();
+        for (Expr e : select.exprs()) cols.add(value(e, null));
+        List<String> keys = groupKeys(groupBy);
+        List<String> having = havingParts(havings);
+        leftJoins = false;
+        boolean grouped = groupBy != null || select.exprs().stream().anyMatch(e -> e instanceof Expr.Aggregate);
+        List<String> orders = orderBy(root, sorts, paged && !grouped && !distinct);
+        if (distinct) {
+            for (String o : orders) {
+                if (cols.stream().noneMatch(c -> o.startsWith(c + " "))) {
+                    throw LqlMessage.DISTINCT_SORT_NOT_SELECTED.exception(o);
+                }
+            }
+        }
+        StringBuilder hql = new StringBuilder("select ").append(distinct ? "distinct " : "").append(String.join(", ", cols))
+                .append(" from ").append(model.entityName(root)).append(' ').append(aliasOf(mainRoot()));
+        joins.forEach((path, j) -> hql.append(j.left() ? " left join " : " join ").append(path).append(' ').append(j.alias()));
+        if (!parts.isEmpty()) hql.append(" where ").append(String.join(" and ", parts));
+        if (!keys.isEmpty()) hql.append(" group by ").append(String.join(", ", keys));
+        if (!having.isEmpty()) hql.append(" having ").append(String.join(" and ", having));
+        if (!orders.isEmpty()) hql.append(" order by ").append(String.join(", ", orders));
+        return new RenderedQuery(hql.toString(), new LinkedHashMap<>(params));
+    }
+
+    // ------------------------------------------------------------------ subqueries (ROADMAP M8)
+
+    /** The alias of a query root: {@code e0} for the main entity, {@code s1} for a subquery root. */
+    private String aliasOf(int root) {
+        if (root == ownRoot) return "s" + root;
+        if (parent != null) return parent.aliasOf(root);
+        return rootPrefix + root;
+    }
+
+    private int mainRoot() {
+        return ownRoot >= 0 ? ownRoot : 0;
+    }
+
+    /**
+     * Renders a subquery in brackets. Its own paths get their own joins; the outer roots are referenced by alias
+     * (correlation). The order is kept only with a limit (S14); a subquery with a limit inside {@code in} is wrapped in
+     * a derived table, because MariaDB cannot use {@code limit} directly there (error 1235).
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java">SubqueryTest</a>):
+     * {@snippet class="org.lambdaql.query.SubqueryTest" region="exists"}
+     *
+     * @param q          the subquery
+     * @param notInValue for {@code !values.contains(x)}: the rendered outer value {@code x}; the subquery then gets
+     *                   {@code and <value> = x} for NOT EXISTS (Q2). Otherwise null
+     * @return the HQL in brackets
+     */
+    private String subquery(Expr.Subquery q, String notInValue) {
+        HqlRenderer inner = new HqlRenderer(model, evaluator, params, "s", "s" + q.root() + "j");
+        inner.parent = this;
+        inner.ownRoot = q.root();
+        inner.captured = captured;
+        Object[] cap = captured;
+        List<String> parts = inner.whereParts(q.wheres().stream().map(p -> new Bound(p, cap)).toList());
+        String alias = "s" + q.root();
+        String select = notInValue != null ? "1" : switch (q.kind()) {
+            case EXISTS -> "1";
+            case VALUES -> inner.value(q.select(), null);
+            case SCALAR -> switch (q.agg()) {
+                case NONE -> inner.value(q.select(), null);
+                case COUNT -> "count(" + alias + ")";
+                default -> q.agg().name().toLowerCase(java.util.Locale.ROOT) + "(" + inner.value(q.select(), null) + ")";
+            };
+        };
+        if (notInValue != null) parts.add(inner.value(q.select(), null) + " = " + notInValue);
+        List<String> orders = q.limit() == null ? List.of()
+                : inner.orderBy(q.entity(), q.sorts().isEmpty() ? List.of() : List.of(new SortBound(q.sorts(), cap)), true);
+        boolean wrap = q.kind() == Expr.Subquery.Kind.VALUES && q.limit() != null && notInValue == null;
+        StringBuilder hql = new StringBuilder("select ").append(select).append(wrap ? " as v" : "")
+                .append(" from ").append(model.entityName(q.entity())).append(' ').append(alias);
+        inner.joins.forEach((path, j) -> hql.append(j.left() ? " left join " : " join ").append(path).append(' ').append(j.alias()));
+        if (!parts.isEmpty()) hql.append(" where ").append(String.join(" and ", parts));
+        if (!orders.isEmpty()) hql.append(" order by ").append(String.join(", ", orders));
+        if (q.limit() != null) hql.append(" limit ").append(q.limit());
+        captured = cap;
+        if (wrap) return "(select t" + q.root() + ".v from (" + hql + ") t" + q.root() + ")";
+        return "(" + hql + ")";
+    }
+
     // ------------------------------------------------------------------ order by
 
     private List<String> orderBy(Class<?> root, List<SortBound> sorts, boolean paged) {
@@ -602,13 +770,13 @@ public final class HqlRenderer {
                 String key = value(item.key(), null);
                 String nulls = sortNonNull(item.key()) ? "" : d.nullsFirst() ? " nulls first" : " nulls last";
                 out.add(key + (d.ascending() ? " asc" : " desc") + nulls);
-                if (id != null && item.key() instanceof Expr.Column c && c.root() == 0 && c.path().equals(List.of(id))) {
+                if (id != null && item.key() instanceof Expr.Column c && c.root() == mainRoot() && c.path().equals(List.of(id))) {
                     hasId = true;
                 }
             }
             leftJoins = false;
         }
-        if (id != null && !hasId) out.add(rootPrefix + "0." + id + " asc");
+        if (id != null && !hasId) out.add(aliasOf(mainRoot()) + "." + id + " asc");
         return out;
     }
 
@@ -621,7 +789,7 @@ public final class HqlRenderer {
     private Direction direction(SortItem item) {
         if (item.kind() == SortItem.Kind.SORT) {
             if (eval(item.arg()) instanceof Direction d) return d;
-            throw new LambdaAnalysisException("정렬 방향(Direction)이 null입니다: " + item);
+            throw LqlMessage.SORT_DIRECTION_NULL.exception(item);
         }
         boolean asc = item.kind() == SortItem.Kind.ASC;
         if (item.arg() == null) return asc ? Direction.ASC : Direction.DESC;
@@ -629,7 +797,7 @@ public final class HqlRenderer {
         boolean first = switch (v) {
             case Boolean b -> b;
             case Number n -> n.intValue() != 0;
-            case null, default -> throw new LambdaAnalysisException("nullsFirst 값이 null입니다: " + item);
+            case null, default -> throw LqlMessage.NULLS_FIRST_NULL.exception(item);
         };
         if (asc) return first ? Direction.ASC_NULLS_FIRST : Direction.ASC_NULLS_LAST;
         return first ? Direction.DESC_NULLS_FIRST : Direction.DESC_NULLS_LAST;
@@ -719,7 +887,7 @@ public final class HqlRenderer {
     private static boolean truthValue(Object v, Pred where) {
         if (v instanceof Boolean b) return b;
         if (v instanceof Number n) return n.intValue() != 0;
-        throw new LambdaAnalysisException("null Boolean 값을 조건으로 씁니다(Java에서는 NullPointerException): " + where);
+        throw LqlMessage.NULL_BOOLEAN_CONDITION.exception(where);
     }
 
     // ------------------------------------------------------------------ conditions
@@ -786,6 +954,9 @@ public final class HqlRenderer {
     }
 
     private String truth(Expr e, boolean positive) {
+        if (e instanceof Expr.Subquery q && q.kind() == Expr.Subquery.Kind.EXISTS) {
+            return (positive ? "exists " : "not exists ") + subquery(q, null);
+        }
         if (isHostLike(e)) {
             return truthValue(eval(e), new Pred.Truth(e)) == positive ? "1=1" : "1=0";
         }
@@ -795,11 +966,16 @@ public final class HqlRenderer {
     }
 
     private String in(Expr value, Expr values, boolean positive) {
+        if (values instanceof Expr.Subquery q) {
+            String x = value(value, null);
+            // NOT IN (subquery) gives no rows when the subquery has a NULL; NOT EXISTS is exact (Q2)
+            return positive ? x + " in " + subquery(q, null) : "not exists " + subquery(q, x);
+        }
         Object v = eval(values);
-        if (v == null) throw new LambdaAnalysisException("IN에 쓸 컬렉션이 null입니다(Java에서는 NullPointerException)");
+        if (v == null) throw LqlMessage.IN_COLLECTION_NULL.exception();
         Collection<?> c = v instanceof Collection<?> col ? col : List.of((Object[]) v);
         if (c.stream().anyMatch(Objects::isNull)) {
-            throw new LambdaAnalysisException("IN에 쓸 컬렉션에 null 원소가 있습니다(ROADMAP D29)");
+            throw LqlMessage.IN_COLLECTION_NULL_ELEMENT.exception();
         }
         if (c.isEmpty()) return positive ? "1=0" : "1=1";
         String x = value(value, null);
@@ -817,7 +993,7 @@ public final class HqlRenderer {
             case Expr.Column c -> path(c);
             case Expr.Host h -> {
                 Object v = eval(h);
-                if (v == null) throw new LambdaAnalysisException("null 값과 크기를 비교할 수 없습니다(Java에서는 NullPointerException): " + h);
+                if (v == null) throw LqlMessage.NULL_ORDER_COMPARE.exception(h);
                 yield bind(v, peer);
             }
             case Expr.Const c -> literal(c, peer);
@@ -826,7 +1002,19 @@ public final class HqlRenderer {
                     : "(" + value(a.left(), peer) + " " + a.op().symbol() + " " + value(a.right(), peer) + ")";
             case Expr.Neg n -> "-(" + value(n.operand(), peer) + ")";
             case Expr.Coalesce c -> "coalesce(" + value(c.first(), peer) + ", " + value(c.second(), peerType(c.first())) + ")";
-            default -> throw new LambdaAnalysisException("HQL로 렌더링할 수 없는 값입니다: " + e);
+            case Expr.Subquery q -> subquery(q, null);
+            case Expr.Aggregate a -> switch (a.fn()) {
+                case COUNT_ALL -> "count(*)";
+                case COUNT_DISTINCT -> "count(distinct " + value(a.arg(), null) + ")";
+                default -> a.fn().name().toLowerCase(java.util.Locale.ROOT) + "(" + value(a.arg(), null) + ")";
+            };
+            // a database function: always function('<key>' as <type>, ...) (ROADMAP M11, D31)
+            case Expr.Func f -> {
+                StringBuilder out = new StringBuilder("function('").append(f.key().replace("'", "''")).append("' as ").append(f.asType());
+                for (Expr arg : f.args()) out.append(", ").append(value(arg, null));
+                yield out.append(')').toString();
+            }
+            default -> throw LqlMessage.VALUE_NOT_RENDERABLE.exception(e);
         };
     }
 
@@ -867,8 +1055,17 @@ public final class HqlRenderer {
     }
 
     private String path(Expr.Column c) {
-        String expr = rootPrefix + c.root();
+        String expr = aliasOf(c.root());
         List<String> names = c.path();
+        if (parent != null && c.root() != ownRoot) {
+            for (int i = 0; i < names.size() - 1; i++) {
+                boolean fkOnly = c.idPath() && i == names.size() - 2;
+                if (c.association().get(i) && !fkOnly) {
+                    throw LqlMessage.SUBQUERY_OUTER_PATH.exception(String.join(".", names));
+                }
+            }
+            return expr + "." + String.join(".", names);
+        }
         if (dmlRoot != null) {
             for (int i = 0; i < names.size() - 1; i++) {
                 boolean fkOnly = c.idPath() && i == names.size() - 2;
@@ -906,7 +1103,7 @@ public final class HqlRenderer {
         if (e instanceof Expr.Host h) {
             Object v = evaluator.eval(h, captured);
             if (v == null && h.nonNullRequired()) {
-                throw new LambdaAnalysisException("null 값에 equals를 호출합니다(Java에서는 NullPointerException): " + h.expr());
+                throw LqlMessage.NULL_EQUALS.exception(h.expr());
             }
             return v;
         }
@@ -916,6 +1113,9 @@ public final class HqlRenderer {
     private static boolean isHostLike(Expr e) {
         return switch (e) {
             case Expr.Column c -> false;
+            case Expr.Subquery q -> false;
+            case Expr.Aggregate a -> false;
+            case Expr.Func f -> false;
             case Expr.Arith a -> isHostLike(a.left()) && isHostLike(a.right());
             case Expr.Neg n -> isHostLike(n.operand());
             case Expr.Coalesce c -> isHostLike(c.first()) && isHostLike(c.second());
@@ -939,7 +1139,7 @@ public final class HqlRenderer {
     private static boolean javaCompare(CmpOp op, Object a, Object b, boolean nullSafe) {
         if (op == CmpOp.EQ) return Objects.equals(norm(a), norm(b));
         if (op == CmpOp.NE) return !Objects.equals(norm(a), norm(b));
-        if (a == null || b == null) throw new LambdaAnalysisException("null 값과 크기를 비교할 수 없습니다");
+        if (a == null || b == null) throw LqlMessage.NULL_ORDER_COMPARE.exception(op);
         int c = a instanceof Number x && b instanceof Number y
                 ? Double.compare(x.doubleValue(), y.doubleValue())
                 : ((Comparable) a).compareTo(b);

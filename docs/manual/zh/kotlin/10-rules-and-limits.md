@@ -6,7 +6,7 @@
 > Kotlin 与 SQL 的不同之处、各数据库的不同之处，以及哪些写法不受支持。
 > 这些规则已用原型在 H2 2.3、MariaDB 10.11 和 Oracle 23ai（Hibernate 6.6.5）上检查过，Kotlin 字节码已用 kotlinc 1.7.22 到 2.3.21 检查过。
 > 目前分析核心、`where`、结果函数（`toList()`、`toSet()`、`first()`、`one()`、`count()`、`exists()`）、排序与分页的核心部分、`SortSpec`、update/insert/delete/upsert（[7](07-dml.md)）以及 Spring Data JPA 模块（[12](12-spring-data-jpa.md)）可以工作（已在 H2、MariaDB 和 Oracle 上用 Java Lambda 测试）。
-> 下面关于子查询、`select` 和存储过程的规则**尚未实现**，DML 中的子查询和聚合也尚未实现。一部分排序规则也尚未实现（见 [4.12](04-order-paging.md#412-rules-summary-s1-to-s14)）。
+> 子查询（[5](05-subquery.md)）和带聚合的 `select`（[6](06-select-group.md)）的规则同样已实现，在 DML 中也是如此。下面关于派生表、CTE 和存储过程的规则**尚未实现**。一部分排序规则也尚未实现（见 [4.12](04-order-paging.md#412-rules-summary-s1-to-s14)）。
 > 完整状态请参阅 [路线 README](README.md)。
 
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[9. Kotlin 说明](09-kotlin-notes.md) | 下一章：[11. 错误与语言](../11-errors-and-languages.md) | [本页的 Java 版本](../java/10-rules-and-limits.md)
@@ -297,7 +297,7 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 |---|---|---|
 | 不带 `limit` 的子查询 `order by` | Oracle：语法错误（ORA-00907）。MariaDB：被忽略 | 移除，并给出 WARN |
 | MariaDB `IN (... limit n)` | 不支持（错误 1235） | 自动包装：`in (select x.id from (... limit n) x)` |
-| MariaDB `lateral` | 结果错误（模拟实现） | 用 `row_number() over (...)` 改写 |
+| MariaDB `lateral` | 结果错误（模拟实现） | 用 `row_number() over (...)` 改写（尚未实现） |
 
 ### 更新、插入、删除
 
@@ -305,7 +305,7 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 |---|---|---|
 | `SET a = ..., b = a + 1`（在设置某列之后又读取它） | MariaDB 读取**新**值，H2 和 Oracle 读取旧值 | 分析时报错（U3） |
 | DML 中的关联路径（`it.customer?.name`） | Hibernate 在各数据库上生成不同的 join，并且会**丢失**没有 customer 的行 | lambdaQL 写出关联标量子查询（在 `where` 和 SET 中）。在 `where` 中，查询会做内连接的路径还会加上 `customer.id is not null`，所以 DML 与查询命中相同的行（U9，已测试） |
-| 带有同一张表子查询的 `DELETE` | MariaDB 错误 1093 | 包装在派生表中（U17；随子查询一起提供，里程碑 M8） |
+| 带有同一张表子查询的 `DELETE` | MariaDB 错误 1093 | 包装在派生表中（U17；尚未实现） |
 | 同一个 enum 值只绑定一次，同时用于 STRING 列和 ORDINAL 列 | H2 和 MariaDB 会**不报错地存入错误的值** | 每个位置使用一个参数，从不共用（U7） |
 | `values(list) { }` 中的大量行 | Oracle：绑定变量硬上限为 65,535（ORA-01745），远在达到之前就已非常慢 | 拆分：每条语句最多 500 个值，全部在一个事务中执行（U13） |
 | 带 `order by ... limit` 的 `update` / `delete` | MariaDB 拒绝 `in` 子查询中的 `limit`（错误 1235）和读取目标表的子查询（错误 1093） | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`：派生表 `t` 在三个数据库上都可用。内层 select 使用查询的连接（D36），因此行与查询相同（用 Java 测试） |

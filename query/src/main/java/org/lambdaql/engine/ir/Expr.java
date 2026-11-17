@@ -23,7 +23,8 @@ import java.util.List;
  */
 public sealed interface Expr permits
         Expr.Param, Expr.Captured, Expr.Const, Expr.Invoke, Expr.GetField, Expr.Arith, Expr.Neg,
-        Expr.Convert, Expr.CmpResult, Expr.NewObject, Expr.ArrayLength, Expr.Coalesce, Expr.Column, Expr.Host {
+        Expr.Convert, Expr.CmpResult, Expr.NewObject, Expr.ArrayLength, Expr.Coalesce, Expr.Column, Expr.Host,
+        Expr.Lambda, Expr.Root, Expr.Subquery, Expr.Aggregate, Expr.ArrayOf, Expr.Func {
 
     /**
      * Returns the JVM type of this value.
@@ -279,6 +280,134 @@ public sealed interface Expr permits
     }
 
     /**
+     * Raw node: a lambda made inside the lambda ({@code invokedynamic} with {@code LambdaMetafactory}), for example
+     * the {@code i -> ...} in {@code sub.from(Item.class).where(i -> ...)}. Its body is read from the class file
+     * (ROADMAP M8, 8.2); it does not need to be serializable.
+     *
+     * @param owner      internal name of the class that has the body method
+     * @param method     the body method name
+     * @param descriptor the body method descriptor
+     * @param isStatic   {@code true} if the body is a static method
+     * @param captured   the values captured by the inner lambda, in order (in the outer lambda's terms)
+     * @param type       the functional interface type
+     */
+    record Lambda(String owner, String method, String descriptor, boolean isStatic, List<Expr> captured, Type type)
+            implements Expr {
+        /** Makes an unmodifiable copy of the captured list. */
+        public Lambda {
+            captured = List.copyOf(captured);
+        }
+        @Override public String toString() { return "lambda(" + method + captured + ")"; }
+    }
+
+    /**
+     * Semantic node: an entity root that is already resolved to a query root index — used for the outer entity
+     * inside a subquery (correlation).
+     *
+     * @param root the query root index
+     * @param type the entity type
+     */
+    record Root(int root, Type type) implements Expr {
+        @Override public String toString() { return "root" + root; }
+    }
+
+    /**
+     * Meaning node: a subquery (ROADMAP M8).
+     *
+     * @param kind   what the subquery gives
+     * @param root   the query root index of the subquery entity
+     * @param entity the subquery entity
+     * @param wheres the normalized conditions (joined with AND); they may use outer roots (correlation)
+     * @param select the selected value ({@link Kind#VALUES}, {@link Kind#SCALAR}), or null
+     * @param agg    the aggregate for {@link Kind#SCALAR}, or {@link Agg#NONE} (then a {@code first()} after limit 1)
+     * @param sorts  the order (only with a limit)
+     * @param limit  the row limit, or null
+     * @param type   the JVM type of the value
+     */
+    record Subquery(Kind kind, int root, Class<?> entity, List<Pred> wheres, Expr select, Agg agg,
+                    List<SortItem> sorts, Integer limit, Type type) implements Expr {
+        /** What a subquery gives. */
+        public enum Kind {
+            /** {@code exists (select 1 ...)}: a boolean. */
+            EXISTS,
+            /** {@code (select v ...)} for {@code x in (...)}. */
+            VALUES,
+            /** One value: an aggregate, or the first value after limit 1. */
+            SCALAR
+        }
+
+        /** The aggregate of a scalar subquery. */
+        public enum Agg {
+            /** No aggregate: the first value after {@code limit(1)}. */
+            NONE,
+            /** {@code count(alias)}. */
+            COUNT,
+            /** {@code max(value)}. */
+            MAX,
+            /** {@code min(value)}. */
+            MIN,
+            /** {@code avg(value)}. */
+            AVG,
+            /** {@code sum(value)}. */
+            SUM
+        }
+
+        /** Makes unmodifiable copies of the lists. */
+        public Subquery {
+            wheres = List.copyOf(wheres);
+            sorts = List.copyOf(sorts);
+        }
+        @Override public String toString() {
+            return "sub(" + kind + (agg == Agg.NONE ? "" : " " + agg) + " " + entity.getSimpleName() + "#" + root
+                    + (select == null ? "" : " select " + select) + " where " + wheres
+                    + (limit == null ? "" : " limit " + limit) + ")";
+        }
+    }
+
+    /**
+     * Meaning node: an aggregate function from {@code org.lambdaql.Agg} (ROADMAP M9).
+     *
+     * @param fn   the function
+     * @param arg  the normalized argument, or null for {@code count(*)}
+     * @param type the JVM type of the result
+     */
+    record Aggregate(Fn fn, Expr arg, Type type) implements Expr {
+        /** An aggregate function. */
+        public enum Fn {
+            /** {@code count(*)}. */
+            COUNT_ALL,
+            /** {@code count(x)}. */
+            COUNT,
+            /** {@code count(distinct x)}. */
+            COUNT_DISTINCT,
+            /** {@code sum(x)}. */
+            SUM,
+            /** {@code avg(x)}. */
+            AVG,
+            /** {@code min(x)}. */
+            MIN,
+            /** {@code max(x)}. */
+            MAX
+        }
+        @Override public String toString() { return fn.name().toLowerCase() + "(" + (arg == null ? "*" : arg) + ")"; }
+    }
+
+    /**
+     * Raw node: an array made in the lambda ({@code anewarray} and {@code aastore}), for example the argument of
+     * Kotlin {@code listOf(a, b)}. Elements that were not stored yet are null.
+     *
+     * @param type  the array type
+     * @param items the elements
+     */
+    record ArrayOf(Type type, List<Expr> items) implements Expr {
+        /** Makes a copy that allows null elements. */
+        public ArrayOf {
+            items = java.util.Collections.unmodifiableList(new java.util.ArrayList<>(items));
+        }
+        @Override public String toString() { return "array" + items; }
+    }
+
+    /**
      * Checks if a JVM type takes two stack slots.
      *
      * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
@@ -289,5 +418,27 @@ public sealed interface Expr permits
      */
     static boolean isWide(Type t) {
         return t.getSort() == Type.LONG || t.getSort() == Type.DOUBLE;
+    }
+
+    /**
+     * Meaning node: a call of a database function declared with {@code @SqlFunction} (ROADMAP M11, D31).
+     * It is written as {@code function('<key>' as <asType>, args...)}.
+     *
+     * @param key    the function name used in the query
+     * @param sql    the SQL name, or the same as {@code key}
+     * @param asType the HQL type name after {@code as} ({@code Double}, {@code String} ...)
+     * @param args   the normalized arguments
+     * @param type   the JVM type of the result
+     */
+    record Func(String key, String sql, String asType, List<Expr> args, Type type) implements Expr {
+        /** Makes an unmodifiable copy of the arguments. */
+        public Func {
+            args = List.copyOf(args);
+        }
+
+        @Override
+        public String toString() {
+            return key + args;
+        }
     }
 }

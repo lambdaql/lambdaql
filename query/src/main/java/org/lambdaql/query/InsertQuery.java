@@ -1,5 +1,6 @@
 package org.lambdaql.query;
 
+import org.lambdaql.i18n.LqlMessage;
 import org.lambdaql.engine.render.HqlRenderer;
 import org.lambdaql.engine.render.RenderedQuery;
 
@@ -88,6 +89,8 @@ public class InsertQuery<T> {
         private final Class<S> source;
         private final QueryContext context;
         private final List<HqlRenderer.Bound> wheres = new ArrayList<>();
+        private final List<HqlRenderer.Bound> havings = new ArrayList<>();
+        private HqlRenderer.ValueBound groupBy;
 
         InsertFrom(Class<T> target, Class<S> source, QueryContext context) {
             this.target = target;
@@ -107,27 +110,61 @@ public class InsertQuery<T> {
         }
 
         /**
+         * Groups the source rows (ROADMAP M9): one key, or many keys with {@code List.of(...)}.
+         * The values in {@code select} may then use {@code Agg} functions.
+         *
+         * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+         * {@snippet class="org.lambdaql.query.ProjectionTest" region="insert-group"}
+         *
+         * @param keys the key lambda on the source
+         * @return this
+         */
+        public InsertFrom<T, S> groupBy(GroupBy<S> keys) {
+            var ref = QueryContext.read(keys);
+            groupBy = new HqlRenderer.ValueBound(context.analyzeGroupKeys(ref, List.of(source)), ref.capturedArgs());
+            return this;
+        }
+
+        /**
+         * Adds a condition on the groups (joined with AND); {@code Agg} functions are allowed.
+         *
+         * @param condition the condition on the source groups
+         * @return this
+         */
+        public InsertFrom<T, S> having(SelectQuery.Where<S> condition) {
+            var ref = QueryContext.read(condition);
+            havings.add(new HqlRenderer.Bound(context.analyzeHaving(ref, List.of(source)), ref.capturedArgs()));
+            return this;
+        }
+
+        /**
          * Maps a source row to a new row: {@code (a, o) -> { a.setId(o.getId()); }}.
          * Source paths through an association use a left join, so source rows without it stay (U10).
+         * {@code Agg} functions are allowed in the values; then every other source value must be a group key (J3).
          *
          * @param assign the mapping
          * @return the runnable INSERT
          */
         public ExecutableInsert<T> select(AssignFrom<T, S> assign) {
             var ref = QueryContext.read(assign);
-            var items = context.analyzeSetters(ref, List.of(target, source), -1).stream()
+            var items = context.analyzeSetters(ref, List.of(target, source), -1, true).stream()
                     .map(a -> new org.lambdaql.engine.ir.Assignment(a.target(),
                             org.lambdaql.engine.sem.AssignmentReader.reroot(a.value(), 1, 0)))
                     .toList();
             for (var a : items) {
                 if (org.lambdaql.engine.sem.AssignmentReader.columns(a.value()).stream().anyMatch(c -> c.root() != 0)) {
-                    throw new org.lambdaql.analyzer.LambdaAnalysisException("insert … select 값에서는 새 행을 읽을 수 없습니다 — " + ref.describe());
+                    throw LqlMessage.INSERT_READS_TARGET.exceptionAt(ref.describe(), "insert … select");
                 }
             }
+            org.lambdaql.engine.sem.SelectReader.checkGrouping(items.stream().map(org.lambdaql.engine.ir.Assignment::value).toList(),
+                    groupBy == null ? List.of() : groupBy.exprs(), havings.stream().map(HqlRenderer.Bound::pred).toList(),
+                    ref.describe());
             HqlRenderer.AssignBound bound = new HqlRenderer.AssignBound(items, ref.capturedArgs());
             List<HqlRenderer.Bound> w = List.copyOf(wheres);
-            return new ExecutableInsert<>(context,
-                    () -> List.<RenderedQuery>of(DmlParts.renderer(context, target).insertSelect(target, source, bound, w)));
+            HqlRenderer.ValueBound g = groupBy;
+            List<HqlRenderer.Bound> h = List.copyOf(havings);
+            return new ExecutableInsert<>(context, () -> List.<RenderedQuery>of(
+                    DmlParts.renderer(context, target).insertSelect(target, source, bound, w, g, h)));
         }
     }
 }

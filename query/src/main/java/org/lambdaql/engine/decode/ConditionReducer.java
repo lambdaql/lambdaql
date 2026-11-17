@@ -1,6 +1,8 @@
 package org.lambdaql.engine.decode;
 
-import org.lambdaql.analyzer.LambdaAnalysisException;
+import org.lambdaql.i18n.LqlMessage;
+import org.lambdaql.LambdaQLException;
+import org.lambdaql.LambdaAnalysisException;
 import org.lambdaql.engine.ir.Pred;
 
 import java.util.ArrayList;
@@ -43,7 +45,7 @@ public final class ConditionReducer {
      * @param root  the graph from {@link Decoder#decodePredicate}
      * @param where a name for error messages (for example {@link org.lambdaql.engine.load.LambdaRef#describe()})
      * @return the condition; {@link Pred.Bool} when the result is constant
-     * @throws org.lambdaql.analyzer.LambdaAnalysisException if the graph cannot be reduced, or if it returns a non-boolean value
+     * @throws org.lambdaql.LambdaAnalysisException if the graph cannot be reduced, or if it returns a non-boolean value
      */
     public static Pred reduce(Node root, String where) {
         Node r = root;
@@ -53,16 +55,14 @@ public final class ConditionReducer {
                 return leaf.value ? Pred.Bool.TRUE : Pred.Bool.FALSE;
             }
             if (!(r instanceof Node.Test t)) {
-                throw new LambdaAnalysisException("조건 람다가 boolean이 아닌 값을 반환합니다 — " + where);
+                throw LqlMessage.NOT_BOOLEAN_CONDITION.exceptionAt(where);
             }
             if (t.onTrue instanceof Node.Leaf a && t.onFalse instanceof Node.Leaf b) {
                 if (a.value == b.value) return a.value ? Pred.Bool.TRUE : Pred.Bool.FALSE;
                 return NegationMinimizer.minimize(a.value ? t.atom : Pred.not(t.atom));
             }
             if (!step(r)) {
-                throw new LambdaAnalysisException(
-                        "조건을 논리식으로 복원하지 못했습니다(값 삼항 연산자 등 같은 조건이 여러 번 필요한 형태는 지원하지 않습니다) — "
-                                + where + "\n" + dump(r));
+                throw LambdaQLException.of(LqlMessage.CONDITION_NOT_RESTORED, where, dump(r), null);
             }
         }
     }

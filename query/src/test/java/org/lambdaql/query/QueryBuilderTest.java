@@ -5,8 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jinq.jpa.JinqJPAStreamProvider;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.lambdaql.analyzer.LambdaAnalysisException;
-import org.lambdaql.function.JpqlFunction;
+import org.lambdaql.LambdaQLException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
@@ -181,7 +180,7 @@ class QueryBuilderTest {
 
 
         SelectQuery<Order> where4 = query.where(o -> o.getCustomer().getId() == 1);
-        SelectQuery<Order> select = where1.select(o -> o.getProduct().toUpperCase());
+        ValueQuery<String> select = where1.select(o -> o.getProduct());
 
 
         SelectJoinQuery<Order, Customer> join = query.leftJoin(Customer.class, (o, c) -> o.getCustomer().getId() == c.getId());
@@ -250,20 +249,8 @@ class QueryBuilderTest {
         SelectQuery<Order> query = queryBuilder.from(Order.class);
         // a condition without the entity is computed in Java when the query runs
         assertEquals("select e0 from Order e0 where 1=0", query.where(obj -> this.bool()).toHql().hql());
-        // method references are planned for M7: rejected with a clear error for now
-        assertThrows(LambdaAnalysisException.class, () -> queryBuilder.from(Order.class).where(JpqlFunction::isNull));
-    }
-
-    @Disabled("M2 대상: LDC 문자열 인자를 raw String 으로 push → IOperand 캐스트 ClassCastException")
-    @Test
-    void selectWhereStaticMethodStack() {
-
-        QueryBuilder queryBuilder = new QueryBuilder(entityManagerFactory);
-        SelectQuery<Order> query = queryBuilder.from(Order.class);
-        SelectQuery<Order> where1 = query.where(obj -> JpqlFunction.like("aaa", "aa%"));
-        //query.where(JpqlFunction::isNull);
-//
-        System.out.println(where1);
+        // a method reference as a condition is rejected with a clear error for now
+        assertThrows(LambdaQLException.class, () -> queryBuilder.from(Order.class).where(Order::isActive));
     }
 
     @Test
@@ -271,10 +258,10 @@ class QueryBuilderTest {
         // 익명 클래스(writeReplace 없음)는 분석 대상이 아니므로 명확한 예외로 거부해야 한다 (ROADMAP 5절, M7)
         QueryBuilder queryBuilder = new QueryBuilder(entityManagerFactory);
         SelectQuery<Order> query = queryBuilder.from(Order.class);
-        LambdaAnalysisException e = assertThrows(LambdaAnalysisException.class, () -> query.where(new SelectQuery.Where<Order>() {
+        LambdaQLException e = assertThrows(LambdaQLException.class, () -> query.where(new SelectQuery.Where<Order>() {
             @Override
             public boolean clause(Order obj) {
-                return JpqlFunction.isNull(obj);
+                return obj.isActive();
             }
         }));
         assertTrue(e.getMessage().contains("QueryBuilderTest$1"), e.getMessage());   // the message names the anonymous class
