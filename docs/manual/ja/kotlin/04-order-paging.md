@@ -4,8 +4,8 @@
 > [!NOTE]
 > **状況**
 > - **中核部分は実装済み**、H2、MariaDB 10.11、Oracle 23.26（Hibernate 6.6.5）でテスト済み: `by.asc`、`by.desc`、`by.sort` を使う `orderBy { o, by -> ... }`、キーが 1 つの書き方 `orderBy { it.key }` と `orderBy({ it.key }, Direction)`、`Direction.parse` / `reversed`、`limit` / `offset`、`orderBy` の後の `first()`、再利用できるソート `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。Spring の `Sort` と `Pageable` は Spring Data JPA モジュールで使えます（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。ほとんどのテストは **Java** のラムダを使います。`limit` を使う Kotlin のソートもテストしています（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、**(テスト済み)** と表示）。
-> - **こちらも実装済み（Java のラムダでテスト済み）:** `join`、`leftJoin`、`crossJoin` の後の結合の書き方 `{ o, c, by -> ... }`（[6.8 明示的な結合](06-select-group.md#68-explicit-joins) を参照）。
-> - **まだ実装されていないもの:** Kotlin のプロパティ参照（`orderBy(Order::price)`）、`SortWhitelist`、`SortSpec` の結合の書き方。
+> - **こちらも実装済み（Java のラムダでテスト済み）:** `join`、`leftJoin`、`crossJoin` の後の結合の書き方 `{ o, c, by -> ... }`（[6.8 明示的な結合](06-select-group.md#68-explicit-joins) を参照）と、外部のソートのためのソートポリシー（`SortRules`、`SortPolicy`、`SortMode`。[4.10](#sort-policy) を参照）。
+> - **まだ実装されていないもの:** Kotlin のプロパティ参照（`orderBy(Order::price)`）、`SortSpec` の結合の書き方。
 > - Kotlin の構文はコンパイルできます（プロトタイプで確認、kotlinc 2.3.21）。nullable なキー、`?.` のキー、プロパティ参照はコンパイルできます。エンティティのキーはコンパイルできません。
 > - この章のそのほかの HQL はライブラリのルールに従いますが、Kotlin のラムダではテストされていません。
 
@@ -491,7 +491,8 @@ order by o1_0.description desc nulls last,o1_0.id desc
 H2 と MariaDB は `desc` で NULL をもともと末尾に置くので、余分な句を書きません。Oracle は `nulls last` を加えます。
 
 **`SortSpec.ofPath`: プロパティ名からのソート。** `SortSpec.ofPath(Order::class.java, "customer.name", Direction.DESC)` は、プロパティのパスから spec を作ります。ソートのキーがコードの外からテキストとして来る場合に使います（Spring モジュールは Spring の `Sort` のためにこれを使います。[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) を参照）。
-パスのどの部分も永続プロパティで、最後の部分は基本型の値でなければなりません。それ以外はエラーです。ただし永続プロパティならどれでも受け付けるので、ユーザーから来たテキストは先に自分の許可リストと照らし合わせてください。
+パスのどの部分も永続プロパティで、最後の部分は基本型の値でなければなりません。それ以外はエラーです。
+どの名前を許可するかはソートポリシーが決めます（下の [ソートポリシー](#sort-policy) を参照）。ポリシーも `@Sortable` フィールドもなければ永続プロパティならどれでも受け付け、lambdaQL は警告 `LQL-5003` をログに出します。
 ここにはラムダがないので、Kotlin でも Java と同じように動きます。Java のテストは [このページの Java 版](../java/04-order-paging.md#410-reusable-and-external-sorts) にあります（リージョン `sort-spec-path`）。
 
 ```kotlin
@@ -501,9 +502,122 @@ qb.from(Order::class.java).orderBy(byName).toList()
 // HQL: select e0 from Order e0 left join e0.customer j1 order by j1.name desc nulls last, e0.id asc
 ```
 
+<a id="sort-policy"></a>
+### ソートポリシー: 許可する外部の名前
+
+**実装済み**（決定 D43）。H2、MariaDB 10.11、Oracle 23.26 で Java のラムダでテスト済み。
+
+コードの外から来たソートの名前（リクエストパラメーター、Spring の `Sort` や `Pageable`）は、どの永続プロパティでも指せます。
+どの名前を許可するかは **ソートポリシー** が決めます。
+
+- `SortRules<T>` は、1 つのエンティティで許可する名前のリストです。各カラムをラムダで書くので、コンパイラーがチェックします。
+- `SortPolicy` は、エンティティごとのルールとモード（`SortMode`）を持ちます。ポリシーは `EntityManagerFactory`、つまり永続化ユニットごとに 1 つ登録します。そのファクトリーを使うすべての `QueryBuilder` とリポジトリーがこのポリシーを使います。
+- エンティティのフィールドに `@Sortable` を付けると、コードなしでルールを書けます（下の [`@Sortable` によるルール](#rules-from-sortable) を参照）。
+
+エンティティのルールは、次の順で **1 か所** からだけ取られます: ポリシーの `SortRules`（コードか Spring の `SortPolicy` Bean）、Spring Boot のプロパティ `lambdaql.sort.*`（[12.5](12-spring-data-jpa.md#sort-policy-with-spring) を参照）、エンティティの `@Sortable` フィールド。2 か所のルールは合わせられません。
+
+**チェックの対象。** 文字列から作ったソートだけです: `SortSpec.ofPath`、そして Spring の `Sort` や `Pageable`（Spring モジュールは `ofPath` を使います。[12.5](12-spring-data-jpa.md#sort-policy-with-spring) を参照）。
+ソートのラムダ（`orderBy { o, by -> ... }`、`SortSpec.of`）は自分のコードなので、チェックされません。
+
+| ルール | 許可する外部の名前 |
+|---|---|
+| `allow { it.price }` | `price`（カラムのパス） |
+| `allow { it.customer?.name }` | `customer.name`。関連を通るパスは、このように書いたときだけ許可されます |
+| `alias("newest") { it.updateAt }` | `newest`。`updateAt` でソートします。このときパス `updateAt` そのものは外部の名前では **ありません**。そのため、クライアントにプロパティ名が見えません |
+
+ルールはエンティティのカラムでなければなりません。
+それ以外のキーは、ルールを最初に使うときに `LQL-4041` で拒否されます（まだテストされていません）。
+
+| `SortMode` | ルールが許可しない名前の扱い |
+|---|---|
+| `OFF` | ソートを実行します。チェックしません |
+| `WARN` | ソートを実行し、エンティティと名前ごとに 1 回、警告 `LQL-5003` をログに出します。**これがデフォルトです:** 登録されたポリシーがなければ `WARN` を使い、ルールは `@Sortable` からだけ取ります |
+| `STRICT` | `SortNotAllowedException`（`LQL-4040`）で拒否します。ルールも `@Sortable` フィールドもないエンティティは、すべての名前を拒否します |
+
+そのため、ポリシーを登録するまでは、`@Sortable` が許可しない外部のソートの名前ごとに、エンティティごとに 1 回 `LQL-5003` が出ます。
+知らない名前を拒否するには `STRICT` で、チェックを止めるには `OFF` でポリシーを登録してください。
+
+| メソッド | 働き |
+|---|---|
+| `SortPolicy.of(mode, rules...)` | モードとエンティティごとのルールからポリシーを作る |
+| `SortPolicy.register(emf, policy)` | 永続化ユニットのポリシーを登録する。前のポリシーは置き換えられる |
+| `SortPolicy.unregister(emf)` | ポリシーを取り除く。デフォルト（`WARN`、ルールは `@Sortable` だけ）に戻る |
+| `SortPolicy.find(emf)` | 登録されたポリシーを返す（`Optional`） |
+| `SortPolicy.effective(emf)` | 有効なポリシーを返す。登録されたものがなければデフォルト |
+
+Spring Boot では、`register` を呼ぶ代わりに `SortPolicy` の Bean を定義してください（[12.5](12-spring-data-jpa.md#sort-policy-with-spring) を参照）。
+
+ソートポリシーについての Kotlin のテストはまだありません。同じルールを Java で書いたものは [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java) でテストされています（H2、MariaDB、Oracle）。テスト済みの例は [このページの Java 版](../java/04-order-paging.md#sort-policy) を参照してください。
+次は設計上の例です。
+
+```kotlin
+val orderRules = SortRules.of(Order::class.java)
+    .allow { it.price }                      // the name "price"
+    .allow { it.customer?.name }             // an association path: allowed only when listed
+    .alias("newest") { it.updateAt }         // the outside name "newest" sorts by updateAt
+SortPolicy.register(emf, SortPolicy.of(SortMode.STRICT, orderRules))
+
+qb.from(Order::class.java).orderBy(SortSpec.ofPath(Order::class.java, "newest", Direction.DESC)).toList()
+// HQL: select e0 from Order e0 order by e0.updateAt desc nulls last
+qb.from(Order::class.java).orderBy(SortSpec.ofPath(Order::class.java, "updateAt", Direction.ASC)).toList()
+// SortNotAllowedException (LQL-4040): the path behind an alias is not an outside name
+qb.from(Order::class.java).orderBy { o, by -> by.asc(o.description) }.toList()
+// a sort lambda is your code: never checked
+```
+
+<a id="rules-from-sortable"></a>
+**`@Sortable` によるルール。** エンティティのフィールドや getter に `@org.lambdaql.Sortable` を付けても、ルールになります。
+
+| アノテーション | 許可する外部の名前 |
+|---|---|
+| プロパティ `name` の `@field:Sortable` | `name` |
+| プロパティ `grade` の `@field:Sortable("level")` | `level`。`grade` でソートします（エイリアス） |
+| 関連プロパティ `customer` の `@field:Sortable(path = "name")` | `customer.name` |
+
+- lambdaQL が読むのは、`from(...)` に書いたエンティティのアノテーションだけです。別のエンティティのアノテーションでは関連のパスは許可されないので、関連フィールドに `path` を書いてください。
+- アノテーションは、ポリシーにそのエンティティのルール（コード、Spring の Bean、Spring Boot のプロパティ）がないときだけ使われます。
+- ポリシーを登録していないデフォルトの `WARN` モードでも働きます。
+
+Kotlin では、アノテーションが JVM のフィールドに付くように `@field:Sortable` と書きます。同じルールは Java でテストされています（[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)、リージョン `annotation`。[このページの Java 版](../java/04-order-paging.md#rules-from-sortable) を参照）。次は設計上の例です。
+
+```kotlin
+@Entity
+class Customer(
+    @Id @GeneratedValue
+    var id: Long? = null,
+    @field:Sortable                     // the outside name "name"
+    var name: String? = null,
+    @field:Sortable("level")            // the outside name "level" sorts by grade
+    var grade: Int? = null,
+)
+
+// Customer has no SortRules in the policy, so its @Sortable fields are the rules
+qb.from(Customer::class.java).orderBy(SortSpec.ofPath(Customer::class.java, "level", Direction.DESC)).toList()
+// HQL: select e0 from Customer e0 order by e0.grade desc nulls last
+```
+
+<a id="rules-as-strings"></a>
+**文字列によるルール。** `allowPath(String...)` と `aliasPath(name, path)` は、プロパティのパスを文字列で受け取ります。設定ファイル向けで、[12.5](12-spring-data-jpa.md#sort-policy-with-spring) の Spring Boot のプロパティがこれを使います。
+パスは、ルールを最初に使うときにエンティティと照らし合わせられます。コードでは、コンパイラーがチェックするラムダの `allow` と `alias` を使ってください。
+
+Java でテストされています（[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)、リージョン `string-paths`）。ラムダがないので、Kotlin でも同じように動きます。
+
+```kotlin
+// the string forms used by configuration files (lambdaql.sort.allow / lambdaql.sort.alias)
+SortPolicy.register(emf, SortPolicy.of(SortMode.STRICT,
+    SortRules.of(Order::class.java).allowPath("price", "customer.name").aliasPath("newest", "updateAt")))
+```
+
+- チェックは、spec を `orderBy` で使ったとき、パスを読む前に行われます。
+  そのため `STRICT` モードでは、ルールにない名前は、プロパティでなくても `SortNotAllowedException` になります。
+- ルールは 1 つのエンティティクラスに属します。同じクラスの `SortRules` を 2 つ渡すと、最後のものが使われます。
+- `SortNotAllowedException` は `LambdaQLException` です（[11. エラーと言語](../11-errors-and-languages.md#exceptions) を参照）。
+  lambdaQL は Web への依存を持ちません。HTTP 400 で応答する例は [12.5](12-spring-data-jpa.md#sort-policy-with-spring) を参照してください。
+
 **まだ実装されていないもの:**
 
-- 外部の文字列（`"price,desc_nulls_last"` のようなリクエストパラメーター）をソートに変える `SortWhitelist<T>`。リストにある名前だけを受け付けます。それまでは、`Direction.parse` と `by.sort(key, dir)` で実行時に方向を決められます（[4.3](#43-direction) を参照）。キーは普通の Kotlin のコードで選ぶか、テキストを自分の許可リストと照らし合わせてから `SortSpec.ofPath` を使ってください。
+- 名前と方向を 1 つにまとめた文字列（`"price,desc_nulls_last"`、ルール S11）。
+  方向は `Direction.parse`（[4.3](#43-direction) を参照）、名前は `SortSpec.ofPath` で読んでください。
 - **予定:** `SortSpec` の結合の書き方、キーセットページング。（結合のためのラムダの書き方 `{ o, c, by -> ... }` は実装済みです。[6.8](06-select-group.md#68-explicit-joins) を参照。）
 
 <a id="411-sorting-inside-subqueries"></a>
@@ -525,12 +639,12 @@ qb.from(Order::class.java).orderBy(byName).toList()
 | S3 | 方向は `asc` / `desc` または `sort(key, Direction)` で決まる。`asc(key)`/`desc(key)`（`ASC`/`DESC`）は NULL のポリシーを使い、`asc(key, nullsFirst)`、`desc(key, nullsFirst)`、`*_NULLS_*` は書いたとおりに使われる | 実装済み |
 | S4 | 本体は `by` の呼び出しをまっすぐつなげたものだけ。`if`、`when`、ループは使えない | 実装済み |
 | S5 | `orderBy` はクエリごとに 1 回。`orderBy` の後に `where` は使えない。`limit` の後に `orderBy` は使えない（コンパイルエラー） | 実装済み |
-| S6 | 再利用には `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。外部の文字列は `SortWhitelist` を通してのみ | `SortSpec` は実装済み（Java のラムダでテスト済み）。`SortWhitelist` と `SortSpec` の結合の書き方はまだ実装されていない |
+| S6 | 再利用には `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。外部の文字列は永続化ユニットのソートポリシー（`SortRules`、`SortPolicy`、`SortMode`。[4.10](#sort-policy) を参照）がチェック | `SortSpec` とソートポリシーは実装済み（Java のラムダでテスト済み）。`SortSpec` の結合の書き方はまだ実装されていない |
 | S7 | キー: カラム、to-one のパス、`+ - *`、拡大変換。値の分岐は使えない。Kotlin の `?.` はパスとして読まれる | 実装済み（Kotlin のラムダではテストされていない） |
 | S8 | `orderBy` だけで使う関連のパスは `left join` を使うので、関連のない行も残る。同じパスを `where` が使うと、ソートは `where` の結合を使う | 実装済み |
 | S9 | ページングでは、キーに id が含まれていなければルートの `@Id asc` が追加される。コレクションの fetch join + ページングは拒否される | ルートの id と、明示的に結合したエンティティの id については実装済み（Java のラムダでテスト済み）。fetch join のチェックはまだ実装されていない |
 | S10 | 解析結果はラムダごとにキャッシュされる。キャプチャした `Direction` は呼び出しのたびに読まれる | 実装済み |
-| S11 | Spring の `Sort.Order` は `Direction` に 1:1 で対応（Spring モジュール。[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) を参照）。`SortWhitelist.parse("price,desc_nulls_last")` | Spring の `Sort` は実装済み、Java でテスト済み（`ignoreCase` はまだサポートしていない）。`SortWhitelist` はまだ実装されていない |
+| S11 | Spring の `Sort.Order` は `Direction` に 1:1 で対応（Spring モジュール。[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) を参照）。プロパティ名はソートポリシーのチェックを通り、エイリアスはそのまま渡される | Spring の `Sort` は実装済み、Java でテスト済み（`ignoreCase` はまだサポートしていない）。ソートポリシーと合わせた場合もテスト済み。`"price,desc_nulls_last"` のような 1 つの文字列の読み取りはまだ実装されていない |
 | S12 | join のクエリも同じ形: `{ o, c, by -> }`、`{ o, c, i, by -> }` | 実装済み（Java のラムダでテスト済み、[6.8](06-select-group.md#68-explicit-joins) を参照） |
 | S13 | プロパティ参照はキーが 1 つの短い書き方（`orderBy(Order::price)`）でのみ。コンパイルできても意味が違う参照は拒否される | まだ実装されていない（Kotlin のプロパティ参照） |
 | S14 | サブクエリのソート: `limit` があれば残り、`limit` がなければ警告付きで取り除かれる。データベースの違いは自動で処理される（5 章を参照） | 実装済み（テスト済み）。MariaDB の `lateral` の書き換えはまだ実装されていない |

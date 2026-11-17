@@ -440,11 +440,23 @@ public enum LqlMessage {
     /** LQL-4039: The procedure returned NULL, but the result type cannot hold NULL. Use a nullable type (Double, Integer, Kotlin Double? ...): &#123;0&#125; */
     PROC_NULL_INTO_PRIMITIVE("LQL-4039", 1),
 
+    /** LQL-4040: Sorting by this name is not allowed for &#123;0&#125;: &#123;1&#125;. Allow it with SortRules (allow or alias). */
+    SORT_NOT_ALLOWED("LQL-4040", 2),
+
+    /** LQL-4041: A sort rule must be a column of the entity, for example o -&gt; o.getPrice(): &#123;0&#125; */
+    SORT_RULE_NOT_PATH("LQL-4041", 1),
+
+    /** LQL-4042: lambdaql.sort: no entity has this JPA entity name (by default the simple class name, or &#64;Entity(name = ...)): &#123;0&#125; */
+    SORT_UNKNOWN_ENTITY("LQL-4042", 1),
+
     /** LQL-4999: Internal error in lambdaQL. Please report it: &#123;0&#125; */
     INTERNAL_ERROR("LQL-4999", 1),
 
     /** LQL-5002: A subquery sort without limit does not change the result, so it was removed (Q4): &#123;0&#125; */
-    SUBQUERY_SORT_REMOVED("LQL-5002", 1);
+    SUBQUERY_SORT_REMOVED("LQL-5002", 1),
+
+    /** LQL-5003: An outside sort is not in the sort rules of &#123;0&#125;: &#123;1&#125;. It runs now; with SortMode.STRICT it would be rejected. */
+    SORT_NOT_ALLOWED_WARN("LQL-5003", 2);
 
     private final String code;
     private final int argCount;

@@ -156,7 +156,9 @@ public final class SortSpec<T> {
         List<HqlRenderer.SortBound> out = new ArrayList<>();
         for (Part p : parts) {
             if (p.ref() == null) {
-                Expr key = SortReader.readPath(p.path(), root, context.model());
+                // an outside sort: the sort policy of the persistence unit allows it and turns an alias into a path (D43)
+                String path = context.sortPolicy().check(context, root, p.path());
+                Expr key = SortReader.readPath(path, root, context.model());
                 SortItem item = new SortItem(key, SortItem.Kind.SORT, new Expr.Const(p.direction(), Type.getType(Direction.class)));
                 out.add(new HqlRenderer.SortBound(List.of(item), new Object[0], p.reversed()));
                 continue;

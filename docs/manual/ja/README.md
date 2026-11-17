@@ -133,7 +133,7 @@ fetch first ? rows only
 | getter から JPA 属性へのマッピング、キャプチャした値の評価 | 実装済み、H2・MariaDB・Oracle でテスト済み | [03](java/03-where.md) | [03](kotlin/03-where.md) |
 | HQL の生成とクエリの実行（`where`、`toList()`） | 実装済み、H2・MariaDB・Oracle でテスト済み | [03](java/03-where.md) | [03](kotlin/03-where.md) |
 | 結果の関数（`first()`、`one()`、`count()`、`exists()`、`toSet()`） | 実装済み、H2・MariaDB・Oracle でテスト済み（Java のラムダ） | [02](java/02-getting-started.md#getting-the-result) | [02](kotlin/02-getting-started.md#getting-the-result) |
-| ソートとページング（`orderBy`、`limit`、`offset`） | 中核部分は実装済み、H2・MariaDB・Oracle でテスト済み。`SortSpec` と結合のソート `(o, c, by)` も含みます。`SortWhitelist` と `SortSpec` の結合の書き方: 設計済み | [04](java/04-order-paging.md) | [04](kotlin/04-order-paging.md) |
+| ソートとページング（`orderBy`、`limit`、`offset`） | 中核部分は実装済み、H2・MariaDB・Oracle でテスト済み。`SortSpec`、結合のソート `(o, c, by)`、外部のソートのためのソートポリシー（コード、Spring Boot のプロパティ、`@Sortable` によるルール）も含みます。`SortSpec` の結合の書き方: 設計済み | [04](java/04-order-paging.md) | [04](kotlin/04-order-paging.md) |
 | サブクエリ（`exists`、`contains`、スカラー、相関） | 実装済み、H2・MariaDB・Oracle でテスト済み（Java のラムダ）。MariaDB の `lateral` の書き換え: まだ実装されていない | [05](java/05-subquery.md) | [05](kotlin/05-subquery.md) |
 | 射影、`groupBy`、`having`、集計（`Agg`） | 実装済み、H2・MariaDB・Oracle でテスト済み（Java のラムダ）。`distinct()` と結果の関数も含みます。集約によるソート: v0.2 の候補 | [06](java/06-select-group.md) | [06](kotlin/06-select-group.md) |
 | 明示的な結合（`join`、`leftJoin`、`crossJoin`、エンティティ 3 つまで） | 実装済み、H2・MariaDB・Oracle でテスト済み（Java のラムダ）。すべてのエンティティに対する `where`、`orderBy`、`select`、ページングを含みます。DML とサブクエリの中の結合: 今後 | [06](java/06-select-group.md#68-explicit-joins) | [06](kotlin/06-select-group.md#68-explicit-joins) |

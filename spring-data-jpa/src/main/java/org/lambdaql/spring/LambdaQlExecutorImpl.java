@@ -42,6 +42,7 @@ import java.util.SequencedSet;
 public class LambdaQlExecutorImpl<T> implements LambdaQlExecutor<T>, RepositoryMetadataAccess {
 
     private final QueryBuilder qb;
+    private final EntityManager entityManager;
 
     /**
      * Creates the executor. Spring Data calls this with its shared, transaction-bound {@link EntityManager}.
@@ -51,6 +52,12 @@ public class LambdaQlExecutorImpl<T> implements LambdaQlExecutor<T>, RepositoryM
      */
     public LambdaQlExecutorImpl(EntityManager entityManager) {
         this.qb = new QueryBuilder(entityManager);
+        this.entityManager = entityManager;
+    }
+
+    /** The outside sort policy of this persistence unit (ROADMAP D43). */
+    private org.lambdaql.query.SortPolicy sortPolicy() {
+        return org.lambdaql.query.SortPolicy.effective(entityManager.getEntityManagerFactory());
     }
 
     @SuppressWarnings("unchecked")
@@ -87,7 +94,7 @@ public class LambdaQlExecutorImpl<T> implements LambdaQlExecutor<T>, RepositoryM
     public List<T> findAll(Where<T> where, Sort sort) {
         Class<T> type = domainType();
         SelectQuery<T> q = qb.from(type).where(where);
-        return sort.isSorted() ? q.orderBy(SpringSorts.toSpec(type, sort)).toList() : q.toList();
+        return sort.isSorted() ? q.orderBy(SpringSorts.toSpec(type, sortPolicy(), sort)).toList() : q.toList();
     }
 
     /** {@inheritDoc} */
@@ -97,7 +104,7 @@ public class LambdaQlExecutorImpl<T> implements LambdaQlExecutor<T>, RepositoryM
         SelectQuery<T> base = qb.from(type).where(where);
         if (pageable.isUnpaged()) {
             List<T> all = pageable.getSort().isSorted()
-                    ? base.orderBy(SpringSorts.toSpec(type, pageable.getSort())).toList()
+                    ? base.orderBy(SpringSorts.toSpec(type, sortPolicy(), pageable.getSort())).toList()
                     : base.toList();
             return new PageImpl<>(all, pageable, all.size());
         }
@@ -105,7 +112,7 @@ public class LambdaQlExecutorImpl<T> implements LambdaQlExecutor<T>, RepositoryM
             throw new IllegalArgumentException("page offset is too large: " + pageable.getOffset());
         }
         OrderedSelectQuery<T> page = pageable.getSort().isSorted()
-                ? base.orderBy(SpringSorts.toSpec(type, pageable.getSort()))
+                ? base.orderBy(SpringSorts.toSpec(type, sortPolicy(), pageable.getSort()))
                 : base.limit(pageable.getPageSize());
         List<T> content = page.limit(pageable.getPageSize()).offset((int) pageable.getOffset()).toList();
         return PageableExecutionUtils.getPage(content, pageable, base::count);
@@ -128,7 +135,7 @@ public class LambdaQlExecutorImpl<T> implements LambdaQlExecutor<T>, RepositoryM
     public SequencedSet<T> findSet(Where<T> where, Sort sort) {
         Class<T> type = domainType();
         SelectQuery<T> q = qb.from(type).where(where);
-        return sort.isSorted() ? q.orderBy(SpringSorts.toSpec(type, sort)).toSet() : q.toSet();
+        return sort.isSorted() ? q.orderBy(SpringSorts.toSpec(type, sortPolicy(), sort)).toSet() : q.toSet();
     }
 
     /** {@inheritDoc} */
@@ -148,7 +155,7 @@ public class LambdaQlExecutorImpl<T> implements LambdaQlExecutor<T>, RepositoryM
     public Optional<T> findFirst(Where<T> where, Sort sort) {
         Class<T> type = domainType();
         SelectQuery<T> q = qb.from(type).where(where);
-        return sort.isSorted() ? q.orderBy(SpringSorts.toSpec(type, sort)).first() : q.first();
+        return sort.isSorted() ? q.orderBy(SpringSorts.toSpec(type, sortPolicy(), sort)).first() : q.first();
     }
 
     /** {@inheritDoc} */

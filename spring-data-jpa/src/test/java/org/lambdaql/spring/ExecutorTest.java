@@ -90,6 +90,31 @@ class ExecutorTest {
                 .map(Member::getId).toList(), ids(active));
     }
 
+    @Autowired
+    private jakarta.persistence.EntityManagerFactory emf;
+
+    @Test
+    void sortPolicyWithSpringSort() {
+        // @start region="sort-policy"
+        // usually a @Bean SortPolicy; the Boot auto-configuration registers it for the EntityManagerFactory
+        org.lambdaql.query.SortPolicy.register(emf, org.lambdaql.query.SortPolicy.of(org.lambdaql.query.SortMode.STRICT,
+                org.lambdaql.query.SortRules.of(Member.class)
+                        .allow(m -> m.getName())
+                        .alias("level", m -> m.getGrade())));
+        try {
+            // the client sends "level"; lambdaQL sorts by grade
+            List<Member> rows = repository.findAll(m -> m.isActive(), Sort.by(Sort.Order.desc("level"), Sort.Order.asc("name")));
+            // a property that is not in the rules
+            assertThrows(org.lambdaql.SortNotAllowedException.class,
+                    () -> repository.findAll(m -> m.isActive(), Sort.by("grade")));
+            // @end
+            assertEquals(all.stream().filter(Member::isActive).sorted(GRADE_DESC_NULLS_LAST.thenComparing(Member::getName))
+                    .map(Member::getId).toList(), ids(rows));
+        } finally {
+            org.lambdaql.query.SortPolicy.unregister(emf);
+        }
+    }
+
     @Test
     void findAllWithSpringSort() {
         // @start region="find-all-spring-sort"

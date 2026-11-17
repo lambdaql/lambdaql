@@ -2,7 +2,7 @@
 
 > [!NOTE]
 > **Status: the query executor and the Spring Boot auto-configuration are implemented.**
-> `LambdaQlExecutor<T>`, Spring `Sort` / `Pageable` support and the `QueryBuilder` bean are tested on H2, MariaDB 10.11 and Oracle 23.26 with Spring Boot 3.4.2. The tests are written in **Java**. **Kotlin repositories are not tested yet.**
+> `LambdaQlExecutor<T>`, Spring `Sort` / `Pageable` support (also with the sort policy) and the `QueryBuilder` bean are tested on H2, MariaDB 10.11 and Oracle 23.26 with Spring Boot 3.4.2. The tests are written in **Java**. **Kotlin repositories are not tested yet.**
 > The update, delete, insert and upsert methods are tested too, in Java: the shortcuts (`deleteAll`, `deleteOne`, `updateAll`, `updateOne`, `insertOne`, `insertAll`, `upsertOne`, `upsertAll`) and the builders (`updateQuery()`, `deleteQuery()`, `insertQuery()`, `upsertQuery()`). They need the caller's transaction. lambdaQL does not add `@Transactional` (decision D41). The Kotlin forms of the shortcuts were compiled with kotlinc 2.3.21; there is no Kotlin test in the build yet.
 > **Not verified yet:** Spring Boot 4.
 > The Kotlin code on this page shows the same calls as the Java tests, in Kotlin syntax. The tested Java code is in [the Java version of this page](../java/12-spring-data-jpa.md).
@@ -293,7 +293,8 @@ lambdaQL turns each `Sort.Order` into one sort key with `SortSpec.ofPath` (see [
 
 | Spring | In lambdaQL |
 |---|---|
-| A property name (`"grade"`, `"team.name"`) | Checked with Spring Data `PropertyPath`, the same as in Spring Data's own repositories. An unknown name gives `PropertyReferenceException`. The path must end at a basic value, not at an entity. A to-one path such as `team.name` uses a `left join`, so rows without a team are kept |
+| A property name (`"grade"`, `"team.name"`) | Checked with Spring Data `PropertyPath`, the same as in Spring Data's own repositories. An unknown name gives `PropertyReferenceException`. The path must end at a basic value, not at an entity. A to-one path such as `team.name` uses a `left join`, so rows without a team are kept. Then the sort policy checks the name (see [below](#sort-policy-with-spring)) |
+| An alias of the sort policy (`"level"`) | Passed on as it is, without the `PropertyPath` check. The sort policy turns it into its path |
 | `ASC` / `DESC` with `NullHandling.NATIVE` (the default) | The lambdaQL NULL rule: NULLs first for ascending, NULLs last for descending. The order is the same on every database (see [4.4](04-order-paging.md#44-null-ordering-is-the-same-on-every-database)) |
 | `NullHandling.NULLS_FIRST` / `NULLS_LAST` | Used as written (`ASC_NULLS_FIRST`, `DESC_NULLS_LAST` and so on) |
 | `ignoreCase()` | Not supported yet. It throws `UnsupportedOperationException` |
@@ -319,7 +320,89 @@ repository.findAll({ it.active }, Sort.by("nickname"))   // no such property: Pr
 val page: Page<Member> = repository.findAll({ it.active }, PageRequest.of(1, 2, Sort.by("name")))
 ```
 
-**Sort from request parameters.** Spring MVC can make a `Pageable` from request parameters such as `?page=1&size=20&sort=name,desc`. Every persistent property is accepted, so a user can sort by any column. If that is a problem, check the property names against your own list of allowed names first.
+**Sort from request parameters.** Spring MVC can make a `Pageable` from request parameters such as `?page=1&size=20&sort=name,desc`. Without a sort policy and without `@Sortable` fields, every persistent property is accepted, so a user can sort by any column. lambdaQL then logs the warning `LQL-5003` once for each entity and name. To allow only some names, use the sort policy below.
+
+<a id="sort-policy-with-spring"></a>
+### The sort policy with Spring
+
+The sort policy (decision D43) decides which outside sort names are allowed. `SortRules`, `SortMode` and the rules are explained in [4.10](04-order-paging.md#sort-policy).
+A Spring `Sort` or `Pageable` is always an outside sort, so the policy checks every name in it. A sort lambda is never checked.
+
+**Where the rules come from.** With Spring Boot, the auto-configuration builds the policy of the `EntityManagerFactory` and registers it after all singleton beans are made. It reads three places:
+
+| Place | What it gives |
+|---|---|
+| A `SortPolicy` bean | A mode and `SortRules` written with lambdas |
+| The properties `lambdaql.sort.*` | A mode and rules written as strings |
+| `@Sortable` fields ([4.10](04-order-paging.md#rules-from-sortable)) | Rules for an entity that has no rules from the bean or the properties |
+
+- The rules of one entity come from one place only, in the order of the table. Rules from two places are not merged.
+- `lambdaql.sort.mode` wins over the mode of the bean. Without both, the mode is `WARN`.
+- This works when there is exactly one `EntityManagerFactory`, the same condition as for the `QueryBuilder` bean (see [12.8](#128-the-querybuilder-bean)). Otherwise call `SortPolicy.register(emf, policy)` yourself.
+- Without a bean and without properties, nothing is registered, so the default applies: `WARN`, with rules only from `@Sortable`.
+
+**Properties.**
+
+| Property | Meaning |
+|---|---|
+| `lambdaql.sort.mode` | `OFF`, `WARN` (the default) or `STRICT` |
+| `lambdaql.sort.allow.<Entity>` | The allowed paths, separated by commas, for example `name,team.name` |
+| `lambdaql.sort.alias.<Entity>.<outside name>` | The path of an alias, for example `lambdaql.sort.alias.Member.level=grade` |
+
+`<Entity>` is the JPA entity name: by default the simple class name, or the name in `@Entity(name = ...)`. It is unique in a persistence unit (Hibernate stops at start-up when two entities have the same name), so two classes with the same simple name in different packages are never mixed up. An unknown name stops the application start with `IllegalStateException` (LQL-4042).
+The paths are checked against the entity the first time the rules are used (see [Rules as strings](04-order-paging.md#rules-as-strings) in 4.10).
+
+The properties are the same for Java and Kotlin. They are tested in Java in [`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java) (regions `properties` and `properties-use`, see [the Java version of this page](../java/12-spring-data-jpa.md#sort-policy-with-spring)). That test also checks that the auto-configuration registers the policy. In `application.properties`:
+
+```properties
+lambdaql.sort.mode=STRICT
+lambdaql.sort.allow.Member=name,team.name
+lambdaql.sort.alias.Member.level=grade
+```
+
+The calls in Kotlin (design example):
+
+```kotlin
+val byLevel: List<Member> = repository.findAll({ it.active }, Sort.by(Sort.Order.desc("level")))
+val byTeam: List<Member> = repository.findAll({ it.active }, Sort.by("team.name", "name"))
+repository.findAll({ it.active }, Sort.by("grade"))   // not in the rules: SortNotAllowedException
+```
+
+**A `SortPolicy` bean.** For rules that the compiler checks, define a `SortPolicy` bean. The same auto-configuration step registers it.
+The same policy is tested in Java in [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java) (region `sort-policy`, registered by hand). This is a design example:
+
+```kotlin
+@Bean
+fun sortPolicy(): SortPolicy = SortPolicy.of(SortMode.STRICT,
+    SortRules.of(Member::class.java)
+        .allow { it.name }
+        .alias("level") { it.grade })
+
+// the client sends "level"; lambdaQL sorts by grade
+val rows: List<Member> = repository.findAll({ it.active }, Sort.by(Sort.Order.desc("level"), Sort.Order.asc("name")))
+repository.findAll({ it.active }, Sort.by("grade"))   // not in the rules: SortNotAllowedException
+```
+
+- An alias such as `level` is not a property of `Member`. lambdaQL passes it on without the Spring `PropertyPath` check, and the policy turns it into `grade`.
+- A name that is neither an alias nor a property still gives `PropertyReferenceException` first, before the policy is asked.
+- In `STRICT` mode, a property that is not in the rules gives `SortNotAllowedException` (`LQL-4040`). Spring does not translate it (see [12.6](#126-transactions-and-exceptions)).
+
+**HTTP 400.** lambdaQL has no web dependency, so it does not choose the HTTP status. A web application usually answers `SortNotAllowedException` with 400 Bad Request.
+This handler is an example only (not tested):
+
+```kotlin
+@RestControllerAdvice
+class SortErrorHandler {
+
+    @ExceptionHandler(SortNotAllowedException::class)
+    fun sortNotAllowed(e: SortNotAllowedException): ProblemDetail =
+        ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.message).apply {
+            setProperty("code", e.code())      // "LQL-4040"
+        }
+}
+```
+
+The message names the entity class and the sort name. If clients must not see the entity name, send only `e.code()`.
 
 ## 12.6 Transactions and exceptions
 
@@ -346,6 +429,7 @@ Errors go through Spring's exception translation, the same as for other reposito
 | `deleteOne` or `updateOne` matches 2 or more rows | `IncorrectResultSizeDataAccessException`. Nothing is changed (tested in Java) |
 | An unknown property in a Spring `Sort` | `PropertyReferenceException` (tested in Java) |
 | `ignoreCase()` in a Spring `Sort` | `UnsupportedOperationException` (tested in Java) |
+| A sort name that the sort policy does not allow, in `STRICT` mode ([12.5](#sort-policy-with-spring)) | `SortNotAllowedException` (`LQL-4040`), not translated (tested in Java) |
 | An update, delete, insert or upsert without a transaction, in a repository call (a shortcut, or `execute()` inside a method with a body) | `InvalidDataAccessApiUsageException` (tested in Java), made by Spring from JPA's `TransactionRequiredException`. Outside a repository method (the `QueryBuilder` bean), JPA's `TransactionRequiredException` |
 | An assignment lambda that breaks a rule (U1, U3, U4, U6) | `LambdaQLException` (for example `TranslationException`, `LQL-3042`), not translated (see [7.8](07-dml.md#rules-checked-at-analysis-time)) |
 

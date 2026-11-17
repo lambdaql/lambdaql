@@ -3,7 +3,7 @@
 
 > [!NOTE]
 > **状況: クエリの実行器と Spring Boot の自動構成は実装済みです。**
-> `LambdaQlExecutor<T>`、Spring の `Sort` / `Pageable` への対応、`QueryBuilder` の Bean は、Spring Boot 3.4.2 を使って H2、MariaDB 10.11、Oracle 23.26 でテスト済みです。テストは **Java** で書かれています。**Kotlin のリポジトリはまだテストしていません。**
+> `LambdaQlExecutor<T>`、Spring の `Sort` / `Pageable` への対応（ソートポリシーを含む）、`QueryBuilder` の Bean は、Spring Boot 3.4.2 を使って H2、MariaDB 10.11、Oracle 23.26 でテスト済みです。テストは **Java** で書かれています。**Kotlin のリポジトリはまだテストしていません。**
 > 更新、削除、挿入、upsert のメソッドも Java でテスト済みです。短縮メソッド（`deleteAll`、`deleteOne`、`updateAll`、`updateOne`、`insertOne`、`insertAll`、`upsertOne`、`upsertAll`）とビルダー（`updateQuery()`、`deleteQuery()`、`insertQuery()`、`upsertQuery()`）です。これらには呼び出し側のトランザクションが必要です。lambdaQL は `@Transactional` を付けません（決定 D41）。短縮メソッドの Kotlin の書き方は kotlinc 2.3.21 でコンパイルしました。ビルドにはまだ Kotlin のテストがありません。
 > **まだ検証していないもの:** Spring Boot 4。
 > このページの Kotlin のコードは、Java のテストと同じ呼び出しを Kotlin の構文で示したものです。テスト済みの Java のコードは [このページの Java 版](../java/12-spring-data-jpa.md) にあります。
@@ -303,7 +303,8 @@ lambdaQL は、各 `Sort.Order` を `SortSpec.ofPath` で 1 つのソートキ�
 
 | Spring | lambdaQL での扱い |
 |---|---|
-| プロパティ名（`"grade"`、`"team.name"`） | Spring Data 自身のリポジトリと同じく、Spring Data の `PropertyPath` でチェックします。知らない名前なら `PropertyReferenceException` になります。パスは、エンティティではなく基本型の値で終わる必要があります。`team.name` のような to-one のパスは `left join` を使うので、チームのない行も残ります |
+| プロパティ名（`"grade"`、`"team.name"`） | Spring Data 自身のリポジトリと同じく、Spring Data の `PropertyPath` でチェックします。知らない名前なら `PropertyReferenceException` になります。パスは、エンティティではなく基本型の値で終わる必要があります。`team.name` のような to-one のパスは `left join` を使うので、チームのない行も残ります。その後、ソートポリシーが名前をチェックします（[下](#sort-policy-with-spring) を参照） |
+| ソートポリシーのエイリアス（`"level"`） | `PropertyPath` のチェックをせず、そのまま渡します。ソートポリシーがパスに変えます |
 | `NullHandling.NATIVE`（デフォルト）での `ASC` / `DESC` | lambdaQL の NULL のルールです。昇順では NULL が先頭、降順では NULL が末尾です。順序はどのデータベースでも同じです（[4.4](04-order-paging.md#44-null-ordering-is-the-same-on-every-database) を参照） |
 | `NullHandling.NULLS_FIRST` / `NULLS_LAST` | 書いたとおりに使います（`ASC_NULLS_FIRST`、`DESC_NULLS_LAST` など） |
 | `ignoreCase()` | まだサポートしていません。`UnsupportedOperationException` を投げます |
@@ -329,7 +330,89 @@ repository.findAll({ it.active }, Sort.by("nickname"))   // no such property: Pr
 val page: Page<Member> = repository.findAll({ it.active }, PageRequest.of(1, 2, Sort.by("name")))
 ```
 
-**リクエストパラメーターからのソート。** Spring MVC は、`?page=1&size=20&sort=name,desc` のようなリクエストパラメーターから `Pageable` を作れます。永続プロパティならどれでも受け付けるので、ユーザーはどのカラムでもソートできます。それが問題になる場合は、先にプロパティ名を自分の許可リストと照らし合わせてください。
+**リクエストパラメーターからのソート。** Spring MVC は、`?page=1&size=20&sort=name,desc` のようなリクエストパラメーターから `Pageable` を作れます。ソートポリシーも `@Sortable` フィールドもなければ、永続プロパティならどれでも受け付けるので、ユーザーはどのカラムでもソートできます。このとき lambdaQL は、エンティティと名前ごとに 1 回、警告 `LQL-5003` をログに出します。一部の名前だけを許可するには、次のソートポリシーを使ってください。
+
+<a id="sort-policy-with-spring"></a>
+### Spring でのソートポリシー
+
+ソートポリシー（決定 D43）は、どの外部のソートの名前を許可するかを決めます。`SortRules`、`SortMode` とルールは [4.10](04-order-paging.md#sort-policy) で説明しています。
+Spring の `Sort` や `Pageable` は常に外部のソートなので、ポリシーはその中の名前をすべてチェックします。ソートのラムダはチェックされません。
+
+**ルールの出どころ。** Spring Boot では、自動構成が `EntityManagerFactory` のポリシーを作り、すべてのシングルトン Bean ができた後で登録します。読むのは次の 3 か所です。
+
+| 出どころ | 与えるもの |
+|---|---|
+| `SortPolicy` の Bean | モードと、ラムダで書いた `SortRules` |
+| プロパティ `lambdaql.sort.*` | モードと、文字列で書いたルール |
+| `@Sortable` フィールド（[4.10](04-order-paging.md#rules-from-sortable)） | Bean にもプロパティにもルールがないエンティティのルール |
+
+- 1 つのエンティティのルールは、表の順で 1 か所からだけ取られます。2 か所のルールは合わせられません。
+- `lambdaql.sort.mode` は Bean のモードより優先されます。どちらもなければ、モードは `WARN` です。
+- これが働くのは `EntityManagerFactory` がちょうど 1 つのときで、`QueryBuilder` の Bean と同じ条件です（[12.8](#128-the-querybuilder-bean) を参照）。そうでない場合は、`SortPolicy.register(emf, policy)` を自分で呼んでください。
+- Bean もプロパティもなければ何も登録されないので、デフォルトが使われます: `WARN`、ルールは `@Sortable` だけ。
+
+**プロパティ。**
+
+| プロパティ | 意味 |
+|---|---|
+| `lambdaql.sort.mode` | `OFF`、`WARN`（デフォルト）、`STRICT` |
+| `lambdaql.sort.allow.<Entity>` | 許可するパスをカンマで区切ったもの。例: `name,team.name` |
+| `lambdaql.sort.alias.<Entity>.<外部の名前>` | エイリアスのパス。例: `lambdaql.sort.alias.Member.level=grade` |
+
+`<Entity>` には JPA のエンティティ名を書きます。既定は単純クラス名で、`@Entity(name = ...)` で変えられます。エンティティ名は永続化ユニットの中で一意です（同じ名前が 2 つあると Hibernate が起動時に止まります）。そのため、パッケージが違う同じ名前のクラスが混ざることはありません。知らない名前なら、アプリケーションの起動が `IllegalStateException`（LQL-4042）で止まります。
+パスは、ルールを最初に使うときにエンティティと照らし合わせられます（4.10 の [文字列によるルール](04-order-paging.md#rules-as-strings) を参照）。
+
+プロパティは Java でも Kotlin でも同じです。Java のテスト [`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java) で確かめています（リージョン `properties`、`properties-use`。[このページの Java 版](../java/12-spring-data-jpa.md#sort-policy-with-spring) を参照）。このテストは、自動構成がポリシーを登録することも確かめています。`application.properties` の例:
+
+```properties
+lambdaql.sort.mode=STRICT
+lambdaql.sort.allow.Member=name,team.name
+lambdaql.sort.alias.Member.level=grade
+```
+
+Kotlin での呼び出し（設計上の例）:
+
+```kotlin
+val byLevel: List<Member> = repository.findAll({ it.active }, Sort.by(Sort.Order.desc("level")))
+val byTeam: List<Member> = repository.findAll({ it.active }, Sort.by("team.name", "name"))
+repository.findAll({ it.active }, Sort.by("grade"))   // not in the rules: SortNotAllowedException
+```
+
+**`SortPolicy` の Bean。** コンパイラーがチェックするルールを使うには、`SortPolicy` の Bean を定義してください。同じ自動構成の処理がそれを登録します。
+同じポリシーは Java で [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java) でテストされています（リージョン `sort-policy`、手で登録）。次は設計上の例です。
+
+```kotlin
+@Bean
+fun sortPolicy(): SortPolicy = SortPolicy.of(SortMode.STRICT,
+    SortRules.of(Member::class.java)
+        .allow { it.name }
+        .alias("level") { it.grade })
+
+// the client sends "level"; lambdaQL sorts by grade
+val rows: List<Member> = repository.findAll({ it.active }, Sort.by(Sort.Order.desc("level"), Sort.Order.asc("name")))
+repository.findAll({ it.active }, Sort.by("grade"))   // not in the rules: SortNotAllowedException
+```
+
+- `level` のようなエイリアスは `Member` のプロパティではありません。lambdaQL は Spring の `PropertyPath` のチェックをせずにそのまま渡し、ポリシーが `grade` に変えます。
+- エイリアスでもプロパティでもない名前は、ポリシーに聞く前に `PropertyReferenceException` になります。
+- `STRICT` モードでは、ルールにないプロパティは `SortNotAllowedException`（`LQL-4040`）になります。Spring はこれを変換しません（[12.6](#126-transactions-and-exceptions) を参照）。
+
+**HTTP 400。** lambdaQL は Web への依存を持たないので、HTTP のステータスを決めません。Web アプリケーションは通常、`SortNotAllowedException` に 400 Bad Request で応答します。
+次のハンドラーは例です（テストされていません）。
+
+```kotlin
+@RestControllerAdvice
+class SortErrorHandler {
+
+    @ExceptionHandler(SortNotAllowedException::class)
+    fun sortNotAllowed(e: SortNotAllowedException): ProblemDetail =
+        ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.message).apply {
+            setProperty("code", e.code())      // "LQL-4040"
+        }
+}
+```
+
+メッセージにはエンティティクラスとソートの名前が入ります。クライアントにエンティティ名を見せたくない場合は、`e.code()` だけを送ってください。
 
 <a id="126-transactions-and-exceptions"></a>
 ## 12.6 トランザクションと例外
@@ -357,6 +440,7 @@ val page: Page<Member> = repository.findAll({ it.active }, PageRequest.of(1, 2, 
 | `deleteOne` や `updateOne` が 2 行以上に一致する | `IncorrectResultSizeDataAccessException`。何も変更されません（Java でテスト済み） |
 | Spring の `Sort` に知らないプロパティがある | `PropertyReferenceException`（Java でテスト済み） |
 | Spring の `Sort` で `ignoreCase()` を使う | `UnsupportedOperationException`（Java でテスト済み） |
+| `STRICT` モードで、ソートポリシーが許可しないソートの名前（[12.5](#sort-policy-with-spring)） | `SortNotAllowedException`（`LQL-4040`）。変換されません（Java でテスト済み） |
 | リポジトリの呼び出し（短縮メソッド、または本体を持つメソッドの中の `execute()`）で、トランザクションなしに更新、削除、挿入、upsert を実行する | `InvalidDataAccessApiUsageException`（Java でテスト済み）。JPA の `TransactionRequiredException` から Spring が作ります。リポジトリのメソッドの外（`QueryBuilder` の Bean）では JPA の `TransactionRequiredException` |
 | ルールに違反する代入のラムダ（U1、U3、U4、U6） | `LambdaQLException`（例: `TranslationException`、`LQL-3042`）。変換されません（[7.8](07-dml.md#rules-checked-at-analysis-time) を参照） |
 

@@ -126,7 +126,7 @@ fetch first ? rows only
 | 将 getter 映射到 JPA 属性，计算捕获的值 | 已实现，已在 H2、MariaDB、Oracle 上测试 | [03](java/03-where.md) | [03](kotlin/03-where.md) |
 | HQL 生成与查询执行（`where`、`toList()`） | 已实现，已在 H2、MariaDB、Oracle 上测试 | [03](java/03-where.md) | [03](kotlin/03-where.md) |
 | 结果函数（`first()`、`one()`、`count()`、`exists()`、`toSet()`） | 已实现，已在 H2、MariaDB、Oracle 上测试（Java Lambda） | [02](java/02-getting-started.md#getting-the-result) | [02](kotlin/02-getting-started.md#getting-the-result) |
-| 排序与分页（`orderBy`、`limit`、`offset`） | 核心部分已实现，已在 H2、MariaDB、Oracle 上测试，包括 `SortSpec` 和 join 排序 `(o, c, by)`。`SortWhitelist` 和 `SortSpec` 的 join 写法：已设计 | [04](java/04-order-paging.md) | [04](kotlin/04-order-paging.md) |
+| 排序与分页（`orderBy`、`limit`、`offset`） | 核心部分已实现，已在 H2、MariaDB、Oracle 上测试，包括 `SortSpec`、join 排序 `(o, c, by)` 和用于外部排序的排序策略（规则来自代码、Spring Boot 属性或 `@Sortable`）。`SortSpec` 的 join 写法：已设计 | [04](java/04-order-paging.md) | [04](kotlin/04-order-paging.md) |
 | 子查询（`exists`、`contains`、标量、关联） | 已实现，已在 H2、MariaDB、Oracle 上测试（Java Lambda）。MariaDB 的 `lateral` 改写：尚未实现 | [05](java/05-subquery.md) | [05](kotlin/05-subquery.md) |
 | 投影、`groupBy`、`having`、聚合（`Agg`） | 已实现，已在 H2、MariaDB、Oracle 上测试（Java Lambda），包括 `distinct()` 和结果函数。按聚合排序：v0.2 候选 | [06](java/06-select-group.md) | [06](kotlin/06-select-group.md) |
 | 显式 join（`join`、`leftJoin`、`crossJoin`，最多三个实体） | 已实现，已在 H2、MariaDB、Oracle 上测试（Java Lambda），包括所有实体上的 `where`、`orderBy`、`select` 和分页。DML 中和子查询中的 join：以后 | [06](java/06-select-group.md#68-explicit-joins) | [06](kotlin/06-select-group.md#68-explicit-joins) |

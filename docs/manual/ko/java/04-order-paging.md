@@ -4,8 +4,8 @@
 > [!NOTE]
 > **상태**
 > - **핵심 기능 구현됨, 테스트함**(Hibernate 6.6.5로 H2, MariaDB 10.11, Oracle 23.26): `by.asc`, `by.desc`, `by.sort`를 사용하는 `orderBy((o, by) -> ...)`, 키 하나의 형태 `orderBy(o -> key)`와 `orderBy(key, Direction)`(`Order::getPrice` 같은 getter 메서드 참조도 가능), `Direction.parse` / `reversed`, `limit` / `offset`, `orderBy` 뒤의 `first()`, 그리고 재사용 정렬 `SortSpec`(`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`). Spring `Sort`와 `Pageable`은 Spring Data JPA 모듈에서 동작합니다([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)).
-> - **추가로 구현됨, 테스트함:** `join`, `leftJoin`, `crossJoin` 뒤의 조인 형태 `(o, c, by) -> ...`([6.8 명시적 조인](06-select-group.md#68-explicit-joins) 참고).
-> - **아직 구현되지 않음:** `SortWhitelist`, `SortSpec`의 조인 형태.
+> - **추가로 구현됨, 테스트함:** `join`, `leftJoin`, `crossJoin` 뒤의 조인 형태 `(o, c, by) -> ...`([6.8 명시적 조인](06-select-group.md#68-explicit-joins) 참고), 외부 정렬의 정렬 정책(`SortRules`, `SortPolicy`, `SortMode`, [4.10](#sort-policy) 참고).
+> - **아직 구현되지 않음:** `SortSpec`의 조인 형태.
 > - **(테스트됨)** 표시가 있는 예제는 테스트 코드에서 그대로 가져온 것입니다. 이 장의 나머지 HQL도 같은 규칙을 따르지만 테스트하지는 않았습니다.
 
 [Java 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [3. 조건(`where`)](03-where.md) | 다음: [5. 서브쿼리](05-subquery.md) | [이 페이지의 Kotlin 버전](../kotlin/04-order-paging.md)
@@ -728,7 +728,8 @@ H2와 MariaDB는 `desc`에서 이미 NULL을 나중에 두므로 추가 구문�
 
 - 경로는 속성 이름을 `.`으로 연결한 문자열입니다. 각 부분은 영속 속성이어야 합니다. 중간에는 to-one 연관이나 임베디드 값, 끝에는 기본 값이 옵니다.
 - 그 밖의 경로는 오류입니다(spec을 `orderBy`에 전달할 때 `IllegalArgumentException`). 따라서 문자열이 다른 HQL로 변환되는 일은 없습니다.
-- 단, 영속 속성이면 **어느 것이든** 받습니다. 문자열이 사용자 입력(예: 요청 파라미터)이면 먼저 허용 이름 목록과 대조하십시오.
+- 허용하는 이름은 persistence unit의 정렬 정책이 정합니다(아래 [정렬 정책](#sort-policy) 참고).
+  정책도 `@Sortable` 필드도 없으면 영속 속성은 **어느 것이든** 받고, lambdaQL이 경고 `LQL-5003`을 기록합니다.
 - 연관 경로는 정렬 람다와 마찬가지로 `left join`을 사용합니다(규칙 S8). `then()`으로 `ofPath` spec과 람다 spec을 연결할 수 있습니다.
 
 **(테스트됨)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), 영역 `sort-spec-path`:
@@ -743,9 +744,146 @@ assertThrows(IllegalArgumentException.class,
         () -> qb.from(Order.class).orderBy(SortSpec.ofPath(Order.class, "price; drop table x", Direction.ASC)));
 ```
 
+<a id="sort-policy"></a>
+### 정렬 정책: 허용하는 외부 이름
+
+**구현됨, 테스트함**(H2, MariaDB 10.11, Oracle 23.26, 결정 D43).
+
+코드 밖에서 들어온 정렬 이름(요청 파라미터, Spring `Sort`나 `Pageable`)은 어느 영속 속성이든 가리킬 수 있습니다.
+**정렬 정책**은 허용하는 이름을 정합니다.
+
+- `SortRules<T>`는 엔티티 하나의 허용 이름 목록입니다. 각 열을 람다로 지정하므로 컴파일러가 검사합니다.
+- `SortPolicy`는 엔티티별 규칙과 모드(`SortMode`)를 담습니다. 정책은 `EntityManagerFactory`, 곧 persistence unit마다 하나를 등록합니다. 그 팩토리를 쓰는 모든 `QueryBuilder`와 리포지토리가 이 정책을 사용합니다.
+- 엔티티 필드의 `@Sortable`로 코드 없이 규칙을 지정할 수 있습니다(아래 [`@Sortable` 규칙](#rules-from-sortable) 참고).
+
+엔티티의 규칙은 다음 순서로 **한 곳**에서만 가져옵니다: 정책의 `SortRules`(코드나 Spring `SortPolicy` 빈), Spring Boot 프로퍼티 `lambdaql.sort.*`([12.5](12-spring-data-jpa.md#sort-policy-with-spring) 참고), 엔티티의 `@Sortable` 필드.
+두 곳의 규칙을 합치지 않습니다.
+
+**검사 대상.** 문자열에서 만든 정렬만 검사합니다: `SortSpec.ofPath`, 그리고 Spring `Sort`나 `Pageable`(Spring 모듈은 `ofPath`를 사용함, [12.5](12-spring-data-jpa.md#sort-policy-with-spring) 참고).
+정렬 람다(`orderBy((o, by) -> ...)`, `SortSpec.of`)는 개발자 코드이므로 검사하지 않습니다.
+
+| 규칙 | 허용하는 외부 이름 |
+|---|---|
+| `allow(o -> o.getPrice())` | `price`(열의 경로) |
+| `allow(o -> o.getCustomer().getName())` | `customer.name`. 연관을 거치는 경로는 이렇게 명시한 경우에만 허용합니다 |
+| `alias("newest", o -> o.getUpdateAt())` | `newest`. 정렬 기준은 `updateAt`입니다. 이때 경로 `updateAt` 자체는 외부 이름이 **아니므로** 클라이언트에 속성 이름이 드러나지 않습니다 |
+
+규칙은 엔티티의 열이어야 합니다.
+그 밖의 키는 규칙을 처음 사용할 때 `LQL-4041`로 거부합니다(아직 테스트하지 않음).
+
+| `SortMode` | 규칙이 허용하지 않는 이름의 처리 |
+|---|---|
+| `OFF` | 정렬을 실행합니다. 검사하지 않습니다 |
+| `WARN` | 정렬을 실행하고, 엔티티와 이름마다 한 번 경고 `LQL-5003`을 기록합니다. **기본값입니다:** 등록한 정책이 없으면 `WARN`을 사용하고, 규칙은 `@Sortable`에서만 가져옵니다 |
+| `STRICT` | `SortNotAllowedException`(`LQL-4040`)으로 거부합니다. 규칙도 `@Sortable` 필드도 없는 엔티티는 모든 이름을 거부합니다 |
+
+따라서 정책을 등록하기 전에는 `@Sortable`이 허용하지 않는 외부 정렬 이름마다 엔티티별로 `LQL-5003`이 한 번 기록됩니다.
+모르는 이름을 거부하려면 `STRICT`로, 검사를 끄려면 `OFF`로 정책을 등록하십시오.
+
+| 메서드 | 기능 |
+|---|---|
+| `SortPolicy.of(mode, rules...)` | 모드와 엔티티별 규칙으로 정책 생성 |
+| `SortPolicy.register(emf, policy)` | persistence unit의 정책 등록. 이전 정책을 대체 |
+| `SortPolicy.unregister(emf)` | 정책 제거. 기본값(`WARN`, `@Sortable` 규칙만 사용)으로 복귀 |
+| `SortPolicy.find(emf)` | 등록한 정책 반환(`Optional`) |
+| `SortPolicy.effective(emf)` | 적용 중인 정책 반환. 등록한 정책이 없으면 기본값 |
+
+Spring Boot에서는 `register`를 호출하는 대신 `SortPolicy` 빈을 정의하십시오([12.5](12-spring-data-jpa.md#sort-policy-with-spring) 참고).
+
+**(테스트됨)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), 영역 `rules`와 `strict`:
+
+```java
+SortRules<Order> orderRules = SortRules.of(Order.class)
+        .allow(o -> o.getPrice())                        // the name "price"
+        .allow(o -> o.getCustomer().getName())           // an association path: allowed only when listed
+        .alias("newest", o -> o.getUpdateAt());          // the outside name "newest" sorts by updateAt
+SortPolicy.register(emf, SortPolicy.of(SortMode.STRICT, orderRules));
+```
+
+다음 예제의 `hql(name, direction)`은 테스트의 보조 메서드입니다.
+`qb.from(Order.class).orderBy(SortSpec.ofPath(Order.class, name, direction)).toHql().hql()`을 반환합니다.
+
+**(테스트됨)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), 영역 `allowed`:
+
+```java
+assertEquals("select e0 from Order e0 order by e0.price asc", hql("price", Direction.ASC));
+assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name asc nulls first", hql("customer.name", Direction.ASC));
+// the alias: the client sends "newest", lambdaQL sorts by updateAt
+assertEquals("select e0 from Order e0 order by e0.updateAt desc nulls last", hql("newest", Direction.DESC));
+```
+
+**(테스트됨)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), 영역 `rejected`(`STRICT` 모드):
+
+```java
+// not in the rules, an unlisted association path, the path behind an alias, an entity without rules
+for (String name : new String[]{"description", "customer.grade", "updateAt"}) {
+    assertEquals("LQL-4040", assertThrows(SortNotAllowedException.class, () -> hql(name, Direction.ASC)).code());
+}
+assertThrows(SortNotAllowedException.class,
+        () -> qb.from(Item.class).orderBy(SortSpec.ofPath(Item.class, "qty", Direction.ASC)).toHql());
+// a sort written as a lambda is code, not outside input: never checked
+assertEquals("select e0 from Order e0 order by e0.description asc nulls first",
+        qb.from(Order.class).orderBy((o, by) -> by.asc(o.getDescription())).toHql().hql());
+```
+
+**(테스트됨)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), 영역 `warn`:
+
+```java
+// WARN (the default): the sort runs and LQL-5003 is logged once per entity and name
+SortPolicy.register(emf, SortPolicy.of(SortMode.WARN));
+assertEquals("select e0 from Order e0 order by e0.description asc nulls first", hql("description", Direction.ASC));
+```
+
+<a id="rules-from-sortable"></a>
+**`@Sortable` 규칙.** 엔티티의 필드나 getter에 `@org.lambdaql.Sortable`을 붙여도 규칙이 됩니다.
+
+| 애너테이션 | 허용하는 외부 이름 |
+|---|---|
+| 필드 `name`의 `@Sortable` | `name` |
+| 필드 `grade`의 `@Sortable("level")` | `level`. 정렬 기준은 `grade`(별칭) |
+| 연관 필드 `customer`의 `@Sortable(path = "name")` | `customer.name` |
+
+- lambdaQL은 `from(...)`에 지정한 엔티티의 애너테이션만 읽습니다. 다른 엔티티의 애너테이션으로는 연관 경로가 허용되지 않으므로, 연관 필드에 `path`를 지정하십시오.
+- 애너테이션은 정책에 그 엔티티의 규칙(코드, Spring 빈, Spring Boot 프로퍼티)이 없을 때만 사용합니다.
+- 정책을 등록하지 않은 기본 `WARN` 모드에서도 동작합니다.
+
+**(테스트됨)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), 영역 `annotation`(위의 `STRICT` 정책은 `Order`의 규칙만 가짐):
+
+```java
+// Customer has no rules in the policy, so its @Sortable fields are the rules:
+//   @Sortable private String name;   @Sortable("level") private Integer grade;
+assertEquals("select e0 from Customer e0 order by e0.name asc nulls first",
+        qb.from(Customer.class).orderBy(SortSpec.ofPath(Customer.class, "name", Direction.ASC)).toHql().hql());
+assertEquals("select e0 from Customer e0 order by e0.grade desc nulls last",
+        qb.from(Customer.class).orderBy(SortSpec.ofPath(Customer.class, "level", Direction.DESC)).toHql().hql());
+assertThrows(SortNotAllowedException.class,
+        () -> qb.from(Customer.class).orderBy(SortSpec.ofPath(Customer.class, "id", Direction.ASC)).toHql());
+```
+
+<a id="rules-as-strings"></a>
+**문자열 규칙.** `allowPath(String...)`와 `aliasPath(name, path)`는 속성 경로를 문자열로 받습니다. 설정 파일용이며, [12.5](12-spring-data-jpa.md#sort-policy-with-spring)의 Spring Boot 프로퍼티가 이 형태를 사용합니다.
+경로는 규칙을 처음 사용할 때 엔티티와 대조합니다. 코드에서는 컴파일러가 검사하는 람다 형태 `allow`와 `alias`를 쓰십시오.
+
+**(테스트됨)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), 영역 `string-paths`:
+
+```java
+// the string forms used by configuration files (lambdaql.sort.allow / lambdaql.sort.alias)
+SortPolicy.register(emf, SortPolicy.of(SortMode.STRICT,
+        SortRules.of(Order.class).allowPath("price", "customer.name").aliasPath("newest", "updateAt")));
+assertEquals("select e0 from Order e0 order by e0.updateAt desc nulls last", hql("newest", Direction.DESC));
+assertThrows(SortNotAllowedException.class, () -> hql("description", Direction.ASC));
+```
+
+- 검사 시점은 spec을 `orderBy`에 전달할 때이며, 경로를 읽기 전입니다.
+  따라서 `STRICT` 모드에서는 규칙에 없는 이름이 속성이 아니어도 `SortNotAllowedException`이 발생합니다.
+- 규칙은 엔티티 클래스 하나에 속합니다. 같은 클래스의 `SortRules`를 두 번 전달하면 마지막 것을 사용합니다.
+- `SortNotAllowedException`은 `LambdaQLException`입니다([11. 오류와 언어](../11-errors-and-languages.md#exceptions) 참고).
+  lambdaQL은 웹 의존성이 없습니다. HTTP 400 응답 예시는 [12.5](12-spring-data-jpa.md#sort-policy-with-spring)를 참고하십시오.
+
 **아직 구현되지 않음:**
 
-- 외부 문자열(`"price,desc_nulls_last"` 같은 요청 파라미터)을 정렬로 바꾸는 `SortWhitelist<T>`. 목록에 있는 이름만 받습니다. 그때까지는 `Direction.parse`와 `by.sort(key, dir)`로 실행 시점의 방향을 정할 수 있습니다([4.3](#43-direction) 참고). 키는 일반 Java 코드에서 고르거나, 문자열을 허용 목록과 대조한 뒤 `SortSpec.ofPath`를 사용하십시오.
+- 이름과 방향을 함께 담은 문자열 하나(`"price,desc_nulls_last"`, 규칙 S11).
+  방향은 `Direction.parse`([4.3](#43-direction) 참고), 이름은 `SortSpec.ofPath`로 읽으십시오.
 - **계획됨:** `SortSpec`의 조인 형태, 키셋 페이징. (조인의 람다 형태 `(o, c, by) -> ...`는 구현됨, [6.8](06-select-group.md#68-explicit-joins) 참고.)
 
 <a id="411-sorting-inside-subqueries"></a>
@@ -767,12 +905,12 @@ assertThrows(IllegalArgumentException.class,
 | S3 | 방향은 `asc` / `desc`나 `sort(key, Direction)`으로 정합니다. `asc(key)`/`desc(key)`(`ASC`/`DESC`)는 NULL 정책을 사용하고, `asc(key, nullsFirst)`, `desc(key, nullsFirst)`, `*_NULLS_*`는 쓴 그대로 사용합니다 | 구현됨 |
 | S4 | 본문은 `by` 호출의 단순한 체인뿐입니다. `if`, 삼항 연산자, 반복문은 안 됩니다 | 구현됨 |
 | S5 | `orderBy`는 쿼리당 한 번입니다. `orderBy` 뒤에 `where`는 안 됩니다. `limit` 뒤에 `orderBy`는 안 됩니다(컴파일 오류) | 구현됨 |
-| S6 | `SortSpec`(`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`)으로 재사용합니다. 외부 문자열은 `SortWhitelist`를 통해서만 받습니다 | `SortSpec`은 구현되고 테스트됨. `SortWhitelist`와 `SortSpec`의 조인 형태는 아직 구현되지 않음 |
+| S6 | `SortSpec`(`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`)으로 재사용합니다. 외부 문자열은 persistence unit의 정렬 정책(`SortRules`, `SortPolicy`, `SortMode`, [4.10](#sort-policy) 참고)이 검사합니다 | `SortSpec`과 정렬 정책은 구현되고 테스트됨. `SortSpec`의 조인 형태는 아직 구현되지 않음 |
 | S7 | 키: 컬럼, to-one 경로, `+ - *`, 확대 변환. 값 분기는 안 됩니다 | 구현됨. 컬럼과 to-one 경로는 테스트함 |
 | S8 | `orderBy`에만 쓰인 연관 경로는 `left join`을 사용하므로 연관이 없는 행도 유지됩니다. 같은 경로를 `where`에서 쓰면 정렬은 `where`의 조인을 사용합니다 | 구현됨 |
 | S9 | 페이징을 사용할 때 키에 id가 없으면 루트 `@Id asc`를 추가합니다. 컬렉션 fetch join + 페이징은 거부됩니다 | 루트 id와 명시적으로 조인한 엔티티의 id는 구현됨(테스트함). fetch join 검사는 아직 구현되지 않음 |
 | S10 | 분석 결과는 람다별로 캐시됩니다. 캡처한 `Direction`은 호출할 때마다 읽습니다 | 구현됨 |
-| S11 | Spring `Sort.Order`는 `Direction`에 1:1로 대응합니다(Spring 모듈, [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) 참고). `SortWhitelist.parse("price,desc_nulls_last")` | Spring `Sort`는 구현되고 테스트됨(`ignoreCase`는 아직 지원하지 않음). `SortWhitelist`는 아직 구현되지 않음 |
+| S11 | Spring `Sort.Order`는 `Direction`에 1:1로 대응합니다(Spring 모듈, [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) 참고). 속성 이름은 정렬 정책의 검사를 거치고, 별칭은 그대로 전달합니다 | Spring `Sort`는 구현되고 테스트됨(`ignoreCase`는 아직 지원하지 않음). 정렬 정책과 함께 쓰는 경우도 테스트함. `"price,desc_nulls_last"` 같은 문자열 하나의 해석은 아직 구현되지 않음 |
 | S12 | 조인 쿼리도 같은 형태를 사용합니다: `(o, c, by)`, `(o, c, i, by)` | 구현됨(테스트함, [6.8](06-select-group.md#68-explicit-joins) 참고) |
 | S13 | 메서드 참조는 키 하나의 짧은 형태에서만 사용합니다. 컴파일은 되지만 의미가 틀린 메서드 참조는 거부됩니다([9. Java 노트](09-java-notes.md#99-method-references) 참고) | 구현됨(getter 참조) |
 | S14 | 서브쿼리 정렬: `limit`이 있으면 유지, 없으면 경고와 함께 제거. 데이터베이스별 차이는 lambdaQL이 처리합니다(5장 참고) | 구현됨(테스트함). MariaDB `lateral` 재작성은 아직 구현되지 않음 |

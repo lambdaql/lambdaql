@@ -4,8 +4,8 @@
 > [!NOTE]
 > **状态**
 > - **核心部分已实现**，并在 H2、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上测试：带有 `by.asc`、`by.desc` 和 `by.sort` 的 `orderBy { o, by -> ... }`，一个排序键的写法 `orderBy { it.key }` 和 `orderBy({ it.key }, Direction)`，`Direction.parse` / `reversed`，`limit` / `offset`，`orderBy` 之后的 `first()`，以及可重用排序 `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。Spring `Sort` 和 `Pageable` 可以在 Spring Data JPA 模块中使用（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。大多数测试使用 **Java** Lambda。带 `limit` 的 Kotlin 排序也已测试（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，标记为 **(已测试)**）。
-> - **也已实现（用 Java Lambda 测试）：** 在 `join`、`leftJoin` 或 `crossJoin` 之后使用的 join 写法 `{ o, c, by -> ... }`（见 [6.8 显式 join](06-select-group.md#68-explicit-joins)）。
-> - **尚未实现：** Kotlin 属性引用（`orderBy(Order::price)`）、`SortWhitelist` 和 `SortSpec` 的 join 写法。
+> - **也已实现（用 Java Lambda 测试）：** 在 `join`、`leftJoin` 或 `crossJoin` 之后使用的 join 写法 `{ o, c, by -> ... }`（见 [6.8 显式 join](06-select-group.md#68-explicit-joins)），以及用于外部排序的排序策略（`SortRules`、`SortPolicy`、`SortMode`，见 [4.10](#sort-policy)）。
+> - **尚未实现：** Kotlin 属性引用（`orderBy(Order::price)`）和 `SortSpec` 的 join 写法。
 > - 该 Kotlin 语法可以编译（已用原型检查，kotlinc 2.3.21）。可空排序键、`?.` 排序键和属性引用可以编译；实体排序键不能编译。
 > - 本章中的其他 HQL 遵循库的规则，但没有用 Kotlin Lambda 测试过。
 
@@ -492,7 +492,8 @@ order by o1_0.description desc nulls last,o1_0.id desc
 H2 和 MariaDB 对 `desc` 本来就把 NULL 放在最后，因此不写额外的子句。Oracle 会加上 `nulls last`。
 
 **`SortSpec.ofPath`：根据属性名排序。** `SortSpec.ofPath(Order::class.java, "customer.name", Direction.DESC)` 根据属性路径创建一个 spec，用于以文本形式来自代码外部的排序键（Spring 模块用它处理 Spring `Sort`，见 [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。
-路径的每一部分都必须是持久化属性，最后一部分必须是基本值。其他任何内容都会报错，但任何持久化属性都会被接受，因此来自用户的文本请先用你自己的列表检查。
+路径的每一部分都必须是持久化属性，最后一部分必须是基本值。其他任何内容都会报错。
+允许哪些名称由排序策略决定（见下面的[排序策略](#sort-policy)）。既没有策略也没有 `@Sortable` 字段时，任何持久化属性都会被接受，并且 lambdaQL 会记录警告 `LQL-5003`。
 这里没有 Lambda，所以 Kotlin 与 Java 的行为相同。Java 测试见[本页的 Java 版本](../java/04-order-paging.md#410-reusable-and-external-sorts)（region `sort-spec-path`）。
 
 ```kotlin
@@ -502,9 +503,122 @@ qb.from(Order::class.java).orderBy(byName).toList()
 // HQL: select e0 from Order e0 left join e0.customer j1 order by j1.name desc nulls last, e0.id asc
 ```
 
+<a id="sort-policy"></a>
+### 排序策略：允许哪些外部名称
+
+**已实现**（决策 D43），已在 H2、MariaDB 10.11 和 Oracle 23.26 上用 Java Lambda 测试。
+
+来自代码外部的排序名称（请求参数、Spring `Sort` 或 `Pageable`）可以指向任何持久化属性。
+**排序策略**决定允许哪些名称。
+
+- `SortRules<T>` 列出一个实体允许的名称。每一列都用 Lambda 给出，因此由编译器检查。
+- `SortPolicy` 保存各实体的规则和一个模式（`SortMode`）。每个 `EntityManagerFactory`（即每个持久化单元）注册一个策略。使用该工厂的所有 `QueryBuilder` 和仓库都使用它。
+- 在实体字段上加 `@Sortable`，无需代码即可给出规则（见下面的[来自 `@Sortable` 的规则](#rules-from-sortable)）。
+
+一个实体的规则只来自**一个**地方，顺序如下：策略中的 `SortRules`（来自代码或 Spring `SortPolicy` bean）、Spring Boot 属性 `lambdaql.sort.*`（见 [12.5](12-spring-data-jpa.md#sort-policy-with-spring)）、实体的 `@Sortable` 字段。两个地方的规则不会合并。
+
+**检查哪些排序。** 只检查由字符串生成的排序：`SortSpec.ofPath`，以及 Spring `Sort` 或 `Pageable`（Spring 模块使用 `ofPath`，见 [12.5](12-spring-data-jpa.md#sort-policy-with-spring)）。
+排序 Lambda（`orderBy { o, by -> ... }`、`SortSpec.of`）是你自己的代码，因此从不检查。
+
+| 规则 | 允许的外部名称 |
+|---|---|
+| `allow { it.price }` | `price`（列的路径） |
+| `allow { it.customer?.name }` | `customer.name`。经过关联的路径只有像这样列出时才被允许 |
+| `alias("newest") { it.updateAt }` | `newest`，按 `updateAt` 排序。此时路径 `updateAt` 本身**不是**外部名称，因此客户端看不到属性名 |
+
+规则必须是实体的列。
+其他任何键会在第一次使用规则时以 `LQL-4041` 拒绝（尚未测试）。
+
+| `SortMode` | 对规则不允许的名称的处理 |
+|---|---|
+| `OFF` | 执行排序，不做检查 |
+| `WARN` | 执行排序，并按实体和名称各记录一次警告 `LQL-5003`。**这是默认值：**没有注册策略时，lambdaQL 使用 `WARN`，规则只来自 `@Sortable` |
+| `STRICT` | 以 `SortNotAllowedException`（`LQL-4040`）拒绝。既没有规则也没有 `@Sortable` 字段的实体，所有名称都会被拒绝 |
+
+因此，在注册策略之前，每个 `@Sortable` 不允许的外部排序名称都会按实体记录一次 `LQL-5003`。
+要拒绝未知名称，请以 `STRICT` 注册策略；要关闭检查，请以 `OFF` 注册。
+
+| 方法 | 作用 |
+|---|---|
+| `SortPolicy.of(mode, rules...)` | 用模式和各实体的规则创建策略 |
+| `SortPolicy.register(emf, policy)` | 注册持久化单元的策略，替换之前的策略 |
+| `SortPolicy.unregister(emf)` | 移除策略，恢复默认值（`WARN`，规则只来自 `@Sortable`） |
+| `SortPolicy.find(emf)` | 返回已注册的策略（`Optional`） |
+| `SortPolicy.effective(emf)` | 返回生效的策略：已注册的策略，否则为默认值 |
+
+在 Spring Boot 中，请定义一个 `SortPolicy` bean，而不是调用 `register`（见 [12.5](12-spring-data-jpa.md#sort-policy-with-spring)）。
+
+目前还没有针对排序策略的 Kotlin 测试。用 Java 写的同样规则在 [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java) 中测试过（H2、MariaDB 和 Oracle）。已测试的示例请看[本页的 Java 版本](../java/04-order-paging.md#sort-policy)。
+下面是设计示例：
+
+```kotlin
+val orderRules = SortRules.of(Order::class.java)
+    .allow { it.price }                      // the name "price"
+    .allow { it.customer?.name }             // an association path: allowed only when listed
+    .alias("newest") { it.updateAt }         // the outside name "newest" sorts by updateAt
+SortPolicy.register(emf, SortPolicy.of(SortMode.STRICT, orderRules))
+
+qb.from(Order::class.java).orderBy(SortSpec.ofPath(Order::class.java, "newest", Direction.DESC)).toList()
+// HQL: select e0 from Order e0 order by e0.updateAt desc nulls last
+qb.from(Order::class.java).orderBy(SortSpec.ofPath(Order::class.java, "updateAt", Direction.ASC)).toList()
+// SortNotAllowedException (LQL-4040): the path behind an alias is not an outside name
+qb.from(Order::class.java).orderBy { o, by -> by.asc(o.description) }.toList()
+// a sort lambda is your code: never checked
+```
+
+<a id="rules-from-sortable"></a>
+**来自 `@Sortable` 的规则。** 也可以在实体的字段或 getter 上标注 `@org.lambdaql.Sortable`：
+
+| 注解 | 允许的外部名称 |
+|---|---|
+| 属性 `name` 上的 `@field:Sortable` | `name` |
+| 属性 `grade` 上的 `@field:Sortable("level")` | `level`，按 `grade` 排序（别名） |
+| 关联属性 `customer` 上的 `@field:Sortable(path = "name")` | `customer.name` |
+
+- lambdaQL 只读取 `from(...)` 中实体的注解。其他实体上的注解不会允许经过关联的路径，请在关联字段上使用 `path`。
+- 只有当策略中没有该实体的规则（来自代码、Spring bean 或 Spring Boot 属性）时，才使用注解。
+- 在没有注册策略的默认 `WARN` 模式下也有效。
+
+在 Kotlin 中请写 `@field:Sortable`，让注解落在 JVM 字段上。同样的规则已用 Java 测试（[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)，region `annotation`，见[本页的 Java 版本](../java/04-order-paging.md#rules-from-sortable)）。下面是设计示例：
+
+```kotlin
+@Entity
+class Customer(
+    @Id @GeneratedValue
+    var id: Long? = null,
+    @field:Sortable                     // the outside name "name"
+    var name: String? = null,
+    @field:Sortable("level")            // the outside name "level" sorts by grade
+    var grade: Int? = null,
+)
+
+// Customer has no SortRules in the policy, so its @Sortable fields are the rules
+qb.from(Customer::class.java).orderBy(SortSpec.ofPath(Customer::class.java, "level", Direction.DESC)).toList()
+// HQL: select e0 from Customer e0 order by e0.grade desc nulls last
+```
+
+<a id="rules-as-strings"></a>
+**字符串形式的规则。** `allowPath(String...)` 和 `aliasPath(name, path)` 以文本形式接收属性路径。它们用于配置：[12.5](12-spring-data-jpa.md#sort-policy-with-spring) 中的 Spring Boot 属性就使用它们。
+路径会在第一次使用规则时与实体核对。在代码中请优先使用 Lambda 形式的 `allow` 和 `alias`，因为编译器会检查它们。
+
+已用 Java 测试（[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)，region `string-paths`）。这里没有 Lambda，因此 Kotlin 中的行为相同：
+
+```kotlin
+// the string forms used by configuration files (lambdaql.sort.allow / lambdaql.sort.alias)
+SortPolicy.register(emf, SortPolicy.of(SortMode.STRICT,
+    SortRules.of(Order::class.java).allowPath("price", "customer.name").aliasPath("newest", "updateAt")))
+```
+
+- 检查发生在 spec 用于 `orderBy` 时，在读取路径之前。
+  因此在 `STRICT` 模式下，不在规则中的名称即使根本不是属性，也会得到 `SortNotAllowedException`。
+- 规则属于一个实体类。如果为同一个类传入两个 `SortRules`，使用最后一个。
+- `SortNotAllowedException` 是 `LambdaQLException`（见 [11. 错误与语言](../11-errors-and-languages.md#exceptions)）。
+  lambdaQL 没有 Web 依赖。用 HTTP 400 响应的示例见 [12.5](12-spring-data-jpa.md#sort-policy-with-spring)。
+
 **尚未实现：**
 
-- `SortWhitelist<T>`，用于把外部字符串（例如 `"price,desc_nulls_last"` 这样的请求参数）转换为排序。它只接受列表中的名称。在此之前，`Direction.parse` 和 `by.sort(key, dir)` 可以提供运行时的方向（见 [4.3](#43-direction)）。排序键请在普通 Kotlin 代码中选择，或者先用你自己的列表检查文本，再使用 `SortSpec.ofPath`。
+- 把名称和方向放在一起的一段文本（`"price,desc_nulls_last"`，规则 S11）。
+  方向请用 `Direction.parse` 读取（见 [4.3](#43-direction)），名称请用 `SortSpec.ofPath`。
 - **计划中：** `SortSpec` 的 join 写法、键集分页（keyset paging）。（join 的 Lambda 写法 `{ o, c, by -> ... }` 已实现，见 [6.8](06-select-group.md#68-explicit-joins)。）
 
 <a id="411-sorting-inside-subqueries"></a>
@@ -526,12 +640,12 @@ qb.from(Order::class.java).orderBy(byName).toList()
 | S3 | 方向来自 `asc` / `desc` 或 `sort(key, Direction)`。`asc(key)`/`desc(key)`（`ASC`/`DESC`）使用 NULL 策略；`asc(key, nullsFirst)`、`desc(key, nullsFirst)` 和 `*_NULLS_*` 按写法使用 | 已实现 |
 | S4 | 主体只能是一条直接的 `by` 调用链。不能有 `if`、`when` 或循环 | 已实现 |
 | S5 | 每个查询只调用一次 `orderBy`。`orderBy` 之后不能调用 `where`。`limit` 之后不能调用 `orderBy`（编译错误） | 已实现 |
-| S6 | 用 `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）重用。外部字符串只能通过 `SortWhitelist` | `SortSpec` 已实现（用 Java Lambda 测试）。`SortWhitelist` 和 `SortSpec` 的 join 写法尚未实现 |
+| S6 | 用 `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）重用。外部字符串由持久化单元的排序策略（`SortRules`、`SortPolicy`、`SortMode`，见 [4.10](#sort-policy)）检查 | `SortSpec` 和排序策略已实现（用 Java Lambda 测试）。`SortSpec` 的 join 写法尚未实现 |
 | S7 | 排序键：列、对一路径、`+ - *`、拓宽转换。不能有值分支。Kotlin 的 `?.` 被当作路径读取 | 已实现（未用 Kotlin Lambda 测试） |
 | S8 | 只在 `orderBy` 中使用的关联路径使用 `left join`，因此没有关联的行会被保留。如果 `where` 使用同一条路径，排序会使用 `where` 的 join | 已实现 |
 | S9 | 分页时，如果排序键不包含根实体的 `@Id`，会添加 `@Id asc`。集合 fetch join + 分页会被拒绝 | 根实体 id 和显式 join 实体的 id 部分已实现（用 Java Lambda 测试）。fetch join 检查尚未实现 |
 | S10 | 分析结果按 Lambda 缓存。捕获的 `Direction` 每次调用都会读取 | 已实现 |
-| S11 | Spring `Sort.Order` 与 `Direction` 一一对应（Spring 模块，见 [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。`SortWhitelist.parse("price,desc_nulls_last")` | Spring `Sort` 已实现，并用 Java 测试（尚不支持 `ignoreCase`）。`SortWhitelist` 尚未实现 |
+| S11 | Spring `Sort.Order` 与 `Direction` 一一对应（Spring 模块，见 [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。属性名经过排序策略检查，别名按原样传递 | Spring `Sort` 已实现，并用 Java 测试（尚不支持 `ignoreCase`），与排序策略一起使用的情况也已测试。读取 `"price,desc_nulls_last"` 这样的一段文本尚未实现 |
 | S12 | join 查询使用相同的形式：`{ o, c, by -> }`、`{ o, c, i, by -> }` | 已实现（用 Java Lambda 测试，见 [6.8](06-select-group.md#68-explicit-joins)） |
 | S13 | 属性引用只能用于一个排序键的简短写法（`orderBy(Order::price)`）。能编译但含义错误的引用会被拒绝 | 尚未实现（Kotlin 属性引用） |
 | S14 | 子查询的排序：有 `limit` 时保留，没有 `limit` 时移除并发出警告。数据库差异由 lambdaQL 替你处理（见第 5 章） | 已实现（已测试）。MariaDB 的 `lateral` 改写尚未实现 |

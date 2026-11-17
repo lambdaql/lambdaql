@@ -386,7 +386,7 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 | 以实体作为排序键（`by.desc(o.customer)`） | 一个列：`by.desc(o.customer?.name)`（无法编译） |
 | join 排序 Lambda 中的属性引用 | Lambda |
 | `orderBy` 中的属性引用（`orderBy(Order::price)`，尚未实现） | Lambda：`orderBy { it.price }` |
-| `SortWhitelist`（尚未实现） | `val dir = Direction.parse(text)` 和 `by.sort(key, dir)` |
+| 把排序名称和方向放在一起的一段文本（`"price,desc_nulls_last"`），尚未实现 | 方向用 `Direction.parse(text)`，名称用 `SortSpec.ofPath`。名称由排序策略检查（[4.10](04-order-paging.md#sort-policy)） |
 | 集合 fetch join 与 `limit` / `offset` 一起使用 | 先分页，再加载集合 |
 | Spring `Sort` 中的 `ignoreCase()`（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)），尚不支持 | 不带 `ignoreCase()` 的排序 |
 | 函数键（`lower(name)`） | 计划中 |

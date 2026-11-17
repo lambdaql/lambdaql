@@ -34,8 +34,8 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-1xxx` | 입력과 람다 로딩 | `LQL-1001`~`LQL-1013` | `LambdaAnalysisException` |
 | `LQL-2xxx` | 바이트코드 디코딩 | `LQL-2001`~`LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | 의미 해석과 Java에서 계산하는 값 | `LQL-3001`~`LQL-3064` | `TranslationException` |
-| `LQL-4xxx` | 렌더링, 바인딩, 실행 | `LQL-4001`~`LQL-4039`, `LQL-4999`(내부 오류) | `LambdaQLException` 자체, 또는 JDK/JPA 표준 예외([예외](#exceptions) 참고) |
-| `LQL-5xxx` | 경고(로그에 기록) | `LQL-5002` | –(`WARN` 로그 한 줄) |
+| `LQL-4xxx` | 렌더링, 바인딩, 실행 | `LQL-4001`~`LQL-4042`, `LQL-4999`(내부 오류) | `LambdaQLException` 자체, 또는 JDK/JPA 표준 예외([예외](#exceptions) 참고) |
+| `LQL-5xxx` | 경고(로그에 기록) | `LQL-5002`, `LQL-5003` | –(`WARN` 로그 한 줄) |
 
 실제 코드의 예:
 
@@ -52,7 +52,9 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-4025` | `NonUniqueResultException` | one()의 조건에 맞는 행이 2개 이상입니다. 조건을 좁히거나 first()를 쓰세요: {0} |
 | `LQL-4034` | `DbOnlyException` | {0}은 DB 함수입니다. lambdaQL 람다 안에서만 쓰며 Java에서는 실행되지 않습니다. |
 | `LQL-4036` | `LambdaQLException` | 스텁이 DB 프로시저 {0}와 맞지 않습니다: {1} |
+| `LQL-4040` | `SortNotAllowedException` | {0}에서는 이 이름으로 정렬할 수 없습니다: {1}. SortRules의 allow나 alias로 허용하세요. |
 | `LQL-5002` | –(`WARN` 로그) | limit 없는 서브쿼리 정렬은 결과에 영향이 없어 제거했습니다(Q4): {0} |
+| `LQL-5003` | –(`WARN` 로그) | 외부 정렬이 {0}의 정렬 규칙에 없습니다: {1}. 지금은 실행하지만 SortMode.STRICT에서는 거부됩니다. |
 
 `{0}`, `{1}`은 인자입니다. 예를 들어 식이나 프로시저 이름이 들어갑니다.
 전체 목록은 메시지 파일에 있습니다([번역자를 위한 안내](#for-translators) 참고).
@@ -75,6 +77,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `UnsupportedLambdaShapeException` | `LQL-2xxx` | lambdaQL이 지원하지 않는 모양의 바이트코드일 때 | 반복문(`LQL-2004`). 값 삼항 연산자나 값 `if`/`when`. 일반적인 boolean 삼항 연산자 `c ? x : y`. |
 | `TranslationException` | `LQL-3xxx` | 람다가 HQL에서 정의된 의미를 갖지 않을 때 | getter가 아닌 엔티티 메서드. 두 엔티티를 `==`로 비교(아직 미지원). `groupBy` 키가 아닌 비집계 값(`LQL-3035`). |
 | `DbOnlyException` | `LQL-4034` | 직접 만든 `@SqlFunction` 메서드를 lambdaQL 람다 밖의 Java에서 호출했을 때 | `OrderFns.discount(1.0)`([람다 밖에서 호출한 플레이스홀더](#placeholders-called-outside-a-lambda) 참고) |
+| `SortNotAllowedException` | `LQL-4040` | `SortMode.STRICT`에서 외부 정렬(Spring `Sort`, `SortSpec.ofPath`)이 정렬 규칙에 없는 이름을 사용할 때 | `name`만 허용한 상태의 `Sort.by("grade")`([4.10 정렬 정책](java/04-order-paging.md#sort-policy) 참고). 웹 애플리케이션은 보통 HTTP 400으로 응답([12.5](java/12-spring-data-jpa.md#sort-policy-with-spring)) |
 
 이 클래스는 모두 `org.lambdaql` 패키지에 있습니다.
 
@@ -386,6 +389,7 @@ lambdaQL은 **SLF4J API**로 로그를 남깁니다.
 | 코드 | 발생 조건 |
 |---|---|
 | `LQL-5002` | 서브쿼리에 `orderBy`는 있지만 `limit`이 없어 lambdaQL이 정렬을 제거할 때(정렬은 결과에 영향이 없음, 규칙 Q4) |
+| `LQL-5003` | 외부 정렬(Spring `Sort`, `SortSpec.ofPath`)이 정렬 규칙에 없는 이름을 사용하고 모드가 `SortMode.WARN`(기본값)일 때. 정렬은 실행됨. 엔티티와 이름마다 한 번 기록([4.10 정렬 정책](java/04-order-paging.md#sort-policy) 참고) |
 
 ```
 WARN  [LQL-5002] limit 없는 서브쿼리 정렬은 결과에 영향이 없어 제거했습니다(Q4): ...
@@ -397,6 +401,7 @@ WARN  [LQL-5002] limit 없는 서브쿼리 정렬은 결과에 영향이 없어 
 - 대소문자를 구분하지 않는 비교에 맞는 인덱스나 콜레이션이 그 컬럼에 없을 때
 
 이런 경고를 오류로 바꾸는 "엄격 모드"가 계획되어 있습니다.
+외부 정렬에는 이미 같은 기능이 있습니다. `SortMode.STRICT`에서는 `LQL-5003`의 경우에 `SortNotAllowedException`(`LQL-4040`)이 발생합니다.
 
 > [!NOTE]
 > `lambdaql-core`는 Spring에 의존하지 않습니다. 로깅 의존성은 `slf4j-api` 하나이므로 로깅 구현체는 사용자가 선택합니다. Spring 모듈(`lambdaql-spring-data-jpa`, `lambdaql-spring-boot-starter`)은 Spring Data JPA를 가져오고, 스타터는 `spring-boot-starter-data-jpa`와 Logback도 함께 가져옵니다.

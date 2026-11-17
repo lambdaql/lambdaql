@@ -2,7 +2,7 @@
 
 > [!NOTE]
 > **상태: 조회 실행기와 Spring Boot 자동 구성 구현됨.**
-> `LambdaQlExecutor<T>`, Spring `Sort` / `Pageable` 지원, `QueryBuilder` 빈은 H2, MariaDB 10.11, Oracle 23.26에서 Spring Boot 3.4.2로 테스트했습니다.
+> `LambdaQlExecutor<T>`, Spring `Sort` / `Pageable` 지원(정렬 정책 포함), `QueryBuilder` 빈은 H2, MariaDB 10.11, Oracle 23.26에서 Spring Boot 3.4.2로 테스트했습니다.
 > 수정, 삭제, 삽입, 업서트 메서드도 테스트했습니다. 대상은 단축 메서드(`deleteAll`, `deleteOne`, `updateAll`, `updateOne`, `insertOne`, `insertAll`, `upsertOne`, `upsertAll`)와 빌더(`updateQuery()`, `deleteQuery()`, `insertQuery()`, `upsertQuery()`)입니다. 이 메서드에는 호출자의 트랜잭션이 필요합니다. lambdaQL은 `@Transactional`을 붙이지 않습니다(결정 D41).
 > **아직 검증하지 않음:** Spring Boot 4.
 > **(테스트됨)** 표시가 있는 예제는 테스트 코드에서 그대로 가져온 것입니다.
@@ -391,7 +391,8 @@ lambdaQL은 각 `Sort.Order`를 `SortSpec.ofPath`로 정렬 키 하나로 변환
 
 | Spring | lambdaQL의 처리 |
 |---|---|
-| 속성 이름(`"grade"`, `"team.name"`) | Spring Data 리포지토리와 같이 Spring Data `PropertyPath`로 검증. 없는 이름이면 `PropertyReferenceException`. 경로의 끝은 엔티티가 아닌 기본 값이어야 함. `team.name` 같은 to-one 경로는 `left join`을 사용하므로 팀이 없는 행도 결과에 포함됨 |
+| 속성 이름(`"grade"`, `"team.name"`) | Spring Data 리포지토리와 같이 Spring Data `PropertyPath`로 검증. 없는 이름이면 `PropertyReferenceException`. 경로의 끝은 엔티티가 아닌 기본 값이어야 함. `team.name` 같은 to-one 경로는 `left join`을 사용하므로 팀이 없는 행도 결과에 포함됨. 이어서 정렬 정책이 이름을 검사함([아래](#sort-policy-with-spring) 참고) |
+| 정렬 정책의 별칭(`"level"`) | `PropertyPath` 검사 없이 그대로 전달. 정렬 정책이 경로로 바꿈 |
 | `NullHandling.NATIVE`(기본값)의 `ASC` / `DESC` | lambdaQL NULL 규칙 적용. 오름차순은 NULL 먼저, 내림차순은 NULL 나중. 모든 데이터베이스에서 같은 순서([4.4](04-order-paging.md#44-null-ordering-is-the-same-on-every-database) 참고) |
 | `NullHandling.NULLS_FIRST` / `NULLS_LAST` | 지정한 그대로 사용(`ASC_NULLS_FIRST`, `DESC_NULLS_LAST` 등) |
 | `ignoreCase()` | 아직 지원하지 않음. `UnsupportedOperationException` 발생 |
@@ -424,7 +425,111 @@ Page<Member> page = repository.findAll(m -> m.isActive(), PageRequest.of(1, 2, S
 ```
 
 **요청 파라미터로 받는 정렬.** Spring MVC는 `?page=1&size=20&sort=name,desc` 같은 요청 파라미터로 `Pageable`을 만들 수 있습니다.
-영속 속성이면 모두 받으므로 사용자가 어느 컬럼으로든 정렬할 수 있습니다. 정렬 대상을 제한해야 하면 먼저 속성 이름을 허용 목록과 대조하십시오.
+정렬 정책도 `@Sortable` 필드도 없으면 영속 속성은 모두 받으므로 사용자가 어느 컬럼으로든 정렬할 수 있습니다. 이때 lambdaQL은 엔티티와 이름마다 한 번 경고 `LQL-5003`을 기록합니다.
+일부 이름만 허용하려면 아래의 정렬 정책을 사용하십시오.
+
+<a id="sort-policy-with-spring"></a>
+### Spring에서의 정렬 정책
+
+정렬 정책(결정 D43)은 허용하는 외부 정렬 이름을 정합니다. `SortRules`, `SortMode`와 규칙은 [4.10](04-order-paging.md#sort-policy)에서 설명합니다.
+Spring `Sort`나 `Pageable`은 항상 외부 정렬이므로 정책이 그 안의 이름을 모두 검사합니다. 정렬 람다는 검사하지 않습니다.
+
+**규칙의 출처.** Spring Boot에서는 자동 구성이 `EntityManagerFactory`의 정책을 만들고, 모든 싱글턴 빈을 만든 뒤 등록합니다.
+자동 구성이 읽는 곳은 세 가지입니다.
+
+| 출처 | 제공 내용 |
+|---|---|
+| `SortPolicy` 빈 | 모드와 람다로 작성한 `SortRules` |
+| 프로퍼티 `lambdaql.sort.*` | 모드와 문자열로 작성한 규칙 |
+| `@Sortable` 필드([4.10](04-order-paging.md#rules-from-sortable)) | 빈이나 프로퍼티에 규칙이 없는 엔티티의 규칙 |
+
+- 엔티티 하나의 규칙은 표의 순서에 따라 한 곳에서만 가져옵니다. 두 곳의 규칙을 합치지 않습니다.
+- `lambdaql.sort.mode`는 빈의 모드보다 우선합니다. 둘 다 없으면 모드는 `WARN`입니다.
+- 등록 조건은 `EntityManagerFactory`가 정확히 하나일 때이며, `QueryBuilder` 빈과 같습니다([12.8](#128-the-querybuilder-bean) 참고). 그 밖의 경우에는 `SortPolicy.register(emf, policy)`를 직접 호출하십시오.
+- 빈도 프로퍼티도 없으면 아무것도 등록하지 않으므로 기본값을 사용합니다: `WARN`, 규칙은 `@Sortable`에서만 가져옴.
+
+**프로퍼티.**
+
+| 프로퍼티 | 의미 |
+|---|---|
+| `lambdaql.sort.mode` | `OFF`, `WARN`(기본값), `STRICT` |
+| `lambdaql.sort.allow.<Entity>` | 허용 경로를 쉼표로 구분. 예: `name,team.name` |
+| `lambdaql.sort.alias.<Entity>.<외부 이름>` | 별칭의 경로. 예: `lambdaql.sort.alias.Member.level=grade` |
+
+`<Entity>`에는 JPA 엔티티 이름을 씁니다. 기본값은 단순 클래스 이름이고, `@Entity(name = ...)`로 바꿀 수 있습니다.
+
+엔티티 이름은 persistence unit 안에서 유일합니다(같은 이름이 둘이면 Hibernate가 시작 단계에서 중단). 그래서 패키지가 다른 같은 이름의 클래스도 섞이지 않습니다. 없는 이름이면 애플리케이션 시작이 `IllegalStateException`(LQL-4042)으로 중단됩니다.
+경로는 규칙을 처음 사용할 때 엔티티와 대조합니다(4.10의 [문자열 규칙](04-order-paging.md#rules-as-strings) 참고).
+
+**(테스트됨)** [`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java), 영역 `properties`(테스트의 프로퍼티. 애플리케이션에서는 `application.properties`나 `application.yaml`에 작성):
+
+```java
+@SpringBootTest(classes = SampleApplication.class, properties = {
+        "lambdaql.sort.mode=STRICT",
+        "lambdaql.sort.allow.Member=name,team.name",
+        "lambdaql.sort.alias.Member.level=grade"})
+```
+
+**(테스트됨)** [`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java), 영역 `properties-use`:
+
+```java
+List<Member> byLevel = repository.findAll(m -> m.isActive(), Sort.by(Sort.Order.desc("level")));
+List<Member> byTeam = repository.findAll(m -> m.isActive(), Sort.by("team.name", "name"));
+assertThrows(SortNotAllowedException.class, () -> repository.findAll(m -> m.isActive(), Sort.by("grade")));
+```
+
+이 테스트는 자동 구성의 정책 등록도 확인합니다.
+
+**`SortPolicy` 빈.** 컴파일러가 검사하는 규칙을 쓰려면 `SortPolicy` 빈을 정의하십시오. 같은 자동 구성 단계가 이 빈을 등록합니다.
+다음 빈은 설계 예제입니다. 아래 테스트는 같은 정책을 직접 등록합니다.
+
+```java
+@Bean
+public SortPolicy sortPolicy() {
+    return SortPolicy.of(SortMode.STRICT,
+            SortRules.of(Member.class)
+                    .allow(m -> m.getName())
+                    .alias("level", m -> m.getGrade()));
+}
+```
+
+**(테스트됨)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), 영역 `sort-policy`(영역은 `try` 안에서 끝나며, `finally` 블록에서 `SortPolicy.unregister(emf)`를 호출함):
+
+```java
+// usually a @Bean SortPolicy; the Boot auto-configuration registers it for the EntityManagerFactory
+org.lambdaql.query.SortPolicy.register(emf, org.lambdaql.query.SortPolicy.of(org.lambdaql.query.SortMode.STRICT,
+        org.lambdaql.query.SortRules.of(Member.class)
+                .allow(m -> m.getName())
+                .alias("level", m -> m.getGrade())));
+try {
+    // the client sends "level"; lambdaQL sorts by grade
+    List<Member> rows = repository.findAll(m -> m.isActive(), Sort.by(Sort.Order.desc("level"), Sort.Order.asc("name")));
+    // a property that is not in the rules
+    assertThrows(org.lambdaql.SortNotAllowedException.class,
+            () -> repository.findAll(m -> m.isActive(), Sort.by("grade")));
+```
+
+- `level` 같은 별칭은 `Member`의 속성이 아닙니다. lambdaQL은 Spring `PropertyPath` 검사 없이 그대로 전달하고, 정책이 `grade`로 바꿉니다.
+- 별칭도 속성도 아닌 이름이면 정책 검사 전에 `PropertyReferenceException`이 발생합니다.
+- `STRICT` 모드에서 규칙에 없는 속성을 지정하면 `SortNotAllowedException`(`LQL-4040`)이 발생합니다. Spring은 이 예외를 변환하지 않습니다([12.6](#126-transactions-and-exceptions) 참고).
+
+**HTTP 400 응답.** lambdaQL은 웹 의존성이 없으므로 HTTP 상태를 정하지 않습니다. 웹 애플리케이션은 보통 `SortNotAllowedException`에 400 Bad Request로 응답합니다.
+다음 핸들러는 예시입니다(테스트하지 않음).
+
+```java
+@RestControllerAdvice
+public class SortErrorHandler {
+
+    @ExceptionHandler(SortNotAllowedException.class)
+    public ProblemDetail sortNotAllowed(SortNotAllowedException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+        problem.setProperty("code", e.code());      // "LQL-4040"
+        return problem;
+    }
+}
+```
+
+메시지에는 엔티티 클래스와 정렬 이름이 들어 있습니다. 클라이언트에 엔티티 이름을 노출하지 않으려면 `e.code()`만 보내십시오.
 
 <a id="126-transactions-and-exceptions"></a>
 ## 12.6 트랜잭션과 예외
@@ -453,6 +558,7 @@ DML을 자체 트랜잭션에서 실행하는 빌더는 `new QueryBuilder(entity
 | `deleteOne` 또는 `updateOne`의 조건에 맞는 행이 2개 이상 | `IncorrectResultSizeDataAccessException`. 아무것도 변경하지 않음(테스트함) |
 | Spring `Sort`에 없는 속성 | `PropertyReferenceException`(테스트함) |
 | Spring `Sort`의 `ignoreCase()` | `UnsupportedOperationException`(테스트함) |
+| `STRICT` 모드에서 정렬 정책이 허용하지 않는 정렬 이름([12.5](#sort-policy-with-spring)) | `SortNotAllowedException`(`LQL-4040`), 변환하지 않음(테스트함) |
 | 리포지토리 호출(단축 메서드, 또는 default 메서드 안의 `execute()`)에서 트랜잭션 없이 수정, 삭제, 삽입, 업서트 실행 | `InvalidDataAccessApiUsageException`(테스트함). Spring이 JPA `TransactionRequiredException`을 변환한 예외입니다. 리포지토리 메서드 밖(`QueryBuilder` 빈)에서는 JPA `TransactionRequiredException` |
 | 규칙(U1, U3, U4, U6)을 어긴 대입 람다 | `LambdaQLException`(예: `TranslationException`, `LQL-3042`). 변환하지 않음([7.8](07-dml.md#rules-checked-at-analysis-time) 참고) |
 

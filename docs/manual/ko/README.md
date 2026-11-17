@@ -133,7 +133,7 @@ fetch first ? rows only
 | getter를 JPA 속성에 매핑, 캡처 값 계산 | 구현됨, H2·MariaDB·Oracle에서 테스트함 | [03](java/03-where.md) | [03](kotlin/03-where.md) |
 | HQL 렌더링과 쿼리 실행(`where`, `toList()`) | 구현됨, H2·MariaDB·Oracle에서 테스트함 | [03](java/03-where.md) | [03](kotlin/03-where.md) |
 | 결과 함수(`first()`, `one()`, `count()`, `exists()`, `toSet()`) | 구현됨, H2·MariaDB·Oracle에서 테스트함(Java 람다) | [02](java/02-getting-started.md#getting-the-result) | [02](kotlin/02-getting-started.md#getting-the-result) |
-| 정렬과 페이징(`orderBy`, `limit`, `offset`) | 핵심 기능 구현됨, H2·MariaDB·Oracle에서 테스트함. `SortSpec`과 조인 정렬 `(o, c, by)` 포함. `SortWhitelist`, `SortSpec`의 조인 형태: 설계됨 | [04](java/04-order-paging.md) | [04](kotlin/04-order-paging.md) |
+| 정렬과 페이징(`orderBy`, `limit`, `offset`) | 핵심 기능 구현됨, H2·MariaDB·Oracle에서 테스트함. `SortSpec`, 조인 정렬 `(o, c, by)`, 외부 정렬의 정렬 정책(코드, Spring Boot 프로퍼티, `@Sortable` 규칙) 포함. `SortSpec`의 조인 형태: 설계됨 | [04](java/04-order-paging.md) | [04](kotlin/04-order-paging.md) |
 | 서브쿼리(`exists`, `contains`, 스칼라, 상관) | 구현됨, H2·MariaDB·Oracle에서 테스트함(Java 람다). MariaDB `lateral` 재작성: 아직 구현되지 않음 | [05](java/05-subquery.md) | [05](kotlin/05-subquery.md) |
 | 프로젝션, `groupBy`, `having`, 집계(`Agg`) | 구현됨, H2·MariaDB·Oracle에서 테스트함(Java 람다). `distinct()`와 결과 함수 포함. 집계 기준 정렬: v0.2 후보 | [06](java/06-select-group.md) | [06](kotlin/06-select-group.md) |
 | 명시적 조인(`join`, `leftJoin`, `crossJoin`, 엔티티 3개까지) | 구현됨, H2·MariaDB·Oracle에서 테스트함(Java 람다). 모든 엔티티에 대한 `where`, `orderBy`, `select`, 페이징 포함. DML과 서브쿼리 안의 조인: 이후 | [06](java/06-select-group.md#68-explicit-joins) | [06](kotlin/06-select-group.md#68-explicit-joins) |

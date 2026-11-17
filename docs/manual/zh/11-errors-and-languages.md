@@ -33,8 +33,8 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-1xxx` | 输入与 Lambda 加载 | `LQL-1001` 至 `LQL-1013` | `LambdaAnalysisException` |
 | `LQL-2xxx` | 字节码解码 | `LQL-2001` 至 `LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | 语义与在 Java 中计算的值 | `LQL-3001` 至 `LQL-3064` | `TranslationException` |
-| `LQL-4xxx` | 生成、绑定与执行 | `LQL-4001` 至 `LQL-4039`、`LQL-4999`（内部错误） | `LambdaQLException` 本身，或 JDK/JPA 标准异常（见[异常](#exceptions)） |
-| `LQL-5xxx` | 警告（记录在日志中） | `LQL-5002` | –（一条 `WARN` 日志） |
+| `LQL-4xxx` | 生成、绑定与执行 | `LQL-4001` 至 `LQL-4042`、`LQL-4999`（内部错误） | `LambdaQLException` 本身，或 JDK/JPA 标准异常（见[异常](#exceptions)） |
+| `LQL-5xxx` | 警告（记录在日志中） | `LQL-5002`、`LQL-5003` | –（一条 `WARN` 日志） |
 
 一些实际的错误码：
 
@@ -51,7 +51,9 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-4025` | `NonUniqueResultException` | 符合 one() 条件的行有两行或以上。请缩小条件或使用 first()：{0} |
 | `LQL-4034` | `DbOnlyException` | {0} 是数据库函数。它只能在 lambdaQL 的 lambda 中使用，不会在 Java 中执行。 |
 | `LQL-4036` | `LambdaQLException` | 存根与数据库存储过程 {0} 不一致：{1} |
+| `LQL-4040` | `SortNotAllowedException` | {0} 不允许按此名称排序：{1}。请用 SortRules 的 allow 或 alias 允许它。 |
 | `LQL-5002` | –（`WARN` 日志） | 没有 limit 的子查询排序不影响结果，已被移除（Q4）：{0} |
+| `LQL-5003` | –（`WARN` 日志） | 外部排序不在 {0} 的排序规则中：{1}。现在会执行，但在 SortMode.STRICT 下会被拒绝。 |
 
 `{0}` 和 `{1}` 是参数，例如表达式或存储过程名。
 完整列表见消息文件（见[致译者](#for-translators)）。
@@ -74,6 +76,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `UnsupportedLambdaShapeException` | `LQL-2xxx` | 字节码的结构是 lambdaQL 不支持的 | 循环（`LQL-2004`）。值三元表达式，或作为值的 `if`/`when`。一般的布尔三元表达式 `c ? x : y`。 |
 | `TranslationException` | `LQL-3xxx` | Lambda 在 HQL 中没有定义的含义 | 不是 getter 的实体方法。用 `==` 比较两个实体（暂不支持）。不是 `groupBy` 键的非聚合值（`LQL-3035`）。 |
 | `DbOnlyException` | `LQL-4034` | 在 lambdaQL Lambda 之外，用 Java 调用了你的 `@SqlFunction` 方法 | `OrderFns.discount(1.0)`（见[在 Lambda 外部调用的占位方法](#placeholders-called-outside-a-lambda)） |
+| `SortNotAllowedException` | `LQL-4040` | 在 `SortMode.STRICT` 下，外部排序（Spring `Sort`、`SortSpec.ofPath`）使用了排序规则不允许的名称 | 只允许 `name` 时的 `Sort.by("grade")`（见 [4.10 排序策略](java/04-order-paging.md#sort-policy)）。Web 应用通常用 HTTP 400 响应它（[12.5](java/12-spring-data-jpa.md#sort-policy-with-spring)） |
 
 这些类都在 `org.lambdaql` 包中。
 
@@ -375,6 +378,7 @@ lambdaQL 目前提供的警告：
 | 错误码 | 何时 |
 |---|---|
 | `LQL-5002` | 子查询有 `orderBy` 但没有 `limit`，因此 lambdaQL 会移除排序（它不起作用，规则 Q4） |
+| `LQL-5003` | 外部排序（Spring `Sort`、`SortSpec.ofPath`）使用了不在排序规则中的名称，并且模式是 `SortMode.WARN`（默认值）。排序会执行。按实体和名称各记录一次（见 [4.10 排序策略](java/04-order-paging.md#sort-policy)） |
 
 ```
 WARN  [LQL-5002] 没有 limit 的子查询排序不影响结果，已被移除（Q4）：...
@@ -385,7 +389,7 @@ WARN  [LQL-5002] 没有 limit 的子查询排序不影响结果，已被移除�
 - `LQL-5001`：在条件的列一侧使用了数据库函数（Java `OrderFns.discount(o.getPrice()) > 10`，Kotlin `OrderFns.discount(it.price)!! > 10`），导致数据库无法使用索引；
 - 不区分大小写的比较在该列上没有匹配的索引或排序规则（collation）。
 
-计划提供一种把这些警告变为错误的"严格模式"。
+计划提供一种把这些警告变为错误的"严格模式"。对于外部排序已经有了：在 `SortMode.STRICT` 下，`LQL-5003` 的情况会抛出 `SortNotAllowedException`（`LQL-4040`）。
 
 > [!NOTE]
 > `lambdaql-core` 不依赖 Spring。在日志方面它只带入 `slf4j-api`，因此日志后端由你选择。Spring 模块（`lambdaql-spring-data-jpa`、`lambdaql-spring-boot-starter`）会带入 Spring Data JPA，starter 还会带入 `spring-boot-starter-data-jpa` 以及 Logback。

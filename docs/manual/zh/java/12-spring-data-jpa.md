@@ -2,7 +2,7 @@
 
 > [!NOTE]
 > **状态：查询执行器和 Spring Boot 自动配置已实现。**
-> `LambdaQlExecutor<T>`、Spring `Sort` / `Pageable` 支持以及 `QueryBuilder` bean 已在 H2、MariaDB 10.11 和 Oracle 23.26 上用 Spring Boot 3.4.2 测试。
+> `LambdaQlExecutor<T>`、Spring `Sort` / `Pageable` 支持（包括排序策略）以及 `QueryBuilder` bean 已在 H2、MariaDB 10.11 和 Oracle 23.26 上用 Spring Boot 3.4.2 测试。
 > 更新、删除、插入和 upsert 方法也已测试：快捷方法（`deleteAll`、`deleteOne`、`updateAll`、`updateOne`、`insertOne`、`insertAll`、`upsertOne`、`upsertAll`）和构建器（`updateQuery()`、`deleteQuery()`、`insertQuery()`、`upsertQuery()`）。它们需要调用方的事务。lambdaQL 不添加 `@Transactional`（决定 D41）。
 > **尚未验证：** Spring Boot 4。
 > 标记为 **(已测试)** 的示例是从测试代码中复制的。
@@ -383,7 +383,8 @@ lambdaQL 用 `SortSpec.ofPath` 把每个 `Sort.Order` 转换为一个排序键�
 
 | Spring | 在 lambdaQL 中 |
 |---|---|
-| 属性名（`"grade"`、`"team.name"`） | 用 Spring Data 的 `PropertyPath` 检查，与 Spring Data 自身的 repository 相同。未知的名称会抛出 `PropertyReferenceException`。路径必须以基本值结尾，而不是以实体结尾。`team.name` 这样的 to-one 路径使用 `left join`，因此没有 team 的行也会保留 |
+| 属性名（`"grade"`、`"team.name"`） | 用 Spring Data 的 `PropertyPath` 检查，与 Spring Data 自身的 repository 相同。未知的名称会抛出 `PropertyReferenceException`。路径必须以基本值结尾，而不是以实体结尾。`team.name` 这样的 to-one 路径使用 `left join`，因此没有 team 的行也会保留。之后由排序策略检查名称（见[下文](#sort-policy-with-spring)） |
+| 排序策略的别名（`"level"`） | 不做 `PropertyPath` 检查，按原样传递。由排序策略变为其路径 |
 | 带 `NullHandling.NATIVE`（默认值）的 `ASC` / `DESC` | lambdaQL 的 NULL 规则：升序时 NULL 在前，降序时 NULL 在后。在每个数据库上顺序都相同（见 [4.4](04-order-paging.md#44-null-ordering-is-the-same-on-every-database)） |
 | `NullHandling.NULLS_FIRST` / `NULLS_LAST` | 按写法使用（`ASC_NULLS_FIRST`、`DESC_NULLS_LAST` 等） |
 | `ignoreCase()` | 尚不支持。会抛出 `UnsupportedOperationException` |
@@ -415,7 +416,107 @@ Page<Member> page = repository.findAll(m -> m.isActive(), PageRequest.of(1, 2, S
 // page 1 (the second page) of the active members by name; the total comes from a count query
 ```
 
-**来自请求参数的排序。** Spring MVC 可以根据 `?page=1&size=20&sort=name,desc` 这样的请求参数创建 `Pageable`。任何持久化属性都会被接受，因此用户可以按任意列排序。如果这会带来问题，请先用你自己的允许名称列表检查属性名。
+**来自请求参数的排序。** Spring MVC 可以根据 `?page=1&size=20&sort=name,desc` 这样的请求参数创建 `Pageable`。既没有排序策略也没有 `@Sortable` 字段时，任何持久化属性都会被接受，因此用户可以按任意列排序。此时 lambdaQL 会按实体和名称各记录一次警告 `LQL-5003`。如果只允许部分名称，请使用下面的排序策略。
+
+<a id="sort-policy-with-spring"></a>
+### 在 Spring 中使用排序策略
+
+排序策略（决策 D43）决定允许哪些外部排序名称。`SortRules`、`SortMode` 和规则在 [4.10](04-order-paging.md#sort-policy) 中说明。
+Spring `Sort` 或 `Pageable` 始终是外部排序，因此策略会检查其中的每个名称。排序 Lambda 从不检查。
+
+**规则的来源。** 在 Spring Boot 中，自动配置会构建 `EntityManagerFactory` 的策略，并在所有单例 bean 创建之后注册它。它读取三个地方：
+
+| 来源 | 提供的内容 |
+|---|---|
+| `SortPolicy` bean | 模式和用 Lambda 写的 `SortRules` |
+| 属性 `lambdaql.sort.*` | 模式和用字符串写的规则 |
+| `@Sortable` 字段（[4.10](04-order-paging.md#rules-from-sortable)） | bean 和属性都没有给出规则的实体的规则 |
+
+- 一个实体的规则按表中的顺序只来自一个地方。两个地方的规则不会合并。
+- `lambdaql.sort.mode` 优先于 bean 的模式。两者都没有时，模式为 `WARN`。
+- 这只在恰好有一个 `EntityManagerFactory` 时生效，与 `QueryBuilder` bean 的条件相同（见 [12.8](#128-the-querybuilder-bean)）。否则请自己调用 `SortPolicy.register(emf, policy)`。
+- 既没有 bean 也没有属性时，不注册任何内容，因此使用默认值：`WARN`，规则只来自 `@Sortable`。
+
+**属性。**
+
+| 属性 | 含义 |
+|---|---|
+| `lambdaql.sort.mode` | `OFF`、`WARN`（默认值）或 `STRICT` |
+| `lambdaql.sort.allow.<Entity>` | 允许的路径，用逗号分隔，例如 `name,team.name` |
+| `lambdaql.sort.alias.<Entity>.<外部名称>` | 别名的路径，例如 `lambdaql.sort.alias.Member.level=grade` |
+
+`<Entity>` 是 JPA 实体名：默认是简单类名，也可以用 `@Entity(name = ...)` 指定。实体名在持久化单元中唯一（两个实体同名时 Hibernate 会在启动时失败），因此不同包中同名的类不会混淆。未知的名称会使应用启动失败，抛出 `IllegalStateException`（LQL-4042）。
+路径会在第一次使用规则时与实体核对（见 4.10 中的[字符串形式的规则](04-order-paging.md#rules-as-strings)）。
+
+**(已测试)** [`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java)，region `properties`（测试的属性；在应用中写在 `application.properties` 或 `application.yaml` 中）：
+
+```java
+@SpringBootTest(classes = SampleApplication.class, properties = {
+        "lambdaql.sort.mode=STRICT",
+        "lambdaql.sort.allow.Member=name,team.name",
+        "lambdaql.sort.alias.Member.level=grade"})
+```
+
+**(已测试)** [`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java)，region `properties-use`：
+
+```java
+List<Member> byLevel = repository.findAll(m -> m.isActive(), Sort.by(Sort.Order.desc("level")));
+List<Member> byTeam = repository.findAll(m -> m.isActive(), Sort.by("team.name", "name"));
+assertThrows(SortNotAllowedException.class, () -> repository.findAll(m -> m.isActive(), Sort.by("grade")));
+```
+
+该测试也检查了自动配置会注册策略。
+
+**`SortPolicy` bean。** 要使用由编译器检查的规则，请定义一个 `SortPolicy` bean。同一个自动配置步骤会注册它。
+这个 bean 是设计示例。下面的测试手动注册同样的策略：
+
+```java
+@Bean
+public SortPolicy sortPolicy() {
+    return SortPolicy.of(SortMode.STRICT,
+            SortRules.of(Member.class)
+                    .allow(m -> m.getName())
+                    .alias("level", m -> m.getGrade()));
+}
+```
+
+**(已测试)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `sort-policy`（region 在 `try` 内结束；`finally` 块调用 `SortPolicy.unregister(emf)`）：
+
+```java
+// usually a @Bean SortPolicy; the Boot auto-configuration registers it for the EntityManagerFactory
+org.lambdaql.query.SortPolicy.register(emf, org.lambdaql.query.SortPolicy.of(org.lambdaql.query.SortMode.STRICT,
+        org.lambdaql.query.SortRules.of(Member.class)
+                .allow(m -> m.getName())
+                .alias("level", m -> m.getGrade())));
+try {
+    // the client sends "level"; lambdaQL sorts by grade
+    List<Member> rows = repository.findAll(m -> m.isActive(), Sort.by(Sort.Order.desc("level"), Sort.Order.asc("name")));
+    // a property that is not in the rules
+    assertThrows(org.lambdaql.SortNotAllowedException.class,
+            () -> repository.findAll(m -> m.isActive(), Sort.by("grade")));
+```
+
+- `level` 这样的别名不是 `Member` 的属性。lambdaQL 不做 Spring `PropertyPath` 检查，按原样传递它，由策略把它变为 `grade`。
+- 既不是别名也不是属性的名称，会在询问策略之前先抛出 `PropertyReferenceException`。
+- 在 `STRICT` 模式下，不在规则中的属性会抛出 `SortNotAllowedException`（`LQL-4040`）。Spring 不转换它（见 [12.6](#126-transactions-and-exceptions)）。
+
+**HTTP 400。** lambdaQL 没有 Web 依赖，因此不决定 HTTP 状态。Web 应用通常用 400 Bad Request 响应 `SortNotAllowedException`。
+下面的处理器只是示例（未测试）：
+
+```java
+@RestControllerAdvice
+public class SortErrorHandler {
+
+    @ExceptionHandler(SortNotAllowedException.class)
+    public ProblemDetail sortNotAllowed(SortNotAllowedException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+        problem.setProperty("code", e.code());      // "LQL-4040"
+        return problem;
+    }
+}
+```
+
+消息中包含实体类名和排序名称。如果不想让客户端看到实体名，只发送 `e.code()`。
 
 <a id="126-transactions-and-exceptions"></a>
 ## 12.6 事务与异常
@@ -443,6 +544,7 @@ Page<Member> page = repository.findAll(m -> m.isActive(), PageRequest.of(1, 2, S
 | `deleteOne` 或 `updateOne` 匹配 2 行或更多行 | `IncorrectResultSizeDataAccessException`。什么都不改变（已测试） |
 | Spring `Sort` 中有未知属性 | `PropertyReferenceException`（已测试） |
 | Spring `Sort` 中使用 `ignoreCase()` | `UnsupportedOperationException`（已测试） |
+| 在 `STRICT` 模式下，排序策略不允许的排序名称（[12.5](#sort-policy-with-spring)） | `SortNotAllowedException`（`LQL-4040`），不转换（已测试） |
 | 在 repository 调用中（快捷方法，或默认方法内部的 `execute()`）没有事务时执行更新、删除、插入或 upsert | `InvalidDataAccessApiUsageException`（已测试），由 Spring 从 JPA 的 `TransactionRequiredException` 转换而来。在 repository 方法外部（`QueryBuilder` bean）则是 JPA 的 `TransactionRequiredException` |
 | 违反规则（U1、U3、U4、U6）的赋值 Lambda | `LambdaQLException`（例如 `TranslationException`，`LQL-3042`），不做转换（见 [7.8](07-dml.md#rules-checked-at-analysis-time)） |
 

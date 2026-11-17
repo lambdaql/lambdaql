@@ -351,7 +351,7 @@ lambdaQL throws a clear error for every form in this list. "Planned" means a lat
 | `orderBy` twice, `where` after `orderBy`, `orderBy` after `limit` | One `orderBy` with all keys (these do not compile) |
 | An entity as a sort key (`by.desc(o.getCustomer())`) | A column: `by.desc(o.getCustomer().getName())` (does not compile) |
 | Method references in join sort lambdas | A lambda |
-| `SortWhitelist` (not implemented yet) | `Direction dir = Direction.parse(text)` and `by.sort(key, dir)` |
+| One text with a sort name and a direction (`"price,desc_nulls_last"`), not implemented yet | `Direction.parse(text)` for the direction and `SortSpec.ofPath` for the name. The sort policy checks the name ([4.10](04-order-paging.md#sort-policy)) |
 | Collection fetch join with `limit` / `offset` | Page first, then load the collection |
 | `ignoreCase()` in a Spring `Sort` ([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)), not supported yet | A sort without `ignoreCase()` |
 | Function keys (`lower(name)`) | Planned |

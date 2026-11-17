@@ -34,8 +34,8 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-1xxx` | 入力とラムダの読み込み | `LQL-1001`〜`LQL-1013` | `LambdaAnalysisException` |
 | `LQL-2xxx` | バイトコードのデコード | `LQL-2001`〜`LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | 意味と Java で計算する値 | `LQL-3001`〜`LQL-3064` | `TranslationException` |
-| `LQL-4xxx` | 生成、バインド、実行 | `LQL-4001`〜`LQL-4039`、`LQL-4999`（内部エラー） | `LambdaQLException` そのもの、または JDK/JPA の標準例外（[例外](#exceptions) を参照） |
-| `LQL-5xxx` | 警告（ログに出力） | `LQL-5002` | –（`WARN` のログ行） |
+| `LQL-4xxx` | 生成、バインド、実行 | `LQL-4001`〜`LQL-4042`、`LQL-4999`（内部エラー） | `LambdaQLException` そのもの、または JDK/JPA の標準例外（[例外](#exceptions) を参照） |
+| `LQL-5xxx` | 警告（ログに出力） | `LQL-5002`、`LQL-5003` | –（`WARN` のログ行） |
 
 実際のコードの例:
 
@@ -52,7 +52,9 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-4025` | `NonUniqueResultException` | one() の条件に合う行が 2 行以上あります。条件を絞るか first() を使ってください: {0} |
 | `LQL-4034` | `DbOnlyException` | {0} はデータベース関数です。lambdaQL のラムダの中でだけ使い、Java では実行されません。 |
 | `LQL-4036` | `LambdaQLException` | スタブがデータベースのプロシージャ {0} と一致しません: {1} |
+| `LQL-4040` | `SortNotAllowedException` | {0} ではこの名前でソートできません: {1}。SortRules の allow か alias で許可してください。 |
 | `LQL-5002` | –（`WARN` ログ） | limit のないサブクエリのソートは結果に影響しないため削除しました（Q4）: {0} |
+| `LQL-5003` | –（`WARN` ログ） | 外部からのソートが {0} のソート規則にありません: {1}。今は実行しますが、SortMode.STRICT では拒否されます。 |
 
 `{0}` と `{1}` は引数です。たとえば式やプロシージャ名が入ります。
 一覧はメッセージファイルにあります（[翻訳者向け](#for-translators) を参照）。
@@ -75,6 +77,7 @@ lambdaQL の例外はすべて `org.lambdaql.LambdaQLException` を継承しま�
 | `UnsupportedLambdaShapeException` | `LQL-2xxx` | バイトコードの形を lambdaQL がサポートしていない | ループ（`LQL-2004`）。値の三項演算子、値としての `if`/`when`。一般的な boolean の三項演算子 `c ? x : y`。 |
 | `TranslationException` | `LQL-3xxx` | ラムダに HQL での意味が定義されていない | getter ではないエンティティのメソッド。2 つのエンティティを `==` で比較する（まだサポートしていない）。`groupBy` のキーではない、集計されていない値（`LQL-3035`）。 |
 | `DbOnlyException` | `LQL-4034` | 自分の `@SqlFunction` メソッドが、lambdaQL のラムダの外で Java から呼ばれた | `OrderFns.discount(1.0)`（[ラムダの外で呼ばれたプレースホルダー](#placeholders-called-outside-a-lambda) を参照） |
+| `SortNotAllowedException` | `LQL-4040` | `SortMode.STRICT` で、外部のソート（Spring の `Sort`、`SortSpec.ofPath`）がソートのルールにない名前を使った | `name` だけを許可しているときの `Sort.by("grade")`（[4.10 ソートポリシー](java/04-order-paging.md#sort-policy) を参照）。Web アプリケーションは通常 HTTP 400 で応答する（[12.5](java/12-spring-data-jpa.md#sort-policy-with-spring)） |
 
 これらのクラスはすべてパッケージ `org.lambdaql` にあります。
 
@@ -385,6 +388,7 @@ lambdaQL は **SLF4J API** を通してログを出します。
 | コード | いつ |
 |---|---|
 | `LQL-5002` | サブクエリに `orderBy` があって `limit` がないため、lambdaQL がソートを取り除くとき（ソートに効果がないため、ルール Q4） |
+| `LQL-5003` | 外部のソート（Spring の `Sort`、`SortSpec.ofPath`）がソートのルールにない名前を使い、モードが `SortMode.WARN`（デフォルト）のとき。ソートは実行される。エンティティと名前ごとに 1 回出る（[4.10 ソートポリシー](java/04-order-paging.md#sort-policy) を参照） |
 
 ```
 WARN  [LQL-5002] A subquery sort without limit does not change the result, so it was removed (Q4): ...
@@ -395,7 +399,7 @@ WARN  [LQL-5002] A subquery sort without limit does not change the result, so it
 - `LQL-5001`: 条件のカラム側でデータベース関数を使っていて（Java の `OrderFns.discount(o.getPrice()) > 10`、Kotlin の `OrderFns.discount(it.price)!! > 10`）、データベースがインデックスを使えないとき
 - 大文字と小文字を区別しない比較に、そのカラムに合うインデックスや照合順序がないとき
 
-これらの警告をエラーに変える「厳格モード」を予定しています。
+これらの警告をエラーに変える「厳格モード」を予定しています。外部のソートにはすでにあります: `SortMode.STRICT` では、`LQL-5003` の場合に `SortNotAllowedException`（`LQL-4040`）を投げます。
 
 > [!NOTE]
 > `lambdaql-core` は Spring に依存しません。ログについて持ち込むのは `slf4j-api` だけなので、ログのバックエンドは自分で選びます。Spring モジュール（`lambdaql-spring-data-jpa`、`lambdaql-spring-boot-starter`）は Spring Data JPA を持ち込み、スターターはさらに Logback を含む `spring-boot-starter-data-jpa` も持ち込みます。

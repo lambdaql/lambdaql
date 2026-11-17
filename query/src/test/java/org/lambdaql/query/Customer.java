@@ -14,9 +14,11 @@ public class Customer implements Serializable {
     @Column(name = "id")
     private int id;
 
+    @org.lambdaql.Sortable                      // outside sorts may use "name" (SortPolicyTest)
     private String name;
 
     /** The customer grade, for example 1 to 5. Can be NULL (used by the planned subquery examples). */
+    @org.lambdaql.Sortable("level")             // the outside name "level" sorts by grade
     private Integer grade;
 
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)

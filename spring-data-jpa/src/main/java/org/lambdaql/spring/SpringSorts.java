@@ -37,12 +37,30 @@ public final class SpringSorts {
      * @throws UnsupportedOperationException                                if an order uses {@code ignoreCase}
      */
     public static <T> SortSpec<T> toSpec(Class<T> type, Sort sort) {
+        return toSpec(type, null, sort);
+    }
+
+    /**
+     * Converts a sorted Spring {@link Sort}; an alias of the sort policy (ROADMAP D43) is passed on as it is and turned
+     * into its path when the query is built.
+     *
+     * @param type   the entity class
+     * @param policy the sort policy of the persistence unit, or null
+     * @param sort   a sort with at least one order
+     * @param <T>    the entity type
+     * @return the same order as a spec
+     * @throws IllegalArgumentException                                     if the sort has no order
+     * @throws org.springframework.data.mapping.PropertyReferenceException if a property that is not an alias does not exist
+     * @throws UnsupportedOperationException                                if an order uses {@code ignoreCase}
+     */
+    public static <T> SortSpec<T> toSpec(Class<T> type, org.lambdaql.query.SortPolicy policy, Sort sort) {
         SortSpec<T> spec = null;
         for (Sort.Order order : sort) {
             if (order.isIgnoreCase()) {
                 throw new UnsupportedOperationException(LqlMessage.IGNORE_CASE_NOT_SUPPORTED.format(order.getProperty()));
             }
-            String path = PropertyPath.from(order.getProperty(), type).toDotPath();
+            String name = order.getProperty();
+            String path = policy != null && policy.isAlias(type, name) ? name : PropertyPath.from(name, type).toDotPath();
             SortSpec<T> part = SortSpec.ofPath(type, path, direction(order));
             spec = spec == null ? part : spec.then(part);
         }

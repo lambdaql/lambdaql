@@ -76,6 +76,11 @@ public final class QueryContext {
         return analyzed;
     }
 
+    /** The outside sort policy of this persistence unit (ROADMAP D43). */
+    SortPolicy sortPolicy() {
+        return SortPolicy.effective(factory());
+    }
+
     private EntityManagerFactory factory() {
         return emf != null ? emf : sharedEntityManager.getEntityManagerFactory();
     }

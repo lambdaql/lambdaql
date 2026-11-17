@@ -3,8 +3,8 @@
 > [!NOTE]
 > **Status**
 > - **Core implemented** and tested on H2, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5): `orderBy { o, by -> ... }` with `by.asc`, `by.desc` and `by.sort`, the one-key forms `orderBy { it.key }` and `orderBy({ it.key }, Direction)`, `Direction.parse` / `reversed`, `limit` / `offset`, `first()` after `orderBy`, and the reusable sort `SortSpec` (`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`). Spring `Sort` and `Pageable` work in the Spring Data JPA module ([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)). Most tests use **Java** lambdas. A Kotlin sort with `limit` is tested too ([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), marked **(tested)**).
-> - **Also implemented (tested with Java lambdas):** the join form `{ o, c, by -> ... }` after `join`, `leftJoin` or `crossJoin` (see [6.8 Explicit joins](06-select-group.md#68-explicit-joins)).
-> - **Not implemented yet:** Kotlin property references (`orderBy(Order::price)`), `SortWhitelist` and the join form of `SortSpec`.
+> - **Also implemented (tested with Java lambdas):** the join form `{ o, c, by -> ... }` after `join`, `leftJoin` or `crossJoin` (see [6.8 Explicit joins](06-select-group.md#68-explicit-joins)), and the sort policy for outside sorts (`SortRules`, `SortPolicy`, `SortMode`, see [4.10](#sort-policy)).
+> - **Not implemented yet:** Kotlin property references (`orderBy(Order::price)`) and the join form of `SortSpec`.
 > - The Kotlin syntax compiles (checked with prototypes, kotlinc 2.3.21). Nullable keys, `?.` keys and property references compile; an entity key does not.
 > - The other HQL in this chapter follows the rules of the library, but it is not tested with Kotlin lambdas.
 
@@ -480,7 +480,7 @@ order by o1_0.description desc nulls last,o1_0.id desc
 H2 and MariaDB already put NULLs last for `desc`, so they write no extra clause. Oracle adds `nulls last`.
 
 **`SortSpec.ofPath`: a sort from a property name.** `SortSpec.ofPath(Order::class.java, "customer.name", Direction.DESC)` makes a spec from a property path, for sort keys that come as text from outside the code (the Spring module uses it for Spring `Sort`, see [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)).
-Every part of the path must be a persistent property, and the last part a basic value. Anything else is an error, but any persistent property is accepted, so check text from users against your own list first.
+Every part of the path must be a persistent property, and the last part a basic value. Anything else is an error. Which names are allowed is decided by the sort policy (see [the sort policy](#sort-policy) below). Without a policy and without `@Sortable` fields, any persistent property is accepted, and lambdaQL logs the warning `LQL-5003`.
 There is no lambda here, so Kotlin works the same as Java. The Java test is in [the Java version of this page](../java/04-order-paging.md#410-reusable-and-external-sorts) (region `sort-spec-path`).
 
 ```kotlin
@@ -490,9 +490,115 @@ qb.from(Order::class.java).orderBy(byName).toList()
 // HQL: select e0 from Order e0 left join e0.customer j1 order by j1.name desc nulls last, e0.id asc
 ```
 
+<a id="sort-policy"></a>
+### The sort policy: which outside names are allowed
+
+**Implemented** (decision D43), tested with Java lambdas on H2, MariaDB 10.11 and Oracle 23.26.
+
+A sort name that comes from outside the code (a request parameter, a Spring `Sort` or `Pageable`) can name any persistent property. The **sort policy** decides which names are allowed.
+
+- `SortRules<T>` lists the allowed names of one entity. You give each column as a lambda, so the compiler checks it.
+- `SortPolicy` holds the rules of the entities and a mode (`SortMode`). You register one policy for each `EntityManagerFactory`, that is, for each persistence unit. Every `QueryBuilder` and repository on that factory uses it.
+- `@Sortable` on the fields of an entity gives rules without code (see [Rules from `@Sortable`](#rules-from-sortable) below).
+
+The rules of an entity come from **one** place, in this order: the `SortRules` in the policy (from code or a Spring `SortPolicy` bean), the Spring Boot properties `lambdaql.sort.*` (see [12.5](12-spring-data-jpa.md#sort-policy-with-spring)), the `@Sortable` fields of the entity. Rules from two places are not merged.
+
+**Which sorts are checked.** Only sorts made from strings: `SortSpec.ofPath`, and a Spring `Sort` or `Pageable` (the Spring module uses `ofPath`, see [12.5](12-spring-data-jpa.md#sort-policy-with-spring)).
+A sort lambda (`orderBy { o, by -> ... }`, `SortSpec.of`) is your own code, so it is never checked.
+
+| Rule | Allowed outside name |
+|---|---|
+| `allow { it.price }` | `price`, the path of the column |
+| `allow { it.customer?.name }` | `customer.name`. A path through an association is allowed only when it is listed like this |
+| `alias("newest") { it.updateAt }` | `newest`, which sorts by `updateAt`. The path `updateAt` itself is then **not** an outside name, so the client never sees the property name |
+
+A rule must be a column of the entity. Any other key is rejected with `LQL-4041` the first time the rules are used (not tested yet).
+
+| `SortMode` | A name that the rules do not allow |
+|---|---|
+| `OFF` | The sort runs. Nothing is checked |
+| `WARN` | The sort runs, and lambdaQL logs the warning `LQL-5003` once per entity and name. **This is the default:** without a registered policy, lambdaQL uses `WARN`, with rules only from `@Sortable` |
+| `STRICT` | The sort is rejected with `SortNotAllowedException` (`LQL-4040`). An entity that has neither rules nor `@Sortable` fields is rejected for every name |
+
+So, until you register a policy, each outside sort name that no `@Sortable` field allows logs `LQL-5003` once for each entity. Register a policy with `STRICT` to reject unknown names, or with `OFF` to turn the check off.
+
+| Method | What it does |
+|---|---|
+| `SortPolicy.of(mode, rules...)` | Makes a policy from a mode and the rules of each entity |
+| `SortPolicy.register(emf, policy)` | Registers the policy of a persistence unit. It replaces an earlier one |
+| `SortPolicy.unregister(emf)` | Removes the policy. The default (`WARN`, rules only from `@Sortable`) applies again |
+| `SortPolicy.find(emf)` | Returns the registered policy (`Optional`) |
+| `SortPolicy.effective(emf)` | Returns the policy in force: the registered one, else the default |
+
+With Spring Boot, define a `SortPolicy` bean instead of calling `register` (see [12.5](12-spring-data-jpa.md#sort-policy-with-spring)).
+
+There are no Kotlin tests for the sort policy yet. The same rules written in Java are tested in [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/04-order-paging.md#sort-policy) for the tested examples. This is a design example:
+
+```kotlin
+val orderRules = SortRules.of(Order::class.java)
+    .allow { it.price }                      // the name "price"
+    .allow { it.customer?.name }             // an association path: allowed only when listed
+    .alias("newest") { it.updateAt }         // the outside name "newest" sorts by updateAt
+SortPolicy.register(emf, SortPolicy.of(SortMode.STRICT, orderRules))
+
+qb.from(Order::class.java).orderBy(SortSpec.ofPath(Order::class.java, "newest", Direction.DESC)).toList()
+// HQL: select e0 from Order e0 order by e0.updateAt desc nulls last
+qb.from(Order::class.java).orderBy(SortSpec.ofPath(Order::class.java, "updateAt", Direction.ASC)).toList()
+// SortNotAllowedException (LQL-4040): the path behind an alias is not an outside name
+qb.from(Order::class.java).orderBy { o, by -> by.asc(o.description) }.toList()
+// a sort lambda is your code: never checked
+```
+
+<a id="rules-from-sortable"></a>
+**Rules from `@Sortable`.** You can also mark the fields or getters of an entity with `@org.lambdaql.Sortable`:
+
+| Annotation | Allowed outside name |
+|---|---|
+| `@field:Sortable` on the property `name` | `name` |
+| `@field:Sortable("level")` on the property `grade` | `level`, which sorts by `grade` (an alias) |
+| `@field:Sortable(path = "name")` on the association property `customer` | `customer.name` |
+
+- lambdaQL reads the annotations of the entity in `from(...)`. An annotation on another entity does not allow a path through an association: use `path` on the association field.
+- The annotations are used only when the policy has no rules for that entity (from code, a Spring bean or Spring Boot properties).
+- They also work without a registered policy, in the default `WARN` mode.
+
+In Kotlin, write `@field:Sortable`, so the annotation goes on the JVM field. The same rules are tested in Java ([`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), region `annotation`, see [the Java version of this page](../java/04-order-paging.md#rules-from-sortable)). This is a design example:
+
+```kotlin
+@Entity
+class Customer(
+    @Id @GeneratedValue
+    var id: Long? = null,
+    @field:Sortable                     // the outside name "name"
+    var name: String? = null,
+    @field:Sortable("level")            // the outside name "level" sorts by grade
+    var grade: Int? = null,
+)
+
+// Customer has no SortRules in the policy, so its @Sortable fields are the rules
+qb.from(Customer::class.java).orderBy(SortSpec.ofPath(Customer::class.java, "level", Direction.DESC)).toList()
+// HQL: select e0 from Customer e0 order by e0.grade desc nulls last
+```
+
+<a id="rules-as-strings"></a>
+**Rules as strings.** `allowPath(String...)` and `aliasPath(name, path)` take property paths as text. They are meant for configuration: the Spring Boot properties in [12.5](12-spring-data-jpa.md#sort-policy-with-spring) use them.
+The paths are checked against the entity the first time the rules are used. In code, prefer `allow` and `alias` with a lambda, because the compiler checks them.
+
+Tested in Java ([`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), region `string-paths`). There is no lambda here, so Kotlin works the same:
+
+```kotlin
+// the string forms used by configuration files (lambdaql.sort.allow / lambdaql.sort.alias)
+SortPolicy.register(emf, SortPolicy.of(SortMode.STRICT,
+    SortRules.of(Order::class.java).allowPath("price", "customer.name").aliasPath("newest", "updateAt")))
+```
+
+- The check runs when the spec is used in `orderBy`, before the path is read. So in `STRICT` mode, a name that is not in the rules gives `SortNotAllowedException` even when it is not a property at all.
+- The rules belong to one entity class. If you pass two `SortRules` for the same class, the last one is used.
+- `SortNotAllowedException` is a `LambdaQLException` (see [11. Errors and languages](../11-errors-and-languages.md#exceptions)). lambdaQL has no web dependency. To answer it with HTTP 400, see the example in [12.5](12-spring-data-jpa.md#sort-policy-with-spring).
+
 **Not implemented yet:**
 
-- `SortWhitelist<T>` to turn an outside string (a request parameter like `"price,desc_nulls_last"`) into a sort. It accepts only the names on its list. Until then, `Direction.parse` and `by.sort(key, dir)` give you a run-time direction (see [4.3](#43-direction)). Choose the key in normal Kotlin code, or check the text against your own list and use `SortSpec.ofPath`.
+- One text with a name and a direction, such as `"price,desc_nulls_last"` (rule S11). Read the direction with `Direction.parse` (see [4.3](#43-direction)) and the name with `SortSpec.ofPath`.
 - **Planned:** the join form of `SortSpec`, keyset paging. (The lambda form `{ o, c, by -> ... }` for joins is implemented, see [6.8](06-select-group.md#68-explicit-joins).)
 
 ## 4.11 Sorting inside subqueries
@@ -512,12 +618,12 @@ See [5. Subqueries](05-subquery.md#59-sorting-inside-a-subquery).
 | S3 | Direction comes from `asc` / `desc` or `sort(key, Direction)`. `asc(key)`/`desc(key)` (`ASC`/`DESC`) use the NULL policy; `asc(key, nullsFirst)`, `desc(key, nullsFirst)` and `*_NULLS_*` are used as written | Implemented |
 | S4 | The body is only a straight chain of `by` calls. No `if`, `when` or loop | Implemented |
 | S5 | `orderBy` once per query. No `where` after `orderBy`. No `orderBy` after `limit` (compile error) | Implemented |
-| S6 | Reuse with `SortSpec` (`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`). Outside strings only through `SortWhitelist` | `SortSpec` implemented (tested with Java lambdas). `SortWhitelist` and the join form of `SortSpec` are not implemented yet |
+| S6 | Reuse with `SortSpec` (`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`). Outside strings are checked by the sort policy of the persistence unit (`SortRules`, `SortPolicy`, `SortMode`, see [4.10](#sort-policy)) | `SortSpec` and the sort policy implemented (tested with Java lambdas). The join form of `SortSpec` is not implemented yet |
 | S7 | Keys: columns, to-one paths, `+ - *`, widening. No value branches. Kotlin `?.` is read as a path | Implemented (not tested with Kotlin lambdas) |
 | S8 | Association paths that are used only in `orderBy` use a `left join`, so rows without the association are kept. If `where` uses the same path, the sort uses the `where` join | Implemented |
 | S9 | With paging, the root `@Id asc` is added if the keys do not contain it. Collection fetch join + paging is rejected | Implemented for the root id and the ids of explicitly joined entities (tested with Java lambdas). The fetch join check is not implemented yet |
 | S10 | The analysis is cached per lambda. A captured `Direction` is read on every call | Implemented |
-| S11 | Spring `Sort.Order` maps 1:1 to `Direction` (Spring module, see [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)). `SortWhitelist.parse("price,desc_nulls_last")` | Spring `Sort` implemented and tested with Java (`ignoreCase` not supported yet). `SortWhitelist` not implemented yet |
+| S11 | Spring `Sort.Order` maps 1:1 to `Direction` (Spring module, see [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)). Its property names go through the sort policy, and an alias is passed on as it is | Spring `Sort` implemented and tested with Java (`ignoreCase` not supported yet), also with the sort policy. Reading one text such as `"price,desc_nulls_last"` is not implemented yet |
 | S12 | Join queries use the same shape: `{ o, c, by -> }`, `{ o, c, i, by -> }` | Implemented (tested with Java lambdas, see [6.8](06-select-group.md#68-explicit-joins)) |
 | S13 | Property references only in the one-key short form (`orderBy(Order::price)`). A reference that compiles but has the wrong meaning is rejected | Not implemented yet (Kotlin property references) |
 | S14 | Subquery sorts: kept with `limit`, removed with a warning without `limit`. Database differences are handled for you (see chapter 5) | Implemented (tested). The MariaDB `lateral` rewrite is not implemented yet |

@@ -9,7 +9,8 @@
 > The **Spring Data JPA module** is implemented too: the repository executor `LambdaQlExecutor<T>` (with Spring `Sort`, `Pageable`, the DML shortcuts such as `deleteAll(where)` and `updateOne(where, set)`, and the update, delete, insert and upsert builders) and the Spring Boot auto-configuration (tested with Spring Boot 3.4.2). DML needs the caller's transaction.
 > **Subqueries** (`where((o, sub) -> ...)`, also in update and delete) and **`select`** (records and DTOs, `groupBy`, `having`, the `Agg` aggregates, also in `insert ... select`) are implemented too (tested on H2, MariaDB and Oracle).
 > **Explicit joins** (`join`, `leftJoin`, `crossJoin`), **derived tables and CTEs** (`qb.from(valueQuery)`, `qb.with(valueQuery)`), **stored procedures and DB functions** (`@SqlProcedure`, `@SqlFunction`, `qb.call`, `qb.exec`) and **error codes with messages in four languages** (`[LQL-xxxx]`) are implemented too (tested on H2, MariaDB and Oracle; procedures on MariaDB and Oracle).
-> The rest of this track (for example `SortWhitelist` and the SARGable warnings) is **designed**: the syntax and rules are decided and were checked with prototypes, but the code is not in the library yet.
+> The **sort policy** for outside sorts (`SortRules`, `SortPolicy`, `SortMode`, `@Sortable`, the Spring Boot properties `lambdaql.sort.*`) is implemented too (tested on H2, MariaDB and Oracle).
+> The rest of this track (for example the join form of `SortSpec` and the SARGable warnings) is **designed**: the syntax and rules are decided and were checked with prototypes, but the code is not in the library yet.
 > No artifact is published to Maven Central yet. To try it, [build from source](02-getting-started.md#build-from-source).
 
 [Manual home](../README.md) | [Kotlin track](../kotlin/README.md) | Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -95,7 +96,7 @@ The pages marked "common" are shared by the Java and Kotlin tracks. They have sm
 | Mapping getters to JPA attributes | Implemented, tested on H2, MariaDB, Oracle | [3](03-where.md) |
 | HQL rendering and running queries (`where`, `toList()`) | Implemented, tested on H2, MariaDB, Oracle | [3](03-where.md) |
 | Result functions (`first()`, `one()`, `count()`, `exists()`, `toSet()`) | Implemented, tested on H2, MariaDB, Oracle | [2](02-getting-started.md#getting-the-result) |
-| Sorting and paging (`orderBy`, `limit`, `offset`) | Core implemented, tested on H2, MariaDB, Oracle, including `SortSpec` and join sorts `(o, c, by)`. `SortWhitelist` and the join form of `SortSpec`: designed | [4](04-order-paging.md) |
+| Sorting and paging (`orderBy`, `limit`, `offset`) | Core implemented, tested on H2, MariaDB, Oracle, including `SortSpec`, join sorts `(o, c, by)` and the sort policy for outside sorts (rules in code, Spring Boot properties or `@Sortable`). The join form of `SortSpec`: designed | [4](04-order-paging.md) |
 | Subqueries (`exists`, `contains`, scalar, correlated) | Implemented, tested on H2, MariaDB, Oracle. The MariaDB `lateral` rewrite: not implemented yet | [5](05-subquery.md) |
 | Projection, `groupBy`, `having`, aggregates (`Agg`) | Implemented, tested on H2, MariaDB, Oracle, including `distinct()` and the result functions. Sorting by an aggregate: v0.2 candidate | [6](06-select-group.md) |
 | Explicit joins (`join`, `leftJoin`, `crossJoin`, up to three entities) | Implemented, tested on H2, MariaDB, Oracle, including `where`, `orderBy`, `select` and paging over all entities. Joins in DML and in subqueries: later | [6](06-select-group.md#68-explicit-joins) |

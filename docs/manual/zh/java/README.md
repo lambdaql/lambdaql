@@ -9,7 +9,8 @@
 > **Spring Data JPA 模块**也已实现：repository 执行器 `LambdaQlExecutor<T>`（支持 Spring `Sort`、`Pageable`、`deleteAll(where)` 和 `updateOne(where, set)` 等 DML 快捷方法，以及更新、删除、插入和 upsert 构建器）以及 Spring Boot 自动配置（已用 Spring Boot 3.4.2 测试）。DML 需要调用方的事务。
 > **子查询**（`where((o, sub) -> ...)`，也可用于 update 和 delete）和 **`select`**（record 和 DTO、`groupBy`、`having`、`Agg` 聚合，也可用于 `insert ... select`）同样已实现（已在 H2、MariaDB 和 Oracle 上测试）。
 > **显式 join**（`join`、`leftJoin`、`crossJoin`）、**派生表和 CTE**（`qb.from(valueQuery)`、`qb.with(valueQuery)`）、**存储过程与数据库函数**（`@SqlProcedure`、`@SqlFunction`、`qb.call`、`qb.exec`）以及**带四种语言消息的错误码**（`[LQL-xxxx]`）同样已实现（已在 H2、MariaDB 和 Oracle 上测试；存储过程在 MariaDB 和 Oracle 上测试）。
-> 本路线中的其余内容（例如 `SortWhitelist` 和 SARGable 警告）处于**已设计**状态：语法和规则已经确定，并已用原型验证过，但代码还没有进入库中。
+> 用于外部排序的**排序策略**（`SortRules`、`SortPolicy`、`SortMode`、`@Sortable`、Spring Boot 属性 `lambdaql.sort.*`）也已实现（已在 H2、MariaDB、Oracle 上测试）。
+> 本路线中的其余内容（例如 `SortSpec` 的 join 写法和 SARGable 警告）处于**已设计**状态：语法和规则已经确定，并已用原型验证过，但代码还没有进入库中。
 > 目前还没有任何构件发布到 Maven Central。如果想试用，请[从源码构建](02-getting-started.md#build-from-source)。
 
 [手册首页](../README.md) | [Kotlin 路线](../kotlin/README.md) | 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -96,7 +97,7 @@ fetch first ? rows only
 | 将 getter 映射到 JPA 属性 | 已实现，已在 H2、MariaDB、Oracle 上测试 | [3](03-where.md) |
 | HQL 生成与查询执行（`where`、`toList()`） | 已实现，已在 H2、MariaDB、Oracle 上测试 | [3](03-where.md) |
 | 结果函数（`first()`、`one()`、`count()`、`exists()`、`toSet()`） | 已实现，已在 H2、MariaDB、Oracle 上测试 | [2](02-getting-started.md#getting-the-result) |
-| 排序与分页（`orderBy`、`limit`、`offset`） | 核心部分已实现，已在 H2、MariaDB、Oracle 上测试，包括 `SortSpec` 和 join 排序 `(o, c, by)`。`SortWhitelist` 和 `SortSpec` 的 join 写法：已设计 | [4](04-order-paging.md) |
+| 排序与分页（`orderBy`、`limit`、`offset`） | 核心部分已实现，已在 H2、MariaDB、Oracle 上测试，包括 `SortSpec`、join 排序 `(o, c, by)` 和用于外部排序的排序策略（规则来自代码、Spring Boot 属性或 `@Sortable`）。`SortSpec` 的 join 写法：已设计 | [4](04-order-paging.md) |
 | 子查询（`exists`、`contains`、标量、关联） | 已实现，已在 H2、MariaDB、Oracle 上测试。MariaDB 的 `lateral` 改写：尚未实现 | [5](05-subquery.md) |
 | 投影、`groupBy`、`having`、聚合（`Agg`） | 已实现，已在 H2、MariaDB、Oracle 上测试，包括 `distinct()` 和结果函数。按聚合排序：v0.2 候选 | [6](06-select-group.md) |
 | 显式 join（`join`、`leftJoin`、`crossJoin`，最多三个实体） | 已实现，已在 H2、MariaDB、Oracle 上测试，包括所有实体上的 `where`、`orderBy`、`select` 和分页。DML 中和子查询中的 join：以后 | [6](06-select-group.md#68-explicit-joins) |

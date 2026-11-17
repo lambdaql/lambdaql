@@ -374,7 +374,7 @@ H2 には OUT パラメーターがないので、プロシージャの機能は
 | `orderBy` を 2 回、`orderBy` の後の `where`、`limit` の後の `orderBy` | すべてのキーを持つ 1 つの `orderBy`（これらはコンパイルできません） |
 | ソートキーとしてのエンティティ（`by.desc(o.getCustomer())`） | カラム: `by.desc(o.getCustomer().getName())`（コンパイルできません） |
 | 結合のソートのラムダでのメソッド参照 | ラムダ |
-| `SortWhitelist`（まだ実装されていない） | `Direction dir = Direction.parse(text)` と `by.sort(key, dir)` |
+| 名前と方向を 1 つにまとめた文字列（`"price,desc_nulls_last"`）、まだ実装されていない | 方向は `Direction.parse(text)`、名前は `SortSpec.ofPath`。名前はソートポリシーがチェックする（[4.10](04-order-paging.md#sort-policy)） |
 | `limit` / `offset` を使うコレクションのフェッチ結合 | 先にページングし、その後でコレクションを読み込む |
 | Spring の `Sort` の `ignoreCase()`（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）、まだサポートしていない | `ignoreCase()` を使わないソート |
 | 関数のキー（`lower(name)`） | 予定 |

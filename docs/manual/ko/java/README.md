@@ -10,7 +10,8 @@
 > **Spring Data JPA 모듈**도 구현되어 있습니다. 리포지토리 실행기 `LambdaQlExecutor<T>`(Spring `Sort`, `Pageable`, `deleteAll(where)`·`updateOne(where, set)` 같은 DML 단축 메서드, 수정·삭제·삽입·업서트 빌더 포함)와 Spring Boot 자동 구성이 대상이며, Spring Boot 3.4.2에서 테스트했습니다. DML에는 호출자의 트랜잭션이 필요합니다.
 > **서브쿼리**(`where((o, sub) -> ...)`, 수정·삭제 포함)와 **`select`**(레코드와 DTO, `groupBy`, `having`, `Agg` 집계, `insert ... select` 포함)도 구현되어 있습니다(H2, MariaDB, Oracle에서 테스트함).
 > **명시적 조인**(`join`, `leftJoin`, `crossJoin`), **파생 테이블과 CTE**(`qb.from(valueQuery)`, `qb.with(valueQuery)`), **저장 프로시저와 DB 함수**(`@SqlProcedure`, `@SqlFunction`, `qb.call`, `qb.exec`), **4개 언어 메시지와 오류 코드**(`[LQL-xxxx]`)도 구현되어 있습니다(H2, MariaDB, Oracle에서 테스트함. 프로시저는 MariaDB와 Oracle에서 테스트함).
-> 이 트랙의 나머지 내용(예: `SortWhitelist`, SARGable 경고)은 **설계** 단계입니다. 문법과 규칙은 확정되었고 프로토타입으로 확인했지만, 코드는 아직 라이브러리에 들어 있지 않습니다.
+> 외부 정렬의 **정렬 정책**(`SortRules`, `SortPolicy`, `SortMode`, `@Sortable`, Spring Boot 프로퍼티 `lambdaql.sort.*`)도 구현되어 있습니다(H2, MariaDB, Oracle에서 테스트함).
+> 이 트랙의 나머지 내용(예: `SortSpec`의 조인 형태, SARGable 경고)은 **설계** 단계입니다. 문법과 규칙은 확정되었고 프로토타입으로 확인했지만, 코드는 아직 라이브러리에 들어 있지 않습니다.
 > 아직 Maven Central에 배포된 아티팩트는 없습니다. 사용해 보려면 [소스에서 빌드](02-getting-started.md#build-from-source)하십시오.
 
 [매뉴얼 홈](../README.md) | [Kotlin 트랙](../kotlin/README.md) | 공통 페이지: [1. 개요](../01-overview.md) · [11. 오류와 언어](../11-errors-and-languages.md)
@@ -98,7 +99,7 @@ fetch first ? rows only
 | getter를 JPA 속성에 매핑 | 구현됨, H2·MariaDB·Oracle에서 테스트함 | [3](03-where.md) |
 | HQL 렌더링과 쿼리 실행(`where`, `toList()`) | 구현됨, H2·MariaDB·Oracle에서 테스트함 | [3](03-where.md) |
 | 결과 함수(`first()`, `one()`, `count()`, `exists()`, `toSet()`) | 구현됨, H2·MariaDB·Oracle에서 테스트함 | [2](02-getting-started.md#getting-the-result) |
-| 정렬과 페이징(`orderBy`, `limit`, `offset`) | 핵심 기능 구현됨, H2·MariaDB·Oracle에서 테스트함. `SortSpec`과 조인 정렬 `(o, c, by)` 포함. `SortWhitelist`, `SortSpec`의 조인 형태: 설계됨 | [4](04-order-paging.md) |
+| 정렬과 페이징(`orderBy`, `limit`, `offset`) | 핵심 기능 구현됨, H2·MariaDB·Oracle에서 테스트함. `SortSpec`, 조인 정렬 `(o, c, by)`, 외부 정렬의 정렬 정책(코드, Spring Boot 프로퍼티, `@Sortable` 규칙) 포함. `SortSpec`의 조인 형태: 설계됨 | [4](04-order-paging.md) |
 | 서브쿼리(`exists`, `contains`, 스칼라, 상관) | 구현됨, H2·MariaDB·Oracle에서 테스트함. MariaDB `lateral` 재작성: 아직 구현되지 않음 | [5](05-subquery.md) |
 | 프로젝션, `groupBy`, `having`, 집계(`Agg`) | 구현됨, H2·MariaDB·Oracle에서 테스트함. `distinct()`와 결과 함수 포함. 집계 기준 정렬: v0.2 후보 | [6](06-select-group.md) |
 | 명시적 조인(`join`, `leftJoin`, `crossJoin`, 엔티티 3개까지) | 구현됨, H2·MariaDB·Oracle에서 테스트함. 모든 엔티티에 대한 `where`, `orderBy`, `select`, 페이징 포함. DML과 서브쿼리 안의 조인: 이후 | [6](06-select-group.md#68-explicit-joins) |

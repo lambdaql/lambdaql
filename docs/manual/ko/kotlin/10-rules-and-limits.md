@@ -401,7 +401,7 @@ lambdaQL은 이 목록의 모든 형태에 대해 명확한 오류를 던집니�
 | 정렬 키로 쓴 엔티티(`by.desc(o.customer)`) | 컬럼: `by.desc(o.customer?.name)`(컴파일되지 않음) |
 | 조인 정렬 람다 안의 속성 참조 | 람다 |
 | `orderBy`의 속성 참조(`orderBy(Order::price)`, 아직 구현되지 않음) | 람다: `orderBy { it.price }` |
-| `SortWhitelist`(아직 구현되지 않음) | `val dir = Direction.parse(text)`와 `by.sort(key, dir)` |
+| 정렬 이름과 방향을 함께 담은 문자열 하나(`"price,desc_nulls_last"`), 아직 구현되지 않음 | 방향은 `Direction.parse(text)`, 이름은 `SortSpec.ofPath`. 이름은 정렬 정책이 검사([4.10](04-order-paging.md#sort-policy)) |
 | `limit` / `offset`과 함께 쓴 컬렉션 fetch join | 먼저 페이징하고, 그다음 컬렉션을 로드 |
 | Spring `Sort`의 `ignoreCase()`([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)), 아직 지원하지 않음 | `ignoreCase()` 없는 정렬 |
 | 함수 키(`lower(name)`) | 계획 중 |

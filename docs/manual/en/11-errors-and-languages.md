@@ -32,8 +32,8 @@ All messages are the values of the enum `org.lambdaql.i18n.LqlMessage`. Each val
 | `LQL-1xxx` | Input and lambda loading | `LQL-1001` to `LQL-1013` | `LambdaAnalysisException` |
 | `LQL-2xxx` | Decoding the bytecode | `LQL-2001` to `LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | Meaning and values computed in Java | `LQL-3001` to `LQL-3064` | `TranslationException` |
-| `LQL-4xxx` | Rendering, binding and running | `LQL-4001` to `LQL-4039`, `LQL-4999` (internal error) | `LambdaQLException` itself, or a JDK/JPA standard exception (see [Exceptions](#exceptions)) |
-| `LQL-5xxx` | Warnings (in the log) | `LQL-5002` | – (a `WARN` log line) |
+| `LQL-4xxx` | Rendering, binding and running | `LQL-4001` to `LQL-4042`, `LQL-4999` (internal error) | `LambdaQLException` itself, or a JDK/JPA standard exception (see [Exceptions](#exceptions)) |
+| `LQL-5xxx` | Warnings (in the log) | `LQL-5002`, `LQL-5003` | – (a `WARN` log line) |
 
 Some real codes:
 
@@ -50,7 +50,9 @@ Some real codes:
 | `LQL-4025` | `NonUniqueResultException` | Two or more rows match one(). Narrow the condition or use first(): {0} |
 | `LQL-4034` | `DbOnlyException` | {0} is a database function. It works only inside a lambdaQL lambda and is never run in Java. |
 | `LQL-4036` | `LambdaQLException` | The stub does not match the database procedure {0}: {1} |
+| `LQL-4040` | `SortNotAllowedException` | Sorting by this name is not allowed for {0}: {1}. Allow it with SortRules (allow or alias). |
 | `LQL-5002` | – (`WARN` log) | A subquery sort without limit does not change the result, so it was removed (Q4): {0} |
+| `LQL-5003` | – (`WARN` log) | An outside sort is not in the sort rules of {0}: {1}. It runs now; with SortMode.STRICT it would be rejected. |
 
 `{0}` and `{1}` are the arguments, for example the expression or the procedure name.
 The full list is in the message files (see [For translators](#for-translators)).
@@ -72,6 +74,7 @@ The exception class comes from the code range.
 | `UnsupportedLambdaShapeException` | `LQL-2xxx` | The bytecode has a shape that lambdaQL does not support | A loop (`LQL-2004`). A value ternary or value `if`/`when`. A general boolean ternary `c ? x : y`. |
 | `TranslationException` | `LQL-3xxx` | The lambda has no defined meaning in HQL | An entity method that is not a getter. Comparing two entities with `==` (not supported yet). A non-aggregated value that is not a `groupBy` key (`LQL-3035`). |
 | `DbOnlyException` | `LQL-4034` | Your `@SqlFunction` method was called in Java, outside a lambdaQL lambda | `OrderFns.discount(1.0)` (see [Placeholders called outside a lambda](#placeholders-called-outside-a-lambda)) |
+| `SortNotAllowedException` | `LQL-4040` | In `SortMode.STRICT`, an outside sort (a Spring `Sort`, `SortSpec.ofPath`) uses a name that the sort rules do not allow | `Sort.by("grade")` when only `name` is allowed (see [4.10 the sort policy](java/04-order-paging.md#sort-policy)). A web application usually answers it with HTTP 400 ([12.5](java/12-spring-data-jpa.md#sort-policy-with-spring)) |
 
 All these classes are in the package `org.lambdaql`.
 
@@ -366,11 +369,12 @@ lambdaQL logs through the **SLF4J API**.
 - Warnings use the `WARN` level and start with a code from the `LQL-5xxx` range.
 - If the `WARN` level is off, lambdaQL does not build the message text.
 
-The warning that lambdaQL has today:
+The warnings that lambdaQL has today:
 
 | Code | When |
 |---|---|
 | `LQL-5002` | A subquery has `orderBy` but no `limit`, so lambdaQL removes the sort (it has no effect, rule Q4) |
+| `LQL-5003` | An outside sort (a Spring `Sort`, `SortSpec.ofPath`) uses a name that is not in the sort rules, and the mode is `SortMode.WARN` (the default). The sort runs. The warning is logged once for each entity and name (see [4.10 the sort policy](java/04-order-paging.md#sort-policy)) |
 
 ```
 WARN  [LQL-5002] A subquery sort without limit does not change the result, so it was removed (Q4): ...
@@ -381,7 +385,7 @@ Planned warnings (not implemented yet):
 - `LQL-5001`: a database function is used on the column side of a condition (Java `OrderFns.discount(o.getPrice()) > 10`, Kotlin `OrderFns.discount(it.price)!! > 10`), so the database cannot use an index;
 - a case-insensitive comparison has no matching index or collation for that column.
 
-A "strict mode" that turns these warnings into errors is planned.
+A "strict mode" that turns these warnings into errors is planned. For outside sorts there is one already: with `SortMode.STRICT`, the case of `LQL-5003` throws `SortNotAllowedException` (`LQL-4040`).
 
 > [!NOTE]
 > `lambdaql-core` has no Spring dependency. For logging it brings only `slf4j-api`, so you choose the logging backend. The Spring modules (`lambdaql-spring-data-jpa`, `lambdaql-spring-boot-starter`) bring Spring Data JPA, and the starter also brings `spring-boot-starter-data-jpa` with Logback.
