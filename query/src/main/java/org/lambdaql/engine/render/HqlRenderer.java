@@ -77,7 +77,70 @@ public final class HqlRenderer {
      * @param alias the alias, for example {@code j1}
      * @param left  {@code true} for {@code left join} (sort-only path), {@code false} for {@code join}
      */
-    private record Join(String alias, boolean left) {
+    private record Join(String alias, boolean left, int root) {
+    }
+
+    /**
+     * An entity join of an explicit join query (ROADMAP D44): {@code [left] join Customer e1 on ...}.
+     *
+     * @param entity the joined entity class (root 1, 2 ... in join order)
+     * @param left   {@code true} for {@code left join}
+     * @param on     the join condition, with the captured values of its lambda; null for {@code cross join} (D45)
+     */
+    public record JoinBound(Class<?> entity, boolean left, Bound on) {
+    }
+
+    private List<JoinBound> entityJoins = List.of();
+
+    /**
+     * Adds the entity joins of an explicit join query (ROADMAP D44). The joined entities are roots 1, 2 ...
+     *
+     * @param entityJoins the joins in order
+     * @return this renderer
+     */
+    public HqlRenderer withJoins(List<JoinBound> entityJoins) {
+        this.entityJoins = List.copyOf(entityJoins);
+        return this;
+    }
+
+    /**
+     * Writes {@code from Entity e0}, the path joins of root 0, then each entity join with its condition and the path
+     * joins of that root (a path join must come after the join of its root).
+     */
+    private String fromClause(Class<?> root) {
+        List<String> ons = new ArrayList<>();
+        boolean saved = leftJoins;
+        leftJoins = true;               // a path in an ON condition must not drop rows of the main entity
+        for (JoinBound j : entityJoins) {
+            if (j.on() == null) {
+                ons.add(null);
+                continue;
+            }
+            captured = j.on().captured();
+            Pred f = fold(j.on().pred());
+            ons.add(f instanceof Pred.Bool b ? (b.value() ? "1=1" : "1=0") : pred(f));
+        }
+        leftJoins = saved;
+        StringBuilder from = new StringBuilder(" from ").append(model.entityName(root)).append(' ').append(aliasOf(mainRoot()));
+        pathJoins(from, mainRoot());
+        for (int k = 0; k < entityJoins.size(); k++) {
+            JoinBound j = entityJoins.get(k);
+            if (ons.get(k) == null) {
+                from.append(" cross join ").append(model.entityName(j.entity())).append(' ').append(aliasOf(k + 1));
+            } else {
+                from.append(j.left() ? " left join " : " join ").append(model.entityName(j.entity())).append(' ')
+                        .append(aliasOf(k + 1)).append(" on ").append(ons.get(k));
+            }
+            pathJoins(from, k + 1);
+        }
+        return from.toString();
+    }
+
+    private void pathJoins(StringBuilder from, int root) {
+        joins.forEach((path, j) -> {
+            if (j.root() == root || (root == mainRoot() && j.root() > entityJoins.size()))
+                from.append(j.left() ? " left join " : " join ").append(path).append(' ').append(j.alias());
+        });
     }
 
     /**
@@ -214,9 +277,7 @@ public final class HqlRenderer {
     private RenderedQuery render(String select, Class<?> root, List<Bound> wheres, List<SortBound> sorts, boolean paged) {
         List<String> parts = whereParts(wheres);
         List<String> orders = orderBy(root, sorts, paged);
-        StringBuilder hql = new StringBuilder("select ").append(select).append(" from ")
-                .append(model.entityName(root)).append(' ').append(aliasOf(mainRoot()));
-        joins.forEach((path, j) -> hql.append(j.left() ? " left join " : " join ").append(path).append(' ').append(j.alias()));
+        StringBuilder hql = new StringBuilder("select ").append(select).append(fromClause(root));
         if (!parts.isEmpty()) hql.append(" where ").append(String.join(" and ", parts));
         if (!orders.isEmpty()) hql.append(" order by ").append(String.join(", ", orders));
         return new RenderedQuery(hql.toString(), new LinkedHashMap<>(params));
@@ -689,8 +750,7 @@ public final class HqlRenderer {
             }
         }
         StringBuilder hql = new StringBuilder("select ").append(distinct ? "distinct " : "").append(String.join(", ", cols))
-                .append(" from ").append(model.entityName(root)).append(' ').append(aliasOf(mainRoot()));
-        joins.forEach((path, j) -> hql.append(j.left() ? " left join " : " join ").append(path).append(' ').append(j.alias()));
+                .append(fromClause(root));
         if (!parts.isEmpty()) hql.append(" where ").append(String.join(" and ", parts));
         if (!keys.isEmpty()) hql.append(" group by ").append(String.join(", ", keys));
         if (!having.isEmpty()) hql.append(" having ").append(String.join(" and ", having));
@@ -777,6 +837,14 @@ public final class HqlRenderer {
             leftJoins = false;
         }
         if (id != null && !hasId) out.add(aliasOf(mainRoot()) + "." + id + " asc");
+        if (id != null) {
+            // a join can repeat the main row, so every joined root adds its id too (D44, D45)
+            for (int k = 0; k < entityJoins.size(); k++) {
+                String jid = model.idName(entityJoins.get(k).entity()).orElse(null);
+                String key = aliasOf(k + 1) + "." + jid + " asc";
+                if (jid != null && !out.contains(key)) out.add(key);
+            }
+        }
         return out;
     }
 
@@ -1079,7 +1147,8 @@ public final class HqlRenderer {
             if (!last && c.association().get(i) && !fkOnly) {
                 String key = expr + "." + names.get(i);
                 boolean left = leftJoins || whereLeftJoins.contains(JoinPlanner.key(c.root(), names.subList(0, i + 1)));
-                expr = joins.computeIfAbsent(key, k -> new Join(joinPrefix + (joins.size() + 1), left)).alias();
+                int owner = c.root();
+                expr = joins.computeIfAbsent(key, k -> new Join(joinPrefix + (joins.size() + 1), left, owner)).alias();
             } else {
                 expr = expr + "." + names.get(i);
             }

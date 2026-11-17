@@ -102,7 +102,7 @@ public class ValueQuery<R> {
     }
 
     private RenderedQuery render(boolean distinctRows) {
-        return new HqlRenderer(context.model(), root.getClassLoader())
+        return renderer()
                 .values(root, wheres, select, groupBy, havings, sorts, distinctRows, limit != null || offset > 0);
     }
 
@@ -153,5 +153,19 @@ public class ValueQuery<R> {
         List<R> rows = (List<R>) projector.build(context.rows(toHql(), offset, 2));
         if (rows.size() > 1) throw new NonUniqueResultException(LqlMessage.MORE_THAN_ONE_ROW.format(toHql().hql()));
         return rows.stream().findFirst();
+    }
+
+    // ------------------------------------------------------------------ explicit joins (ROADMAP D44)
+
+    private List<HqlRenderer.JoinBound> joins = List.of();
+
+    /** Sets the entity joins of a join query; the joined entities are roots 1, 2 ... Not public API. */
+    ValueQuery<R> withJoins(List<HqlRenderer.JoinBound> joins) {
+        this.joins = List.copyOf(joins);
+        return this;
+    }
+
+    private HqlRenderer renderer() {
+        return new HqlRenderer(context.model(), root.getClassLoader()).withJoins(joins);
     }
 }

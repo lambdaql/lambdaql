@@ -53,23 +53,6 @@ public class SelectQuery<T> {
         boolean clause(U obj);
     }
 
-    /**
-     * A join condition lambda (planned).
-     *
-     * @param <T> the main entity type
-     * @param <U> the joined entity type
-     */
-    @FunctionalInterface
-    public interface JoinOn<T, U> extends Serializable {
-        /**
-         * The join condition.
-         *
-         * @param t    the main entity
-         * @param join the joined entity
-         * @return the condition
-         */
-        boolean on(T t, U join);
-    }
 
     /**
      * A value lambda: {@code o -> o.getPrice()} or {@code o -> new OrderView(...)}.
@@ -143,7 +126,7 @@ public class SelectQuery<T> {
      * @return the HQL and its parameters
      */
     public RenderedQuery toHql() {
-        return new HqlRenderer(context.model(), entityClass.getClassLoader()).select(entityClass, wheres);
+        return renderer().select(entityClass, wheres);
     }
 
     /**
@@ -220,7 +203,7 @@ public class SelectQuery<T> {
      * @return {@code select count(e0) from ...}
      */
     RenderedQuery countHql() {
-        return new HqlRenderer(context.model(), entityClass.getClassLoader()).count(entityClass, wheres);
+        return renderer().count(entityClass, wheres);
     }
 
     /**
@@ -229,7 +212,7 @@ public class SelectQuery<T> {
      * @return {@code select 1 from ...}
      */
     RenderedQuery existsHql() {
-        return new HqlRenderer(context.model(), entityClass.getClassLoader()).exists(entityClass, wheres);
+        return renderer().exists(entityClass, wheres);
     }
 
     /**
@@ -248,7 +231,7 @@ public class SelectQuery<T> {
     public OrderedSelectQuery<T> orderBy(SortBy<T> spec) {
         LambdaRef ref = QueryContext.read(spec);
         List<SortItem> items = context.analyzeSortBy(ref, List.of(entityClass));
-        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of(new HqlRenderer.SortBound(items, ref.capturedArgs())));
+        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of(new HqlRenderer.SortBound(items, ref.capturedArgs()))).withJoins(joins);
     }
 
     /**
@@ -268,7 +251,7 @@ public class SelectQuery<T> {
         if (!spec.type().isAssignableFrom(entityClass)) {
             throw new IllegalArgumentException(LqlMessage.SORT_SPEC_TYPE.format(spec.type().getName(), entityClass.getName()));
         }
-        return new OrderedSelectQuery<>(entityClass, context, wheres, spec.bind(context, entityClass));
+        return new OrderedSelectQuery<>(entityClass, context, wheres, spec.bind(context, entityClass)).withJoins(joins);
     }
 
     /**
@@ -303,7 +286,7 @@ public class SelectQuery<T> {
         LambdaRef ref = QueryContext.read(key);
         Expr k = context.analyzeSortKey(ref, entityClass);
         SortItem item = new SortItem(k, SortItem.Kind.SORT, new Expr.Const(direction, Type.getType(Direction.class)));
-        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of(new HqlRenderer.SortBound(List.of(item), ref.capturedArgs())));
+        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of(new HqlRenderer.SortBound(List.of(item), ref.capturedArgs()))).withJoins(joins);
     }
 
     /**
@@ -318,7 +301,7 @@ public class SelectQuery<T> {
      * @throws IllegalArgumentException if {@code count} is negative
      */
     public OrderedSelectQuery<T> limit(int count) {
-        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of()).limit(count);
+        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of()).limit(count).withJoins(joins);
     }
 
     /**
@@ -333,7 +316,7 @@ public class SelectQuery<T> {
      * @throws IllegalArgumentException if {@code count} is negative
      */
     public OrderedSelectQuery<T> offset(int count) {
-        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of()).offset(count);
+        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of()).offset(count).withJoins(joins);
     }
 
     /**
@@ -354,8 +337,8 @@ public class SelectQuery<T> {
         LambdaRef ref = QueryContext.read(clause);
         var projection = context.analyzeSelect(ref, List.of(entityClass));
         org.lambdaql.engine.sem.SelectReader.checkGrouping(projection.columns(), List.of(), List.of(), ref.describe());
-        return new ValueQuery<>(entityClass, context, wheres, projection, ref.capturedArgs(), ref.classLoader(), null, List.of(),
-                List.of(), null, 0);
+        return new ValueQuery<R>(entityClass, context, wheres, projection, ref.capturedArgs(), ref.classLoader(), null, List.of(),
+                List.of(), null, 0).withJoins(joins);
     }
 
     /**
@@ -375,16 +358,50 @@ public class SelectQuery<T> {
     }
 
     /**
-     * Planned: explicit joins. Not implemented yet.
+     * Adds an inner join with another entity: {@code join(Customer.class, (o, c) -> o.getCustomer().getId() == c.getId())}
+     * (ROADMAP D44). Hibernate writes it as an entity join {@code join Customer e1 on ...}.
      *
-     * @param entityClass the joined entity
-     * @param onCondition the join condition
-     * @param <U>         the joined entity type
-     * @return a placeholder
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.JoinQueryTest" region="join"}
+     *
+     * @param entity    the joined entity class
+     * @param condition the join condition
+     * @param <U>       the joined entity type
+     * @return the join query
      */
-    @Deprecated
-    public <U> SelectJoinQuery<T, U> leftJoin(Class<U> entityClass, JoinOn<T, U> onCondition) {
-        return new SelectJoinQuery<>();
+    public <U> SelectJoinQuery<T, U> join(Class<U> entity, SelectJoinQuery.JoinOn<T, U> condition) {
+        return new SelectJoinQuery<>(this, List.of(), List.of(), entity, false, condition);
+    }
+
+    /**
+     * Adds a left join with another entity: rows of the main entity without a match stay (ROADMAP D44).
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.JoinQueryTest" region="left-join"}
+     *
+     * @param entity    the joined entity class
+     * @param condition the join condition
+     * @param <U>       the joined entity type
+     * @return the join query
+     */
+    public <U> SelectJoinQuery<T, U> leftJoin(Class<U> entity, SelectJoinQuery.JoinOn<T, U> condition) {
+        return new SelectJoinQuery<>(this, List.of(), List.of(), entity, true, condition);
+    }
+
+    /**
+     * Adds a cross join with another entity: every pair of rows, for example all customers with all products
+     * (ROADMAP D45). The name says that the product of rows is meant; put the conditions in {@code where}.
+     * To join on a condition, use {@link #join(Class, SelectJoinQuery.JoinOn)}.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.JoinQueryTest" region="cross-join"}
+     *
+     * @param entity the joined entity class
+     * @param <U>    the joined entity type
+     * @return the join query
+     */
+    public <U> SelectJoinQuery<T, U> crossJoin(Class<U> entity) {
+        return new SelectJoinQuery<>(this, List.of(), List.of(), entity, false, null);
     }
 
     /**
@@ -402,5 +419,40 @@ public class SelectQuery<T> {
      */
     public SequencedSet<T> toSet() {
         return DmlParts.toSet(toList());
+    }
+
+    // ------------------------------------------------------------------ explicit joins (ROADMAP D44)
+
+    private List<HqlRenderer.JoinBound> joins = List.of();
+
+    /** Sets the entity joins of a join query; the joined entities are roots 1, 2 ... Not public API. */
+    SelectQuery<T> withJoins(List<HqlRenderer.JoinBound> joins) {
+        this.joins = List.copyOf(joins);
+        return this;
+    }
+
+    private HqlRenderer renderer() {
+        return new HqlRenderer(context.model(), entityClass.getClassLoader()).withJoins(joins);
+    }
+
+    /** Adds a condition that was analyzed with all join roots. Not public API. */
+    void addWhere(HqlRenderer.Bound where) {
+        wheres.add(where);
+    }
+
+    List<HqlRenderer.JoinBound> joins() {
+        return joins;
+    }
+
+    Class<T> entityClass() {
+        return entityClass;
+    }
+
+    QueryContext context() {
+        return context;
+    }
+
+    List<HqlRenderer.Bound> wheres() {
+        return wheres;
     }
 }

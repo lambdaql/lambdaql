@@ -242,8 +242,10 @@ public final class Normalizer {
             Expr[] ab = compareCall(right);
             return cmp(op.flip(), ab[0], ab[1], false);
         }
-        Expr a = done(value(left));
-        Expr b = done(value(right));
+        V va = value(left), vb = value(right);
+        // a joined entity compared with null (ROADMAP D44): c == null is "no matching row", its id is null
+        Expr a = va instanceof Path pa && joinedRoot(pa) && vb instanceof Done db && isNullLiteral(db.expr()) ? rootId(pa) : done(va);
+        Expr b = vb instanceof Path pb && joinedRoot(pb) && va instanceof Done da && isNullLiteral(da.expr()) ? rootId(pb) : done(vb);
         if (isNullLiteral(b)) return op == CmpOp.EQ ? isNullOf(a) : nullCheck(op, a);
         if (isNullLiteral(a)) return op == CmpOp.EQ ? isNullOf(b) : nullCheck(op, b);
         if (a instanceof Expr.Column ca && b instanceof Expr.Host hb) b = retype(hb, ca.javaType());
@@ -272,7 +274,9 @@ public final class Normalizer {
     }
 
     private Pred isNull(Expr operand) {
-        return isNullOf(done(value(operand)));
+        V v = value(operand);
+        if (v instanceof Path p && joinedRoot(p)) return isNullOf(rootId(p));     // c == null for a joined entity (D44)
+        return isNullOf(done(v));
     }
 
     private Pred truth(Expr e) {
@@ -464,6 +468,17 @@ public final class Normalizer {
             if (p.isPresent()) return p;
         }
         return Optional.empty();
+    }
+
+    private static boolean joinedRoot(Path p) {
+        return p.names().isEmpty() && p.kind().equals("ROOT") && p.root() > 0;
+    }
+
+    private Expr rootId(Path p) {
+        String id = model.idName(p.type()).orElseThrow(() -> error(LqlMessage.ENTITY_COMPARE, p.type().getSimpleName()));
+        EntityModel.Property prop = model.property(p.type(), id)
+                .orElseThrow(() -> error(LqlMessage.PROPERTY_NOT_FOUND, p.type().getSimpleName() + "." + id));
+        return new Expr.Column(p.root(), List.of(id), List.of(false), prop.javaType(), false, false);
     }
 
     private Expr done(V v) {

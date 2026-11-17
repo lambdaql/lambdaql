@@ -89,7 +89,7 @@ public class OrderedSelectQuery<T> {
      * @return the HQL and its parameters
      */
     public RenderedQuery toHql() {
-        return new HqlRenderer(context.model(), entityClass.getClassLoader())
+        return renderer()
                 .select(entityClass, wheres, sorts, isPaged());
     }
 
@@ -116,7 +116,7 @@ public class OrderedSelectQuery<T> {
      */
     public Optional<T> first() {
         if (limit != null && limit == 0) return Optional.empty();
-        RenderedQuery q = new HqlRenderer(context.model(), entityClass.getClassLoader())
+        RenderedQuery q = renderer()
                 .select(entityClass, wheres, sorts, true);
         return context.resultList(entityClass, q, offset, 1).stream().findFirst();
     }
@@ -156,7 +156,21 @@ public class OrderedSelectQuery<T> {
         var ref = QueryContext.read(clause);
         var projection = context.analyzeSelect(ref, List.of(entityClass));
         org.lambdaql.engine.sem.SelectReader.checkGrouping(projection.columns(), List.of(), List.of(), ref.describe());
-        return new ValueQuery<>(entityClass, context, wheres, projection, ref.capturedArgs(), ref.classLoader(), null, List.of(),
-                sorts, limit, offset);
+        return new ValueQuery<R>(entityClass, context, wheres, projection, ref.capturedArgs(), ref.classLoader(), null, List.of(),
+                sorts, limit, offset).withJoins(joins);
+    }
+
+    // ------------------------------------------------------------------ explicit joins (ROADMAP D44)
+
+    private List<HqlRenderer.JoinBound> joins = List.of();
+
+    /** Sets the entity joins of a join query; the joined entities are roots 1, 2 ... Not public API. */
+    OrderedSelectQuery<T> withJoins(List<HqlRenderer.JoinBound> joins) {
+        this.joins = List.copyOf(joins);
+        return this;
+    }
+
+    private HqlRenderer renderer() {
+        return new HqlRenderer(context.model(), entityClass.getClassLoader()).withJoins(joins);
     }
 }
