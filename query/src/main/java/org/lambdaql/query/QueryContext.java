@@ -42,13 +42,6 @@ public final class QueryContext {
     private final EntityManagerFactory emf;
     private final EntityManager sharedEntityManager;
     private final org.lambdaql.engine.sem.RowModel model;
-    private final Map<Class<?>, Pred> whereCache = new ConcurrentHashMap<>();
-    private final Map<Class<?>, List<SortItem>> sortCache = new ConcurrentHashMap<>();
-    private final Map<Class<?>, Expr> sortKeyCache = new ConcurrentHashMap<>();
-    private final Map<Class<?>, List<Assignment>> assignCache = new ConcurrentHashMap<>();
-    private final Map<Class<?>, org.lambdaql.engine.sem.SelectReader.Projection> selectCache = new ConcurrentHashMap<>();
-    private final Map<Class<?>, List<Expr>> groupCache = new ConcurrentHashMap<>();
-    private final Map<Class<?>, Pred> havingCache = new ConcurrentHashMap<>();
 
     /**
      * Creates a context.
@@ -59,8 +52,61 @@ public final class QueryContext {
     QueryContext(EntityManagerFactory emf, EntityManager sharedEntityManager) {
         this.emf = emf;
         this.sharedEntityManager = sharedEntityManager;
-        this.model = new org.lambdaql.engine.sem.RowModel(
-                new JpaEntityModel(sharedEntityManager != null ? sharedEntityManager.getMetamodel() : emf.getMetamodel()));
+        this.shared = shared(emf != null ? emf : sharedEntityManager.getEntityManagerFactory(),
+                sharedEntityManager != null ? sharedEntityManager.getMetamodel() : emf.getMetamodel());
+        this.model = shared.model;
+    }
+
+    /**
+     * What every {@code QueryBuilder} on one persistence unit shares: the entity model (with the row types of derived
+     * tables) and the analysis results. The results depend only on the lambda and the entity model, so a new
+     * {@code QueryBuilder} does not analyze a lambda again. The cache is a {@link ClassValue}: an entry goes away with
+     * its lambda class, so redeploying or reloading classes does not keep old class loaders alive.
+     */
+    private static final class Shared {
+        final org.lambdaql.engine.sem.RowModel model;
+        final ClassValue<Map<String, Object>> analyses = new ClassValue<>() {
+            @Override
+            protected Map<String, Object> computeValue(Class<?> type) {
+                return new ConcurrentHashMap<>();
+            }
+        };
+
+        Shared(jakarta.persistence.metamodel.Metamodel metamodel) {
+            this.model = new org.lambdaql.engine.sem.RowModel(new JpaEntityModel(metamodel));
+        }
+    }
+
+    private static final Map<EntityManagerFactory, Shared> SHARED = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
+    /** Test hook: how many lambdas were analyzed (not found in the shared cache). Not public API. */
+    static final java.util.concurrent.atomic.AtomicLong ANALYSES = new java.util.concurrent.atomic.AtomicLong();
+
+    private final Shared shared;
+
+    private static Shared shared(EntityManagerFactory factory, jakarta.persistence.metamodel.Metamodel metamodel) {
+        synchronized (SHARED) {
+            // a closed factory is never used again; its entry would stay because the model refers to the factory
+            SHARED.keySet().removeIf(f -> f != factory && !isOpen(f));
+            return SHARED.computeIfAbsent(factory, f -> new Shared(metamodel));
+        }
+    }
+
+    private static boolean isOpen(EntityManagerFactory f) {
+        try {
+            return f.isOpen();
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /** One analysis of a lambda, shared by all builders on this persistence unit. */
+    @SuppressWarnings("unchecked")
+    private <V> V cached(LambdaRef ref, String kind, java.util.function.Supplier<V> analysis) {
+        return (V) shared.analyses.get(ref.lambdaClass()).computeIfAbsent(kind, k -> {
+            ANALYSES.incrementAndGet();
+            return analysis.get();
+        });
     }
 
     /**
@@ -85,8 +131,6 @@ public final class QueryContext {
         return emf != null ? emf : sharedEntityManager.getEntityManagerFactory();
     }
 
-    private final Map<Class<?>, org.lambdaql.engine.sem.ProcedureReader.ProcCall> procCache = new ConcurrentHashMap<>();
-    private final Map<Class<?>, org.lambdaql.engine.sem.ProcedureReader.FnCall> fnCache = new ConcurrentHashMap<>();
 
     /**
      * Runs a procedure call (ROADMAP M11, D30): analysis is cached per lambda class, the argument values are computed
@@ -100,7 +144,7 @@ public final class QueryContext {
      */
     Object procedure(Class<?> procs, Object lambda, boolean returns) {
         LambdaRef ref = read(lambda);
-        var call = procCache.computeIfAbsent(ref.lambdaClass(), k -> org.lambdaql.engine.sem.ProcedureReader.readCall(ref, procs, returns));
+        var call = cached(ref, "proc", () -> org.lambdaql.engine.sem.ProcedureReader.readCall(ref, procs, returns));
         Object[] values = hostValues(call.args(), ref);
         return procedureWork(em -> ProcedureRunner.call(em, model, call, values, !returns));
     }
@@ -113,7 +157,7 @@ public final class QueryContext {
      */
     Object function(Object lambda) {
         LambdaRef ref = read(lambda);
-        var call = fnCache.computeIfAbsent(ref.lambdaClass(), k -> checked(org.lambdaql.engine.sem.ProcedureReader.readFunction(ref)));
+        var call = cached(ref, "fn", () -> checked(org.lambdaql.engine.sem.ProcedureReader.readFunction(ref)));
         Object[] values = hostValues(call.args(), ref);
         return procedureWork(em -> ProcedureRunner.function(em, call, values));
     }
@@ -154,7 +198,7 @@ public final class QueryContext {
         if (!ref.isLambdaBody()) {
             throw LqlMessage.METHOD_REFERENCE_IN_WHERE.exceptionAt(ref.describe());
         }
-        return whereCache.computeIfAbsent(ref.lambdaClass(), k -> {
+        return cached(ref, "where", () -> {
             var graph = Decoder.decodePredicate(ref, BytecodeLoader.load(ref));
             Pred pred = ConditionReducer.reduce(graph, ref.describe());
             Pred normalized = checked(Normalizer.normalize(pred, roots, model, ref.classLoader(), ref.describe()));
@@ -176,7 +220,7 @@ public final class QueryContext {
      * @return the sort keys
      */
     List<SortItem> analyzeSortBy(LambdaRef ref, List<Class<?>> roots) {
-        return sortCache.computeIfAbsent(ref.lambdaClass(), k -> checked(SortReader.readSortBy(ref, roots, model)));
+        return cached(ref, "sort", () -> checked(SortReader.readSortBy(ref, roots, model)));
     }
 
     /**
@@ -187,7 +231,7 @@ public final class QueryContext {
      * @return the normalized key
      */
     Expr analyzeSortKey(LambdaRef ref, Class<?> root) {
-        return sortKeyCache.computeIfAbsent(ref.lambdaClass(), k -> checked(SortReader.readSortKey(ref, root, model)));
+        return cached(ref, "sortKey", () -> checked(SortReader.readSortKey(ref, root, model)));
     }
 
     /**
@@ -198,7 +242,7 @@ public final class QueryContext {
      * @return the projection
      */
     org.lambdaql.engine.sem.SelectReader.Projection analyzeSelect(LambdaRef ref, List<Class<?>> roots) {
-        return selectCache.computeIfAbsent(ref.lambdaClass(), k -> checked(org.lambdaql.engine.sem.SelectReader.readSelect(ref, roots, model)));
+        return cached(ref, "select", () -> checked(org.lambdaql.engine.sem.SelectReader.readSelect(ref, roots, model)));
     }
 
     /**
@@ -209,7 +253,7 @@ public final class QueryContext {
      * @return the group keys
      */
     List<Expr> analyzeGroupKeys(LambdaRef ref, List<Class<?>> roots) {
-        return groupCache.computeIfAbsent(ref.lambdaClass(), k -> checked(org.lambdaql.engine.sem.SelectReader.readGroupKeys(ref, roots, model)));
+        return cached(ref, "group", () -> checked(org.lambdaql.engine.sem.SelectReader.readGroupKeys(ref, roots, model)));
     }
 
     /**
@@ -220,7 +264,7 @@ public final class QueryContext {
      * @return the condition
      */
     Pred analyzeHaving(LambdaRef ref, List<Class<?>> roots) {
-        return havingCache.computeIfAbsent(ref.lambdaClass(), k -> {
+        return cached(ref, "having", () -> {
             var graph = Decoder.decodePredicate(ref, BytecodeLoader.load(ref));
             Pred pred = ConditionReducer.reduce(graph, ref.describe());
             return checked(Normalizer.normalize(pred, roots, model, ref.classLoader(), ref.describe(), true));
@@ -269,8 +313,7 @@ public final class QueryContext {
      * @return the assignments
      */
     List<Assignment> analyzeSetters(LambdaRef ref, List<Class<?>> roots, int hostParam, boolean aggregates) {
-        return assignCache.computeIfAbsent(ref.lambdaClass(),
-                k -> checked(AssignmentReader.readSetters(ref, roots, hostParam, model, aggregates)));
+        return cached(ref, "assign", () -> checked(AssignmentReader.readSetters(ref, roots, hostParam, model, aggregates)));
     }
 
     /**
@@ -281,7 +324,7 @@ public final class QueryContext {
      * @return the assignments
      */
     List<Assignment> analyzeBuilder(LambdaRef ref, List<Class<?>> roots) {
-        return assignCache.computeIfAbsent(ref.lambdaClass(), k -> checked(AssignmentReader.readBuilder(ref, roots, model)));
+        return cached(ref, "assign", () -> checked(AssignmentReader.readBuilder(ref, roots, model)));
     }
 
     /**
