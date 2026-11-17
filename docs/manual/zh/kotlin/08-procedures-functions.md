@@ -7,7 +7,8 @@
 >   存储过程调用（`@SqlProcedure`、`@InOut`、`qb.call`、`qb.exec`）在 MariaDB 和 Oracle 上测试，单独调用数据库函数在全部三种数据库上测试（[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)）。
 >   lambdaQL 也能读取 Kotlin 写法：带 `@JvmStatic` 的 `companion object` 函数，以及作为结果的 Kotlin data class。本章还没有 Kotlin 测试。
 > - **也已实现（已在 MariaDB 和 Oracle 上用 Java 测试）：**对照数据库检查桩函数参数的**名字**（规则 PR2 的一部分），以及 Oracle 包重载的检测。
-> - **尚未实现：** 作用于列的函数的 SARGable 警告（规则 PR8、FN7）、对照数据库检查参数的**类型**（规则 PR2 的一部分），以及选择并调用 Oracle 包存储过程的某个重载。
+> - **也已实现（用 Java Lambda 测试）：** 条件中数据库函数的 SARGable 警告（规则 PR8、FN7，见 [8.9](#89-warning-functions-on-columns-and-indexes-sargable)）。
+> - **尚未实现：** 对照数据库检查参数的**类型**（规则 PR2 的一部分），以及选择并调用 Oracle 包存储过程的某个重载。
 > - 本章的 Kotlin 代码用 Kotlin 语法展示已测试的 Java 调用。已测试的 Java 代码见[本页的 Java 版本](../java/08-procedures-functions.md)。完整状态请参阅[路线 README](README.md)。
 
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[7. 更新、插入、删除](07-dml.md) | 下一章：[9. Kotlin 说明](09-kotlin-notes.md) | [本页的 Java 版本](../java/08-procedures-functions.md)
@@ -290,7 +291,7 @@ Oracle 上真正的按名绑定（`pass_procedure_paramater_names=true` 加上�
 | PR5 | 多个结果集 → data class 的 `List` 属性，按顺序。不支持 Oracle 隐式结果。 | 已实现，没有测试覆盖 |
 | PR6 | 单独调用的数据库函数在每种数据库上使用不同的路径（参见 [8.8](#88-call-a-db-function-alone)）。 | 已实现（已用 Java 测试） |
 | PR7 | 查询中的数据库函数：参见 [8.6](#86-declare-db-functions) 和规则 FN1 到 FN11。 | 已实现（已用 Java 测试） |
-| PR8 | 条件中作用于列的数据库函数会产生 WARN，因为无法使用索引（参见 [8.9](#89-warning-functions-on-columns-and-indexes-sargable)）。 | 尚未实现 |
+| PR8 | 条件中作用于列的数据库函数会产生 WARN，因为无法使用索引（参见 [8.9](#89-warning-functions-on-columns-and-indexes-sargable)）。错误码为 `LQL-5001`。 | 已实现（用 Java Lambda 测试）。严格模式尚未实现 |
 | PR9 | 存储过程在调用方的事务中运行。需要时 lambdaQL 会在调用前刷新。调用后已加载的实体可能是过时的。 | 已实现 |
 | PR10 | 没有通用的受影响行数。请使用 OUT 参数。 | – |
 | PR11 | `null` IN 值没有问题。不能使用数据库参数的默认值。桩函数上的 Kotlin 默认参数会报错（`LQL-3062`）。 | 已实现 |
@@ -480,7 +481,7 @@ lambdaQL 会先刷新待处理的变更（与 PR9 相同），所以函数能看
 ## 8.9 警告：列上的函数与索引（SARGable）
 
 > [!NOTE]
-> 本节的警告**尚未实现**（规则 PR8、FN7）。目前 lambdaQL 生成这些查询时不会发出警告。
+> **已实现，已用 Java Lambda 测试**（H2、MariaDB 10.11、Oracle 23.26，规则 PR8、FN7）。尚未实现：严格模式（用错误代替警告），以及对不带函数的列运算的警告。
 
 lambdaQL 尽量生成**能够使用索引**的 SQL（参见 [10. 规则与限制](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql)）。
 包在列外面的函数通常**无法**使用普通索引：
@@ -499,18 +500,32 @@ from orders o1_0
 where FN_DISCOUNT(o1_0.price)>10
 ```
 
-所以 lambdaQL 将对这种写法记录一条 **WARN** 日志。在严格模式下，它是一个错误（规则 PR8、FN7）。
+因此 lambdaQL 会对这种写法记录 **WARN**。
+每个 `where` Lambda 只检查一次，在缓存其分析结果时进行。没有 `@SqlFunction` 的条件不会查询数据库。
 
-| 情况 | MariaDB | Oracle |
-|---|---|---|
-| 函数作用于列：`fn(o.price) > 10` | WARN（存储函数不能用于索引） | WARN，**除非**函数是 `DETERMINISTIC` **并且**存在针对相同表达式的函数索引 |
-| 函数只作用于值：`o.price > fn(rate)` | 如果函数是 `NOT DETERMINISTIC`（这是默认值！）则 WARN。此时 MariaDB 会扫描整个索引。 | 没有警告（索引范围扫描） |
+| 情况 | 错误码 | H2 | MariaDB | Oracle |
+|---|---|---|---|---|
+| ① 函数包住列：`fn(o.price) > 10`、作用于列的 Boolean 函数、`IN` 或 `IS NULL` 中的函数 | `LQL-5001`（WARN） | WARN | WARN（存储函数不能用于索引） | WARN，**除非** `user_ind_expressions` 中该表有相同表达式 `FN(COLUMN)` 的函数索引 |
+| ② 值一侧的函数与列比较：`o.price > fn(rate)` | `LQL-5007`（WARN） | 不检查 | `information_schema.routines.is_deterministic = 'NO'`（默认！）时 WARN。此时 MariaDB 会扫描整个索引 | 不检查（Oracle 两种情况都用范围扫描） |
+
+- 与 Oracle 索引比对时，表名和列名取自 Hibernate 映射。只比对只有一个列参数的函数。
+- 如果元数据查询失败（例如没有权限），lambdaQL 以 `INFO` 级别记录 `LQL-5008`。① 仍然警告，② 不检查。
+
+同样的检查已用 Java 测试（[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `sargable`：H2 为 `LQL-5001`，MariaDB 为 `LQL-5001` 和 `LQL-5007`，有函数索引的 Oracle 没有警告）。下面是设计示例（`nondet` 和 `discount` 一样是 `@SqlFunction`）：
+
+```kotlin
+// the function wraps the column: an index on price cannot be used (LQL-5001 at WARN),
+// unless Oracle has a function-based index on SQ_FN_DISCOUNT(price)
+qb.from(Order::class.java).where { OrderFns.discount(it.price)!! > 100 }.toList()
+// the function is on the value side: fine, unless MariaDB says NOT DETERMINISTIC (LQL-5007 at WARN)
+qb.from(Order::class.java).where { it.price!! > OrderFns.nondet(base)!! }.toList()
+```
 
 **建议：**
 
 - 尽可能把函数放在值的一侧：`it.price!! > OrderFns.discount(base)!!`。
 - 在 MariaDB 上，如果你的函数确实是确定性的，请把它声明为 `DETERMINISTIC`。
-- 在 Oracle 上，`DETERMINISTIC` 函数加上函数索引可以消除警告。
+- 在 Oracle 上，存在相同表达式的函数索引时警告会消失（这种索引需要 `DETERMINISTIC` 函数）。
 
 ---
 
@@ -525,7 +540,7 @@ where FN_DISCOUNT(o1_0.price)>10
 | FN4 | 没有注解的调用，或 lambdaQL 无法识别的调用，会报错。它永远不会被悄悄跳过。 | 已实现 |
 | FN5 | 参数遵循 [3. 条件](03-where.md) 中的值规则。即使参数只由捕获值构成，也会被绑定并**在数据库中**求值。 | 已实现（已用 Java 测试） |
 | FN6 | `!!` 和装箱调用会被跳过。返回类型来自声明的函数，必须对应到 `Double`、`Integer`、`Long`、`BigDecimal`、`String`、`LocalDate`、`LocalDateTime` 或 `Boolean`（`LQL-3055`）。 | 已实现（已用 Java 测试） |
-| FN7 | 作用于列的函数会产生 WARN（参见 [8.9](#89-warning-functions-on-columns-and-indexes-sargable)）。 | 尚未实现 |
+| FN7 | 作用于列的函数会产生 WARN（参见 [8.9](#89-warning-functions-on-columns-and-indexes-sargable)）。在 MariaDB 上，值一侧的 `NOT DETERMINISTIC` 函数也会产生 WARN（`LQL-5007`）。 | 已实现（用 Java Lambda 测试）。严格模式尚未实现 |
 | FN8 | 与 Hibernate 内置函数（`COALESCE`、`ROUND`、`SYSDATE`、...）同名会报错（`LQL-3054`）。Hibernate 会悄悄使用内置函数。请使用前缀或 schema 名（`PUBLIC.SQ_FN`）。 | 已实现（已用 Java 测试） |
 | FN9 | Kotlin：默认参数（`LQL-3056`）、`vararg`（`LQL-3057`）和 `inline` 会报错。 | 默认参数和 `vararg`：已实现。`inline`：已设计 |
 | FN10 | v0.1 只支持标量函数。用户自定义的聚合函数和窗口函数计划在 v0.2 中提供。没有参数的函数渲染为 `fn()`。 | 标量函数已实现 |

@@ -7,7 +7,7 @@
 > 每条消息都有错误码 `[LQL-xxxx]`，消息提供英文、日文、中文（简体）和韩文四种语言。
 > 异常是 `LambdaQLException` 及其子类。警告输出到 SLF4J。
 > 标记为 **(已测试)** 的示例是从测试代码（[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)、[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)）中复制的。本页的其他代码为设计示例。
-> 尚未实现：非 SARGable 警告 `LQL-5001`，以及把警告变为错误的严格模式。
+> 尚未实现：把警告变为错误的严格模式。
 
 本页适用于两种语言。代码分别展示在 **Java** 和 **Kotlin** 两个小节中。
 
@@ -34,7 +34,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-2xxx` | 字节码解码 | `LQL-2001` 至 `LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | 语义与在 Java 中计算的值 | `LQL-3001` 至 `LQL-3064` | `TranslationException` |
 | `LQL-4xxx` | 生成、绑定与执行 | `LQL-4001` 至 `LQL-4044`、`LQL-4999`（内部错误） | `LambdaQLException` 本身，或 JDK/JPA 标准异常（见[异常](#exceptions)） |
-| `LQL-5xxx` | 警告（记录在日志中） | `LQL-5002` 至 `LQL-5006` | –（一条日志：级别为 `WARN`；`LQL-5004` 至 `LQL-5006` 以及默认排序模式下的 `LQL-5003` 为 `INFO`） |
+| `LQL-5xxx` | 警告（记录在日志中） | `LQL-5001` 至 `LQL-5008` | –（一条日志：级别为 `WARN`；`LQL-5004` 至 `LQL-5006`、`LQL-5008` 以及默认排序模式下的 `LQL-5003` 为 `INFO`） |
 
 一些实际的错误码：
 
@@ -54,11 +54,14 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-4040` | `SortNotAllowedException` | {0} 不允许按此名称排序：{1}。请用 SortRules 的 allow 或 alias 允许它。 |
 | `LQL-4043` | `LambdaQLException` | {0} 的存根参数与数据库参数名称相同但顺序不同。存根：{1}，数据库：{2} |
 | `LQL-4044` | `LambdaQLException` | Oracle 包中有多个同名的存储过程（重载），lambdaQL 无法区分要调用哪一个：{0} |
+| `LQL-5001` | –（`WARN` 日志） | 函数 {0} 作用在列 {1} 上，因此无法使用该列的普通索引，查询可能全表扫描。请改为把列与值比较，或（Oracle）创建基于函数的索引：{2} |
 | `LQL-5002` | –（`WARN` 日志） | 没有 limit 的子查询排序不影响结果，已被移除（Q4）：{0} |
 | `LQL-5003` | –（`INFO` 或 `WARN` 日志） | 外部排序不在 {0} 的排序规则中：{1}。现在会执行，但在 SortMode.STRICT 下会被拒绝。 |
 | `LQL-5004` | –（`INFO` 日志） | 类文件中没有存根参数名称，因此不检查 {0} 的参数顺序。请用 -parameters（Kotlin：-java-parameters）编译，或使用 @DbParam。 |
 | `LQL-5005` | –（`INFO` 日志） | 无法从数据库元数据读取 {0} 的参数（{1}）。不检查存根；IN、INOUT 参数按存根顺序，其后为 OUT 参数。 |
 | `LQL-5006` | –（`INFO` 日志） | 无法检查 {0} 的重载（{1}）；不做检查继续调用。 |
+| `LQL-5007` | –（`WARN` 日志） | MariaDB 函数 {0} 是 NOT DETERMINISTIC，因此会逐行计算，比较列上的索引无法用于范围查找。如果它是确定性的，请声明为 DETERMINISTIC：{1} |
+| `LQL-5008` | –（`INFO` 日志） | 无法读取 {0} 的索引或函数元数据（{1}）；在没有元数据的情况下继续 SARGable 检查。 |
 
 `{0}` 和 `{1}` 是参数，例如表达式或存储过程名。
 完整列表见消息文件（见[致译者](#for-translators)）。
@@ -382,11 +385,14 @@ lambdaQL 目前提供的警告：
 
 | 错误码 | 何时 |
 |---|---|
+| `LQL-5001` | 条件中数据库函数包住了列（`OrderFns.discount(o.getPrice()) > 10`、作用于列的 Boolean 函数、`IN` 或 `IS NULL` 中的函数），因此无法使用普通索引。每个 `where` Lambda 以 `WARN` 级别记录一次。在 Oracle 上，如果存在相同表达式的基于函数的索引，则不记录（见 [8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable)） |
 | `LQL-5002` | 子查询有 `orderBy` 但没有 `limit`，因此 lambdaQL 会移除排序（它不起作用，规则 Q4） |
 | `LQL-5003` | 外部排序（Spring `Sort`、`SortSpec.ofPath`）使用了不在排序规则中的名称，并且模式是 `SortMode.INFO`（默认值，以 `INFO` 级别记录）或 `SortMode.WARN`（以 `WARN` 级别记录）。排序会执行。按实体和名称各记录一次（见 [4.10 排序策略](java/04-order-paging.md#sort-policy)） |
 | `LQL-5004` | 类文件中没有存储过程存根的参数名（编译时没有 `-parameters` 或 Kotlin 的 `-java-parameters`，也没有 `@DbParam`），并且两个相邻参数类型相同。每个存储过程以 `INFO` 级别记录一次（见 [8.4](java/08-procedures-functions.md#84-warning-argument-order)） |
 | `LQL-5005` | 无法读取存储过程元数据（查询失败，例如没有数据字典视图或 `information_schema` 的权限）。不检查存根，参数布局取自存根。每个存储过程以 `INFO` 级别记录一次（见 [8.4](java/08-procedures-functions.md#when-the-metadata-cannot-be-read)） |
 | `LQL-5006` | 只有 Oracle 重载查询（`all_arguments`）失败。不检查重载继续调用。以 `INFO` 级别记录 |
+| `LQL-5007` | 仅 MariaDB：值一侧的 `NOT DETERMINISTIC` 数据库函数与列比较（`o.getPrice() > OrderFns.nondet(base)`），索引无法用于范围查找。以 `WARN` 级别记录 |
+| `LQL-5008` | 无法读取 SARGable 检查所需的索引或函数元数据（例如没有权限）。以 `INFO` 级别记录。仍会记录 `LQL-5001`；不检查 `LQL-5007` |
 
 ```
 WARN  [LQL-5002] 没有 limit 的子查询排序不影响结果，已被移除（Q4）：...
@@ -394,7 +400,6 @@ WARN  [LQL-5002] 没有 limit 的子查询排序不影响结果，已被移除�
 
 计划中的警告（尚未实现）：
 
-- `LQL-5001`：在条件的列一侧使用了数据库函数（Java `OrderFns.discount(o.getPrice()) > 10`，Kotlin `OrderFns.discount(it.price)!! > 10`），导致数据库无法使用索引；
 - 不区分大小写的比较在该列上没有匹配的索引或排序规则（collation）。
 
 计划提供一种把这些警告变为错误的"严格模式"。对于外部排序已经有了：在 `SortMode.STRICT` 下，`LQL-5003` 的情况会抛出 `SortNotAllowedException`（`LQL-4040`）。

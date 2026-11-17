@@ -7,7 +7,7 @@
 > Kotlin과 SQL이 다른 점, 데이터베이스마다 다른 점, 지원하지 않는 것을 다룹니다.
 > 규칙은 H2 2.3, MariaDB 10.11, Oracle 23ai(Hibernate 6.6.5)에서 프로토타입으로 확인했고, Kotlin 바이트코드는 kotlinc 1.7.22 ~ 2.3.21로 확인했습니다.
 > 현재는 분석 코어, `where`, 결과 함수(`toList()`, `toSet()`, `first()`, `one()`, `count()`, `exists()`), 정렬과 페이징의 핵심 기능, `SortSpec`, update/insert/delete/upsert([7](07-dml.md)), Spring Data JPA 모듈([12](12-spring-data-jpa.md))이 동작합니다(H2, MariaDB, Oracle에서 Java 람다로 테스트함).
-> 서브쿼리([5](05-subquery.md))와 집계를 포함한 `select`([6](06-select-group.md)) 규칙도 DML을 포함해 구현되었습니다. 명시적 조인, 파생 테이블, CTE([6](06-select-group.md)), 프로시저와 DB 함수([8](08-procedures-functions.md)) 규칙도 구현되었습니다. 컬럼에 대한 DB 함수의 경고([10.2](#db-functions-on-a-column))는 **아직 구현되지 않았습니다**. 정렬 규칙 중에도 아직 구현되지 않은 것이 있습니다([4.12](04-order-paging.md#412-rules-summary-s1-to-s14) 참고).
+> 서브쿼리([5](05-subquery.md))와 집계를 포함한 `select`([6](06-select-group.md)) 규칙도 DML을 포함해 구현되었습니다. 명시적 조인, 파생 테이블, CTE([6](06-select-group.md)), 프로시저와 DB 함수([8](08-procedures-functions.md)) 규칙도 구현되었습니다. 컬럼에 대한 DB 함수의 경고([10.2](#db-functions-on-a-column))도 구현되었습니다. 정렬 규칙 중에도 아직 구현되지 않은 것이 있습니다([4.12](04-order-paging.md#412-rules-summary-s1-to-s14) 참고).
 > 전체 상태는 [트랙 README](README.md)를 참고하십시오.
 
 [Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [9. Kotlin 노트](09-kotlin-notes.md) | 다음: [11. 오류와 언어](../11-errors-and-languages.md) | [이 페이지의 Java 버전](../java/10-rules-and-limits.md)
@@ -138,12 +138,10 @@ MariaDB 10.11과 Oracle 23ai, 20,000 ~ 50,000행:
 ### 컬럼에 대한 DB 함수
 
 컬럼 쪽의 DB 함수(`OrderFns.discount(it.price)!! > 10`)는 일반 인덱스를 사용할 수 없습니다.
-lambdaQL은 **WARN**을 기록할 예정입니다(엄격 모드: 오류). 예외: Oracle에서 함수가 `DETERMINISTIC`이고
-같은 식의 함수 기반 인덱스가 있으면 WARN을 기록하지 않습니다. MariaDB에서는 `NOT DETERMINISTIC`(기본값)
-함수는 인수가 파라미터뿐이어도 전체 스캔이 되므로
-(`it.price!! > OrderFns.discount(rate)!!`), lambdaQL은 이때도 경고합니다.
+lambdaQL은 **WARN**(`LQL-5001`)을 기록합니다. 예외: Oracle에서 같은 식의 함수 기반 인덱스가 있으면 기록하지 않습니다.
+MariaDB에서 `NOT DETERMINISTIC`(기본값) 함수는 인자가 파라미터뿐이어도 전체 스캔이 되므로(`it.price!! > OrderFns.discount(rate)!!`) 이 경우에도 경고합니다(`LQL-5007`).
+엄격 모드(경고 대신 오류)는 아직 구현되지 않았습니다.
 [8. 프로시저와 DB 함수](08-procedures-functions.md)를 참고하십시오.
-이 경고는 **아직 구현되지 않았습니다**.
 
 <a id="103-null-rules"></a>
 ## 10.3 NULL 규칙

@@ -7,7 +7,7 @@
 > Kotlin と SQL がどこで違うか、データベースがどこで違うか、何がサポートされないか、です。
 > ルールは H2 2.3、MariaDB 10.11、Oracle 23ai（Hibernate 6.6.5）のプロトタイプで、Kotlin のバイトコードは kotlinc 1.7.22 から 2.3.21 で確認しました。
 > 現在動作するのは解析コア、`where`、結果の関数（`toList()`、`toSet()`、`first()`、`one()`、`count()`、`exists()`）、ソートとページングの中核部分、`SortSpec`、update/insert/delete/upsert（[7](07-dml.md)）、そして Spring Data JPA モジュール（[12](12-spring-data-jpa.md)）です（H2、MariaDB、Oracle で Java のラムダを使ってテスト済み）。
-> サブクエリ（[5](05-subquery.md)）と集計を含む `select`（[6](06-select-group.md)）のルールも実装済みで、DML の中でも使えます。明示的な結合、派生テーブル、CTE（[6](06-select-group.md)）、プロシージャと DB 関数（[8](08-procedures-functions.md)）のルールも実装済みです。カラムに対する DB 関数の警告（[10.2](#db-functions-on-a-column)）は **まだ実装されていません**。ソートのルールにも、まだ実装されていないものがあります（[4.12](04-order-paging.md#412-rules-summary-s1-to-s14) を参照）。
+> サブクエリ（[5](05-subquery.md)）と集計を含む `select`（[6](06-select-group.md)）のルールも実装済みで、DML の中でも使えます。明示的な結合、派生テーブル、CTE（[6](06-select-group.md)）、プロシージャと DB 関数（[8](08-procedures-functions.md)）のルールも実装済みです。カラムに対する DB 関数の警告（[10.2](#db-functions-on-a-column)）も実装済みです。ソートのルールにも、まだ実装されていないものがあります（[4.12](04-order-paging.md#412-rules-summary-s1-to-s14) を参照）。
 > 全体の状況は [トラックの README](README.md) を参照してください。
 
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [9. Kotlin の注意点](09-kotlin-notes.md) | 次: [11. エラーと言語](../11-errors-and-languages.md) | [このページの Java 版](../java/10-rules-and-limits.md)
@@ -137,13 +137,11 @@ MariaDB 10.11 と Oracle 23ai、20,000 から 50,000 行:
 <a id="db-functions-on-a-column"></a>
 ### カラムに対する DB 関数
 
-カラム側の DB 関数（`OrderFns.discount(it.price)!! > 10`）は、通常のインデックスを使えません。
-lambdaQL は **WARN** をログに出す予定です（strict モード: エラー）。例外: Oracle では、関数が
-`DETERMINISTIC` で、同じ式の関数ベースのインデックスがある場合は WARN を出しません。MariaDB では、
-`NOT DETERMINISTIC`（デフォルト）の関数は、引数がパラメーターだけの場合でもフルスキャンになる
-（`it.price!! > OrderFns.discount(rate)!!`）ので、lambdaQL はこの場合も警告します。
+カラム側の DB 関数（`OrderFns.discount(it.price)!! > 10`）は通常のインデックスを使えません。
+lambdaQL は **WARN**（`LQL-5001`）をログに出します。例外: Oracle では、同じ式の関数ベースのインデックスがあれば出しません。
+MariaDB では、`NOT DETERMINISTIC`（デフォルト）の関数は、引数がパラメーターだけでもフルスキャンになります（`it.price!! > OrderFns.discount(rate)!!`）。そのため、その場合も警告します（`LQL-5007`）。
+厳格モード（警告の代わりにエラー）はまだ実装されていません。
 [8. プロシージャと DB 関数](08-procedures-functions.md) を参照してください。
-この警告は **まだ実装されていません**。
 
 <a id="103-null-rules"></a>
 ## 10.3 NULL のルール

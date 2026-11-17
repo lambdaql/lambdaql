@@ -6,7 +6,7 @@
 > Java 与 SQL 的差异、各数据库之间的差异，以及哪些内容不受支持。
 > 这些规则已在 H2 2.3、MariaDB 10.11 和 Oracle 23ai（Hibernate 6.6.5）上用原型检查过。
 > 目前分析核心、`where`、结果函数（`toList()`、`toSet()`、`first()`、`one()`、`count()`、`exists()`）、排序与分页的核心部分、`SortSpec`、update/insert/delete/upsert（[7](07-dml.md)）以及 Spring Data JPA 模块（[12](12-spring-data-jpa.md)）可以工作（已在 H2、MariaDB 和 Oracle 上测试）。
-> 子查询（[5](05-subquery.md)）和带聚合的 `select`（[6](06-select-group.md)）的规则同样已实现，在 DML 中也是如此。显式 join、派生表、CTE（[6](06-select-group.md)）以及存储过程与数据库函数（[8](08-procedures-functions.md)）的规则同样已实现。列上的数据库函数的警告（[10.2](#db-functions-on-a-column)）**尚未实现**。一部分排序规则也尚未实现（见 [4.12](04-order-paging.md#412-rules-summary-s1-to-s14)）。
+> 子查询（[5](05-subquery.md)）和带聚合的 `select`（[6](06-select-group.md)）的规则同样已实现，在 DML 中也是如此。显式 join、派生表、CTE（[6](06-select-group.md)）以及存储过程与数据库函数（[8](08-procedures-functions.md)）的规则同样已实现。列上的数据库函数的警告（[10.2](#db-functions-on-a-column)）同样已实现。一部分排序规则也尚未实现（见 [4.12](04-order-paging.md#412-rules-summary-s1-to-s14)）。
 > 完整状态请参见 [Java 路线 README](README.md#status)。
 
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[9. Java 说明](09-java-notes.md) | 下一章：[11. 错误与语言](../11-errors-and-languages.md) | [本页的 Kotlin 版本](../kotlin/10-rules-and-limits.md)
@@ -127,12 +127,10 @@ MariaDB 10.11 和 Oracle 23ai，20,000 到 50,000 行：
 ### 列上的数据库函数
 
 列一侧的数据库函数（`OrderFns.discount(o.getPrice()) > 10`）无法使用普通索引。
-lambdaQL 将记录 **WARN**（严格模式下为错误）。例外：在 Oracle 上，如果函数是
-`DETERMINISTIC` 的，并且存在表达式相同的函数索引，则不发出 WARN。在 MariaDB 上，
-`NOT DETERMINISTIC`（默认）的函数即使参数只有参数值（`o.getPrice() > OrderFns.discount(rate)`），
-也会导致全表扫描，因此 lambdaQL 在这种情况下也会发出警告。
+lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在相同表达式的函数索引时不记录。
+在 MariaDB 上，`NOT DETERMINISTIC`（默认）的函数即使参数只有参数值（`o.getPrice() > OrderFns.discount(rate)`），也会导致全扫描，因此这种情况也会警告（`LQL-5007`）。
+严格模式（用错误代替警告）尚未实现。
 参见 [8. 存储过程与数据库函数](08-procedures-functions.md)。
-此警告**尚未实现**。
 
 <a id="103-null-rules"></a>
 ## 10.3 NULL 规则

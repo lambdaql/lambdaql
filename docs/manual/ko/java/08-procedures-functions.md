@@ -8,7 +8,8 @@
 >   프로시저 호출(`@SqlProcedure`, `@InOut`, `qb.call`, `qb.exec`)은 MariaDB와 Oracle에서, DB 함수 단독 호출은 세 데이터베이스 모두에서 테스트했습니다([`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)).
 >   H2에는 OUT 파라미터가 없으므로 프로시저 테스트는 H2에서 실행하지 않습니다.
 > - **추가로 구현됨, 테스트함:** 데이터베이스와의 스텁 인자 **이름** 대조(규칙 PR2의 일부), Oracle 패키지 오버로드 검출.
-> - **아직 구현되지 않음:** 컬럼에 대한 함수의 SARGable 경고(규칙 PR8, FN7), 데이터베이스와의 파라미터 **타입** 대조(규칙 PR2의 일부), Oracle 패키지 프로시저의 오버로드 하나를 골라 호출하는 기능.
+> - **추가로 구현됨, 테스트함:** 조건 안의 DB 함수에 대한 SARGable 경고(규칙 PR8, FN7, [8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고).
+> - **아직 구현되지 않음:** 데이터베이스와의 파라미터 **타입** 대조(규칙 PR2의 일부), Oracle 패키지 프로시저의 오버로드 하나를 골라 호출하는 기능.
 > - **(테스트됨)** 표시가 있는 예제는 테스트 코드에서 그대로 가져온 것입니다. 다른 예제도 같은 규칙을 따르지만 테스트로 확인하지는 않았습니다. 전체 상태는 [Java 트랙 README](README.md#status)를 참고하십시오.
 
 [Java 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [7. 수정, 삽입, 삭제](07-dml.md) | 다음: [9. Java 노트](09-java-notes.md) | [이 페이지의 Kotlin 버전](../kotlin/08-procedures-functions.md)
@@ -360,7 +361,7 @@ Oracle의 실제 이름 바인딩(`pass_procedure_paramater_names=true`와 스�
 | PR5 | 결과 집합 여러 개 → 레코드의 `List` 컴포넌트, 순서대로. Oracle 암시적 결과는 지원하지 않습니다. | 구현됨, 테스트로 확인하지 않음 |
 | PR6 | 단독으로 호출한 DB 함수는 데이터베이스마다 다른 경로를 사용합니다([8.8](#88-call-a-db-function-alone) 참고). | 구현됨(테스트함) |
 | PR7 | 쿼리 안의 DB 함수: [8.6](#86-declare-db-functions)과 규칙 FN1 ~ FN11 참고. | 구현됨(테스트함) |
-| PR8 | 조건에서 컬럼에 DB 함수를 쓰면 인덱스를 사용할 수 없으므로 WARN을 남깁니다([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). | 아직 구현되지 않음 |
+| PR8 | 조건에서 컬럼에 DB 함수를 쓰면 인덱스를 사용할 수 없으므로 WARN을 남깁니다([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). 코드는 `LQL-5001`. | 구현됨(테스트함). 엄격 모드는 아직 구현되지 않음 |
 | PR9 | 프로시저는 호출한 트랜잭션 안에서 실행됩니다. lambdaQL은 필요하면 호출 전에 flush합니다. 호출 후에는 로드한 엔티티가 오래된 상태일 수 있습니다. | 구현됨 |
 | PR10 | 공통된 영향받은 행 수가 없습니다. OUT 파라미터를 사용하십시오. | – |
 | PR11 | `null` IN 값은 괜찮습니다. DB 파라미터 기본값은 사용할 수 없습니다. | 구현됨 |
@@ -600,7 +601,7 @@ lambdaQL은 먼저 대기 중인 변경 사항을 flush합니다(PR9와 같음).
 ## 8.9 주의: 컬럼에 대한 함수와 인덱스(SARGable)
 
 > [!NOTE]
-> 이 절의 경고는 **아직 구현되지 않았습니다**(규칙 PR8, FN7). 현재 lambdaQL은 이런 쿼리를 경고 없이 만듭니다.
+> **구현됨, 테스트함**(H2, MariaDB 10.11, Oracle 23.26, 규칙 PR8, FN7). 아직 구현되지 않음: 엄격 모드(경고 대신 오류), 함수 없이 열에 적용한 산술 연산의 경고.
 
 lambdaQL은 **인덱스를 사용할 수 있는** SQL을 만들려고 합니다([10. 규칙과 제한](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql) 참고).
 컬럼을 감싼 함수는 보통 일반 인덱스를 **사용할 수 없습니다**.
@@ -619,18 +620,32 @@ from orders o1_0
 where FN_DISCOUNT(o1_0.price)>10
 ```
 
-그래서 lambdaQL은 이 형태에 **WARN**을 남길 예정입니다. strict 모드에서는 오류입니다(규칙 PR8, FN7).
+따라서 lambdaQL은 이 형태에 **WARN**을 기록합니다.
+검사는 `where` 람다마다 한 번, 분석 결과를 캐시할 때 수행합니다. `@SqlFunction`이 없는 조건은 DB를 조회하지 않습니다.
 
-| 경우 | MariaDB | Oracle |
-|---|---|---|
-| 컬럼에 대한 함수: `fn(o.price) > 10` | WARN(저장 함수는 인덱스에 사용할 수 없음) | WARN. **단**, 함수가 `DETERMINISTIC`이고 **같은 식에 대한** 함수 기반 인덱스가 있으면 제외 |
-| 값에만 쓴 함수: `o.price > fn(rate)` | 함수가 `NOT DETERMINISTIC`(기본값!)이면 WARN. 이때 MariaDB는 인덱스 전체를 스캔함 | 경고 없음(인덱스 범위 스캔) |
+| 경우 | 코드 | H2 | MariaDB | Oracle |
+|---|---|---|---|---|
+| ① 함수가 열을 감쌈: `fn(o.price) > 10`, 열에 적용한 Boolean 함수, `IN`이나 `IS NULL` 안의 함수 | `LQL-5001`(WARN) | WARN | WARN(저장 함수는 인덱스에 쓸 수 없음) | WARN. **단**, `user_ind_expressions`에 같은 식 `FN(COLUMN)`의 함수 기반 인덱스가 그 테이블에 있으면 기록하지 않음 |
+| ② 값 쪽의 함수를 열과 비교: `o.price > fn(rate)` | `LQL-5007`(WARN) | 검사하지 않음 | `information_schema.routines.is_deterministic = 'NO'`(기본값!)이면 WARN. 이때 MariaDB는 인덱스 전체를 스캔함 | 검사하지 않음(Oracle은 어느 쪽이든 범위 스캔) |
+
+- Oracle 인덱스 대조에 쓰는 테이블·열 이름은 Hibernate 매핑에서 가져옵니다. 열 인자 하나인 함수만 대조합니다.
+- 메타데이터 조회가 실패하면(예: 권한 없음) `LQL-5008`을 `INFO` 레벨로 기록합니다. ①은 그대로 경고하고, ②는 검사하지 않습니다.
+
+**(테스트됨)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `sargable`(테스트는 로그를 수집함: H2는 `LQL-5001`, MariaDB는 `LQL-5001`과 `LQL-5007`, `SQ_FN_DISCOUNT(price)` 함수 기반 인덱스가 있는 Oracle은 없음):
+
+```java
+// the function wraps the column: an index on price cannot be used (LQL-5001 at WARN),
+// unless Oracle has a function-based index on SQ_FN_DISCOUNT(price)
+qb.from(Order.class).where(o -> OrderFns.discount(o.getPrice()) > 100).toHql();
+// the function is on the value side: fine, unless MariaDB says NOT DETERMINISTIC (LQL-5007 at WARN)
+qb.from(Order.class).where(o -> o.getPrice() > OrderFns.nondet(base)).toHql();
+```
 
 **권장:**
 
 - 가능하면 함수를 값 쪽에 두십시오: `o.getPrice() > OrderFns.discount(base)`.
 - MariaDB에서는 실제로 결정적인 함수라면 `DETERMINISTIC`으로 선언하십시오.
-- Oracle에서는 `DETERMINISTIC` 함수와 함수 기반 인덱스가 있으면 경고가 사라집니다.
+- Oracle에서는 같은 식의 함수 기반 인덱스가 있으면 경고가 사라집니다(이런 인덱스에는 `DETERMINISTIC` 함수가 필요합니다).
 
 ---
 
@@ -645,7 +660,7 @@ where FN_DISCOUNT(o1_0.price)>10
 | FN4 | 애너테이션이 없는 호출이나 lambdaQL이 식별할 수 없는 호출은 오류입니다. 조용히 건너뛰지 않습니다. | 구현됨 |
 | FN5 | 인자는 [3. 조건](03-where.md)의 값 규칙을 따릅니다. 캡처 값만으로 만든 인자도 바인딩되어 **데이터베이스에서** 평가됩니다. | 구현됨(테스트함) |
 | FN6 | 박싱 호출은 건너뜁니다. 반환 타입은 선언된 메서드에서 옵니다. `Double`, `Integer`, `Long`, `BigDecimal`, `String`, `LocalDate`, `LocalDateTime`, `Boolean` 중 하나여야 합니다(`LQL-3055`). | 구현됨(테스트함) |
-| FN7 | 컬럼에 대한 함수는 WARN을 냅니다([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). | 아직 구현되지 않음 |
+| FN7 | 컬럼에 대한 함수는 WARN을 냅니다([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). MariaDB에서는 값 쪽의 `NOT DETERMINISTIC` 함수도 WARN(`LQL-5007`). | 구현됨(테스트함). 엄격 모드는 아직 구현되지 않음 |
 | FN8 | Hibernate 내장 함수(`COALESCE`, `ROUND`, `SYSDATE`, ...)와 같은 이름은 오류입니다(`LQL-3054`). Hibernate가 조용히 내장 함수를 사용하기 때문입니다. 접두사나 스키마 이름(`PUBLIC.SQ_FN`)을 사용하십시오. | 구현됨(테스트함) |
 | FN9 | Kotlin 전용(기본 인자, `inline`, `vararg`). Kotlin 트랙을 참고하십시오. | 기본 인자와 `vararg`는 구현됨. `inline`은 설계됨 |
 | FN10 | v0.1에는 스칼라 함수만 있습니다. 사용자 집계 함수와 윈도 함수는 v0.2에 계획되어 있습니다. 인자가 없는 함수는 `fn()`으로 렌더링됩니다. | 스칼라 함수 구현됨 |

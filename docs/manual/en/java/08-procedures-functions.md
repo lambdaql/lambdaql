@@ -7,7 +7,8 @@
 >   procedure calls (`@SqlProcedure`, `@InOut`, `qb.call`, `qb.exec`) on MariaDB and Oracle, and a DB function called alone on all three databases ([`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)).
 >   H2 has no OUT parameters, so the procedure tests do not run on H2.
 > - **Also implemented and tested:** the check of the stub argument **names** against the database (part of rule PR2), and the detection of Oracle package overloads.
-> - **Not implemented yet:** the SARGable warnings for functions on columns (rules PR8, FN7), the check of parameter **types** against the database (part of rule PR2), and calling one overload of an Oracle package procedure.
+> - **Also implemented and tested:** the SARGable warnings for DB functions in conditions (rules PR8, FN7, see [8.9](#89-warning-functions-on-columns-and-indexes-sargable)).
+> - **Not implemented yet:** the check of parameter **types** against the database (part of rule PR2), and calling one overload of an Oracle package procedure.
 > - Examples marked **(tested)** are copied from the test suite. The other examples follow the same rules, but they are not covered by a test. See the [Java track README](README.md#status) for the full status.
 
 [Java track](README.md) | [Manual home](../README.md) | Previous: [7. Update, insert, delete](07-dml.md) | Next: [9. Java notes](09-java-notes.md) | [Kotlin version of this page](../kotlin/08-procedures-functions.md)
@@ -346,7 +347,7 @@ Real name binding on Oracle (`pass_procedure_paramater_names=true` together with
 | PR5 | Many result sets → `List` components of a record, in order. Oracle implicit results are not supported. | Implemented, not covered by a test |
 | PR6 | A DB function called alone uses a different path per database (see [8.8](#88-call-a-db-function-alone)). | Implemented (tested) |
 | PR7 | DB functions in queries: see [8.6](#86-declare-db-functions) and rules FN1 to FN11. | Implemented (tested) |
-| PR8 | A DB function on a column in a condition gives a WARN, because the index cannot be used (see [8.9](#89-warning-functions-on-columns-and-indexes-sargable)). | Not implemented yet |
+| PR8 | A DB function on a column in a condition gives a WARN (`LQL-5001`), because the index cannot be used (see [8.9](#89-warning-functions-on-columns-and-indexes-sargable)). | Implemented (tested). Strict mode: not implemented yet |
 | PR9 | The procedure runs in the calling transaction. lambdaQL flushes before the call when needed. Loaded entities can be stale after it. | Implemented |
 | PR10 | No common affected-row count. Use an OUT parameter. | – |
 | PR11 | `null` IN values are fine. DB parameter defaults cannot be used. | Implemented |
@@ -577,7 +578,7 @@ lambdaQL flushes pending changes first (as in PR9), so the function sees your la
 ## 8.9 Warning: functions on columns and indexes (SARGable)
 
 > [!NOTE]
-> The warnings in this section are **not implemented yet** (rules PR8, FN7). Today lambdaQL writes these queries without a warning.
+> **Implemented and tested** on H2, MariaDB 10.11 and Oracle 23.26 (rules PR8, FN7). Not implemented yet: strict mode (an error instead of a warning) and warnings for arithmetic on a column without a function.
 
 lambdaQL tries to make SQL that **can use an index** (see [10. Rules and limits](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql)).
 A function around a column usually **cannot** use a normal index:
@@ -596,18 +597,32 @@ from orders o1_0
 where FN_DISCOUNT(o1_0.price)>10
 ```
 
-So lambdaQL will log a **WARN** for this form. In strict mode, it is an error (rules PR8, FN7).
+So lambdaQL logs a **WARN** for this form.
+lambdaQL checks each `where` lambda once, when its analysis is cached. A condition without an `@SqlFunction` needs no database lookup.
 
-| Case | MariaDB | Oracle |
-|---|---|---|
-| function on a column: `fn(o.price) > 10` | WARN (a stored function cannot be used in an index) | WARN, **unless** the function is `DETERMINISTIC` **and** a function-based index exists for the same expression |
-| function only on values: `o.price > fn(rate)` | WARN if the function is `NOT DETERMINISTIC` (the default!). Then MariaDB scans the full index. | no warning (index range scan) |
+| Case | Code | H2 | MariaDB | Oracle |
+|---|---|---|---|---|
+| ① A function wraps a column: `fn(o.price) > 10`, a Boolean function on a column, a function inside `IN` or `IS NULL` | `LQL-5001` (WARN) | WARN | WARN (a stored function cannot be used in an index) | WARN, **unless** `user_ind_expressions` has a function-based index with the same expression `FN(COLUMN)` on the table |
+| ② A function on the value side, compared with a column: `o.price > fn(rate)` | `LQL-5007` (WARN) | not checked | WARN when `information_schema.routines.is_deterministic = 'NO'` (the default!). Then MariaDB scans the full index | not checked (Oracle uses a range scan either way) |
+
+- For the Oracle index match, lambdaQL takes the table and column names from the Hibernate mapping. Only functions with one column argument are matched.
+- If the metadata lookup fails (for example without permission), lambdaQL logs `LQL-5008` at `INFO` level. Case ① still warns; case ② is not checked.
+
+**(tested)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `sargable` (the test captures the log: H2 gives `LQL-5001`, MariaDB `LQL-5001` and `LQL-5007`, Oracle with a function-based index on `SQ_FN_DISCOUNT(price)` gives none):
+
+```java
+// the function wraps the column: an index on price cannot be used (LQL-5001 at WARN),
+// unless Oracle has a function-based index on SQ_FN_DISCOUNT(price)
+qb.from(Order.class).where(o -> OrderFns.discount(o.getPrice()) > 100).toHql();
+// the function is on the value side: fine, unless MariaDB says NOT DETERMINISTIC (LQL-5007 at WARN)
+qb.from(Order.class).where(o -> o.getPrice() > OrderFns.nondet(base)).toHql();
+```
 
 **Advice:**
 
 - Put the function on the value side when you can: `o.getPrice() > OrderFns.discount(base)`.
 - On MariaDB, declare your function `DETERMINISTIC` if it is.
-- On Oracle, a `DETERMINISTIC` function plus a function-based index removes the warning.
+- On Oracle, a function-based index on the same expression removes the warning (Oracle needs a `DETERMINISTIC` function for such an index).
 
 ---
 
@@ -621,7 +636,7 @@ So lambdaQL will log a **WARN** for this form. In strict mode, it is an error (r
 | FN4 | A call without the annotation, or a call lambdaQL cannot identify, is an error. It is never skipped silently. | Implemented |
 | FN5 | Arguments follow the value rules of [3. Conditions](03-where.md). Even an argument made only from captured values is bound and evaluated **in the database**. | Implemented (tested) |
 | FN6 | Boxing calls are skipped. The return type comes from the declared method. It must be `Double`, `Integer`, `Long`, `BigDecimal`, `String`, `LocalDate`, `LocalDateTime` or `Boolean` (`LQL-3055`). | Implemented (tested) |
-| FN7 | A function on a column gives a WARN (see [8.9](#89-warning-functions-on-columns-and-indexes-sargable)). | Not implemented yet |
+| FN7 | A function on a column gives a WARN (`LQL-5001`). On MariaDB, a `NOT DETERMINISTIC` function on the value side gives a WARN too (`LQL-5007`). See [8.9](#89-warning-functions-on-columns-and-indexes-sargable). | Implemented (tested). Strict mode: not implemented yet |
 | FN8 | A name equal to a Hibernate built-in function (`COALESCE`, `ROUND`, `SYSDATE`, ...) is an error (`LQL-3054`). Hibernate would silently use the built-in. Use a prefix or a schema name (`PUBLIC.SQ_FN`). | Implemented (tested) |
 | FN9 | Kotlin only (default arguments, `inline`, `vararg`). See the Kotlin track. | Default arguments and `vararg`: implemented. `inline`: designed |
 | FN10 | v0.1 has scalar functions only. User aggregate and window functions are planned for v0.2. A function without arguments renders as `fn()`. | Scalar functions implemented |

@@ -7,7 +7,7 @@
 > Every message has a code `[LQL-xxxx]`, and the messages exist in English, Japanese, Chinese (Simplified) and Korean.
 > The exceptions are `LambdaQLException` and its subclasses. Warnings go to SLF4J.
 > Examples marked **(tested)** are copied from the test suite ([`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)). The other code on this page is a design example.
-> Not implemented yet: the non-SARGable warning `LQL-5001` and a strict mode that turns warnings into errors.
+> Not implemented yet: a strict mode that turns warnings into errors.
 
 This page is for both languages. Code is shown in separate **Java** and **Kotlin** sections.
 
@@ -33,7 +33,7 @@ All messages are the values of the enum `org.lambdaql.i18n.LqlMessage`. Each val
 | `LQL-2xxx` | Decoding the bytecode | `LQL-2001` to `LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | Meaning and values computed in Java | `LQL-3001` to `LQL-3064` | `TranslationException` |
 | `LQL-4xxx` | Rendering, binding and running | `LQL-4001` to `LQL-4044`, `LQL-4999` (internal error) | `LambdaQLException` itself, or a JDK/JPA standard exception (see [Exceptions](#exceptions)) |
-| `LQL-5xxx` | Warnings (in the log) | `LQL-5002` to `LQL-5006` | – (a log line: `WARN`, or `INFO` for `LQL-5004` to `LQL-5006` and for `LQL-5003` in the default sort mode) |
+| `LQL-5xxx` | Warnings (in the log) | `LQL-5001` to `LQL-5008` | – (a log line: `WARN`, or `INFO` for `LQL-5004` to `LQL-5006` and `LQL-5008` and for `LQL-5003` in the default sort mode) |
 
 Some real codes:
 
@@ -53,11 +53,14 @@ Some real codes:
 | `LQL-4040` | `SortNotAllowedException` | Sorting by this name is not allowed for {0}: {1}. Allow it with SortRules (allow or alias). |
 | `LQL-4043` | `LambdaQLException` | The stub arguments of {0} have the database parameter names in another order. Stub: {1}, database: {2} |
 | `LQL-4044` | `LambdaQLException` | The Oracle package has several procedures with this name (overloads); lambdaQL cannot tell which one to call: {0} |
+| `LQL-5001` | – (`WARN` log) | The function {0} is applied to the column {1}, so a normal index on the column cannot be used and the query may scan the whole table. Compare the column with a value instead, or (Oracle) create a function-based index: {2} |
 | `LQL-5002` | – (`WARN` log) | A subquery sort without limit does not change the result, so it was removed (Q4): {0} |
 | `LQL-5003` | – (`INFO` or `WARN` log) | An outside sort is not in the sort rules of {0}: {1}. It runs now; with SortMode.STRICT it would be rejected. |
 | `LQL-5004` | – (`INFO` log) | The stub argument names are not in the class file, so the argument order of {0} is not checked. Compile with -parameters (Kotlin: -java-parameters) or use @DbParam. |
 | `LQL-5005` | – (`INFO` log) | The parameters of {0} could not be read from the database metadata ({1}). The stub is not checked; IN and INOUT parameters are taken in stub order, then the OUT parameters. |
 | `LQL-5006` | – (`INFO` log) | The overloads of {0} could not be checked ({1}); the call goes on without the check. |
+| `LQL-5007` | – (`WARN` log) | The MariaDB function {0} is NOT DETERMINISTIC, so it is computed for every row and an index on the compared column is not used for a range. Declare it DETERMINISTIC if it is: {1} |
+| `LQL-5008` | – (`INFO` log) | The index or function metadata for {0} could not be read ({1}); the SARGable check goes on without it. |
 
 `{0}` and `{1}` are the arguments, for example the expression or the procedure name.
 The full list is in the message files (see [For translators](#for-translators)).
@@ -378,11 +381,14 @@ The warnings that lambdaQL has today:
 
 | Code | When |
 |---|---|
+| `LQL-5001` | A DB function wraps a column in a condition (`OrderFns.discount(o.getPrice()) > 10`, a Boolean function on a column, a function inside `IN` or `IS NULL`), so a normal index cannot be used. Logged at `WARN` level, once per `where` lambda. Not on Oracle when a function-based index with the same expression exists (see [8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable)) |
 | `LQL-5002` | A subquery has `orderBy` but no `limit`, so lambdaQL removes the sort (it has no effect, rule Q4) |
 | `LQL-5003` | An outside sort (a Spring `Sort`, `SortSpec.ofPath`) uses a name that is not in the sort rules, and the mode is `SortMode.INFO` (the default, logged at `INFO` level) or `SortMode.WARN` (logged at `WARN` level). The sort runs. The message is logged once for each entity and name (see [4.10 the sort policy](java/04-order-paging.md#sort-policy)) |
 | `LQL-5004` | A procedure stub has no argument names in the class file (compiled without `-parameters`, Kotlin `-java-parameters`, and without `@DbParam`), and two neighbouring arguments have the same type. Logged at `INFO` level, once per procedure (see [8.4](java/08-procedures-functions.md#84-warning-argument-order)) |
 | `LQL-5005` | The procedure metadata cannot be read (the lookup fails, for example without permission on the dictionary views or `information_schema`). The stub is not checked, and the parameter layout comes from the stub. Logged at `INFO` level, once per procedure (see [8.4](java/08-procedures-functions.md#when-the-metadata-cannot-be-read)) |
 | `LQL-5006` | Only the Oracle overload lookup (`all_arguments`) fails. The call goes on without the overload check. Logged at `INFO` level |
+| `LQL-5007` | MariaDB only: a `NOT DETERMINISTIC` DB function on the value side is compared with a column (`o.getPrice() > OrderFns.nondet(base)`), so the index is not used for a range. Logged at `WARN` level |
+| `LQL-5008` | The index or function metadata for the SARGable check cannot be read (for example without permission). Logged at `INFO` level. `LQL-5001` is still logged; `LQL-5007` is not checked |
 
 ```
 WARN  [LQL-5002] A subquery sort without limit does not change the result, so it was removed (Q4): ...
@@ -390,7 +396,6 @@ WARN  [LQL-5002] A subquery sort without limit does not change the result, so it
 
 Planned warnings (not implemented yet):
 
-- `LQL-5001`: a database function is used on the column side of a condition (Java `OrderFns.discount(o.getPrice()) > 10`, Kotlin `OrderFns.discount(it.price)!! > 10`), so the database cannot use an index;
 - a case-insensitive comparison has no matching index or collation for that column.
 
 A "strict mode" that turns these warnings into errors is planned. For outside sorts there is one already: with `SortMode.STRICT`, the case of `LQL-5003` throws `SortNotAllowedException` (`LQL-4040`).

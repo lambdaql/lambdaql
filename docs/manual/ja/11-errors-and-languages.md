@@ -8,7 +8,7 @@
 > すべてのメッセージに `[LQL-xxxx]` のコードが付き、メッセージは英語、日本語、中国語（簡体字）、韓国語で用意されています。
 > 例外は `LambdaQLException` とそのサブクラスです。警告は SLF4J に出力されます。
 > **(テスト済み)** と書かれた例は、テストコード（[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)、[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)）からそのまま取ったものです。このページのそれ以外のコードは設計上の例です。
-> まだ実装されていないもの: SARGable でない条件の警告 `LQL-5001` と、警告をエラーに変える厳格モード。
+> まだ実装されていないもの: 警告をエラーに変える厳格モード。
 
 このページは両方の言語向けです。コードは **Java** と **Kotlin** の別々のセクションに分けて載せています。
 
@@ -35,7 +35,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-2xxx` | バイトコードのデコード | `LQL-2001`〜`LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | 意味と Java で計算する値 | `LQL-3001`〜`LQL-3064` | `TranslationException` |
 | `LQL-4xxx` | 生成、バインド、実行 | `LQL-4001`〜`LQL-4044`、`LQL-4999`（内部エラー） | `LambdaQLException` そのもの、または JDK/JPA の標準例外（[例外](#exceptions) を参照） |
-| `LQL-5xxx` | 警告（ログに出力） | `LQL-5002`〜`LQL-5006` | –（ログ行。レベルは `WARN`。`LQL-5004`〜`LQL-5006` と、デフォルトのソートモードの `LQL-5003` は `INFO`） |
+| `LQL-5xxx` | 警告（ログに出力） | `LQL-5001`〜`LQL-5008` | –（ログ行。レベルは `WARN`。`LQL-5004`〜`LQL-5006`、`LQL-5008` と、デフォルトのソートモードの `LQL-5003` は `INFO`） |
 
 実際のコードの例:
 
@@ -55,11 +55,14 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-4040` | `SortNotAllowedException` | {0} ではこの名前でソートできません: {1}。SortRules の allow か alias で許可してください。 |
 | `LQL-4043` | `LambdaQLException` | {0} のスタブ引数は、データベースの引数と名前が同じで順序だけが違います。スタブ: {1}、データベース: {2} |
 | `LQL-4044` | `LambdaQLException` | Oracle パッケージにこの名前のプロシージャが複数あります（オーバーロード）。どれを呼ぶか区別できません: {0} |
+| `LQL-5001` | –（`WARN` ログ） | 関数 {0} が列 {1} に適用されているため、列の通常のインデックスを使えず、全件スキャンになることがあります。列を値と比較する形に変えるか、（Oracle）関数ベースのインデックスを作ってください: {2} |
 | `LQL-5002` | –（`WARN` ログ） | limit のないサブクエリのソートは結果に影響しないため削除しました（Q4）: {0} |
 | `LQL-5003` | –（`INFO` または `WARN` ログ） | 外部からのソートが {0} のソート規則にありません: {1}。今は実行しますが、SortMode.STRICT では拒否されます。 |
 | `LQL-5004` | –（`INFO` ログ） | クラスファイルにスタブ引数の名前がないため、{0} の引数の順序を確認しません。-parameters（Kotlin: -java-parameters）でコンパイルするか、@DbParam を使ってください。 |
 | `LQL-5005` | –（`INFO` ログ） | データベースのメタデータから {0} の引数を読めませんでした（{1}）。スタブは照合せず、IN・INOUT はスタブの順、その後に OUT 引数が来るとみなします。 |
 | `LQL-5006` | –（`INFO` ログ） | {0} のオーバーロードを確認できませんでした（{1}）。確認せずに呼び出します。 |
+| `LQL-5007` | –（`WARN` ログ） | MariaDB の関数 {0} は NOT DETERMINISTIC のため行ごとに計算され、比較する列のインデックスが範囲検索に使われません。決定的な関数なら DETERMINISTIC と宣言してください: {1} |
+| `LQL-5008` | –（`INFO` ログ） | {0} のインデックス・関数のメタデータを読めませんでした（{1}）。メタデータなしで SARGable の確認を続けます。 |
 
 `{0}` と `{1}` は引数です。たとえば式やプロシージャ名が入ります。
 一覧はメッセージファイルにあります（[翻訳者向け](#for-translators) を参照）。
@@ -392,11 +395,14 @@ lambdaQL は **SLF4J API** を通してログを出します。
 
 | コード | いつ |
 |---|---|
+| `LQL-5001` | 条件で DB 関数がカラムを包んでいるとき（`OrderFns.discount(o.getPrice()) > 10`、カラムに対する Boolean の関数、`IN` や `IS NULL` の中の関数）。通常のインデックスを使えない。`where` のラムダごとに 1 回、`WARN` レベルで出る。Oracle で同じ式の関数ベースのインデックスがあれば出ない（[8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) を参照） |
 | `LQL-5002` | サブクエリに `orderBy` があって `limit` がないため、lambdaQL がソートを取り除くとき（ソートに効果がないため、ルール Q4） |
 | `LQL-5003` | 外部のソート（Spring の `Sort`、`SortSpec.ofPath`）がソートのルールにない名前を使い、モードが `SortMode.INFO`（デフォルト、`INFO` レベルで出る）か `SortMode.WARN`（`WARN` レベルで出る）のとき。ソートは実行される。エンティティと名前ごとに 1 回出る（[4.10 ソートポリシー](java/04-order-paging.md#sort-policy) を参照） |
 | `LQL-5004` | クラスファイルにプロシージャのスタブの引数名がなく（`-parameters`、Kotlin の `-java-parameters` なしでコンパイルし、`@DbParam` もない）、隣り合う 2 つの引数の型が同じとき。プロシージャごとに 1 回、`INFO` レベルで出る（[8.4](java/08-procedures-functions.md#84-warning-argument-order) を参照） |
 | `LQL-5005` | プロシージャのメタデータを読めないとき（たとえばディクショナリビューや `information_schema` の権限がなく、取得が失敗する）。スタブは照合せず、引数の並びはスタブから取る。プロシージャごとに 1 回、`INFO` レベルで出る（[8.4](java/08-procedures-functions.md#when-the-metadata-cannot-be-read) を参照） |
 | `LQL-5006` | Oracle のオーバーロードの取得（`all_arguments`）だけが失敗したとき。オーバーロードのチェックなしで呼び出す。`INFO` レベルで出る |
+| `LQL-5007` | MariaDB のみ: 値の側の `NOT DETERMINISTIC` な DB 関数をカラムと比べるとき（`o.getPrice() > OrderFns.nondet(base)`）。インデックスが範囲検索に使われない。`WARN` レベルで出る |
+| `LQL-5008` | SARGable の確認のためのインデックスや関数のメタデータを読めないとき（たとえば権限がない）。`INFO` レベルで出る。`LQL-5001` はそのまま出し、`LQL-5007` は確認しない |
 
 ```
 WARN  [LQL-5002] A subquery sort without limit does not change the result, so it was removed (Q4): ...
@@ -404,7 +410,6 @@ WARN  [LQL-5002] A subquery sort without limit does not change the result, so it
 
 予定している警告（まだ実装されていません）:
 
-- `LQL-5001`: 条件のカラム側でデータベース関数を使っていて（Java の `OrderFns.discount(o.getPrice()) > 10`、Kotlin の `OrderFns.discount(it.price)!! > 10`）、データベースがインデックスを使えないとき
 - 大文字と小文字を区別しない比較に、そのカラムに合うインデックスや照合順序がないとき
 
 これらの警告をエラーに変える「厳格モード」を予定しています。外部のソートにはすでにあります: `SortMode.STRICT` では、`LQL-5003` の場合に `SortNotAllowedException`（`LQL-4040`）を投げます。

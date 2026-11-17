@@ -132,9 +132,9 @@ fetch first ? rows only
 | 显式 join（`join`、`leftJoin`、`crossJoin`，最多三个实体） | 已实现，已在 H2、MariaDB、Oracle 上测试（Java Lambda），包括所有实体上的 `where`、`orderBy`、`select` 和分页。DML 中和子查询中的 join：以后 | [06](java/06-select-group.md#68-explicit-joins) | [06](kotlin/06-select-group.md#68-explicit-joins) |
 | 派生表与 CTE（`qb.from(valueQuery)`、`qb.with(valueQuery)`） | 已实现，已在 H2、MariaDB、Oracle 上测试（Java Lambda）。与派生表的 join 以及两次使用同一个 CTE：以后 | [06](java/06-select-group.md#69-derived-table-subquery-in-from) | [06](kotlin/06-select-group.md#69-derived-table-subquery-in-from) |
 | `update`、`insert`、`delete`、upsert | 已实现，已在 H2、MariaDB、Oracle 上测试（Java Lambda），包括 `limit` 和 `executeOne()`。update 和 delete 的 `where` 中的子查询（`sub`）以及 `insert ... select` 中的聚合：已实现。`set` 值中的子查询：已设计 | [07](java/07-dml.md) | [07](kotlin/07-dml.md) |
-| 存储过程与数据库函数 | 已实现：查询中的数据库函数和单独调用，已在 H2、MariaDB、Oracle 上测试；存储过程（`call`、`exec`、OUT、INOUT、结果集）已在 MariaDB 和 Oracle 上测试（H2 没有 OUT 参数）。参数名检查（已在 MariaDB 和 Oracle 上测试）和 Oracle 包重载检测（已在 Oracle 上测试）：已实现。SARGable 警告、存储过程参数的类型检查：尚未实现 | [08](java/08-procedures-functions.md) | [08](kotlin/08-procedures-functions.md) |
+| 存储过程与数据库函数 | 已实现：查询中的数据库函数和单独调用，已在 H2、MariaDB、Oracle 上测试；存储过程（`call`、`exec`、OUT、INOUT、结果集）已在 MariaDB 和 Oracle 上测试（H2 没有 OUT 参数）。参数名检查（已在 MariaDB 和 Oracle 上测试）和 Oracle 包重载检测（已在 Oracle 上测试）：已实现。数据库函数的 SARGable 警告（`LQL-5001`、`LQL-5007`）：已实现。存储过程参数的类型检查：尚未实现 | [08](java/08-procedures-functions.md) | [08](kotlin/08-procedures-functions.md) |
 | Kotlin 写法（`?.`、`?:`、`!!`、区间、`when`、`in`） | `?.`、`!!`、对捕获集合使用 `in`、data class、`Pair`/`Triple`、属性赋值：已在 H2、MariaDB、Oracle 上用 Kotlin Lambda 测试。`?:`、区间、`when`、属性引用：已设计 | – | [09](kotlin/09-kotlin-notes.md) |
-| 4 种语言的错误码和消息 | 已实现，已做单元测试：`[LQL-xxxx]` 错误码、`LambdaQLException` 及其子类、英文、日文、中文和韩文消息、`lambdaql.locale`。警告 `LQL-5001` 和严格模式：尚未实现 | [11](11-errors-and-languages.md) | [11](11-errors-and-languages.md) |
+| 4 种语言的错误码和消息 | 已实现，已做单元测试：`[LQL-xxxx]` 错误码、`LambdaQLException` 及其子类、英文、日文、中文和韩文消息、`lambdaql.locale`。严格模式：尚未实现 | [11](11-errors-and-languages.md) | [11](11-errors-and-languages.md) |
 | Spring Data JPA（`LambdaQlExecutor<T>`、Spring `Sort` / `Pageable`、Spring Boot 自动配置） | 已实现，已在 H2、MariaDB、Oracle 上用 Spring Boot 3.4.2 测试（Java），包括 DML 快捷方法（`deleteAll`、`updateOne` 等）以及更新、删除、插入和 upsert 构建器。Spring Boot 4：尚未验证 | [12](java/12-spring-data-jpa.md) | [12](kotlin/12-spring-data-jpa.md) |
 
 术语含义：

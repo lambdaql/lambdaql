@@ -8,7 +8,8 @@
 >   プロシージャの呼び出し（`@SqlProcedure`、`@InOut`、`qb.call`、`qb.exec`）は MariaDB と Oracle で、DB 関数の単独呼び出しは 3 つのデータベースすべてでテストしています（[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)）。
 >   lambdaQL は Kotlin の書き方も読みます: `@JvmStatic` を付けた `companion object` の関数と、結果としての Kotlin の data class。この章の Kotlin のテストはまだありません。
 > - **こちらも実装済み（MariaDB と Oracle で Java によりテスト済み）:** スタブの引数 **名** とデータベースとの照合（ルール PR2 の一部）、Oracle パッケージのオーバーロードの検出。
-> - **まだ実装されていないもの:** カラムに対する関数の SARGable 警告（ルール PR8、FN7）、パラメーターの **型** のデータベースとの照合（ルール PR2 の一部）、Oracle パッケージのプロシージャのオーバーロードを 1 つ選んで呼ぶこと。
+> - **こちらも実装済み（Java のラムダでテスト済み）:** 条件の中の DB 関数についての SARGable 警告（ルール PR8、FN7。[8.9](#89-warning-functions-on-columns-and-indexes-sargable) を参照）。
+> - **まだ実装されていないもの:** パラメーターの **型** のデータベースとの照合（ルール PR2 の一部）、Oracle パッケージのプロシージャのオーバーロードを 1 つ選んで呼ぶこと。
 > - この章の Kotlin のコードは、テスト済みの Java の呼び出しを Kotlin の構文で示したものです。テスト済みの Java のコードは [このページの Java 版](../java/08-procedures-functions.md) にあります。全体の状況は [トラックの README](README.md) を見てください。
 
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [7. 更新、挿入、削除](07-dml.md) | 次: [9. Kotlin の注意点](09-kotlin-notes.md) | [このページの Java 版](../java/08-procedures-functions.md)
@@ -296,7 +297,7 @@ Oracle での本当の名前によるバインド（`pass_procedure_paramater_na
 | PR5 | 複数の結果セット → data class の `List` プロパティに順番どおり。Oracle の暗黙的な結果はサポートしません。 | 実装済み、テストでは確認していません |
 | PR6 | 単独で呼び出す DB 関数は、データベースごとに異なる経路を使います（[8.8](#88-call-a-db-function-alone) を参照）。 | 実装済み（Java でテスト済み） |
 | PR7 | クエリの中の DB 関数: [8.6](#86-declare-db-functions) とルール FN1 から FN11 を参照。 | 実装済み（Java でテスト済み） |
-| PR8 | 条件の中でカラムに DB 関数を使うと、インデックスが使えないので WARN になります（[8.9](#89-warning-functions-on-columns-and-indexes-sargable) を参照）。 | まだ実装されていません |
+| PR8 | 条件の中でカラムに DB 関数を使うと、インデックスが使えないので WARN になります（[8.9](#89-warning-functions-on-columns-and-indexes-sargable) を参照）。コードは `LQL-5001`。 | 実装済み（Java のラムダでテスト済み）。厳格モードはまだ実装されていません |
 | PR9 | プロシージャは呼び出し元のトランザクションの中で実行されます。必要なら lambdaQL は呼び出しの前にフラッシュします。呼び出しのあと、読み込まれたエンティティが古くなっていることがあります。 | 実装済み |
 | PR10 | 共通の影響行数はありません。OUT パラメーターを使ってください。 | – |
 | PR11 | IN の値に `null` を使うのは問題ありません。DB のパラメーターのデフォルトは使えません。スタブ関数の Kotlin のデフォルト引数はエラーです（`LQL-3062`）。 | 実装済み |
@@ -487,7 +488,7 @@ lambdaQL は先に保留中の変更をフラッシュするので（PR9 と同�
 ## 8.9 注意: カラムに対する関数とインデックス（SARGable）
 
 > [!NOTE]
-> このセクションの警告は **まだ実装されていません**（ルール PR8、FN7）。現在の lambdaQL は、これらのクエリを警告なしで書きます。
+> **実装済み、Java のラムダでテスト済み**（H2、MariaDB 10.11、Oracle 23.26、ルール PR8、FN7）。まだ実装されていないもの: 厳格モード（警告の代わりにエラー）、関数を使わないカラムの算術演算の警告。
 
 lambdaQL は **インデックスを使える** SQL を作ろうとします（[10. ルールと制限](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql) を参照）。
 カラムを関数で囲むと、通常のインデックスはたいてい **使えません**。
@@ -506,18 +507,32 @@ from orders o1_0
 where FN_DISCOUNT(o1_0.price)>10
 ```
 
-そのため、lambdaQL はこの形に対して **WARN** をログに出す予定です。strict モードではエラーです（ルール PR8、FN7）。
+そのため、lambdaQL はこの形に **WARN** を出します。
+チェックは `where` のラムダごとに 1 回、解析結果をキャッシュするときに行います。`@SqlFunction` のない条件では、データベースを調べません。
 
-| ケース | MariaDB | Oracle |
-|---|---|---|
-| カラムに対する関数: `fn(o.price) > 10` | WARN（ストアド関数はインデックスに使えません） | WARN。**ただし** 関数が `DETERMINISTIC` で、**かつ** 同じ式の関数ベースインデックスがある場合は除きます |
-| 値だけに対する関数: `o.price > fn(rate)` | 関数が `NOT DETERMINISTIC`（これがデフォルト!）なら WARN。その場合、MariaDB はインデックス全体をスキャンします。 | 警告なし（インデックスの範囲スキャン） |
+| 場合 | コード | H2 | MariaDB | Oracle |
+|---|---|---|---|---|
+| ① 関数がカラムを包む: `fn(o.price) > 10`、カラムに対する Boolean の関数、`IN` や `IS NULL` の中の関数 | `LQL-5001`（WARN） | WARN | WARN（ストアド関数はインデックスに使えない） | WARN。**ただし**、`user_ind_expressions` に同じ式 `FN(COLUMN)` の関数ベースインデックスがそのテーブルにあれば出ない |
+| ② 値の側の関数をカラムと比べる: `o.price > fn(rate)` | `LQL-5007`（WARN） | 確認しない | `information_schema.routines.is_deterministic = 'NO'`（デフォルト!）なら WARN。このとき MariaDB はインデックス全体をスキャンする | 確認しない（Oracle はどちらでも範囲スキャン） |
+
+- Oracle のインデックスとの照合では、テーブル名とカラム名を Hibernate のマッピングから取ります。カラムの引数が 1 つの関数だけを照合します。
+- メタデータの取得が失敗した場合（たとえば権限がない）、`LQL-5008` を `INFO` レベルでログに出します。① はそのまま警告し、② は確認しません。
+
+同じチェックは Java でテストされています（[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)、リージョン `sargable`: H2 は `LQL-5001`、MariaDB は `LQL-5001` と `LQL-5007`、関数ベースインデックスがある Oracle はなし）。次は設計上の例です（`nondet` は `discount` と同じ `@SqlFunction` です）。
+
+```kotlin
+// the function wraps the column: an index on price cannot be used (LQL-5001 at WARN),
+// unless Oracle has a function-based index on SQ_FN_DISCOUNT(price)
+qb.from(Order::class.java).where { OrderFns.discount(it.price)!! > 100 }.toList()
+// the function is on the value side: fine, unless MariaDB says NOT DETERMINISTIC (LQL-5007 at WARN)
+qb.from(Order::class.java).where { it.price!! > OrderFns.nondet(base)!! }.toList()
+```
 
 **アドバイス:**
 
 - できるだけ関数を値の側に置いてください: `it.price!! > OrderFns.discount(base)!!`。
 - MariaDB では、関数が決定的なら `DETERMINISTIC` と宣言してください。
-- Oracle では、`DETERMINISTIC` な関数と関数ベースインデックスを用意すると警告が出なくなります。
+- Oracle では、同じ式の関数ベースインデックスがあると警告が消えます（このようなインデックスには `DETERMINISTIC` な関数が必要です）。
 
 ---
 
@@ -532,7 +547,7 @@ where FN_DISCOUNT(o1_0.price)>10
 | FN4 | アノテーションのない呼び出しや、lambdaQL が特定できない呼び出しはエラーです。黙って読み飛ばすことはありません。 | 実装済み |
 | FN5 | 引数は [3. 条件](03-where.md) の値のルールに従います。キャプチャ値だけでできた引数でも、バインドされて **データベースで** 評価されます。 | 実装済み（Java でテスト済み） |
 | FN6 | `!!` とボクシングの呼び出しは読み飛ばされます。戻り値の型は宣言した関数から決まります。型は `Double`、`Integer`、`Long`、`BigDecimal`、`String`、`LocalDate`、`LocalDateTime`、`Boolean` のいずれかに対応しなければなりません（`LQL-3055`）。 | 実装済み（Java でテスト済み） |
-| FN7 | カラムに対する関数は WARN になります（[8.9](#89-warning-functions-on-columns-and-indexes-sargable) を参照）。 | まだ実装されていません |
+| FN7 | カラムに対する関数は WARN になります（[8.9](#89-warning-functions-on-columns-and-indexes-sargable) を参照）。MariaDB では、値の側の `NOT DETERMINISTIC` な関数も WARN（`LQL-5007`）。 | 実装済み（Java のラムダでテスト済み）。厳格モードはまだ実装されていません |
 | FN8 | Hibernate の組み込み関数（`COALESCE`、`ROUND`、`SYSDATE`、...）と同じ名前はエラーです（`LQL-3054`）。Hibernate が黙って組み込み関数を使ってしまうからです。接頭辞かスキーマ名（`PUBLIC.SQ_FN`）を使ってください。 | 実装済み（Java でテスト済み） |
 | FN9 | Kotlin: デフォルト引数（`LQL-3056`）、`vararg`（`LQL-3057`）、`inline` はエラーです。 | デフォルト引数と `vararg`: 実装済み。`inline`: 設計済み |
 | FN10 | v0.1 にはスカラー関数だけがあります。ユーザー定義の集約関数とウィンドウ関数は v0.2 の予定です。引数のない関数は `fn()` として出力されます。 | スカラー関数は実装済み |

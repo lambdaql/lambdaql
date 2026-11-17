@@ -6,7 +6,7 @@
 > where Java and SQL differ, where databases differ, and what is not supported.
 > The rules were checked with prototypes on H2 2.3, MariaDB 10.11 and Oracle 23ai (Hibernate 6.6.5).
 > Today the analysis core, `where`, the result functions (`toList()`, `toSet()`, `first()`, `one()`, `count()`, `exists()`), the core of sorting and paging, `SortSpec`, update/insert/delete/upsert ([7](07-dml.md)) and the Spring Data JPA module ([12](12-spring-data-jpa.md)) work (tested on H2, MariaDB and Oracle).
-> The rules for subqueries ([5](05-subquery.md)) and `select` with aggregates ([6](06-select-group.md)) are implemented too, also in DML. The rules for explicit joins, derived tables, CTEs ([6](06-select-group.md)), procedures and DB functions ([8](08-procedures-functions.md)) are implemented too. The warnings for DB functions on a column ([10.2](#db-functions-on-a-column)) are **not implemented yet**. Some sorting rules are not implemented yet either (see [4.12](04-order-paging.md#412-rules-summary-s1-to-s14)).
+> The rules for subqueries ([5](05-subquery.md)) and `select` with aggregates ([6](06-select-group.md)) are implemented too, also in DML. The rules for explicit joins, derived tables, CTEs ([6](06-select-group.md)), procedures and DB functions ([8](08-procedures-functions.md)) are implemented too. The warnings for DB functions on a column ([10.2](#db-functions-on-a-column)) are implemented too. Some sorting rules are not implemented yet either (see [4.12](04-order-paging.md#412-rules-summary-s1-to-s14)).
 > See the [Java track README](README.md#status) for the full status.
 
 [Java track](README.md) | [Manual home](../README.md) | Previous: [9. Java notes](09-java-notes.md) | Next: [11. Errors and languages](../11-errors-and-languages.md) | [Kotlin version of this page](../kotlin/10-rules-and-limits.md)
@@ -124,12 +124,10 @@ MariaDB 10.11 and Oracle 23ai, 20,000 to 50,000 rows:
 ### DB functions on a column
 
 A DB function on the column side (`OrderFns.discount(o.getPrice()) > 10`) cannot use a normal index.
-lambdaQL will log a **WARN** (strict mode: error). Exception: on Oracle, no WARN when the function is
-`DETERMINISTIC` and a function-based index with the same expression exists. On MariaDB, a function
-that is `NOT DETERMINISTIC` (the default) gives a full scan even when its arguments are only
-parameters (`o.getPrice() > OrderFns.discount(rate)`), so lambdaQL also warns there.
+lambdaQL logs a **WARN** (`LQL-5001`). Exception: on Oracle, no WARN when a function-based index with the same expression exists.
+On MariaDB, a function that is `NOT DETERMINISTIC` (the default) gives a full scan even when its arguments are only parameters (`o.getPrice() > OrderFns.discount(rate)`), so lambdaQL warns there too (`LQL-5007`).
+Strict mode (an error instead of a warning) is not implemented yet.
 See [8. Procedures and DB functions](08-procedures-functions.md).
-This warning is **not implemented yet**.
 
 ## 10.3 NULL rules
 

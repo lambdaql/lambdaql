@@ -11,7 +11,7 @@
 > **サブクエリ**（`where((o, sub) -> ...)`、更新と削除でも）と **`select`**（record と DTO、`groupBy`、`having`、`Agg` の集計、`insert ... select` でも）も実装済みです（H2、MariaDB、Oracle でテスト済み）。
 > **明示的な結合**（`join`、`leftJoin`、`crossJoin`）、**派生テーブルと CTE**（`qb.from(valueQuery)`、`qb.with(valueQuery)`）、**ストアドプロシージャと DB 関数**（`@SqlProcedure`、`@SqlFunction`、`qb.call`、`qb.exec`）、**4 つの言語のメッセージを持つエラーコード**（`[LQL-xxxx]`）も実装済みです（H2、MariaDB、Oracle でテスト済み。プロシージャは MariaDB と Oracle）。
 > 外部のソートのための **ソートポリシー**（`SortRules`、`SortPolicy`、`SortMode`、`@Sortable`、Spring Boot のプロパティ `lambdaql.sort.*`）も実装済みです（H2、MariaDB、Oracle でテスト済み）。
-> このトラックのそれ以外の内容（たとえば `SortSpec` の結合の書き方と SARGable 警告）は **設計済み** です。構文とルールは決まっていてプロトタイプで確認しましたが、コードはまだライブラリに入っていません。
+> このトラックのそれ以外の内容（たとえば `SortSpec` の結合の書き方と厳格モード）は **設計済み** です。構文とルールは決まっていてプロトタイプで確認しましたが、コードはまだライブラリに入っていません。
 > 成果物（アーティファクト）はまだ Maven Central に公開していません。試すには、[ソースからビルド](02-getting-started.md#build-from-source)してください。
 
 [マニュアルのホーム](../README.md) | [Kotlin トラック](../kotlin/README.md) | 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -105,8 +105,8 @@ fetch first ? rows only
 | 明示的な結合（`join`、`leftJoin`、`crossJoin`、エンティティ 3 つまで） | 実装済み、H2・MariaDB・Oracle でテスト済み。すべてのエンティティに対する `where`、`orderBy`、`select`、ページングを含みます。DML とサブクエリの中の結合: 今後 | [6](06-select-group.md#68-explicit-joins) |
 | 派生テーブルと CTE（`qb.from(valueQuery)`、`qb.with(valueQuery)`） | 実装済み、H2・MariaDB・Oracle でテスト済み。派生テーブルとの結合と、同じ CTE の 2 回の使用: 今後 | [6](06-select-group.md#69-derived-table-subquery-in-from) |
 | `update`、`insert`、`delete`、upsert | 実装済み、H2・MariaDB・Oracle でテスト済み。`limit` と `executeOne()` も含みます。更新と削除の `where` の中のサブクエリ（`sub`）と `insert ... select` の集計: 実装済み。`set` の値の中のサブクエリ: 設計済み | [7](07-dml.md) |
-| ストアドプロシージャと DB 関数 | 実装済み: クエリの中の DB 関数と単独呼び出しは H2・MariaDB・Oracle でテスト済み。プロシージャ（`call`、`exec`、OUT、INOUT、結果セット）は MariaDB と Oracle でテスト済み（H2 には OUT パラメーターがありません）。引数名の照合（MariaDB と Oracle でテスト済み）と Oracle パッケージのオーバーロードの検出（Oracle でテスト済み）: 実装済み。SARGable 警告、プロシージャのパラメーターの型の照合: まだ実装されていません | [8](08-procedures-functions.md) |
-| 4 言語のエラーコードとメッセージ | 実装済み、ユニットテスト済み: `[LQL-xxxx]` コード、`LambdaQLException` とそのサブクラス、英語・日本語・中国語・韓国語のメッセージ、`lambdaql.locale`。警告 `LQL-5001` と厳格モード: まだ実装されていません | [11](../11-errors-and-languages.md) |
+| ストアドプロシージャと DB 関数 | 実装済み: クエリの中の DB 関数と単独呼び出しは H2・MariaDB・Oracle でテスト済み。プロシージャ（`call`、`exec`、OUT、INOUT、結果セット）は MariaDB と Oracle でテスト済み（H2 には OUT パラメーターがありません）。引数名の照合（MariaDB と Oracle でテスト済み）と Oracle パッケージのオーバーロードの検出（Oracle でテスト済み）: 実装済み。DB 関数の SARGable 警告（`LQL-5001`、`LQL-5007`）: 実装済み。プロシージャのパラメーターの型の照合: まだ実装されていません | [8](08-procedures-functions.md) |
+| 4 言語のエラーコードとメッセージ | 実装済み、ユニットテスト済み: `[LQL-xxxx]` コード、`LambdaQLException` とそのサブクラス、英語・日本語・中国語・韓国語のメッセージ、`lambdaql.locale`。厳格モード: まだ実装されていません | [11](../11-errors-and-languages.md) |
 | Spring Data JPA（`LambdaQlExecutor<T>`、Spring の `Sort` / `Pageable`、Spring Boot の自動構成） | 実装済み、Spring Boot 3.4.2 で H2・MariaDB・Oracle でテスト済み。DML の短縮メソッド（`deleteAll`、`updateOne` など）と、更新、削除、挿入、upsert のビルダーも含みます。Spring Boot 4: まだ検証していません | [12](12-spring-data-jpa.md) |
 
 用語の意味:
