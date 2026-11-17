@@ -34,8 +34,8 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-1xxx` | 입력과 람다 로딩 | `LQL-1001`~`LQL-1013` | `LambdaAnalysisException` |
 | `LQL-2xxx` | 바이트코드 디코딩 | `LQL-2001`~`LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | 의미 해석과 Java에서 계산하는 값 | `LQL-3001`~`LQL-3064` | `TranslationException` |
-| `LQL-4xxx` | 렌더링, 바인딩, 실행 | `LQL-4001`~`LQL-4042`, `LQL-4999`(내부 오류) | `LambdaQLException` 자체, 또는 JDK/JPA 표준 예외([예외](#exceptions) 참고) |
-| `LQL-5xxx` | 경고(로그에 기록) | `LQL-5002`, `LQL-5003` | –(`WARN` 로그 한 줄. `LQL-5003`은 기본 정렬 모드에서 `INFO`) |
+| `LQL-4xxx` | 렌더링, 바인딩, 실행 | `LQL-4001`~`LQL-4044`, `LQL-4999`(내부 오류) | `LambdaQLException` 자체, 또는 JDK/JPA 표준 예외([예외](#exceptions) 참고) |
+| `LQL-5xxx` | 경고(로그에 기록) | `LQL-5002`~`LQL-5006` | –(로그 한 줄. 레벨은 `WARN`이며, `LQL-5004`~`LQL-5006`과 기본 정렬 모드의 `LQL-5003`은 `INFO`) |
 
 실제 코드의 예:
 
@@ -53,8 +53,13 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-4034` | `DbOnlyException` | {0}은 DB 함수입니다. lambdaQL 람다 안에서만 쓰며 Java에서는 실행되지 않습니다. |
 | `LQL-4036` | `LambdaQLException` | 스텁이 DB 프로시저 {0}와 맞지 않습니다: {1} |
 | `LQL-4040` | `SortNotAllowedException` | {0}에서는 이 이름으로 정렬할 수 없습니다: {1}. SortRules의 allow나 alias로 허용하세요. |
+| `LQL-4043` | `LambdaQLException` | {0}의 스텁 인자가 DB 인자와 이름은 같고 순서만 다릅니다. 스텁: {1}, DB: {2} |
+| `LQL-4044` | `LambdaQLException` | Oracle 패키지에 이 이름의 프로시저가 여러 개 있습니다(오버로드). 어느 것을 호출할지 구분할 수 없습니다: {0} |
 | `LQL-5002` | –(`WARN` 로그) | limit 없는 서브쿼리 정렬은 결과에 영향이 없어 제거했습니다(Q4): {0} |
 | `LQL-5003` | –(`INFO` 또는 `WARN` 로그) | 외부 정렬이 {0}의 정렬 규칙에 없습니다: {1}. 지금은 실행하지만 SortMode.STRICT에서는 거부됩니다. |
+| `LQL-5004` | –(`INFO` 로그) | 클래스 파일에 스텁 인자 이름이 없어 {0}의 인자 순서를 확인하지 않습니다. -parameters(Kotlin: -java-parameters)로 컴파일하거나 @DbParam을 쓰세요. |
+| `LQL-5005` | –(`INFO` 로그) | DB 메타데이터에서 {0}의 인자 정보를 읽지 못했습니다({1}). 스텁을 대조하지 않으며, IN·INOUT은 스텁 순서대로, 그 뒤에 OUT 인자가 온다고 봅니다. |
+| `LQL-5006` | –(`INFO` 로그) | {0}의 오버로드를 확인하지 못했습니다({1}). 확인 없이 호출합니다. |
 
 `{0}`, `{1}`은 인자입니다. 예를 들어 식이나 프로시저 이름이 들어갑니다.
 전체 목록은 메시지 파일에 있습니다([번역자를 위한 안내](#for-translators) 참고).
@@ -72,7 +77,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 
 | 예외 | 코드 | 발생 시점 | 예 |
 |---|---|---|---|
-| `LambdaQLException` | `LQL-4xxx` | 모든 lambdaQL 예외의 기본 클래스. 렌더링, 바인딩, 실행 문제에는 이 클래스 자체를 던집니다 | 크기 비교에 쓴 `null` 캡처 값(`LQL-4009`). DB와 맞지 않는 프로시저 스텁(`LQL-4036`). |
+| `LambdaQLException` | `LQL-4xxx` | 모든 lambdaQL 예외의 기본 클래스. 렌더링, 바인딩, 실행 문제에는 이 클래스 자체를 던집니다 | 크기 비교에 쓴 `null` 캡처 값(`LQL-4009`). DB와 맞지 않는 프로시저 스텁(`LQL-4036`). DB 인자 이름과 순서가 다른 스텁 인자(`LQL-4043`, [8.4](java/08-procedures-functions.md#84-warning-argument-order)의 `@DbParam` 참고). |
 | `LambdaAnalysisException` | `LQL-1xxx` | lambdaQL이 람다를 로드할 수 없을 때 | 람다 대신 익명 클래스(Kotlin `object : ...`). 직렬화할 수 없는 람다(`LQL-1002`). |
 | `UnsupportedLambdaShapeException` | `LQL-2xxx` | lambdaQL이 지원하지 않는 모양의 바이트코드일 때 | 반복문(`LQL-2004`). 값 삼항 연산자나 값 `if`/`when`. 일반적인 boolean 삼항 연산자 `c ? x : y`. |
 | `TranslationException` | `LQL-3xxx` | 람다가 HQL에서 정의된 의미를 갖지 않을 때 | getter가 아닌 엔티티 메서드. 두 엔티티를 `==`로 비교(아직 미지원). `groupBy` 키가 아닌 비집계 값(`LQL-3035`). |
@@ -390,6 +395,9 @@ lambdaQL은 **SLF4J API**로 로그를 남깁니다.
 |---|---|
 | `LQL-5002` | 서브쿼리에 `orderBy`는 있지만 `limit`이 없어 lambdaQL이 정렬을 제거할 때(정렬은 결과에 영향이 없음, 규칙 Q4) |
 | `LQL-5003` | 외부 정렬(Spring `Sort`, `SortSpec.ofPath`)이 정렬 규칙에 없는 이름을 사용하고 모드가 `SortMode.INFO`(기본값, `INFO` 레벨로 기록)나 `SortMode.WARN`(`WARN` 레벨로 기록)일 때. 정렬은 실행됨. 엔티티와 이름마다 한 번 기록([4.10 정렬 정책](java/04-order-paging.md#sort-policy) 참고) |
+| `LQL-5004` | 클래스 파일에 프로시저 스텁의 인자 이름이 없고(`-parameters`, Kotlin `-java-parameters` 없이 컴파일, `@DbParam`도 없음) 이웃한 두 인자의 타입이 같을 때. 프로시저마다 한 번 `INFO` 레벨로 기록([8.4](java/08-procedures-functions.md#84-warning-argument-order) 참고) |
+| `LQL-5005` | 프로시저 메타데이터를 읽을 수 없을 때(예: 딕셔너리 뷰나 `information_schema`에 권한이 없어 조회 실패). 스텁을 대조하지 않고 인자 배치를 스텁에서 가져옴. 프로시저마다 한 번 `INFO` 레벨로 기록([8.4](java/08-procedures-functions.md#when-the-metadata-cannot-be-read) 참고) |
+| `LQL-5006` | Oracle 오버로드 조회(`all_arguments`)만 실패할 때. 오버로드 확인 없이 호출함. `INFO` 레벨로 기록 |
 
 ```
 WARN  [LQL-5002] limit 없는 서브쿼리 정렬은 결과에 영향이 없어 제거했습니다(Q4): ...

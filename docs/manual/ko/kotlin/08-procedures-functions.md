@@ -7,7 +7,8 @@
 >   쿼리 안의 DB 함수(`@SqlFunction`)는 H2 2.3, MariaDB 10.11, Oracle 23.26에서 테스트했습니다([`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)).
 >   프로시저 호출(`@SqlProcedure`, `@InOut`, `qb.call`, `qb.exec`)은 MariaDB와 Oracle에서, DB 함수 단독 호출은 세 데이터베이스 모두에서 테스트했습니다([`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)).
 >   lambdaQL은 Kotlin 형태(`@JvmStatic`을 붙인 `companion object` 함수, 결과로 쓰는 Kotlin data class)도 읽습니다. 이 장의 Kotlin 테스트는 아직 없습니다.
-> - **아직 구현되지 않음:** 컬럼에 적용한 함수의 SARGable 경고(규칙 PR8, FN7), 데이터베이스와의 파라미터 **타입**·**이름** 대조(규칙 PR2의 일부와 그 WARN), Oracle 패키지 오버로드 검출.
+> - **추가로 구현됨(MariaDB, Oracle에서 Java로 테스트함):** 데이터베이스와의 스텁 인자 **이름** 대조(규칙 PR2의 일부), Oracle 패키지 오버로드 검출.
+> - **아직 구현되지 않음:** 컬럼에 적용한 함수의 SARGable 경고(규칙 PR8, FN7), 데이터베이스와의 파라미터 **타입** 대조(규칙 PR2의 일부), Oracle 패키지 프로시저의 오버로드 하나를 골라 호출하는 기능.
 > - 이 장의 Kotlin 코드는 테스트한 Java 호출을 Kotlin 문법으로 옮긴 것입니다. 테스트한 Java 코드는 [이 페이지의 Java 버전](../java/08-procedures-functions.md)에 있습니다. 전체 상태는 [트랙 README](README.md)를 참고하십시오.
 
 [Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [7. 수정, 삽입, 삭제](07-dml.md) | 다음: [9. Kotlin 노트](09-kotlin-notes.md) | [이 페이지의 Java 버전](../java/08-procedures-functions.md)
@@ -212,7 +213,8 @@ Kotlin의 이름 있는 인자(`calc(rate = rate, id = id)`)는 이를 바꾸지
 | INOUT 파라미터 = `@InOut`을 붙인 인자 | 예, 오류 `LQL-4036` |
 | OUT 값과 결과 집합의 개수 = 반환 타입의 구성 요소 수 | 예, 오류 `LQL-4038` |
 | 타입 | **아직 구현되지 않음** |
-| **같은 타입**의 두 파라미터가 뒤바뀜 | **아직 구현되지 않음**(계획: 파라미터 이름을 얻을 수 있을 때만) |
+| 같은 파라미터 이름이 다른 순서로 놓임 | 예, 오류 `LQL-4043`(Java로 테스트함). 스텁 인자 이름을 알 수 있을 때만(아래 참고) |
+| Oracle 패키지 프로시저 이름에 오버로드가 여러 개 | 예, 오류 `LQL-4044`(Oracle에서 Java로 테스트함) |
 
 위험한 경우의 예:
 
@@ -221,12 +223,64 @@ Kotlin의 이름 있는 인자(`calc(rate = rate, id = id)`)는 이를 바꾸지
 @SqlProcedure("SP_TRANSFER") fun transfer(from: Long, to: Long)   // 뒤바뀜! 같은 타입
 ```
 
-개수, 모드, 타입이 모두 맞습니다. 이름만이 실수를 드러낼 수 있습니다.
-lambdaQL은 아직 이름을 **비교하지 않습니다**.
+개수, 모드, 타입이 모두 일치합니다. 이름만이 실수를 드러낼 수 있습니다.
+그래서 lambdaQL은 첫 호출 때 IN과 INOUT 인자의 이름을 비교합니다.
 
-계획은 다음과 같습니다. 이름을 얻을 수 있으면(Kotlin `-java-parameters` 또는 kotlin-reflect, 또는 `@Param`) `p_` 접두사와 대소문자를 무시하고 비교합니다. 이름을 얻을 수 없고 이웃한 두 파라미터의 타입이 같으면 WARN을 기록합니다.
+- 스텁 인자 이름은 클래스 파일에서 읽습니다. `-java-parameters`로 컴파일한 경우에만 이름이 남습니다([Kotlin 컴파일러 설정](02-getting-started.md#kotlin-compiler-settings) 참고). 스텁 인자에 `@org.lambdaql.DbParam("p_to")`를 붙이면 DB 이름을 직접 지정합니다.
+- DB 이름에서 **모든** 이름에 공통이고 `_`로 끝나는 접두사(`p_`, `in_`, `v_` 등)를 제거합니다. 정해진 접두사를 가정하지 않습니다. 이어서 대소문자와 `_`를 무시합니다.
+- 이름은 같고 순서만 다르면 호출 전에 `LambdaQLException` `LQL-4043`이 발생합니다.
+- 이름이 다르면(스텁이 다른 명명 규칙을 따름) 오류가 아닙니다. 검사가 동작하도록 `@DbParam`을 붙이십시오.
+- 클래스 파일에 이름이 없고 이웃한 두 인자의 타입이 같으면, 프로시저마다 한 번 `LQL-5004`를 `INFO` 레벨로 기록합니다.
+- 타입은 아직 비교하지 않습니다.
 
-**권장:** 스텁 인자의 순서를 직접 확인하십시오. `-java-parameters`로 컴파일하고([Kotlin 컴파일러 설정](02-getting-started.md#kotlin-compiler-settings) 참고) 데이터베이스와 같은 이름을 사용하면, 계획된 검사가 구현된 뒤 실수를 검출할 수 있습니다.
+같은 스텁을 Java로 테스트했습니다([`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `names`, `name-check`, MariaDB와 Oracle. [이 페이지의 Java 버전](../java/08-procedures-functions.md#84-warning-argument-order) 참고).
+Kotlin에서 이름을 남기려면 `-java-parameters`가 필요합니다. 다음은 설계 예제입니다.
+
+```kotlin
+// Database: SQ_PROC_DIFF(p_to, p_from)
+interface DiffProcs {
+    @SqlProcedure("SQ_PROC_DIFF")
+    fun diff(to: Int?, from: Int?): Int?                             // same order as the database: runs
+
+    @SqlProcedure("SQ_PROC_DIFF")
+    fun swapped(from: Int?, to: Int?): Int?                          // same names, other order: LQL-4043
+
+    @SqlProcedure("SQ_PROC_DIFF")
+    fun named(@DbParam("p_to") target: Int?, @DbParam("p_from") source: Int?): Int?   // another naming rule
+}
+
+qb.call(DiffProcs::class.java) { it.diff(10, 3) }.execute()       // 7
+qb.call(DiffProcs::class.java) { it.swapped(3, 10) }.execute()    // LambdaQLException LQL-4043, before the call
+```
+
+**권장:** `-java-parameters`로 컴파일하고 DB와 같은 이름을 쓰거나(공통 접두사는 생략 가능) `@DbParam`을 붙이십시오. 그러면 뒤바뀐 순서를 검출합니다.
+
+**Oracle 패키지 오버로드.** Oracle 패키지에는 같은 이름의 프로시저가 여러 개 있을 수 있습니다.
+lambdaQL은 스텁이 어느 것을 가리키는지 구분할 수 없으므로, 그런 이름을 호출하면 `LQL-4044`로 중단합니다. 오버로드 하나를 골라 호출하는 기능은 이후 계획입니다.
+
+Java로 테스트했습니다([`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `overload`, Oracle 전용). 다음은 설계 예제입니다.
+
+```kotlin
+interface PkgProcs {
+    @SqlProcedure(pkg = "SQ_PKG", value = "TWICE") fun twice(value: Double?): Double?
+    @SqlProcedure(pkg = "SQ_PKG", value = "HALF")  fun half(value: Double?): Double?    // HALF has two overloads
+}
+
+qb.call(PkgProcs::class.java) { it.twice(2.5) }.execute()     // 5.0
+qb.call(PkgProcs::class.java) { it.half(10.0) }.execute()     // LambdaQLException LQL-4044
+```
+
+<a id="when-the-metadata-cannot-be-read"></a>
+**메타데이터를 읽을 수 없는 경우.** DB 사용자에게 딕셔너리 뷰나 `information_schema`를 읽을 권한이 없을 수 있습니다.
+메타데이터 조회 자체가 실패하면(`SQLException`) lambdaQL은 호출을 중단하지 않습니다.
+
+- 프로시저마다 한 번 `LQL-5005`를 `INFO` 레벨로 기록하고, 스텁을 대조하지 않습니다.
+- 인자 배치는 스텁에서 가져옵니다. IN과 INOUT 인자는 스텁 순서, 그 뒤에 OUT 파라미터(결과 구성 요소 순서), Oracle에서는 그 뒤에 `List` 구성 요소마다 `REF CURSOR` 하나입니다. 따라서 메타데이터가 없으면 DB 선언에서 OUT 파라미터가 IN 파라미터 뒤에 있어야 합니다.
+- 메타데이터가 필요한 검사는 건너뜁니다: 개수와 `@InOut` 검사(`LQL-4036`), 이름 순서 검사(`LQL-4043`).
+- 조회는 성공했지만 프로시저가 없으면 여전히 `LQL-4035`입니다.
+- Oracle 오버로드 조회(`all_arguments`)만 실패하면 `LQL-5006`을 `INFO` 레벨로 기록하고, 오버로드 확인 없이 호출합니다.
+
+이 대체 동작은 MariaDB와 Oracle에서 Java로 테스트했습니다(`ProcedureTest`의 테스트 메서드 `withoutMetadata`, 실패를 모의함).
 
 Oracle의 실제 이름 바인딩(`pass_procedure_paramater_names=true`와 스텁 파라미터 이름을 함께 사용)도 계획되어 있습니다.
 
@@ -238,7 +292,7 @@ Oracle의 실제 이름 바인딩(`pass_procedure_paramater_names=true`와 스�
 | # | 규칙 | 상태 |
 |---|---|---|
 | PR1 | 이름: 어노테이션 값을 그대로 사용. 값이 비어 있으면 함수 이름을 UPPER_SNAKE로. 패키지나 스키마 이름(`SQ_PKG.CALC`, `LQL.SQ_CALC`)도 동작함. 혼동을 피하려면 `@SqlProcedure(schema = ..., pkg = ..., value = ...)`로 쓸 수도 있음. | 구현됨. 스키마·패키지 이름은 테스트로 확인하지 않음 |
-| PR2 | 인자는 **위치로** 바인딩됨. 첫 호출 때 IN/INOUT 파라미터 개수와 `@InOut` 위치를 DB 메타데이터와 대조함. 타입과 이름의 대조는 계획됨([8.4](#84-warning-argument-order) 참고). | 개수와 `@InOut` 대조는 구현됨(Java로 테스트함). 타입·이름 대조, Oracle 패키지 오버로드 검출은 아직 구현되지 않음 |
+| PR2 | 인자는 **위치로** 바인딩됨. 첫 호출 때 IN/INOUT 파라미터 개수와 `@InOut` 위치를 DB 메타데이터와 대조함. 이름을 알 수 있으면 이름도 대조하며, 같은 이름이 다른 순서면 오류. 타입 대조는 계획됨([8.4](#84-warning-argument-order) 참고). 메타데이터를 읽을 수 없으면 검사를 건너뛰고 인자 배치를 스텁에서 가져옴([8.4](#when-the-metadata-cannot-be-read) 참고). | 개수, `@InOut`, 이름 대조는 구현됨(Java로 테스트함). Oracle 패키지 오버로드 검출도 구현됨(Oracle에서 테스트함). 타입 대조는 아직 구현되지 않음. 메타데이터 없는 대체 동작(`LQL-5005`, `LQL-5006`)은 구현됨(MariaDB, Oracle에서 Java로 테스트함). |
 | PR3 | OUT 1개 → 반환 값. OUT/INOUT 여러 개 → 데이터 클래스 또는 record. `@InOut`은 INOUT 파라미터를 표시함. | 구현됨(Java로 테스트함) |
 | PR4 | 결과 집합 1개 → `List<T>`. 엔티티는 Hibernate로, 데이터 클래스/record는 레이블 매칭을 사용하는 JDBC로. 페이징 없음. | 구현됨(Java에서 record로 테스트함) |
 | PR5 | 결과 집합 여러 개 → 데이터 클래스의 `List` 속성, 순서대로. Oracle 암시적 결과는 지원하지 않음. | 구현됨, 테스트로 확인하지 않음 |
@@ -508,9 +562,9 @@ where FN_DISCOUNT(o1_0.price)>10
 | lambdaQL의 프로시저 호출 | – | 예(테스트함) | 예(테스트함) |
 | Boolean 파라미터 / 결과 | – | 예 | 예(23ai 이상) |
 
-v0.1에 계획되지 않은 것: 동적 프로시저 이름을 위한 문자열 빌더(v0.2 후보), Oracle 패키지 오버로드, 테이블 값 함수, 프로시저 결과의 페이징.
+v0.1에 계획되지 않은 것: 동적 프로시저 이름을 위한 문자열 빌더(v0.2 후보), Oracle 패키지 프로시저의 오버로드 하나를 골라 호출하는 기능(오버로드 검출은 구현됨, `LQL-4044`), 테이블 반환 함수, 프로시저 결과 페이징.
 
-이 장의 오류는 `[LQL-xxxx]` 코드가 있는 `LambdaQLException`(또는 그 하위 클래스)입니다. 람다를 읽을 때는 `LQL-3052`~`LQL-3063`, 호출을 실행할 때는 `LQL-4034`~`LQL-4039`입니다. [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
+이 장의 오류는 `[LQL-xxxx]` 코드가 있는 `LambdaQLException`(또는 그 하위 클래스)입니다. 람다를 읽을 때는 `LQL-3052`~`LQL-3063`, 호출을 실행할 때는 `LQL-4034`~`LQL-4039`, `LQL-4043`, `LQL-4044`입니다. 호출 중에 `LQL-5004`, `LQL-5005`, `LQL-5006`을 `INFO` 레벨로 기록할 수도 있습니다. [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
 
 ---
 

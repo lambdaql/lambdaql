@@ -454,7 +454,7 @@ DML 语句需要事务：`QueryBuilder(EntityManagerFactory)` 会打开自己的
 | 对带有 OUT 参数的存储过程使用 `exec` | `call` |
 | 参数的数据库默认值 | 传入每一个参数 |
 | 桩函数中的 Kotlin 默认参数 | 传入每一个参数；去掉默认值 |
-| Oracle 包重载（尚不能检测）、动态存储过程名 | 计划中 |
+| 选择并调用 Oracle 包存储过程的某个重载（已能检测有重载的名称：`LQL-4044`）、动态存储过程名 | 计划中 |
 | Oracle 隐式结果（`DBMS_SQL.RETURN_RESULT`）、MariaDB 包、存储过程结果的分页 | 不支持 |
 
 <a id="108-caching-a-lambda-is-analyzed-once"></a>

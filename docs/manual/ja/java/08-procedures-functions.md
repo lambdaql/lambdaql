@@ -7,7 +7,8 @@
 >   クエリの中の DB 関数（`@SqlFunction`）は H2 2.3、MariaDB 10.11、Oracle 23.26 で（[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)）、
 >   プロシージャの呼び出し（`@SqlProcedure`、`@InOut`、`qb.call`、`qb.exec`）は MariaDB と Oracle で、DB 関数の単独呼び出しは 3 つのデータベースすべてでテストしています（[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)）。
 >   H2 には OUT パラメーターがないため、プロシージャのテストは H2 では実行しません。
-> - **まだ実装されていないもの:** カラムに対する関数の SARGable 警告（ルール PR8、FN7）、パラメーターの **型** と **名前** のデータベースとの照合（ルール PR2 の一部と、その WARN）、Oracle パッケージのオーバーロードの検出。
+> - **こちらも実装済み、テスト済み:** スタブの引数 **名** とデータベースとの照合（ルール PR2 の一部）、Oracle パッケージのオーバーロードの検出。
+> - **まだ実装されていないもの:** カラムに対する関数の SARGable 警告（ルール PR8、FN7）、パラメーターの **型** のデータベースとの照合（ルール PR2 の一部）、Oracle パッケージのプロシージャのオーバーロードを 1 つ選んで呼ぶこと。
 > - **(テスト済み)** と書かれた例は、テストコードからそのまま取ったものです。それ以外の例も同じルールに従いますが、テストでは確認していません。全体の状況は [Java トラックの README](README.md#status) を参照してください。
 
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [7. 更新、挿入、削除](07-dml.md) | 次: [9. Java の注意点](09-java-notes.md) | [このページの Kotlin 版](../kotlin/08-procedures-functions.md)
@@ -255,7 +256,8 @@ MariaDB と H2 のドライバーは名前付きパラメーターをサポー�
 | INOUT のパラメーター = `@InOut` を付けた引数 | はい、エラー `LQL-4036` |
 | OUT の値と結果セットの数 = 戻り値の型の部分の数 | はい、エラー `LQL-4038` |
 | 型 | **まだ実装されていません** |
-| **同じ型** の 2 つのパラメーターの入れ替わり | **まだ実装されていません**（予定: パラメーター名が取得できる場合だけ） |
+| 同じパラメーター名が別の順序で並ぶ | はい、エラー `LQL-4043`（テスト済み）。スタブの引数名が分かるときだけ（下を参照） |
+| Oracle パッケージのプロシージャ名に複数のオーバーロードがある | はい、エラー `LQL-4044`（Oracle でテスト済み） |
 
 **(テスト済み)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)、リージョン `rules`（MariaDB と Oracle）:
 
@@ -281,9 +283,65 @@ assertEquals("LQL-3060", assertThrows(LambdaQLException.class,
 ```
 
 数、モード、型はすべて一致しています。間違いを示せるのは名前だけです。
-lambdaQL は名前を **まだ比較しません**。予定: 名前が取得できる場合（javac の `-parameters`、または `@Param`）は名前を比較し、`p_` の接頭辞と大文字・小文字は無視し、名前が取得できず隣り合う 2 つのパラメーターが同じ型の場合は WARN をログに出します。
+そこで lambdaQL は、最初の呼び出しで IN と INOUT の引数の名前を比べます。
 
-**アドバイス:** スタブの引数の順序は自分で確認してください。予定している確認で間違いを見つけられるように、`-parameters` でコンパイルし（[2. はじめよう](02-getting-started.md#recommended-compiler-option--parameters) を参照）、データベースと同じ名前を使ってください。
+- スタブの引数名はクラスファイルから読みます。名前が残るのは `-parameters` でコンパイルしたときだけです（[2. はじめよう](02-getting-started.md#recommended-compiler-option--parameters) を参照）。スタブの引数に `@org.lambdaql.DbParam("p_to")` を付けると、データベースの名前を直接指定できます。
+- データベースの名前から、**すべて** の名前に共通で `_` で終わる接頭辞（`p_`、`in_`、`v_` など）を取り除きます。決まった接頭辞は仮定しません。そのあと、大文字と小文字、`_` を無視します。
+- 同じ名前で順序だけが違う場合: 呼び出しの前に `LambdaQLException` `LQL-4043`。
+- 名前が違う場合（スタブが別の命名規則に従う）: エラーにしません。チェックが働くように `@DbParam` を付けてください。
+- クラスファイルに名前がなく、隣り合う 2 つの引数の型が同じ場合: プロシージャごとに 1 回、`LQL-5004` を `INFO` レベルでログに出します。
+- 型はまだ比べません。
+
+**(テスト済み)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)、リージョン `names`（データベースのプロシージャは `SQ_PROC_DIFF(p_to, p_from)`。テストのスタブは `-parameters` でコンパイルしています）:
+
+```java
+/** Argument names: with -parameters lambdaQL compares them with the database names (p_to, p_from). */
+interface DiffProcs {
+    @SqlProcedure("SQ_PROC_DIFF")
+    Integer diff(Integer to, Integer from);                       // same order as the database: runs
+
+    @SqlProcedure("SQ_PROC_DIFF")
+    Integer swapped(Integer from, Integer to);                    // same names, other order: LQL-4043
+
+    @SqlProcedure("SQ_PROC_DIFF")
+    Integer named(@DbParam("p_to") Integer target, @DbParam("p_from") Integer source);   // another naming rule
+}
+```
+
+**(テスト済み)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)、リージョン `name-check`（MariaDB と Oracle）:
+
+```java
+assertEquals(7, qb.call(DiffProcs.class, p -> p.diff(10, 3)).execute());
+assertEquals(7, qb.call(DiffProcs.class, p -> p.named(10, 3)).execute());
+// the same names in another order: stopped before the call (it would run with the values swapped)
+assertEquals("LQL-4043", assertThrows(LambdaQLException.class,
+        () -> qb.call(DiffProcs.class, p -> p.swapped(3, 10)).execute()).code());
+```
+
+**アドバイス:** `-parameters` でコンパイルしてデータベースと同じ名前を使う（共通の接頭辞は省略できます）か、`@DbParam` を付けてください。そうすれば、入れ替わった順序が見つかります。
+
+**Oracle パッケージのオーバーロード。** Oracle のパッケージには、同じ名前のプロシージャが複数あることがあります。
+lambdaQL はスタブがどれを指すのか区別できないので、そのような名前を呼ぶと `LQL-4044` で止まります。オーバーロードを 1 つ選んで呼ぶ機能は、後で予定しています。
+
+**(テスト済み)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)、リージョン `overload`（Oracle のみ）。スタブ `PkgProcs` は `@SqlProcedure(pkg = "SQ_PKG", value = "TWICE")` と `@SqlProcedure(pkg = "SQ_PKG", value = "HALF")` を宣言しています:
+
+```java
+assertEquals(5.0, qb.call(PkgProcs.class, p -> p.twice(2.5)).execute(), 1e-9);
+// HALF has two overloads in the package: lambdaQL cannot tell which one to call
+assertEquals("LQL-4044", assertThrows(LambdaQLException.class,
+        () -> qb.call(PkgProcs.class, p -> p.half(10.0)).execute()).code());
+```
+
+<a id="when-the-metadata-cannot-be-read"></a>
+**メタデータを読めない場合。** データベースのユーザーが、ディクショナリビューや `information_schema` を読めないことがあります。メタデータの取得そのものが失敗した場合（`SQLException`）、lambdaQL は呼び出しを止めません。
+
+- プロシージャごとに 1 回、`LQL-5005` を `INFO` レベルでログに出し、スタブは照合しません。
+- 引数の並びはスタブから取ります: IN と INOUT の引数をスタブの順に、その後に OUT パラメーター（結果の部分の順）、Oracle ではさらに `List` の部分ごとに `REF CURSOR` を 1 つ。そのため、メタデータがないときは、データベースの宣言で OUT パラメーターを IN パラメーターの後に置く必要があります。
+- メタデータが必要なチェックは省かれます: 数と `@InOut` のチェック（`LQL-4036`）、名前の順序のチェック（`LQL-4043`）。
+- 取得はできたがプロシージャが見つからない場合は、これまでどおり `LQL-4035` です。
+- Oracle のオーバーロードの取得（`all_arguments`）だけが失敗した場合は、`LQL-5006` を `INFO` レベルでログに出し、オーバーロードのチェックなしで呼び出します。
+
+この代わりの動作は、MariaDB と Oracle でテスト済みです（`ProcedureTest` のテストメソッド `withoutMetadata`。失敗を模擬します）。
 
 Oracle での本当の名前によるバインド（`pass_procedure_paramater_names=true` とスタブのパラメーター名の組み合わせ）も予定しています。
 
@@ -295,7 +353,7 @@ Oracle での本当の名前によるバインド（`pass_procedure_paramater_na
 | # | ルール | 状況 |
 |---|---|---|
 | PR1 | 名前: アノテーションの値をそのまま使います。値が空の場合: メソッド名を UPPER_SNAKE にしたもの。パッケージ名やスキーマ名（`SQ_PKG.CALC`、`LQL.SQ_CALC`）も使えます。混乱を避けるために `@SqlProcedure(schema = ..., pkg = ..., value = ...)` と書くこともできます。 | 実装済み。スキーマ名とパッケージ名はテストで確認していません |
-| PR2 | 引数は **位置で** バインドされます。最初の呼び出しで、IN/INOUT のパラメーターの数と `@InOut` の位置を DB のメタデータと照合します。型と名前の照合は予定です（[8.4](#84-warning-argument-order) を参照）。 | 数と `@InOut` の照合は実装済み（テスト済み）。型と名前の照合、Oracle パッケージのオーバーロードの検出: まだ実装されていません |
+| PR2 | 引数は **位置で** バインドされます。最初の呼び出しで、IN/INOUT のパラメーターの数と `@InOut` の位置を DB のメタデータと照合します。名前が分かれば名前も照合し、同じ名前が別の順序ならエラーです。型の照合は予定です（[8.4](#84-warning-argument-order) を参照）。メタデータを読めない場合は、チェックを省き、引数の並びをスタブから取ります（[8.4](#when-the-metadata-cannot-be-read) を参照）。 | 数、`@InOut`、名前の照合は実装済み（テスト済み）。Oracle パッケージのオーバーロードの検出も実装済み（Oracle でテスト済み）。型の照合はまだ実装されていない。メタデータなしの代わりの動作（`LQL-5005`、`LQL-5006`）も実装済み（MariaDB と Oracle でテスト済み）。 |
 | PR3 | OUT が 1 つ → 戻り値。OUT/INOUT が複数 → record。`@InOut` は INOUT パラメーターを示します。 | 実装済み（テスト済み） |
 | PR4 | 結果セットが 1 つ → `List<T>`。エンティティは Hibernate で、record はラベルの対応付けを使って JDBC で読みます。ページングはありません。 | 実装済み（record でテスト済み） |
 | PR5 | 複数の結果セット → record の `List` コンポーネントに順番に入ります。Oracle の暗黙の結果はサポートしません。 | 実装済み、テストでは確認していません |
@@ -629,9 +687,9 @@ assertEquals("LQL-3055", assertThrows(LambdaQLException.class,
 | lambdaQL でのプロシージャ呼び出し | – | はい（テスト済み） | はい（テスト済み） |
 | boolean のパラメーター / 結果 | – | はい | はい（23ai 以降） |
 
-v0.1 では予定していないもの: 動的なプロシージャ名のための文字列ビルダー（v0.2 の候補）、Oracle パッケージのオーバーロード、テーブル値関数、プロシージャの結果のページング。
+v0.1 では予定していないもの: 動的なプロシージャ名のための文字列ビルダー（v0.2 の候補）、Oracle パッケージのプロシージャのオーバーロードを 1 つ選んで呼ぶこと（オーバーロードの検出は実装済み、`LQL-4044`）、テーブル値関数、プロシージャの結果のページング。
 
-この章のエラーは、`[LQL-xxxx]` コードを持つ `LambdaQLException`（またはそのサブクラス）です: lambdaQL がラムダを読むときは `LQL-3052`〜`LQL-3063`、呼び出しを実行するときは `LQL-4034`〜`LQL-4039`。[11. エラーと言語](../11-errors-and-languages.md) を参照してください。
+この章のエラーは、`[LQL-xxxx]` コードを持つ `LambdaQLException`（またはそのサブクラス）です: lambdaQL がラムダを読むときは `LQL-3052`〜`LQL-3063`、呼び出しを実行するときは `LQL-4034`〜`LQL-4039`、`LQL-4043`、`LQL-4044`。呼び出しでは `LQL-5004`、`LQL-5005`、`LQL-5006` が `INFO` レベルで出ることもあります。[11. エラーと言語](../11-errors-and-languages.md) を参照してください。
 
 ---
 

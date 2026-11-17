@@ -439,7 +439,7 @@ DML 문장에는 트랜잭션이 필요합니다. `QueryBuilder(EntityManagerFac
 | 람다 안의 스텁 메서드 호출 하나 외의 모든 것(로그, 중첩 호출, 분기) | 호출 하나. 인자는 미리 계산 |
 | OUT 파라미터가 있는 프로시저에 `exec` | `call` |
 | 인자의 DB 기본값 | 모든 인자를 전달 |
-| Oracle 패키지 오버로드(아직 검출하지 않음), 동적 프로시저 이름 | 계획 중 |
+| Oracle 패키지 프로시저의 오버로드 하나를 골라 호출(오버로드가 있는 이름은 검출함: `LQL-4044`), 동적 프로시저 이름 | 계획 중 |
 | Oracle 암시적 결과(`DBMS_SQL.RETURN_RESULT`), MariaDB 패키지, 프로시저 결과 페이징 | 지원하지 않음 |
 
 <a id="108-caching-a-lambda-is-analyzed-once"></a>

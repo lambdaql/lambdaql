@@ -32,8 +32,8 @@ All messages are the values of the enum `org.lambdaql.i18n.LqlMessage`. Each val
 | `LQL-1xxx` | Input and lambda loading | `LQL-1001` to `LQL-1013` | `LambdaAnalysisException` |
 | `LQL-2xxx` | Decoding the bytecode | `LQL-2001` to `LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | Meaning and values computed in Java | `LQL-3001` to `LQL-3064` | `TranslationException` |
-| `LQL-4xxx` | Rendering, binding and running | `LQL-4001` to `LQL-4042`, `LQL-4999` (internal error) | `LambdaQLException` itself, or a JDK/JPA standard exception (see [Exceptions](#exceptions)) |
-| `LQL-5xxx` | Warnings (in the log) | `LQL-5002`, `LQL-5003` | – (a `WARN` log line; `LQL-5003` is `INFO` in the default sort mode) |
+| `LQL-4xxx` | Rendering, binding and running | `LQL-4001` to `LQL-4044`, `LQL-4999` (internal error) | `LambdaQLException` itself, or a JDK/JPA standard exception (see [Exceptions](#exceptions)) |
+| `LQL-5xxx` | Warnings (in the log) | `LQL-5002` to `LQL-5006` | – (a log line: `WARN`, or `INFO` for `LQL-5004` to `LQL-5006` and for `LQL-5003` in the default sort mode) |
 
 Some real codes:
 
@@ -51,8 +51,13 @@ Some real codes:
 | `LQL-4034` | `DbOnlyException` | {0} is a database function. It works only inside a lambdaQL lambda and is never run in Java. |
 | `LQL-4036` | `LambdaQLException` | The stub does not match the database procedure {0}: {1} |
 | `LQL-4040` | `SortNotAllowedException` | Sorting by this name is not allowed for {0}: {1}. Allow it with SortRules (allow or alias). |
+| `LQL-4043` | `LambdaQLException` | The stub arguments of {0} have the database parameter names in another order. Stub: {1}, database: {2} |
+| `LQL-4044` | `LambdaQLException` | The Oracle package has several procedures with this name (overloads); lambdaQL cannot tell which one to call: {0} |
 | `LQL-5002` | – (`WARN` log) | A subquery sort without limit does not change the result, so it was removed (Q4): {0} |
 | `LQL-5003` | – (`INFO` or `WARN` log) | An outside sort is not in the sort rules of {0}: {1}. It runs now; with SortMode.STRICT it would be rejected. |
+| `LQL-5004` | – (`INFO` log) | The stub argument names are not in the class file, so the argument order of {0} is not checked. Compile with -parameters (Kotlin: -java-parameters) or use @DbParam. |
+| `LQL-5005` | – (`INFO` log) | The parameters of {0} could not be read from the database metadata ({1}). The stub is not checked; IN and INOUT parameters are taken in stub order, then the OUT parameters. |
+| `LQL-5006` | – (`INFO` log) | The overloads of {0} could not be checked ({1}); the call goes on without the check. |
 
 `{0}` and `{1}` are the arguments, for example the expression or the procedure name.
 The full list is in the message files (see [For translators](#for-translators)).
@@ -69,7 +74,7 @@ The exception class comes from the code range.
 
 | Exception | Codes | When | Example |
 |---|---|---|---|
-| `LambdaQLException` | `LQL-4xxx` | Base class of all lambdaQL exceptions. lambdaQL throws this class itself for rendering, binding and running problems | A `null` captured value in an order compare (`LQL-4009`). A procedure stub that does not match the database (`LQL-4036`). |
+| `LambdaQLException` | `LQL-4xxx` | Base class of all lambdaQL exceptions. lambdaQL throws this class itself for rendering, binding and running problems | A `null` captured value in an order compare (`LQL-4009`). A procedure stub that does not match the database (`LQL-4036`). Stub arguments with the database names in another order (`LQL-4043`, see `@DbParam` in [8.4](java/08-procedures-functions.md#84-warning-argument-order)). |
 | `LambdaAnalysisException` | `LQL-1xxx` | lambdaQL cannot load the lambda | An anonymous class (Kotlin `object : ...`) instead of a lambda. A non-serializable lambda (`LQL-1002`). |
 | `UnsupportedLambdaShapeException` | `LQL-2xxx` | The bytecode has a shape that lambdaQL does not support | A loop (`LQL-2004`). A value ternary or value `if`/`when`. A general boolean ternary `c ? x : y`. |
 | `TranslationException` | `LQL-3xxx` | The lambda has no defined meaning in HQL | An entity method that is not a getter. Comparing two entities with `==` (not supported yet). A non-aggregated value that is not a `groupBy` key (`LQL-3035`). |
@@ -375,6 +380,9 @@ The warnings that lambdaQL has today:
 |---|---|
 | `LQL-5002` | A subquery has `orderBy` but no `limit`, so lambdaQL removes the sort (it has no effect, rule Q4) |
 | `LQL-5003` | An outside sort (a Spring `Sort`, `SortSpec.ofPath`) uses a name that is not in the sort rules, and the mode is `SortMode.INFO` (the default, logged at `INFO` level) or `SortMode.WARN` (logged at `WARN` level). The sort runs. The message is logged once for each entity and name (see [4.10 the sort policy](java/04-order-paging.md#sort-policy)) |
+| `LQL-5004` | A procedure stub has no argument names in the class file (compiled without `-parameters`, Kotlin `-java-parameters`, and without `@DbParam`), and two neighbouring arguments have the same type. Logged at `INFO` level, once per procedure (see [8.4](java/08-procedures-functions.md#84-warning-argument-order)) |
+| `LQL-5005` | The procedure metadata cannot be read (the lookup fails, for example without permission on the dictionary views or `information_schema`). The stub is not checked, and the parameter layout comes from the stub. Logged at `INFO` level, once per procedure (see [8.4](java/08-procedures-functions.md#when-the-metadata-cannot-be-read)) |
+| `LQL-5006` | Only the Oracle overload lookup (`all_arguments`) fails. The call goes on without the overload check. Logged at `INFO` level |
 
 ```
 WARN  [LQL-5002] A subquery sort without limit does not change the result, so it was removed (Q4): ...

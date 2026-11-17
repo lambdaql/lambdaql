@@ -34,8 +34,8 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-1xxx` | 入力とラムダの読み込み | `LQL-1001`〜`LQL-1013` | `LambdaAnalysisException` |
 | `LQL-2xxx` | バイトコードのデコード | `LQL-2001`〜`LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | 意味と Java で計算する値 | `LQL-3001`〜`LQL-3064` | `TranslationException` |
-| `LQL-4xxx` | 生成、バインド、実行 | `LQL-4001`〜`LQL-4042`、`LQL-4999`（内部エラー） | `LambdaQLException` そのもの、または JDK/JPA の標準例外（[例外](#exceptions) を参照） |
-| `LQL-5xxx` | 警告（ログに出力） | `LQL-5002`、`LQL-5003` | –（`WARN` のログ行。`LQL-5003` はデフォルトのソートモードでは `INFO`） |
+| `LQL-4xxx` | 生成、バインド、実行 | `LQL-4001`〜`LQL-4044`、`LQL-4999`（内部エラー） | `LambdaQLException` そのもの、または JDK/JPA の標準例外（[例外](#exceptions) を参照） |
+| `LQL-5xxx` | 警告（ログに出力） | `LQL-5002`〜`LQL-5006` | –（ログ行。レベルは `WARN`。`LQL-5004`〜`LQL-5006` と、デフォルトのソートモードの `LQL-5003` は `INFO`） |
 
 実際のコードの例:
 
@@ -53,8 +53,13 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-4034` | `DbOnlyException` | {0} はデータベース関数です。lambdaQL のラムダの中でだけ使い、Java では実行されません。 |
 | `LQL-4036` | `LambdaQLException` | スタブがデータベースのプロシージャ {0} と一致しません: {1} |
 | `LQL-4040` | `SortNotAllowedException` | {0} ではこの名前でソートできません: {1}。SortRules の allow か alias で許可してください。 |
+| `LQL-4043` | `LambdaQLException` | {0} のスタブ引数は、データベースの引数と名前が同じで順序だけが違います。スタブ: {1}、データベース: {2} |
+| `LQL-4044` | `LambdaQLException` | Oracle パッケージにこの名前のプロシージャが複数あります（オーバーロード）。どれを呼ぶか区別できません: {0} |
 | `LQL-5002` | –（`WARN` ログ） | limit のないサブクエリのソートは結果に影響しないため削除しました（Q4）: {0} |
 | `LQL-5003` | –（`INFO` または `WARN` ログ） | 外部からのソートが {0} のソート規則にありません: {1}。今は実行しますが、SortMode.STRICT では拒否されます。 |
+| `LQL-5004` | –（`INFO` ログ） | クラスファイルにスタブ引数の名前がないため、{0} の引数の順序を確認しません。-parameters（Kotlin: -java-parameters）でコンパイルするか、@DbParam を使ってください。 |
+| `LQL-5005` | –（`INFO` ログ） | データベースのメタデータから {0} の引数を読めませんでした（{1}）。スタブは照合せず、IN・INOUT はスタブの順、その後に OUT 引数が来るとみなします。 |
+| `LQL-5006` | –（`INFO` ログ） | {0} のオーバーロードを確認できませんでした（{1}）。確認せずに呼び出します。 |
 
 `{0}` と `{1}` は引数です。たとえば式やプロシージャ名が入ります。
 一覧はメッセージファイルにあります（[翻訳者向け](#for-translators) を参照）。
@@ -72,7 +77,7 @@ lambdaQL の例外はすべて `org.lambdaql.LambdaQLException` を継承しま�
 
 | 例外 | コード | いつ | 例 |
 |---|---|---|---|
-| `LambdaQLException` | `LQL-4xxx` | lambdaQL のすべての例外の基底クラス。生成、バインド、実行の問題では、lambdaQL はこのクラスそのものを投げます | 大小比較でキャプチャした値が `null`（`LQL-4009`）。プロシージャのスタブがデータベースと一致しない（`LQL-4036`）。 |
+| `LambdaQLException` | `LQL-4xxx` | lambdaQL のすべての例外の基底クラス。生成、バインド、実行の問題では、lambdaQL はこのクラスそのものを投げます | 大小比較でキャプチャした値が `null`（`LQL-4009`）。プロシージャのスタブがデータベースと一致しない（`LQL-4036`）。スタブ引数がデータベースの名前と違う順序（`LQL-4043`。[8.4](java/08-procedures-functions.md#84-warning-argument-order) の `@DbParam` を参照）。 |
 | `LambdaAnalysisException` | `LQL-1xxx` | lambdaQL がラムダを読み込めない | ラムダではなく匿名クラス（Kotlin の `object : ...`）。シリアライズ可能でないラムダ（`LQL-1002`）。 |
 | `UnsupportedLambdaShapeException` | `LQL-2xxx` | バイトコードの形を lambdaQL がサポートしていない | ループ（`LQL-2004`）。値の三項演算子、値としての `if`/`when`。一般的な boolean の三項演算子 `c ? x : y`。 |
 | `TranslationException` | `LQL-3xxx` | ラムダに HQL での意味が定義されていない | getter ではないエンティティのメソッド。2 つのエンティティを `==` で比較する（まだサポートしていない）。`groupBy` のキーではない、集計されていない値（`LQL-3035`）。 |
@@ -389,6 +394,9 @@ lambdaQL は **SLF4J API** を通してログを出します。
 |---|---|
 | `LQL-5002` | サブクエリに `orderBy` があって `limit` がないため、lambdaQL がソートを取り除くとき（ソートに効果がないため、ルール Q4） |
 | `LQL-5003` | 外部のソート（Spring の `Sort`、`SortSpec.ofPath`）がソートのルールにない名前を使い、モードが `SortMode.INFO`（デフォルト、`INFO` レベルで出る）か `SortMode.WARN`（`WARN` レベルで出る）のとき。ソートは実行される。エンティティと名前ごとに 1 回出る（[4.10 ソートポリシー](java/04-order-paging.md#sort-policy) を参照） |
+| `LQL-5004` | クラスファイルにプロシージャのスタブの引数名がなく（`-parameters`、Kotlin の `-java-parameters` なしでコンパイルし、`@DbParam` もない）、隣り合う 2 つの引数の型が同じとき。プロシージャごとに 1 回、`INFO` レベルで出る（[8.4](java/08-procedures-functions.md#84-warning-argument-order) を参照） |
+| `LQL-5005` | プロシージャのメタデータを読めないとき（たとえばディクショナリビューや `information_schema` の権限がなく、取得が失敗する）。スタブは照合せず、引数の並びはスタブから取る。プロシージャごとに 1 回、`INFO` レベルで出る（[8.4](java/08-procedures-functions.md#when-the-metadata-cannot-be-read) を参照） |
+| `LQL-5006` | Oracle のオーバーロードの取得（`all_arguments`）だけが失敗したとき。オーバーロードのチェックなしで呼び出す。`INFO` レベルで出る |
 
 ```
 WARN  [LQL-5002] A subquery sort without limit does not change the result, so it was removed (Q4): ...

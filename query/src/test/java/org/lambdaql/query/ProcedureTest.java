@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.lambdaql.DbOnlyException;
+import org.lambdaql.DbParam;
 import org.lambdaql.InOut;
 import org.lambdaql.LambdaQLException;
 import org.lambdaql.SqlFunction;
@@ -69,6 +70,29 @@ class ProcedureTest {
         Double calcWrong(Integer customerId);                         // does not match the database: 1 argument
     }
 
+    // @start region="names"
+    /** Argument names: with -parameters lambdaQL compares them with the database names (p_to, p_from). */
+    interface DiffProcs {
+        @SqlProcedure("SQ_PROC_DIFF")
+        Integer diff(Integer to, Integer from);                       // same order as the database: runs
+
+        @SqlProcedure("SQ_PROC_DIFF")
+        Integer swapped(Integer from, Integer to);                    // same names, other order: LQL-4043
+
+        @SqlProcedure("SQ_PROC_DIFF")
+        Integer named(@DbParam("p_to") Integer target, @DbParam("p_from") Integer source);   // another naming rule
+    }
+    // @end
+
+    /** Oracle package procedures (CALL is not overloaded, HALF is). */
+    interface PkgProcs {
+        @SqlProcedure(pkg = "SQ_PKG", value = "TWICE")
+        Double twice(Double value);
+
+        @SqlProcedure(pkg = "SQ_PKG", value = "HALF")
+        Double half(Double value);
+    }
+
     /** A database function. */
     interface MathFns {
         @SqlFunction("SQ_FN_HALF")
@@ -92,7 +116,8 @@ class ProcedureTest {
                             + " BEGIN SET p_balance = p_balance + p_add; SET p_msg = 'ok'; END",
                     "CREATE OR REPLACE PROCEDURE SQ_PROC_RECENT(IN p_cust INT)"
                             + " BEGIN SELECT id, price FROM SQ_orders WHERE customer_id = p_cust ORDER BY id; END",
-                    "CREATE OR REPLACE PROCEDURE SQ_PROC_PURGE(IN p_status INT) BEGIN DELETE FROM SQ_orders WHERE status = p_status; END"),
+                    "CREATE OR REPLACE PROCEDURE SQ_PROC_PURGE(IN p_status INT) BEGIN DELETE FROM SQ_orders WHERE status = p_status; END",
+                    "CREATE OR REPLACE PROCEDURE SQ_PROC_DIFF(IN p_to INT, IN p_from INT, OUT p_diff INT) BEGIN SET p_diff = p_to - p_from; END"),
             "oracle", List.of(
                     "CREATE OR REPLACE FUNCTION SQ_FN_HALF(p IN NUMBER) RETURN NUMBER DETERMINISTIC IS BEGIN RETURN p / 2; END;",
                     "CREATE OR REPLACE PROCEDURE SQ_PROC_CALC(p_cust IN NUMBER, p_rate IN NUMBER, p_total OUT NUMBER) IS"
@@ -103,16 +128,22 @@ class ProcedureTest {
                             + " BEGIN p_balance := p_balance + p_add; p_msg := 'ok'; END;",
                     "CREATE OR REPLACE PROCEDURE SQ_PROC_RECENT(p_cust IN NUMBER, p_cur OUT SYS_REFCURSOR) IS"
                             + " BEGIN OPEN p_cur FOR SELECT id, price FROM SQ_orders WHERE customer_id = p_cust ORDER BY id; END;",
-                    "CREATE OR REPLACE PROCEDURE SQ_PROC_PURGE(p_status IN NUMBER) IS BEGIN DELETE FROM SQ_orders WHERE status = p_status; END;"));
+                    "CREATE OR REPLACE PROCEDURE SQ_PROC_PURGE(p_status IN NUMBER) IS BEGIN DELETE FROM SQ_orders WHERE status = p_status; END;",
+                    "CREATE OR REPLACE PROCEDURE SQ_PROC_DIFF(p_to IN NUMBER, p_from IN NUMBER, p_diff OUT NUMBER) IS BEGIN p_diff := p_to - p_from; END;",
+                    "CREATE OR REPLACE PACKAGE SQ_PKG AS PROCEDURE twice(p IN NUMBER, r OUT NUMBER);"
+                            + " PROCEDURE half(p IN NUMBER, r OUT NUMBER); PROCEDURE half(p IN NUMBER, q IN NUMBER, r OUT NUMBER); END;",
+                    "CREATE OR REPLACE PACKAGE BODY SQ_PKG AS PROCEDURE twice(p IN NUMBER, r OUT NUMBER) IS BEGIN r := p * 2; END;"
+                            + " PROCEDURE half(p IN NUMBER, r OUT NUMBER) IS BEGIN r := p / 2; END;"
+                            + " PROCEDURE half(p IN NUMBER, q IN NUMBER, r OUT NUMBER) IS BEGIN r := p / q; END; END;"));
 
     private static final Map<String, List<String>> DROP = Map.of(
             "h2", List.of("DROP ALIAS IF EXISTS SQ_FN_HALF"),
             "mariadb", List.of("DROP FUNCTION IF EXISTS SQ_FN_HALF", "DROP PROCEDURE IF EXISTS SQ_PROC_CALC",
                     "DROP PROCEDURE IF EXISTS SQ_PROC_STAT", "DROP PROCEDURE IF EXISTS SQ_PROC_ADJUST",
-                    "DROP PROCEDURE IF EXISTS SQ_PROC_RECENT", "DROP PROCEDURE IF EXISTS SQ_PROC_PURGE"),
+                    "DROP PROCEDURE IF EXISTS SQ_PROC_RECENT", "DROP PROCEDURE IF EXISTS SQ_PROC_PURGE", "DROP PROCEDURE IF EXISTS SQ_PROC_DIFF"),
             "oracle", List.of("DROP FUNCTION SQ_FN_HALF", "DROP PROCEDURE SQ_PROC_CALC", "DROP PROCEDURE SQ_PROC_STAT",
                     "DROP PROCEDURE SQ_PROC_ADJUST", "DROP PROCEDURE SQ_PROC_RECENT", "DROP PROCEDURE SQ_PROC_PURGE",
-                    "PURGE RECYCLEBIN"));
+                    "DROP PROCEDURE SQ_PROC_DIFF", "DROP PACKAGE SQ_PKG", "PURGE RECYCLEBIN"));
 
     @Autowired
     private EntityManagerFactory emf;
@@ -192,6 +223,52 @@ class ProcedureTest {
         Double half = qb.call(() -> MathFns.half(price)).execute();
         // @end
         assertEquals(75.0, half, 1e-9);
+    }
+
+    @Test
+    void argumentNames() {
+        assumeFalse(DB.equals("h2"), "H2 has no OUT parameters (PR15)");
+        // @start region="name-check"
+        assertEquals(7, qb.call(DiffProcs.class, p -> p.diff(10, 3)).execute());
+        assertEquals(7, qb.call(DiffProcs.class, p -> p.named(10, 3)).execute());
+        // the same names in another order: stopped before the call (it would run with the values swapped)
+        assertEquals("LQL-4043", assertThrows(LambdaQLException.class,
+                () -> qb.call(DiffProcs.class, p -> p.swapped(3, 10)).execute()).code());
+        // @end
+    }
+
+    @Test
+    void oracleOverloads() {
+        org.junit.jupiter.api.Assumptions.assumeTrue(DB.equals("oracle"), "packages: Oracle only");
+        // @start region="overload"
+        assertEquals(5.0, qb.call(PkgProcs.class, p -> p.twice(2.5)).execute(), 1e-9);
+        // HALF has two overloads in the package: lambdaQL cannot tell which one to call
+        assertEquals("LQL-4044", assertThrows(LambdaQLException.class,
+                () -> qb.call(PkgProcs.class, p -> p.half(10.0)).execute()).code());
+        // @end
+    }
+
+    @Test
+    void withoutMetadata() {
+        assumeFalse(DB.equals("h2"), "H2 has no OUT parameters (PR15)");
+        // without permission to read the metadata, lambdaQL logs LQL-5005 at INFO and takes the layout from the stub:
+        // IN and INOUT in stub order, then OUT (and Oracle REF CURSOR) parameters
+        ProcedureRunner.simulateNoMetadata = true;
+        try {
+            double sum = ofKim().stream().mapToDouble(Order::getPrice).sum();
+            assertEquals(sum * 2, qb.call(OrderProcs.class, p -> p.calc(1, 2.0)).execute(), 1e-9);
+            assertEquals(new Adjusted(15, "ok"), qb.call(OrderProcs.class, p -> p.adjust(5, 10)).execute());
+            assertEquals(ofKim().stream().map(o -> new Line(o.getId(), o.getPrice())).toList(),
+                    qb.call(OrderProcs.class, p -> p.recent(1)).execute());
+            // the name check needs the metadata: the swapped stub now runs with the values as given (3 - 10)
+            assertEquals(-7, qb.call(DiffProcs.class, p -> p.swapped(3, 10)).execute());
+            if (DB.equals("oracle")) {
+                // the overload check is skipped too; Oracle picks the overload by the number of arguments
+                assertEquals(5.0, qb.call(PkgProcs.class, p -> p.half(10.0)).execute(), 1e-9);
+            }
+        } finally {
+            ProcedureRunner.simulateNoMetadata = false;
+        }
     }
 
     @Test

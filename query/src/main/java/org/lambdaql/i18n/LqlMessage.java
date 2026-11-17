@@ -449,6 +449,12 @@ public enum LqlMessage {
     /** LQL-4042: lambdaql.sort: no entity has this JPA entity name (by default the simple class name, or &#64;Entity(name = ...)): &#123;0&#125; */
     SORT_UNKNOWN_ENTITY("LQL-4042", 1),
 
+    /** LQL-4043: The stub arguments of &#123;0&#125; have the database parameter names in another order. Stub: &#123;1&#125;, database: &#123;2&#125; */
+    PROC_ARG_ORDER("LQL-4043", 3),
+
+    /** LQL-4044: The Oracle package has several procedures with this name (overloads); lambdaQL cannot tell which one to call: &#123;0&#125; */
+    PROC_OVERLOADED("LQL-4044", 1),
+
     /** LQL-4999: Internal error in lambdaQL. Please report it: &#123;0&#125; */
     INTERNAL_ERROR("LQL-4999", 1),
 
@@ -456,7 +462,16 @@ public enum LqlMessage {
     SUBQUERY_SORT_REMOVED("LQL-5002", 1),
 
     /** LQL-5003: An outside sort is not in the sort rules of &#123;0&#125;: &#123;1&#125;. It runs now; with SortMode.STRICT it would be rejected. */
-    SORT_NOT_ALLOWED_WARN("LQL-5003", 2);
+    SORT_NOT_ALLOWED_WARN("LQL-5003", 2),
+
+    /** LQL-5004: The stub argument names are not in the class file, so the argument order of &#123;0&#125; is not checked. Compile with -parameters (Kotlin: -java-parameters) or use &#64;DbParam. */
+    PROC_NAMES_UNAVAILABLE("LQL-5004", 1),
+
+    /** LQL-5005: The parameters of &#123;0&#125; could not be read from the database metadata (&#123;1&#125;). The stub is not checked; IN and INOUT parameters are taken in stub order, then the OUT parameters. */
+    PROC_METADATA_UNAVAILABLE("LQL-5005", 2),
+
+    /** LQL-5006: The overloads of &#123;0&#125; could not be checked (&#123;1&#125;); the call goes on without the check. */
+    PROC_OVERLOAD_CHECK_SKIPPED("LQL-5006", 2);
 
     private final String code;
     private final int argCount;

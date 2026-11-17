@@ -105,7 +105,7 @@ fetch first ? rows only
 | 명시적 조인(`join`, `leftJoin`, `crossJoin`, 엔티티 3개까지) | 구현됨, H2·MariaDB·Oracle에서 테스트함. 모든 엔티티에 대한 `where`, `orderBy`, `select`, 페이징 포함. DML과 서브쿼리 안의 조인: 이후 | [6](06-select-group.md#68-explicit-joins) |
 | 파생 테이블과 CTE(`qb.from(valueQuery)`, `qb.with(valueQuery)`) | 구현됨, H2·MariaDB·Oracle에서 테스트함. 파생 테이블과의 조인, 같은 CTE의 중복 사용: 이후 | [6](06-select-group.md#69-derived-table-subquery-in-from) |
 | `update`, `insert`, `delete`, upsert | 구현됨. H2, MariaDB, Oracle에서 테스트. `limit`과 `executeOne()` 포함. 수정·삭제 `where` 안의 서브쿼리(`sub`)와 `insert ... select`의 집계: 구현됨. `set` 값 안의 서브쿼리: 설계됨 | [7](07-dml.md) |
-| 저장 프로시저와 DB 함수 | 구현됨. 쿼리 안의 DB 함수와 단독 호출은 H2·MariaDB·Oracle에서 테스트함. 프로시저(`call`, `exec`, OUT, INOUT, 결과 집합)는 MariaDB와 Oracle에서 테스트함(H2에는 OUT 파라미터가 없음). SARGable 경고, 프로시저 파라미터의 타입·이름 대조, Oracle 패키지 오버로드: 아직 구현되지 않음 | [8](08-procedures-functions.md) |
+| 저장 프로시저와 DB 함수 | 구현됨. 쿼리 안의 DB 함수와 단독 호출은 H2·MariaDB·Oracle에서 테스트함. 프로시저(`call`, `exec`, OUT, INOUT, 결과 집합)는 MariaDB와 Oracle에서 테스트함(H2에는 OUT 파라미터가 없음). 인자 이름 대조(MariaDB, Oracle에서 테스트함)와 Oracle 패키지 오버로드 검출(Oracle에서 테스트함): 구현됨. SARGable 경고, 프로시저 파라미터의 타입 대조: 아직 구현되지 않음 | [8](08-procedures-functions.md) |
 | 4개 언어의 오류 코드와 메시지 | 구현됨, 단위 테스트함: `[LQL-xxxx]` 코드, `LambdaQLException`과 하위 클래스, 영어·일본어·중국어·한국어 메시지, `lambdaql.locale`. 경고 `LQL-5001`과 엄격 모드: 아직 구현되지 않음 | [11](../11-errors-and-languages.md) |
 | Spring Data JPA(`LambdaQlExecutor<T>`, Spring `Sort` / `Pageable`, Spring Boot 자동 구성) | 구현됨. H2, MariaDB, Oracle에서 Spring Boot 3.4.2로 테스트. DML 단축 메서드(`deleteAll`, `updateOne` 등)와 수정·삭제·삽입·업서트 빌더 포함. Spring Boot 4: 아직 검증하지 않음 | [12](12-spring-data-jpa.md) |
 

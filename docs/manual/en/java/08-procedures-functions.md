@@ -6,7 +6,8 @@
 >   DB functions in queries (`@SqlFunction`) on H2 2.3, MariaDB 10.11 and Oracle 23.26 ([`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java));
 >   procedure calls (`@SqlProcedure`, `@InOut`, `qb.call`, `qb.exec`) on MariaDB and Oracle, and a DB function called alone on all three databases ([`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)).
 >   H2 has no OUT parameters, so the procedure tests do not run on H2.
-> - **Not implemented yet:** the SARGable warnings for functions on columns (rules PR8, FN7), the check of parameter **types** and **names** against the database (part of rule PR2, and its WARN), and the detection of Oracle package overloads.
+> - **Also implemented and tested:** the check of the stub argument **names** against the database (part of rule PR2), and the detection of Oracle package overloads.
+> - **Not implemented yet:** the SARGable warnings for functions on columns (rules PR8, FN7), the check of parameter **types** against the database (part of rule PR2), and calling one overload of an Oracle package procedure.
 > - Examples marked **(tested)** are copied from the test suite. The other examples follow the same rules, but they are not covered by a test. See the [Java track README](README.md#status) for the full status.
 
 [Java track](README.md) | [Manual home](../README.md) | Previous: [7. Update, insert, delete](07-dml.md) | Next: [9. Java notes](09-java-notes.md) | [Kotlin version of this page](../kotlin/08-procedures-functions.md)
@@ -245,7 +246,8 @@ What lambdaQL checks on the first call (from JDBC metadata `getProcedureColumns`
 | INOUT parameters = arguments with `@InOut` | yes, error `LQL-4036` |
 | number of OUT values and result sets = parts of the return type | yes, error `LQL-4038` |
 | type | **not implemented yet** |
-| two parameters **of the same type** swapped | **not implemented yet** (planned: only if parameter names are available) |
+| the same parameter names in another order | yes, error `LQL-4043` (tested). Only when the stub argument names are known (see below) |
+| an Oracle package procedure name with several overloads | yes, error `LQL-4044` (tested, Oracle) |
 
 **(tested)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `rules` (MariaDB and Oracle):
 
@@ -270,10 +272,64 @@ Example of the dangerous case:
 @SqlProcedure("SP_TRANSFER") void transfer(Long from, Long to);   // swapped! same types
 ```
 
-The count, modes and types all match. Only the names can show the mistake.
-lambdaQL does **not** compare the names yet. The plan: compare names when they are available (javac `-parameters`, or `@Param`), ignore the `p_` prefix and case, and log a WARN when names are not available and two neighbor parameters have the same type.
+The count, modes and types all match. Only the names can show the mistake. So lambdaQL compares the names of the IN and INOUT arguments on the first call:
 
-**Advice:** check the order of the stub arguments by hand. Compile with `-parameters` (see [2. Getting started](02-getting-started.md#recommended-compiler-option--parameters)) and use the same names as the database, so the planned check can find mistakes.
+- The stub argument names come from the class file. They are there only when you compile with `-parameters` (see [2. Getting started](02-getting-started.md#recommended-compiler-option--parameters)). `@org.lambdaql.DbParam("p_to")` on a stub argument gives the database name directly.
+- From the database names, lambdaQL removes a prefix that ends with `_` and that **all** of them share (`p_`, `in_`, `v_` ...). No fixed prefix is assumed. Then it ignores case and `_`.
+- The same names in another order: `LambdaQLException` `LQL-4043`, before the call.
+- Other names (the stub follows another naming rule): no error. Add `@DbParam` so the check still works.
+- No names in the class file, and two neighbouring arguments of the same type: lambdaQL logs `LQL-5004` at `INFO` level, once per procedure.
+- The types are not compared yet.
+
+**(tested)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `names` (the database procedure is `SQ_PROC_DIFF(p_to, p_from)`; the test stubs are compiled with `-parameters`):
+
+```java
+/** Argument names: with -parameters lambdaQL compares them with the database names (p_to, p_from). */
+interface DiffProcs {
+    @SqlProcedure("SQ_PROC_DIFF")
+    Integer diff(Integer to, Integer from);                       // same order as the database: runs
+
+    @SqlProcedure("SQ_PROC_DIFF")
+    Integer swapped(Integer from, Integer to);                    // same names, other order: LQL-4043
+
+    @SqlProcedure("SQ_PROC_DIFF")
+    Integer named(@DbParam("p_to") Integer target, @DbParam("p_from") Integer source);   // another naming rule
+}
+```
+
+**(tested)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `name-check` (MariaDB and Oracle):
+
+```java
+assertEquals(7, qb.call(DiffProcs.class, p -> p.diff(10, 3)).execute());
+assertEquals(7, qb.call(DiffProcs.class, p -> p.named(10, 3)).execute());
+// the same names in another order: stopped before the call (it would run with the values swapped)
+assertEquals("LQL-4043", assertThrows(LambdaQLException.class,
+        () -> qb.call(DiffProcs.class, p -> p.swapped(3, 10)).execute()).code());
+```
+
+**Advice:** compile with `-parameters` and use the same names as the database (the shared prefix may be left out), or add `@DbParam`. Then a swapped order is found.
+
+**Oracle package overloads.** An Oracle package can hold several procedures with the same name. lambdaQL cannot tell which one the stub means, so a call to such a name stops with `LQL-4044`. Choosing one overload is planned for later.
+
+**(tested)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `overload` (Oracle only). The stub `PkgProcs` declares `@SqlProcedure(pkg = "SQ_PKG", value = "TWICE")` and `@SqlProcedure(pkg = "SQ_PKG", value = "HALF")`:
+
+```java
+assertEquals(5.0, qb.call(PkgProcs.class, p -> p.twice(2.5)).execute(), 1e-9);
+// HALF has two overloads in the package: lambdaQL cannot tell which one to call
+assertEquals("LQL-4044", assertThrows(LambdaQLException.class,
+        () -> qb.call(PkgProcs.class, p -> p.half(10.0)).execute()).code());
+```
+
+<a id="when-the-metadata-cannot-be-read"></a>
+**When the metadata cannot be read.** Some database users may not read the dictionary views or `information_schema`. If the metadata lookup itself fails (an `SQLException`), lambdaQL does not stop the call:
+
+- It logs `LQL-5005` at `INFO` level, once per procedure, and does not check the stub.
+- It takes the parameter layout from the stub: the IN and INOUT arguments in stub order, then the OUT parameters (in the order of the result parts), then on Oracle one `REF CURSOR` for each `List` part. So without metadata, the database declaration must put the OUT parameters after the IN parameters.
+- The checks that need the metadata are skipped: the count and `@InOut` checks (`LQL-4036`) and the name order check (`LQL-4043`).
+- If the lookup works but finds no procedure, the error is still `LQL-4035`.
+- If only the Oracle overload lookup (`all_arguments`) fails, lambdaQL logs `LQL-5006` at `INFO` level and calls without the overload check.
+
+This fallback is tested on MariaDB and Oracle (`ProcedureTest`, test method `withoutMetadata`, which simulates the failure).
 
 Real name binding on Oracle (`pass_procedure_paramater_names=true` together with the stub parameter names) is planned too.
 
@@ -284,7 +340,7 @@ Real name binding on Oracle (`pass_procedure_paramater_names=true` together with
 | # | Rule | Status |
 |---|---|---|
 | PR1 | Name: the annotation value as is. Empty value: method name in UPPER_SNAKE. Package or schema names (`SQ_PKG.CALC`, `LQL.SQ_CALC`) work. You can also write `@SqlProcedure(schema = ..., pkg = ..., value = ...)` to avoid confusion. | Implemented. Schema and package names are not covered by a test |
-| PR2 | Arguments are bound **by position**. On the first call, the count of IN/INOUT parameters and the `@InOut` positions are checked against DB metadata. Type and name checks are planned (see [8.4](#84-warning-argument-order)). | Count and `@InOut` check implemented (tested). Type and name checks, and the detection of Oracle package overloads: not implemented yet |
+| PR2 | Arguments are bound **by position**. On the first call, the count of IN/INOUT parameters and the `@InOut` positions are checked against DB metadata. Names are checked when they are known; the same names in another order is an error. Type checks are planned (see [8.4](#84-warning-argument-order)). If the metadata cannot be read, the checks are skipped and the layout comes from the stub (see [8.4](#when-the-metadata-cannot-be-read)). | Count, `@InOut` and name checks implemented (tested), and the detection of Oracle package overloads (tested on Oracle). Type checks: not implemented yet. The fallback without metadata (`LQL-5005`, `LQL-5006`): implemented (tested on MariaDB and Oracle). |
 | PR3 | One OUT → return value. Many OUT/INOUT → record. `@InOut` marks INOUT parameters. | Implemented (tested) |
 | PR4 | One result set → `List<T>`. Entities through Hibernate; records through JDBC with label matching. No paging. | Implemented (tested with a record) |
 | PR5 | Many result sets → `List` components of a record, in order. Oracle implicit results are not supported. | Implemented, not covered by a test |
@@ -609,9 +665,9 @@ assertEquals("LQL-3055", assertThrows(LambdaQLException.class,
 | Procedure calls in lambdaQL | – | yes (tested) | yes (tested) |
 | Boolean parameters / results | – | yes | yes (23ai or later) |
 
-Not planned for v0.1: a string builder for dynamic procedure names (v0.2 candidate), Oracle package overloads, table-valued functions, paging of procedure results.
+Not planned for v0.1: a string builder for dynamic procedure names (v0.2 candidate), calling one overload of an Oracle package procedure (overloads are detected, `LQL-4044`), table-valued functions, paging of procedure results.
 
-Errors from this chapter are `LambdaQLException` (or its subclass) with a `[LQL-xxxx]` code: `LQL-3052` to `LQL-3063` when lambdaQL reads the lambda, `LQL-4034` to `LQL-4039` when the call runs. See [11. Errors and languages](../11-errors-and-languages.md).
+Errors from this chapter are `LambdaQLException` (or its subclass) with a `[LQL-xxxx]` code: `LQL-3052` to `LQL-3063` when lambdaQL reads the lambda, `LQL-4034` to `LQL-4039`, `LQL-4043` and `LQL-4044` when the call runs. The call can also log `LQL-5004`, `LQL-5005` or `LQL-5006` at `INFO` level. See [11. Errors and languages](../11-errors-and-languages.md).
 
 ---
 

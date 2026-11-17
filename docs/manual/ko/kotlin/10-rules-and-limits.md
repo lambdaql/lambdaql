@@ -473,7 +473,7 @@ DML 문장에는 트랜잭션이 필요합니다. `QueryBuilder(EntityManagerFac
 | OUT 파라미터가 있는 프로시저에 `exec` | `call` |
 | 인수에 대한 DB 기본값 | 모든 인수를 전달 |
 | 스텁 함수의 Kotlin 기본 인수 | 모든 인수를 전달하고 기본값을 제거 |
-| Oracle 패키지 오버로드(아직 검출하지 않음), 동적 프로시저 이름 | 계획 중 |
+| Oracle 패키지 프로시저의 오버로드 하나를 골라 호출(오버로드가 있는 이름은 검출함: `LQL-4044`), 동적 프로시저 이름 | 계획 중 |
 | Oracle 암시적 결과(`DBMS_SQL.RETURN_RESULT`), MariaDB 패키지, 프로시저 결과의 페이징 | 지원하지 않음 |
 
 <a id="108-caching-a-lambda-is-analyzed-once"></a>

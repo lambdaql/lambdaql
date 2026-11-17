@@ -75,6 +75,11 @@ dependencies {
 
 }
 
+// stub argument names for the procedure name check (ROADMAP M11, PR2): the test stubs are compiled with -parameters
+compileTestJava {
+	options.compilerArgs << '-parameters'
+}
+
 test{
 	useJUnitPlatform()
 	// the Kotlin tests run in the same task, so -Dlql.db and the SQL files work the same way

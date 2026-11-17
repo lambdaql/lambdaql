@@ -6,7 +6,8 @@
 >   查询中的数据库函数（`@SqlFunction`），在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上测试（[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)）；
 >   存储过程调用（`@SqlProcedure`、`@InOut`、`qb.call`、`qb.exec`）在 MariaDB 和 Oracle 上测试，单独调用数据库函数在全部三种数据库上测试（[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)）。
 >   lambdaQL 也能读取 Kotlin 写法：带 `@JvmStatic` 的 `companion object` 函数，以及作为结果的 Kotlin data class。本章还没有 Kotlin 测试。
-> - **尚未实现：** 作用于列的函数的 SARGable 警告（规则 PR8、FN7）、对照数据库检查参数的**类型**和**名字**（规则 PR2 的一部分及其 WARN），以及 Oracle 包重载的检测。
+> - **也已实现（已在 MariaDB 和 Oracle 上用 Java 测试）：**对照数据库检查桩函数参数的**名字**（规则 PR2 的一部分），以及 Oracle 包重载的检测。
+> - **尚未实现：** 作用于列的函数的 SARGable 警告（规则 PR8、FN7）、对照数据库检查参数的**类型**（规则 PR2 的一部分），以及选择并调用 Oracle 包存储过程的某个重载。
 > - 本章的 Kotlin 代码用 Kotlin 语法展示已测试的 Java 调用。已测试的 Java 代码见[本页的 Java 版本](../java/08-procedures-functions.md)。完整状态请参阅[路线 README](README.md)。
 
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[7. 更新、插入、删除](07-dml.md) | 下一章：[9. Kotlin 说明](09-kotlin-notes.md) | [本页的 Java 版本](../java/08-procedures-functions.md)
@@ -206,7 +207,8 @@ lambdaQL 在第一次调用时检查的内容（来自 JDBC 元数据 `getProced
 | INOUT 参数 = 带 `@InOut` 的参数 | 能，报错 `LQL-4036` |
 | OUT 值和结果集的个数 = 返回类型的组成部分 | 能，报错 `LQL-4038` |
 | 类型 | **尚未实现** |
-| 两个**相同类型**的参数被交换 | **尚未实现**（计划：仅当参数名可用时） |
+| 相同的参数名以另一种顺序排列 | 是，错误 `LQL-4043`（已用 Java 测试）。仅当能获得存根参数名时（见下文） |
+| Oracle 包存储过程名有多个重载 | 是，错误 `LQL-4044`（已在 Oracle 上用 Java 测试） |
 
 危险情况的示例：
 
@@ -215,10 +217,62 @@ lambdaQL 在第一次调用时检查的内容（来自 JDBC 元数据 `getProced
 @SqlProcedure("SP_TRANSFER") fun transfer(from: Long, to: Long)   // 顺序反了！类型相同
 ```
 
-个数、模式和类型全部一致。只有名字能暴露这个错误。
-lambdaQL **目前还不**比较名字。计划是：在名字可用时（Kotlin `-java-parameters` 或 kotlin-reflect，或 `@Param`）比较名字，忽略 `p_` 前缀和大小写；名字不可用且两个相邻参数类型相同时记录一条 WARN 日志。
+个数、模式和类型全部匹配。只有名字能暴露这个错误。
+因此 lambdaQL 在第一次调用时比较 IN 和 INOUT 参数的名字：
 
-**建议：**手动检查桩函数参数的顺序。使用 `-java-parameters` 编译（参见 [Kotlin 编译器设置](02-getting-started.md#kotlin-compiler-settings)），并使用与数据库相同的名字，这样计划中的检查就能发现错误。
+- 桩函数参数名从类文件中读取。只有用 `-java-parameters` 编译时名字才会保留（见 [Kotlin 编译器设置](02-getting-started.md#kotlin-compiler-settings)）。在桩函数参数上加 `@org.lambdaql.DbParam("p_to")` 可以直接给出数据库中的名字。
+- lambdaQL 从数据库参数名中去掉一个以 `_` 结尾、并且**所有**名字共有的前缀（`p_`、`in_`、`v_` 等）。不假定固定的前缀。然后忽略大小写和 `_`。
+- 名字相同但顺序不同：在调用之前抛出 `LambdaQLException` `LQL-4043`。
+- 名字不同（桩函数遵循另一种命名规则）：不报错。请加上 `@DbParam`，让检查仍然有效。
+- 类文件中没有名字，并且两个相邻参数类型相同：每个存储过程以 `INFO` 级别记录一次 `LQL-5004`。
+- 类型尚不比较。
+
+同样的桩函数已用 Java 测试（[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `names` 和 `name-check`，MariaDB 和 Oracle；参见[本页的 Java 版本](../java/08-procedures-functions.md#84-warning-argument-order)）。Kotlin 需要 `-java-parameters` 才能保留名字。下面是设计示例：
+
+```kotlin
+// Database: SQ_PROC_DIFF(p_to, p_from)
+interface DiffProcs {
+    @SqlProcedure("SQ_PROC_DIFF")
+    fun diff(to: Int?, from: Int?): Int?                             // same order as the database: runs
+
+    @SqlProcedure("SQ_PROC_DIFF")
+    fun swapped(from: Int?, to: Int?): Int?                          // same names, other order: LQL-4043
+
+    @SqlProcedure("SQ_PROC_DIFF")
+    fun named(@DbParam("p_to") target: Int?, @DbParam("p_from") source: Int?): Int?   // another naming rule
+}
+
+qb.call(DiffProcs::class.java) { it.diff(10, 3) }.execute()       // 7
+qb.call(DiffProcs::class.java) { it.swapped(3, 10) }.execute()    // LambdaQLException LQL-4043, before the call
+```
+
+**建议：**用 `-java-parameters` 编译，并使用与数据库相同的名字（共同前缀可以省略），或者加上 `@DbParam`。这样就能发现顺序被交换的错误。
+
+**Oracle 包重载。** Oracle 包中可以有多个同名的存储过程。
+lambdaQL 无法区分桩函数指的是哪一个，因此调用这样的名字会以 `LQL-4044` 停止。选择并调用某一个重载计划在以后提供。
+
+已用 Java 测试（[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `overload`，仅 Oracle）。下面是设计示例：
+
+```kotlin
+interface PkgProcs {
+    @SqlProcedure(pkg = "SQ_PKG", value = "TWICE") fun twice(value: Double?): Double?
+    @SqlProcedure(pkg = "SQ_PKG", value = "HALF")  fun half(value: Double?): Double?    // HALF has two overloads
+}
+
+qb.call(PkgProcs::class.java) { it.twice(2.5) }.execute()     // 5.0
+qb.call(PkgProcs::class.java) { it.half(10.0) }.execute()     // LambdaQLException LQL-4044
+```
+
+<a id="when-the-metadata-cannot-be-read"></a>
+**无法读取元数据时。** 有些数据库用户无权读取数据字典视图或 `information_schema`。如果元数据查询本身失败（`SQLException`），lambdaQL 不会停止调用：
+
+- 每个存储过程以 `INFO` 级别记录一次 `LQL-5005`，并且不检查桩函数。
+- 参数布局取自桩函数：IN 和 INOUT 参数按桩函数顺序，然后是 OUT 参数（按结果部分的顺序），在 Oracle 上再为每个 `List` 部分加一个 `REF CURSOR`。因此没有元数据时，数据库声明中 OUT 参数必须放在 IN 参数之后。
+- 需要元数据的检查会被跳过：个数和 `@InOut` 检查（`LQL-4036`）以及名字顺序检查（`LQL-4043`）。
+- 如果查询成功但没有找到存储过程，仍然是 `LQL-4035`。
+- 如果只有 Oracle 重载查询（`all_arguments`）失败，lambdaQL 以 `INFO` 级别记录 `LQL-5006`，并在不检查重载的情况下调用。
+
+这种降级行为已在 MariaDB 和 Oracle 上用 Java 测试（`ProcedureTest` 的测试方法 `withoutMetadata`，模拟失败）。
 
 Oracle 上真正的按名绑定（`pass_procedure_paramater_names=true` 加上桩函数的参数名）也在计划中。
 
@@ -230,7 +284,7 @@ Oracle 上真正的按名绑定（`pass_procedure_paramater_names=true` 加上�
 | # | 规则 | 状态 |
 |---|---|---|
 | PR1 | 名字：直接使用注解的值。值为空时：使用 UPPER_SNAKE 形式的函数名。包名或 schema 名（`SQ_PKG.CALC`、`LQL.SQ_CALC`）可以使用。你也可以写 `@SqlProcedure(schema = ..., pkg = ..., value = ...)` 以避免混淆。 | 已实现。schema 名和包名没有测试覆盖 |
-| PR2 | 参数**按位置**绑定。第一次调用时，会对照数据库元数据检查 IN/INOUT 参数的个数和 `@InOut` 的位置。类型和名字的检查在计划中（参见 [8.4](#84-warning-argument-order)）。 | 个数和 `@InOut` 检查已实现（已用 Java 测试）。类型和名字检查、Oracle 包重载的检测：尚未实现 |
+| PR2 | 参数**按位置**绑定。第一次调用时，会对照数据库元数据检查 IN/INOUT 参数的个数和 `@InOut` 的位置。能获得名字时也检查名字，相同名字顺序不同即为错误。类型检查在计划中（参见 [8.4](#84-warning-argument-order)）。无法读取元数据时，跳过这些检查，参数布局取自桩函数（见 [8.4](#when-the-metadata-cannot-be-read)）。 | 个数、`@InOut` 和名字检查已实现（已用 Java 测试）。Oracle 包重载检测也已实现（已在 Oracle 上测试）。类型检查尚未实现。没有元数据时的降级行为（`LQL-5005`、`LQL-5006`）也已实现（已在 MariaDB 和 Oracle 上用 Java 测试）。 |
 | PR3 | 一个 OUT → 返回值。多个 OUT/INOUT → data class 或 record。`@InOut` 标记 INOUT 参数。 | 已实现（已用 Java 测试） |
 | PR4 | 一个结果集 → `List<T>`。实体通过 Hibernate 读取；data class 和 record 通过 JDBC 按标签匹配读取。不能分页。 | 已实现（已用 Java 的 record 测试） |
 | PR5 | 多个结果集 → data class 的 `List` 属性，按顺序。不支持 Oracle 隐式结果。 | 已实现，没有测试覆盖 |
@@ -497,9 +551,9 @@ where FN_DISCOUNT(o1_0.price)>10
 | lambdaQL 中的存储过程调用 | – | 支持（已测试） | 支持（已测试） |
 | Boolean 参数 / 结果 | – | 支持 | 支持（23ai 及以上版本） |
 
-v0.1 不计划提供：用于动态存储过程名的字符串构建器（v0.2 候选）、Oracle 包重载、表值函数、存储过程结果的分页。
+v0.1 不计划提供：用于动态存储过程名的字符串构建器（v0.2 候选）、选择并调用 Oracle 包存储过程的某个重载（重载检测已实现，`LQL-4044`）、表值函数、存储过程结果的分页。
 
-本章中的错误都是带有 `[LQL-xxxx]` 错误码的 `LambdaQLException`（或其子类）：读取 Lambda 时为 `LQL-3052` 至 `LQL-3063`，执行调用时为 `LQL-4034` 至 `LQL-4039`。参见 [11. 错误与语言](../11-errors-and-languages.md)。
+本章中的错误都是带有 `[LQL-xxxx]` 错误码的 `LambdaQLException`（或其子类）：读取 Lambda 时为 `LQL-3052` 至 `LQL-3063`，执行调用时为 `LQL-4034` 至 `LQL-4039`、`LQL-4043` 和 `LQL-4044`。调用时还可能以 `INFO` 级别记录 `LQL-5004`、`LQL-5005` 或 `LQL-5006`。参见 [11. 错误与语言](../11-errors-and-languages.md)。
 
 ---
 

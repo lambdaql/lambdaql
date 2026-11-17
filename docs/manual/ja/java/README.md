@@ -105,7 +105,7 @@ fetch first ? rows only
 | 明示的な結合（`join`、`leftJoin`、`crossJoin`、エンティティ 3 つまで） | 実装済み、H2・MariaDB・Oracle でテスト済み。すべてのエンティティに対する `where`、`orderBy`、`select`、ページングを含みます。DML とサブクエリの中の結合: 今後 | [6](06-select-group.md#68-explicit-joins) |
 | 派生テーブルと CTE（`qb.from(valueQuery)`、`qb.with(valueQuery)`） | 実装済み、H2・MariaDB・Oracle でテスト済み。派生テーブルとの結合と、同じ CTE の 2 回の使用: 今後 | [6](06-select-group.md#69-derived-table-subquery-in-from) |
 | `update`、`insert`、`delete`、upsert | 実装済み、H2・MariaDB・Oracle でテスト済み。`limit` と `executeOne()` も含みます。更新と削除の `where` の中のサブクエリ（`sub`）と `insert ... select` の集計: 実装済み。`set` の値の中のサブクエリ: 設計済み | [7](07-dml.md) |
-| ストアドプロシージャと DB 関数 | 実装済み: クエリの中の DB 関数と単独呼び出しは H2・MariaDB・Oracle でテスト済み。プロシージャ（`call`、`exec`、OUT、INOUT、結果セット）は MariaDB と Oracle でテスト済み（H2 には OUT パラメーターがありません）。SARGable 警告、プロシージャのパラメーターの型と名前の照合、Oracle パッケージのオーバーロード: まだ実装されていません | [8](08-procedures-functions.md) |
+| ストアドプロシージャと DB 関数 | 実装済み: クエリの中の DB 関数と単独呼び出しは H2・MariaDB・Oracle でテスト済み。プロシージャ（`call`、`exec`、OUT、INOUT、結果セット）は MariaDB と Oracle でテスト済み（H2 には OUT パラメーターがありません）。引数名の照合（MariaDB と Oracle でテスト済み）と Oracle パッケージのオーバーロードの検出（Oracle でテスト済み）: 実装済み。SARGable 警告、プロシージャのパラメーターの型の照合: まだ実装されていません | [8](08-procedures-functions.md) |
 | 4 言語のエラーコードとメッセージ | 実装済み、ユニットテスト済み: `[LQL-xxxx]` コード、`LambdaQLException` とそのサブクラス、英語・日本語・中国語・韓国語のメッセージ、`lambdaql.locale`。警告 `LQL-5001` と厳格モード: まだ実装されていません | [11](../11-errors-and-languages.md) |
 | Spring Data JPA（`LambdaQlExecutor<T>`、Spring の `Sort` / `Pageable`、Spring Boot の自動構成） | 実装済み、Spring Boot 3.4.2 で H2・MariaDB・Oracle でテスト済み。DML の短縮メソッド（`deleteAll`、`updateOne` など）と、更新、削除、挿入、upsert のビルダーも含みます。Spring Boot 4: まだ検証していません | [12](12-spring-data-jpa.md) |
 

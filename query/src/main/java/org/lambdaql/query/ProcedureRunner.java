@@ -51,6 +51,8 @@ final class ProcedureRunner {
     }
 
     private static final Map<String, List<DbParam>> META = new ConcurrentHashMap<>();
+    private static final java.util.Set<String> NAMES_LOGGED = ConcurrentHashMap.newKeySet();
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(ProcedureRunner.class);
 
     private ProcedureRunner() {
     }
@@ -60,11 +62,15 @@ final class ProcedureRunner {
     static Object call(EntityManager em, EntityModel model, ProcedureReader.ProcCall call, Object[] values, boolean exec) {
         flush(em);
         Session session = em.unwrap(Session.class);
-        List<DbParam> params = session.doReturningWork(c -> metadata(c, call));
-        checkArguments(call, params);
+        Type ret = call.stub().getGenericReturnType();
+        // the metadata is read when the user may read it; otherwise the stub alone gives the parameter layout
+        List<DbParam> read = session.doReturningWork(c -> metadataOrNull(c, call));
+        List<DbParam> params = read != null ? read
+                : session.doReturningWork(c -> inferred(call, ret == void.class ? List.of() : slots(ret),
+                        c.getMetaData().getDatabaseProductName().toLowerCase(Locale.ROOT).contains("oracle")));
+        if (read != null) checkArguments(call, params);
         List<DbParam> outs = params.stream().filter(p -> p.mode() != 1 && !p.cursor()).toList();
         long cursors = params.stream().filter(DbParam::cursor).count();
-        Type ret = call.stub().getGenericReturnType();
         if (exec || ret == void.class) {
             if (!outs.isEmpty() || cursors > 0) throw LqlMessage.PROC_EXEC_HAS_OUT.exception(call.fullName());
         }
@@ -92,6 +98,7 @@ final class ProcedureRunner {
             throw LqlMessage.PROC_SIGNATURE_MISMATCH.exception(call.fullName(),
                     "IN/INOUT " + ins.size() + " in the database, " + stubParams.length + " stub arguments");
         }
+        checkNames(call, ins, stubParams);
         for (int i = 0; i < ins.size(); i++) {
             boolean inout = stubParams[i].isAnnotationPresent(InOut.class);
             if (inout != (ins.get(i).mode() == 2)) {
@@ -100,6 +107,57 @@ final class ProcedureRunner {
                                 + " in the database; mark INOUT arguments with @InOut");
             }
         }
+    }
+
+    /**
+     * PR2 names: the names are compared without case, {@code _}, and a prefix that all database names share
+     * ({@code p_}, {@code in_} ...). Only the same names in another order is an error (an argument mix-up is then
+     * almost certain); other names are a different naming rule and pass.
+     */
+    private static void checkNames(ProcedureReader.ProcCall call, List<DbParam> ins, java.lang.reflect.Parameter[] stub) {
+        if (ins.size() < 2) return;
+        String prefix = commonPrefix(ins.stream().map(p -> String.valueOf(p.name()).toLowerCase(Locale.ROOT)).toList());
+        List<String> db = ins.stream().map(p -> key(String.valueOf(p.name()), prefix)).toList();
+        List<String> java = new ArrayList<>();
+        for (java.lang.reflect.Parameter p : stub) {
+            org.lambdaql.DbParam named = p.getAnnotation(org.lambdaql.DbParam.class);
+            if (named != null) java.add(key(named.value(), prefix));
+            else if (p.isNamePresent()) java.add(key(p.getName(), ""));
+            else {
+                if (sameTypeNeighbours(stub) && LOG.isInfoEnabled() && NAMES_LOGGED.add(call.fullName())) {
+                    LOG.info("{}", LqlMessage.PROC_NAMES_UNAVAILABLE.format(call.fullName()));
+                }
+                return;
+            }
+        }
+        if (java.equals(db)) return;
+        if (new java.util.HashSet<>(java).equals(new java.util.HashSet<>(db)) && java.size() == new java.util.HashSet<>(java).size()) {
+            throw LqlMessage.PROC_ARG_ORDER.exception(call.fullName(), java, db);
+        }
+    }
+
+    private static boolean sameTypeNeighbours(java.lang.reflect.Parameter[] stub) {
+        for (int i = 1; i < stub.length; i++) if (box(stub[i].getType()) == box(stub[i - 1].getType())) return true;
+        return false;
+    }
+
+    /** The longest prefix that all names share and that ends with {@code _}, for example {@code p_}. */
+    private static String commonPrefix(List<String> names) {
+        String first = names.get(0);
+        int end = first.length();
+        for (String n : names) {
+            int i = 0;
+            while (i < end && i < n.length() && n.charAt(i) == first.charAt(i)) i++;
+            end = i;
+        }
+        int cut = first.lastIndexOf('_', end - 1);
+        return cut < 0 ? "" : first.substring(0, cut + 1);
+    }
+
+    private static String key(String name, String prefix) {
+        String n = name.toLowerCase(Locale.ROOT);
+        if (!prefix.isEmpty() && n.startsWith(prefix) && n.length() > prefix.length()) n = n.substring(prefix.length());
+        return n.replace("_", "");
     }
 
     private static Object[] runJdbc(Connection c, ProcedureReader.ProcCall call, List<DbParam> params, Object[] values,
@@ -218,6 +276,46 @@ final class ProcedureRunner {
 
     // ------------------------------------------------------------------ metadata (PR2)
 
+    /** Test hook: makes the metadata lookups fail as without permission. Not public API. */
+    static volatile boolean simulateNoMetadata;
+
+    /**
+     * Reads the parameters from the JDBC metadata, or returns null (and logs LQL-5005 at INFO once per procedure)
+     * when the lookup itself fails, for example without permission on the dictionary views.
+     */
+    private static List<DbParam> metadataOrNull(Connection c, ProcedureReader.ProcCall call) throws SQLException {
+        try {
+            if (simulateNoMetadata) throw new SQLException("simulated: no permission");
+            return metadata(c, call);
+        } catch (SQLException e) {
+            if (LOG.isInfoEnabled() && NAMES_LOGGED.add("meta:" + call.fullName())) {
+                LOG.info("{}", LqlMessage.PROC_METADATA_UNAVAILABLE.format(call.fullName(), e.getMessage()));
+            }
+            return null;
+        }
+    }
+
+    /**
+     * The parameter layout from the stub alone: IN and INOUT in stub order, then one OUT per scalar result part that
+     * is not an INOUT value, then (Oracle) one REF CURSOR per list part.
+     */
+    private static List<DbParam> inferred(ProcedureReader.ProcCall call, List<Slot> slots, boolean oracle) {
+        List<DbParam> out = new ArrayList<>();
+        int inouts = 0;
+        for (java.lang.reflect.Parameter p : call.stub().getParameters()) {
+            boolean inout = p.isAnnotationPresent(InOut.class);
+            if (inout) inouts++;
+            out.add(new DbParam(p.getName(), inout ? 2 : 1, false));
+        }
+        long scalars = slots.stream().filter(sl -> !sl.list()).count();
+        for (long i = inouts; i < scalars; i++) out.add(new DbParam("out" + i, 4, false));
+        if (oracle) {
+            long lists = slots.stream().filter(Slot::list).count();
+            for (long i = 0; i < lists; i++) out.add(new DbParam("cursor" + i, 4, true));
+        }
+        return out;
+    }
+
     private static List<DbParam> metadata(Connection c, ProcedureReader.ProcCall call) throws SQLException {
         DatabaseMetaData md = c.getMetaData();
         String product = md.getDatabaseProductName().toLowerCase(Locale.ROOT);
@@ -241,6 +339,24 @@ final class ProcedureRunner {
         String pattern = esc == null ? name : name.replace("_", esc + "_");
         try (ResultSet rs = md.getProcedures(catalog, schema, pattern)) {
             if (!rs.next()) throw LqlMessage.PROC_NOT_FOUND.exception(call.fullName());
+        }
+        if (oracle && call.pkg() != null) {
+            // an Oracle package can hold several procedures with the same name: their columns would be mixed
+            try (var ps = c.prepareStatement("select count(distinct nvl(overload, '0')) from all_arguments"
+                    + " where owner = ? and package_name = ? and object_name = ?")) {
+                if (simulateNoMetadata) throw new SQLException("simulated: no permission");
+                ps.setString(1, schema);
+                ps.setString(2, catalog);
+                ps.setString(3, name);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next() && rs.getInt(1) > 1) throw LqlMessage.PROC_OVERLOADED.exception(call.fullName());
+                }
+            } catch (SQLException e) {
+                // no permission on the dictionary view: go on without the overload check
+                if (LOG.isInfoEnabled() && NAMES_LOGGED.add("overload:" + call.fullName())) {
+                    LOG.info("{}", LqlMessage.PROC_OVERLOAD_CHECK_SKIPPED.format(call.fullName(), e.getMessage()));
+                }
+            }
         }
         List<DbParam> params = new ArrayList<>();
         try (ResultSet rs = md.getProcedureColumns(catalog, schema, pattern, "%")) {

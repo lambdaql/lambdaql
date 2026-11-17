@@ -446,7 +446,7 @@ A DML statement needs a transaction: `QueryBuilder(EntityManagerFactory)` opens 
 | `exec` for a procedure that has OUT parameters | `call` |
 | DB default values for arguments | Pass every argument |
 | Kotlin default arguments in a stub function | Pass every argument; remove the default |
-| Oracle package overloads (not detected yet), dynamic procedure names | Planned |
+| Calling one overload of an Oracle package procedure (an overloaded name is detected: `LQL-4044`), dynamic procedure names | Planned |
 | Oracle implicit results (`DBMS_SQL.RETURN_RESULT`), MariaDB packages, paging of procedure results | Not supported |
 
 ## 10.8 Caching: a lambda is analyzed once

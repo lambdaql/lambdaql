@@ -33,8 +33,8 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-1xxx` | 输入与 Lambda 加载 | `LQL-1001` 至 `LQL-1013` | `LambdaAnalysisException` |
 | `LQL-2xxx` | 字节码解码 | `LQL-2001` 至 `LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | 语义与在 Java 中计算的值 | `LQL-3001` 至 `LQL-3064` | `TranslationException` |
-| `LQL-4xxx` | 生成、绑定与执行 | `LQL-4001` 至 `LQL-4042`、`LQL-4999`（内部错误） | `LambdaQLException` 本身，或 JDK/JPA 标准异常（见[异常](#exceptions)） |
-| `LQL-5xxx` | 警告（记录在日志中） | `LQL-5002`、`LQL-5003` | –（一条 `WARN` 日志；在默认排序模式下 `LQL-5003` 为 `INFO`） |
+| `LQL-4xxx` | 生成、绑定与执行 | `LQL-4001` 至 `LQL-4044`、`LQL-4999`（内部错误） | `LambdaQLException` 本身，或 JDK/JPA 标准异常（见[异常](#exceptions)） |
+| `LQL-5xxx` | 警告（记录在日志中） | `LQL-5002` 至 `LQL-5006` | –（一条日志：级别为 `WARN`；`LQL-5004` 至 `LQL-5006` 以及默认排序模式下的 `LQL-5003` 为 `INFO`） |
 
 一些实际的错误码：
 
@@ -52,8 +52,13 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-4034` | `DbOnlyException` | {0} 是数据库函数。它只能在 lambdaQL 的 lambda 中使用，不会在 Java 中执行。 |
 | `LQL-4036` | `LambdaQLException` | 存根与数据库存储过程 {0} 不一致：{1} |
 | `LQL-4040` | `SortNotAllowedException` | {0} 不允许按此名称排序：{1}。请用 SortRules 的 allow 或 alias 允许它。 |
+| `LQL-4043` | `LambdaQLException` | {0} 的存根参数与数据库参数名称相同但顺序不同。存根：{1}，数据库：{2} |
+| `LQL-4044` | `LambdaQLException` | Oracle 包中有多个同名的存储过程（重载），lambdaQL 无法区分要调用哪一个：{0} |
 | `LQL-5002` | –（`WARN` 日志） | 没有 limit 的子查询排序不影响结果，已被移除（Q4）：{0} |
 | `LQL-5003` | –（`INFO` 或 `WARN` 日志） | 外部排序不在 {0} 的排序规则中：{1}。现在会执行，但在 SortMode.STRICT 下会被拒绝。 |
+| `LQL-5004` | –（`INFO` 日志） | 类文件中没有存根参数名称，因此不检查 {0} 的参数顺序。请用 -parameters（Kotlin：-java-parameters）编译，或使用 @DbParam。 |
+| `LQL-5005` | –（`INFO` 日志） | 无法从数据库元数据读取 {0} 的参数（{1}）。不检查存根；IN、INOUT 参数按存根顺序，其后为 OUT 参数。 |
+| `LQL-5006` | –（`INFO` 日志） | 无法检查 {0} 的重载（{1}）；不做检查继续调用。 |
 
 `{0}` 和 `{1}` 是参数，例如表达式或存储过程名。
 完整列表见消息文件（见[致译者](#for-translators)）。
@@ -71,7 +76,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 
 | 异常 | 错误码 | 何时抛出 | 示例 |
 |---|---|---|---|
-| `LambdaQLException` | `LQL-4xxx` | 所有 lambdaQL 异常的基类。对于生成、绑定和执行中的问题，lambdaQL 直接抛出这个类 | 在大小比较中捕获了 `null` 值（`LQL-4009`）。存储过程存根与数据库不一致（`LQL-4036`）。 |
+| `LambdaQLException` | `LQL-4xxx` | 所有 lambdaQL 异常的基类。对于生成、绑定和执行中的问题，lambdaQL 直接抛出这个类 | 在大小比较中捕获了 `null` 值（`LQL-4009`）。存储过程存根与数据库不一致（`LQL-4036`）。存根参数与数据库参数名称相同但顺序不同（`LQL-4043`，见 [8.4](java/08-procedures-functions.md#84-warning-argument-order) 中的 `@DbParam`）。 |
 | `LambdaAnalysisException` | `LQL-1xxx` | lambdaQL 无法加载 Lambda | 用匿名类（Kotlin 中为 `object : ...`）代替了 Lambda。不可序列化的 Lambda（`LQL-1002`）。 |
 | `UnsupportedLambdaShapeException` | `LQL-2xxx` | 字节码的结构是 lambdaQL 不支持的 | 循环（`LQL-2004`）。值三元表达式，或作为值的 `if`/`when`。一般的布尔三元表达式 `c ? x : y`。 |
 | `TranslationException` | `LQL-3xxx` | Lambda 在 HQL 中没有定义的含义 | 不是 getter 的实体方法。用 `==` 比较两个实体（暂不支持）。不是 `groupBy` 键的非聚合值（`LQL-3035`）。 |
@@ -379,6 +384,9 @@ lambdaQL 目前提供的警告：
 |---|---|
 | `LQL-5002` | 子查询有 `orderBy` 但没有 `limit`，因此 lambdaQL 会移除排序（它不起作用，规则 Q4） |
 | `LQL-5003` | 外部排序（Spring `Sort`、`SortSpec.ofPath`）使用了不在排序规则中的名称，并且模式是 `SortMode.INFO`（默认值，以 `INFO` 级别记录）或 `SortMode.WARN`（以 `WARN` 级别记录）。排序会执行。按实体和名称各记录一次（见 [4.10 排序策略](java/04-order-paging.md#sort-policy)） |
+| `LQL-5004` | 类文件中没有存储过程存根的参数名（编译时没有 `-parameters` 或 Kotlin 的 `-java-parameters`，也没有 `@DbParam`），并且两个相邻参数类型相同。每个存储过程以 `INFO` 级别记录一次（见 [8.4](java/08-procedures-functions.md#84-warning-argument-order)） |
+| `LQL-5005` | 无法读取存储过程元数据（查询失败，例如没有数据字典视图或 `information_schema` 的权限）。不检查存根，参数布局取自存根。每个存储过程以 `INFO` 级别记录一次（见 [8.4](java/08-procedures-functions.md#when-the-metadata-cannot-be-read)） |
+| `LQL-5006` | 只有 Oracle 重载查询（`all_arguments`）失败。不检查重载继续调用。以 `INFO` 级别记录 |
 
 ```
 WARN  [LQL-5002] 没有 limit 的子查询排序不影响结果，已被移除（Q4）：...

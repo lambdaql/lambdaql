@@ -73,7 +73,7 @@ fetch first ? rows only
 | 6 | [選択、集計、グループ化](06-select-group.md) | `select`、data class、`Pair`、`groupBy`、`having`、`Agg`、結合、派生テーブル、CTE | `select`、`groupBy`、`having`、`Agg`、`distinct()`: 実装済み、H2・MariaDB・Oracle でテスト済み（data class、`Pair`、`Triple`、`groupBy`、`having` は Kotlin のラムダでも）。明示的な結合、派生テーブル、CTE: 実装済み（Java のテスト。Kotlin はまだテストしていません） |
 | 7 | [更新、挿入、削除](07-dml.md) | プロパティへの代入、`by.set`、`values`、`all()`、`execute()`、`limit`、`executeOne()` | 実装済み、H2・MariaDB・Oracle でテスト済み。`limit` と `executeOne()` も含みます（プロパティへの代入、`by[column] = value`、insert、delete は Kotlin のラムダでも）。update と delete の `where` の中のサブクエリ（`sub`）と `insert ... select` の集計: 実装済み。`set` の値の中のサブクエリ: 設計済み |
 | 7.6 | [Upsert](07-6-upsert.md) | `upsert`、`onConflict { ... }.update { ... }`、`onConflict { ... }.ignore()`、データベースごとの行数 | 実装済み、H2・MariaDB・Oracle でテスト済み（Java のテスト。Kotlin はまだテストしていません） |
-| 8 | [プロシージャと DB 関数](08-procedures-functions.md) | `@SqlProcedure`、`companion object` の中の `@SqlFunction`、`qb.call`、`qb.exec` | 実装済み（Java のテスト。Kotlin はまだテストしていません）: DB 関数は H2・MariaDB・Oracle、プロシージャは MariaDB と Oracle。SARGable 警告、プロシージャのパラメーターの型と名前の照合: まだ実装されていません |
+| 8 | [プロシージャと DB 関数](08-procedures-functions.md) | `@SqlProcedure`、`companion object` の中の `@SqlFunction`、`qb.call`、`qb.exec` | 実装済み（Java のテスト。Kotlin はまだテストしていません）: DB 関数は H2・MariaDB・Oracle、プロシージャは MariaDB と Oracle。引数名の照合と Oracle パッケージのオーバーロードの検出も実装済み。SARGable 警告、プロシージャのパラメーターの型の照合: まだ実装されていません |
 | 9 | [Kotlin の注意点](09-kotlin-notes.md) | Kotlin で特別なこと: `?.` `?:` `!!`、`==`、`in`、`when`、演算子、制限 KC1 から KC21 | 一部テスト済み（`?.`、`!!`、`in`、data class、プロパティへの代入）。そのほかの書き方: 設計済み |
 | 10 | [ルールと制限](10-rules-and-limits.md) | すべてのルール表を 1 か所に | 一部実装済み |
 | 11 | [エラーと言語](../11-errors-and-languages.md)（共通） | エラーコード、例外、メッセージの言語、ログ | 実装済み、ユニットテスト済み。警告 `LQL-5001` と厳格モード: まだ実装されていません |
