@@ -729,7 +729,7 @@ H2와 MariaDB는 `desc`에서 이미 NULL을 나중에 두므로 추가 구문�
 - 경로는 속성 이름을 `.`으로 연결한 문자열입니다. 각 부분은 영속 속성이어야 합니다. 중간에는 to-one 연관이나 임베디드 값, 끝에는 기본 값이 옵니다.
 - 그 밖의 경로는 오류입니다(spec을 `orderBy`에 전달할 때 `IllegalArgumentException`). 따라서 문자열이 다른 HQL로 변환되는 일은 없습니다.
 - 허용하는 이름은 persistence unit의 정렬 정책이 정합니다(아래 [정렬 정책](#sort-policy) 참고).
-  정책도 `@Sortable` 필드도 없으면 영속 속성은 **어느 것이든** 받고, lambdaQL이 경고 `LQL-5003`을 기록합니다.
+  정책도 `@Sortable` 필드도 없으면 영속 속성은 **어느 것이든** 받고, lambdaQL이 `LQL-5003`을 기록합니다(기본 레벨은 `INFO`).
 - 연관 경로는 정렬 람다와 마찬가지로 `left join`을 사용합니다(규칙 S8). `then()`으로 `ofPath` spec과 람다 spec을 연결할 수 있습니다.
 
 **(테스트됨)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), 영역 `sort-spec-path`:
@@ -774,7 +774,8 @@ assertThrows(IllegalArgumentException.class,
 | `SortMode` | 규칙이 허용하지 않는 이름의 처리 |
 |---|---|
 | `OFF` | 정렬을 실행합니다. 검사하지 않습니다 |
-| `WARN` | 정렬을 실행하고, 엔티티와 이름마다 한 번 경고 `LQL-5003`을 기록합니다. **기본값입니다:** 등록한 정책이 없으면 `WARN`을 사용하고, 규칙은 `@Sortable`에서만 가져옵니다 |
+| `INFO` | 정렬을 실행하고, 엔티티와 이름마다 한 번 `LQL-5003`을 `INFO` 레벨로 기록합니다. **기본값입니다:** 등록한 정책이 없으면 `INFO`를 사용하고, 규칙은 `@Sortable`에서만 가져옵니다 |
+| `WARN` | `INFO`와 같으며, 로그 레벨만 `WARN`입니다 |
 | `STRICT` | `SortNotAllowedException`(`LQL-4040`)으로 거부합니다. 규칙도 `@Sortable` 필드도 없는 엔티티는 모든 이름을 거부합니다 |
 
 따라서 정책을 등록하기 전에는 `@Sortable`이 허용하지 않는 외부 정렬 이름마다 엔티티별로 `LQL-5003`이 한 번 기록됩니다.
@@ -784,7 +785,7 @@ assertThrows(IllegalArgumentException.class,
 |---|---|
 | `SortPolicy.of(mode, rules...)` | 모드와 엔티티별 규칙으로 정책 생성 |
 | `SortPolicy.register(emf, policy)` | persistence unit의 정책 등록. 이전 정책을 대체 |
-| `SortPolicy.unregister(emf)` | 정책 제거. 기본값(`WARN`, `@Sortable` 규칙만 사용)으로 복귀 |
+| `SortPolicy.unregister(emf)` | 정책 제거. 기본값(`INFO`, `@Sortable` 규칙만 사용)으로 복귀 |
 | `SortPolicy.find(emf)` | 등록한 정책 반환(`Optional`) |
 | `SortPolicy.effective(emf)` | 적용 중인 정책 반환. 등록한 정책이 없으면 기본값 |
 
@@ -829,7 +830,7 @@ assertEquals("select e0 from Order e0 order by e0.description asc nulls first",
 **(테스트됨)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), 영역 `warn`:
 
 ```java
-// WARN (the default): the sort runs and LQL-5003 is logged once per entity and name
+// INFO (the default) and WARN: the sort runs and LQL-5003 is logged once per entity and name
 SortPolicy.register(emf, SortPolicy.of(SortMode.WARN));
 assertEquals("select e0 from Order e0 order by e0.description asc nulls first", hql("description", Direction.ASC));
 ```
@@ -845,7 +846,7 @@ assertEquals("select e0 from Order e0 order by e0.description asc nulls first", 
 
 - lambdaQL은 `from(...)`에 지정한 엔티티의 애너테이션만 읽습니다. 다른 엔티티의 애너테이션으로는 연관 경로가 허용되지 않으므로, 연관 필드에 `path`를 지정하십시오.
 - 애너테이션은 정책에 그 엔티티의 규칙(코드, Spring 빈, Spring Boot 프로퍼티)이 없을 때만 사용합니다.
-- 정책을 등록하지 않은 기본 `WARN` 모드에서도 동작합니다.
+- 정책을 등록하지 않은 기본 `INFO` 모드에서도 동작합니다.
 
 **(테스트됨)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), 영역 `annotation`(위의 `STRICT` 정책은 `Order`의 규칙만 가짐):
 

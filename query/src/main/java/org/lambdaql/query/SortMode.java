@@ -11,7 +11,9 @@ package org.lambdaql.query;
 public enum SortMode {
     /** No check. */
     OFF,
-    /** Run the sort, and log a warning (LQL-5003) once per entity and name. The default. */
+    /** Run the sort, and log LQL-5003 at INFO level once per entity and name. The default when no policy is registered. */
+    INFO,
+    /** Run the sort, and log LQL-5003 at WARN level once per entity and name. */
     WARN,
     /** Reject the sort with {@link org.lambdaql.SortNotAllowedException} (LQL-4040). */
     STRICT

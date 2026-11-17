@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>
  * Only sorts made from strings are checked: a Spring {@code Sort} or {@code Pageable} and {@link SortSpec#ofPath}.
  * The rules of an entity come from one place: the rules given here, else its {@link org.lambdaql.Sortable} fields.
- * Without a registered policy, lambdaQL uses {@link SortMode#WARN} with no rules.
+ * Without a registered policy, lambdaQL uses {@link SortMode#INFO} with rules only from {@link org.lambdaql.Sortable}.
  *
  * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java">SortPolicyTest</a>):
  * {@snippet class="org.lambdaql.query.SortPolicyTest" region="strict"}
@@ -28,7 +28,7 @@ public final class SortPolicy {
 
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(SortPolicy.class);
     private static final Map<EntityManagerFactory, SortPolicy> REGISTRY = Collections.synchronizedMap(new WeakHashMap<>());
-    private static final SortPolicy DEFAULT = new SortPolicy(SortMode.WARN, Map.of());
+    private static final SortPolicy DEFAULT = new SortPolicy(SortMode.INFO, Map.of());
 
     private static final Map<Class<?>, Optional<SortRules<?>>> ANNOTATED = new ConcurrentHashMap<>();
 
@@ -68,7 +68,7 @@ public final class SortPolicy {
     }
 
     /**
-     * Removes the policy of a persistence unit; the default ({@link SortMode#WARN}, no rules) applies again.
+     * Removes the policy of a persistence unit; the default ({@link SortMode#INFO}, rules only from {@link org.lambdaql.Sortable}) applies again.
      *
      * @param emf the entity manager factory
      */
@@ -88,7 +88,7 @@ public final class SortPolicy {
 
     /**
      * Returns the policy in force for a persistence unit: the registered one, else the default
-     * ({@link SortMode#WARN}, rules only from {@link org.lambdaql.Sortable}).
+     * ({@link SortMode#INFO}, rules only from {@link org.lambdaql.Sortable}).
      *
      * @param emf the entity manager factory
      * @return the policy
@@ -141,6 +141,11 @@ public final class SortPolicy {
             case WARN -> {
                 if (warned.add(root.getName() + "#" + name) && LOG.isWarnEnabled()) {
                     LOG.warn("{}", LqlMessage.SORT_NOT_ALLOWED_WARN.format(root.getSimpleName(), name));
+                }
+            }
+            case INFO -> {
+                if (warned.add(root.getName() + "#" + name) && LOG.isInfoEnabled()) {
+                    LOG.info("{}", LqlMessage.SORT_NOT_ALLOWED_WARN.format(root.getSimpleName(), name));
                 }
             }
             case OFF -> { }

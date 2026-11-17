@@ -69,7 +69,7 @@ public class LambdaQlAutoConfiguration {
      * Registers the outside sort policy for the entity manager factory (ROADMAP D43). The rules of an entity come from
      * one place, in this order: the {@link SortPolicy} bean, the properties, the {@code @Sortable} fields.
      * <pre>
-     * lambdaql.sort.mode=STRICT                       # OFF, WARN (default), STRICT; wins over the bean's mode
+     * lambdaql.sort.mode=STRICT                       # OFF, INFO (default), WARN, STRICT; wins over the bean's mode
      * lambdaql.sort.allow.Order=price,customer.name   # the JPA entity name (by default the simple class name)
      * lambdaql.sort.alias.Order.newest=updateAt       # outside name newest sorts by updateAt
      * </pre>
@@ -108,7 +108,7 @@ public class LambdaQlAutoConfiguration {
                 alias.getOrDefault(key, Map.of()).forEach(r::aliasPath);
                 rules.put(type, r);
             }
-            SortMode m = mode != null ? mode : bean != null ? bean.mode() : SortMode.WARN;
+            SortMode m = mode != null ? mode : bean != null ? bean.mode() : SortMode.INFO;
             SortPolicy.register(entityManagerFactory, SortPolicy.of(m, rules.values().toArray(SortRules<?>[]::new)));
         };
     }

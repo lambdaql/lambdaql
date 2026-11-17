@@ -33,7 +33,7 @@ All messages are the values of the enum `org.lambdaql.i18n.LqlMessage`. Each val
 | `LQL-2xxx` | Decoding the bytecode | `LQL-2001` to `LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | Meaning and values computed in Java | `LQL-3001` to `LQL-3064` | `TranslationException` |
 | `LQL-4xxx` | Rendering, binding and running | `LQL-4001` to `LQL-4042`, `LQL-4999` (internal error) | `LambdaQLException` itself, or a JDK/JPA standard exception (see [Exceptions](#exceptions)) |
-| `LQL-5xxx` | Warnings (in the log) | `LQL-5002`, `LQL-5003` | – (a `WARN` log line) |
+| `LQL-5xxx` | Warnings (in the log) | `LQL-5002`, `LQL-5003` | – (a `WARN` log line; `LQL-5003` is `INFO` in the default sort mode) |
 
 Some real codes:
 
@@ -52,7 +52,7 @@ Some real codes:
 | `LQL-4036` | `LambdaQLException` | The stub does not match the database procedure {0}: {1} |
 | `LQL-4040` | `SortNotAllowedException` | Sorting by this name is not allowed for {0}: {1}. Allow it with SortRules (allow or alias). |
 | `LQL-5002` | – (`WARN` log) | A subquery sort without limit does not change the result, so it was removed (Q4): {0} |
-| `LQL-5003` | – (`WARN` log) | An outside sort is not in the sort rules of {0}: {1}. It runs now; with SortMode.STRICT it would be rejected. |
+| `LQL-5003` | – (`INFO` or `WARN` log) | An outside sort is not in the sort rules of {0}: {1}. It runs now; with SortMode.STRICT it would be rejected. |
 
 `{0}` and `{1}` are the arguments, for example the expression or the procedure name.
 The full list is in the message files (see [For translators](#for-translators)).
@@ -374,7 +374,7 @@ The warnings that lambdaQL has today:
 | Code | When |
 |---|---|
 | `LQL-5002` | A subquery has `orderBy` but no `limit`, so lambdaQL removes the sort (it has no effect, rule Q4) |
-| `LQL-5003` | An outside sort (a Spring `Sort`, `SortSpec.ofPath`) uses a name that is not in the sort rules, and the mode is `SortMode.WARN` (the default). The sort runs. The warning is logged once for each entity and name (see [4.10 the sort policy](java/04-order-paging.md#sort-policy)) |
+| `LQL-5003` | An outside sort (a Spring `Sort`, `SortSpec.ofPath`) uses a name that is not in the sort rules, and the mode is `SortMode.INFO` (the default, logged at `INFO` level) or `SortMode.WARN` (logged at `WARN` level). The sort runs. The message is logged once for each entity and name (see [4.10 the sort policy](java/04-order-paging.md#sort-policy)) |
 
 ```
 WARN  [LQL-5002] A subquery sort without limit does not change the result, so it was removed (Q4): ...

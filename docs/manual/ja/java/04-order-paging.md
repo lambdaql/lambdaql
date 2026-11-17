@@ -729,7 +729,7 @@ H2 と MariaDB は `desc` で NULL をもともと末尾に置くので、余分
 - パスは、プロパティ名を `.` でつないだものです。どの部分も永続プロパティでなければなりません。途中は to-one の関連か埋め込み値、最後は基本型の値です。
 - それ以外はエラーです（spec を `orderBy` で使ったときに `IllegalArgumentException`）。そのため、テキストが別の HQL になることはありません。
 - どの名前を許可するかは、永続化ユニットのソートポリシーが決めます（下の [ソートポリシー](#sort-policy) を参照）。
-  ポリシーも `@Sortable` フィールドもなければ、永続プロパティなら **どれでも** 受け付け、lambdaQL は警告 `LQL-5003` をログに出します。
+  ポリシーも `@Sortable` フィールドもなければ、永続プロパティなら **どれでも** 受け付け、lambdaQL は `LQL-5003` をログに出します（デフォルトは `INFO` レベル）。
 - 関連のパスは、ソートのラムダと同じように `left join` を使います（ルール S8）。`then()` は `ofPath` の spec とラムダの spec をつなげます。
 
 **(テスト済み)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-spec-path`:
@@ -773,7 +773,8 @@ assertThrows(IllegalArgumentException.class,
 | `SortMode` | ルールが許可しない名前の扱い |
 |---|---|
 | `OFF` | ソートを実行します。チェックしません |
-| `WARN` | ソートを実行し、エンティティと名前ごとに 1 回、警告 `LQL-5003` をログに出します。**これがデフォルトです:** 登録されたポリシーがなければ `WARN` を使い、ルールは `@Sortable` からだけ取ります |
+| `INFO` | ソートを実行し、エンティティと名前ごとに 1 回、`LQL-5003` を `INFO` レベルでログに出します。**これがデフォルトです:** 登録されたポリシーがなければ `INFO` を使い、ルールは `@Sortable` からだけ取ります |
+| `WARN` | `INFO` と同じですが、ログレベルが `WARN` です |
 | `STRICT` | `SortNotAllowedException`（`LQL-4040`）で拒否します。ルールも `@Sortable` フィールドもないエンティティは、すべての名前を拒否します |
 
 そのため、ポリシーを登録するまでは、`@Sortable` が許可しない外部のソートの名前ごとに、エンティティごとに 1 回 `LQL-5003` が出ます。
@@ -783,7 +784,7 @@ assertThrows(IllegalArgumentException.class,
 |---|---|
 | `SortPolicy.of(mode, rules...)` | モードとエンティティごとのルールからポリシーを作る |
 | `SortPolicy.register(emf, policy)` | 永続化ユニットのポリシーを登録する。前のポリシーは置き換えられる |
-| `SortPolicy.unregister(emf)` | ポリシーを取り除く。デフォルト（`WARN`、ルールは `@Sortable` だけ）に戻る |
+| `SortPolicy.unregister(emf)` | ポリシーを取り除く。デフォルト（`INFO`、ルールは `@Sortable` だけ）に戻る |
 | `SortPolicy.find(emf)` | 登録されたポリシーを返す（`Optional`） |
 | `SortPolicy.effective(emf)` | 有効なポリシーを返す。登録されたものがなければデフォルト |
 
@@ -828,7 +829,7 @@ assertEquals("select e0 from Order e0 order by e0.description asc nulls first",
 **(テスト済み)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)、リージョン `warn`:
 
 ```java
-// WARN (the default): the sort runs and LQL-5003 is logged once per entity and name
+// INFO (the default) and WARN: the sort runs and LQL-5003 is logged once per entity and name
 SortPolicy.register(emf, SortPolicy.of(SortMode.WARN));
 assertEquals("select e0 from Order e0 order by e0.description asc nulls first", hql("description", Direction.ASC));
 ```
@@ -844,7 +845,7 @@ assertEquals("select e0 from Order e0 order by e0.description asc nulls first", 
 
 - lambdaQL が読むのは、`from(...)` に書いたエンティティのアノテーションだけです。別のエンティティのアノテーションでは関連のパスは許可されないので、関連フィールドに `path` を書いてください。
 - アノテーションは、ポリシーにそのエンティティのルール（コード、Spring の Bean、Spring Boot のプロパティ）がないときだけ使われます。
-- ポリシーを登録していないデフォルトの `WARN` モードでも働きます。
+- ポリシーを登録していないデフォルトの `INFO` モードでも働きます。
 
 **(テスト済み)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)、リージョン `annotation`（上の `STRICT` のポリシーは `Order` のルールだけを持ちます）:
 

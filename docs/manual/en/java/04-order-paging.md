@@ -717,7 +717,7 @@ H2 and MariaDB already put NULLs last for `desc`, so they write no extra clause.
 
 - The path is property names joined with `.`. Every part must be a persistent property: to-one associations or embedded values in the middle, and a basic value at the end.
 - Anything else is an error (`IllegalArgumentException` when the spec is used in `orderBy`). So the text can never become other HQL.
-- Which names are allowed is decided by the sort policy of the persistence unit (see [the sort policy](#sort-policy) below). Without a policy and without `@Sortable` fields, **any** persistent property is accepted, and lambdaQL logs the warning `LQL-5003`.
+- Which names are allowed is decided by the sort policy of the persistence unit (see [the sort policy](#sort-policy) below). Without a policy and without `@Sortable` fields, **any** persistent property is accepted, and lambdaQL logs `LQL-5003` (at `INFO` level by default).
 - An association path uses a `left join`, the same as in a sort lambda (rule S8). `then()` joins `ofPath` specs and lambda specs.
 
 **(tested)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-spec-path`:
@@ -759,7 +759,8 @@ A rule must be a column of the entity. Any other key is rejected with `LQL-4041`
 | `SortMode` | A name that the rules do not allow |
 |---|---|
 | `OFF` | The sort runs. Nothing is checked |
-| `WARN` | The sort runs, and lambdaQL logs the warning `LQL-5003` once per entity and name. **This is the default:** without a registered policy, lambdaQL uses `WARN`, with rules only from `@Sortable` |
+| `INFO` | The sort runs, and lambdaQL logs `LQL-5003` at `INFO` level once per entity and name. **This is the default:** without a registered policy, lambdaQL uses `INFO`, with rules only from `@Sortable` |
+| `WARN` | The same as `INFO`, but the log level is `WARN` |
 | `STRICT` | The sort is rejected with `SortNotAllowedException` (`LQL-4040`). An entity that has neither rules nor `@Sortable` fields is rejected for every name |
 
 So, until you register a policy, each outside sort name that no `@Sortable` field allows logs `LQL-5003` once for each entity. Register a policy with `STRICT` to reject unknown names, or with `OFF` to turn the check off.
@@ -768,7 +769,7 @@ So, until you register a policy, each outside sort name that no `@Sortable` fiel
 |---|---|
 | `SortPolicy.of(mode, rules...)` | Makes a policy from a mode and the rules of each entity |
 | `SortPolicy.register(emf, policy)` | Registers the policy of a persistence unit. It replaces an earlier one |
-| `SortPolicy.unregister(emf)` | Removes the policy. The default (`WARN`, rules only from `@Sortable`) applies again |
+| `SortPolicy.unregister(emf)` | Removes the policy. The default (`INFO`, rules only from `@Sortable`) applies again |
 | `SortPolicy.find(emf)` | Returns the registered policy (`Optional`) |
 | `SortPolicy.effective(emf)` | Returns the policy in force: the registered one, else the default |
 
@@ -812,7 +813,7 @@ assertEquals("select e0 from Order e0 order by e0.description asc nulls first",
 **(tested)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), region `warn`:
 
 ```java
-// WARN (the default): the sort runs and LQL-5003 is logged once per entity and name
+// INFO (the default) and WARN: the sort runs and LQL-5003 is logged once per entity and name
 SortPolicy.register(emf, SortPolicy.of(SortMode.WARN));
 assertEquals("select e0 from Order e0 order by e0.description asc nulls first", hql("description", Direction.ASC));
 ```
@@ -828,7 +829,7 @@ assertEquals("select e0 from Order e0 order by e0.description asc nulls first", 
 
 - lambdaQL reads the annotations of the entity in `from(...)`. An annotation on another entity does not allow a path through an association: use `path` on the association field.
 - The annotations are used only when the policy has no rules for that entity (from code, a Spring bean or Spring Boot properties).
-- They also work without a registered policy, in the default `WARN` mode.
+- They also work without a registered policy, in the default `INFO` mode.
 
 **(tested)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), region `annotation` (the `STRICT` policy above has rules only for `Order`):
 

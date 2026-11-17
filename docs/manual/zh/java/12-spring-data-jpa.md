@@ -416,7 +416,7 @@ Page<Member> page = repository.findAll(m -> m.isActive(), PageRequest.of(1, 2, S
 // page 1 (the second page) of the active members by name; the total comes from a count query
 ```
 
-**来自请求参数的排序。** Spring MVC 可以根据 `?page=1&size=20&sort=name,desc` 这样的请求参数创建 `Pageable`。既没有排序策略也没有 `@Sortable` 字段时，任何持久化属性都会被接受，因此用户可以按任意列排序。此时 lambdaQL 会按实体和名称各记录一次警告 `LQL-5003`。如果只允许部分名称，请使用下面的排序策略。
+**来自请求参数的排序。** Spring MVC 可以根据 `?page=1&size=20&sort=name,desc` 这样的请求参数创建 `Pageable`。既没有排序策略也没有 `@Sortable` 字段时，任何持久化属性都会被接受，因此用户可以按任意列排序。此时 lambdaQL 会按实体和名称以 `INFO` 级别各记录一次 `LQL-5003`。如果只允许部分名称，请使用下面的排序策略。
 
 <a id="sort-policy-with-spring"></a>
 ### 在 Spring 中使用排序策略
@@ -433,15 +433,15 @@ Spring `Sort` 或 `Pageable` 始终是外部排序，因此策略会检查其中
 | `@Sortable` 字段（[4.10](04-order-paging.md#rules-from-sortable)） | bean 和属性都没有给出规则的实体的规则 |
 
 - 一个实体的规则按表中的顺序只来自一个地方。两个地方的规则不会合并。
-- `lambdaql.sort.mode` 优先于 bean 的模式。两者都没有时，模式为 `WARN`。
+- `lambdaql.sort.mode` 优先于 bean 的模式。两者都没有时，模式为 `INFO`。
 - 这只在恰好有一个 `EntityManagerFactory` 时生效，与 `QueryBuilder` bean 的条件相同（见 [12.8](#128-the-querybuilder-bean)）。否则请自己调用 `SortPolicy.register(emf, policy)`。
-- 既没有 bean 也没有属性时，不注册任何内容，因此使用默认值：`WARN`，规则只来自 `@Sortable`。
+- 既没有 bean 也没有属性时，不注册任何内容，因此使用默认值：`INFO`，规则只来自 `@Sortable`。
 
 **属性。**
 
 | 属性 | 含义 |
 |---|---|
-| `lambdaql.sort.mode` | `OFF`、`WARN`（默认值）或 `STRICT` |
+| `lambdaql.sort.mode` | `OFF`、`INFO`（默认值）、`WARN` 或 `STRICT` |
 | `lambdaql.sort.allow.<Entity>` | 允许的路径，用逗号分隔，例如 `name,team.name` |
 | `lambdaql.sort.alias.<Entity>.<外部名称>` | 别名的路径，例如 `lambdaql.sort.alias.Member.level=grade` |
 

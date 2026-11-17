@@ -492,7 +492,7 @@ H2 と MariaDB は `desc` で NULL をもともと末尾に置くので、余分
 
 **`SortSpec.ofPath`: プロパティ名からのソート。** `SortSpec.ofPath(Order::class.java, "customer.name", Direction.DESC)` は、プロパティのパスから spec を作ります。ソートのキーがコードの外からテキストとして来る場合に使います（Spring モジュールは Spring の `Sort` のためにこれを使います。[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) を参照）。
 パスのどの部分も永続プロパティで、最後の部分は基本型の値でなければなりません。それ以外はエラーです。
-どの名前を許可するかはソートポリシーが決めます（下の [ソートポリシー](#sort-policy) を参照）。ポリシーも `@Sortable` フィールドもなければ永続プロパティならどれでも受け付け、lambdaQL は警告 `LQL-5003` をログに出します。
+どの名前を許可するかはソートポリシーが決めます（下の [ソートポリシー](#sort-policy) を参照）。ポリシーも `@Sortable` フィールドもなければ永続プロパティならどれでも受け付け、lambdaQL は `LQL-5003` をログに出します（デフォルトは `INFO` レベル）。
 ここにはラムダがないので、Kotlin でも Java と同じように動きます。Java のテストは [このページの Java 版](../java/04-order-paging.md#410-reusable-and-external-sorts) にあります（リージョン `sort-spec-path`）。
 
 ```kotlin
@@ -531,7 +531,8 @@ qb.from(Order::class.java).orderBy(byName).toList()
 | `SortMode` | ルールが許可しない名前の扱い |
 |---|---|
 | `OFF` | ソートを実行します。チェックしません |
-| `WARN` | ソートを実行し、エンティティと名前ごとに 1 回、警告 `LQL-5003` をログに出します。**これがデフォルトです:** 登録されたポリシーがなければ `WARN` を使い、ルールは `@Sortable` からだけ取ります |
+| `INFO` | ソートを実行し、エンティティと名前ごとに 1 回、`LQL-5003` を `INFO` レベルでログに出します。**これがデフォルトです:** 登録されたポリシーがなければ `INFO` を使い、ルールは `@Sortable` からだけ取ります |
+| `WARN` | `INFO` と同じですが、ログレベルが `WARN` です |
 | `STRICT` | `SortNotAllowedException`（`LQL-4040`）で拒否します。ルールも `@Sortable` フィールドもないエンティティは、すべての名前を拒否します |
 
 そのため、ポリシーを登録するまでは、`@Sortable` が許可しない外部のソートの名前ごとに、エンティティごとに 1 回 `LQL-5003` が出ます。
@@ -541,7 +542,7 @@ qb.from(Order::class.java).orderBy(byName).toList()
 |---|---|
 | `SortPolicy.of(mode, rules...)` | モードとエンティティごとのルールからポリシーを作る |
 | `SortPolicy.register(emf, policy)` | 永続化ユニットのポリシーを登録する。前のポリシーは置き換えられる |
-| `SortPolicy.unregister(emf)` | ポリシーを取り除く。デフォルト（`WARN`、ルールは `@Sortable` だけ）に戻る |
+| `SortPolicy.unregister(emf)` | ポリシーを取り除く。デフォルト（`INFO`、ルールは `@Sortable` だけ）に戻る |
 | `SortPolicy.find(emf)` | 登録されたポリシーを返す（`Optional`） |
 | `SortPolicy.effective(emf)` | 有効なポリシーを返す。登録されたものがなければデフォルト |
 
@@ -576,7 +577,7 @@ qb.from(Order::class.java).orderBy { o, by -> by.asc(o.description) }.toList()
 
 - lambdaQL が読むのは、`from(...)` に書いたエンティティのアノテーションだけです。別のエンティティのアノテーションでは関連のパスは許可されないので、関連フィールドに `path` を書いてください。
 - アノテーションは、ポリシーにそのエンティティのルール（コード、Spring の Bean、Spring Boot のプロパティ）がないときだけ使われます。
-- ポリシーを登録していないデフォルトの `WARN` モードでも働きます。
+- ポリシーを登録していないデフォルトの `INFO` モードでも働きます。
 
 Kotlin では、アノテーションが JVM のフィールドに付くように `@field:Sortable` と書きます。同じルールは Java でテストされています（[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)、リージョン `annotation`。[このページの Java 版](../java/04-order-paging.md#rules-from-sortable) を参照）。次は設計上の例です。
 

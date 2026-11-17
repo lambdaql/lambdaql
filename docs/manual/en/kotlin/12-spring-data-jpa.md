@@ -320,7 +320,7 @@ repository.findAll({ it.active }, Sort.by("nickname"))   // no such property: Pr
 val page: Page<Member> = repository.findAll({ it.active }, PageRequest.of(1, 2, Sort.by("name")))
 ```
 
-**Sort from request parameters.** Spring MVC can make a `Pageable` from request parameters such as `?page=1&size=20&sort=name,desc`. Without a sort policy and without `@Sortable` fields, every persistent property is accepted, so a user can sort by any column. lambdaQL then logs the warning `LQL-5003` once for each entity and name. To allow only some names, use the sort policy below.
+**Sort from request parameters.** Spring MVC can make a `Pageable` from request parameters such as `?page=1&size=20&sort=name,desc`. Without a sort policy and without `@Sortable` fields, every persistent property is accepted, so a user can sort by any column. lambdaQL then logs `LQL-5003` at `INFO` level once for each entity and name. To allow only some names, use the sort policy below.
 
 <a id="sort-policy-with-spring"></a>
 ### The sort policy with Spring
@@ -337,15 +337,15 @@ A Spring `Sort` or `Pageable` is always an outside sort, so the policy checks ev
 | `@Sortable` fields ([4.10](04-order-paging.md#rules-from-sortable)) | Rules for an entity that has no rules from the bean or the properties |
 
 - The rules of one entity come from one place only, in the order of the table. Rules from two places are not merged.
-- `lambdaql.sort.mode` wins over the mode of the bean. Without both, the mode is `WARN`.
+- `lambdaql.sort.mode` wins over the mode of the bean. Without both, the mode is `INFO`.
 - This works when there is exactly one `EntityManagerFactory`, the same condition as for the `QueryBuilder` bean (see [12.8](#128-the-querybuilder-bean)). Otherwise call `SortPolicy.register(emf, policy)` yourself.
-- Without a bean and without properties, nothing is registered, so the default applies: `WARN`, with rules only from `@Sortable`.
+- Without a bean and without properties, nothing is registered, so the default applies: `INFO`, with rules only from `@Sortable`.
 
 **Properties.**
 
 | Property | Meaning |
 |---|---|
-| `lambdaql.sort.mode` | `OFF`, `WARN` (the default) or `STRICT` |
+| `lambdaql.sort.mode` | `OFF`, `INFO` (the default), `WARN` or `STRICT` |
 | `lambdaql.sort.allow.<Entity>` | The allowed paths, separated by commas, for example `name,team.name` |
 | `lambdaql.sort.alias.<Entity>.<outside name>` | The path of an alias, for example `lambdaql.sort.alias.Member.level=grade` |
 

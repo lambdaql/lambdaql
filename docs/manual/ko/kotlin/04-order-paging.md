@@ -493,7 +493,7 @@ H2와 MariaDB는 `desc`에서 이미 NULL을 나중에 두므로 추가 구문�
 
 **`SortSpec.ofPath`: 속성 이름으로 만드는 정렬.** `SortSpec.ofPath(Order::class.java, "customer.name", Direction.DESC)`는 속성 경로로 spec을 만듭니다. 코드 밖에서 문자열로 들어오는 정렬 키에 사용하며, Spring 모듈은 Spring `Sort`를 이 방식으로 변환합니다([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) 참고).
 경로의 각 부분은 영속 속성이어야 하고, 마지막 부분은 기본 값이어야 합니다. 그 밖의 경로는 오류입니다.
-허용하는 이름은 정렬 정책이 정합니다(아래 [정렬 정책](#sort-policy) 참고). 정책도 `@Sortable` 필드도 없으면 영속 속성은 어느 것이든 받고, lambdaQL이 경고 `LQL-5003`을 기록합니다.
+허용하는 이름은 정렬 정책이 정합니다(아래 [정렬 정책](#sort-policy) 참고). 정책도 `@Sortable` 필드도 없으면 영속 속성은 어느 것이든 받고, lambdaQL이 `LQL-5003`을 기록합니다(기본 레벨은 `INFO`).
 이 형태에는 람다가 없으므로 Kotlin에서도 Java와 같게 동작합니다. Java 테스트는 [이 페이지의 Java 버전](../java/04-order-paging.md#410-reusable-and-external-sorts)에 있습니다(영역 `sort-spec-path`).
 
 ```kotlin
@@ -533,7 +533,8 @@ qb.from(Order::class.java).orderBy(byName).toList()
 | `SortMode` | 규칙이 허용하지 않는 이름의 처리 |
 |---|---|
 | `OFF` | 정렬을 실행합니다. 검사하지 않습니다 |
-| `WARN` | 정렬을 실행하고, 엔티티와 이름마다 한 번 경고 `LQL-5003`을 기록합니다. **기본값입니다:** 등록한 정책이 없으면 `WARN`을 사용하고, 규칙은 `@Sortable`에서만 가져옵니다 |
+| `INFO` | 정렬을 실행하고, 엔티티와 이름마다 한 번 `LQL-5003`을 `INFO` 레벨로 기록합니다. **기본값입니다:** 등록한 정책이 없으면 `INFO`를 사용하고, 규칙은 `@Sortable`에서만 가져옵니다 |
+| `WARN` | `INFO`와 같으며, 로그 레벨만 `WARN`입니다 |
 | `STRICT` | `SortNotAllowedException`(`LQL-4040`)으로 거부합니다. 규칙도 `@Sortable` 필드도 없는 엔티티는 모든 이름을 거부합니다 |
 
 따라서 정책을 등록하기 전에는 `@Sortable`이 허용하지 않는 외부 정렬 이름마다 엔티티별로 `LQL-5003`이 한 번 기록됩니다.
@@ -543,7 +544,7 @@ qb.from(Order::class.java).orderBy(byName).toList()
 |---|---|
 | `SortPolicy.of(mode, rules...)` | 모드와 엔티티별 규칙으로 정책 생성 |
 | `SortPolicy.register(emf, policy)` | persistence unit의 정책 등록. 이전 정책을 대체 |
-| `SortPolicy.unregister(emf)` | 정책 제거. 기본값(`WARN`, `@Sortable` 규칙만 사용)으로 복귀 |
+| `SortPolicy.unregister(emf)` | 정책 제거. 기본값(`INFO`, `@Sortable` 규칙만 사용)으로 복귀 |
 | `SortPolicy.find(emf)` | 등록한 정책 반환(`Optional`) |
 | `SortPolicy.effective(emf)` | 적용 중인 정책 반환. 등록한 정책이 없으면 기본값 |
 
@@ -579,7 +580,7 @@ qb.from(Order::class.java).orderBy { o, by -> by.asc(o.description) }.toList()
 
 - lambdaQL은 `from(...)`에 지정한 엔티티의 애너테이션만 읽습니다. 다른 엔티티의 애너테이션으로는 연관 경로가 허용되지 않으므로, 연관 필드에 `path`를 지정하십시오.
 - 애너테이션은 정책에 그 엔티티의 규칙(코드, Spring 빈, Spring Boot 프로퍼티)이 없을 때만 사용합니다.
-- 정책을 등록하지 않은 기본 `WARN` 모드에서도 동작합니다.
+- 정책을 등록하지 않은 기본 `INFO` 모드에서도 동작합니다.
 
 Kotlin에서는 애너테이션이 JVM 필드에 붙도록 `@field:Sortable`로 씁니다.
 같은 규칙을 Java로 테스트했습니다([`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), 영역 `annotation`, [이 페이지의 Java 버전](../java/04-order-paging.md#rules-from-sortable) 참고). 다음은 설계 예제입니다.

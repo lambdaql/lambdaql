@@ -104,10 +104,13 @@ class SortPolicyTest {
     @Test
     void warnAndOff() {
         // @start region="warn"
-        // WARN (the default): the sort runs and LQL-5003 is logged once per entity and name
+        // INFO (the default) and WARN: the sort runs and LQL-5003 is logged once per entity and name
         SortPolicy.register(emf, SortPolicy.of(SortMode.WARN));
         assertEquals("select e0 from Order e0 order by e0.description asc nulls first", hql("description", Direction.ASC));
         // @end
+        SortPolicy.unregister(emf);
+        assertEquals(SortMode.INFO, SortPolicy.effective(emf).mode());
+        assertEquals("select e0 from Order e0 order by e0.description asc nulls first", hql("description", Direction.ASC));
         SortPolicy.register(emf, SortPolicy.of(SortMode.OFF));
         assertEquals("select e0 from Order e0 order by e0.description asc nulls first", hql("description", Direction.ASC));
     }

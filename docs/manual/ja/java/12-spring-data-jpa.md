@@ -417,7 +417,7 @@ Page<Member> page = repository.findAll(m -> m.isActive(), PageRequest.of(1, 2, S
 // page 1 (the second page) of the active members by name; the total comes from a count query
 ```
 
-**リクエストパラメーターからのソート。** Spring MVC は、`?page=1&size=20&sort=name,desc` のようなリクエストパラメーターから `Pageable` を作れます。ソートポリシーも `@Sortable` フィールドもなければ、永続プロパティならどれでも受け付けるので、ユーザーはどのカラムでもソートできます。このとき lambdaQL は、エンティティと名前ごとに 1 回、警告 `LQL-5003` をログに出します。一部の名前だけを許可するには、次のソートポリシーを使ってください。
+**リクエストパラメーターからのソート。** Spring MVC は、`?page=1&size=20&sort=name,desc` のようなリクエストパラメーターから `Pageable` を作れます。ソートポリシーも `@Sortable` フィールドもなければ、永続プロパティならどれでも受け付けるので、ユーザーはどのカラムでもソートできます。このとき lambdaQL は、エンティティと名前ごとに 1 回、`LQL-5003` を `INFO` レベルでログに出します。一部の名前だけを許可するには、次のソートポリシーを使ってください。
 
 <a id="sort-policy-with-spring"></a>
 ### Spring でのソートポリシー
@@ -434,15 +434,15 @@ Spring の `Sort` や `Pageable` は常に外部のソートなので、ポリ�
 | `@Sortable` フィールド（[4.10](04-order-paging.md#rules-from-sortable)） | Bean にもプロパティにもルールがないエンティティのルール |
 
 - 1 つのエンティティのルールは、表の順で 1 か所からだけ取られます。2 か所のルールは合わせられません。
-- `lambdaql.sort.mode` は Bean のモードより優先されます。どちらもなければ、モードは `WARN` です。
+- `lambdaql.sort.mode` は Bean のモードより優先されます。どちらもなければ、モードは `INFO` です。
 - これが働くのは `EntityManagerFactory` がちょうど 1 つのときで、`QueryBuilder` の Bean と同じ条件です（[12.8](#128-the-querybuilder-bean) を参照）。そうでない場合は、`SortPolicy.register(emf, policy)` を自分で呼んでください。
-- Bean もプロパティもなければ何も登録されないので、デフォルトが使われます: `WARN`、ルールは `@Sortable` だけ。
+- Bean もプロパティもなければ何も登録されないので、デフォルトが使われます: `INFO`、ルールは `@Sortable` だけ。
 
 **プロパティ。**
 
 | プロパティ | 意味 |
 |---|---|
-| `lambdaql.sort.mode` | `OFF`、`WARN`（デフォルト）、`STRICT` |
+| `lambdaql.sort.mode` | `OFF`、`INFO`（デフォルト）、`WARN`、`STRICT` |
 | `lambdaql.sort.allow.<Entity>` | 許可するパスをカンマで区切ったもの。例: `name,team.name` |
 | `lambdaql.sort.alias.<Entity>.<外部の名前>` | エイリアスのパス。例: `lambdaql.sort.alias.Member.level=grade` |
 

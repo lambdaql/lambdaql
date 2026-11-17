@@ -493,7 +493,7 @@ H2 和 MariaDB 对 `desc` 本来就把 NULL 放在最后，因此不写额外的
 
 **`SortSpec.ofPath`：根据属性名排序。** `SortSpec.ofPath(Order::class.java, "customer.name", Direction.DESC)` 根据属性路径创建一个 spec，用于以文本形式来自代码外部的排序键（Spring 模块用它处理 Spring `Sort`，见 [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。
 路径的每一部分都必须是持久化属性，最后一部分必须是基本值。其他任何内容都会报错。
-允许哪些名称由排序策略决定（见下面的[排序策略](#sort-policy)）。既没有策略也没有 `@Sortable` 字段时，任何持久化属性都会被接受，并且 lambdaQL 会记录警告 `LQL-5003`。
+允许哪些名称由排序策略决定（见下面的[排序策略](#sort-policy)）。既没有策略也没有 `@Sortable` 字段时，任何持久化属性都会被接受，并且 lambdaQL 会记录 `LQL-5003`（默认为 `INFO` 级别）。
 这里没有 Lambda，所以 Kotlin 与 Java 的行为相同。Java 测试见[本页的 Java 版本](../java/04-order-paging.md#410-reusable-and-external-sorts)（region `sort-spec-path`）。
 
 ```kotlin
@@ -532,7 +532,8 @@ qb.from(Order::class.java).orderBy(byName).toList()
 | `SortMode` | 对规则不允许的名称的处理 |
 |---|---|
 | `OFF` | 执行排序，不做检查 |
-| `WARN` | 执行排序，并按实体和名称各记录一次警告 `LQL-5003`。**这是默认值：**没有注册策略时，lambdaQL 使用 `WARN`，规则只来自 `@Sortable` |
+| `INFO` | 执行排序，并按实体和名称各以 `INFO` 级别记录一次 `LQL-5003`。**这是默认值：**没有注册策略时，lambdaQL 使用 `INFO`，规则只来自 `@Sortable` |
+| `WARN` | 与 `INFO` 相同，但日志级别为 `WARN` |
 | `STRICT` | 以 `SortNotAllowedException`（`LQL-4040`）拒绝。既没有规则也没有 `@Sortable` 字段的实体，所有名称都会被拒绝 |
 
 因此，在注册策略之前，每个 `@Sortable` 不允许的外部排序名称都会按实体记录一次 `LQL-5003`。
@@ -542,7 +543,7 @@ qb.from(Order::class.java).orderBy(byName).toList()
 |---|---|
 | `SortPolicy.of(mode, rules...)` | 用模式和各实体的规则创建策略 |
 | `SortPolicy.register(emf, policy)` | 注册持久化单元的策略，替换之前的策略 |
-| `SortPolicy.unregister(emf)` | 移除策略，恢复默认值（`WARN`，规则只来自 `@Sortable`） |
+| `SortPolicy.unregister(emf)` | 移除策略，恢复默认值（`INFO`，规则只来自 `@Sortable`） |
 | `SortPolicy.find(emf)` | 返回已注册的策略（`Optional`） |
 | `SortPolicy.effective(emf)` | 返回生效的策略：已注册的策略，否则为默认值 |
 
@@ -577,7 +578,7 @@ qb.from(Order::class.java).orderBy { o, by -> by.asc(o.description) }.toList()
 
 - lambdaQL 只读取 `from(...)` 中实体的注解。其他实体上的注解不会允许经过关联的路径，请在关联字段上使用 `path`。
 - 只有当策略中没有该实体的规则（来自代码、Spring bean 或 Spring Boot 属性）时，才使用注解。
-- 在没有注册策略的默认 `WARN` 模式下也有效。
+- 在没有注册策略的默认 `INFO` 模式下也有效。
 
 在 Kotlin 中请写 `@field:Sortable`，让注解落在 JVM 字段上。同样的规则已用 Java 测试（[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)，region `annotation`，见[本页的 Java 版本](../java/04-order-paging.md#rules-from-sortable)）。下面是设计示例：
 

@@ -480,7 +480,7 @@ order by o1_0.description desc nulls last,o1_0.id desc
 H2 and MariaDB already put NULLs last for `desc`, so they write no extra clause. Oracle adds `nulls last`.
 
 **`SortSpec.ofPath`: a sort from a property name.** `SortSpec.ofPath(Order::class.java, "customer.name", Direction.DESC)` makes a spec from a property path, for sort keys that come as text from outside the code (the Spring module uses it for Spring `Sort`, see [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)).
-Every part of the path must be a persistent property, and the last part a basic value. Anything else is an error. Which names are allowed is decided by the sort policy (see [the sort policy](#sort-policy) below). Without a policy and without `@Sortable` fields, any persistent property is accepted, and lambdaQL logs the warning `LQL-5003`.
+Every part of the path must be a persistent property, and the last part a basic value. Anything else is an error. Which names are allowed is decided by the sort policy (see [the sort policy](#sort-policy) below). Without a policy and without `@Sortable` fields, any persistent property is accepted, and lambdaQL logs `LQL-5003` (at `INFO` level by default).
 There is no lambda here, so Kotlin works the same as Java. The Java test is in [the Java version of this page](../java/04-order-paging.md#410-reusable-and-external-sorts) (region `sort-spec-path`).
 
 ```kotlin
@@ -517,7 +517,8 @@ A rule must be a column of the entity. Any other key is rejected with `LQL-4041`
 | `SortMode` | A name that the rules do not allow |
 |---|---|
 | `OFF` | The sort runs. Nothing is checked |
-| `WARN` | The sort runs, and lambdaQL logs the warning `LQL-5003` once per entity and name. **This is the default:** without a registered policy, lambdaQL uses `WARN`, with rules only from `@Sortable` |
+| `INFO` | The sort runs, and lambdaQL logs `LQL-5003` at `INFO` level once per entity and name. **This is the default:** without a registered policy, lambdaQL uses `INFO`, with rules only from `@Sortable` |
+| `WARN` | The same as `INFO`, but the log level is `WARN` |
 | `STRICT` | The sort is rejected with `SortNotAllowedException` (`LQL-4040`). An entity that has neither rules nor `@Sortable` fields is rejected for every name |
 
 So, until you register a policy, each outside sort name that no `@Sortable` field allows logs `LQL-5003` once for each entity. Register a policy with `STRICT` to reject unknown names, or with `OFF` to turn the check off.
@@ -526,7 +527,7 @@ So, until you register a policy, each outside sort name that no `@Sortable` fiel
 |---|---|
 | `SortPolicy.of(mode, rules...)` | Makes a policy from a mode and the rules of each entity |
 | `SortPolicy.register(emf, policy)` | Registers the policy of a persistence unit. It replaces an earlier one |
-| `SortPolicy.unregister(emf)` | Removes the policy. The default (`WARN`, rules only from `@Sortable`) applies again |
+| `SortPolicy.unregister(emf)` | Removes the policy. The default (`INFO`, rules only from `@Sortable`) applies again |
 | `SortPolicy.find(emf)` | Returns the registered policy (`Optional`) |
 | `SortPolicy.effective(emf)` | Returns the policy in force: the registered one, else the default |
 
@@ -560,7 +561,7 @@ qb.from(Order::class.java).orderBy { o, by -> by.asc(o.description) }.toList()
 
 - lambdaQL reads the annotations of the entity in `from(...)`. An annotation on another entity does not allow a path through an association: use `path` on the association field.
 - The annotations are used only when the policy has no rules for that entity (from code, a Spring bean or Spring Boot properties).
-- They also work without a registered policy, in the default `WARN` mode.
+- They also work without a registered policy, in the default `INFO` mode.
 
 In Kotlin, write `@field:Sortable`, so the annotation goes on the JVM field. The same rules are tested in Java ([`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), region `annotation`, see [the Java version of this page](../java/04-order-paging.md#rules-from-sortable)). This is a design example:
 

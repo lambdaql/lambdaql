@@ -35,7 +35,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-2xxx` | バイトコードのデコード | `LQL-2001`〜`LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | 意味と Java で計算する値 | `LQL-3001`〜`LQL-3064` | `TranslationException` |
 | `LQL-4xxx` | 生成、バインド、実行 | `LQL-4001`〜`LQL-4042`、`LQL-4999`（内部エラー） | `LambdaQLException` そのもの、または JDK/JPA の標準例外（[例外](#exceptions) を参照） |
-| `LQL-5xxx` | 警告（ログに出力） | `LQL-5002`、`LQL-5003` | –（`WARN` のログ行） |
+| `LQL-5xxx` | 警告（ログに出力） | `LQL-5002`、`LQL-5003` | –（`WARN` のログ行。`LQL-5003` はデフォルトのソートモードでは `INFO`） |
 
 実際のコードの例:
 
@@ -54,7 +54,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-4036` | `LambdaQLException` | スタブがデータベースのプロシージャ {0} と一致しません: {1} |
 | `LQL-4040` | `SortNotAllowedException` | {0} ではこの名前でソートできません: {1}。SortRules の allow か alias で許可してください。 |
 | `LQL-5002` | –（`WARN` ログ） | limit のないサブクエリのソートは結果に影響しないため削除しました（Q4）: {0} |
-| `LQL-5003` | –（`WARN` ログ） | 外部からのソートが {0} のソート規則にありません: {1}。今は実行しますが、SortMode.STRICT では拒否されます。 |
+| `LQL-5003` | –（`INFO` または `WARN` ログ） | 外部からのソートが {0} のソート規則にありません: {1}。今は実行しますが、SortMode.STRICT では拒否されます。 |
 
 `{0}` と `{1}` は引数です。たとえば式やプロシージャ名が入ります。
 一覧はメッセージファイルにあります（[翻訳者向け](#for-translators) を参照）。
@@ -388,7 +388,7 @@ lambdaQL は **SLF4J API** を通してログを出します。
 | コード | いつ |
 |---|---|
 | `LQL-5002` | サブクエリに `orderBy` があって `limit` がないため、lambdaQL がソートを取り除くとき（ソートに効果がないため、ルール Q4） |
-| `LQL-5003` | 外部のソート（Spring の `Sort`、`SortSpec.ofPath`）がソートのルールにない名前を使い、モードが `SortMode.WARN`（デフォルト）のとき。ソートは実行される。エンティティと名前ごとに 1 回出る（[4.10 ソートポリシー](java/04-order-paging.md#sort-policy) を参照） |
+| `LQL-5003` | 外部のソート（Spring の `Sort`、`SortSpec.ofPath`）がソートのルールにない名前を使い、モードが `SortMode.INFO`（デフォルト、`INFO` レベルで出る）か `SortMode.WARN`（`WARN` レベルで出る）のとき。ソートは実行される。エンティティと名前ごとに 1 回出る（[4.10 ソートポリシー](java/04-order-paging.md#sort-policy) を参照） |
 
 ```
 WARN  [LQL-5002] A subquery sort without limit does not change the result, so it was removed (Q4): ...

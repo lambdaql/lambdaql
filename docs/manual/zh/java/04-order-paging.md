@@ -730,7 +730,7 @@ H2 和 MariaDB 对 `desc` 本来就把 NULL 放在最后，因此不写额外的
 - 路径是用 `.` 连接的属性名。每一部分都必须是持久化属性：中间是 to-one 关联或嵌入值，最后是基本值。
 - 其他任何内容都会报错（在 `orderBy` 中使用该 spec 时抛出 `IllegalArgumentException`）。因此这段文本永远不会变成其他 HQL。
 - 允许哪些名称由持久化单元的排序策略决定（见下面的[排序策略](#sort-policy)）。
-  既没有策略也没有 `@Sortable` 字段时，**任何**持久化属性都会被接受，并且 lambdaQL 会记录警告 `LQL-5003`。
+  既没有策略也没有 `@Sortable` 字段时，**任何**持久化属性都会被接受，并且 lambdaQL 会记录 `LQL-5003`（默认为 `INFO` 级别）。
 - 关联路径使用 `left join`，与排序 Lambda 中相同（规则 S8）。`then()` 可以把 `ofPath` spec 和 Lambda spec 连接起来。
 
 **(已测试)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-spec-path`：
@@ -774,7 +774,8 @@ assertThrows(IllegalArgumentException.class,
 | `SortMode` | 对规则不允许的名称的处理 |
 |---|---|
 | `OFF` | 执行排序，不做检查 |
-| `WARN` | 执行排序，并按实体和名称各记录一次警告 `LQL-5003`。**这是默认值：**没有注册策略时，lambdaQL 使用 `WARN`，规则只来自 `@Sortable` |
+| `INFO` | 执行排序，并按实体和名称各以 `INFO` 级别记录一次 `LQL-5003`。**这是默认值：**没有注册策略时，lambdaQL 使用 `INFO`，规则只来自 `@Sortable` |
+| `WARN` | 与 `INFO` 相同，但日志级别为 `WARN` |
 | `STRICT` | 以 `SortNotAllowedException`（`LQL-4040`）拒绝。既没有规则也没有 `@Sortable` 字段的实体，所有名称都会被拒绝 |
 
 因此，在注册策略之前，每个 `@Sortable` 不允许的外部排序名称都会按实体记录一次 `LQL-5003`。
@@ -784,7 +785,7 @@ assertThrows(IllegalArgumentException.class,
 |---|---|
 | `SortPolicy.of(mode, rules...)` | 用模式和各实体的规则创建策略 |
 | `SortPolicy.register(emf, policy)` | 注册持久化单元的策略，替换之前的策略 |
-| `SortPolicy.unregister(emf)` | 移除策略，恢复默认值（`WARN`，规则只来自 `@Sortable`） |
+| `SortPolicy.unregister(emf)` | 移除策略，恢复默认值（`INFO`，规则只来自 `@Sortable`） |
 | `SortPolicy.find(emf)` | 返回已注册的策略（`Optional`） |
 | `SortPolicy.effective(emf)` | 返回生效的策略：已注册的策略，否则为默认值 |
 
@@ -829,7 +830,7 @@ assertEquals("select e0 from Order e0 order by e0.description asc nulls first",
 **(已测试)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)，region `warn`：
 
 ```java
-// WARN (the default): the sort runs and LQL-5003 is logged once per entity and name
+// INFO (the default) and WARN: the sort runs and LQL-5003 is logged once per entity and name
 SortPolicy.register(emf, SortPolicy.of(SortMode.WARN));
 assertEquals("select e0 from Order e0 order by e0.description asc nulls first", hql("description", Direction.ASC));
 ```
@@ -845,7 +846,7 @@ assertEquals("select e0 from Order e0 order by e0.description asc nulls first", 
 
 - lambdaQL 只读取 `from(...)` 中实体的注解。其他实体上的注解不会允许经过关联的路径，请在关联字段上使用 `path`。
 - 只有当策略中没有该实体的规则（来自代码、Spring bean 或 Spring Boot 属性）时，才使用注解。
-- 在没有注册策略的默认 `WARN` 模式下也有效。
+- 在没有注册策略的默认 `INFO` 模式下也有效。
 
 **(已测试)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)，region `annotation`（上面的 `STRICT` 策略只有 `Order` 的规则）：
 

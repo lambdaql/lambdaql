@@ -34,7 +34,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-2xxx` | 字节码解码 | `LQL-2001` 至 `LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | 语义与在 Java 中计算的值 | `LQL-3001` 至 `LQL-3064` | `TranslationException` |
 | `LQL-4xxx` | 生成、绑定与执行 | `LQL-4001` 至 `LQL-4042`、`LQL-4999`（内部错误） | `LambdaQLException` 本身，或 JDK/JPA 标准异常（见[异常](#exceptions)） |
-| `LQL-5xxx` | 警告（记录在日志中） | `LQL-5002`、`LQL-5003` | –（一条 `WARN` 日志） |
+| `LQL-5xxx` | 警告（记录在日志中） | `LQL-5002`、`LQL-5003` | –（一条 `WARN` 日志；在默认排序模式下 `LQL-5003` 为 `INFO`） |
 
 一些实际的错误码：
 
@@ -53,7 +53,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-4036` | `LambdaQLException` | 存根与数据库存储过程 {0} 不一致：{1} |
 | `LQL-4040` | `SortNotAllowedException` | {0} 不允许按此名称排序：{1}。请用 SortRules 的 allow 或 alias 允许它。 |
 | `LQL-5002` | –（`WARN` 日志） | 没有 limit 的子查询排序不影响结果，已被移除（Q4）：{0} |
-| `LQL-5003` | –（`WARN` 日志） | 外部排序不在 {0} 的排序规则中：{1}。现在会执行，但在 SortMode.STRICT 下会被拒绝。 |
+| `LQL-5003` | –（`INFO` 或 `WARN` 日志） | 外部排序不在 {0} 的排序规则中：{1}。现在会执行，但在 SortMode.STRICT 下会被拒绝。 |
 
 `{0}` 和 `{1}` 是参数，例如表达式或存储过程名。
 完整列表见消息文件（见[致译者](#for-translators)）。
@@ -378,7 +378,7 @@ lambdaQL 目前提供的警告：
 | 错误码 | 何时 |
 |---|---|
 | `LQL-5002` | 子查询有 `orderBy` 但没有 `limit`，因此 lambdaQL 会移除排序（它不起作用，规则 Q4） |
-| `LQL-5003` | 外部排序（Spring `Sort`、`SortSpec.ofPath`）使用了不在排序规则中的名称，并且模式是 `SortMode.WARN`（默认值）。排序会执行。按实体和名称各记录一次（见 [4.10 排序策略](java/04-order-paging.md#sort-policy)） |
+| `LQL-5003` | 外部排序（Spring `Sort`、`SortSpec.ofPath`）使用了不在排序规则中的名称，并且模式是 `SortMode.INFO`（默认值，以 `INFO` 级别记录）或 `SortMode.WARN`（以 `WARN` 级别记录）。排序会执行。按实体和名称各记录一次（见 [4.10 排序策略](java/04-order-paging.md#sort-policy)） |
 
 ```
 WARN  [LQL-5002] 没有 limit 的子查询排序不影响结果，已被移除（Q4）：...

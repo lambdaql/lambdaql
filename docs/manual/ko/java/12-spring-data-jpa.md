@@ -425,7 +425,7 @@ Page<Member> page = repository.findAll(m -> m.isActive(), PageRequest.of(1, 2, S
 ```
 
 **요청 파라미터로 받는 정렬.** Spring MVC는 `?page=1&size=20&sort=name,desc` 같은 요청 파라미터로 `Pageable`을 만들 수 있습니다.
-정렬 정책도 `@Sortable` 필드도 없으면 영속 속성은 모두 받으므로 사용자가 어느 컬럼으로든 정렬할 수 있습니다. 이때 lambdaQL은 엔티티와 이름마다 한 번 경고 `LQL-5003`을 기록합니다.
+정렬 정책도 `@Sortable` 필드도 없으면 영속 속성은 모두 받으므로 사용자가 어느 컬럼으로든 정렬할 수 있습니다. 이때 lambdaQL은 엔티티와 이름마다 한 번 `LQL-5003`을 `INFO` 레벨로 기록합니다.
 일부 이름만 허용하려면 아래의 정렬 정책을 사용하십시오.
 
 <a id="sort-policy-with-spring"></a>
@@ -444,15 +444,15 @@ Spring `Sort`나 `Pageable`은 항상 외부 정렬이므로 정책이 그 안�
 | `@Sortable` 필드([4.10](04-order-paging.md#rules-from-sortable)) | 빈이나 프로퍼티에 규칙이 없는 엔티티의 규칙 |
 
 - 엔티티 하나의 규칙은 표의 순서에 따라 한 곳에서만 가져옵니다. 두 곳의 규칙을 합치지 않습니다.
-- `lambdaql.sort.mode`는 빈의 모드보다 우선합니다. 둘 다 없으면 모드는 `WARN`입니다.
+- `lambdaql.sort.mode`는 빈의 모드보다 우선합니다. 둘 다 없으면 모드는 `INFO`입니다.
 - 등록 조건은 `EntityManagerFactory`가 정확히 하나일 때이며, `QueryBuilder` 빈과 같습니다([12.8](#128-the-querybuilder-bean) 참고). 그 밖의 경우에는 `SortPolicy.register(emf, policy)`를 직접 호출하십시오.
-- 빈도 프로퍼티도 없으면 아무것도 등록하지 않으므로 기본값을 사용합니다: `WARN`, 규칙은 `@Sortable`에서만 가져옴.
+- 빈도 프로퍼티도 없으면 아무것도 등록하지 않으므로 기본값을 사용합니다: `INFO`, 규칙은 `@Sortable`에서만 가져옴.
 
 **프로퍼티.**
 
 | 프로퍼티 | 의미 |
 |---|---|
-| `lambdaql.sort.mode` | `OFF`, `WARN`(기본값), `STRICT` |
+| `lambdaql.sort.mode` | `OFF`, `INFO`(기본값), `WARN`, `STRICT` |
 | `lambdaql.sort.allow.<Entity>` | 허용 경로를 쉼표로 구분. 예: `name,team.name` |
 | `lambdaql.sort.alias.<Entity>.<외부 이름>` | 별칭의 경로. 예: `lambdaql.sort.alias.Member.level=grade` |
 

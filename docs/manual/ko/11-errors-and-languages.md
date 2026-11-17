@@ -35,7 +35,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-2xxx` | 바이트코드 디코딩 | `LQL-2001`~`LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | 의미 해석과 Java에서 계산하는 값 | `LQL-3001`~`LQL-3064` | `TranslationException` |
 | `LQL-4xxx` | 렌더링, 바인딩, 실행 | `LQL-4001`~`LQL-4042`, `LQL-4999`(내부 오류) | `LambdaQLException` 자체, 또는 JDK/JPA 표준 예외([예외](#exceptions) 참고) |
-| `LQL-5xxx` | 경고(로그에 기록) | `LQL-5002`, `LQL-5003` | –(`WARN` 로그 한 줄) |
+| `LQL-5xxx` | 경고(로그에 기록) | `LQL-5002`, `LQL-5003` | –(`WARN` 로그 한 줄. `LQL-5003`은 기본 정렬 모드에서 `INFO`) |
 
 실제 코드의 예:
 
@@ -54,7 +54,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-4036` | `LambdaQLException` | 스텁이 DB 프로시저 {0}와 맞지 않습니다: {1} |
 | `LQL-4040` | `SortNotAllowedException` | {0}에서는 이 이름으로 정렬할 수 없습니다: {1}. SortRules의 allow나 alias로 허용하세요. |
 | `LQL-5002` | –(`WARN` 로그) | limit 없는 서브쿼리 정렬은 결과에 영향이 없어 제거했습니다(Q4): {0} |
-| `LQL-5003` | –(`WARN` 로그) | 외부 정렬이 {0}의 정렬 규칙에 없습니다: {1}. 지금은 실행하지만 SortMode.STRICT에서는 거부됩니다. |
+| `LQL-5003` | –(`INFO` 또는 `WARN` 로그) | 외부 정렬이 {0}의 정렬 규칙에 없습니다: {1}. 지금은 실행하지만 SortMode.STRICT에서는 거부됩니다. |
 
 `{0}`, `{1}`은 인자입니다. 예를 들어 식이나 프로시저 이름이 들어갑니다.
 전체 목록은 메시지 파일에 있습니다([번역자를 위한 안내](#for-translators) 참고).
@@ -389,7 +389,7 @@ lambdaQL은 **SLF4J API**로 로그를 남깁니다.
 | 코드 | 발생 조건 |
 |---|---|
 | `LQL-5002` | 서브쿼리에 `orderBy`는 있지만 `limit`이 없어 lambdaQL이 정렬을 제거할 때(정렬은 결과에 영향이 없음, 규칙 Q4) |
-| `LQL-5003` | 외부 정렬(Spring `Sort`, `SortSpec.ofPath`)이 정렬 규칙에 없는 이름을 사용하고 모드가 `SortMode.WARN`(기본값)일 때. 정렬은 실행됨. 엔티티와 이름마다 한 번 기록([4.10 정렬 정책](java/04-order-paging.md#sort-policy) 참고) |
+| `LQL-5003` | 외부 정렬(Spring `Sort`, `SortSpec.ofPath`)이 정렬 규칙에 없는 이름을 사용하고 모드가 `SortMode.INFO`(기본값, `INFO` 레벨로 기록)나 `SortMode.WARN`(`WARN` 레벨로 기록)일 때. 정렬은 실행됨. 엔티티와 이름마다 한 번 기록([4.10 정렬 정책](java/04-order-paging.md#sort-policy) 참고) |
 
 ```
 WARN  [LQL-5002] limit 없는 서브쿼리 정렬은 결과에 영향이 없어 제거했습니다(Q4): ...
