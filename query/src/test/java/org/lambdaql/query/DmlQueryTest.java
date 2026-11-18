@@ -311,6 +311,36 @@ class DmlQueryTest {
     }
 
     @Test
+    void deleteWithSelfSubquery() {
+        double avg = orders().stream().mapToDouble(Order::getPrice).average().orElseThrow();
+        List<Long> below = ids(orders().stream().filter(o -> o.getPrice() < avg).toList());
+        // @start region="delete-self-subquery"
+        // the subquery reads the target table: lambdaQL reads the matching ids through a derived table first (U17),
+        // because MariaDB cannot delete from a table that a subquery reads (error 1093)
+        ExecutableDelete<Order> d = qb.delete(Order.class)
+                .where((o, sub) -> o.getPrice() < sub.from(Order.class).avg(x -> x.getPrice()));
+        assertEquals("delete from Order d0 where d0.id in (select t.id from (select e0.id as id from Order e0"
+                + " where e0.price < (select avg(s1.price) from Order s1)) t)", d.toHql().hql());
+        // a subquery on another table keeps the plain form
+        ExecutableDelete<Order> unused = qb.delete(Order.class)
+                .where((o, sub) -> !sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists());
+        assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)",
+                unused.toHql().hql());
+        // @end
+        assertEquals(below.size(), d.execute());
+        assertTrue(orders().stream().noneMatch(o -> below.contains(o.getId())));
+        // correlated: the cheaper order of each status that has a more expensive one
+        seed();
+        List<Order> all = orders();
+        List<Long> cheaper = ids(all.stream().filter(o -> all.stream()
+                .anyMatch(x -> x.getStatus() == o.getStatus() && x.getPrice() > o.getPrice())).toList());
+        ExecutableDelete<Order> c = qb.delete(Order.class).where((o, sub) -> sub.from(Order.class)
+                .where(x -> x.getStatus() == o.getStatus() && x.getPrice() > o.getPrice()).exists());
+        assertEquals(cheaper.size(), c.execute());
+        assertTrue(orders().stream().noneMatch(o -> cheaper.contains(o.getId())));
+    }
+
+    @Test
     void deleteWithLimit() {
         long cheapest = orders().stream().filter(o -> o.getStatus() == 1).min(java.util.Comparator.comparing(Order::getPrice)).orElseThrow().getId();
         // @start region="delete-limit"

@@ -222,6 +222,21 @@ class KotlinQueryTest {
     }
 
     @Test
+    fun deleteWithSelfSubquery() {
+        // @start region="delete-self-subquery"
+        // the subquery reads the target table: the matching ids are read through a derived table first (U17, MariaDB 1093)
+        val d = qb.delete(Order::class.java).where { o, sub -> o.price < sub.from(Order::class.java).avg { x -> x.price } }
+        assertEquals("delete from Order d0 where d0.id in (select t.id from (select e0.id as id from Order e0"
+                + " where e0.price < (select avg(s1.price) from Order s1)) t)", d.toHql().hql())
+        // @end
+        qb.delete(Item::class.java).all().execute()      // the seeded items point at orders (foreign key)
+        val avg = orders.map { it.price }.average()
+        val below = orders.filter { it.price < avg }
+        assertEquals(below.size, d.execute())
+        assertEquals(ids(orders - below.toSet()), ids(reload()))
+    }
+
+    @Test
     fun embeddedCompare() {
         // @start region="embedded-compare"
         // address is @Embedded (city, zip): == with a value object compares each column (D48)

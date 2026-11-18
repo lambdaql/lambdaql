@@ -96,6 +96,39 @@ where not exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id)
 모든 JPA 벌크 문장과 마찬가지로, delete는 JPA `cascade`나 `orphanRemoval`을 실행하지 않고 이미 로드된 엔티티에도 반영되지 않습니다(규칙 U16).
 delete에는 트랜잭션이 필요합니다([7.8](07-dml.md#transactions) 참고).
 
+<a id="delete-with-a-subquery-on-the-same-table"></a>
+## 같은 테이블을 읽는 서브쿼리
+
+`where`의 서브쿼리가 삭제 대상 엔티티(또는 같은 상속 계층의 엔티티)를 읽을 수 있습니다. 서브쿼리 자신의 `from`, 서브쿼리 안의 조인, U9의 상관 스칼라 서브쿼리가 이에 해당합니다.
+이때 lambdaQL은 먼저 대상 id를 파생 테이블로 읽고 그 id로 삭제합니다(규칙 U17).
+
+```
+delete from Order d0 where d0.id in (select t.id from (select e0.id as id from Order e0 where <condition>) t)
+```
+
+- 이유: 서브쿼리가 대상 테이블을 읽으면 MariaDB는 Hibernate의 `delete t from …`을 거부합니다(오류 1093, "specified twice").
+- 상관 서브쿼리에도 같은 형태가 동작합니다. 서브쿼리만 감싸는 방식은 상관 서브쿼리에 쓸 수 없습니다.
+- H2, MariaDB 10.11, Oracle 23.26에서 실측했습니다(비상관 `avg`, 상관 `exists`, `max`, 서브쿼리 안의 조인). 세 DB에서 삭제한 행 수가 같고, MariaDB도 실패하지 않습니다.
+- 다른 테이블을 읽는 서브쿼리는 기존 형태를 유지합니다(위의 `not exists` 예).
+- `update`는 감싸지 않습니다. 자기 테이블을 읽는 서브쿼리가 있는 `update`는 세 DB 모두에서 동작합니다(MariaDB 10.11에서 실측).
+- 복합 id 엔티티는 감싸지 않습니다. `limit`이 있는 delete는 원래 아래의 감싼 형태(별칭 `x0`)를 사용합니다.
+
+**(테스트됨)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `delete-self-subquery`:
+
+```java
+// the subquery reads the target table: lambdaQL reads the matching ids through a derived table first (U17),
+// because MariaDB cannot delete from a table that a subquery reads (error 1093)
+ExecutableDelete<Order> d = qb.delete(Order.class)
+        .where((o, sub) -> o.getPrice() < sub.from(Order.class).avg(x -> x.getPrice()));
+assertEquals("delete from Order d0 where d0.id in (select t.id from (select e0.id as id from Order e0"
+        + " where e0.price < (select avg(s1.price) from Order s1)) t)", d.toHql().hql());
+// a subquery on another table keeps the plain form
+ExecutableDelete<Order> unused = qb.delete(Order.class)
+        .where((o, sub) -> !sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists());
+assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)",
+        unused.toHql().hql());
+```
+
 <a id="delete-the-first-rows-limit"></a>
 ## 앞쪽 행 삭제: `limit`
 

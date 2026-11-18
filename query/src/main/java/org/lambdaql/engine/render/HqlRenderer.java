@@ -130,6 +130,8 @@ public final class HqlRenderer {
     private boolean collectGuards;
     /** Association prefixes used by a DML condition: key → the foreign key column to check for NOT NULL. */
     private final Map<String, Expr.Column> dmlGuards = new LinkedHashMap<>();
+    /** Entities read by subqueries of this statement, kept on the top renderer (U17). */
+    private final java.util.Set<Class<?>> subqueryReads = new java.util.HashSet<>();
     private java.util.Set<String> whereLeftJoins = java.util.Set.of();
 
     /**
@@ -527,7 +529,16 @@ public final class HqlRenderer {
     public RenderedQuery delete(Class<?> root, List<Bound> wheres, DmlScope scope) {
         dmlRoot = root;
         String where = scopedWhere(root, wheres, scope);
-        String hql = "delete from " + model.entityName(root) + " e0" + (where.isEmpty() ? "" : " where " + where);
+        String entity = model.entityName(root);
+        String id = model.idName(root).orElse(null);
+        if (!where.isEmpty() && scope.limit() == null && id != null && readsTarget(root)) {
+            // U17: MariaDB cannot delete from a table that a subquery reads (error 1093). The matching ids are read
+            // through a derived table first, the same rows as the plain form on every database.
+            String hql = "delete from " + entity + " d0 where d0." + id + " in (select t.id from (select e0." + id
+                    + " as id from " + entity + " e0 where " + where + ") t)";
+            return new RenderedQuery(hql, new LinkedHashMap<>(params));
+        }
+        String hql = "delete from " + entity + " e0" + (where.isEmpty() ? "" : " where " + where);
         return new RenderedQuery(hql, new LinkedHashMap<>(params));
     }
 
@@ -549,6 +560,31 @@ public final class HqlRenderer {
 
     private String idOf(Class<?> root) {
         return model.idName(root).orElseThrow(() -> LqlMessage.COMPOSITE_KEY_LIMIT.exception(root.getName()));
+    }
+
+    /** Checks if a subquery of this statement reads the target entity or an entity of the same hierarchy (U17). */
+    private boolean readsTarget(Class<?> root) {
+        for (Class<?> c : subqueryReads) {
+            if (c != null && (c.isAssignableFrom(root) || root.isAssignableFrom(c))) return true;
+        }
+        return false;
+    }
+
+    /** Records an entity read by a subquery on the top renderer (U17). */
+    private void noteRead(Class<?> entity) {
+        HqlRenderer top = this;
+        while (top.parent != null) top = top.parent;
+        top.subqueryReads.add(entity);
+    }
+
+    /** The class reached after the association step {@code i} of a column path. */
+    private Class<?> stepClass(Class<?> owner, List<String> names, int i) {
+        Class<?> t = owner;
+        for (int j = 0; j <= i && t != null; j++) {
+            Class<?> from = t;
+            t = model.property(from, names.get(j)).map(EntityModel.Property::javaType).orElse(null);
+        }
+        return t;
     }
 
     private String scopedWhere(Class<?> root, List<Bound> wheres, DmlScope scope) {
@@ -803,6 +839,7 @@ public final class HqlRenderer {
             dmlGuards.putIfAbsent(JoinPlanner.key(c.root(), prefix),
                     new Expr.Column(c.root(), fkPath, fkAssoc, Object.class, false, true));
         }
+        noteRead(owner);
         StringBuilder from = new StringBuilder(model.entityName(owner)).append(' ').append(alias);
         String expr = alias;
         for (int i = hop + 1; i < names.size(); i++) {
@@ -810,6 +847,7 @@ public final class HqlRenderer {
             boolean fkOnly = c.idPath() && i == names.size() - 2;
             if (!last && c.association().get(i) && !fkOnly) {
                 String inner = "s" + (++subqueries);
+                noteRead(stepClass(dmlRoot, names, i));
                 from.append(" left join ").append(expr).append('.').append(names.get(i)).append(' ').append(inner);
                 expr = inner;
             } else {
@@ -909,6 +947,7 @@ public final class HqlRenderer {
      * @return the HQL in brackets
      */
     private String subquery(Expr.Subquery q, String notInValue) {
+        noteRead(q.entity());
         HqlRenderer inner = new HqlRenderer(model, evaluator, params, "s", "s" + q.root() + "j");
         inner.parent = this;
         inner.ownRoot = q.root();
@@ -1323,6 +1362,7 @@ public final class HqlRenderer {
                 String key = expr + "." + names.get(i);
                 boolean left = (leftJoins && !requiredStep(c, i)) || whereLeftJoins.contains(JoinPlanner.key(c.root(), names.subList(0, i + 1)));
                 int owner = c.root();
+                if (parent != null) noteRead(stepClass(rootClass(c.root()), names, i));
                 expr = joins.computeIfAbsent(key, k -> new Join(joinPrefix + (joins.size() + 1), left, owner)).alias();
             } else {
                 expr = expr + "." + names.get(i);

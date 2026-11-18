@@ -140,3 +140,11 @@ B6 대상 페이지: `java/03`·`kotlin/03`(임베디드 경로 절, 같음 비�
 
 - `ja/kotlin/09-kotlin-notes.md`의 명시 앵커를 `plain--and-`로 바꿨습니다. 이 앵커를 가리키는 링크는 없습니다.
 - 일본어·중국어 `kotlin/03-where.md`는 원칙이 세 가지인데 "두 가지"로 적혀 있습니다.
+
+## 대기 항목: U17 DELETE의 자기 테이블 서브쿼리
+
+| 항목 | 내용 | 테스트 영역 |
+|---|---|---|
+| U17 구현 | DELETE의 서브쿼리(서브쿼리 안 조인, 상관 스칼라 서브쿼리 포함)가 대상과 같은 엔티티를 읽으면 `delete from X d0 where d0.id in (select t.id from (select e0.id as id from X e0 where …) t)`로 렌더링. MariaDB 오류 1093 해소(세 DB 실측). UPDATE는 해당 없음. 복합 키는 감싸지 않음 | `DmlQueryTest` `delete-self-subquery` |
+
+대상 페이지: `java/07-dml.md`·`kotlin/07-dml.md`("아직 구현되지 않았습니다" 문장에서 U17 제외, U17 행), `java/07-4-delete.md`·`kotlin/07-4-delete.md`(새 예제), `java/10-rules-and-limits.md`·`kotlin/10-rules-and-limits.md`(1093 행의 "아직 구현되지 않음" 제거).

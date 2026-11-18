@@ -300,7 +300,7 @@ lambdaQL은 NULL이 될 수 있는 모든 키에 대해 HQL에 `nulls first` / `
 |---|---|---|
 | `SET a = ..., b = a + 1`(설정한 뒤 컬럼을 읽음) | MariaDB는 **새** 값을, H2와 Oracle은 이전 값을 읽음 | 분석 시점에 오류(U3) |
 | DML 안의 연관 경로(`o.getCustomer().getName()`) | Hibernate가 DB마다 다른 조인을 만들고 고객이 없는 **행을 잃음** | lambdaQL은 상관 스칼라 서브쿼리를 씀(`where`와 SET). `where`에서 조회라면 inner join할 경로에는 `customer.id is not null`도 더함. 그래서 DML이 쿼리와 같은 행에 적용됨(U9, 테스트함) |
-| 같은 테이블에 대한 서브쿼리가 있는 `DELETE` | MariaDB 오류 1093 | 파생 테이블로 감쌈(U17. 아직 구현되지 않음) |
+| 같은 테이블에 대한 서브쿼리가 있는 `DELETE` | MariaDB 오류 1093 | 대상 id를 파생 테이블로 먼저 읽음: `d0.id in (select t.id from (select e0.id as id … where <condition>) t)`(U17). 상관 서브쿼리에도 동작하고 세 DB에서 같은 행을 삭제(실측). `update`는 감싸지 않음(MariaDB에서도 동작) |
 | STRING 컬럼과 ORDINAL 컬럼에 같은 enum 값을 한 번만 바인딩 | H2와 MariaDB는 **오류 없이 잘못된 값**을 저장 | 위치마다 파라미터 하나, 절대 공유하지 않음(U7) |
 | `values(list, ...)`의 많은 행 | Oracle: 바인드 65,535개의 고정 제한(ORA-01745), 그보다 훨씬 전부터 매우 느림 | 문장당 값 500개 이하로 나누고, 모든 문장을 한 트랜잭션에서 실행(U13) |
 | `order by ... limit`이 있는 `update` / `delete` | MariaDB는 `in` 서브쿼리의 `limit`(오류 1235)과 대상 테이블을 읽는 서브쿼리(오류 1093)를 거부 | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: 파생 테이블 `t`로 세 데이터베이스 모두에서 동작. 안쪽 select가 조회의 조인(D36)을 사용하므로 조회와 같은 행을 대상으로 함(테스트함) |

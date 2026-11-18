@@ -342,7 +342,7 @@ lambdaQL은 이 조건을 따로 처리하지 않습니다.
 ## 7.9 전체 규칙 U1~U21(요약)
 
 lambdaQL이 람다를 읽을 때 검사하는 규칙: U1, U3, U4, U6(테스트함). 컴파일러가 검사하는 규칙: U5.
-U11, U12, U15, U20에 대한 lambdaQL의 검사는 아직 구현되지 않았습니다. U17(같은 테이블을 읽는 서브쿼리에 대한 MariaDB용 감싸기)도 아직 구현되지 않았습니다.
+U11, U12, U15, U20에 대한 lambdaQL의 검사는 아직 구현되지 않았습니다.
 
 | # | 규칙 |
 |---|---|
@@ -362,7 +362,7 @@ U11, U12, U15, U20에 대한 lambdaQL의 검사는 아직 구현되지 않았습
 | U14 | `set` 람다 하나로 여러 컬럼에 할당할 수 있고, `set()`은 여러 번 호출할 수 있습니다. 모두 호출 순서대로 SET 목록 하나로 합쳐집니다. |
 | U15 | `@Version` 엔티티는 `update versioned`를 사용합니다. 버전에 직접 할당하지 마십시오. `execute() == 0` 확인은 사용자의 몫입니다. |
 | U16 | 벌크 DML은 영속성 컨텍스트를 건너뜁니다. 실행 전 flush, 실행 후 오래된 엔티티, cascade 없음. |
-| U17 | DELETE 서브쿼리가 같은 엔티티를 읽으면 lambdaQL은 이를 파생 테이블로 감쌉니다. (그렇지 않으면 MariaDB 오류 1093.) |
+| U17 | DELETE의 서브쿼리가 대상 엔티티(또는 같은 상속 계층)를 읽으면 lambdaQL은 대상 id를 파생 테이블로 먼저 읽습니다: `d0.id in (select t.id from (select e0.id as id from … where <condition>) t)`. 그렇지 않으면 MariaDB 오류 1093이 납니다. 상관 서브쿼리에도 동작하며, `update`와 복합 id 엔티티는 감싸지 않습니다([7.4](07-4-delete.md#delete-with-a-subquery-on-the-same-table) 참고). |
 | U18 | 상속: SINGLE_TABLE은 완전히 지원합니다. JOINED와 TABLE_PER_CLASS의 update/delete는 임시 테이블을 사용합니다. 그 하위 클래스로의 insert는 거부됩니다. |
 | U19 | 쿼리 캐시 키에는 진입점, 대상 엔티티, set 람다, where/all, versioned 여부, 분할 크기가 들어갑니다. |
 | U20 | `by.set(column, value)`: 컬럼은 대상에 대한 getter 경로여야 합니다. 타입은 분석 시점에 검사합니다. 한 람다 안에서 setter와 `by.set`을 섞지 마십시오. |
