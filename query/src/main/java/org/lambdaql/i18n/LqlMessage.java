@@ -164,7 +164,7 @@ public enum LqlMessage {
     /** LQL-3011: Entities cannot be compared with each other yet. Compare the ids: &#123;0&#125; */
     ENTITY_COMPARE("LQL-3011", 1),
 
-    /** LQL-3012: A whole value object cannot be compared. Compare its fields: &#123;0&#125; */
+    /** LQL-3012: A whole value object can only be compared for equality (equals, ==, !=) with a captured value object of the same type, another value of the same type, or null. Compare its fields: &#123;0&#125; */
     EMBEDDABLE_COMPARE("LQL-3012", 1),
 
     /** LQL-3013: A subquery must start with sub.from(...): &#123;0&#125; */

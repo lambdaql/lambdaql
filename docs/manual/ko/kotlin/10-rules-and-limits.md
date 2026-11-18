@@ -155,6 +155,7 @@ MariaDB에서 `NOT DETERMINISTIC`(기본값) 함수는 인자가 파라미터뿐
 | `it.description == it.custName`(엔티티 값 두 개) | `e0.description = e0.custName` | 어느 한쪽이 NULL: 반환되지 않음. NULL과 NULL도 마찬가지(SQL 의미, D48) |
 | `it.description.equals(text)`(`String?`) | `==`와 같음 | `==`와 같음 |
 | `x == null`, `x != null` | `is null`, `is not null` | 2값 |
+| 값 객체(`@Embedded`) 전체: `it.address == addr`, `it.address != addr` | 컬럼마다 펼침: `e0.address.city = :p1 and e0.address.zip = :p2`, 부정은 `<> ... or ...`. `== null`은 모든 컬럼 `is null`(and), `!= null`은 `is not null`(or) | 컬럼마다 SQL 의미(D48): NULL 컬럼은 `=`에도 `<>`에도 불일치. 캡처한 객체가 `null`이면 일치하는 행 없음(`WARN` 수준 `LQL-4045`) |
 | `it.id == id`(`it.id`는 `Long?`, `id`는 캡처한 `Long`), `it.id == null`: NULL이 될 수 없는 컬럼(id, 기본형, `nullable = false`, 경로에 연관 단계 없음) | `not (e0.id is null or e0.id <> :p1)` 대신 `e0.id = :p1`. `it.id == null`은 `1=0`(Java로 테스트함) | 컬럼에 NULL이 없음. 연관을 거치는 경로(`it.customer?.id`)는 검사 유지 |
 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL 3값 논리 |
 | `it.flag == true` / `it.flag != true` | `e0.flag = true` / `e0.flag <> true` | NULL: 반환되지 않음(SQL 의미, D48) |
@@ -366,6 +367,7 @@ lambdaQL은 이 목록의 모든 형태에 대해 명확한 오류를 던집니�
 | boolean 중위 함수 `and`, `or`, `xor` | `&&`, `\|\|` |
 | 가드 아래의 `/`, `%`, `CAST`(`it.qty != 0 && it.price!! / it.qty > 2`) | 나눗셈 없이 비교: `it.qty > 0 && it.price!! > 2.0 * it.qty` |
 | 엔티티 `==` 엔티티(`it.customer == c`)(KC13) | `it.customer?.id == c.id`(계획 중: 식별자 동등성) |
+| 값 객체(`@Embedded`)의 크기 비교, 다른 타입과의 비교(`LQL-3012`) | 필드를 비교. 같은 타입과의 `==`, `!=`, `null` 비교는 지원 |
 | 컬렉션 경로(`it.items...`, `@OneToMany`, `@ManyToMany`) | `exists()` 서브쿼리 또는 조인 |
 | `item in it.items` | `exists()` 서브쿼리 |
 | 람다 안에서 만든 컬렉션(`listOf(1, 2)`, `setOf(...)`)(KC8) | 밖에서 만들어 캡처. (`groupBy` 키는 예외) |

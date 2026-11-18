@@ -642,10 +642,41 @@ lambdaQL은 JPA Metamodel로 각 단계를 확인합니다.
 | 경로 단계 | HQL | 예 |
 |---|---|---|
 | to-one 연관(`@ManyToOne`, `@OneToOne`) | 별칭이 붙은 `join`(기본은 inner, 아래 참고) | `o.getCustomer().getName()` -> `join e0.customer j1` ... `j1.name` |
-| 임베디드(`@Embedded`) | 같은 테이블, 조인 없음 | `Order`에 임베디드 `address`가 있다면: `o.getAddress().getCity()` -> `e0.address.city` |
+| 임베디드(`@Embedded`) | 같은 테이블, 조인 없음. 값 객체 전체의 같음 비교는 컬럼마다 펼침(아래 참고) | `Order`에 임베디드 `address`가 있다면: `o.getAddress().getCity()` -> `e0.address.city` |
 | 대상의 `@Id`로 끝나는 경로 | 외래 키 컬럼, 조인 없음 | `o.getCustomer().getId()` -> `e0.customer.id` |
 | 연관 자체를 `null`과 비교 | 외래 키 컬럼, 조인 없음 | `o.getCustomer() == null` -> `e0.customer is null` |
 | 컬렉션(`@OneToMany`, `@ManyToMany`) | **거부됨** | `o.getItems()...` -> `exists` 서브쿼리 사용 |
+
+**값 객체 전체의 비교.** 임베디드 값 객체(`@Embedded`) 전체를 같음으로 비교하면 lambdaQL은 컬럼마다 비교 하나로 펼칩니다(B6).
+`o.getAddress().equals(addr)`, `Objects.equals(o.getAddress(), addr)`, `addr.equals(o.getAddress())`는 모두 `e0.address.city = :p1 and e0.address.zip = :p2`가 됩니다.
+
+- 부정(`!o.getAddress().equals(addr)`)은 `e0.address.city <> :p1 or e0.address.zip <> :p2`입니다.
+- `o.getAddress() == null`은 `e0.address.city is null and e0.address.zip is null`이고, `!= null`은 `e0.address.city is not null or e0.address.zip is not null`입니다.
+- 각 컬럼은 SQL 의미를 따릅니다(D48). NULL 컬럼은 `=`에도 `<>`에도 일치하지 않습니다. 예를 들어 (Seoul, NULL) 행은 같음 비교에도 부정에도 일치하지 않습니다(세 DB에서 실측).
+- 캡처한 값 객체의 각 속성은 쿼리가 실행될 때 읽어 바인딩합니다. 캡처한 객체가 `null`이면 모든 컬럼에 NULL을 바인딩하므로 일치하는 행이 없고, 컬럼마다 `LQL-4045`를 `WARN` 수준으로 기록합니다.
+- 중첩된 값 객체도 펼칩니다.
+- 크기 비교(`<` 등)와 다른 타입과의 비교는 여전히 `LQL-3012` 오류입니다. 필드를 비교하십시오.
+
+**(테스트됨)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java), 영역 `embedded-compare`:
+
+```java
+// address is @Embedded (city, zip): comparing the whole value object compares each column (D48)
+Address addr = new Address("Seoul", "04524");
+SelectQuery<Order> same = qb.from(Order.class).where(o -> o.getAddress().equals(addr));
+assertEquals("select e0 from Order e0 where e0.address.city = :p1 and e0.address.zip = :p2", same.toHql().hql());
+assertEquals(Map.of("p1", "Seoul", "p2", "04524"), same.toHql().parameters());
+// Objects.equals and addr.equals(...) are the same comparison
+assertEquals(same.toHql().hql(), qb.from(Order.class).where(o -> Objects.equals(o.getAddress(), addr)).toHql().hql());
+// null checks each column: "no address" means every column is NULL
+SelectQuery<Order> none = qb.from(Order.class).where(o -> o.getAddress() == null);
+assertEquals("select e0 from Order e0 where e0.address.city is null and e0.address.zip is null", none.toHql().hql());
+SelectQuery<Order> some = qb.from(Order.class).where(o -> o.getAddress() != null);
+assertEquals("select e0 from Order e0 where e0.address.city is not null or e0.address.zip is not null",
+        some.toHql().hql());
+// each column follows the SQL meaning: a NULL column matches neither = nor <>
+SelectQuery<Order> other = qb.from(Order.class).where(o -> !o.getAddress().equals(addr));
+assertEquals("select e0 from Order e0 where e0.address.city <> :p1 or e0.address.zip <> :p2", other.toHql().hql());
+```
 
 `where`에서 연관 경로는 기본적으로 **inner join**입니다(결정 D36).
 **(테스트됨)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), 영역 `inner-join`:
@@ -807,6 +838,7 @@ lambdaQL은 코드 `[LQL-xxxx]`와 소스 줄 번호가 담긴 예외를 던집�
 | 엔티티의 다른 메서드 | `o.calcSomething()` | getter만 사용 |
 | 엔티티 컬렉션 경로 | `o.getItems().size() > 0` | `exists` 서브쿼리 |
 | 엔티티와 엔티티 비교 | `o.getCustomer() == c` | id 비교(엔티티 비교는 계획 중) |
+| 값 객체의 크기 비교, 다른 타입과의 비교(`LQL-3012`) | `o.getAddress().compareTo(a) > 0`(`Address`가 `Comparable`일 때) | 필드를 비교. 같음 비교는 지원 |
 | 가드 아래의 `/`, `%`, 캐스트 | [3.12](#312-errors-that-depend-on-order-of-evaluation) 참고 | 가드를 없애거나 조건을 바꿈 |
 | 메서드를 호출하는 null 캡처 값 | `p == null`일 때 `o.getDescription().equals(p.trim())`, `o.getStatus() > p.intValue()`(`Double p`) | 앞에 null 가드(`p == null \|\| ...`)를 쓰거나 쿼리 전에 `p`를 확인 |
 | `NaN` / `Infinity` 캡처 값 | `o.getPrice() > Double.NaN` | NaN을 보내지 않음 |

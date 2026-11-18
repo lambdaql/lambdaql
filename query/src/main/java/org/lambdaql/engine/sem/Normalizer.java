@@ -244,6 +244,10 @@ public final class Normalizer {
             return cmp(op.flip(), ab[0], ab[1], false);
         }
         V va = value(left), vb = value(right);
+        if (op == CmpOp.EQ || op == CmpOp.NE) {
+            Pred parts = embeddedEq(va, vb, nullSafe);
+            if (parts != null) return op == CmpOp.EQ ? parts : Pred.not(parts);
+        }
         // a joined entity compared with null (ROADMAP D44): c == null is "no matching row", its id is null
         Expr a = va instanceof Path pa && joinedRoot(pa) && vb instanceof Done db && isNullLiteral(db.expr()) ? rootId(pa) : done(va);
         Expr b = vb instanceof Path pb && joinedRoot(pb) && va instanceof Done da && isNullLiteral(da.expr()) ? rootId(pb) : done(vb);
@@ -277,6 +281,7 @@ public final class Normalizer {
     private Pred isNull(Expr operand) {
         V v = value(operand);
         if (v instanceof Path p && joinedRoot(p)) return isNullOf(rootId(p));     // c == null for a joined entity (D44)
+        if (v instanceof Path p && p.kind().equals("EMBEDDED")) return embeddedParts(p, null, true); // B6
         return isNullOf(done(v));
     }
 
@@ -289,15 +294,19 @@ public final class Normalizer {
             }
             // a.equals(b)
             if (!m.isStatic() && m.name().equals("equals") && m.descriptor().equals("(Ljava/lang/Object;)Z")) {
-                Expr a = done(value(inv.receiver()));
+                V ra = value(inv.receiver()), rb = value(inv.args().get(0));
+                Pred parts = embeddedEq(ra, rb, true);
+                if (parts != null) return parts;
+                Expr a = done(ra);
                 if (a instanceof Expr.Host h) a = new Expr.Host(h.expr(), h.javaType(), true, h.autoUnboxed());
-                Expr b = done(value(inv.args().get(0)));
-                return eq(a, b);
+                return eq(a, done(rb));
             }
             // Objects.equals(a, b), Kotlin Intrinsics.areEqual(a, b)
             if (m.isStatic() && inv.args().size() == 2
                     && (m.is("java/util/Objects", "equals") || m.is(INTRINSICS, "areEqual"))) {
-                return eq(done(value(inv.args().get(0))), done(value(inv.args().get(1))));
+                V ra = value(inv.args().get(0)), rb = value(inv.args().get(1));
+                Pred parts = embeddedEq(ra, rb, true);
+                return parts != null ? parts : eq(done(ra), done(rb));
             }
             // captured.contains(x) and Kotlin CollectionsKt.contains(captured, x)
             if (!m.isStatic() && m.name().equals("contains") && m.descriptor().equals("(Ljava/lang/Object;)Z")
@@ -313,12 +322,80 @@ public final class Normalizer {
     }
 
     private Pred eq(Expr a, Expr b) {
+        return eq(a, b, true);
+    }
+
+    private Pred eq(Expr a, Expr b, boolean nullSafe) {
         if (isNullLiteral(b)) return isNullOf(a);
         if (isNullLiteral(a)) return isNullOf(b);
         if (a instanceof Expr.Column ca && b instanceof Expr.Host hb) b = retype(hb, ca.javaType());
         if (b instanceof Expr.Column cb && a instanceof Expr.Host ha) a = retype(ha, cb.javaType());
         rejectEntityCompare(a, b);
-        return new Pred.Cmp(CmpOp.EQ, a, b, true);
+        return new Pred.Cmp(CmpOp.EQ, a, b, nullSafe);
+    }
+
+    // ------------------------------------------------------------------ value objects (ROADMAP D48, B6)
+
+    /** Reads one property of a captured value object when the query runs. */
+    private static final MethodRef EMBEDDED_PROPERTY = new MethodRef("org/lambdaql/engine/sem/EmbeddedValues", "property",
+            "(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;", true, false);
+
+    /**
+     * Writes an equality with a value object ({@code @Embedded}) column by column (ROADMAP D48, B6):
+     * {@code o.getAddress().equals(addr)} becomes {@code address.city = :p1 and address.zip = :p2}, and
+     * {@code o.getAddress() == null} becomes {@code address.city is null and address.zip is null}. Each part follows
+     * the SQL meaning, so a NULL part matches no value.
+     *
+     * @param va       one side
+     * @param vb       the other side
+     * @param nullSafe the null-safe flag for each part compare
+     * @return the condition, or {@code null} when neither side is a value object
+     */
+    private Pred embeddedEq(V va, V vb, boolean nullSafe) {
+        Path p = embedded(va) ? (Path) va : embedded(vb) ? (Path) vb : null;
+        if (p == null) return null;
+        V other = p == va ? vb : va;
+        if (other instanceof Done d && isNullLiteral(d.expr())) return embeddedParts(p, null, true);
+        boolean sameType = other instanceof Path o && embedded(o) && o.type().equals(p.type());
+        if (!sameType && !(other instanceof Done d2 && d2.expr() instanceof Expr.Host)) {
+            throw error(LqlMessage.EMBEDDABLE_COMPARE, String.join(".", p.names()));
+        }
+        return embeddedParts(p, other, nullSafe);
+    }
+
+    private static boolean embedded(V v) {
+        return v instanceof Path p && p.kind().equals("EMBEDDED");
+    }
+
+    /**
+     * Makes the per-part condition of a value object: {@code part is null} for each part when {@code other} is
+     * {@code null}, else {@code part = other's part}, joined with {@code and}. Nested value objects are expanded too.
+     */
+    private Pred embeddedParts(Path p, V other, boolean nullSafe) {
+        List<String> attrs = model.attributeNames(p.type());
+        if (attrs.isEmpty()) throw error(LqlMessage.EMBEDDABLE_COMPARE, String.join(".", p.names()));
+        Pred out = Pred.Bool.TRUE;
+        for (String attr : attrs) {
+            EntityModel.Property prop = model.property(p.type(), attr)
+                    .orElseThrow(() -> error(LqlMessage.PROPERTY_NOT_FOUND, p.type().getSimpleName() + "." + attr));
+            V part = stepTo(p, prop);
+            Pred one;
+            if (other == null) {
+                one = embedded(part) ? embeddedParts((Path) part, null, nullSafe) : isNullOf(done(part));
+            } else {
+                V otherPart = other instanceof Path o ? stepTo(o, prop) : hostPart((Expr.Host) ((Done) other).expr(), prop);
+                one = embedded(part) ? embeddedParts((Path) part, otherPart, nullSafe) : eq(done(part), done(otherPart), nullSafe);
+            }
+            out = Pred.and(out, one);
+        }
+        return out;
+    }
+
+    /** One property of a captured value object, read in Java when the query runs (null when the object is null). */
+    private static V hostPart(Expr.Host h, EntityModel.Property prop) {
+        Expr read = new Expr.Invoke(null, EMBEDDED_PROPERTY,
+                List.of(h.expr(), new Expr.Const(prop.name(), Type.getType(String.class))));
+        return new Done(new Expr.Host(read, prop.javaType(), false, false));
     }
 
     // ------------------------------------------------------------------ values
@@ -444,6 +521,10 @@ public final class Normalizer {
     private V step(Path p, MethodRef getter) {
         EntityModel.Property prop = findProperty(p.type(), getter.name())
                 .orElseThrow(() -> error(LqlMessage.PROPERTY_NOT_FOUND, p.type().getSimpleName() + "." + getter.name()));
+        return stepTo(p, prop);
+    }
+
+    private V stepTo(Path p, EntityModel.Property prop) {
         List<String> names = new ArrayList<>(p.names());
         names.add(prop.name());
         List<Boolean> assoc = new ArrayList<>(p.assoc());

@@ -221,6 +221,20 @@ class KotlinQueryTest {
         assertEquals(ids(orders - without.toSet()), ids(reload()))
     }
 
+    @Test
+    fun embeddedCompare() {
+        // @start region="embedded-compare"
+        // address is @Embedded (city, zip): == with a value object compares each column (D48)
+        val addr = Address("Seoul", "04524")
+        val same = qb.from(Order::class.java).where { it.address == addr }
+        assertEquals("select e0 from Order e0 where e0.address.city = :p1 and e0.address.zip = :p2", same.toHql().hql())
+        val none = qb.from(Order::class.java).where { it.address == null }
+        assertEquals("select e0 from Order e0 where e0.address.city is null and e0.address.zip is null", none.toHql().hql())
+        // @end
+        assertEquals(ids(orders.filter { it.address?.city == null && it.address?.zip == null }), ids(none.toList()))
+        assertEquals(listOf<Long>(), ids(same.toList()))
+    }
+
     /** Minimal Spring context: the datasource chosen by application-test.yaml and the test entities. */
     @EnableAutoConfiguration
     @EntityScan("org.lambdaql.query")

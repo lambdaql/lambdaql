@@ -475,10 +475,31 @@ lambdaQL은 JPA Metamodel로 각 단계를 확인합니다.
 | 경로 단계 | HQL | 예 |
 |---|---|---|
 | to-one 연관(`@ManyToOne`, `@OneToOne`) | 별칭이 붙은 `join`(기본은 inner, 아래 참고) | `it.customer?.name` -> `join e0.customer j1` ... `j1.name` |
-| 임베디드(`@Embedded`) | 같은 테이블, 조인 없음 | `Order`에 임베디드 `address`가 있다면: `it.address.city` -> `e0.address.city` |
+| 임베디드(`@Embedded`) | 같은 테이블, 조인 없음. 값 객체 전체의 같음 비교는 컬럼마다 펼침(아래 참고) | `Order`에 임베디드 `address`가 있다면: `it.address.city` -> `e0.address.city` |
 | 대상의 `@Id`로 끝나는 경로 | 외래 키 컬럼, 조인 없음 | `it.customer?.id` -> `e0.customer.id` |
 | 연관 자체를 `null`과 비교 | 외래 키 컬럼, 조인 없음 | `it.customer == null` -> `e0.customer is null` |
 | 컬렉션(`@OneToMany`, `@ManyToMany`) | **거부됨** | `it.items...` -> `exists()` 서브쿼리 사용 |
+
+**값 객체 전체의 비교.** 임베디드 값 객체(`@Embedded`) 전체를 같음으로 비교하면 lambdaQL은 컬럼마다 비교 하나로 펼칩니다(B6).
+`it.address == addr`는 모두 `e0.address.city = :p1 and e0.address.zip = :p2`가 됩니다.
+
+- 부정(`it.address != addr`)은 `e0.address.city <> :p1 or e0.address.zip <> :p2`입니다.
+- `it.address == null`은 `e0.address.city is null and e0.address.zip is null`이고, `!= null`은 `e0.address.city is not null or e0.address.zip is not null`입니다.
+- 각 컬럼은 SQL 의미를 따릅니다(D48). NULL 컬럼은 `=`에도 `<>`에도 일치하지 않습니다. 예를 들어 (Seoul, NULL) 행은 같음 비교에도 부정에도 일치하지 않습니다(세 DB에서 실측).
+- 캡처한 값 객체의 각 속성은 쿼리가 실행될 때 읽어 바인딩합니다. 캡처한 객체가 `null`이면 모든 컬럼에 NULL을 바인딩하므로 일치하는 행이 없고, 컬럼마다 `LQL-4045`를 `WARN` 수준으로 기록합니다.
+- 중첩된 값 객체도 펼칩니다.
+- 크기 비교(`<` 등)와 다른 타입과의 비교는 여전히 `LQL-3012` 오류입니다. 필드를 비교하십시오.
+
+**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `embedded-compare`:
+
+```kotlin
+// address is @Embedded (city, zip): == with a value object compares each column (D48)
+val addr = Address("Seoul", "04524")
+val same = qb.from(Order::class.java).where { it.address == addr }
+assertEquals("select e0 from Order e0 where e0.address.city = :p1 and e0.address.zip = :p2", same.toHql().hql())
+val none = qb.from(Order::class.java).where { it.address == null }
+assertEquals("select e0 from Order e0 where e0.address.city is null and e0.address.zip is null", none.toHql().hql())
+```
 
 `it.customer?.name`, `it.customer!!.name`, 그리고 (Java 엔티티라면) `it.customer.name`은 모두 **같은 컬럼** `j1.name`을 뜻합니다.
 
@@ -638,6 +659,7 @@ lambdaQL은 코드 `[LQL-xxxx]`와 소스 줄 번호가 담긴 예외를 던집�
 | 엔티티의 다른 메서드 | `it.calcSomething()` | 속성만 사용 |
 | 엔티티 컬렉션 경로 | `it.items.size > 0` | `exists()` 서브쿼리 |
 | 엔티티와 엔티티 비교(KC13) | `it.customer == c` | id 비교(엔티티 비교는 계획 중) |
+| 값 객체의 크기 비교, 다른 타입과의 비교(`LQL-3012`) | `it.address > a`(`Address`가 `Comparable`일 때) | 필드를 비교. `==`, `!=`는 지원 |
 | 가드 아래의 `/`, `%`, 캐스트 | [3.12](#312-errors-that-depend-on-order-of-evaluation) 참고 | 가드를 없애거나 조건을 바꿈 |
 | `NaN` / `Infinity` 캡처 값 | `it.price!! > Double.NaN` | NaN을 보내지 않음 |
 | `isNaN()`(KC14) | `it.price!!.isNaN()` | – |

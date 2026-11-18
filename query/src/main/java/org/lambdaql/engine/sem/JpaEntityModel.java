@@ -6,6 +6,7 @@ import jakarta.persistence.metamodel.ManagedType;
 import jakarta.persistence.metamodel.Metamodel;
 import jakarta.persistence.metamodel.SingularAttribute;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -52,6 +53,17 @@ public final class JpaEntityModel implements EntityModel {
     @Override
     public Optional<Property> property(Class<?> owner, String name) {
         return cache.computeIfAbsent(owner.getName() + "#" + name, k -> lookup(owner, name));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public List<String> attributeNames(Class<?> embeddable) {
+        try {
+            return metamodel.managedType(embeddable).getAttributes().stream()
+                    .map(Attribute::getName).sorted().toList();
+        } catch (IllegalArgumentException e) {
+            return List.of();
+        }
     }
 
     /** {@inheritDoc} */

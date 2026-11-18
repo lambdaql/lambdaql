@@ -1,5 +1,6 @@
 package org.lambdaql.engine.sem;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -74,6 +75,21 @@ public interface EntityModel {
      * @return the property, or empty if there is no such property
      */
     Optional<Property> property(Class<?> owner, String name);
+
+    /**
+     * Returns the property names of an embeddable class, in name order. Used to write a value object comparison
+     * column by column (ROADMAP D48, B6): {@code o.getAddress().equals(addr)} becomes
+     * {@code address.city = :p1 and address.zip = :p2}.
+     *
+     * <p>Example: for {@code @Embeddable class Address { String city; String zip; }} this returns
+     * {@code [city, zip]}.
+     *
+     * @param embeddable an {@code @Embeddable} class
+     * @return the property names; empty if the class is not known
+     */
+    default List<String> attributeNames(Class<?> embeddable) {
+        return List.of();
+    }
 
     /**
      * Returns the name of the {@code @Id} property of an entity.

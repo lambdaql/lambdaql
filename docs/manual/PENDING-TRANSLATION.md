@@ -131,8 +131,10 @@ D48의 1단계(엔티티 값의 SQL 의미)는 아래 페이지에 반영되어 
 | B2 STRING 열거형 정렬 | `@Enumerated(EnumType.STRING)` 열로 정렬하면 DB는 이름 순, Java는 선언 순. 쿼리는 그대로, DEBUG `LQL-5011` | `MappingRulesTest` `enum-string-sort` |
 | B7 `@SQLRestriction`·`@SoftDelete` | Hibernate가 조회·count·서브쿼리·조인 `on`·파생 테이블·벌크 UPDATE/DELETE에 조건을 붙임. `@SoftDelete`의 DELETE는 `update … set deleted = 1`(MariaDB·Oracle 실측) | 없음(실측만) |
 | B3 `@Lob` | 정렬·distinct·group by에 쓰면 Oracle은 ORA-22848/22849(실측), H2·MariaDB는 동작. 쿼리는 그대로 두고 DEBUG `LQL-5010` | `MappingRulesTest` `lob` |
+| B6 값 객체 비교 | `@Embedded` 값 객체 전체의 같음 비교(`equals`, `Objects.equals`, Kotlin `==`, `!=`)를 컬럼별 비교로 전개. `== null`은 모든 컬럼 `is null`의 `and`. 각 컬럼은 SQL 의미. null 캡처 객체는 컬럼마다 NULL 바인딩과 WARN `LQL-4045`. 그 밖의 비교는 `LQL-3012`(문구 개정) | `MappingRulesTest` `embedded-compare`, `KotlinQueryTest` `embedded-compare` |
 
 대상 페이지: `java/04`·`kotlin/04`(S8), `java/06`·`kotlin/06`(J1, distinct·group by), `java/10`·`kotlin/10`(R24·S8·J1 행), `11-errors-and-languages.md`(5xxx 범위 `LQL-5011`까지, 코드 표·로그 표).
+B6 대상 페이지: `java/03`·`kotlin/03`(임베디드 경로 절, 같음 비교 규칙), `java/09`·`kotlin/09`(equals·`==` 표), `java/10`·`kotlin/10`(규칙 표), `11-errors-and-languages.md`(`LQL-3012` 문구).
 
 ### 참고 사항
 

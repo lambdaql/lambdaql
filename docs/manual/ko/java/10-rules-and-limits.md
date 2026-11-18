@@ -150,6 +150,7 @@ MariaDB에서 `NOT DETERMINISTIC`(기본값) 함수는 인자가 파라미터뿐
 | `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | NULL: 선택되지 않음(SQL 의미) |
 | `!o.getActive()`(nullable `Boolean`) | `e0.active = false` | NULL: 선택되지 않음(NULL은 false가 아님) |
 | `x == null`, `x != null` | `is null`, `is not null` | 2값 |
+| 값 객체(`@Embedded`) 전체: `o.getAddress().equals(addr)`, `Objects.equals(o.getAddress(), addr)`, `!o.getAddress().equals(addr)` | 컬럼마다 펼침: `e0.address.city = :p1 and e0.address.zip = :p2`, 부정은 `<> ... or ...`. `== null`은 모든 컬럼 `is null`(and), `!= null`은 `is not null`(or) | 컬럼마다 SQL 의미(D48): NULL 컬럼은 `=`에도 `<>`에도 불일치. 캡처한 객체가 `null`이면 일치하는 행 없음(`WARN` 수준 `LQL-4045`) |
 | NULL이 될 수 없는 컬럼(id, 기본형, `nullable = false`, 경로에 연관 단계 없음)의 `o.getId() == null` | `1=0`. 비교와 함께 쓰면 검사를 제거: `o.getId() != null && o.getId() == id`는 `e0.id = :p1`(테스트함) | 컬럼에 NULL이 없음. 연관을 거치는 경로(`o.getCustomer().getId()`)는 검사 유지 |
 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL 3값 논리 |
 | `where` 안의 `o.getCustomer().getName()` | `j1.name` + `join e0.customer j1`(기본은 inner join) | 고객이 없으면 주문이 선택되지 않음 |
@@ -344,6 +345,7 @@ lambdaQL은 이 목록의 모든 형태에 대해 명확한 오류를 던집니�
 | 단락 평가를 하지 않는 `&`, `\|`, `^` | `&&`, `\|\|` |
 | 가드 아래의 `/`, `%`, `CAST`(`qty != 0 && total / qty > 2`) | 나눗셈 없이 비교: `qty > 0 && total > 2 * qty` |
 | 엔티티 `==` 엔티티(`o.getCustomer() == c`) | `o.getCustomer().getId() == c.getId()`(계획 중: 식별자 동등성) |
+| 값 객체(`@Embedded`)의 크기 비교, 다른 타입과의 비교(`LQL-3012`) | 필드를 비교. 같은 타입과의 같음 비교(`equals`, `==`, `!=`, `null`)는 지원 |
 | 컬렉션 경로(`o.getItems()...`, `@OneToMany`, `@ManyToMany`) | `exists()` 서브쿼리나 조인 |
 | `o.getItems().contains(x)` | `exists()` 서브쿼리 |
 | 람다 안에서 만든 컬렉션(`List.of(1, 2)`) | 밖에서 만들어 캡처. (`groupBy` 키는 예외) |

@@ -111,6 +111,7 @@ lambdaQL에서 두 객체 사이의 `==`는 **값 비교**입니다(결정 D12).
 | enum | enum | 객체 비교 | R2 | `x = :p1` |
 | `Boolean` 컬럼 | `Boolean.TRUE` | 객체 비교 | R2 | `e0.active = :p1` |
 | `Boolean` 컬럼 | `true` | 언박싱 | R1 | `e0.active = true` |
+| 값 객체(`@Embedded`) | 같은 타입의 캡처 값 객체 | `equals` / 객체 비교 | 컬럼마다 펼침(B6) | `e0.address.city = :p1 and e0.address.zip = :p2`([3.10](03-where.md#310-association-paths) 참고) |
 | 무엇이든 | `null` | null 검사 | R3 | `x is null` |
 | 엔티티 | 엔티티(`o.getCustomer() == c`) | 객체 비교 | **v0.1에는 없음** | –(대신 id를 비교) |
 

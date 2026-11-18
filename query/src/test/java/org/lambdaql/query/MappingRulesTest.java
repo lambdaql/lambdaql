@@ -15,6 +15,8 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -112,6 +114,43 @@ class MappingRulesTest {
             log.setLevel(old);
             log.detachAppender(appender);
         }
+    }
+
+    @Test
+    void embeddedCompare() {
+        EntityManager em = emf.createEntityManager();
+        em.getTransaction().begin();
+        em.createQuery("update Order o set o.address.city = 'Seoul', o.address.zip = '04524' where o.price = 10").executeUpdate();
+        em.createQuery("update Order o set o.address.city = 'Seoul' where o.price = 20").executeUpdate();
+        em.getTransaction().commit();
+        em.close();
+        // @start region="embedded-compare"
+        // address is @Embedded (city, zip): comparing the whole value object compares each column (D48)
+        Address addr = new Address("Seoul", "04524");
+        SelectQuery<Order> same = qb.from(Order.class).where(o -> o.getAddress().equals(addr));
+        assertEquals("select e0 from Order e0 where e0.address.city = :p1 and e0.address.zip = :p2", same.toHql().hql());
+        assertEquals(Map.of("p1", "Seoul", "p2", "04524"), same.toHql().parameters());
+        // Objects.equals and addr.equals(...) are the same comparison
+        assertEquals(same.toHql().hql(), qb.from(Order.class).where(o -> Objects.equals(o.getAddress(), addr)).toHql().hql());
+        // null checks each column: "no address" means every column is NULL
+        SelectQuery<Order> none = qb.from(Order.class).where(o -> o.getAddress() == null);
+        assertEquals("select e0 from Order e0 where e0.address.city is null and e0.address.zip is null", none.toHql().hql());
+        SelectQuery<Order> some = qb.from(Order.class).where(o -> o.getAddress() != null);
+        assertEquals("select e0 from Order e0 where e0.address.city is not null or e0.address.zip is not null",
+                some.toHql().hql());
+        // each column follows the SQL meaning: a NULL column matches neither = nor <>
+        SelectQuery<Order> other = qb.from(Order.class).where(o -> !o.getAddress().equals(addr));
+        assertEquals("select e0 from Order e0 where e0.address.city <> :p1 or e0.address.zip <> :p2", other.toHql().hql());
+        // @end
+        assertEquals(same.toHql().hql(), qb.from(Order.class).where(o -> addr.equals(o.getAddress())).toHql().hql());
+        assertEquals(List.of(10.0), same.select(o -> o.getPrice()).toList());
+        assertEquals(List.of(30.0), none.select(o -> o.getPrice()).toList());
+        assertEquals(List.of(10.0, 20.0), some.select(o -> o.getPrice()).toList().stream().sorted().toList());
+        // (Seoul, NULL): city <> 'Seoul' is false and zip <> '04524' is unknown, so no row; (NULL, NULL) neither
+        assertEquals(List.of(), other.select(o -> o.getPrice()).toList());
+        // a null value object binds NULL for each column: no row, and LQL-4045 is logged at WARN when it runs
+        Address nothing = null;
+        assertEquals(List.of(), qb.from(Order.class).where(o -> o.getAddress().equals(nothing)).select(o -> o.getPrice()).toList());
     }
 
     /** Minimal Spring context: the datasource chosen by application-test.yaml and the test entities. */

@@ -505,6 +505,7 @@ class OrderRepo(private val qb: QueryBuilder) {
 | enum `==` | 지원 |
 | enum `<`, `>` | 지원. lambdaQL은 이를 enum 상수의 `in (...)`으로 펼치므로 ORDINAL과 STRING 매핑 모두에서 동작함 |
 | 엔티티 `==` 엔티티 | **거부됨**(KC13). id를 비교할 것 |
+| 값 객체(`@Embedded`) `==`, `!=` | 지원. 컬럼마다 펼침(B6, [3.10](03-where.md#310-association-paths) 참고). 크기 비교는 `LQL-3012` |
 | `+ - *`, 단항 `-` | 지원 |
 | `%` | 지원, `mod`로 출력 |
 | 정수 `/` | **주의.** 데이터베이스마다 결과가 다름(MariaDB는 `5/2`가 `2.5`, Kotlin은 `2`). 최종 규칙은 정해지지 않았으며 v0.1에서 거부될 수 있음. 가드 아래(`qty != 0 && total / qty > 2`)에서는 항상 거부됨 |

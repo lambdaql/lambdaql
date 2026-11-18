@@ -3,6 +3,7 @@ package org.lambdaql.engine.sem;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -63,6 +64,11 @@ public final class RowModel implements EntityModel {
             }
         }
         return Optional.empty();
+    }
+
+    @Override
+    public List<String> attributeNames(Class<?> embeddable) {
+        return jpa.attributeNames(embeddable);
     }
 
     @Override

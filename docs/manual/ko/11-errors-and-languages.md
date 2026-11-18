@@ -87,7 +87,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LambdaQLException` | `LQL-4xxx` | 모든 lambdaQL 예외의 기본 클래스. 렌더링, 바인딩, 실행 문제에는 이 클래스 자체를 던집니다 | DB와 맞지 않는 프로시저 스텁(`LQL-4036`). DB 인자 이름과 순서가 다른 스텁 인자(`LQL-4043`, [8.4](java/08-procedures-functions.md#84-warning-argument-order)의 `@DbParam` 참고). |
 | `LambdaAnalysisException` | `LQL-1xxx` | lambdaQL이 람다를 로드할 수 없을 때 | 람다 대신 익명 클래스(Kotlin `object : ...`). 직렬화할 수 없는 람다(`LQL-1002`). |
 | `UnsupportedLambdaShapeException` | `LQL-2xxx` | lambdaQL이 지원하지 않는 모양의 바이트코드일 때 | 반복문(`LQL-2004`). 값 삼항 연산자나 값 `if`/`when`. 일반적인 boolean 삼항 연산자 `c ? x : y`. |
-| `TranslationException` | `LQL-3xxx` | 람다가 HQL에서 정의된 의미를 갖지 않을 때 | getter가 아닌 엔티티 메서드. 두 엔티티를 `==`로 비교(아직 미지원). `groupBy` 키가 아닌 비집계 값(`LQL-3035`). |
+| `TranslationException` | `LQL-3xxx` | 람다가 HQL에서 정의된 의미를 갖지 않을 때 | getter가 아닌 엔티티 메서드. 두 엔티티를 `==`로 비교(아직 미지원). 값 객체의 크기 비교(`LQL-3012`). `groupBy` 키가 아닌 비집계 값(`LQL-3035`). |
 | `DbOnlyException` | `LQL-4034` | 직접 만든 `@SqlFunction` 메서드를 lambdaQL 람다 밖의 Java에서 호출했을 때 | `OrderFns.discount(1.0)`([람다 밖에서 호출한 플레이스홀더](#placeholders-called-outside-a-lambda) 참고) |
 | `SortNotAllowedException` | `LQL-4040` | `SortMode.STRICT`에서 외부 정렬(Spring `Sort`, `SortSpec.ofPath`)이 정렬 규칙에 없는 이름을 사용할 때 | `name`만 허용한 상태의 `Sort.by("grade")`([4.10 정렬 정책](java/04-order-paging.md#sort-policy) 참고). 웹 애플리케이션은 보통 HTTP 400으로 응답([12.5](java/12-spring-data-jpa.md#sort-policy-with-spring)) |
 
