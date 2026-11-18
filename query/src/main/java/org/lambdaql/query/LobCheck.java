@@ -11,9 +11,10 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Tells (DEBUG, LQL-5010) when a {@code @Lob} column is used as a sort key, a distinct value or a group key
- * (ROADMAP D48, B3): H2 and MariaDB accept it, Oracle rejects it (ORA-22848, ORA-22849, measured). lambdaQL does not
- * change the query; the message helps to find the cause of such a database error. Not public API.
+ * Tells (DEBUG) about mapping annotations that change how the database sorts or compares (ROADMAP D48):
+ * a {@code @Lob} column used as a sort key, a distinct value or a group key (B3, LQL-5010: H2 and MariaDB accept it,
+ * Oracle rejects it, ORA-22848 / ORA-22849, measured), and an enum stored as text used as a sort key (B2, LQL-5011:
+ * sorted by name, not by declaration order). lambdaQL does not change the query. Not public API.
  */
 final class LobCheck {
 
@@ -44,7 +45,24 @@ final class LobCheck {
                 String column = String.join(".", path);
                 if (LOGGED.add(column + "|" + usage)) LOG.debug("{}", LqlMessage.LOB_IN_SORT_OR_KEY.format(column, usage));
             }
+            // B2: an enum stored as text sorts by name in the database, by declaration order in Java
+            if (owner != null && usage.equals("order by") && stringEnum(owner, path.get(path.size() - 1))) {
+                String column = String.join(".", path);
+                if (LOGGED.add(column + "|enum")) LOG.debug("{}", LqlMessage.ENUM_STRING_SORT.format(column));
+            }
         }
+    }
+
+    private static boolean stringEnum(Class<?> owner, String name) {
+        for (Class<?> c = owner; c != null && c != Object.class; c = c.getSuperclass()) {
+            for (Field f : c.getDeclaredFields()) {
+                if (f.getName().equals(name) && f.getType().isEnum()) {
+                    jakarta.persistence.Enumerated e = f.getAnnotation(jakarta.persistence.Enumerated.class);
+                    return e != null && e.value() == jakarta.persistence.EnumType.STRING;
+                }
+            }
+        }
+        return false;
     }
 
     private static boolean isLob(Class<?> owner, String name) {

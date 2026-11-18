@@ -73,6 +73,34 @@ public final class HqlRenderer {
         return null;
     }
 
+    /**
+     * A5: a sort key that is a unique, never-NULL column of the main entity ({@code @Column(unique = true)} or Hibernate
+     * {@code @NaturalId}) orders every row, so paging needs no id tie-breaker. A nullable unique column can hold NULL in
+     * many rows, so it does not count.
+     */
+    private static boolean uniqueKey(Class<?> root, Expr.Column c) {
+        if (c.path().size() != 1 || !c.nonNull() || root == null) return false;
+        String name = c.path().get(0);
+        String cap = Character.toUpperCase(name.charAt(0)) + name.substring(1);
+        for (Class<?> k = root; k != null && k != Object.class; k = k.getSuperclass()) {
+            for (java.lang.reflect.Field f : k.getDeclaredFields()) {
+                if (f.getName().equals(name) && unique(f.getAnnotations())) return true;
+            }
+            for (java.lang.reflect.Method m : k.getDeclaredMethods()) {
+                if ((m.getName().equals("get" + cap) || m.getName().equals("is" + cap)) && unique(m.getAnnotations())) return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean unique(java.lang.annotation.Annotation[] annotations) {
+        for (java.lang.annotation.Annotation a : annotations) {
+            if (a instanceof jakarta.persistence.Column col && col.unique()) return true;
+            if (a.annotationType().getName().equals("org.hibernate.annotations.NaturalId")) return true;
+        }
+        return false;
+    }
+
     private boolean allStepsRequired(Expr.Column c) {
         for (int i = 0; i < c.path().size() - 1; i++) {
             if (c.association().get(i) && !requiredStep(c, i)) return false;
@@ -927,8 +955,9 @@ public final class HqlRenderer {
                 String key = value(item.key(), null);
                 String nulls = sortNonNull(item.key()) ? "" : d.nullsFirst() ? " nulls first" : " nulls last";
                 out.add(key + (d.ascending() ? " asc" : " desc") + nulls);
-                if (id != null && item.key() instanceof Expr.Column c && c.root() == mainRoot() && c.path().equals(List.of(id))) {
-                    hasId = true;
+                if (id != null && item.key() instanceof Expr.Column c && c.root() == mainRoot()
+                        && (c.path().equals(List.of(id)) || uniqueKey(root, c))) {
+                    hasId = true;       // the key already gives every row its own place (S9, A5)
                 }
             }
             leftJoins = false;

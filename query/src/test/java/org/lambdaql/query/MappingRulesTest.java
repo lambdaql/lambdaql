@@ -69,6 +69,20 @@ class MappingRulesTest {
     }
 
     @Test
+    void uniqueSortKey() {
+        // @start region="unique-key"
+        // code is @Column(unique = true, nullable = false): it orders every row, so paging adds no id tie-breaker
+        assertEquals("select e0 from OrderLine e0 order by e0.code asc",
+                qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getCode())).limit(2).toHql().hql());
+        // a key that is not unique still gets the id tie-breaker (S9)
+        assertEquals("select e0 from OrderLine e0 join e0.order j1 order by j1.price asc, e0.id asc",
+                qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getOrder().getPrice())).limit(2).toHql().hql());
+        // @end
+        assertEquals(List.of("memo-10.0", "memo-20.0"), qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getCode())).limit(2)
+                .toList().stream().map(OrderLine::getCode).toList());
+    }
+
+    @Test
     void lobColumn() {
         ch.qos.logback.classic.Logger log = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(LobCheck.class);
         Level old = log.getLevel();
@@ -87,6 +101,13 @@ class MappingRulesTest {
             List<String> found = appender.list.stream().map(ILoggingEvent::getFormattedMessage)
                     .filter(m -> m.startsWith("[LQL-5010]")).toList();
             assertEquals(3, found.size(), String.valueOf(appender.list));
+            // @start region="enum-string-sort"
+            // kind is @Enumerated(EnumType.STRING): the database sorts by name, Java by declaration order (LQL-5011, DEBUG)
+            assertEquals("select e0 from Order e0 order by e0.kind asc nulls first",
+                    qb.from(Order.class).orderBy((o, by) -> by.asc(o.getKind())).toHql().hql());
+            // @end
+            assertEquals(1, appender.list.stream().filter(e -> e.getFormattedMessage().startsWith("[LQL-5011]")).count(),
+                    String.valueOf(appender.list));
         } finally {
             log.setLevel(old);
             log.detachAppender(appender);

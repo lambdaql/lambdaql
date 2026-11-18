@@ -354,6 +354,7 @@ MariaDB에는 `NULLS` 구문이 없으므로, 기본값이 아닌 위치는 Hibe
 | 컬럼: `o.getPrice()` | 허용 | 테스트함 |
 | to-one 경로: `o.getCustomer().getName()` | 허용 | `left join`(필수 연관은 inner join), 아래 참고(테스트함) |
 | `@Lob` 컬럼 | 허용 | Oracle은 거부함. `DEBUG` 수준 `LQL-5010`, 아래 참고(테스트함) |
+| `@Enumerated(EnumType.STRING)` enum 컬럼 | 허용 | 이름 순으로 정렬됨(선언 순서가 아님). `DEBUG` 수준 `LQL-5011`, 아래 참고(테스트함) |
 | 산술: `o.getPrice() * 2`, `+`, `-` | 허용 | 아직 테스트하지 않음 |
 | 확대 변환(`int`에서 `long`으로) | 허용 | 아직 테스트하지 않음 |
 | 엔티티: `by.desc(o.getCustomer())` | **컴파일 오류** | 엔티티는 `Comparable`이 아님 |
@@ -420,6 +421,17 @@ lambdaQL은 쿼리를 바꾸지 않고, 컬럼과 사용처마다 한 번 `LQL-5
 qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getMemo())).toHql();
 qb.from(OrderLine.class).groupBy(l -> l.getMemo()).select(l -> l.getMemo()).toHql();
 qb.from(OrderLine.class).select(l -> l.getMemo()).distinct().toHql();
+```
+
+**`EnumType.STRING` enum의 정렬.** `@Enumerated(EnumType.STRING)`으로 매핑한 enum 컬럼은 데이터베이스가 상수 **이름**의 문자열 순서로 정렬합니다. Java의 enum 비교는 선언 순서를 따르므로 결과 순서가 다를 수 있습니다(B2).
+lambdaQL은 쿼리를 바꾸지 않고, 컬럼마다 한 번 `LQL-5011`을 `DEBUG` 수준으로 기록합니다. `ORDINAL`(또는 `@Enumerated` 없음)은 선언 순서로 정렬하므로 기록하지 않습니다.
+
+**(테스트됨)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java), 영역 `enum-string-sort`:
+
+```java
+// kind is @Enumerated(EnumType.STRING): the database sorts by name, Java by declaration order (LQL-5011, DEBUG)
+assertEquals("select e0 from Order e0 order by e0.kind asc nulls first",
+        qb.from(Order.class).orderBy((o, by) -> by.asc(o.getKind())).toHql().hql());
 ```
 
 별칭은 `where`와 함께 사용합니다. `where`가 같은 경로를 이미 조인했다면 정렬은 그 조인을 사용합니다.
@@ -638,9 +650,22 @@ fetch first ? rows only
 규칙: **페이징을 사용하고 정렬 키에 id가 없으면 lambdaQL은 루트 `@Id asc`를 마지막 키로 추가합니다.**
 
 - 한 번만 추가합니다. 키에 이미 id가 있으면(예: `by.desc(o.getId())`) 추가하지 않습니다.
+- 정렬 키에 주 엔티티의 유일하고 NULL이 될 수 없는 컬럼이 있으면 추가하지 않습니다(A5). `nullable = false`인 `@Column(unique = true)`, Hibernate `@NaturalId`, `@Id`가 이에 해당하며, 이 키만으로 모든 행의 순서가 정해지기 때문입니다.
+  NULL이 될 수 있는 유일 컬럼은 해당하지 않습니다. NULL은 여러 행에 있을 수 있기 때문입니다.
 - `limit`과 `offset`이 없으면 아무것도 추가하지 않습니다.
 - 명시적 조인(`join`, `leftJoin`, `crossJoin`)이 있으면 조인한 모든 엔티티의 id도 조인 순서대로 추가합니다(테스트함, [6.8](06-select-group.md#68-explicit-joins) 참고).
 - 아직 구현되지 않음: 컬렉션 fetch join과 `limit`/`offset`을 함께 사용하면 거부합니다.
+
+**(테스트됨)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java), 영역 `unique-key`(`OrderLine.code`는 `@Column(unique = true, nullable = false)`):
+
+```java
+// code is @Column(unique = true, nullable = false): it orders every row, so paging adds no id tie-breaker
+assertEquals("select e0 from OrderLine e0 order by e0.code asc",
+        qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getCode())).limit(2).toHql().hql());
+// a key that is not unique still gets the id tie-breaker (S9)
+assertEquals("select e0 from OrderLine e0 join e0.order j1 order by j1.price asc, e0.id asc",
+        qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getOrder().getPrice())).limit(2).toHql().hql());
+```
 
 <a id="49-strings-and-special-values"></a>
 ## 4.9 문자열과 특수한 값
@@ -940,7 +965,7 @@ assertThrows(SortNotAllowedException.class, () -> hql("description", Direction.A
 | S6 | `SortSpec`(`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`)으로 재사용합니다. 외부 문자열은 persistence unit의 정렬 정책(`SortRules`, `SortPolicy`, `SortMode`, [4.10](#sort-policy) 참고)이 검사합니다 | `SortSpec`과 정렬 정책은 구현되고 테스트됨. `SortSpec`의 조인 형태는 아직 구현되지 않음 |
 | S7 | 키: 컬럼, to-one 경로, `+ - *`, 확대 변환. 값 분기는 안 됩니다 | 구현됨. 컬럼과 to-one 경로는 테스트함 |
 | S8 | `orderBy`에만 쓰인 연관 경로는 `left join`을 사용하므로 연관이 없는 행도 유지됩니다. 필수 연관(`optional = false`)은 행을 잃지 않으므로 inner join입니다(A4). 같은 경로를 `where`에서 쓰면 정렬은 `where`의 조인을 사용합니다 | 구현됨 |
-| S9 | 페이징을 사용할 때 키에 id가 없으면 루트 `@Id asc`를 추가합니다. 컬렉션 fetch join + 페이징은 거부됩니다 | 루트 id와 명시적으로 조인한 엔티티의 id는 구현됨(테스트함). fetch join 검사는 아직 구현되지 않음 |
+| S9 | 페이징을 사용할 때 키에 id가 없으면 루트 `@Id asc`를 추가합니다. 키에 유일하고 NULL이 될 수 없는 컬럼(`unique = true`이고 `nullable = false`, `@NaturalId`)이 있으면 추가하지 않습니다(A5). 컬렉션 fetch join + 페이징은 거부됩니다 | 루트 id와 명시적으로 조인한 엔티티의 id는 구현됨(테스트함). fetch join 검사는 아직 구현되지 않음 |
 | S10 | 분석 결과는 람다별로 캐시됩니다. 캡처한 `Direction`은 호출할 때마다 읽습니다 | 구현됨 |
 | S11 | Spring `Sort.Order`는 `Direction`에 1:1로 대응합니다(Spring 모듈, [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) 참고). 속성 이름은 정렬 정책의 검사를 거치고, 별칭은 그대로 전달합니다 | Spring `Sort`는 구현되고 테스트됨(`ignoreCase`는 아직 지원하지 않음). 정렬 정책과 함께 쓰는 경우도 테스트함. `"price,desc_nulls_last"` 같은 문자열 하나의 해석은 아직 구현되지 않음 |
 | S12 | 조인 쿼리도 같은 형태를 사용합니다: `(o, c, by)`, `(o, c, i, by)` | 구현됨(테스트함, [6.8](06-select-group.md#68-explicit-joins) 참고) |

@@ -24,6 +24,10 @@ public class OrderLine {
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
+    /** A unique code that is never NULL: a sort by it needs no id tie-breaker (A5). */
+    @jakarta.persistence.Column(unique = true, nullable = false)
+    private String code;
+
     /** A large text. */
     @Lob
     private String memo;
@@ -41,6 +45,12 @@ public class OrderLine {
     public OrderLine(Order order, String memo) {
         this.order = order;
         this.memo = memo;
+        this.code = memo.replace(' ', '-');
+    }
+
+    /** @return the code */
+    public String getCode() {
+        return code;
     }
 
     /** @return the id */

@@ -489,7 +489,10 @@ public enum LqlMessage {
     SQL_NULL_MEANING("LQL-5009", 1),
 
     /** LQL-5010: The column &#123;0&#125; is a &#64;Lob column; some databases (for example Oracle) cannot use a LOB in &#123;1&#125;. */
-    LOB_IN_SORT_OR_KEY("LQL-5010", 2);
+    LOB_IN_SORT_OR_KEY("LQL-5010", 2),
+
+    /** LQL-5011: The enum column &#123;0&#125; is stored as text (&#64;Enumerated(STRING)), so the database sorts it by name, not by the declaration order of the enum. */
+    ENUM_STRING_SORT("LQL-5011", 1);
 
     private final String code;
     private final int argCount;
