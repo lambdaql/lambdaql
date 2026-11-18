@@ -976,7 +976,7 @@ qb.from(Order.class).leftJoin(Customer.class, (o, c) -> o.getCustomer().getId() 
 | S6 | 재사용·조립형은 `SortSpec`: `SortSpec.of(Order.class, (o, by) -> by.desc(o.getUpdateAt()).asc(o.getId()))`, `then()`, `reversed()`. 외부 문자열(요청 파라미터, Spring `Sort`)은 `SortWhitelist<T>`로만 변환 | 컴파일 타임 + 런타임 |
 | S7 | 키 식은 컬럼, to-one 경로, `+ - *`, 넓히는 변환까지(값 분기 없음). Kotlin `?.`는 경로로 해석 | 분석 시점 |
 | S8 | 연관 경로는 정렬 전용 `left join`(암묵 경로는 세 DB 모두 inner join으로 NULL 행 탈락). 조인 쿼리의 키 안 경로도 이미 조인된 alias 또는 정렬 전용 `left join` | 렌더러 |
-| S9 | 페이징 시 키 집합에 유일 키가 없으면 루트 `@Id asc`를 마지막에 자동 추가(to-many 조인이면 조인 엔티티 `@Id`도). collection fetch join + `limit/offset`은 거부 | 렌더러 |
+| S9 | 페이징 시 키 집합에 유일 키가 없으면 루트 `@Id asc`를 마지막에 자동 추가(to-many 조인이면 조인 엔티티 `@Id`도). 엔티티와 값 쿼리의 `first()`도 한 행만 읽으므로 같이 추가(값 쿼리 `first()`는 2026-11-18 보완, 이전에는 누락). collection fetch join + `limit/offset`은 거부 | 렌더러 |
 | S10 | 분석 캐시는 람다 하나 단위. `sort(key, dir)`의 `dir`(또는 `nullsFirst`)이 캡처 값이면 실행할 때마다 읽는 바인딩 값으로 취급(구조는 캐시) | 캐시 |
 | S11 | Spring `Sort.Order`(direction + `NullHandling`)는 `Direction` 6개 값과 1:1(v0.2 모듈). `SortWhitelist.parse("price,desc_nulls_last")` 지원 | 런타임 |
 | S12 | 조인 쿼리도 같은 형태(`(o, c, by)`, `(o, c, i, by)`). 쿼리 종류마다 `orderBy` 오버로드 몇 개만 필요(키 개수별 오버로드 없음) | 컴파일 타임 |

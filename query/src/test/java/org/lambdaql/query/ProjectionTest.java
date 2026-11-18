@@ -196,6 +196,23 @@ class ProjectionTest {
         assertEquals(sorted.subList(1, 3), q.limit(2).offset(1).toList());
         // paging adds the id tie-breaker (S9), so the pages do not overlap
         assertTrue(q.toHql().hql().endsWith("order by e0.price desc, e0.id asc"), q.toHql().hql());
+        // first() reads one row, so it gets the same tie-breaker: of two orders with price 150, always the smaller id
+        ch.qos.logback.classic.Logger sql = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger("org.hibernate.SQL");
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> seen = new ch.qos.logback.core.read.ListAppender<>();
+        seen.start();
+        sql.addAppender(seen);
+        ch.qos.logback.classic.Level old = sql.getLevel();
+        sql.setLevel(ch.qos.logback.classic.Level.DEBUG);
+        try {
+            Long tied = qb.from(Order.class).where(o -> o.getPrice() == 150)
+                    .orderBy((o, by) -> by.desc(o.getPrice())).select(o -> o.getId()).first().orElseThrow();
+            assertEquals(orders.stream().filter(o -> o.getPrice() == 150).map(Order::getId).min(Comparator.naturalOrder()).orElseThrow(), tied);
+            String last = seen.list.get(seen.list.size() - 1).getFormattedMessage().replaceAll("\\s+", " ");
+            assertTrue(last.matches(".*order by o1_0\\.price desc, ?o1_0\\.id.*"), last);
+        } finally {
+            sql.setLevel(old);
+            sql.detachAppender(seen);
+        }
     }
 
     @Test

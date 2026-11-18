@@ -148,3 +148,11 @@ B6 대상 페이지: `java/03`·`kotlin/03`(임베디드 경로 절, 같음 비�
 | U17 구현 | DELETE의 서브쿼리(서브쿼리 안 조인, 상관 스칼라 서브쿼리 포함)가 대상과 같은 엔티티를 읽으면 `delete from X d0 where d0.id in (select t.id from (select e0.id as id from X e0 where …) t)`로 렌더링. MariaDB 오류 1093 해소(세 DB 실측). UPDATE는 해당 없음. 복합 키는 감싸지 않음 | `DmlQueryTest` `delete-self-subquery` |
 
 대상 페이지: `java/07-dml.md`·`kotlin/07-dml.md`("아직 구현되지 않았습니다" 문장에서 U17 제외, U17 행), `java/07-4-delete.md`·`kotlin/07-4-delete.md`(새 예제), `java/10-rules-and-limits.md`·`kotlin/10-rules-and-limits.md`(1093 행의 "아직 구현되지 않음" 제거).
+
+## 대기 항목: 값 쿼리 `first()`의 보조 정렬
+
+| 항목 | 내용 | 테스트 |
+|---|---|---|
+| S9 보완 | 값 쿼리(`select(...)` 뒤)의 `first()`도 id 보조 정렬을 더함. 정렬 키 값이 같은 행이 여러 개이면 `id`가 가장 작은 행의 값 | `ProjectionTest` `pagingAndFirst`(영역 없음) |
+
+대상 페이지: `java/06-select-group.md`·`kotlin/06-select-group.md`의 값 쿼리 페이징 문단(규칙 S9 문장 다음 줄).

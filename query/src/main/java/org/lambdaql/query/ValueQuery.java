@@ -145,7 +145,9 @@ public class ValueQuery<R> {
     @SuppressWarnings("unchecked")
     public Optional<R> first() {
         if (limit != null && limit == 0) return Optional.empty();
-        return ((List<R>) projector.build(context.rows(toHql(), offset, 1))).stream().findFirst();
+        // reads one row, so the order gets the id tie-breaker as with limit (S9): ties give the same row every time
+        RenderedQuery q = renderer().values(root, wheres, select, groupBy, havings, sorts, distinct, true);
+        return ((List<R>) projector.build(context.rows(q, offset, 1))).stream().findFirst();
     }
 
     /**
