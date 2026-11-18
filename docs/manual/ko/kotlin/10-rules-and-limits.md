@@ -161,7 +161,7 @@ MariaDB에서 `NOT DETERMINISTIC`(기본값) 함수는 인자가 파라미터뿐
 | `it.flag ?: false`(조건) | `(e0.flag is not null and e0.flag = true)` | NULL은 false로 취급 |
 | `where` 안의 `it.customer?.name`, `it.customer!!.name` | `j1.name` + `join e0.customer j1`(기본은 inner join) | 고객 없음: 주문이 반환되지 않음. `it.customer?.name == null`도 마찬가지 |
 | `it.customer == null \|\| it.customer?.name == p` | `e0.customer is null or j1.name = :p1` + `join e0.customer j1` | 고객 없음: 반환되지 **않음**(inner join, D48. `DEBUG` 수준 `LQL-5009`). 유지하려면 `leftJoin` 사용 |
-| 같은 경로를 `orderBy`나 `select`에만 씀 | `j1.name` + `left join e0.customer j1` | 고객 없음: 컬럼이 NULL |
+| 같은 경로를 `orderBy`나 `select`에만 씀 | `j1.name` + `left join e0.customer j1`. 필수 연관(`optional = false`)은 `join` | 고객 없음: 컬럼이 NULL |
 | `it.customer == null`, `it.customer != null` | `e0.customer is null`, `e0.customer is not null`(외래 키 컬럼, 조인 없음) | 고객이 없는 주문 / 고객이 있는 주문 |
 | `it.customer?.id` | `e0.customer.id`(외래 키 컬럼, 조인 없음) | 고객 없음: NULL |
 | `a ?: b`(값) | 값에서는 `coalesce(a, b)`, 문자열 조건에서는 SARGable 형태 | [9.5](09-kotlin-notes.md#95-null-operators---and-) 참고 |
@@ -212,7 +212,7 @@ MariaDB에서 `NOT DETERMINISTIC`(기본값) 함수는 인자가 파라미터뿐
 | R21 | Kotlin 문자열 함수(`startsWith`, `endsWith`, `contains`, `equals(ignoreCase)`, `lowercase`, `length`, `isNullOrEmpty`) | `like ... escape '\'`, D24 대소문자 무시 경로, `lower`, `length`, `(x is null or x = :p)` |
 | R22 | Kotlin 호스트 값(캡처한 `var`, private 속성, `companion` 값) | 실행할 때마다 읽음. 쓰기는 거부됨 |
 | R23 | 속성 참조 `Order::price` | getter와 같음. `orderBy`(`orderBy(Order::price)`)에서는 **아직 구현되지 않음**: `orderBy { it.price }`를 사용하십시오 |
-| R24 | 연관 경로(`it.customer?.name`, `it.customer!!.name`, Java 엔티티의 `it.customer.name`) | 컬럼. to-one 연관: where, order by, select가 함께 사용하는 별칭. `where`에서는 항상 inner join(D48. 연관이 없는 행을 유지하려면 `leftJoin` 사용), order by나 select에만 쓰면 `left join`. 임베디드: 같은 테이블. 대상의 `@Id`로 끝나거나 연관을 `null`과 비교: 외래 키 컬럼, 조인 없음. 컬렉션: 오류 |
+| R24 | 연관 경로(`it.customer?.name`, `it.customer!!.name`, Java 엔티티의 `it.customer.name`) | 컬럼. to-one 연관: where, order by, select가 함께 사용하는 별칭. `where`에서는 항상 inner join(D48. 연관이 없는 행을 유지하려면 `leftJoin` 사용), order by나 select에만 쓰면 `left join`(필수 연관 `optional = false`는 inner join, A4). 임베디드: 같은 테이블. 대상의 `@Id`로 끝나거나 연관을 `null`과 비교: 외래 키 컬럼, 조인 없음. 컬렉션: 오류 |
 
 Java 전용 규칙 R4(엔티티 값에 대한 `equals`)와 R5(Java null-safe 헬퍼)는 [Java 트랙](../java/10-rules-and-limits.md)에 있습니다. Kotlin에서는 `==`가 R5와 같은 의미를 갖습니다.
 
@@ -279,9 +279,10 @@ lambdaQL은 많은 차이를 감춥니다. 일부는 알아 두어야 합니다.
 | 페이징 SQL | `offset ? rows fetch first ? rows only` | `limit ?,?` | `offset ? rows fetch first ? rows only` | Hibernate에 전달(`setFirstResult` / `setMaxResults`) |
 | 같은 값을 가진 행의 순서 | – | – | 무작위 | 페이징할 때 키에 id가 없으면 lambdaQL이 루트의 `@Id asc`를 추가 |
 | 문자열 순서 | 대소문자 구분 | `_ci` | `NLS_SORT`(JVM 로캘) | DB를 따름 |
-| `order by`의 암시적 경로 | inner join(행 누락) | 같음 | 같음 | lambdaQL은 `left join`을 사용(또는 같은 경로의 `where` 조인) |
+| `order by`의 암시적 경로 | inner join(행 누락) | 같음 | 같음 | lambdaQL은 `left join`을 사용(필수 연관은 inner join)(또는 같은 경로의 `where` 조인) |
+| `order by`, `distinct`, `group by`의 `@Lob` 컬럼 | 동작 | 동작 | **ORA-22848 / ORA-22849** | 쿼리를 바꾸지 않고 `LQL-5010`을 `DEBUG` 수준으로 기록(B3) |
 
-lambdaQL은 NULL이 될 수 있는 모든 키에 대해 HQL에 `nulls first` / `nulls last`를 씁니다. 데이터베이스 기본값과 같으면 Hibernate가 이를 뺍니다.
+lambdaQL은 NULL이 될 수 있는 모든 키에 대해 HQL에 `nulls first` / `nulls last`를 씁니다. 필수 연관만 거치고 NULL이 될 수 없는 경로에는 쓰지 않습니다. 데이터베이스 기본값과 같으면 Hibernate가 이를 뺍니다.
 기본값(`ASC` = NULLS FIRST, `DESC` = NULLS LAST)은 H2, MariaDB와 같으므로 이 DB들에서는 추가 SQL이
 필요 없습니다. Oracle에만 `NULLS` 절이 붙습니다. NULL 위치를 바꾸려면
 `by.asc(key, false)`(NULL이 마지막)나 `by.desc(key, true)`(NULL이 처음)를 사용하십시오(D35). MariaDB에서는 이들이 `CASE` 흉내를 사용합니다.

@@ -486,7 +486,10 @@ public enum LqlMessage {
     SARGABLE_CHECK_SKIPPED("LQL-5008", 2),
 
     /** LQL-5009: SQL meaning: in &#123;0&#125;, a row whose value is NULL does not match (Java would treat null differently). Add a null check such as x == null || ... to include it. */
-    SQL_NULL_MEANING("LQL-5009", 1);
+    SQL_NULL_MEANING("LQL-5009", 1),
+
+    /** LQL-5010: The column &#123;0&#125; is a &#64;Lob column; some databases (for example Oracle) cannot use a LOB in &#123;1&#125;. */
+    LOB_IN_SORT_OR_KEY("LQL-5010", 2);
 
     private final String code;
     private final int argCount;

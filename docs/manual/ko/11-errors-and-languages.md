@@ -35,7 +35,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-2xxx` | 바이트코드 디코딩 | `LQL-2001`~`LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | 의미 해석과 Java에서 계산하는 값 | `LQL-3001`~`LQL-3064` | `TranslationException` |
 | `LQL-4xxx` | 렌더링, 바인딩, 실행 | `LQL-4001`~`LQL-4045`, `LQL-4999`(내부 오류) | `LambdaQLException` 자체, 또는 JDK/JPA 표준 예외([예외](#exceptions) 참고). `LQL-4045`는 `WARN` 로그(자기 기본형 언박싱만 있는 비교는 `DEBUG`) |
-| `LQL-5xxx` | 경고(로그에 기록) | `LQL-5001`~`LQL-5009` | –(로그 한 줄. 레벨은 `WARN`이며, `LQL-5004`~`LQL-5006`, `LQL-5008`과 기본 정렬 모드의 `LQL-5003`은 `INFO`, `LQL-5009`는 `DEBUG`) |
+| `LQL-5xxx` | 경고(로그에 기록) | `LQL-5001`~`LQL-5010` | –(로그 한 줄. 레벨은 `WARN`이며, `LQL-5004`~`LQL-5006`, `LQL-5008`과 기본 정렬 모드의 `LQL-5003`은 `INFO`, `LQL-5009`, `LQL-5010`은 `DEBUG`) |
 
 실제 코드의 예:
 
@@ -65,6 +65,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-5007` | –(`WARN` 로그) | MariaDB 함수 {0}가 NOT DETERMINISTIC이라 행마다 다시 계산되고, 비교하는 열의 인덱스를 범위 검색에 쓰지 못합니다. 결정적 함수라면 DETERMINISTIC으로 선언하세요: {1} |
 | `LQL-5008` | –(`INFO` 로그) | {0}의 인덱스·함수 메타데이터를 읽지 못했습니다({1}). 메타데이터 없이 SARGable 검사를 계속합니다. |
 | `LQL-5009` | –(`DEBUG` 로그) | SQL 의미: {0}에서 값이 NULL인 행은 조건에 맞지 않습니다(Java의 null 처리와 다름). 포함하려면 x == null || ...처럼 null 검사를 적으세요. |
+| `LQL-5010` | –(`DEBUG` 로그) | 열 {0}은 @Lob 열입니다. 일부 DB(예: Oracle)는 LOB를 {1}에 쓸 수 없습니다. |
 
 `{0}`, `{1}`은 인자입니다. 예를 들어 식이나 프로시저 이름이 들어갑니다.
 전체 목록은 메시지 파일에 있습니다([번역자를 위한 안내](#for-translators) 참고).
@@ -411,6 +412,7 @@ lambdaQL은 **SLF4J API**로 로그를 남깁니다.
 | `LQL-5007` | MariaDB 전용: 값 쪽의 `NOT DETERMINISTIC` DB 함수를 열과 비교할 때(`o.getPrice() > OrderFns.nondet(base)`). 인덱스를 범위 검색에 쓰지 못함. `WARN` 레벨로 기록 |
 | `LQL-5008` | SARGable 검사용 인덱스·함수 메타데이터를 읽을 수 없을 때(예: 권한 없음). `INFO` 레벨로 기록. `LQL-5001`은 그대로 기록하고 `LQL-5007`은 검사하지 않음 |
 | `LQL-5009` | 조건이 엔티티 값을 SQL 의미로 비교해(결정 D48) Java·Kotlin에서는 맞는 NULL 행이 빠질 수 있을 때: 엔티티 값끼리의 `==`/`equals`, 값과의 `!=`, NULL 가능 `Boolean`의 `!`, 연관 경로의 null guard(경로는 INNER JOIN 유지), 서브쿼리 `NOT IN`. 조건 문장마다 한 번 `DEBUG` 레벨로 기록(3.6.3 참고: [Java](java/03-where.md#363-write-your-null-checks-yourself) \| [Kotlin](kotlin/03-where.md#363-write-your-null-checks-yourself)) |
+| `LQL-5010` | `@Lob` 컬럼을 `order by`, `distinct`, `group by`에 쓸 때. H2와 MariaDB는 실행하지만 Oracle은 거부함(ORA-22848, ORA-22849). `=` 비교는 세 DB 모두 동작. lambdaQL은 쿼리를 바꾸지 않음. 컬럼과 사용처마다 한 번 `DEBUG` 레벨로 기록([4.5](java/04-order-paging.md#45-what-a-sort-key-can-be) 참고) |
 
 ```
 WARN  [LQL-5002] limit 없는 서브쿼리 정렬은 결과에 영향이 없어 제거했습니다(Q4): ...

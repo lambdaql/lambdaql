@@ -329,7 +329,7 @@ lambdaQL은 정책 하나로 이를 해결합니다. **NULL은 가장 작은 값
 
 **lambdaQL이 쓰는 방법.** NULL이 될 수 있는 키에는 lambdaQL이 항상 HQL에 NULL 위치를 씁니다. 예: `e0.description asc nulls first`.
 NULL이 될 수 없는 키(`double` 같은 기본형 컬럼이나 `@Id`)에는 `nulls` 부분이 없습니다.
-연관 뒤의 컬럼은 언제나 NULL이 될 수 있으므로(고객이 없는 주문이 있을 수 있음) 항상 붙습니다.
+연관 뒤의 컬럼은 연관이 없으면 NULL이 되므로(고객이 없는 주문이 있을 수 있음) 붙습니다. 경로의 모든 연관 단계가 필수(`optional = false`)이고 값이 NULL이 될 수 없으면 붙지 않습니다.
 
 그다음 Hibernate가 데이터베이스별 SQL을 씁니다. 데이터베이스 기본값과 같으면 이 절을 뺍니다.
 MariaDB에는 `NULLS` 구문이 없으므로, 기본값이 아닌 위치는 Hibernate가 `CASE` 식으로 씁니다.
@@ -352,7 +352,8 @@ MariaDB에는 `NULLS` 구문이 없으므로, 기본값이 아닌 위치는 Hibe
 | 키 | 허용 | 참고 |
 |---|---|---|
 | 컬럼: `o.getPrice()` | 허용 | 테스트함 |
-| to-one 경로: `o.getCustomer().getName()` | 허용 | `left join`, 아래 참고(테스트함) |
+| to-one 경로: `o.getCustomer().getName()` | 허용 | `left join`(필수 연관은 inner join), 아래 참고(테스트함) |
+| `@Lob` 컬럼 | 허용 | Oracle은 거부함. `DEBUG` 수준 `LQL-5010`, 아래 참고(테스트함) |
 | 산술: `o.getPrice() * 2`, `+`, `-` | 허용 | 아직 테스트하지 않음 |
 | 확대 변환(`int`에서 `long`으로) | 허용 | 아직 테스트하지 않음 |
 | 엔티티: `by.desc(o.getCustomer())` | **컴파일 오류** | 엔티티는 `Comparable`이 아님 |
@@ -389,6 +390,36 @@ select …
 from orders o1_0
 left join customers c1_0 on c1_0.id=o1_0.customer_id
 order by c1_0.name asc nulls first,o1_0.id
+```
+
+**필수 연관은 inner join을 사용합니다.** `optional = false`로 매핑한 연관(예: `@ManyToOne(optional = false)`)은 대상이 항상 있으므로 inner join으로 행을 잃지 않습니다(A4).
+그래서 정렬이나 select에만 쓴 경로라도 이런 연관은 `join`을 사용합니다. 그 밖의 연관은 위처럼 `left join`을 사용합니다(규칙 S8, J1).
+경로의 모든 연관 단계가 필수이고 값이 NULL이 될 수 없으면 정렬에 `nulls first/last`도 붙지 않습니다.
+
+**(테스트됨)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java), 영역 `required-association`(테스트 엔티티 `OrderLine`의 `@ManyToOne(optional = false) Order order`):
+
+```java
+// order is optional = false: a sort or select path through it cannot lose rows, so it is an inner join
+OrderedSelectQuery<OrderLine> sorted = qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getOrder().getPrice()));
+assertEquals("select e0 from OrderLine e0 join e0.order j1 order by j1.price asc", sorted.toHql().hql());
+ValueQuery<Double> values = qb.from(OrderLine.class).select(l -> l.getOrder().getPrice());
+assertEquals("select j1.price from OrderLine e0 join e0.order j1", values.toHql().hql());
+// an association that can be missing keeps the left join (Order.customer)
+assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name asc nulls first",
+        qb.from(Order.class).orderBy((o, by) -> by.asc(o.getCustomer().getName())).toHql().hql());
+```
+
+**`@Lob` 컬럼의 정렬.** `@Lob` 컬럼을 `orderBy`, `distinct`, `groupBy`에 쓰면 H2와 MariaDB는 실행하지만 Oracle은 거부합니다(ORA-22848, ORA-22849, 실측). `=` 비교는 세 데이터베이스 모두에서 동작합니다.
+lambdaQL은 쿼리를 바꾸지 않고, 컬럼과 사용처마다 한 번 `LQL-5010`을 `DEBUG` 수준으로 기록합니다(B3).
+
+**(테스트됨)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java), 영역 `lob`(`OrderLine.memo`는 `@Lob`):
+
+```java
+// memo is @Lob: H2 and MariaDB sort and group it, Oracle rejects it (ORA-22848, ORA-22849).
+// lambdaQL keeps the query and logs LQL-5010 at DEBUG
+qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getMemo())).toHql();
+qb.from(OrderLine.class).groupBy(l -> l.getMemo()).select(l -> l.getMemo()).toHql();
+qb.from(OrderLine.class).select(l -> l.getMemo()).distinct().toHql();
 ```
 
 별칭은 `where`와 함께 사용합니다. `where`가 같은 경로를 이미 조인했다면 정렬은 그 조인을 사용합니다.
@@ -730,7 +761,7 @@ H2와 MariaDB는 `desc`에서 이미 NULL을 나중에 두므로 추가 구문�
 - 그 밖의 경로는 오류입니다(spec을 `orderBy`에 전달할 때 `IllegalArgumentException`). 따라서 문자열이 다른 HQL로 변환되는 일은 없습니다.
 - 허용하는 이름은 persistence unit의 정렬 정책이 정합니다(아래 [정렬 정책](#sort-policy) 참고).
   정책도 `@Sortable` 필드도 없으면 영속 속성은 **어느 것이든** 받고, lambdaQL이 `LQL-5003`을 기록합니다(기본 레벨은 `INFO`).
-- 연관 경로는 정렬 람다와 마찬가지로 `left join`을 사용합니다(규칙 S8). `then()`으로 `ofPath` spec과 람다 spec을 연결할 수 있습니다.
+- 연관 경로는 정렬 람다와 마찬가지로 `left join`(필수 연관은 inner join)을 사용합니다(규칙 S8). `then()`으로 `ofPath` spec과 람다 spec을 연결할 수 있습니다.
 
 **(테스트됨)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), 영역 `sort-spec-path`:
 
@@ -908,7 +939,7 @@ assertThrows(SortNotAllowedException.class, () -> hql("description", Direction.A
 | S5 | `orderBy`는 쿼리당 한 번입니다. `orderBy` 뒤에 `where`는 안 됩니다. `limit` 뒤에 `orderBy`는 안 됩니다(컴파일 오류) | 구현됨 |
 | S6 | `SortSpec`(`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`)으로 재사용합니다. 외부 문자열은 persistence unit의 정렬 정책(`SortRules`, `SortPolicy`, `SortMode`, [4.10](#sort-policy) 참고)이 검사합니다 | `SortSpec`과 정렬 정책은 구현되고 테스트됨. `SortSpec`의 조인 형태는 아직 구현되지 않음 |
 | S7 | 키: 컬럼, to-one 경로, `+ - *`, 확대 변환. 값 분기는 안 됩니다 | 구현됨. 컬럼과 to-one 경로는 테스트함 |
-| S8 | `orderBy`에만 쓰인 연관 경로는 `left join`을 사용하므로 연관이 없는 행도 유지됩니다. 같은 경로를 `where`에서 쓰면 정렬은 `where`의 조인을 사용합니다 | 구현됨 |
+| S8 | `orderBy`에만 쓰인 연관 경로는 `left join`을 사용하므로 연관이 없는 행도 유지됩니다. 필수 연관(`optional = false`)은 행을 잃지 않으므로 inner join입니다(A4). 같은 경로를 `where`에서 쓰면 정렬은 `where`의 조인을 사용합니다 | 구현됨 |
 | S9 | 페이징을 사용할 때 키에 id가 없으면 루트 `@Id asc`를 추가합니다. 컬렉션 fetch join + 페이징은 거부됩니다 | 루트 id와 명시적으로 조인한 엔티티의 id는 구현됨(테스트함). fetch join 검사는 아직 구현되지 않음 |
 | S10 | 분석 결과는 람다별로 캐시됩니다. 캡처한 `Direction`은 호출할 때마다 읽습니다 | 구현됨 |
 | S11 | Spring `Sort.Order`는 `Direction`에 1:1로 대응합니다(Spring 모듈, [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) 참고). 속성 이름은 정렬 정책의 검사를 거치고, 별칭은 그대로 전달합니다 | Spring `Sort`는 구현되고 테스트됨(`ignoreCase`는 아직 지원하지 않음). 정렬 정책과 함께 쓰는 경우도 테스트함. `"price,desc_nulls_last"` 같은 문자열 하나의 해석은 아직 구현되지 않음 |

@@ -68,6 +68,7 @@ public class ValueQuery<R> {
      */
     public ValueQuery<R> distinct() {
         this.distinct = true;
+        if (source == null) LobCheck.check(context.model(), List.of(root), select.exprs(), "distinct");
         return this;
     }
 

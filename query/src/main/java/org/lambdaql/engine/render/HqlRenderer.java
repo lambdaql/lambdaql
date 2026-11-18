@@ -61,6 +61,39 @@ public final class HqlRenderer {
     private HqlRenderer parent;
     /** The query root of the subquery this renderer renders, or -1. */
     private int ownRoot = -1;
+    private Class<?> ownRootClass;      // the entity of ownRoot (a subquery root)
+    private Class<?> mainRootClass;     // the entity (or row type) of root 0
+
+    /** The entity class of a root, for reading the mapping of a path (A4). Null when it is not known. */
+    private Class<?> rootClass(int root) {
+        if (root == ownRoot && ownRootClass != null) return ownRootClass;
+        if (parent != null) return parent.rootClass(root);
+        if (root == 0) return mainRootClass;
+        if (root >= 1 && root <= entityJoins.size()) return entityJoins.get(root - 1).entity();
+        return null;
+    }
+
+    private boolean allStepsRequired(Expr.Column c) {
+        for (int i = 0; i < c.path().size() - 1; i++) {
+            if (c.association().get(i) && !requiredStep(c, i)) return false;
+        }
+        return true;
+    }
+
+    /**
+     * Checks if step {@code i} of a path is an association that can never be missing ({@code optional = false}):
+     * then a sort or select path through it keeps every row with an inner join too (ROADMAP D48, A4).
+     */
+    private boolean requiredStep(Expr.Column c, int i) {
+        Class<?> owner = rootClass(c.root());
+        List<String> names = c.path();
+        for (int k = 0; k < i && owner != null; k++) {
+            owner = model.property(owner, names.get(k)).map(EntityModel.Property::javaType).orElse(null);
+        }
+        if (owner == null) return false;
+        return model.property(owner, names.get(i))
+                .map(p -> p.kind() == EntityModel.Kind.ASSOCIATION && p.nonNull()).orElse(false);
+    }
     private Object[] captured = new Object[0];
     private boolean leftJoins;
     /** The target entity while rendering UPDATE/DELETE (association paths become subqueries), else null. */
@@ -318,6 +351,7 @@ public final class HqlRenderer {
     }
 
     private RenderedQuery render(String select, Class<?> root, List<Bound> wheres, List<SortBound> sorts, boolean paged) {
+        mainRootClass = root;
         List<String> parts = whereParts(wheres);
         List<String> orders = orderBy(root, sorts, paged);
         StringBuilder hql = new StringBuilder("select ").append(select).append(fromClause(root));
@@ -789,6 +823,7 @@ public final class HqlRenderer {
      */
     public RenderedQuery values(Class<?> root, List<Bound> wheres, ValueBound select, ValueBound groupBy, List<Bound> havings,
                                 List<SortBound> sorts, boolean distinct, boolean paged) {
+        mainRootClass = root;
         List<String> parts = whereParts(wheres);
         leftJoins = true;
         captured = select.captured();
@@ -849,6 +884,7 @@ public final class HqlRenderer {
         HqlRenderer inner = new HqlRenderer(model, evaluator, params, "s", "s" + q.root() + "j");
         inner.parent = this;
         inner.ownRoot = q.root();
+        inner.ownRootClass = q.entity();
         inner.captured = captured;
         Object[] cap = captured;
         List<String> parts = inner.whereParts(q.wheres().stream().map(p -> new Bound(p, cap)).toList());
@@ -939,9 +975,10 @@ public final class HqlRenderer {
      * @param e the key
      * @return {@code true} if the key is never NULL
      */
-    private static boolean sortNonNull(Expr e) {
+    private boolean sortNonNull(Expr e) {
         return switch (e) {
-            case Expr.Column c -> c.nonNull() && !c.association().contains(true);
+            // a non-null value is still NULL behind a missing association, unless every association step is required (A4)
+            case Expr.Column c -> c.nonNull() && allStepsRequired(c);
             case Expr.Const c -> !c.isNull();
             case Expr.Arith a -> sortNonNull(a.left()) && sortNonNull(a.right()) && a.op() != ArithOp.DIV && a.op() != ArithOp.REM;
             case Expr.Neg n -> sortNonNull(n.operand());
@@ -1255,7 +1292,7 @@ public final class HqlRenderer {
             boolean fkOnly = c.idPath() && i == names.size() - 2;
             if (!last && c.association().get(i) && !fkOnly) {
                 String key = expr + "." + names.get(i);
-                boolean left = leftJoins || whereLeftJoins.contains(JoinPlanner.key(c.root(), names.subList(0, i + 1)));
+                boolean left = (leftJoins && !requiredStep(c, i)) || whereLeftJoins.contains(JoinPlanner.key(c.root(), names.subList(0, i + 1)));
                 int owner = c.root();
                 expr = joins.computeIfAbsent(key, k -> new Join(joinPrefix + (joins.size() + 1), left, owner)).alias();
             } else {

@@ -220,7 +220,11 @@ public final class QueryContext {
      * @return the sort keys
      */
     List<SortItem> analyzeSortBy(LambdaRef ref, List<Class<?>> roots) {
-        return cached(ref, "sort", () -> checked(SortReader.readSortBy(ref, roots, model)));
+        return cached(ref, "sort", () -> {
+            List<SortItem> items = checked(SortReader.readSortBy(ref, roots, model));
+            LobCheck.check(model, roots, items.stream().map(SortItem::key).toList(), "order by");
+            return items;
+        });
     }
 
     /**
@@ -231,7 +235,11 @@ public final class QueryContext {
      * @return the normalized key
      */
     Expr analyzeSortKey(LambdaRef ref, Class<?> root) {
-        return cached(ref, "sortKey", () -> checked(SortReader.readSortKey(ref, root, model)));
+        return cached(ref, "sortKey", () -> {
+            Expr key = checked(SortReader.readSortKey(ref, root, model));
+            LobCheck.check(model, List.of(root), List.of(key), "order by");
+            return key;
+        });
     }
 
     /**
@@ -253,7 +261,11 @@ public final class QueryContext {
      * @return the group keys
      */
     List<Expr> analyzeGroupKeys(LambdaRef ref, List<Class<?>> roots) {
-        return cached(ref, "group", () -> checked(org.lambdaql.engine.sem.SelectReader.readGroupKeys(ref, roots, model)));
+        return cached(ref, "group", () -> {
+            List<Expr> keys = checked(org.lambdaql.engine.sem.SelectReader.readGroupKeys(ref, roots, model));
+            LobCheck.check(model, roots, keys, "group by");
+            return keys;
+        });
     }
 
     /**

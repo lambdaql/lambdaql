@@ -122,6 +122,15 @@ D48의 1단계(엔티티 값의 SQL 의미)는 아래 페이지에 반영되어 
 - `en/java/09`의 "wanted = null -> status가 NULL인 행" 주석과 "equals와 ==는 NULL에서만 다름" 문장.
 - `en/java/10` 캡처 null 표의 "No" 행에 남은 "argument of col.equals(p)". `en/kotlin/09` D22 행과 `en/kotlin/10` 10.1 항목 2의 "nullable 두 값의 ==".
 
+## 대기 항목: 결정 D48 후속(B3 `@Lob`, A4 필수 연관)
+
+| 항목 | 내용 | 테스트 영역 |
+|---|---|---|
+| A4 필수 연관(`optional = false`) | 정렬·select 경로가 INNER JOIN. 모든 연관 단계가 필수이고 값이 NULL 불가면 정렬의 `nulls first/last` 생략. 다른 연관은 LEFT JOIN 유지(S8, J1) | `MappingRulesTest` `required-association` |
+| B3 `@Lob` | 정렬·distinct·group by에 쓰면 Oracle은 ORA-22848/22849(실측), H2·MariaDB는 동작. 쿼리는 그대로 두고 DEBUG `LQL-5010` | `MappingRulesTest` `lob` |
+
+대상 페이지: `java/04`·`kotlin/04`(S8), `java/06`·`kotlin/06`(J1, distinct·group by), `java/10`·`kotlin/10`(R24·S8·J1 행), `11-errors-and-languages.md`(5xxx 범위 `LQL-5010`까지, 코드 표·로그 표).
+
 ### 참고 사항
 
 - `ja/kotlin/09-kotlin-notes.md`의 명시 앵커를 `plain--and-`로 바꿨습니다. 이 앵커를 가리키는 링크는 없습니다.

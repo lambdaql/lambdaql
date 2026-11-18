@@ -154,7 +154,7 @@ MariaDB에서 `NOT DETERMINISTIC`(기본값) 함수는 인자가 파라미터뿐
 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL 3값 논리 |
 | `where` 안의 `o.getCustomer().getName()` | `j1.name` + `join e0.customer j1`(기본은 inner join) | 고객이 없으면 주문이 선택되지 않음 |
 | `o.getCustomer() == null \|\| o.getCustomer().getName().equals(p)` | `e0.customer is null or j1.name = :p1` + `join e0.customer j1` | 고객이 없으면 선택되지 **않음**(inner join, D48. `DEBUG` 수준 `LQL-5009`). 유지하려면 `leftJoin` 사용 |
-| `orderBy`나 `select`에만 쓴 `o.getCustomer().getName()` | `j1.name` + `left join e0.customer j1` | 고객이 없으면 컬럼이 NULL |
+| `orderBy`나 `select`에만 쓴 `o.getCustomer().getName()` | `j1.name` + `left join e0.customer j1`. 필수 연관(`optional = false`)은 `join` | 고객이 없으면 컬럼이 NULL |
 | `o.getCustomer() == null`, `o.getCustomer() != null` | `e0.customer is null`, `e0.customer is not null`(FK 컬럼, 조인 없음) | 고객이 없는 주문 / 고객이 있는 주문 |
 | `o.getCustomer().getId()` | `e0.customer.id`(FK 컬럼, 조인 없음) | 고객이 없으면 NULL |
 | `ids.contains(o.getId())` | `e0.id in (:p1)` | id가 NULL: 선택되지 않음 |
@@ -193,7 +193,7 @@ MariaDB에서 `NOT DETERMINISTIC`(기본값) 함수는 인자가 파라미터뿐
 | R9 | 캡처 값 | 실행 시점의 값을 가진 바인드 파라미터 |
 | R10 | 속성 접근 | getter 호출, JPA 속성에 매핑 |
 | R11 ~ R23 | Kotlin 규칙 | [이 페이지의 Kotlin 버전](../kotlin/10-rules-and-limits.md) 참고 |
-| R24 | 연관 경로(`o.getCustomer().getName()`) | 컬럼. to-one 연관: where, order by, select가 공유하는 별칭. `where`에서는 항상 inner join(D48. 연관이 없는 행을 유지하려면 `leftJoin` 사용), order by나 select에만 쓰면 `left join`. 임베디드: 같은 테이블. 대상 `@Id`로 끝나거나 연관을 `null`과 비교: FK 컬럼, 조인 없음. 컬렉션: 오류 |
+| R24 | 연관 경로(`o.getCustomer().getName()`) | 컬럼. to-one 연관: where, order by, select가 공유하는 별칭. `where`에서는 항상 inner join(D48. 연관이 없는 행을 유지하려면 `leftJoin` 사용), order by나 select에만 쓰면 `left join`(필수 연관 `optional = false`는 inner join, A4). 임베디드: 같은 테이블. 대상 `@Id`로 끝나거나 연관을 `null`과 비교: FK 컬럼, 조인 없음. 컬렉션: 오류 |
 
 그 밖의 규칙:
 
@@ -260,9 +260,10 @@ lambdaQL은 많은 차이를 감춥니다. 알아야 하는 것도 있습니다.
 | 페이징 SQL | `offset ? rows fetch first ? rows only` | `limit ?,?` | `offset ? rows fetch first ? rows only` | Hibernate에 전달(`setFirstResult` / `setMaxResults`) |
 | 같은 값을 가진 행의 순서 | – | – | 무작위 | 페이징할 때 키에 id가 없으면 lambdaQL이 루트 `@Id asc`를 추가 |
 | 문자열 순서 | 대소문자 구분 | `_ci` | `NLS_SORT`(JVM 로캘) | DB를 따름 |
-| `order by`의 암시적 경로 | inner join(행을 잃음) | 같음 | 같음 | lambdaQL은 `left join` 사용(또는 같은 경로의 `where` 조인) |
+| `order by`의 암시적 경로 | inner join(행을 잃음) | 같음 | 같음 | lambdaQL은 `left join` 사용(필수 연관은 inner join)(또는 같은 경로의 `where` 조인) |
+| `order by`, `distinct`, `group by`의 `@Lob` 컬럼 | 동작 | 동작 | **ORA-22848 / ORA-22849** | 쿼리를 바꾸지 않고 `LQL-5010`을 `DEBUG` 수준으로 기록(B3) |
 
-lambdaQL은 NULL이 될 수 있는 모든 키에 대해 HQL에 `nulls first` / `nulls last`를 씁니다. 데이터베이스 기본값과 같으면 Hibernate가 이를 뺍니다.
+lambdaQL은 NULL이 될 수 있는 모든 키에 대해 HQL에 `nulls first` / `nulls last`를 씁니다. 필수 연관만 거치고 NULL이 될 수 없는 경로에는 쓰지 않습니다. 데이터베이스 기본값과 같으면 Hibernate가 이를 뺍니다.
 기본값(`ASC` = NULLS FIRST, `DESC` = NULLS LAST)은 H2, MariaDB와 같으므로 그쪽에서는 추가 SQL이
 필요 없습니다. Oracle에만 `NULLS` 절이 붙습니다. NULL 위치를 바꾸려면
 `by.asc(key, false)`(NULL이 마지막)나 `by.desc(key, true)`(NULL이 처음)를 사용하십시오(D35). MariaDB에서는 이들이 `CASE` 흉내를 사용합니다.
