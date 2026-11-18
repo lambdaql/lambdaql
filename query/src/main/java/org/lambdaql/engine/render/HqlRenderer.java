@@ -1067,7 +1067,7 @@ public final class HqlRenderer {
         }
         if ((op == CmpOp.EQ || op == CmpOp.NE) && ((isHostLike(a) && eval(a) == null) || (isHostLike(b) && eval(b) == null))) {
             String nulled = value(a, peerType(b)) + " " + op.symbol() + " " + value(b, peerType(a));
-            if (LOG.isWarnEnabled()) LOG.warn("{}", LqlMessage.NULL_CAPTURED_COMPARE.format(nulled));
+            nullCaptured(nulled, (isHostLike(a) && autoUnboxed(a)) || (isHostLike(b) && autoUnboxed(b)));
             return nulled;
         }
         String text = value(a, peerType(b)) + " " + op.symbol() + " " + value(b, peerType(a));
@@ -1076,6 +1076,22 @@ public final class HqlRenderer {
     }
 
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(HqlRenderer.class);
+
+    /**
+     * Logs a comparison with a null captured value (LQL-4045): at DEBUG when the null came through javac's automatic
+     * unboxing (the author did not write a method call on it), else at WARN (D48).
+     */
+    private static void nullCaptured(String text, boolean autoUnboxed) {
+        if (autoUnboxed) {
+            if (LOG.isDebugEnabled()) LOG.debug("{}", LqlMessage.NULL_CAPTURED_COMPARE.format(text));
+        } else if (LOG.isWarnEnabled()) {
+            LOG.warn("{}", LqlMessage.NULL_CAPTURED_COMPARE.format(text));
+        }
+    }
+
+    private static boolean autoUnboxed(Expr e) {
+        return e instanceof Expr.Host h && h.autoUnboxed();
+    }
     private static final java.util.Set<String> MEANING_LOGGED = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     /** D48: entity values are compared with the SQL meaning; tell (DEBUG, once per condition text) when NULL rows drop out. */
@@ -1089,7 +1105,7 @@ public final class HqlRenderer {
         if (v == null) {
             // D48: the SQL meaning, = NULL / <> NULL match no row; the value is known only now, so warn when it runs
             String text = col + " " + op.symbol() + " " + bindRaw(null);
-            if (LOG.isWarnEnabled()) LOG.warn("{}", LqlMessage.NULL_CAPTURED_COMPARE.format(text));
+            nullCaptured(text, autoUnboxed(host));
             return text;
         }
         String param = host instanceof Expr.Const c ? literal(c, peerType(column)) : bind(v, peerType(column));
@@ -1152,7 +1168,7 @@ public final class HqlRenderer {
                 if (v == null) {
                     // D48: a null captured value is bound as NULL (SQL meaning: no row matches); known only now
                     String p = bindRaw(null);
-                    if (LOG.isWarnEnabled()) LOG.warn("{}", LqlMessage.NULL_CAPTURED_COMPARE.format(h.expr() + " -> " + p));
+                    nullCaptured(h.expr() + " -> " + p, h.autoUnboxed());
                     yield p;
                 }
                 yield bind(v, peer);

@@ -15,6 +15,7 @@ import org.objectweb.asm.Type;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -289,7 +290,7 @@ public final class Normalizer {
             // a.equals(b)
             if (!m.isStatic() && m.name().equals("equals") && m.descriptor().equals("(Ljava/lang/Object;)Z")) {
                 Expr a = done(value(inv.receiver()));
-                if (a instanceof Expr.Host h) a = new Expr.Host(h.expr(), h.javaType(), true);
+                if (a instanceof Expr.Host h) a = new Expr.Host(h.expr(), h.javaType(), true, h.autoUnboxed());
                 Expr b = done(value(inv.args().get(0)));
                 return eq(a, b);
             }
@@ -356,8 +357,15 @@ public final class Normalizer {
             if (converted != null) return new Done(converted);
             Object enumConstant = enumConstant(e);
             if (enumConstant != null) return new Done(new Expr.Const(enumConstant, e.type()));
-            // a value made only from captured values (min.doubleValue(), str.trim()) is computed in Java and its result
-            // is bound; a NullPointerException there is thrown like Java (LQL-4012)
+            // a value made only from captured values (str.trim(), min.intValue()) is computed in Java and its result is
+            // bound; a NullPointerException there is thrown like Java (LQL-4012). The one exception: unboxing a box to its
+            // own primitive (Double.doubleValue(), Integer.intValue() ...) is the same bytecode as javac's automatic
+            // unboxing, so it is treated as automatic: the boxed value is bound, and a null is NULL in SQL (D48)
+            Expr unboxed = autoUnboxed(e);
+            if (unboxed != e) {
+                if (usesEntity(unboxed)) throw error(LqlMessage.HOST_VALUE_HAS_ENTITY, unboxed);
+                return new Done(new Expr.Host(unboxed, classOf(unboxed.type()), false, true));
+            }
             return new Done(host(e, classOf(e.type()), false));
         }
         return switch (e) {
@@ -715,7 +723,7 @@ public final class Normalizer {
 
     private Expr retype(Expr.Host h, Class<?> columnType) {
         boolean numeric = Number.class.isAssignableFrom(columnType);
-        return numeric ? new Expr.Host(h.expr(), columnType, h.nonNullRequired()) : h;
+        return numeric ? new Expr.Host(h.expr(), columnType, h.nonNullRequired(), h.autoUnboxed()) : h;
     }
 
     private void rejectEntityCompare(Expr a, Expr b) {
@@ -826,6 +834,26 @@ public final class Normalizer {
             case Expr.CmpResult c -> callsDbFunction(c.left()) || callsDbFunction(c.right());
             default -> false;
         };
+    }
+
+    private static final Map<String, String> OWN_PRIMITIVE = Map.of(
+            "java/lang/Integer", "intValue", "java/lang/Long", "longValue", "java/lang/Double", "doubleValue",
+            "java/lang/Float", "floatValue", "java/lang/Short", "shortValue", "java/lang/Byte", "byteValue",
+            "java/lang/Boolean", "booleanValue", "java/lang/Character", "charValue");
+
+    /**
+     * Removes an unboxing to the box's own primitive (and a widening after it), which is what javac adds for
+     * automatic unboxing. An unboxing to another primitive ({@code Double.intValue()}) can only be written by hand and
+     * stays. Returns the same expression when there is nothing to remove.
+     */
+    private static Expr autoUnboxed(Expr e) {
+        Expr x = e;
+        while (x instanceof Expr.Convert c) x = c.operand();
+        if (x instanceof Expr.Invoke inv && !inv.method().isStatic() && inv.args().isEmpty() && inv.receiver() != null
+                && inv.method().name().equals(OWN_PRIMITIVE.get(inv.method().owner()))) {
+            return inv.receiver();
+        }
+        return e;
     }
 
     static boolean usesEntity(Expr e) {

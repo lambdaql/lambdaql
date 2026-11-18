@@ -86,11 +86,18 @@ class SqlMeaningTest {
             assertEquals(List.of("f"), qb.from(Coded.class).where(c -> !c.getVip()).toList().stream().map(Coded::getCode).toList());
             // @end
             assertTrue(appender.list.stream().anyMatch(e -> e.getFormattedMessage().startsWith("[LQL-5009]")), String.valueOf(appender.list));
-            // a value made only from captured values runs in Java: min.doubleValue() with a null min throws like Java (LQL-4012)
+            // javac's automatic unboxing (min.doubleValue(), same bytecode as writing it): treated as automatic, so a null
+            // min is bound as NULL, no row, WARN when it runs
             Double min = null;
             String none = null;
+            assertEquals("select e0 from Order e0 where e0.price > :p1", qb.from(Order.class).where(o -> o.getPrice() > min).toHql().hql());
+            assertEquals(List.of(), qb.from(Order.class).where(o -> o.getPrice() > min).toList());
+            // the null came through automatic unboxing: LQL-4045 at DEBUG, not WARN
+            assertTrue(appender.list.stream().anyMatch(e -> e.getLevel() == Level.DEBUG && e.getFormattedMessage().startsWith("[LQL-4045]")
+                    && e.getFormattedMessage().contains("> :p")), String.valueOf(appender.list));
+            // an unboxing to another primitive (Double.intValue()) is written by hand: it runs in Java and throws (LQL-4012)
             assertEquals("LQL-4012", org.junit.jupiter.api.Assertions.assertThrows(org.lambdaql.LambdaQLException.class,
-                    () -> qb.from(Order.class).where(o -> o.getPrice() > min).toHql()).code());
+                    () -> qb.from(Order.class).where(o -> o.getPrice() > min.intValue()).toHql()).code());
             // p.equals(column) is a comparison like column.equals(p): a null p is bound as NULL, no row, WARN (no exception)
             assertEquals("select e0 from Order e0 where e0.description = :p1",
                     qb.from(Order.class).where(o -> none.equals(o.getDescription())).toHql().hql());
@@ -98,7 +105,9 @@ class SqlMeaningTest {
             // a comparison with a null value (no Java method on it): bound as NULL, no row, WARN when it runs
             String d = null;
             assertEquals(List.of(), qb.from(Order.class).where(o -> Objects.equals(o.getDescription(), d)).toList());
-            assertTrue(appender.list.stream().anyMatch(e -> e.getFormattedMessage().startsWith("[LQL-4045]")), String.valueOf(appender.list));
+            // a plain comparison with a null captured value: LQL-4045 at WARN
+            assertTrue(appender.list.stream().anyMatch(e -> e.getLevel() == Level.WARN && e.getFormattedMessage().startsWith("[LQL-4045]")),
+                    String.valueOf(appender.list));
         } finally {
             log.setLevel(old);
             log.detachAppender(appender);

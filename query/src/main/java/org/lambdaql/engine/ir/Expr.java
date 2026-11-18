@@ -274,7 +274,18 @@ public sealed interface Expr permits
      * @param nonNullRequired {@code true} if a null value must be an error, because Java would throw
      *                        {@code NullPointerException} (for example the receiver of {@code p.equals(...)})
      */
-    record Host(Expr expr, Class<?> javaType, boolean nonNullRequired) implements Expr {
+    record Host(Expr expr, Class<?> javaType, boolean nonNullRequired, boolean autoUnboxed) implements Expr {
+        /**
+         * A value computed in Java.
+         *
+         * @param expr            the expression of captured values
+         * @param javaType        the Java type of the value
+         * @param nonNullRequired {@code true} when Java needs a non-null value here
+         */
+        public Host(Expr expr, Class<?> javaType, boolean nonNullRequired) {
+            this(expr, javaType, nonNullRequired, false);
+        }
+
         @Override public Type type() { return Type.getType(javaType); }
         @Override public String toString() { return "host(" + expr + ")"; }
     }

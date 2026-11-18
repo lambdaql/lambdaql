@@ -169,8 +169,9 @@ MariaDB에서 `NOT DETERMINISTIC`(기본값) 함수는 인자가 파라미터뿐
 | 캡처 값의 위치 | `null` 허용? |
 |---|---|
 | 객체 사이의 `==` / `!=`, `Objects.equals`, `col.equals(p)`, `p.equals(col)` | 예. 단, 일치하는 행이 없음(`= NULL`). 쿼리가 실행될 때 `LQL-4045`를 `WARN` 수준으로 기록 |
-| 같은 값에 대한 null 가드 아래: `p == null \|\| o.getStatus() > p` | 예. 가드는 쿼리가 실행될 때 Java에서 결정합니다. `p == null`이면 필터 없음, 다른 값이면 `e0.status > :p1`. 가드가 먼저 와야 함 |
-| 언박싱 비교(`o.getPrice() > p`, `Double p`), 캡처 값에 대한 메서드 호출(`p.trim()`) | **아니요.** Java에서 값을 계산할 때 오류(`LQL-4012`, Java라면 NPE) |
+| 같은 값에 대한 null 가드 아래: `p == null \|\| o.getStatus() > p` | 예. 가드는 쿼리가 실행될 때 Java에서 결정합니다. `p == null`이면 필터 없음, 다른 값이면 `e0.status > :p1`. 자기 기본형 언박싱만 있는 비교는 가드 위치와 상관없음 |
+| 언박싱 비교(`o.getPrice() > p`, `Double p`) | 예. 단, 일치하는 행이 없음(`> NULL`). 자기 기본형으로의 언박싱은 실행하지 않음. 쿼리가 실행될 때 `LQL-4045`를 `DEBUG` 수준으로 기록 |
+| 캡처 값에 대한 메서드 호출(`p.trim()`), 다른 기본형으로 바꾸는 언박싱(`p.intValue()`, `Double p`) | **아니요.** Java에서 값을 계산할 때 오류(`LQL-4012`, Java라면 NPE) |
 | `in`에 쓰는 컬렉션의 `null` 요소 | **아니요.** 바인딩할 때 오류 |
 | `NaN`, `Infinity` | **아니요.** 항상 오류 |
 

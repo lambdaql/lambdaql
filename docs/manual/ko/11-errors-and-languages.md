@@ -34,7 +34,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-1xxx` | 입력과 람다 로딩 | `LQL-1001`~`LQL-1013` | `LambdaAnalysisException` |
 | `LQL-2xxx` | 바이트코드 디코딩 | `LQL-2001`~`LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | 의미 해석과 Java에서 계산하는 값 | `LQL-3001`~`LQL-3064` | `TranslationException` |
-| `LQL-4xxx` | 렌더링, 바인딩, 실행 | `LQL-4001`~`LQL-4045`, `LQL-4999`(내부 오류) | `LambdaQLException` 자체, 또는 JDK/JPA 표준 예외([예외](#exceptions) 참고). `LQL-4045`는 `WARN` 로그 |
+| `LQL-4xxx` | 렌더링, 바인딩, 실행 | `LQL-4001`~`LQL-4045`, `LQL-4999`(내부 오류) | `LambdaQLException` 자체, 또는 JDK/JPA 표준 예외([예외](#exceptions) 참고). `LQL-4045`는 `WARN` 로그(자기 기본형 언박싱만 있는 비교는 `DEBUG`) |
 | `LQL-5xxx` | 경고(로그에 기록) | `LQL-5001`~`LQL-5009` | –(로그 한 줄. 레벨은 `WARN`이며, `LQL-5004`~`LQL-5006`, `LQL-5008`과 기본 정렬 모드의 `LQL-5003`은 `INFO`, `LQL-5009`는 `DEBUG`) |
 
 실제 코드의 예:
@@ -55,7 +55,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-4040` | `SortNotAllowedException` | {0}에서는 이 이름으로 정렬할 수 없습니다: {1}. SortRules의 allow나 alias로 허용하세요. |
 | `LQL-4043` | `LambdaQLException` | {0}의 스텁 인자가 DB 인자와 이름은 같고 순서만 다릅니다. 스텁: {1}, DB: {2} |
 | `LQL-4044` | `LambdaQLException` | Oracle 패키지에 이 이름의 프로시저가 여러 개 있습니다(오버로드). 어느 것을 호출할지 구분할 수 없습니다: {0} |
-| `LQL-4045` | –(실행 시 `WARN` 로그) | {0}에서 캡처 값이 null입니다. SQL에서 = NULL과 <> NULL은 어떤 행과도 맞지 않습니다. 람다에 x == null을 쓰거나 쿼리 전에 값을 확인하세요. |
+| `LQL-4045` | –(실행 시 `WARN` 로그, 자기 기본형 언박싱을 거친 비교는 `DEBUG`) | {0}에서 캡처 값이 null입니다. SQL에서 = NULL과 <> NULL은 어떤 행과도 맞지 않습니다. 람다에 x == null을 쓰거나 쿼리 전에 값을 확인하세요. |
 | `LQL-5001` | –(`WARN` 로그) | 함수 {0}가 열 {1}에 씌워져 있어 열의 일반 인덱스를 쓸 수 없고 전체 스캔이 될 수 있습니다. 열을 값과 비교하도록 바꾸거나 (Oracle) 함수 기반 인덱스를 만드세요: {2} |
 | `LQL-5002` | –(`WARN` 로그) | limit 없는 서브쿼리 정렬은 결과에 영향이 없어 제거했습니다(Q4): {0} |
 | `LQL-5003` | –(`INFO` 또는 `WARN` 로그) | 외부 정렬이 {0}의 정렬 규칙에 없습니다: {1}. 지금은 실행하지만 SortMode.STRICT에서는 거부됩니다. |
@@ -229,7 +229,7 @@ lambdaQL은 실패한 결과도 캐시하므로, 잘못된 람다는 다음번�
 ### null 캡처 값
 
 어떤 형태는 `null` 캡처 값을 받아들이고, 어떤 형태는 받아들이지 않습니다.
-`=`나 `<>`에 쓰인 캡처 값 `null`은 어떤 행에도 일치하지 않습니다(SQL 의미, 결정 D48). 이때 lambdaQL은 실행 시점에 `LQL-4045`를 `WARN` 수준으로 기록합니다.
+`=`나 `<>`에 쓰인 캡처 값 `null`은 어떤 행에도 일치하지 않습니다(SQL 의미, 결정 D48). 이때 lambdaQL은 실행 시점에 `LQL-4045`를 `WARN` 수준으로 기록합니다. 크기 비교처럼 자기 기본형 언박싱(`min.doubleValue()`)을 거친 경우에는 `DEBUG` 수준입니다.
 NULL과 일치시키려면 null 검사를 직접 작성하십시오.
 null 규칙 전체는 3. 조건([Java](java/03-where.md) | [Kotlin](kotlin/03-where.md))에 있습니다.
 
@@ -241,8 +241,8 @@ null 규칙 전체는 3. 조건([Java](java/03-where.md) | [Kotlin](kotlin/03-wh
 | `Objects.equals(o.getDescription(), name)` | 실행됨 | 위와 같음 |
 | `o.getDescription().equals(name)` | 실행됨 | 위와 같음 |
 | `name.equals(o.getDescription())` | 실행됨 | 위와 같음 |
-| `o.getStatus() > minStatus`(`minStatus`가 `null`) | 오류(`LQL-4012`) | javac가 추가한 언박싱(`minStatus.intValue()`)을 Java에서 계산하므로 `NullPointerException`에 해당합니다. |
-| `name.trim()` 같은 캡처 값의 메서드 호출 | 오류(`LQL-4012`) | 쿼리 전에 Java에서 값을 준비하는 단계이므로 Java처럼 `NullPointerException`에 해당합니다. |
+| `o.getStatus() > minStatus`(`minStatus`가 `null`) | 실행됨 | NULL을 바인딩한 `e0.status > :p1`: 일치하는 행 없음. 자기 기본형으로의 언박싱(`minStatus.intValue()`)은 실행하지 않음. `DEBUG` 수준 `LQL-4045` |
+| `name.trim()`, `minStatus.longValue()`(`Integer`를 다른 기본형으로) 같은 캡처 값의 메서드 호출 | 오류(`LQL-4012`) | 쿼리 전에 Java에서 값을 준비하는 단계이므로 Java처럼 `NullPointerException`에 해당합니다. |
 
 NULL을 찾으려면 `o.getDescription() == null`이라고 씁니다.
 `name`이 null일 때 필터를 생략하려면 `name == null || o.getDescription().equals(name)`이라고 씁니다(가드는 쿼리 실행 전에 결정됨).
@@ -253,7 +253,7 @@ NULL을 찾으려면 `o.getDescription() == null`이라고 씁니다.
 |---|---|---|
 | `it.description == name` | 실행됨 | NULL을 바인딩한 `e0.description = :p1`: 일치하는 행 없음. `WARN` 수준 `LQL-4045` |
 | `minPrice == null \|\| it.price!! > minPrice` | 허용 | null 검사를 직접 작성했으므로 lambdaQL이 이를 사용합니다. |
-| `it.price!! > minPrice!!`(`minPrice`가 `null`) | 오류(`LQL-4012`) | 캡처 값의 `minPrice!!`를 먼저 계산하므로 `NullPointerException`에 해당합니다. |
+| `it.price!! > minPrice!!`(`minPrice`가 `null`) | 실행됨 | NULL을 바인딩한 `e0.price > :p1`: 일치하는 행 없음. `!!`와 언박싱은 실행하지 않음. `DEBUG` 수준 `LQL-4045` |
 | `it.id in ids`(`ids`에 `null` 요소가 있음) | 바인딩 시 오류 | null 요소가 있는 `IN`은 SQL의 함정입니다. |
 
 <a id="placeholders-called-outside-a-lambda"></a>
@@ -401,7 +401,7 @@ lambdaQL은 **SLF4J API**로 로그를 남깁니다.
 
 | 코드 | 발생 조건 |
 |---|---|
-| `LQL-4045` | `=`·`<>`(`==`, `!=`, `equals`, `Objects.equals`)의 캡처 값이 `null`이라 맞는 행이 없을 때(SQL 의미, 결정 D48). 실행할 때만 알 수 있음. `WARN` 레벨로 기록. NULL을 찾으려면 `x == null`(3.6 참고: [Java](java/03-where.md#36-null-rules) \| [Kotlin](kotlin/03-where.md#36-null-rules)) |
+| `LQL-4045` | `=`·`<>`(`==`, `!=`, `equals`, `Objects.equals`)의 캡처 값이 `null`이라 맞는 행이 없을 때(SQL 의미, 결정 D48). 실행할 때만 알 수 있음. `WARN` 레벨로 기록. 크기 비교처럼 자기 기본형 언박싱(`min.doubleValue()`)을 거친 경우에는 `DEBUG` 레벨. NULL을 찾으려면 `x == null`(3.6 참고: [Java](java/03-where.md#36-null-rules) \| [Kotlin](kotlin/03-where.md#36-null-rules)) |
 | `LQL-5001` | 조건에서 DB 함수가 열을 감쌀 때(`OrderFns.discount(o.getPrice()) > 10`, 열에 적용한 Boolean 함수, `IN`이나 `IS NULL` 안의 함수). 일반 인덱스를 쓸 수 없음. `where` 람다마다 한 번 `WARN` 레벨로 기록. Oracle에서 같은 식의 함수 기반 인덱스가 있으면 기록하지 않음([8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) 참고) |
 | `LQL-5002` | 서브쿼리에 `orderBy`는 있지만 `limit`이 없어 lambdaQL이 정렬을 제거할 때(정렬은 결과에 영향이 없음, 규칙 Q4) |
 | `LQL-5003` | 외부 정렬(Spring `Sort`, `SortSpec.ofPath`)이 정렬 규칙에 없는 이름을 사용하고 모드가 `SortMode.INFO`(기본값, `INFO` 레벨로 기록)나 `SortMode.WARN`(`WARN` 레벨로 기록)일 때. 정렬은 실행됨. 엔티티와 이름마다 한 번 기록([4.10 정렬 정책](java/04-order-paging.md#sort-policy) 참고) |

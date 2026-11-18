@@ -76,10 +76,12 @@ NULL에 대해 이것이 뜻하는 바:
 | `o.getStatus() == 1`, status가 NULL | NullPointerException | SQL 의미: UNKNOWN, 행이 반환되지 않음(규칙 R1) |
 | `o.getPrice() > 100`, price가 NULL | NullPointerException | 행이 반환되지 않음(R1) |
 | `!o.getActive()`(`Boolean`), active가 NULL | NullPointerException | 행이 반환되지 않음 |
-| `o.getPrice() > p`, 캡처한 `Double p`가 `null` | NullPointerException | 쿼리가 실행될 때 **예외**(`LQL-4012`) |
-| `i.getQty() == q`, `qty`는 `int`, 캡처한 `Integer q`가 `null` | NullPointerException | 쿼리가 실행될 때 **예외**(`LQL-4012`) |
+| `o.getPrice() > p`, 캡처한 `Double p`가 `null` | NullPointerException | `e0.price > :p1`에 NULL 바인딩, 일치하는 행 없음(`DEBUG` 수준 `LQL-4045`) |
+| `i.getQty() == q`, `qty`는 `int`, 캡처한 `Integer q`가 `null` | NullPointerException | `i.qty = :p1`에 NULL 바인딩, 일치하는 행 없음(`DEBUG` 수준 `LQL-4045`) |
+| `o.getStatus() > p.intValue()`, 캡처한 `Double p`가 `null` | NullPointerException | 쿼리가 실행될 때 **예외**(`LQL-4012`) |
 
-즉, NULL인 엔티티 값은 SQL을 따릅니다. 언박싱 위치의 캡처 값은 Java에서 계산하므로(`p.doubleValue()`), `null`이면 Java처럼 오류입니다.
+즉, NULL인 엔티티 값은 SQL을 따릅니다. 캡처 값을 자기 기본형으로 언박싱하는 호출(`Double.doubleValue()`, `Integer.intValue()` 등, 뒤의 확대 변환 포함)은 javac의 자동 언박싱과 같은 바이트코드이므로 실행하지 않고 박싱 값을 바인딩합니다.
+다른 기본형으로 바꾸는 호출(`Double`의 `intValue()`)은 손으로만 쓸 수 있는 계산이므로 Java에서 실행하고, `null`이면 Java처럼 오류입니다.
 
 NULL 행을 원한다면 검사를 직접 작성하십시오.
 

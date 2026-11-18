@@ -233,7 +233,8 @@ qb.from(Order.class).where(o -> o.getStatus() == wanted).toList();
    결과가 Java와 다를 수 있으면 lambdaQL은 `LQL-5009`를 `DEBUG` 수준으로 기록합니다.
 2. **캡처 값은 Java에서 먼저 계산하고, 비교는 역시 SQL 의미를 따릅니다.** 캡처 값 `null`은 NULL로 바인딩되므로 `= :p1`과 `<> :p1`은 어떤 행에도 일치하지 않습니다.
    이 경우 lambdaQL은 실행 시점에 `LQL-4045`를 `WARN` 수준으로 기록합니다. NULL을 찾으려면 `x == null`이라고 쓰십시오(`is null`이 됨).
-   캡처 값만으로 된 식(javac가 추가한 언박싱 `min.doubleValue()`, `p.trim()` 등)은 Java에서 계산한 값이므로, 수신 객체가 `null`이면 Java처럼 예외(`LQL-4012`)를 던집니다([3.6.4](#364-captured-null-values) 참고).
+   캡처 값만으로 된 식(`p.trim()`, 다른 기본형으로 바꾸는 `min.intValue()` 등)은 Java에서 계산한 값이므로, 수신 객체가 `null`이면 Java처럼 예외(`LQL-4012`)를 던집니다.
+   자기 기본형으로의 언박싱(`min.doubleValue()`)은 javac의 자동 언박싱과 같은 바이트코드이므로 실행하지 않고 박싱 값을 그대로 바인딩합니다([3.6.4](#364-captured-null-values) 참고).
 
 lambdaQL은 **직접 작성한 경우에만 null을 처리합니다**(`== null`, `!= null`).
 숨겨진 null 검사를 절대 대신 추가하지 않습니다.
@@ -388,7 +389,8 @@ assertEquals(List.of("f"), qb.from(Coded.class).where(c -> !c.getVip()).toList()
 |---|---|
 | 캡처 값과의 `==`, `!=`, `Objects.equals(...)`, `o.getDescription().equals(p)` | 실행됨: NULL을 바인딩한 `= :p1` / `<> :p1`이므로 일치하는 행이 **없음**. `WARN` 수준 `LQL-4045` |
 | `p.equals(o.getDescription())`(`p`가 수신 객체) | 위와 같음: `e0.description = :p1`(NULL), 일치하는 행 **없음**. `WARN` 수준 `LQL-4045`. 예외는 없음 |
-| Java가 값을 언박싱하는 비교: `o.getPrice() > p`(`Double p`), `i.getQty() == q`(`int qty`, `Integer q`) | 쿼리가 실행될 때 **예외**(`LQL-4012`). javac가 추가한 `p.doubleValue()`를 Java에서 계산하기 때문 |
+| Java가 값을 언박싱하는 비교: `o.getPrice() > p`(`Double p`), `i.getQty() == q`(`int qty`, `Integer q`) | 실행됨: `e0.price > :p1`에 NULL 바인딩, 일치하는 행 **없음**. `DEBUG` 수준 `LQL-4045`. 자기 기본형으로의 언박싱(`p.doubleValue()`)은 실행하지 않음 |
+| 다른 기본형으로 바꾸는 언박싱(`p.intValue()`, `Double p`)과 메서드 호출(`p.trim()`) | 쿼리가 실행될 때 **예외**(`LQL-4012`). Java에서 값을 계산하기 때문 |
 
 **`p.equals(o.getDescription())` 형태는 권장하지 않습니다.** SQL로는 `o.getDescription().equals(p)`와 같은 비교(`e0.description = :p1`)이므로 `p`가 `null`이어도 예외가 나지 않습니다.
 Java 코드로 읽으면 `null.equals(...)`가 NullPointerException처럼 보이므로, 엔티티 값을 앞에 두는 `o.getDescription().equals(p)`로 쓰십시오.
@@ -396,10 +398,12 @@ Java 코드로 읽으면 `null.equals(...)`가 NullPointerException처럼 보이
 이유: 람다 안의 비교는 SQL 의미를 따릅니다(결정 D48). SQL에서 NULL과의 `=`, `<>`는 참이 되지 않습니다.
 캡처 값이 null인지는 쿼리가 실행될 때만 알 수 있으므로, lambdaQL은 실행할 때 경고를 기록합니다.
 
-캡처 값만으로 된 식은 쿼리 전에 Java에서 계산하는 값입니다. javac가 추가한 언박싱(`p.doubleValue()`)이나 `p.trim()` 같은 메서드 호출이 이에 해당하며, `null`이면 Java처럼 예외(`LQL-4012`)를 던집니다.
+캡처 값만으로 된 식은 쿼리 전에 Java에서 계산하는 값입니다. `p.trim()` 같은 메서드 호출과 다른 기본형으로 바꾸는 언박싱(`p.intValue()`, `Double p`)이 이에 해당하며, `null`이면 Java처럼 예외(`LQL-4012`)를 던집니다.
+다만 자기 기본형으로의 언박싱(`Double.doubleValue()`, `Integer.intValue()`, `Long.longValue()` 등, 뒤의 확대 변환 포함)은 계산하지 않습니다.
+javac의 자동 언박싱과 손으로 쓴 호출은 같은 바이트코드이므로, lambdaQL은 이를 자동 언박싱으로 보고 박싱 값을 바인딩합니다. `null`이면 일치하는 행이 없고 `LQL-4045`를 `DEBUG` 수준으로 기록합니다.
 NULL 행을 찾으려면 `x == null`이라고 쓰십시오.
 
-**규칙의 예외: null 가드.** 같은 캡처 값을 먼저 null 검사하면 언박싱 비교에도 null을 쓸 수 있습니다.
+**null 가드로 필터 생략.** 같은 캡처 값을 null 검사하면, 값이 null일 때 그 조건이 필터 없이 사라집니다.
 **(테스트됨)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), 영역 `captured-null-guard`:
 
 ```java
@@ -437,7 +441,8 @@ where o1_0.price>?
 - `min == null`이면 가드가 참이므로 조건 전체가 참입니다. 필터가 없습니다. 비교 `o.getPrice() > min`은 HQL에 쓰지 않습니다(Java도 이 비교를 실행하지 않습니다).
 - `min = 100.0`이면 가드가 거짓이므로 `e0.price > :p1`만 남습니다.
 - 람다는 여전히 한 번만 분석합니다. 값에 따라 달라지는 것은 HQL 텍스트뿐입니다.
-- 가드가 먼저 와야 합니다. `min == null`일 때 `o.getPrice() > min || min == null`은 쿼리가 실행될 때 예외(`LQL-4012`)를 던집니다. 비교 부분의 언박싱을 먼저 계산하기 때문이며, Java의 NullPointerException과 같습니다.
+- 이 경우 가드의 위치는 결과에 영향을 주지 않습니다. `min == null`일 때 `o.getPrice() > min || min == null`도 필터가 없습니다. 비교 부분의 언박싱을 Java에서 실행하지 않기 때문입니다(Java라면 NullPointerException).
+- 캡처 값에 메서드를 호출하는 비교(`o.getDescription().equals(p.trim())`)는 다릅니다. 가드가 뒤에 있으면 `p.trim()`을 먼저 계산하므로 `p == null`일 때 예외(`LQL-4012`)를 던집니다.
 - `&&`에서는 가드가 반대로 동작합니다. `min == null`일 때 `min != null && o.getPrice() > min`은 행을 반환하지 않습니다(`where 1=0`).
 
 <a id="365-converted-attributes-convert"></a>
@@ -787,7 +792,7 @@ qb.from(Item.class)
 ## 3.13 거부되는 것
 
 lambdaQL은 코드 `[LQL-xxxx]`와 소스 줄 번호가 담긴 예외를 던집니다. 추측하지 않습니다.
-대부분의 모양은 람다를 분석할 때(처음 사용할 때) 발견됩니다. 잘못된 캡처 값(언박싱하거나 메서드를 호출한 `null`, NaN)은 쿼리가 실행될 때 발견됩니다.
+대부분의 모양은 람다를 분석할 때(처음 사용할 때) 발견됩니다. 잘못된 캡처 값(메서드를 호출한 `null`, NaN, `null` 요소가 있는 컬렉션)은 쿼리가 실행될 때 발견됩니다.
 [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
 
 | 형태 | 예 | 해결 방법 |
@@ -803,7 +808,7 @@ lambdaQL은 코드 `[LQL-xxxx]`와 소스 줄 번호가 담긴 예외를 던집�
 | 엔티티 컬렉션 경로 | `o.getItems().size() > 0` | `exists` 서브쿼리 |
 | 엔티티와 엔티티 비교 | `o.getCustomer() == c` | id 비교(엔티티 비교는 계획 중) |
 | 가드 아래의 `/`, `%`, 캐스트 | [3.12](#312-errors-that-depend-on-order-of-evaluation) 참고 | 가드를 없애거나 조건을 바꿈 |
-| 언박싱하는 null 캡처 값 | `p == null`일 때 `o.getPrice() > p`(`Double p`) | 앞에 null 가드(`p == null \|\| ...`)를 쓰거나 쿼리 전에 `p`를 확인 |
+| 메서드를 호출하는 null 캡처 값 | `p == null`일 때 `o.getDescription().equals(p.trim())`, `o.getStatus() > p.intValue()`(`Double p`) | 앞에 null 가드(`p == null \|\| ...`)를 쓰거나 쿼리 전에 `p`를 확인 |
 | `NaN` / `Infinity` 캡처 값 | `o.getPrice() > Double.NaN` | NaN을 보내지 않음 |
 | 익명 클래스, `Serializable`이 아닌 람다 | `new Where<Order>() { ... }`, `java.util.function.Predicate` | 람다 사용 |
 
