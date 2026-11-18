@@ -654,6 +654,8 @@ assertEquals("LQL-3064", assertThrows(LambdaQLException.class,
 
 v0.1에 아직 없는 것: 파생 테이블끼리의 조인, 파생 테이블과 엔티티의 조인, update, delete, insert 안의 파생 테이블.
 
+엔티티의 `@SQLRestriction`과 `@SoftDelete` 조건은 엔티티 조인의 `on`과 파생 테이블 안에도 Hibernate가 붙입니다(MariaDB 10.11, Oracle 23.26에서 실측). lambdaQL은 이 조건을 따로 처리하지 않습니다.
+
 ---
 
 <a id="610-cte-with"></a>

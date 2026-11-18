@@ -327,6 +327,15 @@ qb.delete(Order.class).where(o -> o.getStatus() == 1).orderBy((o, by) -> by.asc(
 - 문장 실행 후, 같은 `EntityManager`에 이미 로드된 엔티티는 **이전 값**을 가집니다. 그 엔티티를 다시 사용한다면 `entityManager.clear()`를 호출하십시오.
 - JPA `cascade`와 `orphanRemoval`은 실행되지 **않습니다**. 자식을 먼저 삭제하거나 데이터베이스에서 `ON DELETE CASCADE`를 사용하십시오.
 
+<a id="sqlrestriction-and-softdelete"></a>
+### `@SQLRestriction`과 `@SoftDelete`
+
+Hibernate는 엔티티의 `@SQLRestriction` 조건과 `@SoftDelete` 조건을 lambdaQL이 만드는 모든 문장에 붙입니다(MariaDB 10.11, Oracle 23.26에서 실측. H2는 미측정).
+벌크 `update`와 `delete`도 마찬가지입니다. 예: `where m1_0.order_id=? and (m1_0.hidden = 0)`.
+
+`@SoftDelete` 엔티티의 `delete`는 `update … set deleted = 1 where … and deleted = 0`이 됩니다. 행이 실제로 지워지지 않습니다.
+lambdaQL은 이 조건을 따로 처리하지 않습니다.
+
 ---
 
 <a id="79-all-rules-u1-to-u21-summary"></a>

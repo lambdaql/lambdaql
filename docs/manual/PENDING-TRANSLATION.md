@@ -129,6 +129,7 @@ D48의 1단계(엔티티 값의 SQL 의미)는 아래 페이지에 반영되어 
 | A4 필수 연관(`optional = false`) | 정렬·select 경로가 INNER JOIN. 모든 연관 단계가 필수이고 값이 NULL 불가면 정렬의 `nulls first/last` 생략. 다른 연관은 LEFT JOIN 유지(S8, J1) | `MappingRulesTest` `required-association` |
 | A5 유일 정렬 키 | 정렬 키가 유일하고 NULL이 아닌 열(`@Column(unique = true)`, `@NaturalId`)이면 페이징 보조 정렬(S9) `e0.id asc` 생략 | `MappingRulesTest` `unique-key` |
 | B2 STRING 열거형 정렬 | `@Enumerated(EnumType.STRING)` 열로 정렬하면 DB는 이름 순, Java는 선언 순. 쿼리는 그대로, DEBUG `LQL-5011` | `MappingRulesTest` `enum-string-sort` |
+| B7 `@SQLRestriction`·`@SoftDelete` | Hibernate가 조회·count·서브쿼리·조인 `on`·파생 테이블·벌크 UPDATE/DELETE에 조건을 붙임. `@SoftDelete`의 DELETE는 `update … set deleted = 1`(MariaDB·Oracle 실측) | 없음(실측만) |
 | B3 `@Lob` | 정렬·distinct·group by에 쓰면 Oracle은 ORA-22848/22849(실측), H2·MariaDB는 동작. 쿼리는 그대로 두고 DEBUG `LQL-5010` | `MappingRulesTest` `lob` |
 
 대상 페이지: `java/04`·`kotlin/04`(S8), `java/06`·`kotlin/06`(J1, distinct·group by), `java/10`·`kotlin/10`(R24·S8·J1 행), `11-errors-and-languages.md`(5xxx 범위 `LQL-5011`까지, 코드 표·로그 표).

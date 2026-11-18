@@ -343,6 +343,7 @@ Java는 중첩된 람다에서 같은 이름을 두 번 쓰는 것을 허용하�
 - `@Id`로 끝나는 경로는 외래 키 컬럼입니다(조인 없음).
 - **바깥 엔티티**는 자신의 컬럼과 외래 키 id(`o.getId()`, `o.getCustomer().getId()`)만 사용할 수 있습니다. 조인이 필요한 바깥 엔티티의 경로(`o.getCustomer().getName()`)는 분석 시점에 오류가 됩니다. 대신 외래 키 id를 비교하십시오.
 - 컬렉션 경로(`o.getItems()`)는 거부됩니다. 컬렉션에 대해 물으려면 서브쿼리를 사용하십시오.
+- 엔티티의 `@SQLRestriction`과 `@SoftDelete` 조건은 서브쿼리(`exists`, `in`) 안에도 Hibernate가 붙입니다(MariaDB 10.11, Oracle 23.26에서 실측). lambdaQL은 이 조건을 따로 처리하지 않습니다.
 
 ```java
 // o.getItems().size() > 0 (거부됨) 대신:
