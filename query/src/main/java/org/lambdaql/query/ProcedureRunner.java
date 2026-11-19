@@ -43,7 +43,10 @@ import java.util.concurrent.ConcurrentHashMap;
 final class ProcedureRunner {
 
     /** One database parameter: mode 1 IN, 2 INOUT, 4 OUT; {@code cursor} for an Oracle REF CURSOR. */
-    record DbParam(String name, int mode, boolean cursor) {
+    record DbParam(String name, int mode, boolean cursor, int sqlType, String typeName) {
+        DbParam(String name, int mode, boolean cursor) {
+            this(name, mode, cursor, java.sql.Types.OTHER, null);
+        }
     }
 
     /** One part of the result: a scalar from an OUT/INOUT parameter, or a list from a result set. */
@@ -100,6 +103,7 @@ final class ProcedureRunner {
         }
         checkNames(call, ins, stubParams);
         for (int i = 0; i < ins.size(); i++) {
+            checkType(call, i, ins.get(i), stubParams[i].getType());
             boolean inout = stubParams[i].isAnnotationPresent(InOut.class);
             if (inout != (ins.get(i).mode() == 2)) {
                 throw LqlMessage.PROC_SIGNATURE_MISMATCH.exception(call.fullName(),
@@ -107,6 +111,50 @@ final class ProcedureRunner {
                                 + " in the database; mark INOUT arguments with @InOut");
             }
         }
+    }
+
+    /** The kind of a value, as far as an argument type check needs it (PR2). */
+    private enum Kind { NUMBER, TEXT, TIME, BOOLEAN, BINARY }
+
+    /** The kind of a database parameter type, or null when it is not one of the plain kinds (cursor, object, unknown). */
+    private static Kind kind(int sqlType) {
+        return switch (sqlType) {
+            case java.sql.Types.TINYINT, java.sql.Types.SMALLINT, java.sql.Types.INTEGER, java.sql.Types.BIGINT,
+                 java.sql.Types.DECIMAL, java.sql.Types.NUMERIC, java.sql.Types.REAL, java.sql.Types.FLOAT,
+                 java.sql.Types.DOUBLE -> Kind.NUMBER;
+            case java.sql.Types.CHAR, java.sql.Types.VARCHAR, java.sql.Types.LONGVARCHAR, java.sql.Types.NCHAR,
+                 java.sql.Types.NVARCHAR, java.sql.Types.LONGNVARCHAR, java.sql.Types.CLOB, java.sql.Types.NCLOB -> Kind.TEXT;
+            case java.sql.Types.DATE, java.sql.Types.TIME, java.sql.Types.TIMESTAMP, java.sql.Types.TIME_WITH_TIMEZONE,
+                 java.sql.Types.TIMESTAMP_WITH_TIMEZONE -> Kind.TIME;
+            case java.sql.Types.BOOLEAN, java.sql.Types.BIT -> Kind.BOOLEAN;
+            case java.sql.Types.BINARY, java.sql.Types.VARBINARY, java.sql.Types.LONGVARBINARY, java.sql.Types.BLOB -> Kind.BINARY;
+            default -> null;
+        };
+    }
+
+    /** The kind of a stub argument type, or null when it is not one of the plain kinds. */
+    private static Kind kind(Class<?> type) {
+        Class<?> t = box(type);
+        if (Number.class.isAssignableFrom(t)) return Kind.NUMBER;
+        if (t == String.class || t == Character.class) return Kind.TEXT;
+        if (t == Boolean.class) return Kind.BOOLEAN;
+        if (t == byte[].class) return Kind.BINARY;
+        if (java.time.temporal.Temporal.class.isAssignableFrom(t) || java.util.Date.class.isAssignableFrom(t)) return Kind.TIME;
+        return null;
+    }
+
+    /**
+     * PR2 types: a stub argument must have the kind of the database parameter (a number for NUMBER/INT, a string for
+     * VARCHAR, a date or time for DATE/TIMESTAMP). A boolean also fits a number parameter (MariaDB BOOLEAN is TINYINT(1),
+     * Oracle before 23 has no BOOLEAN). Unknown kinds on either side (enum, object types, cursors) are not checked.
+     */
+    private static void checkType(ProcedureReader.ProcCall call, int index, DbParam db, Class<?> stub) {
+        Kind d = kind(db.sqlType()), j = kind(stub);
+        if (d == null || j == null || d == j) return;
+        if (j == Kind.BOOLEAN && d == Kind.NUMBER) return;
+        throw LqlMessage.PROC_SIGNATURE_MISMATCH.exception(call.fullName(),
+                "argument " + (index + 1) + " (" + db.name() + ") is " + db.typeName() + " in the database, "
+                        + stub.getSimpleName() + " in the stub");
     }
 
     /**
@@ -366,7 +414,7 @@ final class ProcedureRunner {
                 String typeName = String.valueOf(rs.getString("TYPE_NAME"));
                 boolean cursor = typeName.toUpperCase(Locale.ROOT).contains("CURSOR");
                 int mode = type == DatabaseMetaData.procedureColumnInOut ? 2 : type == DatabaseMetaData.procedureColumnOut ? 4 : 1;
-                params.add(new DbParam(rs.getString("COLUMN_NAME"), mode, cursor));
+                params.add(new DbParam(rs.getString("COLUMN_NAME"), mode, cursor, rs.getInt("DATA_TYPE"), typeName));
             }
         }
         List<DbParam> out = List.copyOf(params);

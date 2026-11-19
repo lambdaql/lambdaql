@@ -293,7 +293,7 @@ Oracle의 실제 이름 바인딩(`pass_procedure_paramater_names=true`와 스�
 | # | 규칙 | 상태 |
 |---|---|---|
 | PR1 | 이름: 어노테이션 값을 그대로 사용. 값이 비어 있으면 함수 이름을 UPPER_SNAKE로. 패키지나 스키마 이름(`SQ_PKG.CALC`, `LQL.SQ_CALC`)도 동작함. 혼동을 피하려면 `@SqlProcedure(schema = ..., pkg = ..., value = ...)`로 쓸 수도 있음. | 구현됨. 스키마·패키지 이름은 테스트로 확인하지 않음 |
-| PR2 | 인자는 **위치로** 바인딩됨. 첫 호출 때 IN/INOUT 파라미터 개수와 `@InOut` 위치를 DB 메타데이터와 대조함. 이름을 알 수 있으면 이름도 대조하며, 같은 이름이 다른 순서면 오류. 타입 대조는 계획됨([8.4](#84-warning-argument-order) 참고). 메타데이터를 읽을 수 없으면 검사를 건너뛰고 인자 배치를 스텁에서 가져옴([8.4](#when-the-metadata-cannot-be-read) 참고). | 개수, `@InOut`, 이름 대조는 구현됨(Java로 테스트함). Oracle 패키지 오버로드 검출도 구현됨(Oracle에서 테스트함). 타입 대조는 아직 구현되지 않음. 메타데이터 없는 대체 동작(`LQL-5005`, `LQL-5006`)은 구현됨(MariaDB, Oracle에서 Java로 테스트함). |
+| PR2 | 인자는 **위치로** 바인딩됨. 첫 호출 때 IN/INOUT 파라미터 개수와 `@InOut` 위치를 DB 메타데이터와 대조함. 이름을 알 수 있으면 이름도 대조하며, 같은 이름이 다른 순서면 오류. 인자 타입의 종류(숫자, 문자, 날짜·시간, 불리언, 이진)도 대조하며, 다르면 오류(`LQL-4036`)([8.4](#84-warning-argument-order) 참고). 메타데이터를 읽을 수 없으면 검사를 건너뛰고 인자 배치를 스텁에서 가져옴([8.4](#when-the-metadata-cannot-be-read) 참고). | 개수, `@InOut`, 이름 대조는 구현됨(Java로 테스트함). Oracle 패키지 오버로드 검출도 구현됨(Oracle에서 테스트함). 타입 대조도 구현됨(Java로 테스트함). 메타데이터 없는 대체 동작(`LQL-5005`, `LQL-5006`)은 구현됨(MariaDB, Oracle에서 Java로 테스트함). |
 | PR3 | OUT 1개 → 반환 값. OUT/INOUT 여러 개 → 데이터 클래스 또는 record. `@InOut`은 INOUT 파라미터를 표시함. | 구현됨(Java로 테스트함) |
 | PR4 | 결과 집합 1개 → `List<T>`. 엔티티는 Hibernate로, 데이터 클래스/record는 레이블 매칭을 사용하는 JDBC로. 페이징 없음. | 구현됨(Java에서 record로 테스트함) |
 | PR5 | 결과 집합 여러 개 → 데이터 클래스의 `List` 속성, 순서대로. Oracle 암시적 결과는 지원하지 않음. | 구현됨, 테스트로 확인하지 않음 |

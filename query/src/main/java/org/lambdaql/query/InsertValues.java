@@ -97,7 +97,21 @@ public class InsertValues<T> extends ExecutableInsert<T> {
          * @return the runnable upsert
          */
         public ExecutableInsert<T> update(Assign<T> assign) {
-            HqlRenderer.AssignBound updates = DmlParts.setters(context, entityClass, assign);
+            return updateWith(DmlParts.setters(context, entityClass, assign));
+        }
+
+        /**
+         * On conflict, changes the existing row with values that may use subqueries: {@code (o, sub) -> ...}
+         * (ROADMAP D49).
+         *
+         * @param assign the assignments for the existing row
+         * @return the runnable upsert
+         */
+        public ExecutableInsert<T> update(AssignSub<T> assign) {
+            return updateWith(DmlParts.withSub(context, entityClass, assign));
+        }
+
+        private ExecutableInsert<T> updateWith(HqlRenderer.AssignBound updates) {
             DmlParts.checkRules(List.of(updates), entityClass);
             return new ExecutableInsert<>(context, () -> {
                 List<RenderedQuery> out = new ArrayList<>();

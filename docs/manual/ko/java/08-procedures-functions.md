@@ -306,6 +306,9 @@ interface DiffProcs {
 
     @SqlProcedure("SQ_PROC_DIFF")
     Integer named(@DbParam("p_to") Integer target, @DbParam("p_from") Integer source);   // another naming rule
+
+    @SqlProcedure("SQ_PROC_DIFF")
+    Integer text(String to, Integer from);                        // a string for a number parameter: LQL-4036
 }
 ```
 
@@ -320,6 +323,22 @@ assertEquals("LQL-4043", assertThrows(LambdaQLException.class,
 ```
 
 **권장:** `-parameters`로 컴파일하고 DB와 같은 이름을 쓰거나(공통 접두사는 생략 가능) `@DbParam`을 붙이십시오. 그러면 뒤바뀐 순서를 검출합니다.
+
+**인자 타입 대조.** 첫 호출 때 각 인자의 Java 타입과 DB 파라미터 타입의 종류를 대조합니다.
+종류는 숫자, 문자, 날짜·시간, 불리언, 이진 다섯 가지이며, 다르면 호출 전에 `LQL-4036`으로 중단합니다.
+
+- 불리언 인자는 숫자 파라미터에도 맞는 것으로 봅니다. MariaDB의 `BOOLEAN`은 `TINYINT(1)`이고, Oracle 23 이전에는 `BOOLEAN` 타입이 없습니다.
+- 종류를 정할 수 없는 쪽(enum, 객체 타입, 커서)은 대조하지 않습니다.
+- 같은 종류 안의 차이(`Integer` 인자와 `NUMBER(10,2)` 파라미터 등)는 드라이버 변환에 맡깁니다.
+
+**(테스트됨)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `type-check`(MariaDB, Oracle):
+
+```java
+// the kind of each argument is compared with the database parameter: a string for a number parameter stops
+LambdaQLException wrong = assertThrows(LambdaQLException.class,
+        () -> qb.call(DiffProcs.class, p -> p.text("10", 3)).execute());
+assertEquals("LQL-4036", wrong.code(), wrong.getMessage());
+```
 
 **Oracle 패키지 오버로드.** Oracle 패키지에는 같은 이름의 프로시저가 여러 개 있을 수 있습니다.
 lambdaQL은 스텁이 어느 것을 가리키는지 구분할 수 없으므로, 그런 이름을 호출하면 `LQL-4044`로 중단합니다. 오버로드 하나를 골라 호출하는 기능은 이후 계획입니다.
@@ -355,7 +374,7 @@ Oracle의 실제 이름 바인딩(`pass_procedure_paramater_names=true`와 스�
 | # | 규칙 | 상태 |
 |---|---|---|
 | PR1 | 이름: 애너테이션 값 그대로. 값이 비어 있으면 메서드 이름을 UPPER_SNAKE로. 패키지나 스키마 이름(`SQ_PKG.CALC`, `LQL.SQ_CALC`)도 동작합니다. 혼동을 피하려면 `@SqlProcedure(schema = ..., pkg = ..., value = ...)`로 쓸 수도 있습니다. | 구현됨. 스키마·패키지 이름은 테스트로 확인하지 않음 |
-| PR2 | 인자는 **위치로** 바인딩됩니다. 첫 호출에서 IN/INOUT 파라미터 개수와 `@InOut` 위치를 DB 메타데이터와 대조합니다. 이름을 알 수 있으면 이름도 대조하며, 같은 이름이 다른 순서면 오류입니다. 타입 대조는 계획되어 있습니다([8.4](#84-warning-argument-order) 참고). 메타데이터를 읽을 수 없으면 검사를 건너뛰고 인자 배치를 스텁에서 가져옵니다([8.4](#when-the-metadata-cannot-be-read) 참고). | 개수, `@InOut`, 이름 대조는 구현됨(테스트함). Oracle 패키지 오버로드 검출도 구현됨(Oracle에서 테스트함). 타입 대조는 아직 구현되지 않음. 메타데이터 없는 대체 동작(`LQL-5005`, `LQL-5006`)은 구현됨(MariaDB, Oracle에서 테스트함). |
+| PR2 | 인자는 **위치로** 바인딩됩니다. 첫 호출에서 IN/INOUT 파라미터 개수와 `@InOut` 위치를 DB 메타데이터와 대조합니다. 이름을 알 수 있으면 이름도 대조하며, 같은 이름이 다른 순서면 오류입니다. 인자 타입의 종류(숫자, 문자, 날짜·시간, 불리언, 이진)도 대조하며, 다르면 오류(`LQL-4036`)입니다([8.4](#84-warning-argument-order) 참고). 메타데이터를 읽을 수 없으면 검사를 건너뛰고 인자 배치를 스텁에서 가져옵니다([8.4](#when-the-metadata-cannot-be-read) 참고). | 개수, `@InOut`, 이름 대조는 구현됨(테스트함). Oracle 패키지 오버로드 검출도 구현됨(Oracle에서 테스트함). 타입 대조도 구현됨(MariaDB, Oracle에서 테스트함). 메타데이터 없는 대체 동작(`LQL-5005`, `LQL-5006`)은 구현됨(MariaDB, Oracle에서 테스트함). |
 | PR3 | OUT 1개 → 반환 값. OUT/INOUT 여러 개 → 레코드. `@InOut`은 INOUT 파라미터를 표시합니다. | 구현됨(테스트함) |
 | PR4 | 결과 집합 1개 → `List<T>`. 엔티티는 Hibernate로, 레코드는 레이블 대응으로 JDBC를 통해 읽습니다. 페이징 없음. | 구현됨(레코드로 테스트함) |
 | PR5 | 결과 집합 여러 개 → 레코드의 `List` 컴포넌트, 순서대로. Oracle 암시적 결과는 지원하지 않습니다. | 구현됨, 테스트로 확인하지 않음 |

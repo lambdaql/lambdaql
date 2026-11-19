@@ -81,6 +81,9 @@ class ProcedureTest {
 
         @SqlProcedure("SQ_PROC_DIFF")
         Integer named(@DbParam("p_to") Integer target, @DbParam("p_from") Integer source);   // another naming rule
+
+        @SqlProcedure("SQ_PROC_DIFF")
+        Integer text(String to, Integer from);                        // a string for a number parameter: LQL-4036
     }
     // @end
 
@@ -234,6 +237,17 @@ class ProcedureTest {
         // the same names in another order: stopped before the call (it would run with the values swapped)
         assertEquals("LQL-4043", assertThrows(LambdaQLException.class,
                 () -> qb.call(DiffProcs.class, p -> p.swapped(3, 10)).execute()).code());
+        // @end
+    }
+
+    @Test
+    void argumentTypes() {
+        assumeFalse(DB.equals("h2"), "H2 has no OUT parameters (PR15)");
+        // @start region="type-check"
+        // the kind of each argument is compared with the database parameter: a string for a number parameter stops
+        LambdaQLException wrong = assertThrows(LambdaQLException.class,
+                () -> qb.call(DiffProcs.class, p -> p.text("10", 3)).execute());
+        assertEquals("LQL-4036", wrong.code(), wrong.getMessage());
         // @end
     }
 

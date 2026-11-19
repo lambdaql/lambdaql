@@ -179,3 +179,11 @@ B6 대상 페이지: `java/03`·`kotlin/03`(임베디드 경로 절, 같음 비�
 
 대상 페이지: `java/07-dml.md`·`kotlin/07-dml.md`(7.3 규칙 목록, U20 행, "아직 구현되지 않았습니다" 문장), `java/09-java-notes.md`(제네릭 `value` 행), `11-errors-and-languages.md`(3xxx 범위 `LQL-3065`까지, 코드 표 행).
 
+## 대기 항목: 프로시저 인자 타입 대조(PR2)
+
+| 항목 | 내용 | 테스트 영역 |
+|---|---|---|
+| PR2 타입 대조 구현 | 첫 호출 때 인자의 Java 타입과 DB 파라미터 타입의 종류(숫자, 문자, 날짜·시간, 불리언, 이진)를 대조, 다르면 `LQL-4036`. 불리언은 숫자 파라미터에도 허용, enum·객체·커서는 건너뜀 | `ProcedureTest` `type-check`, 스텁 `DiffProcs`에 `text` 메서드 추가(`names` 영역) |
+
+대상 페이지: `README.md`, `java/README.md`, `kotlin/README.md`(기능 표의 "타입 대조: 아직 구현되지 않음"), `java/08-procedures-functions.md`(8.4 스텁 코드, "인자 타입 대조" 문단, PR2 행), `kotlin/08-procedures-functions.md`(PR2 행).
+

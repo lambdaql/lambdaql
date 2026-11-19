@@ -40,6 +40,16 @@ public class UpsertQuery<T> {
     }
 
     /**
+     * Upserts one row whose values may use subqueries: {@code (a, sub) -> ...} (ROADMAP D49).
+     *
+     * @param assign the assignment lambda
+     * @return the runnable upsert
+     */
+    public ExecutableInsert<T> values(AssignSub<T> assign) {
+        return plan(List.of(DmlParts.withSub(context, entityClass, assign)));
+    }
+
+    /**
      * Upserts one row per list element (one statement per row).
      *
      * @param rows   the elements

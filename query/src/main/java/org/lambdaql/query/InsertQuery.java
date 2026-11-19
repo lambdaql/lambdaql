@@ -40,6 +40,20 @@ public class InsertQuery<T> {
     }
 
     /**
+     * Inserts one row whose values may use subqueries: {@code (a, sub) -> a.setPrice(sub.from(Item.class).sum(...))}
+     * (ROADMAP D49). A subquery can read captured values, not the new row.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert-values-sub"}
+     *
+     * @param assign the assignment lambda
+     * @return the runnable INSERT (and {@code onConflict})
+     */
+    public InsertValues<T> values(AssignSub<T> assign) {
+        return InsertValues.of(entityClass, context, List.of(DmlParts.withSub(context, entityClass, assign)));
+    }
+
+    /**
      * Inserts one row per list element.
      *
      * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):

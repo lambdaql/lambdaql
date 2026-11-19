@@ -198,6 +198,42 @@ class DmlQueryTest {
     }
 
     @Test
+    void valuesSubProbe() {
+        items();
+        String[] hqls = {
+            "insert into Archive (id, price) values (100, (select sum(i.price) from Item i))",
+            "insert into Archive (id, price) values (101, (select sum(i.price) from Item i where i.order.id = :p1)), (102, (select max(o.price) from Order o))",
+            "insert into Archive (id, price) values (103, 1.0)",
+            "insert into Archive (id, price) values (104, (select max(a.price) from Archive a))",
+            "insert into Archive e0 (id, price) values (103, (select sum(i.price) from Item i)) on conflict(id) do update set price = excluded.price",
+            "insert into Archive e0 (id, price) values (105, (select sum(i.price) from Item i)) on conflict(id) do update set price = excluded.price",
+            "insert into Archive e0 (id, price) values (103, 2.0) on conflict(id) do update set price = (select max(o.price) from Order o)",
+        };
+        long oid = orders().get(0).getId();
+        int n = 0;
+        for (String h : hqls) {
+            n++;
+            EntityManager em = emf.createEntityManager();
+            try {
+                em.getTransaction().begin();
+                var q = em.createQuery(h);
+                if (h.contains(":p1")) q.setParameter("p1", oid);
+                int r = q.executeUpdate();
+                em.getTransaction().commit();
+                Object rows = em.createQuery("select a.id, a.price from Archive a order by a.id").getResultList().stream()
+                        .map(x -> java.util.Arrays.toString((Object[]) x)).toList();
+                System.out.println("VSUB " + n + " -> " + r + " " + rows);
+            } catch (RuntimeException e) {
+                if (em.getTransaction().isActive()) em.getTransaction().rollback();
+                Throwable c = e; while (c.getCause() != null) c = c.getCause();
+                System.out.println("VSUB " + n + " -> FAIL " + c.getClass().getSimpleName() + ": " + String.valueOf(c.getMessage()).lines().findFirst().orElse(""));
+            } finally {
+                em.close();
+            }
+        }
+    }
+
+    @Test
     void updatePatchAndRules() {
         long id = orders().get(0).getId();
         // @start region="update-patch"
