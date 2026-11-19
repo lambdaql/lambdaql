@@ -8,7 +8,7 @@
 >   프로시저 호출(`@SqlProcedure`, `@InOut`, `qb.call`, `qb.exec`)은 MariaDB와 Oracle에서, DB 함수 단독 호출은 세 데이터베이스 모두에서 테스트했습니다([`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)).
 >   H2에는 OUT 파라미터가 없으므로 프로시저 테스트는 H2에서 실행하지 않습니다.
 > - **추가로 구현됨, 테스트함:** 데이터베이스와의 스텁 인자 **이름** 대조(규칙 PR2의 일부), Oracle 패키지 오버로드 검출.
-> - **추가로 구현됨, 테스트함:** 조건 안의 DB 함수에 대한 SARGable 경고(규칙 PR8, FN7, [8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고).
+> - **추가로 구현됨, 테스트함:** 조건 안의 DB 함수와 컬럼 산술에 대한 SARGable 경고, 엄격 모드 `SargableMode.STRICT`(규칙 PR8, FN7, 결정 D50, [8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고).
 > - **아직 구현되지 않음:** 데이터베이스와의 파라미터 **타입** 대조(규칙 PR2의 일부), Oracle 패키지 프로시저의 오버로드 하나를 골라 호출하는 기능.
 > - **(테스트됨)** 표시가 있는 예제는 테스트 코드에서 그대로 가져온 것입니다. 다른 예제도 같은 규칙을 따르지만 테스트로 확인하지는 않았습니다. 전체 상태는 [Java 트랙 README](README.md#status)를 참고하십시오.
 
@@ -380,7 +380,7 @@ Oracle의 실제 이름 바인딩(`pass_procedure_paramater_names=true`와 스�
 | PR5 | 결과 집합 여러 개 → 레코드의 `List` 컴포넌트, 순서대로. Oracle 암시적 결과는 지원하지 않습니다. | 구현됨, 테스트로 확인하지 않음 |
 | PR6 | 단독으로 호출한 DB 함수는 데이터베이스마다 다른 경로를 사용합니다([8.8](#88-call-a-db-function-alone) 참고). | 구현됨(테스트함) |
 | PR7 | 쿼리 안의 DB 함수: [8.6](#86-declare-db-functions)과 규칙 FN1 ~ FN11 참고. | 구현됨(테스트함) |
-| PR8 | 조건에서 컬럼에 DB 함수를 쓰면 인덱스를 사용할 수 없으므로 WARN을 남깁니다([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). 코드는 `LQL-5001`. | 구현됨(테스트함). 엄격 모드는 아직 구현되지 않음 |
+| PR8 | 조건에서 컬럼에 DB 함수를 쓰면 인덱스를 사용할 수 없으므로 WARN을 남깁니다([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). 코드는 `LQL-5001`. | 구현됨(테스트함). `SargableMode.STRICT`에서는 오류(`LQL-3066`, D50) |
 | PR9 | 프로시저는 호출한 트랜잭션 안에서 실행됩니다. lambdaQL은 필요하면 호출 전에 flush합니다. 호출 후에는 로드한 엔티티가 오래된 상태일 수 있습니다. | 구현됨 |
 | PR10 | 공통된 영향받은 행 수가 없습니다. OUT 파라미터를 사용하십시오. | – |
 | PR11 | `null` IN 값은 괜찮습니다. DB 파라미터 기본값은 사용할 수 없습니다. | 구현됨 |
@@ -620,7 +620,7 @@ lambdaQL은 먼저 대기 중인 변경 사항을 flush합니다(PR9와 같음).
 ## 8.9 주의: 컬럼에 대한 함수와 인덱스(SARGable)
 
 > [!NOTE]
-> **구현됨, 테스트함**(H2, MariaDB 10.11, Oracle 23.26, 규칙 PR8, FN7). 아직 구현되지 않음: 엄격 모드(경고 대신 오류), 함수 없이 열에 적용한 산술 연산의 경고.
+> **구현됨, 테스트함**(H2, MariaDB 10.11, Oracle 23.26, 규칙 PR8, FN7). 엄격 모드(`SargableMode.STRICT`)와 컬럼 산술의 경고(`LQL-5012`, `LQL-5013`)도 구현됨(결정 D50).
 
 lambdaQL은 **인덱스를 사용할 수 있는** SQL을 만들려고 합니다([10. 규칙과 제한](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql) 참고).
 컬럼을 감싼 함수는 보통 일반 인덱스를 **사용할 수 없습니다**.
@@ -660,6 +660,40 @@ qb.from(Order.class).where(o -> OrderFns.discount(o.getPrice()) > 100).toHql();
 qb.from(Order.class).where(o -> o.getPrice() > OrderFns.nondet(base)).toHql();
 ```
 
+**SARGable 모드**(결정 D50). `SargableMode`에는 세 값이 있습니다.
+
+- `OFF`: 검사하지 않고 메타데이터도 조회하지 않습니다.
+- `WARN`(기본값): 경고를 기록합니다.
+- `STRICT`: `WARN`이라면 경고를 기록할 경우(`LQL-5001`, `LQL-5007`, `LQL-5012`)에 분석이 `org.lambdaql.NonSargableException`(`LQL-3066`)으로 실패합니다.
+
+persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 지정하고 `SargablePolicy.unregister(emf)`로 해제합니다. Spring에서는 `lambdaql.sargable.mode=STRICT`를 씁니다([12](12-spring-data-jpa.md) 참고).
+검사는 람다마다 한 번, 분석 결과를 공유 캐시에 넣을 때 실행됩니다. 그래서 첫 쿼리 전에 모드를 등록하십시오.
+
+**컬럼에 대한 산술**(결정 D50).
+
+- 컬럼 하나와 값만으로 된 `+ - * /`(`o.getQty() * 2 > n`)는 값 쪽으로 옮길 수 있습니다. lambdaQL은 `LQL-5012`를 `WARN` 수준으로 기록하고, `STRICT`에서는 오류입니다.
+- 컬럼끼리의 산술(`o.getPrice() * o.getQty() > n`)과 `%`는 옮길 수 없으므로 `LQL-5013`을 `DEBUG` 수준으로만 기록합니다. `STRICT`에서도 허용합니다.
+- 옮긴 형태는 의미가 같아야 합니다. `o.getQty() > n / 2.0`처럼 소수로 나누십시오. 정수 나눗셈 `n / 2`는 `>=`, `=`, `<`와 음수 `n`에서 다른 행을 냅니다. 음수를 곱했다면 비교 방향을 바꾸십시오. `LQL-5012` 메시지가 이를 안내합니다.
+- 인덱스가 있는지 조회해 경고를 줄이는 방식은 채택하지 않았습니다. 권한과 시노님 때문에 "인덱스 없음"과 "알 수 없음"이 섞이고, 컬럼 산술은 드문 형태이기 때문입니다.
+
+**(테스트됨)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `sargable-strict`:
+
+```java
+// STRICT: what WARN would log fails the analysis (NonSargableException, LQL-3066)
+SargablePolicy.register(emf, SargableMode.STRICT);
+NonSargableException fn = assertThrows(NonSargableException.class,
+        () -> qb.from(Order.class).where(o -> OrderFns.discount(o.getTotal()) > 100).toHql());
+assertEquals("LQL-3066", fn.code());
+assertThrows(NonSargableException.class, () -> qb.from(Order.class).where(o -> o.getCnt() * 2 > n).toHql());
+// the same meaning on the value side uses the index; divide by a decimal (n / 2 is integer division)
+var moved = qb.from(Order.class).where(o -> o.getCnt() > n / 2.0).toHql();
+assertEquals("select e0 from Order e0 where e0.cnt > :p1", moved.hql());
+// cnt is a whole number: cnt > 2.5 is bound as cnt > 2 (the same rows), never cut to a wrong 2 for >=
+assertEquals(Map.of("p1", 2), moved.parameters());
+// arithmetic between columns cannot move, so STRICT allows it
+qb.from(Order.class).where(o -> o.getCnt() * o.getStatus() > n).toHql();
+```
+
 **권장:**
 
 - 가능하면 함수를 값 쪽에 두십시오: `o.getPrice() > OrderFns.discount(base)`.
@@ -679,7 +713,7 @@ qb.from(Order.class).where(o -> o.getPrice() > OrderFns.nondet(base)).toHql();
 | FN4 | 애너테이션이 없는 호출이나 lambdaQL이 식별할 수 없는 호출은 오류입니다. 조용히 건너뛰지 않습니다. | 구현됨 |
 | FN5 | 인자는 [3. 조건](03-where.md)의 값 규칙을 따릅니다. 캡처 값만으로 만든 인자도 바인딩되어 **데이터베이스에서** 평가됩니다. | 구현됨(테스트함) |
 | FN6 | 박싱 호출은 건너뜁니다. 반환 타입은 선언된 메서드에서 옵니다. `Double`, `Integer`, `Long`, `BigDecimal`, `String`, `LocalDate`, `LocalDateTime`, `Boolean` 중 하나여야 합니다(`LQL-3055`). | 구현됨(테스트함) |
-| FN7 | 컬럼에 대한 함수는 WARN을 냅니다([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). MariaDB에서는 값 쪽의 `NOT DETERMINISTIC` 함수도 WARN(`LQL-5007`). | 구현됨(테스트함). 엄격 모드는 아직 구현되지 않음 |
+| FN7 | 컬럼에 대한 함수는 WARN을 냅니다([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). MariaDB에서는 값 쪽의 `NOT DETERMINISTIC` 함수도 WARN(`LQL-5007`). | 구현됨(테스트함). `SargableMode.STRICT`에서는 오류(`LQL-3066`, D50) |
 | FN8 | Hibernate 내장 함수(`COALESCE`, `ROUND`, `SYSDATE`, ...)와 같은 이름은 오류입니다(`LQL-3054`). Hibernate가 조용히 내장 함수를 사용하기 때문입니다. 접두사나 스키마 이름(`PUBLIC.SQ_FN`)을 사용하십시오. | 구현됨(테스트함) |
 | FN9 | Kotlin 전용(기본 인자, `inline`, `vararg`). Kotlin 트랙을 참고하십시오. | 기본 인자와 `vararg`는 구현됨. `inline`은 설계됨 |
 | FN10 | v0.1에는 스칼라 함수만 있습니다. 사용자 집계 함수와 윈도 함수는 v0.2에 계획되어 있습니다. 인자가 없는 함수는 `fn()`으로 렌더링됩니다. | 스칼라 함수 구현됨 |

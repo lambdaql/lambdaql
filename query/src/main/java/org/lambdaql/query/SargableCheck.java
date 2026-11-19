@@ -43,9 +43,12 @@ final class SargableCheck {
     private SargableCheck() {
     }
 
-    static void check(EntityManager em, Pred pred, List<Class<?>> roots, String where) {
+    static void check(EntityManager em, Pred pred, List<Class<?>> roots, String where, SargableMode mode) {
+        if (mode == SargableMode.OFF) return;
+        boolean strict = mode == SargableMode.STRICT;
+        arithmetic(pred, where, strict);                 // needs no database
         if (org.lambdaql.engine.sem.SqlFunctions.calls(pred).isEmpty()) return;
-        if (!LOG.isWarnEnabled()) return;
+        if (!strict && !LOG.isWarnEnabled()) return;
         Map<Integer, Class<?>> rootTypes = new HashMap<>();
         for (int i = 0; i < roots.size(); i++) rootTypes.put(i, roots.get(i));
         List<Finding> findings = new ArrayList<>();
@@ -58,13 +61,99 @@ final class SargableCheck {
                 String column = String.join(".", f.column().path());
                 if (f.onColumn()) {
                     if (product.contains("oracle") && hasFunctionIndex(c, session, f)) continue;
-                    LOG.warn("{}", LqlMessage.SARGABLE_COLUMN_FUNCTION.format(f.fn().key(), column, where));
+                    report(LqlMessage.SARGABLE_COLUMN_FUNCTION.format(f.fn().key(), column, where), strict);
                 } else if (product.contains("maria") || product.contains("mysql")) {
                     Boolean det = deterministic(c, f.fn());
-                    if (Boolean.FALSE.equals(det)) LOG.warn("{}", LqlMessage.SARGABLE_NONDETERMINISTIC.format(f.fn().key(), where));
+                    if (Boolean.FALSE.equals(det)) report(LqlMessage.SARGABLE_NONDETERMINISTIC.format(f.fn().key(), where), strict);
                 }
             }
         });
+    }
+
+    /** WARN in {@link SargableMode#WARN}; in {@link SargableMode#STRICT} the analysis fails instead. */
+    private static void report(String finding, boolean strict) {
+        if (strict) throw new org.lambdaql.NonSargableException(finding);
+        LOG.warn("{}", finding);
+    }
+
+    // ------------------------------------------------------------------ arithmetic on columns
+
+    /**
+     * Arithmetic on a column (ROADMAP PR8, 2026-11-19): one column with values only ({@code o.getQty() * 2 > n})
+     * can move to the value side ({@code o.getQty() > n / 2.0}: a decimal division keeps the meaning, {@code n / 2}
+     * would be integer division), so it is reported like a function (LQL-5012, WARN or STRICT). Arithmetic between columns or with {@code %} cannot move, so it is only a DEBUG note (LQL-5013).
+     */
+    private static void arithmetic(Pred p, String where, boolean strict) {
+        switch (p) {
+            case Pred.And a -> a.items().forEach(i -> arithmetic(i, where, strict));
+            case Pred.Or o -> o.items().forEach(i -> arithmetic(i, where, strict));
+            case Pred.Not n -> arithmetic(n.operand(), where, strict);
+            case Pred.Cmp c -> {
+                arithmeticSide(c.left(), c.right(), where, strict);
+                arithmeticSide(c.right(), c.left(), where, strict);
+                subqueryArithmetic(c.left(), where, strict);
+                subqueryArithmetic(c.right(), where, strict);
+            }
+            case Pred.In in -> {
+                if (computed(in.value())) expression(in.value(), where);
+                subqueryArithmetic(in.values(), where, strict);
+            }
+            case Pred.Truth t -> subqueryArithmetic(t.operand(), where, strict);
+            case Pred.IsNull n -> { }
+            case Pred.Bool b -> { }
+        }
+    }
+
+    private static void subqueryArithmetic(Expr e, String where, boolean strict) {
+        if (e instanceof Expr.Subquery q) q.wheres().forEach(w -> arithmetic(w, where, strict));
+    }
+
+    private static void arithmeticSide(Expr self, Expr other, String where, boolean strict) {
+        if (!computed(self)) return;
+        List<Expr.Column> cols = distinct(columns(self));
+        if (cols.size() == 1 && columns(other).isEmpty() && movable(self)) {
+            report(LqlMessage.SARGABLE_COLUMN_ARITHMETIC.format(String.join(".", cols.get(0).path()), where), strict);
+        } else {
+            expression(self, where);
+        }
+    }
+
+    private static void expression(Expr e, String where) {
+        if (!LOG.isDebugEnabled()) return;
+        List<String> names = distinct(columns(e)).stream().map(c -> String.join(".", c.path())).toList();
+        LOG.debug("{}", LqlMessage.SARGABLE_COLUMN_EXPRESSION.format(String.join(", ", names), where));
+    }
+
+    /** Arithmetic with a column inside and no database function (a function is reported on its own). */
+    private static boolean computed(Expr e) {
+        return (e instanceof Expr.Arith || e instanceof Expr.Neg) && !columns(e).isEmpty() && !hasFunc(e);
+    }
+
+    /** Only + - * / and negation: an operation that a reader can undo on the value side. */
+    private static boolean movable(Expr e) {
+        return switch (e) {
+            case Expr.Arith a -> a.op() != org.lambdaql.engine.ir.ArithOp.REM && movable(a.left()) && movable(a.right());
+            case Expr.Neg n -> movable(n.operand());
+            default -> true;
+        };
+    }
+
+    private static boolean hasFunc(Expr e) {
+        return switch (e) {
+            case Expr.Func f -> true;
+            case Expr.Arith a -> hasFunc(a.left()) || hasFunc(a.right());
+            case Expr.Neg n -> hasFunc(n.operand());
+            case Expr.Coalesce c -> hasFunc(c.first()) || hasFunc(c.second());
+            default -> false;
+        };
+    }
+
+    private static List<Expr.Column> distinct(List<Expr.Column> cols) {
+        List<Expr.Column> out = new ArrayList<>();
+        for (Expr.Column c : cols) {
+            if (out.stream().noneMatch(x -> x.root() == c.root() && x.path().equals(c.path()))) out.add(c);
+        }
+        return out;
     }
 
     // ------------------------------------------------------------------ finding the patterns

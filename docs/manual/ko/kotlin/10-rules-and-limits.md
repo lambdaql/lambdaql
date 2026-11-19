@@ -139,7 +139,23 @@ MariaDB 10.11과 Oracle 23ai, 20,000 ~ 50,000행:
 컬럼 쪽의 DB 함수(`OrderFns.discount(it.price)!! > 10`)는 일반 인덱스를 사용할 수 없습니다.
 lambdaQL은 **WARN**(`LQL-5001`)을 기록합니다. 예외: Oracle에서 같은 식의 함수 기반 인덱스가 있으면 기록하지 않습니다.
 MariaDB에서 `NOT DETERMINISTIC`(기본값) 함수는 인자가 파라미터뿐이어도 전체 스캔이 되므로(`it.price!! > OrderFns.discount(rate)!!`) 이 경우에도 경고합니다(`LQL-5007`).
-엄격 모드(경고 대신 오류)는 아직 구현되지 않았습니다.
+`SargableMode.STRICT`에서는 경고 대신 분석이 실패합니다(`LQL-3066`, 결정 D50).
+
+**SARGable 모드**(결정 D50). `SargableMode`에는 세 값이 있습니다.
+
+- `OFF`: 검사하지 않고 메타데이터도 조회하지 않습니다.
+- `WARN`(기본값): 경고를 기록합니다.
+- `STRICT`: `WARN`이라면 경고를 기록할 경우(`LQL-5001`, `LQL-5007`, `LQL-5012`)에 분석이 `org.lambdaql.NonSargableException`(`LQL-3066`)으로 실패합니다.
+
+persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 지정하고 `SargablePolicy.unregister(emf)`로 해제합니다. Spring에서는 `lambdaql.sargable.mode=STRICT`를 씁니다([12](12-spring-data-jpa.md) 참고).
+검사는 람다마다 한 번, 분석 결과를 공유 캐시에 넣을 때 실행됩니다. 그래서 첫 쿼리 전에 모드를 등록하십시오.
+
+**컬럼에 대한 산술**(결정 D50).
+
+- 컬럼 하나와 값만으로 된 `+ - * /`(`it.qty * 2 > n`)는 값 쪽으로 옮길 수 있습니다. lambdaQL은 `LQL-5012`를 `WARN` 수준으로 기록하고, `STRICT`에서는 오류입니다.
+- 컬럼끼리의 산술(`it.price!! * it.qty > n`)과 `%`는 옮길 수 없으므로 `LQL-5013`을 `DEBUG` 수준으로만 기록합니다. `STRICT`에서도 허용합니다.
+- 옮긴 형태는 의미가 같아야 합니다. `it.qty > n / 2.0`처럼 소수로 나누십시오. 정수 나눗셈 `n / 2`는 `>=`, `=`, `<`와 음수 `n`에서 다른 행을 냅니다. 음수를 곱했다면 비교 방향을 바꾸십시오. `LQL-5012` 메시지가 이를 안내합니다.
+- 인덱스가 있는지 조회해 경고를 줄이는 방식은 채택하지 않았습니다. 권한과 시노님 때문에 "인덱스 없음"과 "알 수 없음"이 섞이고, 컬럼 산술은 드문 형태이기 때문입니다.
 [8. 프로시저와 DB 함수](08-procedures-functions.md)를 참고하십시오.
 
 <a id="103-null-rules"></a>
@@ -155,6 +171,7 @@ MariaDB에서 `NOT DETERMINISTIC`(기본값) 함수는 인자가 파라미터뿐
 | `it.description == it.custName`(엔티티 값 두 개) | `e0.description = e0.custName` | 어느 한쪽이 NULL: 반환되지 않음. NULL과 NULL도 마찬가지(SQL 의미, D48) |
 | `it.description.equals(text)`(`String?`) | `==`와 같음 | `==`와 같음 |
 | `x == null`, `x != null` | `is null`, `is not null` | 2값 |
+| `it.cnt >= 2.5`(정수 컬럼, 소수 값) | 같은 의미의 정수 비교: `>=`, `<`는 올림(`e0.cnt >= 3`), `>`, `<=`는 내림, `==`는 `1=0`, `!=`는 `is not null`. IN 목록에서는 그런 요소를 뺌(D48 B8) | 인덱스 사용 가능. 이전처럼 값을 잘라 잘못된 행을 반환하지 않음 |
 | 값 객체(`@Embedded`) 전체: `it.address == addr`, `it.address != addr` | 컬럼마다 펼침: `e0.address.city = :p1 and e0.address.zip = :p2`, 부정은 `<> ... or ...`. `== null`은 모든 컬럼 `is null`(and), `!= null`은 `is not null`(or) | 컬럼마다 SQL 의미(D48): NULL 컬럼은 `=`에도 `<>`에도 불일치. 캡처한 객체가 `null`이면 일치하는 행 없음(`WARN` 수준 `LQL-4045`) |
 | `it.id == id`(`it.id`는 `Long?`, `id`는 캡처한 `Long`), `it.id == null`: NULL이 될 수 없는 컬럼(id, 기본형, `nullable = false`, 경로에 연관 단계 없음) | `not (e0.id is null or e0.id <> :p1)` 대신 `e0.id = :p1`. `it.id == null`은 `1=0`(Java로 테스트함) | 컬럼에 NULL이 없음. 연관을 거치는 경로(`it.customer?.id`)는 검사 유지 |
 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL 3값 논리 |

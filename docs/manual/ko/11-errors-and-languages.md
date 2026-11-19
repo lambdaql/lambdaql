@@ -33,9 +33,9 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 |---|---|---|---|
 | `LQL-1xxx` | 입력과 람다 로딩 | `LQL-1001`~`LQL-1013` | `LambdaAnalysisException` |
 | `LQL-2xxx` | 바이트코드 디코딩 | `LQL-2001`~`LQL-2025` | `UnsupportedLambdaShapeException` |
-| `LQL-3xxx` | 의미 해석과 Java에서 계산하는 값 | `LQL-3001`~`LQL-3065` | `TranslationException` |
+| `LQL-3xxx` | 의미 해석과 Java에서 계산하는 값 | `LQL-3001`~`LQL-3066` | `TranslationException`(`LQL-3066`은 하위 클래스 `NonSargableException`) |
 | `LQL-4xxx` | 렌더링, 바인딩, 실행 | `LQL-4001`~`LQL-4045`, `LQL-4999`(내부 오류) | `LambdaQLException` 자체, 또는 JDK/JPA 표준 예외([예외](#exceptions) 참고). `LQL-4045`는 `WARN` 로그(자기 기본형 언박싱만 있는 비교는 `DEBUG`) |
-| `LQL-5xxx` | 경고(로그에 기록) | `LQL-5001`~`LQL-5011` | –(로그 한 줄. 레벨은 `WARN`이며, `LQL-5004`~`LQL-5006`, `LQL-5008`과 기본 정렬 모드의 `LQL-5003`은 `INFO`, `LQL-5009`~`LQL-5011`은 `DEBUG`) |
+| `LQL-5xxx` | 경고(로그에 기록) | `LQL-5001`~`LQL-5013` | –(로그 한 줄. 레벨은 `WARN`이며, `LQL-5004`~`LQL-5006`, `LQL-5008`과 기본 정렬 모드의 `LQL-5003`은 `INFO`, `LQL-5009`~`LQL-5011`, `LQL-5013`은 `DEBUG`) |
 
 실제 코드의 예:
 
@@ -48,6 +48,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-3058` | `TranslationException` | DB 함수 {0}은 SQL 이름이 따로 있어 등록이 필요합니다. 클래스를 lambdaql.functions.classes 설정에 넣으세요. |
 | `LQL-3064` | `TranslationException` | 파생 테이블·CTE의 행 타입은 Java record나 Kotlin data class여야 합니다(J5): {0} |
 | `LQL-3065` | `TranslationException` | Dml.value: 값의 타입 {2}가 열 {0}({1})에 맞지 않습니다(U20) |
+| `LQL-3066` | `NonSargableException` | 인덱스를 쓸 수 없는 조건이며 SARGable 모드가 STRICT입니다: {0} |
 | `LQL-4009` | `LambdaQLException` | null 값은 <, <=, >, >=로 비교할 수 없습니다(Java에서는 NullPointerException): {0} |
 | `LQL-4014` | `IllegalArgumentException` | limit은 0 이상이어야 합니다: {0} |
 | `LQL-4025` | `NonUniqueResultException` | one()의 조건에 맞는 행이 2개 이상입니다. 조건을 좁히거나 first()를 쓰세요: {0} |
@@ -68,6 +69,8 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-5009` | –(`DEBUG` 로그) | SQL 의미: {0}에서 값이 NULL인 행은 조건에 맞지 않습니다(Java의 null 처리와 다름). 포함하려면 x == null || ...처럼 null 검사를 적으세요. |
 | `LQL-5010` | –(`DEBUG` 로그) | 열 {0}은 @Lob 열입니다. 일부 DB(예: Oracle)는 LOB를 {1}에 쓸 수 없습니다. |
 | `LQL-5011` | –(`DEBUG` 로그) | 열거형 열 {0}은 문자열로 저장되어(@Enumerated(STRING)) DB는 선언 순서가 아니라 이름 순으로 정렬합니다. |
+| `LQL-5012` | –(`WARN` 로그) | 열 {0}에 산술을 걸면 조건이 인덱스를 쓸 수 없습니다. 같은 의미로 값 쪽에 옮기세요. 소수로 나누고(o.getQty() * 2 > n 대신 o.getQty() > n / 2.0, n / 2는 정수 나눗셈), 음수를 곱했다면 비교 방향을 바꾸세요: {1} |
+| `LQL-5013` | –(`DEBUG` 로그) | 조건이 열 {0}을 계산하므로 그 열의 인덱스를 쓸 수 없습니다: {1} |
 
 `{0}`, `{1}`은 인자입니다. 예를 들어 식이나 프로시저 이름이 들어갑니다.
 전체 목록은 메시지 파일에 있습니다([번역자를 위한 안내](#for-translators) 참고).
@@ -90,6 +93,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `UnsupportedLambdaShapeException` | `LQL-2xxx` | lambdaQL이 지원하지 않는 모양의 바이트코드일 때 | 반복문(`LQL-2004`). 값 삼항 연산자나 값 `if`/`when`. 일반적인 boolean 삼항 연산자 `c ? x : y`. |
 | `TranslationException` | `LQL-3xxx` | 람다가 HQL에서 정의된 의미를 갖지 않을 때 | getter가 아닌 엔티티 메서드. 두 엔티티를 `==`로 비교(아직 미지원). 값 객체의 크기 비교(`LQL-3012`). `groupBy` 키가 아닌 비집계 값(`LQL-3035`). |
 | `DbOnlyException` | `LQL-4034` | 직접 만든 `@SqlFunction` 메서드를 lambdaQL 람다 밖의 Java에서 호출했을 때 | `OrderFns.discount(1.0)`([람다 밖에서 호출한 플레이스홀더](#placeholders-called-outside-a-lambda) 참고) |
+| `NonSargableException` | `LQL-3066` | `SargableMode.STRICT`에서 인덱스를 쓸 수 없는 조건(`LQL-5001`, `LQL-5007`, `LQL-5012`에 해당)을 분석할 때. `TranslationException`의 하위 클래스 | `OrderFns.discount(o.getTotal()) > 100`, `o.getCnt() * 2 > n`(결정 D50) |
 | `SortNotAllowedException` | `LQL-4040` | `SortMode.STRICT`에서 외부 정렬(Spring `Sort`, `SortSpec.ofPath`)이 정렬 규칙에 없는 이름을 사용할 때 | `name`만 허용한 상태의 `Sort.by("grade")`([4.10 정렬 정책](java/04-order-paging.md#sort-policy) 참고). 웹 애플리케이션은 보통 HTTP 400으로 응답([12.5](java/12-spring-data-jpa.md#sort-policy-with-spring)) |
 
 이 클래스는 모두 `org.lambdaql` 패키지에 있습니다.
@@ -416,6 +420,8 @@ lambdaQL은 **SLF4J API**로 로그를 남깁니다.
 | `LQL-5009` | 조건이 엔티티 값을 SQL 의미로 비교해(결정 D48) Java·Kotlin에서는 맞는 NULL 행이 빠질 수 있을 때: 엔티티 값끼리의 `==`/`equals`, 값과의 `!=`, NULL 가능 `Boolean`의 `!`, 연관 경로의 null guard(경로는 INNER JOIN 유지), 서브쿼리 `NOT IN`. 조건 문장마다 한 번 `DEBUG` 레벨로 기록(3.6.3 참고: [Java](java/03-where.md#363-write-your-null-checks-yourself) \| [Kotlin](kotlin/03-where.md#363-write-your-null-checks-yourself)) |
 | `LQL-5010` | `@Lob` 컬럼을 `order by`, `distinct`, `group by`에 쓸 때. H2와 MariaDB는 실행하지만 Oracle은 거부함(ORA-22848, ORA-22849). `=` 비교는 세 DB 모두 동작. lambdaQL은 쿼리를 바꾸지 않음. 컬럼과 사용처마다 한 번 `DEBUG` 레벨로 기록([4.5](java/04-order-paging.md#45-what-a-sort-key-can-be) 참고) |
 | `LQL-5011` | `@Enumerated(EnumType.STRING)` enum 컬럼으로 정렬할 때. DB는 이름 순으로, Java·Kotlin은 선언 순서로 정렬하므로 순서가 다를 수 있음. lambdaQL은 쿼리를 바꾸지 않음. 컬럼마다 한 번 `DEBUG` 레벨로 기록. `ORDINAL`은 기록하지 않음([4.5](java/04-order-paging.md#45-what-a-sort-key-can-be) 참고) |
+| `LQL-5012` | 컬럼 하나와 값만으로 된 산술(`+ - * /`)이 조건의 컬럼 쪽에 있을 때(`o.getQty() * 2 > n`). 값 쪽으로 옮길 수 있음. `WARN` 레벨로 기록. `SargableMode.STRICT`에서는 `LQL-3066` 오류(결정 D50, [8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) 참고) |
+| `LQL-5013` | 컬럼끼리의 산술이나 `%`가 조건에 있을 때(`o.getPrice() * o.getQty() > n`). 옮길 수 없으므로 `DEBUG` 레벨로만 기록. `STRICT`에서도 허용 |
 
 ```
 WARN  [LQL-5002] limit 없는 서브쿼리 정렬은 결과에 영향이 없어 제거했습니다(Q4): ...

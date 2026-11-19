@@ -81,6 +81,9 @@ public final class HostEvaluator {
      */
     public static Object convert(Object value, Class<?> target) {
         if (!(value instanceof Number n) || target == null || target.isInstance(value)) return value;
+        // never cut a value: 2.5 or 1e20 has no exact whole-number form, so it stays as it is (the renderer rewrites
+        // a comparison with such a value, and Hibernate rejects a binding instead of changing it)
+        if (INTEGRAL.contains(target) && exactWhole(n, target) == null) return value;
         if (target == Integer.class) return n.intValue();
         if (target == Long.class) return n.longValue();
         if (target == Double.class) return n.doubleValue();
@@ -90,6 +93,60 @@ public final class HostEvaluator {
         if (target == BigDecimal.class) return new BigDecimal(n.toString());
         if (target == BigInteger.class) return BigInteger.valueOf(n.longValue());
         return value;
+    }
+
+    private static final java.util.Set<Class<?>> INTEGRAL = java.util.Set.of(Byte.class, Short.class, Integer.class,
+            Long.class, BigInteger.class);
+
+    /**
+     * Checks if a number is a whole number in the range of an integral type.
+     *
+     * @param n      a number
+     * @param target an integral wrapper type, or {@code BigInteger}
+     * @return the value as a {@code BigDecimal} when it fits exactly, else null
+     */
+    public static BigDecimal exactWhole(Number n, Class<?> target) {
+        BigDecimal bd = decimal(n);
+        if (bd == null) return null;
+        if (bd.signum() != 0 && bd.stripTrailingZeros().scale() > 0) return null;
+        BigDecimal[] range = range(target);
+        if (range != null && (bd.compareTo(range[0]) < 0 || bd.compareTo(range[1]) > 0)) return null;
+        return bd;
+    }
+
+    /** The exact decimal value of a number; null for NaN and the infinities. */
+    public static BigDecimal decimal(Number n) {
+        if (n instanceof BigDecimal b) return b;
+        if (n instanceof BigInteger b) return new BigDecimal(b);
+        if (n instanceof Double || n instanceof Float) {
+            double d = n.doubleValue();
+            return Double.isFinite(d) ? BigDecimal.valueOf(d) : null;
+        }
+        return BigDecimal.valueOf(n.longValue());
+    }
+
+    /**
+     * The smallest and largest value of an integral type.
+     *
+     * @param target an integral wrapper type
+     * @return {@code [min, max]}, or null for {@code BigInteger} (no limit) and other types
+     */
+    public static BigDecimal[] range(Class<?> target) {
+        if (target == Byte.class) return new BigDecimal[]{BigDecimal.valueOf(Byte.MIN_VALUE), BigDecimal.valueOf(Byte.MAX_VALUE)};
+        if (target == Short.class) return new BigDecimal[]{BigDecimal.valueOf(Short.MIN_VALUE), BigDecimal.valueOf(Short.MAX_VALUE)};
+        if (target == Integer.class) return new BigDecimal[]{BigDecimal.valueOf(Integer.MIN_VALUE), BigDecimal.valueOf(Integer.MAX_VALUE)};
+        if (target == Long.class) return new BigDecimal[]{BigDecimal.valueOf(Long.MIN_VALUE), BigDecimal.valueOf(Long.MAX_VALUE)};
+        return null;
+    }
+
+    /**
+     * Checks if a type is a whole-number type that a fraction would be cut for.
+     *
+     * @param type a wrapper type
+     * @return true for Byte, Short, Integer, Long and BigInteger
+     */
+    public static boolean integral(Class<?> type) {
+        return type != null && INTEGRAL.contains(type);
     }
 
     // ------------------------------------------------------------------ helpers

@@ -5,6 +5,7 @@ import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.lambdaql.NonSargableException;
 import org.junit.jupiter.api.TestInstance;
 import org.lambdaql.DbOnlyException;
 import org.lambdaql.LambdaQLException;
@@ -226,6 +227,44 @@ class FunctionTest {
         assertEquals("select e0 from Order e0 where function('SQ_TAX' as Double, e0.price) > 100.0", q.toHql().hql());
         // @end
         assertEquals(java(o -> o.getPrice() * 0.9 > 100), idsOf(q.toList()));
+    }
+
+    @Test
+    void sargableStrictAndArithmetic() {
+        ch.qos.logback.classic.Logger log = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(SargableCheck.class);
+        var appender = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        appender.start();
+        log.addAppender(appender);
+        ch.qos.logback.classic.Level old = log.getLevel();
+        log.setLevel(ch.qos.logback.classic.Level.DEBUG);
+        int n = 5;
+        try {
+            // WARN (the default): arithmetic on one column with values can move to the value side (LQL-5012, WARN);
+            // arithmetic between columns cannot, so it is only a DEBUG note (LQL-5013)
+            qb.from(Order.class).where(o -> o.getStatus() * 2 > n).toHql();
+            qb.from(Order.class).where(o -> o.getPrice() * o.getStatus() > n).toHql();
+            assertEquals(List.of("WARN LQL-5012", "DEBUG LQL-5013"), appender.list.stream()
+                    .map(e -> e.getLevel() + " " + e.getFormattedMessage().substring(1, 9)).toList(), String.valueOf(appender.list));
+            // @start region="sargable-strict"
+            // STRICT: what WARN would log fails the analysis (NonSargableException, LQL-3066)
+            SargablePolicy.register(emf, SargableMode.STRICT);
+            NonSargableException fn = assertThrows(NonSargableException.class,
+                    () -> qb.from(Order.class).where(o -> OrderFns.discount(o.getTotal()) > 100).toHql());
+            assertEquals("LQL-3066", fn.code());
+            assertThrows(NonSargableException.class, () -> qb.from(Order.class).where(o -> o.getCnt() * 2 > n).toHql());
+            // the same meaning on the value side uses the index; divide by a decimal (n / 2 is integer division)
+            var moved = qb.from(Order.class).where(o -> o.getCnt() > n / 2.0).toHql();
+            assertEquals("select e0 from Order e0 where e0.cnt > :p1", moved.hql());
+            // cnt is a whole number: cnt > 2.5 is bound as cnt > 2 (the same rows), never cut to a wrong 2 for >=
+            assertEquals(Map.of("p1", 2), moved.parameters());
+            // arithmetic between columns cannot move, so STRICT allows it
+            qb.from(Order.class).where(o -> o.getCnt() * o.getStatus() > n).toHql();
+            // @end
+        } finally {
+            SargablePolicy.unregister(emf);
+            log.setLevel(old);
+            log.detachAppender(appender);
+        }
     }
 
     @Test

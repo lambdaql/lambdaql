@@ -195,3 +195,13 @@ B6 대상 페이지: `java/03`·`kotlin/03`(임베디드 경로 절, 같음 비�
 
 대상 페이지: `java/07-dml.md`·`kotlin/07-dml.md`(미구현 목록과 7.3 서브쿼리 절), `java/07-5-insert.md`·`kotlin/07-5-insert.md`(values·upsert 절).
 
+## 대기 항목: D50 SARGable strict 모드와 열 산술, D48 B8 정수 열 비교
+
+| 항목 | 내용 | 테스트 영역 |
+|---|---|---|
+| SARGable 모드 | `SargableMode` OFF·WARN(기본)·STRICT, `SargablePolicy.register(emf, mode)`, Spring `lambdaql.sargable.mode`. STRICT면 `NonSargableException`(`LQL-3066`) | `FunctionTest` `sargable-strict` |
+| 열 산술 | 열 하나와 값의 `+ - * /`는 WARN `LQL-5012`(STRICT 오류). 열끼리의 산술과 `%`는 DEBUG `LQL-5013`. 옮길 때는 소수로 나눔(`n / 2.0`) | `FunctionTest` `sargable-strict` |
+| 정수 열과 소수 값(B8) | `cnt >= 2.5` → `cnt >= 3`, `cnt > 2.5` → `cnt > 2`, `cnt == 2.5` → 행 없음, IN 목록에서 제외. 이전에는 2.5를 2로 잘라 결과가 틀렸음 | `SqlMeaningTest` `whole-number` |
+
+대상 페이지: `java/08-procedures-functions.md`·`kotlin/08-procedures-functions.md`(SARGable 절), `java/03-where.md`·`kotlin/03-where.md`(3.4 비교: "컬럼에 대한 산술과 인덱스", "정수 컬럼과 소수 값" 문단), `java/12-spring-data-jpa.md`·`kotlin/12-spring-data-jpa.md`("SARGable 모드 프로퍼티" 문단), `11-errors-and-languages.md`(3xxx 범위 `LQL-3066`, 5xxx 범위 `LQL-5013`까지, 코드 표·로그 표), `java/10-rules-and-limits.md`·`kotlin/10-rules-and-limits.md`.
+

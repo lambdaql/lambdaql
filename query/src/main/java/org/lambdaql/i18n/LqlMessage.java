@@ -323,6 +323,9 @@ public enum LqlMessage {
     /** LQL-3065: Dml.value: the value type &#123;2&#125; does not fit the column &#123;0&#125; (&#123;1&#125;) (U20) */
     VALUE_TYPE("LQL-3065", 3),
 
+    /** LQL-3066: The condition cannot use an index, and the SARGable mode is STRICT: &#123;0&#125; */
+    NON_SARGABLE("LQL-3066", 1),
+
     /** LQL-4001: limit and the one-row protection are not supported yet for an entity with a composite key: &#123;0&#125; */
     COMPOSITE_KEY_LIMIT("LQL-4001", 1),
 
@@ -492,7 +495,13 @@ public enum LqlMessage {
     LOB_IN_SORT_OR_KEY("LQL-5010", 2),
 
     /** LQL-5011: The enum column &#123;0&#125; is stored as text (&#64;Enumerated(STRING)), so the database sorts it by name, not by the declaration order of the enum. */
-    ENUM_STRING_SORT("LQL-5011", 1);
+    ENUM_STRING_SORT("LQL-5011", 1),
+
+    /** LQL-5012: Arithmetic on the column &#123;0&#125; keeps the condition from using an index. Move it to the value side with the same meaning: divide by a decimal (o.getQty() &gt; n / 2.0 for o.getQty() * 2 &gt; n; n / 2 would be integer division), and reverse the comparison for a negative factor: &#123;1&#125; */
+    SARGABLE_COLUMN_ARITHMETIC("LQL-5012", 2),
+
+    /** LQL-5013: The condition computes on the columns &#123;0&#125;, so it cannot use an index on them: &#123;1&#125; */
+    SARGABLE_COLUMN_EXPRESSION("LQL-5013", 2);
 
     private final String code;
     private final int argCount;

@@ -2,6 +2,8 @@ package org.lambdaql.spring.boot;
 
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.metamodel.EntityType;
+import org.lambdaql.query.SargableMode;
+import org.lambdaql.query.SargablePolicy;
 import org.lambdaql.query.SortMode;
 import org.lambdaql.query.SortPolicy;
 import org.lambdaql.query.SortRules;
@@ -111,6 +113,21 @@ public class LambdaQlAutoConfiguration {
             SortMode m = mode != null ? mode : bean != null ? bean.mode() : SortMode.INFO;
             SortPolicy.register(entityManagerFactory, SortPolicy.of(m, rules.values().toArray(SortRules<?>[]::new)));
         };
+    }
+
+    /**
+     * Registers the SARGable mode for the entity manager factory (ROADMAP PR8):
+     * {@code lambdaql.sargable.mode=STRICT} (OFF, WARN (default), STRICT). Without the property nothing is registered
+     * and the mode is WARN.
+     *
+     * @param entityManagerFactory the only entity manager factory
+     * @param environment          the Spring environment with {@code lambdaql.sargable.mode}
+     * @return a callback that runs after all singletons are made
+     */
+    @Bean
+    public SmartInitializingSingleton lambdaQlSargableRegistration(EntityManagerFactory entityManagerFactory, Environment environment) {
+        return () -> Binder.get(environment).bind("lambdaql.sargable.mode", SargableMode.class)
+                .ifBound(mode -> SargablePolicy.register(entityManagerFactory, mode));
     }
 
     private static Class<?> entity(EntityManagerFactory emf, String key) {

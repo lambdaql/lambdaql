@@ -8,7 +8,7 @@
 >   프로시저 호출(`@SqlProcedure`, `@InOut`, `qb.call`, `qb.exec`)은 MariaDB와 Oracle에서, DB 함수 단독 호출은 세 데이터베이스 모두에서 테스트했습니다([`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)).
 >   lambdaQL은 Kotlin 형태(`@JvmStatic`을 붙인 `companion object` 함수, 결과로 쓰는 Kotlin data class)도 읽습니다. 이 장의 Kotlin 테스트는 아직 없습니다.
 > - **추가로 구현됨(MariaDB, Oracle에서 Java로 테스트함):** 데이터베이스와의 스텁 인자 **이름** 대조(규칙 PR2의 일부), Oracle 패키지 오버로드 검출.
-> - **추가로 구현됨(Java 람다로 테스트함):** 조건 안의 DB 함수에 대한 SARGable 경고(규칙 PR8, FN7, [8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고).
+> - **추가로 구현됨(Java 람다로 테스트함):** 조건 안의 DB 함수와 컬럼 산술에 대한 SARGable 경고, 엄격 모드 `SargableMode.STRICT`(규칙 PR8, FN7, 결정 D50, [8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고).
 > - **아직 구현되지 않음:** 데이터베이스와의 파라미터 **타입** 대조(규칙 PR2의 일부), Oracle 패키지 프로시저의 오버로드 하나를 골라 호출하는 기능.
 > - 이 장의 Kotlin 코드는 테스트한 Java 호출을 Kotlin 문법으로 옮긴 것입니다. 테스트한 Java 코드는 [이 페이지의 Java 버전](../java/08-procedures-functions.md)에 있습니다. 전체 상태는 [트랙 README](README.md)를 참고하십시오.
 
@@ -299,7 +299,7 @@ Oracle의 실제 이름 바인딩(`pass_procedure_paramater_names=true`와 스�
 | PR5 | 결과 집합 여러 개 → 데이터 클래스의 `List` 속성, 순서대로. Oracle 암시적 결과는 지원하지 않음. | 구현됨, 테스트로 확인하지 않음 |
 | PR6 | 단독으로 호출한 DB 함수는 데이터베이스마다 다른 경로를 사용함([8.8](#88-call-a-db-function-alone) 참고). | 구현됨(Java로 테스트함) |
 | PR7 | 쿼리 안의 DB 함수: [8.6](#86-declare-db-functions)과 규칙 FN1 ~ FN11 참고. | 구현됨(Java로 테스트함) |
-| PR8 | 조건에서 컬럼에 DB 함수를 적용하면 인덱스를 사용할 수 없으므로 WARN을 기록함([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). 코드는 `LQL-5001`. | 구현됨(Java 람다로 테스트함). 엄격 모드는 아직 구현되지 않음 |
+| PR8 | 조건에서 컬럼에 DB 함수를 적용하면 인덱스를 사용할 수 없으므로 WARN을 기록함([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). 코드는 `LQL-5001`. | 구현됨(Java 람다로 테스트함). `SargableMode.STRICT`에서는 오류(`LQL-3066`, D50) |
 | PR9 | 프로시저는 호출한 쪽 트랜잭션에서 실행됨. lambdaQL은 필요할 때 호출 전에 플러시함. 호출 후에는 로드된 엔티티가 오래된 상태일 수 있음. | 구현됨 |
 | PR10 | 공통된 영향받은 행 수가 없음. OUT 파라미터를 사용. | – |
 | PR11 | `null` IN 값은 괜찮음. DB 파라미터 기본값은 사용할 수 없음. 스텁 함수의 Kotlin 기본 인자는 오류(`LQL-3062`). | 구현됨 |
@@ -492,7 +492,7 @@ lambdaQL은 먼저 대기 중인 변경을 플러시하므로(PR9와 같음) 함
 ## 8.9 주의: 컬럼에 적용한 함수와 인덱스(SARGable)
 
 > [!NOTE]
-> **구현됨, Java 람다로 테스트함**(H2, MariaDB 10.11, Oracle 23.26, 규칙 PR8, FN7). 아직 구현되지 않음: 엄격 모드(경고 대신 오류), 함수 없이 열에 적용한 산술 연산의 경고.
+> **구현됨, Java 람다로 테스트함**(H2, MariaDB 10.11, Oracle 23.26, 규칙 PR8, FN7). 엄격 모드(`SargableMode.STRICT`)와 컬럼 산술의 경고(`LQL-5012`, `LQL-5013`)도 구현됨(결정 D50).
 
 lambdaQL은 **인덱스를 사용할 수 있는** SQL을 만들려고 합니다([10. 규칙과 제한](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql) 참고).
 컬럼을 감싼 함수는 보통 일반 인덱스를 사용할 수 **없습니다**.
@@ -532,6 +532,24 @@ qb.from(Order::class.java).where { OrderFns.discount(it.price)!! > 100 }.toList(
 qb.from(Order::class.java).where { it.price!! > OrderFns.nondet(base)!! }.toList()
 ```
 
+**SARGable 모드**(결정 D50). `SargableMode`에는 세 값이 있습니다.
+
+- `OFF`: 검사하지 않고 메타데이터도 조회하지 않습니다.
+- `WARN`(기본값): 경고를 기록합니다.
+- `STRICT`: `WARN`이라면 경고를 기록할 경우(`LQL-5001`, `LQL-5007`, `LQL-5012`)에 분석이 `org.lambdaql.NonSargableException`(`LQL-3066`)으로 실패합니다.
+
+persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 지정하고 `SargablePolicy.unregister(emf)`로 해제합니다. Spring에서는 `lambdaql.sargable.mode=STRICT`를 씁니다([12](12-spring-data-jpa.md) 참고).
+검사는 람다마다 한 번, 분석 결과를 공유 캐시에 넣을 때 실행됩니다. 그래서 첫 쿼리 전에 모드를 등록하십시오.
+
+**컬럼에 대한 산술**(결정 D50).
+
+- 컬럼 하나와 값만으로 된 `+ - * /`(`it.qty * 2 > n`)는 값 쪽으로 옮길 수 있습니다. lambdaQL은 `LQL-5012`를 `WARN` 수준으로 기록하고, `STRICT`에서는 오류입니다.
+- 컬럼끼리의 산술(`it.price!! * it.qty > n`)과 `%`는 옮길 수 없으므로 `LQL-5013`을 `DEBUG` 수준으로만 기록합니다. `STRICT`에서도 허용합니다.
+- 옮긴 형태는 의미가 같아야 합니다. `it.qty > n / 2.0`처럼 소수로 나누십시오. 정수 나눗셈 `n / 2`는 `>=`, `=`, `<`와 음수 `n`에서 다른 행을 냅니다. 음수를 곱했다면 비교 방향을 바꾸십시오. `LQL-5012` 메시지가 이를 안내합니다.
+- 인덱스가 있는지 조회해 경고를 줄이는 방식은 채택하지 않았습니다. 권한과 시노님 때문에 "인덱스 없음"과 "알 수 없음"이 섞이고, 컬럼 산술은 드문 형태이기 때문입니다.
+
+이에 대한 Kotlin 테스트는 없습니다. Java 테스트([`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `sargable-strict`)가 `STRICT` 모드를 확인합니다.
+
 **권장:**
 
 - 가능하면 함수를 값 쪽에 두십시오: `it.price!! > OrderFns.discount(base)!!`.
@@ -551,7 +569,7 @@ qb.from(Order::class.java).where { it.price!! > OrderFns.nondet(base)!! }.toList
 | FN4 | 어노테이션이 없는 호출이나 lambdaQL이 식별할 수 없는 호출은 오류. 절대 조용히 건너뛰지 않음. | 구현됨 |
 | FN5 | 인자는 [3. 조건](03-where.md)의 값 규칙을 따름. 캡처 값만으로 만든 인자도 바인딩되어 **데이터베이스에서** 평가됨. | 구현됨(Java로 테스트함) |
 | FN6 | `!!`와 박싱 호출은 건너뜀. 반환 타입은 선언된 함수에서 옴. `Double`, `Integer`, `Long`, `BigDecimal`, `String`, `LocalDate`, `LocalDateTime`, `Boolean` 중 하나에 대응해야 함(`LQL-3055`). | 구현됨(Java로 테스트함) |
-| FN7 | 컬럼에 적용한 함수는 WARN을 냄([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). MariaDB에서는 값 쪽의 `NOT DETERMINISTIC` 함수도 WARN(`LQL-5007`). | 구현됨(Java 람다로 테스트함). 엄격 모드는 아직 구현되지 않음 |
+| FN7 | 컬럼에 적용한 함수는 WARN을 냄([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). MariaDB에서는 값 쪽의 `NOT DETERMINISTIC` 함수도 WARN(`LQL-5007`). | 구현됨(Java 람다로 테스트함). `SargableMode.STRICT`에서는 오류(`LQL-3066`, D50) |
 | FN8 | Hibernate 내장 함수(`COALESCE`, `ROUND`, `SYSDATE`, ...)와 같은 이름은 오류(`LQL-3054`). Hibernate가 조용히 내장 함수를 사용하기 때문. 접두사나 스키마 이름(`PUBLIC.SQ_FN`)을 사용. | 구현됨(Java로 테스트함) |
 | FN9 | Kotlin: 기본 인자(`LQL-3056`), `vararg`(`LQL-3057`), `inline`은 오류. | 기본 인자와 `vararg`는 구현됨. `inline`은 설계됨 |
 | FN10 | v0.1은 스칼라 함수만 지원. 사용자 집계 함수와 윈도 함수는 v0.2에 계획됨. 인자가 없는 함수는 `fn()`으로 출력됨. | 스칼라 함수 구현됨 |

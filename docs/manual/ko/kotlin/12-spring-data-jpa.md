@@ -367,6 +367,8 @@ Spring `Sort`나 `Pageable`은 항상 외부 정렬이므로 정책이 그 안�
 | `lambdaql.sort.allow.<Entity>` | 허용 경로를 쉼표로 구분. 예: `name,team.name` |
 | `lambdaql.sort.alias.<Entity>.<외부 이름>` | 별칭의 경로. 예: `lambdaql.sort.alias.Member.level=grade` |
 
+**SARGable 모드 프로퍼티.** `lambdaql.sargable.mode`는 `OFF`, `WARN`(기본값), `STRICT` 중 하나입니다(결정 D50). 자동 구성이 `lambdaql.sort.mode`와 같은 방식으로 등록합니다. `STRICT`이면 인덱스를 쓸 수 없는 조건의 분석이 `NonSargableException`(`LQL-3066`)으로 실패합니다([8.9](08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) 참고).
+
 `<Entity>`에는 JPA 엔티티 이름을 씁니다. 기본값은 단순 클래스 이름이고, `@Entity(name = ...)`로 바꿀 수 있습니다.
 
 엔티티 이름은 persistence unit 안에서 유일합니다(같은 이름이 둘이면 Hibernate가 시작 단계에서 중단). 그래서 패키지가 다른 같은 이름의 클래스도 섞이지 않습니다. 없는 이름이면 애플리케이션 시작이 `IllegalStateException`(LQL-4042)으로 중단됩니다.

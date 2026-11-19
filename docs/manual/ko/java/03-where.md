@@ -180,6 +180,42 @@ where o1_0.kind='RUSH'
 `+`, `-`, `*`를 사용한 단순 산술은 설계에 포함되어 있습니다.
 정수 `/`는 피하십시오. 데이터베이스마다 결과가 다릅니다(MariaDB는 `5/2 = 2.5`). `/`의 최종 규칙은 아직 정해지지 않았습니다.
 
+**컬럼에 대한 산술과 인덱스**(결정 D50). `o.getQty() * 2 > n`처럼 컬럼에 산술을 걸면 인덱스를 쓸 수 없습니다. lambdaQL은 `LQL-5012`를 `WARN` 수준으로 기록하고, `SargableMode.STRICT`에서는 분석이 실패합니다(`LQL-3066`).
+값 쪽으로 옮길 때는 `o.getQty() > n / 2.0`처럼 소수로 나누십시오. 정수 나눗셈 `n / 2`는 다른 행을 냅니다. 음수를 곱했다면 비교 방향을 바꾸십시오. 자세한 내용은 [10.2](10-rules-and-limits.md#db-functions-on-a-column)를 참고하십시오.
+
+**정수 컬럼과 소수 값**(결정 D48 B8). 정수 컬럼을 정수로 나타낼 수 없는 값과 비교하면, lambdaQL은 같은 의미의 정수 비교로 바꿉니다. 인덱스는 그대로 쓸 수 있고, 리터럴도 같게 처리합니다.
+
+| 비교 | 바꾼 형태 |
+|---|---|
+| `>=`, `<` | 올림: `cnt >= 2.5`는 `cnt >= 3` |
+| `>`, `<=` | 내림: `cnt > 2.5`는 `cnt > 2` |
+| `==` | 일치하는 행 없음(`1=0`) |
+| `!=` | `cnt is not null`(SQL 의미) |
+| 범위를 벗어난 값(`1e20`) | 일치하는 행 없음, 또는 `is not null` |
+| IN 목록 | 그런 요소는 뺌 |
+
+이전에는 값을 컬럼 타입으로 잘라 `o.getCnt() >= 2.5`가 `cnt >= 2`가 되었고, 잘못된 행을 반환했습니다.
+Hibernate는 정수 파라미터에 바인딩한 소수를 거부하고(`CoercionException`), IN 목록의 요소는 조용히 자릅니다(세 DB에서 실측).
+
+**(테스트됨)** [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java), 영역 `whole-number`:
+
+```java
+// cnt is a whole number; 2.5 has no whole-number form, so the comparison keeps its meaning with one
+// (binding 2.5 as 2 would change the rows)
+double half = 2.5;
+RenderedQuery atLeast = qb.from(Order.class).where(o -> o.getCnt() >= half).toHql();
+assertEquals("select e0 from Order e0 where e0.cnt >= :p1", atLeast.hql());
+assertEquals(Map.of("p1", 3), atLeast.parameters());                         // cnt >= 2.5 is cnt >= 3
+RenderedQuery more = qb.from(Order.class).where(o -> o.getCnt() > half).toHql();
+assertEquals(Map.of("p1", 2), more.parameters());                            // cnt > 2.5 is cnt > 2
+assertEquals("select e0 from Order e0 where 1=0", qb.from(Order.class).where(o -> o.getCnt() == half).toHql().hql());
+// an IN list drops what can never equal a whole number
+List<Double> values = List.of(2.5, 3.0);
+RenderedQuery in = qb.from(Order.class).where(o -> values.contains(o.getCnt().doubleValue())).toHql();
+assertEquals("select e0 from Order e0 where e0.cnt in (:p1)", in.hql());
+assertEquals(Map.of("p1", List.of(3)), in.parameters());
+```
+
 **부동소수점:** `float`/`double` 컬럼에 대해 lambdaQL은 Java와 비트 단위까지 같은 결과를 약속하지 않습니다.
 캡처한 `NaN`이나 `Infinity` 값은 쿼리가 실행될 때 거부됩니다.
 

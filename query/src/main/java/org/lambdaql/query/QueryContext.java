@@ -204,7 +204,7 @@ public final class QueryContext {
             Pred normalized = checked(Normalizer.normalize(pred, roots, model, ref.classLoader(), ref.describe()));
             // PR8: functions that keep the condition from using an index (once per lambda)
             withEntityManager(em -> {
-                SargableCheck.check(em, normalized, roots, ref.describe());
+                SargableCheck.check(em, normalized, roots, ref.describe(), SargablePolicy.effective(factory()));
                 return null;
             });
             return normalized;
