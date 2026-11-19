@@ -39,8 +39,9 @@ final class DerivedSource {
 
     /** The table text: {@code (select ...)}, or the name of the CTE that it adds to the statement. */
     String table(HqlRenderer outer) {
-        String q = inner.renderInner(outer.nested(), columnNames(rowType));
-        return cteName != null ? outer.addCte(cteName, q) : "(" + q + ")";
+        // a CTE is written once per statement, however often it is read (the same Cte object)
+        if (cteName != null) return outer.addCte(this, cteName, () -> inner.renderInner(outer.nested(), columnNames(rowType)));
+        return "(" + inner.renderInner(outer.nested(), columnNames(rowType)) + ")";
     }
 
     /** The source of a join with this derived table or CTE (ROADMAP D44 extension). */

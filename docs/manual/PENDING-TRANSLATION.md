@@ -212,6 +212,7 @@ B6 대상 페이지: `java/03`·`kotlin/03`(임베디드 경로 절, 같음 비�
 | 조인 결과 `distinct()` | `select distinct e0`, 정렬 키는 루트 열만(J7), 페이징 보조 정렬은 루트 id만. `exists` 서브쿼리를 먼저 권장 | `JoinQueryTest` `join-distinct`, `KotlinQueryTest` `join-distinct` |
 | 파생 테이블·CTE 조인 | `join`·`leftJoin(cte, …)`, `join`·`leftJoin(qb.from(…)…select(…), …)`. CTE 여러 개는 `t`, `t2`. 파생 행의 `x == null`은 `LQL-3067` | `JoinQueryTest` `join-cte`·`join-derived`, `KotlinQueryTest` `join-cte` |
 | 서브쿼리 안 조인 | `sub.from(A).join(B, (a, b) -> …)`·`leftJoin` → `where`·`exists`·`count`·`select`·집계가 두 행을 받음. 엔티티 2개까지 | `SubqueryTest` `sub-join`, `KotlinQueryTest` `sub-join` |
+| CTE 재사용 | 같은 `Cte` 객체를 한 문장에서 여러 번 읽으면 정의는 한 번, 같은 이름으로 읽음. 다른 `Cte` 객체는 `t`, `t2` | `JoinQueryTest` `cte-reuse` |
 
 대상 페이지: 명시적 조인을 다루는 페이지(조인 절), 파생 테이블·CTE 페이지, `11-errors-and-languages.md`(3xxx 범위 `LQL-3067`까지), `java/10-rules-and-limits.md`·`kotlin/10-rules-and-limits.md`(J 규칙).
 

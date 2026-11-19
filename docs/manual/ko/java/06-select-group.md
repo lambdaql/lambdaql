@@ -5,7 +5,7 @@
 > **상태**
 > - **구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, Hibernate 6.6.5, 마일스톤 M9, 결정 D27): 값 하나, Java 레코드, DTO의 `select`, 키 하나나 여러 개의 `groupBy`, `having`, `Agg` 함수, `distinct()`, `limit`, `offset`, `toList`, `toSet`, `first`, `one`, `orderBy(...).select(...)`, 규칙 J3, J4, J7의 검사.
 > - **추가로 구현됨, 테스트함**(결정 D44, D45, D46): 엔티티 3개까지의 `join`, `leftJoin`, `crossJoin` 명시적 조인과 `select((o, c) -> ...)`(6.8), `qb.from(valueQuery)`와 `qb.with(valueQuery)`의 파생 테이블과 CTE(6.9, 6.10, 마일스톤 M8-2). 조인 결과의 `distinct()`와 파생 테이블·CTE의 조인(6.8, 결정 D51).
-> - **아직 구현되지 않음:** 집계 기준 정렬과 그룹 쿼리의 `orderBy`(v0.2 후보), 같은 CTE의 중복 사용. 서브쿼리 안의 조인은 구현됨([5. 서브쿼리](05-subquery.md#joins-inside-a-subquery)). update와 delete의 조인은 추가하지 않습니다(D51).
+> - **아직 구현되지 않음:** 집계 기준 정렬과 그룹 쿼리의 `orderBy`(v0.2 후보). 서브쿼리 안의 조인은 구현됨([5. 서브쿼리](05-subquery.md#joins-inside-a-subquery)). update와 delete의 조인은 추가하지 않습니다(D51).
 > - **(테스트됨)** 표시가 있는 예제는 테스트 코드에서 그대로 가져온 것입니다. 전체 상태는 [Java 트랙 README](README.md#status)를 참고하십시오.
 
 [Java 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [5. 서브쿼리](05-subquery.md) | 다음: [7. 수정, 삽입, 삭제](07-dml.md) | [이 페이지의 Kotlin 버전](../kotlin/06-select-group.md)
@@ -580,7 +580,7 @@ assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.
 
 - HQL은 `with t as (...) ... join t e1 on ...` 또는 `join (select ...) e1 on ...`입니다.
 - 행 타입은 레코드입니다(J5). 접근자(`x.total()`)가 컬럼을 읽습니다.
-- 한 문장에 CTE가 여러 개면 이름을 따로 붙입니다: `with t as (...), t2 as (...)`.
+- 같은 `Cte` 객체를 한 문장에서 두 번 읽으면 정의를 한 번만 쓰고, 두 조인이 같은 이름을 읽습니다: `join t e1 on ... left join t e2 on ...`. 서로 다른 `Cte` 객체는 `with t as (...), t2 as (...)`처럼 이름을 따로 받습니다(세 DB에서 실측).
 - 파생 행에는 id가 없으므로 `x == null`은 오류(`LQL-3067`)입니다. `x.customerId() == null`처럼 컬럼을 비교하십시오.
 - Hibernate 6.6은 엔티티의 `select distinct`, 파생 테이블과 CTE의 inner/left join, 서브쿼리 안의 엔티티 조인을 받아들입니다(세 DB에서 실측).
 
@@ -612,6 +612,20 @@ SelectJoinQuery<Customer, Total> small = qb.from(Customer.class)
 assertEquals("select e0 from Customer e0 left join (select d0.customer.id as customerId, sum(d0.price) as total"
         + " from Order d0 where d0.customer is not null group by d0.customer.id) e1 on e1.customerId = e0.id"
         + " where e1.customerId is null or e1.total < 210.0", small.toHql().hql());
+```
+
+**(테스트됨)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), 영역 `cte-reuse`:
+
+```java
+// the same CTE read twice is written once
+ValueQuery<NameTotal> reused = qb.from(Customer.class)
+        .join(t, (c, x) -> x.customerId().equals(c.getId()))
+        .leftJoin(t, (c, x, y) -> y.customerId().equals(c.getId()) && y.total() > 210)
+        .select((c, x, y) -> new NameTotal(c.getName(), y.total()));
+assertEquals("with t as (select d0.customer.id as customerId, sum(d0.price) as total from Order d0"
+        + " where d0.customer is not null group by d0.customer.id)"
+        + " select e0.name, e2.total from Customer e0 join t e1 on e1.customerId = e0.id"
+        + " left join t e2 on e2.customerId = e0.id and e2.total > 210.0", reused.toHql().hql());
 ```
 
 <a id="what-a-join-query-has"></a>
@@ -783,7 +797,8 @@ MariaDB와 Oracle은 진짜 `with`를 실행합니다. 컬럼 목록은 Hibernat
 - MariaDB와 Oracle은 실제 `with`를 실행합니다. H2에서는 Hibernate가 이를 파생 테이블로 펼칩니다. 결과는 같습니다(세 데이터베이스에서 테스트함).
 - 행 타입 규칙은 파생 테이블과 같습니다: 레코드(J5).
 - 엔티티 쿼리에 CTE를 조인하는 형태는 [파생 테이블과 CTE의 조인](#join-a-derived-table-or-cte)을 참고하십시오(D51).
-- v0.1에 아직 없는 것: 한 쿼리에서 같은 CTE를 두 번 사용, update, delete, insert 안의 CTE.
+- 같은 CTE를 한 쿼리에서 두 번 읽을 수 있습니다. 정의는 한 번만 씁니다([파생 테이블과 CTE의 조인](#join-a-derived-table-or-cte) 참고).
+- v0.1에 아직 없는 것: update, delete, insert 안의 CTE.
 
 ---
 
@@ -835,7 +850,7 @@ assertThrows(IllegalStateException.class, () -> qb.from(Order.class)
 | 사용자 집계 함수와 윈도 함수 | v0.2 후보 |
 | insert의 조인, 엔티티 4개 이상, 서브쿼리 안의 엔티티 3개 이상 | 이후 |
 | update, delete의 조인 | 추가하지 않음(D51). 연관 경로(U9)나 `sub`(D49) 사용 |
-| 한 쿼리에서 같은 CTE를 두 번 사용, DML 안의 파생 테이블과 CTE | 이후 |
+| DML 안의 파생 테이블과 CTE | 이후 |
 
 이 장의 오류는 코드가 붙은 `TranslationException`입니다. 잘못된 그룹 키(J3)는 `LQL-3035`, `where` 안의 `Agg`는 `LQL-3005`, `distinct`에서 select하지 않은 정렬 키(J7)는 `LQL-3046`, 파생 테이블이나 CTE의 행 타입(J5)은 `LQL-3064`입니다. [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
 

@@ -6,7 +6,7 @@
 > - **구현됨**(마일스톤 M9, 결정 D27). H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 6.6.5)에서 테스트했습니다. 대상은 값 하나, 데이터 클래스, `Pair`, `Triple`의 `select`, 키 하나나 여러 키(`listOf`, `a to b`, `Triple`)의 `groupBy`, `having`, `Agg` 함수, `distinct()`, `limit`, `offset`, `toList`, `toSet`, `first`, `one`, `orderBy { }.select { }`, 규칙 J3, J4, J7의 검사입니다. 
 > - **Kotlin 람다로 테스트함**([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 빌드에 포함, H2, MariaDB, Oracle): 데이터 클래스, `Pair`, 키 하나의 `groupBy`와 `having`, `listOf` 키의 `groupBy`와 `Triple` 결과, 조인 결과의 `distinct()`, CTE의 조인. 이 예제에는 **(테스트됨)** 표시가 있습니다. 그 밖의 Kotlin 형태는 빌드 밖에서 kotlinc 2.3.21로 컴파일했고, Java 형태와 같은 HQL을 만듭니다.
 > - **추가로 구현됨**(결정 D44, D45, D46, Java 람다로 테스트함): 엔티티 3개까지의 `join`, `leftJoin`, `crossJoin` 명시적 조인과 `select { o, c -> ... }`(6.8), `qb.from(valueQuery)`와 `qb.with(valueQuery)`의 파생 테이블과 CTE(6.9, 6.10, 마일스톤 M8-2). 조인 결과의 `distinct()`와 파생 테이블·CTE의 조인(6.8, 결정 D51).
-> - **아직 구현되지 않음:** 집계 기준 정렬과 그룹 쿼리의 `orderBy`(v0.2 후보), 같은 CTE의 중복 사용. 서브쿼리 안의 조인은 구현됨([5. 서브쿼리](05-subquery.md#joins-inside-a-subquery)). update와 delete의 조인은 추가하지 않습니다(D51).
+> - **아직 구현되지 않음:** 집계 기준 정렬과 그룹 쿼리의 `orderBy`(v0.2 후보). 서브쿼리 안의 조인은 구현됨([5. 서브쿼리](05-subquery.md#joins-inside-a-subquery)). update와 delete의 조인은 추가하지 않습니다(D51).
 > - 그 밖의 Kotlin 코드는 테스트된 Java 쿼리를 Kotlin 문법으로 옮긴 것입니다. 테스트된 Java 예제는 [이 페이지의 Java 버전](../java/06-select-group.md)에 있습니다. 전체 상태는 [트랙 README](README.md)를 참고하십시오.
 
 [Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [5. 서브쿼리](05-subquery.md) | 다음: [7. 수정, 삽입, 삭제](07-dml.md) | [이 페이지의 Java 버전](../java/06-select-group.md)
@@ -619,7 +619,7 @@ assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.
 
 - HQL은 `with t as (...) ... join t e1 on ...` 또는 `join (select ...) e1 on ...`입니다.
 - 행 타입은 Kotlin data class(또는 Java 레코드)입니다(J5). 속성(`x.total`)이 컬럼을 읽습니다.
-- 한 문장에 CTE가 여러 개면 이름을 따로 붙입니다: `with t as (...), t2 as (...)`.
+- 같은 `Cte` 객체를 한 문장에서 두 번 읽으면 정의를 한 번만 쓰고, 두 조인이 같은 이름을 읽습니다: `join t e1 on ... left join t e2 on ...`. 서로 다른 `Cte` 객체는 `with t as (...), t2 as (...)`처럼 이름을 따로 받습니다(세 DB에서 실측).
 - 파생 행에는 id가 없으므로 `x == null`은 오류(`LQL-3067`)입니다. `x.customerId == null`처럼 컬럼을 비교하십시오.
 - Hibernate 6.6은 엔티티의 `select distinct`, 파생 테이블과 CTE의 inner/left join, 서브쿼리 안의 엔티티 조인을 받아들입니다(세 DB에서 실측).
 
@@ -641,6 +641,8 @@ assertEquals("with t as (select d0.customer.id as customerId, sum(d0.price) as t
 ```
 
 `x.customerId`가 nullable `Int?`이면 `x.customerId == c.id`는 `e1.customerId is not null and e1.customerId = e0.id`가 됩니다(위 영역 참고). 이름 없는 파생 테이블의 조인은 Java 테스트([`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), 영역 `join-derived`)가 확인합니다.
+
+같은 CTE를 두 번 읽는 형태는 Java 테스트([`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), 영역 `cte-reuse`)가 확인합니다.
 
 <a id="what-a-join-query-has"></a>
 ### 조인 쿼리의 함수
@@ -780,7 +782,8 @@ MariaDB와 Oracle은 진짜 `with`를 실행합니다. 컬럼 목록은 Hibernat
 - MariaDB와 Oracle은 실제 `with`를 실행합니다. H2에서는 Hibernate가 이를 파생 테이블로 펼칩니다. 결과는 같습니다(세 데이터베이스에서 Java 람다로 테스트함).
 - 행 타입 규칙은 파생 테이블과 같습니다: 데이터 클래스나 record(J5).
 - 엔티티 쿼리에 CTE를 조인하는 형태는 [파생 테이블과 CTE의 조인](#join-a-derived-table-or-cte)을 참고하십시오(D51).
-- v0.1에 아직 없는 것: 한 쿼리에서 같은 CTE를 두 번 사용, update, delete, insert 안의 CTE.
+- 같은 CTE를 한 쿼리에서 두 번 읽을 수 있습니다. 정의는 한 번만 씁니다([파생 테이블과 CTE의 조인](#join-a-derived-table-or-cte) 참고).
+- v0.1에 아직 없는 것: update, delete, insert 안의 CTE.
 
 ---
 
@@ -811,7 +814,7 @@ MariaDB와 Oracle은 진짜 `with`를 실행합니다. 컬럼 목록은 Hibernat
 | 사용자 집계 함수와 윈도 함수 | v0.2 후보 |
 | insert의 조인, 엔티티 4개 이상, 서브쿼리 안의 엔티티 3개 이상 | 이후 |
 | update, delete의 조인 | 추가하지 않음(D51). 연관 경로(U9)나 `sub`(D49) 사용 |
-| 한 쿼리에서 같은 CTE를 두 번 사용, DML 안의 파생 테이블과 CTE | 이후 |
+| DML 안의 파생 테이블과 CTE | 이후 |
 
 이 장의 오류는 코드가 붙은 `TranslationException`입니다. 잘못된 그룹 키(J3)는 `LQL-3035`, `where` 안의 `Agg`는 `LQL-3005`, `distinct`에서 select하지 않은 정렬 키(J7)는 `LQL-3046`, 파생 테이블이나 CTE의 행 타입(J5)은 `LQL-3064`입니다. [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
 

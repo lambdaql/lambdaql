@@ -183,6 +183,7 @@ public final class HqlRenderer {
     private List<JoinBound> entityJoins = List.of();
     private String source;          // a derived table "(select ...)" or a CTE name, instead of the entity name
     private final Map<String, String> ctes = new LinkedHashMap<>();   // "with t as (...), t2 as (...)" before the select
+    private final Map<Object, String> cteNames = new java.util.IdentityHashMap<>();   // CTE source -> name (reuse)
     private boolean distinctRows;   // select distinct e0 (explicit join results)
     private List<String> aliases = List.of();
 
@@ -217,9 +218,26 @@ public final class HqlRenderer {
      * @return the name to read the CTE by
      */
     public String addCte(String name, String body) {
+        return addCte(null, name, () -> body);
+    }
+
+    /**
+     * Adds a CTE once per source: the same CTE used twice in one statement is written once and read by one name.
+     *
+     * @param key  the CTE source (same object, same CTE), or null for a new CTE every time
+     * @param name the wanted name
+     * @param body writes the query of the CTE; called only the first time for a key
+     * @return the name to read the CTE by
+     */
+    public String addCte(Object key, String name, java.util.function.Supplier<String> body) {
+        HqlRenderer top = this;
+        while (top.parent != null) top = top.parent;
+        if (key != null && top.cteNames.containsKey(key)) return top.cteNames.get(key);
+        String text = body.get();
         String unique = name;
-        for (int i = 2; ctes.containsKey(unique); i++) unique = name + i;
-        ctes.put(unique, body);
+        for (int i = 2; top.ctes.containsKey(unique); i++) unique = name + i;
+        top.ctes.put(unique, text);
+        if (key != null) top.cteNames.put(key, unique);
         return unique;
     }
 

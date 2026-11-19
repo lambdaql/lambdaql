@@ -248,6 +248,19 @@ class JoinQueryTest {
                 .select((c, x, y) -> new NameTotal(c.getName(), y.total()));
         assertTrue(twice.toHql().hql().startsWith("with t as (") && twice.toHql().hql().contains("), t2 as ("), twice.toHql().hql());
         assertEquals(2, twice.toList().size());
+        // @start region="cte-reuse"
+        // the same CTE read twice is written once
+        ValueQuery<NameTotal> reused = qb.from(Customer.class)
+                .join(t, (c, x) -> x.customerId().equals(c.getId()))
+                .leftJoin(t, (c, x, y) -> y.customerId().equals(c.getId()) && y.total() > 210)
+                .select((c, x, y) -> new NameTotal(c.getName(), y.total()));
+        assertEquals("with t as (select d0.customer.id as customerId, sum(d0.price) as total from Order d0"
+                + " where d0.customer is not null group by d0.customer.id)"
+                + " select e0.name, e2.total from Customer e0 join t e1 on e1.customerId = e0.id"
+                + " left join t e2 on e2.customerId = e0.id and e2.total > 210.0", reused.toHql().hql());
+        // @end
+        assertEquals(List.of(new NameTotal("Kim", null), new NameTotal("Lee", 250.0)),
+                reused.toList().stream().sorted(Comparator.comparing(NameTotal::name)).toList());
     }
 
     @Test
