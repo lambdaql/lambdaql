@@ -27,6 +27,8 @@
   捕获的值和计算出的值始终是绑定参数（`:p1`、`:p2` ……）（D37）。
 - 实体：`Order`（`id`、`price`、`status`、`active`、`description`、`customer`、`updateAt`、`items`），
   `Customer`（`id`、`name`、`grade`），`Item`（`order`、`price`、`qty`）。
+  10.3 中的行还使用 `Order` 的这些属性：`cnt`（`Integer`）、`custName`（`String`）和 `address`（`@Embedded`，含 `city` 和 `zip`）。
+  在这些行中，`active` 是可为 null 的 `Boolean`，getter 为 `getActive()`。
 
 ---
 
@@ -269,7 +271,7 @@ lambdaQL 隐藏了许多差异，但有一些你必须了解。
 | 分页 SQL | `offset ? rows fetch first ? rows only` | `limit ?,?` | `offset ? rows fetch first ? rows only` | 交给 Hibernate（`setFirstResult` / `setMaxResults`） |
 | 相等行的顺序 | – | – | 随机 | 分页时，如果排序键不包含 id，lambdaQL 会添加根实体的 `@Id asc`。有唯一且不可为 NULL 的键（`unique = true` 且 `nullable = false`、`@NaturalId`）时不添加（A5） |
 | 字符串顺序 | 区分大小写 | `_ci` | `NLS_SORT`（JVM 区域设置） | 遵循数据库 |
-| `order by` 中的隐式路径 | inner join（丢失行） | 相同 | 相同 | lambdaQL 使用 `left join`（必需关联为内连接）（或同一路径的 `where` join） |
+| `order by` 中的隐式路径 | inner join（丢失行） | 相同 | 相同 | lambdaQL 使用 `left join`（必需关联为内连接，或同一路径的 `where` join） |
 | `order by`、`distinct`、`group by` 中的 `@Lob` 列 | 可用 | 可用 | **ORA-22848 / ORA-22849** | 不改变查询，以 `DEBUG` 级别记录 `LQL-5010`（B3） |
 | `@Enumerated(EnumType.STRING)` 枚举列的排序 | 按名称 | 按名称 | 按名称 | 不改变查询，以 `DEBUG` 级别记录 `LQL-5011`（B2）。只有 `ORDINAL` 映射按声明顺序 |
 

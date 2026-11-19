@@ -22,7 +22,7 @@ val changed = u.execute()                      // number of updated rows
 `st` 是捕获值，所以它是绑定参数（`:p1`）。`!!` 会被忽略（D23）。常量 `2.0` 仍是字面量（决策 D37）。
 `toHql()` 不执行语句，只给出 HQL 和参数。
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。该测试使用 Java Lambda。含义相同的 Kotlin Lambda 生成相同的 HQL，因此 SQL 也相同。标记为 **（计划中）** 的块来自 [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)。由于 lambdaQL 目前还不会生成这些语句，该测试把计划中的 HQL 直接交给 Hibernate。
+**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。该测试使用 Java Lambda。含义相同的 Kotlin Lambda 生成相同的 HQL，因此 SQL 也相同。
 
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `update`：
 
@@ -175,7 +175,7 @@ assertEquals("update Order e0 set e0.price = (select sum(s1.price) from Item s1 
 ```
 
 - 读取其他表的聚合和读取同一张表的聚合都可以使用（在 H2、MariaDB 10.11、Oracle 23.26 上实测）。在 `update` 中，MariaDB 也不会报错误 1093。
-- 没有匹配的行时，聚合为 NULL。如果是 NOT NULL 列，数据库会报错，因此请用 `Objects.requireNonNullElse(…, 0.0)` 包装，使其变成 `coalesce(...)`。
+- 没有匹配的行时，聚合为 NULL。如果是 NOT NULL 列，数据库会报错，因此请用 `?: 0.0` 或 `Objects.requireNonNullElse(…, 0.0)` 包装，使其变成 `coalesce(...)`。
 
 一个参数的尾随 Lambda（`set { it... }`）和两个参数的尾随 Lambda（`set { o, sub -> ... }`）是不同的重载。Kotlin 会选择正确的那一个。
 

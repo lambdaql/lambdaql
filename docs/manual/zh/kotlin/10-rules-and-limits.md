@@ -26,6 +26,7 @@
 - 实体：`Order`（`id`、`price`、`status`、`active`、`description`、`customer`、`updateAt`、`items`），
   `Customer`（`id`、`name`、`grade`），`Item`（`order`、`price`、`qty`）。参见 [2. 入门](02-getting-started.md#example-entities)。
   有些行使用了一个额外的可空属性 `flag: Boolean?`。
+  10.3 中的行还使用 `Order` 的这些属性：`cnt: Int?`、`custName: String?` 和 `address`（`@Embedded`，含 `city` 和 `zip`）。
 
 ---
 
@@ -188,7 +189,7 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 |---|---|
 | 两个可空值之间的 `==` / `!=` | 允许，但没有匹配的行（`= NULL`）。查询执行时以 `WARN` 级别记录 `LQL-4045` |
 | 在同一个值的 null 保护之下：`p == null \|\| it.status!! > p` | 允许。这个保护会在查询执行时在应用程序中决定：`p == null` 时不过滤，其他值时为 `e0.status > :p1`。只含 `!!` 和拆箱为自身基本类型的比较与保护位置无关 |
-| 带 `!!` 或在大小比较（`<` `<=` `>` `>=`）中：`it.price!! > p!!` | 允许，但没有匹配的行（`> NULL`）。不执行 `!!`（D23）和拆箱为自身基本类型的操作。以 `DEBUG` 级别记录 `LQL-4045` |
+| 带 `!!` 或在大小比较（`<` `<=` `>` `>=`）中：`it.price!! > p!!` | 允许，但没有匹配的行（`> NULL`）。不执行 `!!`（D23）和拆箱为自身基本类型的操作。查询执行时以 `DEBUG` 级别记录 `LQL-4045` |
 | 对捕获值的方法调用（`p.trim()`、转换为其他基本类型的 `p.toInt()`） | **不允许。**计算值时报错（`LQL-4012`，Kotlin 会抛出 NPE） |
 | `in` 中带有 `null` 元素的集合 | **不允许。**绑定时报错 |
 | `NaN`、`Infinity` | **不允许。**总是报错 |
@@ -288,7 +289,7 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 | 分页 SQL | `offset ? rows fetch first ? rows only` | `limit ?,?` | `offset ? rows fetch first ? rows only` | 交给 Hibernate（`setFirstResult` / `setMaxResults`） |
 | 相等行的顺序 | – | – | 随机 | 分页时，如果排序键不包含 id，lambdaQL 会添加根实体的 `@Id asc`。有唯一且不可为 NULL 的键（`unique = true` 且 `nullable = false`、`@NaturalId`）时不添加（A5） |
 | 字符串顺序 | 区分大小写 | `_ci` | `NLS_SORT`（JVM 区域设置） | 遵循数据库 |
-| `order by` 中的隐式路径 | inner join（丢失行） | 相同 | 相同 | lambdaQL 使用 `left join`（必需关联为内连接）（或同一路径的 `where` join） |
+| `order by` 中的隐式路径 | inner join（丢失行） | 相同 | 相同 | lambdaQL 使用 `left join`（必需关联为内连接，或同一路径的 `where` join） |
 | `order by`、`distinct`、`group by` 中的 `@Lob` 列 | 可用 | 可用 | **ORA-22848 / ORA-22849** | 不改变查询，以 `DEBUG` 级别记录 `LQL-5010`（B3） |
 | `@Enumerated(EnumType.STRING)` enum 列的排序 | 按名称 | 按名称 | 按名称 | 不改变查询，以 `DEBUG` 级别记录 `LQL-5011`（B2）。只有 `ORDINAL` 映射按声明顺序 |
 

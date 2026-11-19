@@ -26,6 +26,7 @@
 - 엔티티: `Order`(`id`, `price`, `status`, `active`, `description`, `customer`, `updateAt`, `items`),
   `Customer`(`id`, `name`, `grade`), `Item`(`order`, `price`, `qty`). [2. 시작하기](02-getting-started.md#example-entities)를 참고하십시오.
   몇몇 행은 nullable 속성 `flag: Boolean?`을 추가로 사용합니다.
+  10.3의 행은 `Order`의 속성 `cnt: Int?`, `custName: String?`, `address`(`@Embedded`, `city`와 `zip`)도 사용합니다.
 
 ---
 
@@ -188,7 +189,7 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 |---|---|
 | 두 nullable 값 사이의 `==` / `!=` | 예. 단, 일치하는 행이 없음(`= NULL`). 쿼리가 실행될 때 `LQL-4045`를 `WARN` 수준으로 기록 |
 | 같은 값에 대한 null 가드 아래: `p == null \|\| it.status!! > p` | 예. 가드는 쿼리가 실행될 때 애플리케이션에서 결정합니다. `p == null`이면 필터 없음, 다른 값이면 `e0.status > :p1`. `!!`와 자기 기본형 언박싱만 있는 비교는 가드 위치와 상관없음 |
-| `!!`와 함께 쓰거나 크기 비교(`<` `<=` `>` `>=`)에 사용: `it.price!! > p!!` | 예. 단, 일치하는 행이 없음(`> NULL`). `!!`(D23)와 자기 기본형 언박싱은 실행하지 않음. `LQL-4045`를 `DEBUG` 수준으로 기록 |
+| `!!`와 함께 쓰거나 크기 비교(`<` `<=` `>` `>=`)에 사용: `it.price!! > p!!` | 예. 단, 일치하는 행이 없음(`> NULL`). `!!`(D23)와 자기 기본형 언박싱은 실행하지 않음. 쿼리가 실행될 때 `LQL-4045`를 `DEBUG` 수준으로 기록 |
 | 캡처 값에 대한 메서드 호출(`p.trim()`, 다른 기본형으로 바꾸는 `p.toInt()`) | **아니요.** 값을 계산할 때 오류(`LQL-4012`, Kotlin이라면 NPE) |
 | `in`에 사용하는 컬렉션 안의 `null` 요소 | **아니요.** 바인딩할 때 오류 |
 | `NaN`, `Infinity` | **아니요.** 항상 오류 |
@@ -288,7 +289,7 @@ lambdaQL은 많은 차이를 감춥니다. 일부는 알아 두어야 합니다.
 | 페이징 SQL | `offset ? rows fetch first ? rows only` | `limit ?,?` | `offset ? rows fetch first ? rows only` | Hibernate에 전달(`setFirstResult` / `setMaxResults`) |
 | 같은 값을 가진 행의 순서 | – | – | 무작위 | 페이징할 때 키에 id가 없으면 lambdaQL이 루트의 `@Id asc`를 추가. 유일하고 NULL이 될 수 없는 키(`unique = true`이고 `nullable = false`, `@NaturalId`)가 있으면 추가하지 않음(A5) |
 | 문자열 순서 | 대소문자 구분 | `_ci` | `NLS_SORT`(JVM 로캘) | DB를 따름 |
-| `order by`의 암시적 경로 | inner join(행 누락) | 같음 | 같음 | lambdaQL은 `left join`을 사용(필수 연관은 inner join)(또는 같은 경로의 `where` 조인) |
+| `order by`의 암시적 경로 | inner join(행 누락) | 같음 | 같음 | lambdaQL은 `left join`을 사용(필수 연관은 inner join, 또는 같은 경로의 `where` 조인) |
 | `order by`, `distinct`, `group by`의 `@Lob` 컬럼 | 동작 | 동작 | **ORA-22848 / ORA-22849** | 쿼리를 바꾸지 않고 `LQL-5010`을 `DEBUG` 수준으로 기록(B3) |
 | `@Enumerated(EnumType.STRING)` enum 컬럼의 정렬 | 이름 순 | 이름 순 | 이름 순 | 쿼리를 바꾸지 않고 `LQL-5011`을 `DEBUG` 수준으로 기록(B2). 선언 순서는 `ORDINAL` 매핑에서만 |
 

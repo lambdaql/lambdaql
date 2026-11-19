@@ -26,6 +26,7 @@
 - エンティティ: `Order`（`id`、`price`、`status`、`active`、`description`、`customer`、`updateAt`、`items`）、
   `Customer`（`id`、`name`、`grade`）、`Item`（`order`、`price`、`qty`）。[2. はじめよう](02-getting-started.md#example-entities) を参照してください。
   一部の行では、追加の nullable なプロパティ `flag: Boolean?` を使います。
+  10.3 の行では、`Order` の次のプロパティも使います。`cnt: Int?`、`custName: String?`、`address`（`@Embedded`、`city` と `zip`）。
 
 ---
 
@@ -188,7 +189,7 @@ persistence unit ごとに `SargablePolicy.register(emf, SargableMode.STRICT)` �
 |---|---|
 | 2 つの nullable な値の間の `==` / `!=` | はい。ただし一致する行はない（`= NULL`）。クエリの実行時に `LQL-4045` を `WARN` レベルでログに出す |
 | 同じ値に対する null ガードの下: `p == null \|\| it.status!! > p` | はい。ガードはクエリの実行時にアプリケーションの中で決まる: `p == null` なら絞り込みなし、それ以外の値なら `e0.status > :p1`。`!!` と自分のプリミティブ型へのアンボクシングだけの比較は、ガードの位置に関係しない |
-| `!!` 付き、または大小比較（`<` `<=` `>` `>=`）の中: `it.price!! > p!!` | はい。ただし一致する行はない（`> NULL`）。`!!`（D23）と自分のプリミティブ型へのアンボクシングは実行しない。`LQL-4045` を `DEBUG` レベルでログに出す |
+| `!!` 付き、または大小比較（`<` `<=` `>` `>=`）の中: `it.price!! > p!!` | はい。ただし一致する行はない（`> NULL`）。`!!`（D23）と自分のプリミティブ型へのアンボクシングは実行しない。クエリの実行時に `LQL-4045` を `DEBUG` レベルでログに出す |
 | キャプチャ値に対するメソッド呼び出し（`p.trim()`、別のプリミティブ型に変える `p.toInt()`） | **いいえ。** 値を計算するときにエラー（`LQL-4012`、Kotlin なら NPE） |
 | `in` の中の、`null` の要素を持つコレクション | **いいえ。** バインドするときにエラー |
 | `NaN`、`Infinity` | **いいえ。** 常にエラー |
@@ -288,7 +289,7 @@ lambdaQL は多くの違いを隠します。知っておく必要があるも�
 | ページングの SQL | `offset ? rows fetch first ? rows only` | `limit ?,?` | `offset ? rows fetch first ? rows only` | Hibernate に渡す（`setFirstResult` / `setMaxResults`） |
 | 同じ値の行の順序 | – | – | ランダム | ページングでは、キーに id が含まれていない場合に lambdaQL がルートの `@Id asc` を追加する。一意で NULL になれないキー（`unique = true` かつ `nullable = false`、`@NaturalId`）があれば追加しない（A5） |
 | 文字列の順序 | 大文字と小文字を区別 | `_ci` | `NLS_SORT`（JVM のロケール） | DB に従う |
-| `order by` の暗黙のパス | inner join（行が失われる） | 同じ | 同じ | lambdaQL は `left join`（必須の関連は内部結合）を使う（または同じパスの `where` の結合） |
+| `order by` の暗黙のパス | inner join（行が失われる） | 同じ | 同じ | lambdaQL は `left join` を使う（必須の関連は内部結合、または同じパスの `where` の結合） |
 | `order by`、`distinct`、`group by` での `@Lob` カラム | 動作する | 動作する | **ORA-22848 / ORA-22849** | クエリを変えずに `LQL-5010` を `DEBUG` レベルでログに出す（B3） |
 | `@Enumerated(EnumType.STRING)` の enum カラムのソート | 名前順 | 名前順 | 名前順 | クエリを変えずに `LQL-5011` を `DEBUG` レベルでログに出す（B2）。宣言順になるのは `ORDINAL` のマッピングだけ |
 

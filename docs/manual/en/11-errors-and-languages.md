@@ -443,6 +443,6 @@ Instead, two areas have their own `STRICT` mode.
 | How do I recognize a lambdaQL error? | It is a `LambdaQLException`, and the message starts with `[LQL-xxxx]`. |
 | How do I check an error in code or tests? | Use `e.code()`. Do not compare the text. |
 | How do I get English text on a non-English server? | `LqlMessages.setLocale(Locale.ROOT)`, `-Dlambdaql.locale=en`, or `e.getMessage(Locale.ROOT)`. |
-| Where do warnings go? | To SLF4J, level `WARN`. |
+| Where do warnings go? | To the SLF4J log. The level differs by code: `WARN`, `INFO` or `DEBUG`. |
 
 [Manual home](README.md) | [Java track](java/README.md) | [Kotlin track](kotlin/README.md)

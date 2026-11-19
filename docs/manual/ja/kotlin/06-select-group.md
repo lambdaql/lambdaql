@@ -23,8 +23,8 @@
 - [6.2 1 つの値の選択](#62-select-one-value)
 - [6.3 data class、Pair、Triple の選択](#63-select-a-data-class-pair-or-triple)
 - [6.4 集約関数: `Agg`](#64-aggregate-functions-agg)
-- [6.5 Group by](#65-group-by)
-- [6.6 Having](#66-having)
+- [6.5 グループ化（group by）](#65-group-by)
+- [6.6 having](#66-having)
 - [6.7 distinct、ページング、結果](#67-distinct-paging-and-results)
 - [6.8 明示的な結合](#68-explicit-joins)
 - [6.9 派生テーブル（FROM の中のサブクエリ）](#69-derived-table-subquery-in-from)
@@ -265,7 +265,8 @@ where o1_0.status=1
 
 ---
 
-## 6.5 Group by
+<a id="65-group-by"></a>
+## 6.5 グループ化（group by）
 
 グループのキーは `groupBy` で書きます。lambdaQL はキーを推測しません。
 `groupBy` はグループ化したクエリを返します。`having { }`（任意）を呼び、次に `select { }` を呼んでください。
@@ -350,7 +351,7 @@ qb.from(Order::class.java)
 
 ---
 
-## 6.6 Having
+## 6.6 having
 
 `having` はグループに対する条件です。`where` と同じラムダのルール（[3. 条件（`where`）](03-where.md)）を使い、`Agg` も使えます。
 `having` は何回でも呼び出せます。条件は `AND` でつながります。
@@ -784,8 +785,8 @@ MariaDB と Oracle は本物の `with` を実行します。カラムのリス�
 
 | # | ルール | 状況 |
 |---|---|---|
-| J1 | `select` のラムダは **1 つの値の式** または **1 つのコンストラクター呼び出し** を返す。コンストラクターの各引数は値の式（[3. 条件（`where`）](03-where.md) のルール）。`select` だけで使う関連のパスは `left join` のエイリアスになるので、行は失われない。必須の関連（`optional = false`）は inner join（A4）。同じパスを `where` で使うと、`select` は `where` の結合を使う（R24）。 | 実装済み（テスト済み、Kotlin のラムダでもテスト済み） |
-| J2 | コンストラクターの場合、lambdaQL はカラムだけを選択し、コンストラクターを直接呼び出す。`select new` は書かない。`Pair`/`Triple` も同じ方法で作る。 | 実装済み（テスト済み、Kotlin のラムダでもテスト済み） |
+| J1 | `select` のラムダは **1 つの値の式** または **1 つのコンストラクター呼び出し** を返す。コンストラクターの各引数は値の式（[3. 条件（`where`）](03-where.md) のルール）。`select` だけで使う関連のパスは `left join` のエイリアスになるので、行は失われない。必須の関連（`optional = false`）は inner join（A4）。同じパスを `where` で使うと、`select` は `where` の結合を使う（R24）。 | 実装済み（Java と Kotlin のラムダでテスト済み） |
+| J2 | コンストラクターの場合、lambdaQL はカラムだけを選択し、コンストラクターを直接呼び出す。`select new` は書かない。`Pair`/`Triple` も同じ方法で作る。 | 実装済み（Java と Kotlin のラムダでテスト済み） |
 | J3 | 集約がある場合、`select` と `having`（と `insert ... select` の値）の中の集約でない値はすべて `groupBy` のキーでなければならない。そうでなければ、解析時にエラー。 | 実装済み（Java のラムダでテスト済み）。エラーは `TranslationException`（`LQL-3035`、[11](../11-errors-and-languages.md) を参照） |
 | J4 | 行がない、またはすべての値が NULL のとき、`sum`/`avg`/`min`/`max` は NULL を返す。`count` は 0 を返す。コンストラクターのパラメーターは nullable にする。non-null のパラメーターに NULL が入ると `IllegalStateException` が発生する。 | 実装済み（Java のラムダでテスト済み） |
 | J5 | 派生テーブルまたは CTE の行の型: **Kotlin の data class または Java の record のみ**。通常のクラスは単純な `select` でだけ使える。そうでなければ `LQL-3064`。結合した派生テーブルと CTE の行にも適用する（D51）。派生した行は `null` と比較できない（`LQL-3067`）。 | 実装済み（Java のラムダでテスト済み） |

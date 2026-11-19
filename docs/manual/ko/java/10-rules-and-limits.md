@@ -27,6 +27,8 @@
   캡처 값과 계산한 값은 항상 바인드 파라미터(`:p1`, `:p2`, ...)입니다(D37).
 - 엔티티: `Order`(`id`, `price`, `status`, `active`, `description`, `customer`, `updateAt`, `items`),
   `Customer`(`id`, `name`, `grade`), `Item`(`order`, `price`, `qty`).
+  10.3의 행은 `Order`의 속성 `cnt`(`Integer`), `custName`(`String`), `address`(`@Embedded`, `city`와 `zip`)도 사용합니다.
+  이 행에서 `active`는 NULL이 될 수 있는 `Boolean`이고 getter는 `getActive()`입니다.
 
 ---
 
@@ -269,7 +271,7 @@ lambdaQL은 많은 차이를 감춥니다. 알아야 하는 것도 있습니다.
 | 페이징 SQL | `offset ? rows fetch first ? rows only` | `limit ?,?` | `offset ? rows fetch first ? rows only` | Hibernate에 전달(`setFirstResult` / `setMaxResults`) |
 | 같은 값을 가진 행의 순서 | – | – | 무작위 | 페이징할 때 키에 id가 없으면 lambdaQL이 루트 `@Id asc`를 추가. 유일하고 NULL이 될 수 없는 키(`unique = true`이고 `nullable = false`, `@NaturalId`)가 있으면 추가하지 않음(A5) |
 | 문자열 순서 | 대소문자 구분 | `_ci` | `NLS_SORT`(JVM 로캘) | DB를 따름 |
-| `order by`의 암시적 경로 | inner join(행을 잃음) | 같음 | 같음 | lambdaQL은 `left join` 사용(필수 연관은 inner join)(또는 같은 경로의 `where` 조인) |
+| `order by`의 암시적 경로 | inner join(행을 잃음) | 같음 | 같음 | lambdaQL은 `left join` 사용(필수 연관은 inner join, 또는 같은 경로의 `where` 조인) |
 | `order by`, `distinct`, `group by`의 `@Lob` 컬럼 | 동작 | 동작 | **ORA-22848 / ORA-22849** | 쿼리를 바꾸지 않고 `LQL-5010`을 `DEBUG` 수준으로 기록(B3) |
 | `@Enumerated(EnumType.STRING)` enum 컬럼의 정렬 | 이름 순 | 이름 순 | 이름 순 | 쿼리를 바꾸지 않고 `LQL-5011`을 `DEBUG` 수준으로 기록(B2). 선언 순서는 `ORDINAL` 매핑에서만 |
 

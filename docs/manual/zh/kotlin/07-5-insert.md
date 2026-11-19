@@ -101,7 +101,7 @@ HQL 为 `values (:p1, (select sum(s1.price) from Item s1 where s1.order.id = :p2
 第一个示例中的 `IdOrder` 那一行就是这样做的：`IdOrder` 的 id 是自动生成的。
 
 <a id="insert--select"></a>
-## Insert ... select
+## insert ... select
 
 从另一个实体复制行。`select` Lambda 接收目标（`a`）和源（`o`）。
 
@@ -145,7 +145,7 @@ qb.insert(Archive::class.java).from(Order::class.java)
 ```
 
 <a id="insert--select-with-aggregates"></a>
-## 带聚合的 Insert ... select
+## 带聚合的 insert ... select
 
 使用 [6. 查询列、聚合与分组](06-select-group.md) 中的 `groupBy`、`having` 和 `Agg` 函数。
 顺序是 `from(...)`、`where { }`、`groupBy { }`、`having { }`、`select { }`。`where`、`groupBy` 和 `having` 都是可选的。

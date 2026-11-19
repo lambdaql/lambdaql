@@ -443,6 +443,6 @@ WARN  [LQL-5002] limit 없는 서브쿼리 정렬은 결과에 영향이 없어 
 | lambdaQL 오류는 어떻게 알아봅니까? | `LambdaQLException`이고, 메시지가 `[LQL-xxxx]`로 시작합니다. |
 | 코드나 테스트에서 오류를 어떻게 검사합니까? | `e.code()`를 사용합니다. 텍스트를 비교하지 마십시오. |
 | 영어가 아닌 서버에서 영어 텍스트를 얻으려면? | `LqlMessages.setLocale(Locale.ROOT)`, `-Dlambdaql.locale=en`, 또는 `e.getMessage(Locale.ROOT)`. |
-| 경고는 어디로 갑니까? | SLF4J의 `WARN` 레벨로 갑니다. |
+| 경고는 어디로 갑니까? | SLF4J 로그로 갑니다. 레벨은 코드마다 다르며 `WARN`, `INFO`, `DEBUG` 중 하나입니다. |
 
 [매뉴얼 홈](README.md) | [Java 트랙](java/README.md) | [Kotlin 트랙](kotlin/README.md)

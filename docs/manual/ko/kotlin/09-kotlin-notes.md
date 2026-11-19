@@ -168,6 +168,7 @@ lambdaQL은 항상 단순한 `=`와 `<>`를 씁니다(결정 D48).
 lambdaQL에서 `===`는 `==`와 마찬가지로 **값 비교**를 뜻합니다(R17).
 쿼리에는 객체 동일성이 없습니다. Kotlin 자체는 값이 1000인 서로 다른 두 `Long` 박스에 대해 `false`를 내지만, lambdaQL은 `true`를 냅니다.
 
+<a id="bigdecimal"></a>
 ### `BigDecimal`
 
 Kotlin에서 `BigDecimal`에 대한 `==`는 `equals`를 호출하며, 이는 스케일까지 비교합니다(`1.0 != 1.00`).

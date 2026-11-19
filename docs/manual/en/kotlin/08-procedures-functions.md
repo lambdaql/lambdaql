@@ -5,6 +5,8 @@
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
 
+---
+
 This chapter has two parts.
 
 | Part | What | Annotation | How you call it |
@@ -202,7 +204,7 @@ These are the checks lambdaQL makes on the first call, with JDBC metadata (`getP
 | number of IN and INOUT parameters = number of stub arguments | yes, error `LQL-4036` (tested in Java) |
 | INOUT parameters = arguments with `@InOut` | yes, error `LQL-4036` |
 | number of OUT values and result sets = number of parts of the return type | yes, error `LQL-4038` |
-| the kind of type (number, text, date/time, boolean, binary) | yes, error `LQL-4036` (tested). Differences within one kind are not checked (see "Argument type check" below) |
+| the kind of type (number, text, date/time, boolean, binary) | yes, error `LQL-4036` (tested in Java). Differences within one kind are not checked (see "Argument type check" below) |
 | the same parameter names in another order | yes, error `LQL-4043` (tested in Java). Only when the stub argument names are known (see below) |
 | an Oracle package procedure name with several overloads | yes, error `LQL-4044` (tested in Java on Oracle) |
 

@@ -151,6 +151,7 @@ nullable 컬럼과의 비교는 **SQL 의미**를 따릅니다.
 **부동소수점:** `Float`/`Double` 컬럼에 대해 lambdaQL은 Kotlin과 비트 단위까지 같은 결과를 약속하지 않습니다.
 캡처한 `NaN`이나 `Infinity` 값은 쿼리가 실행될 때 거부됩니다.
 
+<a id="35-and-or-not"></a>
 ## 3.5 AND, OR, NOT
 
 | Kotlin | HQL |

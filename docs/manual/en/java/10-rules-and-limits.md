@@ -27,6 +27,8 @@ How to read the examples:
   Captured and computed values are always bind parameters (`:p1`, `:p2`, ...) (D37).
 - Entities: `Order` (`id`, `price`, `status`, `active`, `description`, `customer`, `updateAt`, `items`),
   `Customer` (`id`, `name`, `grade`), `Item` (`order`, `price`, `qty`).
+  The rows in 10.3 also use these `Order` properties: `cnt` (`Integer`), `custName` (`String`) and `address` (`@Embedded`, `city` and `zip`).
+  In those rows `active` is a nullable `Boolean` with the getter `getActive()`.
 
 ---
 
@@ -270,7 +272,7 @@ lambdaQL hides many differences. Some you must know.
 | Paging SQL | `offset ? rows fetch first ? rows only` | `limit ?,?` | `offset ? rows fetch first ? rows only` | Passed to Hibernate (`setFirstResult` / `setMaxResults`) |
 | Order of equal rows | – | – | random | With paging, lambdaQL adds the root `@Id asc` when the keys do not contain the id. It does not add it when there is a unique key that can never be NULL (`unique = true` and `nullable = false`, `@NaturalId`) (A5) |
 | String order | case-sensitive | `_ci` | `NLS_SORT` (JVM locale) | Follows the DB |
-| Implicit path in `order by` | inner join (rows lost) | same | same | lambdaQL uses `left join` (an inner join for a required association), or the `where` join of the same path |
+| Implicit path in `order by` | inner join (rows lost) | same | same | lambdaQL uses `left join` (an inner join for a required association, or the `where` join of the same path) |
 | `@Lob` column in `order by`, `distinct`, `group by` | works | works | **ORA-22848 / ORA-22849** | The query is not changed. `LQL-5010` is logged at `DEBUG` level (B3) |
 | Sort on an `@Enumerated(EnumType.STRING)` enum column | name order | name order | name order | The query is not changed. `LQL-5011` is logged at `DEBUG` level (B2). Declaration order only with an `ORDINAL` mapping |
 

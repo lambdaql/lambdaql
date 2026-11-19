@@ -27,6 +27,8 @@
   キャプチャした値と計算した値は常にバインドパラメーター（`:p1`、`:p2`、...）になります（D37）。
 - エンティティ: `Order`（`id`、`price`、`status`、`active`、`description`、`customer`、`updateAt`、`items`）、
   `Customer`（`id`、`name`、`grade`）、`Item`（`order`、`price`、`qty`）。
+  10.3 の行では、`Order` の次のプロパティも使います。`cnt`（`Integer`）、`custName`（`String`）、`address`（`@Embedded`、`city` と `zip`）。
+  これらの行では、`active` は null になりうる `Boolean` で、getter は `getActive()` です。
 
 ---
 
@@ -269,7 +271,7 @@ lambdaQL は多くの違いを隠します。知っておく必要があるも�
 | ページングの SQL | `offset ? rows fetch first ? rows only` | `limit ?,?` | `offset ? rows fetch first ? rows only` | Hibernate に渡す（`setFirstResult` / `setMaxResults`） |
 | 等しい行の順序 | – | – | ランダム | ページングでキーに id が含まれていない場合、lambdaQL はルートの `@Id asc` を追加する。一意で NULL になれないキー（`unique = true` かつ `nullable = false`、`@NaturalId`）があれば追加しない（A5） |
 | 文字列の順序 | 大文字小文字を区別 | `_ci` | `NLS_SORT`（JVM のロケール） | DB に従う |
-| `order by` の暗黙のパス | inner join（行が失われる） | 同じ | 同じ | lambdaQL は `left join`（必須の関連は内部結合）を使う（または同じパスの `where` の結合） |
+| `order by` の暗黙のパス | inner join（行が失われる） | 同じ | 同じ | lambdaQL は `left join` を使う（必須の関連は内部結合、または同じパスの `where` の結合） |
 | `order by`、`distinct`、`group by` での `@Lob` カラム | 動く | 動く | **ORA-22848 / ORA-22849** | クエリを変えずに `LQL-5010` を `DEBUG` レベルでログに出す（B3） |
 | `@Enumerated(EnumType.STRING)` の enum カラムのソート | 名前順 | 名前順 | 名前順 | クエリを変えずに `LQL-5011` を `DEBUG` レベルでログに出す（B2）。宣言順になるのは `ORDINAL` のマッピングだけ |
 

@@ -101,7 +101,7 @@ id가 IDENTITY나 SEQUENCE를 사용하면 id를 생략할 수 있습니다(규�
 첫 번째 예제의 `IdOrder` 줄이 이 경우에 해당합니다. `IdOrder`의 id는 생성되는 값입니다.
 
 <a id="insert--select"></a>
-## Insert ... select
+## insert ... select
 
 다른 엔티티에서 행을 복사합니다. `select` 람다는 대상(`a`)과 소스(`o`)를 받습니다.
 

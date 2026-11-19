@@ -22,7 +22,7 @@ val changed = u.execute()                      // number of updated rows
 `st` はキャプチャ値なので、バインドパラメーター（`:p1`）になります。`!!` は無視されます（D23）。定数 `2.0` はリテラルのままです（決定 D37）。
 `toHql()` は文を実行せずに HQL とパラメーターを返します。
 
-**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。このテストは Java のラムダを使います。意味が同じ Kotlin のラムダは同じ HQL になるので、SQL も同じです。 **（予定）** と書かれたブロックは [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) から取っています。lambdaQL はまだこれらの文を作らないので、このテストが予定の HQL を Hibernate に直接渡します。
+**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。このテストは Java のラムダを使います。意味が同じ Kotlin のラムダは同じ HQL になるので、SQL も同じです。
 
 **データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `update`:
 
@@ -175,7 +175,7 @@ assertEquals("update Order e0 set e0.price = (select sum(s1.price) from Item s1 
 ```
 
 - 別のテーブルの集約も、同じテーブルの集約も使えます（H2、MariaDB 10.11、Oracle 23.26 で実測）。`update` では MariaDB もエラー 1093 を出しません。
-- 一致する行がない場合、集約は NULL です。NOT NULL カラムでは DB エラーになるので、`Objects.requireNonNullElse(…, 0.0)` で囲んで `coalesce(...)` にしてください。
+- 一致する行がない場合、集約は NULL です。NOT NULL カラムでは DB エラーになるので、`?: 0.0` か `Objects.requireNonNullElse(…, 0.0)` で囲んで `coalesce(...)` にしてください。
 
 引数が 1 つのトレイリングラムダ（`set { it... }`）と引数が 2 つのトレイリングラムダ（`set { o, sub -> ... }`）は、別々のオーバーロードです。Kotlin が適切な方を選びます。
 

@@ -23,8 +23,8 @@
 - [6.2 查询一个值](#62-select-one-value)
 - [6.3 查询 data class、Pair、Triple](#63-select-a-data-class-pair-or-triple)
 - [6.4 聚合函数：`Agg`](#64-aggregate-functions-agg)
-- [6.5 Group by](#65-group-by)
-- [6.6 Having](#66-having)
+- [6.5 分组（group by）](#65-group-by)
+- [6.6 having](#66-having)
 - [6.7 distinct、分页与结果](#67-distinct-paging-and-results)
 - [6.8 显式 join](#68-explicit-joins)
 - [6.9 派生表（FROM 中的子查询）](#69-derived-table-subquery-in-from)
@@ -265,7 +265,8 @@ where o1_0.status=1
 
 ---
 
-## 6.5 Group by
+<a id="65-group-by"></a>
+## 6.5 分组（group by）
 
 用 `groupBy` 写出分组键。lambdaQL 不会猜测分组键。
 `groupBy` 返回分组查询。先调用 `having { }`（可选），再调用 `select { }`。
@@ -350,7 +351,7 @@ qb.from(Order::class.java)
 
 ---
 
-## 6.6 Having
+## 6.6 having
 
 `having` 是针对分组的条件。它使用与 `where` 相同的 Lambda 规则（[3. 条件（`where`）](03-where.md)），并且可以使用 `Agg`。
 `having` 可以调用多次。各个条件用 `AND` 连接。
@@ -784,8 +785,8 @@ MariaDB 和 Oracle 执行真正的 `with`。列清单由 Hibernate 自己写出�
 
 | # | 规则 | 状态 |
 |---|---|---|
-| J1 | `select` 的 Lambda 返回**一个值表达式**或**一次构造函数调用**。每个构造函数参数都是一个值表达式（[3. 条件（`where`）](03-where.md) 的规则）。只在 `select` 中使用的关联路径会变成 `left join` 别名，因此不会丢失行。必需关联（`optional = false`）是内连接（A4）。如果 `where` 使用同一条路径，`select` 会使用 `where` 的 join（R24）。 | 已实现（已测试，也用 Kotlin Lambda 测试） |
-| J2 | 对于构造函数，lambdaQL 只查询列，并自己调用构造函数。它不会写 `select new`。`Pair`/`Triple` 也以同样方式构建。 | 已实现（已测试，也用 Kotlin Lambda 测试） |
+| J1 | `select` 的 Lambda 返回**一个值表达式**或**一次构造函数调用**。每个构造函数参数都是一个值表达式（[3. 条件（`where`）](03-where.md) 的规则）。只在 `select` 中使用的关联路径会变成 `left join` 别名，因此不会丢失行。必需关联（`optional = false`）是内连接（A4）。如果 `where` 使用同一条路径，`select` 会使用 `where` 的 join（R24）。 | 已实现（已用 Java 和 Kotlin Lambda 测试） |
+| J2 | 对于构造函数，lambdaQL 只查询列，并自己调用构造函数。它不会写 `select new`。`Pair`/`Triple` 也以同样方式构建。 | 已实现（已用 Java 和 Kotlin Lambda 测试） |
 | J3 | 有聚合时，`select` 和 `having`（以及 `insert ... select` 的值）中每个非聚合值都必须是 `groupBy` 的键。否则会在分析时报错。 | 已实现（用 Java Lambda 测试）。错误是 `TranslationException`（`LQL-3035`，见 [11](../11-errors-and-languages.md)） |
 | J4 | 没有行或所有值都是 NULL 时，`sum`/`avg`/`min`/`max` 返回 NULL，`count` 返回 0。构造函数参数请写成可空类型。NULL 进入非空参数时会抛出 `IllegalStateException`。 | 已实现（用 Java Lambda 测试） |
 | J5 | 派生表或 CTE 的行类型：**只能是 Kotlin data class 或 Java record**。普通类只允许用于简单的 `select`。否则为 `LQL-3064`。也适用于被 join 的派生表和 CTE 的行（D51）。派生行不能与 `null` 比较（`LQL-3067`）。 | 已实现（用 Java Lambda 测试） |

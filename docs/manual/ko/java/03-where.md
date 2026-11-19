@@ -211,6 +211,7 @@ assertEquals(Map.of("p1", List.of(new BigDecimal("2.5"), new BigDecimal("3.0")))
 **부동소수점:** `float`/`double` 컬럼에 대해 lambdaQL은 Java와 비트 단위까지 같은 결과를 약속하지 않습니다.
 캡처한 `NaN`이나 `Infinity` 값은 쿼리가 실행될 때 거부됩니다.
 
+<a id="35-and-or-not"></a>
 ## 3.5 AND, OR, NOT
 
 | Java | HQL |

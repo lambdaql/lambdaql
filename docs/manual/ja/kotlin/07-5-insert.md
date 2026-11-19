@@ -101,7 +101,7 @@ id が IDENTITY か SEQUENCE を使う場合、id を省略できます（ルー
 最初の例の `IdOrder` の行がこれにあたります。`IdOrder` の id は生成される値です。
 
 <a id="insert--select"></a>
-## Insert ... select
+## insert ... select
 
 別のエンティティから行をコピーします。`select` のラムダは対象（`a`）とソース（`o`）を受け取ります。
 

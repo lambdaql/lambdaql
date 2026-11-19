@@ -26,6 +26,7 @@ How to read the examples:
 - Entities: `Order` (`id`, `price`, `status`, `active`, `description`, `customer`, `updateAt`, `items`),
   `Customer` (`id`, `name`, `grade`), `Item` (`order`, `price`, `qty`). See [2. Getting started](02-getting-started.md#example-entities).
   Some rows use an extra nullable property `flag: Boolean?`.
+  The rows in 10.3 also use these `Order` properties: `cnt: Int?`, `custName: String?` and `address` (`@Embedded`, `city` and `zip`).
 
 ---
 
@@ -188,7 +189,7 @@ See [8. Procedures and DB functions](08-procedures-functions.md).
 |---|---|
 | `==` / `!=` between two nullable values | yes, but no row matches (`= NULL`). `LQL-4045` at `WARN` level when the query runs |
 | Under a null guard on the same value: `p == null \|\| it.status!! > p` | yes. The guard is decided in the application when the query runs. `p == null` gives no filter, and any other value gives `e0.status > :p1`. A comparison with only `!!` and the unboxing to its own primitive type does not depend on the guard position |
-| With `!!` or in a size comparison (`<` `<=` `>` `>=`): `it.price!! > p!!` | yes, but no row matches (`> NULL`). `!!` (D23) and the unboxing to its own primitive type are not run. `LQL-4045` at `DEBUG` level |
+| With `!!` or in a size comparison (`<` `<=` `>` `>=`): `it.price!! > p!!` | yes, but no row matches (`> NULL`). `!!` (D23) and the unboxing to its own primitive type are not run. `LQL-4045` at `DEBUG` level when the query runs |
 | A method call on the captured value (`p.trim()`, `p.toInt()` that changes it to another primitive type) | **no.** Error when the value is computed (`LQL-4012`; Kotlin would throw NPE) |
 | A collection with a `null` element in `in` | **no.** Error when bound |
 | `NaN`, `Infinity` | **no.** Always an error |
@@ -288,7 +289,7 @@ lambdaQL hides many differences. Some you must know.
 | Paging SQL | `offset ? rows fetch first ? rows only` | `limit ?,?` | `offset ? rows fetch first ? rows only` | Passed to Hibernate (`setFirstResult` / `setMaxResults`) |
 | Order of equal rows | – | – | random | With paging, lambdaQL adds the root `@Id asc` when the keys do not contain the id. It does not add it when there is a unique key that cannot be NULL (`unique = true` and `nullable = false`, `@NaturalId`) (A5) |
 | String order | case-sensitive | `_ci` | `NLS_SORT` (JVM locale) | Follows the DB |
-| Implicit path in `order by` | inner join (rows lost) | same | same | lambdaQL uses `left join` (an inner join for a required association), or the `where` join of the same path |
+| Implicit path in `order by` | inner join (rows lost) | same | same | lambdaQL uses `left join` (an inner join for a required association, or the `where` join of the same path) |
 | `@Lob` column in `order by`, `distinct`, `group by` | works | works | **ORA-22848 / ORA-22849** | The query is not changed; lambdaQL logs `LQL-5010` at `DEBUG` level (B3) |
 | Sorting an enum column with `@Enumerated(EnumType.STRING)` | by name | by name | by name | The query is not changed; lambdaQL logs `LQL-5011` at `DEBUG` level (B2). Declaration order only with the `ORDINAL` mapping |
 

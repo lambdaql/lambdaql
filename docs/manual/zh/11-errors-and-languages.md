@@ -443,6 +443,6 @@ WARN  [LQL-5002] 没有 limit 的子查询排序不影响结果，已被移除�
 | 如何识别 lambdaQL 错误？ | 它是 `LambdaQLException`，消息以 `[LQL-xxxx]` 开头。 |
 | 如何在代码或测试中检查错误？ | 使用 `e.code()`。不要比较文本。 |
 | 如何在非英文服务器上获得英文文本？ | `LqlMessages.setLocale(Locale.ROOT)`、`-Dlambdaql.locale=en` 或 `e.getMessage(Locale.ROOT)`。 |
-| 警告输出到哪里？ | 以 SLF4J 的 `WARN` 级别输出。 |
+| 警告输出到哪里？ | 输出到 SLF4J 日志。级别因代码而异，为 `WARN`、`INFO` 或 `DEBUG` 之一。 |
 
 [手册首页](README.md) | [Java 路线](java/README.md) | [Kotlin 路线](kotlin/README.md)

@@ -22,7 +22,7 @@ val changed = u.execute()                      // number of updated rows
 `st` is a captured value, so it is a bind parameter (`:p1`). `!!` is ignored (D23). The constant `2.0` stays a literal (decision D37).
 `toHql()` gives the HQL and the parameters without running the statement.
 
-**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 6.6.5, and it fails if Hibernate's SQL changes. The test uses Java lambdas. A Kotlin lambda with the same meaning gives the same HQL, so it gets the same SQL. Blocks marked **(planned)** come from [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) instead. It gives the planned HQL to Hibernate directly, because lambdaQL does not make these statements yet.
+**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 6.6.5, and it fails if Hibernate's SQL changes. The test uses Java lambdas. A Kotlin lambda with the same meaning gives the same HQL, so it gets the same SQL.
 
 **SQL by database (from the Java test run; Kotlin gives the same HQL)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `update`:
 
@@ -175,7 +175,7 @@ assertEquals("update Order e0 set e0.price = (select sum(s1.price) from Item s1 
 ```
 
 - An aggregate over another table and an aggregate over the same table both work (measured on H2, MariaDB 10.11 and Oracle 23.26). In an `update`, MariaDB does not raise error 1093 either.
-- If no row matches, the aggregate is NULL. For a NOT NULL column this is a database error, so wrap it in `Objects.requireNonNullElse(…, 0.0)` to get `coalesce(...)`.
+- If no row matches, the aggregate is NULL. For a NOT NULL column this is a database error, so wrap it in `?: 0.0` or `Objects.requireNonNullElse(…, 0.0)` to get `coalesce(...)`.
 
 A trailing lambda with one argument (`set { it... }`) and a trailing lambda with two arguments (`set { o, sub -> ... }`) are different overloads. Kotlin picks the right one.
 

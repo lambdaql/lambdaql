@@ -23,11 +23,11 @@
 - [6.2 값 하나 조회](#62-select-one-value)
 - [6.3 데이터 클래스, Pair, Triple 조회](#63-select-a-data-class-pair-or-triple)
 - [6.4 집계 함수: `Agg`](#64-aggregate-functions-agg)
-- [6.5 Group by](#65-group-by)
-- [6.6 Having](#66-having)
+- [6.5 그룹화(group by)](#65-group-by)
+- [6.6 having](#66-having)
 - [6.7 distinct, 페이징, 결과](#67-distinct-paging-and-results)
 - [6.8 명시적 조인](#68-explicit-joins)
-- [6.9 파생 테이블(FROM의 서브쿼리)](#69-derived-table-subquery-in-from)
+- [6.9 파생 테이블(FROM 안의 서브쿼리)](#69-derived-table-subquery-in-from)
 - [6.10 CTE(`with`)](#610-cte-with)
 - [6.11 규칙 J1 ~ J8](#611-rules-j1-to-j8)
 - [6.12 v0.1에 없는 것](#612-not-in-v01)
@@ -265,7 +265,8 @@ where o1_0.status=1
 
 ---
 
-## 6.5 Group by
+<a id="65-group-by"></a>
+## 6.5 그룹화(group by)
 
 그룹 키는 `groupBy`로 작성합니다. lambdaQL은 키를 추측하지 않습니다.
 `groupBy`는 그룹 쿼리를 반환합니다. `having { }`(선택)을 호출한 다음 `select { }`를 호출하십시오.
@@ -350,7 +351,8 @@ qb.from(Order::class.java)
 
 ---
 
-## 6.6 Having
+<a id="66-having"></a>
+## 6.6 having
 
 `having`은 그룹에 대한 조건입니다. `where`와 같은 람다 규칙([3. 조건(`where`)](03-where.md))을 사용하며, `Agg`를 사용할 수 있습니다.
 `having`은 여러 번 호출할 수 있습니다. 조건은 `AND`로 연결됩니다.
@@ -651,7 +653,7 @@ update와 delete의 조인은 추가하지 않기로 했습니다(D51). 연관 �
 ---
 
 <a id="69-derived-table-subquery-in-from"></a>
-## 6.9 파생 테이블(FROM의 서브쿼리)
+## 6.9 파생 테이블(FROM 안의 서브쿼리)
 
 `select`로 값 쿼리(데이터 클래스, [6.3](#63-select-a-data-class-pair-or-triple) 참고)를 만든 뒤 `qb.from(...)`에 전달하십시오.
 그 행이 바깥 쿼리의 테이블이 됩니다(결정 D46).
@@ -784,8 +786,8 @@ MariaDB와 Oracle은 진짜 `with`를 실행합니다. 컬럼 목록은 Hibernat
 
 | # | 규칙 | 상태 |
 |---|---|---|
-| J1 | `select` 람다는 **값 식 하나**나 **생성자 호출 하나**를 반환합니다. 생성자의 각 인자는 값 식입니다([3. 조건(`where`)](03-where.md)의 규칙). `select`에만 쓰인 연관 경로는 `left join` 별칭이 되므로 행을 잃지 않습니다. 필수 연관(`optional = false`)은 inner join입니다(A4). 같은 경로를 `where`에서 쓰면 `select`는 `where`의 조인을 사용합니다(R24). | 구현됨(테스트함, Kotlin 람다로도 테스트함) |
-| J2 | 생성자의 경우 lambdaQL은 컬럼만 조회하고 생성자를 직접 호출합니다. `select new`는 쓰지 않습니다. `Pair`/`Triple`도 같은 방식으로 만듭니다. | 구현됨(테스트함, Kotlin 람다로도 테스트함) |
+| J1 | `select` 람다는 **값 식 하나**나 **생성자 호출 하나**를 반환합니다. 생성자의 각 인자는 값 식입니다([3. 조건(`where`)](03-where.md)의 규칙). `select`에만 쓰인 연관 경로는 `left join` 별칭이 되므로 행을 잃지 않습니다. 필수 연관(`optional = false`)은 inner join입니다(A4). 같은 경로를 `where`에서 쓰면 `select`는 `where`의 조인을 사용합니다(R24). | 구현됨(Java와 Kotlin 람다로 테스트함) |
+| J2 | 생성자의 경우 lambdaQL은 컬럼만 조회하고 생성자를 직접 호출합니다. `select new`는 쓰지 않습니다. `Pair`/`Triple`도 같은 방식으로 만듭니다. | 구현됨(Java와 Kotlin 람다로 테스트함) |
 | J3 | 집계가 있으면 `select`와 `having`(그리고 `insert ... select`의 값)에서 집계가 아닌 값은 모두 `groupBy` 키여야 합니다. 그렇지 않으면 분석 시점에 오류가 발생합니다. | 구현됨(Java 람다로 테스트함). 오류는 `TranslationException`(`LQL-3035`, [11](../11-errors-and-languages.md) 참고) |
 | J4 | `sum`/`avg`/`min`/`max`는 행이 없거나 모든 값이 NULL이면 NULL을 냅니다. `count`는 0을 냅니다. 생성자 파라미터는 nullable로 쓰십시오. non-null 파라미터에 NULL이 오면 `IllegalStateException`이 발생합니다. | 구현됨(Java 람다로 테스트함) |
 | J5 | 파생 테이블이나 CTE의 행 타입: **Kotlin 데이터 클래스나 Java record만**. 일반 클래스는 단순 `select`에서만 허용됩니다. 그렇지 않으면 `LQL-3064`. 조인한 파생 테이블과 CTE의 행에도 적용합니다(D51). 파생 행은 `null`과 비교할 수 없습니다(`LQL-3067`). | 구현됨(Java 람다로 테스트함) |

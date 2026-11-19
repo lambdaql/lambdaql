@@ -150,7 +150,7 @@ lambdaQL은 각 값을 생성자 인자의 타입으로 변환합니다(예: Hib
 <a id="64-aggregate-functions-agg"></a>
 ## 6.4 집계 함수: `Agg`
 
-집계 함수는 **`org.lambdaql.Agg`의 static 메서드**입니다.
+집계 함수는 **`org.lambdaql.Agg`의 정적 메서드**입니다.
 SQL 표준 함수이므로 lambdaQL이 제공합니다. (직접 만든 DB 함수는 [8. 프로시저와 DB 함수](08-procedures-functions.md)를 참고하십시오.)
 static 헬퍼 클래스는 `Agg`와 DML 대입용 `Dml`(결정 D49) 두 개뿐입니다.
 
@@ -299,6 +299,7 @@ qb.from(Order.class)
 
 ---
 
+<a id="66-having"></a>
 ## 6.6 having
 
 `having`은 그룹에 대한 조건입니다. `where`와 같은 람다 규칙([3. 조건(`where`)](03-where.md))을 사용하며, `Agg`를 사용할 수 있습니다.

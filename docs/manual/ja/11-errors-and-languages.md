@@ -443,6 +443,6 @@ WARN  [LQL-5002] limit のないサブクエリのソートは結果に影響し
 | lambdaQL のエラーはどう見分けますか？ | `LambdaQLException` で、メッセージが `[LQL-xxxx]` で始まります。 |
 | コードやテストでエラーをチェックするには？ | `e.code()` を使います。テキストを比較しないでください。 |
 | 英語以外のサーバーで英語のテキストを得るには？ | `LqlMessages.setLocale(Locale.ROOT)`、`-Dlambdaql.locale=en`、または `e.getMessage(Locale.ROOT)`。 |
-| 警告はどこに出ますか？ | SLF4J へ、`WARN` レベルで出ます。 |
+| 警告はどこに出ますか？ | SLF4J のログへ出ます。レベルはコードごとに異なり、`WARN`、`INFO`、`DEBUG` のいずれかです。 |
 
 [マニュアルのホーム](README.md) | [Java トラック](java/README.md) | [Kotlin トラック](kotlin/README.md)

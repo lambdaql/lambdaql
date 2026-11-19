@@ -24,16 +24,13 @@
 이전 대기 항목(D48~D51 등)은 모두 반영되어 지웠습니다. 내용은 git 기록에 있습니다.
 앞으로 한국어 원본이 바뀌면 이 문서에 다시 항목을 적습니다.
 
-## 한국어 원본 다듬기 후보(2026-11-19 번역 중 발견, 미수정)
+## 한국어 원본 다듬기(2026-11-19 네 언어에 반영 완료)
 
-표시가 깨지지 않는 문구 문제라 남겨 두었습니다. 고치면 세 번역본에도 반영합니다.
+번역 중 발견한 문구 문제 9건을 한국어 원본과 영어, 일본어, 중국어에 함께 고쳤습니다. 남은 대기 항목은 없습니다.
 
-- 07-2(Java·Kotlin) "SQL 블록 읽는 법": 더 이상 쓰지 않는 **(예정)** 표시를 설명함
-- Kotlin 07-5 제목 "Insert ... select"의 대문자, Kotlin 08 "공통 페이지" 줄 뒤 `---` 없음, Kotlin 08 8.4 "(테스트함)"과 "Java로 테스트함" 혼용
-- Kotlin 10 10.3 캡처 null 표의 `!!` 행에 "쿼리가 실행될 때" 누락, 10.6 "`order by`의 암시적 경로" 행의 괄호 두 개 연속
-- 명시 앵커가 없는 제목(java/03 3.5, 06 6.5·6.6, Kotlin 09 `BigDecimal`), README 첫 앵커 `lambdaql-user-manual-english`
-- 08장 `pass_procedure_paramater_names` 철자(설정 이름 그대로인지 미확인)
-- 11장 요약 표 "경고는 어디로 갑니까? → SLF4J의 `WARN` 레벨": 같은 장 로깅 절(코드마다 WARN·INFO·DEBUG)과 다름
-- Java·Kotlin 06장 표기 차이: 6.4 "static 메서드"/"정적 메서드", 6.9 제목 "FROM 안의 서브쿼리"/"FROM의 서브쿼리", 6.5·6.6 제목 형식. Kotlin 06 6.11의 테스트 표시 혼용
-- Kotlin 07-2는 NULL 집계 대책으로 `Objects.requireNonNullElse(…, 0.0)`만, Kotlin 07-dml 7.3은 `?: 0.0`도 안내
-- 10장 "예제 읽는 법"의 엔티티 목록에 10.3 행이 쓰는 `cnt`, `address`(Java는 `custName`, `getActive()`)가 없음
+고치지 않은 것과 이유는 다음과 같습니다.
+
+- 08장 `pass_procedure_paramater_names`: Hibernate 6.6.5의 설정 이름(`hibernate.query.pass_procedure_paramater_names`, `QuerySettings`)이 이 철자여서 문서를 그대로 둠
+- README 첫 앵커 `lambdaql-user-manual-english`: 링크가 쓸 수 있어 이름을 바꾸지 않음
+- 영어 번역본: 영어 제목은 `Insert ... select`, `Group by`, `Having`처럼 문장형 대문자이고 Java와 Kotlin이 이미 같아 제목을 바꾸지 않음
+- 3.5, 6.6, `BigDecimal` 제목의 앵커: 번역본은 제목 자체가 같은 id를 만들어 명시 앵커를 넣지 않음(한국어 원본에만 명시 앵커 추가). 일본어와 중국어 Kotlin 06의 6.5는 제목을 Java에 맞추면서 id가 달라져 명시 앵커를 추가함
