@@ -62,7 +62,7 @@ qb.from(Order.class)
 | JDK | **21**(`jvm.version=21`) |
 | Gradle | wrapper **8.10**. Java 23 이하에서만 실행된다. 데몬 JVM은 `gradle/gradle-daemon-jvm.properties`(`toolchainVersion=21`)로 고정 |
 | IntelliJ | Gradle JVM이 최신 JDK로 잡히면 "Gradle 8.10 is incompatible" 오류. Gradle JVM을 21로 지정 |
-| 의존성 | Spring Boot BOM 3.4.2(Hibernate ORM 6.6.5), Kotlin 2.3.21(테스트만), ASM 9.11.1(`api`) |
+| 의존성 | `feature/boot4`: Spring Boot BOM 4.1.2(Hibernate ORM 7.4.13), Kotlin 2.3.21(테스트만), ASM 9.11.1(`implementation`: 사용자에게는 런타임 전용, 2026-11-19) |
 | ASM | 새 JDK 릴리스마다 최신 ASM으로 갱신한다. 구버전은 새 클래스 파일 버전을 읽지 못한다(D9) |
 | 테스트 DB | `application-test.yaml`(H2, `ddl-auto: create-drop`). `-Dlql.db=mariadb|oracle`이면 `lql-db-<이름>.yaml`을 `spring.config.import`로 읽는다. 테이블은 `SqPrefixNamingStrategy`로 `SQ_` 접두가 붙는다 |
 
@@ -205,6 +205,7 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
   2. `query/build.gradle`에 JDK 24 툴체인으로 컴파일하는 `java24` 소스 세트를 두고 jar의 `META-INF/versions/24`에 넣는다(`Multi-Release: true`).
   3. 테스트를 JDK 21(ASM)과 JDK 24 이상(ClassFile)에서 모두 돌린다. 이 PC에는 JDK 21과 26만 있다.
 - **최소 JDK**: ClassFile API는 JDK 24에서 정식(JEP 484). 25와의 차이는 확인하지 못해 24부터 지원(미측정).
+- **ASM 의존 범위**: `api` → `implementation`(작성자 지시, 2026-11-19). 배포 POM에서 `runtime` 범위라 사용자의 컴파일 클래스패스에는 없다. 새 ASM이 필요하면 사용자가 자기 의존성으로 올릴 수 있다.
 - **Gradle**: 9.9.1로 올렸다(2026-11-19). Gradle 9에서 프로젝트 수준 `sourceCompatibility`가 없어져 `java { }` 안으로 옮겼다.
 
 ---
