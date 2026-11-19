@@ -132,7 +132,7 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 
 장기 보존이 필요하면 소스(`*.java`, `*.kt`, `*.py`)와 요약(`*.md`)만 저장소로 옮긴다.
 
-### 6.3 개발 도구(`.claude/tools/`)
+### 6.3 개발 도구(`.claude/tools/`, 로컬 전용)
 
 | 도구 | 용도 |
 |---|---|
@@ -140,13 +140,13 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 | `docs/check_ko.py` | 한국어 매뉴얼 검사(링크, 앵커, 일부 테스트 구간) |
 | `docs/check_translation.py <lang>` | 번역 검사(낡음 안내, 앵커, 코드 블록, 남은 한글, 링크) |
 
-실행 방법은 [`.claude/tools/README.md`](.claude/tools/README.md)에 있다. 개인 설정(`.claude/settings.local.json`)은 git에서 제외한다.
+`.claude/`는 전역 gitignore(`~/.gitignore_global`)로 git에서 제외하므로 이 도구들은 저장소에 없고 작업 PC에만 있다. 실행 방법은 `.claude/tools/README.md`에 있다. 다른 PC에서 작업하려면 이 폴더를 따로 복사한다.
 
 ---
 
 ## 7. 메시지 카탈로그 생성기
 
-`LqlMessage.java`와 `LqlMessages{,_ja,_ko,_zh}.properties`는 생성 결과다. 원본은 `.claude/tools/i18n/catalog.py`(항목: 키, 코드, 인자 수, en, ko, ja, zh)이고 `python3 .claude/tools/i18n/gen.py`로 다시 쓴다. 생성 결과를 직접 고치지 않는다.
+`LqlMessage.java`와 `LqlMessages{,_ja,_ko,_zh}.properties`는 생성 결과다. 원본은 로컬 전용 `.claude/tools/i18n/catalog.py`(항목: 키, 코드, 인자 수, en, ko, ja, zh)이고 `python3 .claude/tools/i18n/gen.py`로 다시 쓴다. 생성 결과를 직접 고치지 않는다.
 
 - 코드를 추가할 때 3xxx는 `# ---- 4xxx rendering and running` 앞, 4xxx는 `("INTERNAL_ERROR"` 앞, 5xxx는 목록 끝에 넣는다.
 - 쓰지 않게 된 코드는 지운다(예: LQL-3040). 같은 번호를 다른 뜻으로 다시 쓰지 않는다.
