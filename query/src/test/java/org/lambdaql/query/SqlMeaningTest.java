@@ -143,6 +143,13 @@ class SqlMeaningTest {
         assertEquals(List.of(3), qb.from(Order.class).where(o -> o.getCnt() >= half).select(o -> o.getCnt()).toList());
         assertEquals(List.of(3), qb.from(Order.class).where(o -> o.getCnt() > half).select(o -> o.getCnt()).toList());
         assertEquals(List.of(), qb.from(Order.class).where(o -> o.getCnt() == half).toList());
+        // a constant written in the lambda gets the same rewrite
+        RenderedQuery literal = qb.from(Order.class).where(o -> o.getCnt() >= 2.5).toHql();
+        assertEquals("select e0 from Order e0 where e0.cnt >= :p1", literal.hql());
+        assertEquals(Map.of("p1", 3), literal.parameters());
+        assertEquals(List.of(3), qb.from(Order.class).where(o -> o.getCnt() >= 2.5).select(o -> o.getCnt()).toList());
+        assertEquals(List.of(2, 2, 3), qb.from(Order.class).where(o -> o.getCnt() < 3.5).select(o -> o.getCnt()).toList()
+                .stream().sorted().toList());
     }
 
     /** Minimal Spring context: the datasource chosen by application-test.yaml and the test entities. */
