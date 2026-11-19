@@ -1,3 +1,4 @@
+<a id="lambdaql-user-manual-english"></a>
 # lambdaQL 用户手册（简体中文）
 
 **其他语言：** [English](../en/README.md) | [한국어](../ko/README.md) | [日本語](../ja/README.md) | [简体中文](../zh/README.md)
@@ -6,6 +7,7 @@ lambdaQL 是一个面向 Java 和 Kotlin 的查询库。
 你只需编写普通的 Lambda 表达式。lambdaQL 读取 Lambda 的字节码，并构建 Hibernate 6.6 HQL 查询。
 Lambda 永远不会被执行。
 
+<a id="a-first-look"></a>
 ## 初步了解
 
 ### Java
@@ -28,6 +30,7 @@ val orders = qb.from(Order::class.java)
     .toList()
 ```
 
+<a id="hql-the-same-for-both"></a>
 ### HQL（两种语言相同）
 
 ```
@@ -66,6 +69,7 @@ order by o1_0.price desc nulls last,o1_0.id
 fetch first ? rows only
 ```
 
+<a id="choose-your-track"></a>
 ## 选择你的路线
 
 本手册有**两条路线**：一条面向 Java，一条面向 Kotlin。
@@ -80,6 +84,7 @@ fetch first ? rows only
 两条路线的章节编号和文件名相同。只有第 9 章不同（Java 说明或 Kotlin 说明）。
 每个路线页面都有指向另一条路线中同一页面的链接，你可以随时切换。
 
+<a id="common-pages"></a>
 ## 公共页面
 
 这些页面适用于两种语言。代码分别展示在 Java 和 Kotlin 两个小节中。
@@ -89,6 +94,7 @@ fetch first ? rows only
 | [1. 概述](01-overview.md) | lambdaQL 是什么、为什么需要它、它如何工作、设计原则 |
 | [11. 错误与语言](11-errors-and-languages.md) | 错误码、异常、消息语言、日志 |
 
+<a id="table-of-contents"></a>
 ## 目录
 
 | # | 章节 | Java | Kotlin |
@@ -107,10 +113,12 @@ fetch first ? rows only
 | 11 | 错误与语言（公共） | [11-errors-and-languages.md](11-errors-and-languages.md) | [11-errors-and-languages.md](11-errors-and-languages.md) |
 | 12 | Spring Data JPA：`LambdaQlExecutor<T>`、DML 快捷方法、Spring `Sort` 和 `Pageable`、模块、事务、`QueryBuilder` bean | [Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md) |
 
+<a id="about-the-examples"></a>
 ## 关于示例
 
 示例均为设计示例。某个功能实现后，其示例将替换为取自测试套件的代码，并附上测试文件的链接。在 3. 条件、4. 排序与分页、5. 子查询、6. 查询列、聚合与分组、7. 更新、插入、删除、8. 存储过程与数据库函数、11. 错误与语言和 12. Spring Data JPA（Java）中，这些示例标记为 **(已测试)**。Kotlin 路线中取自 Kotlin 测试的示例也同样标记。
 
+<a id="example-entities"></a>
 ## 示例实体
 
 本手册中的所有示例都使用以下三个实体。
@@ -123,6 +131,7 @@ fetch first ? rows only
 
 完整的实体代码见入门章节：[Java](java/02-getting-started.md#example-entities) | [Kotlin](kotlin/02-getting-started.md#example-entities)。
 
+<a id="supported-environment"></a>
 ## 支持的环境
 
 | 项目 | 版本 |
@@ -133,10 +142,11 @@ fetch first ? rows only
 | 已验证的数据库 | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
 | Spring Boot（可选） | 3.4（已用 3.4.2 测试）。Spring Boot 4 尚未验证 |
 
+<a id="folder-layout"></a>
 ## 目录结构
 
 ```
-manual/en/
+manual/zh/
 ├── README.md                      本页面
 ├── 01-overview.md                 公共
 ├── 11-errors-and-languages.md     公共
@@ -154,9 +164,10 @@ manual/en/
 
 每个语言文件夹（`en`、`ko`、`ja`、`zh`）中的文件名都相同。要切换语言，只需更改链接中的文件夹名。
 
+<a id="help-and-contributions"></a>
 ## 帮助与贡献
 
 - 源代码：<https://github.com/codebit0/lambdaql>
-- 英文手册是原始版本。韩文、日文和中文手册是翻译版本。
+- 韩文手册是原始版本。英文、日文和中文手册是翻译版本。
 - 如果你在任何语言版本中发现错误，请提交 issue 或 pull request。欢迎帮助翻译。
 - 设计文档（韩文，面向贡献者）：[ROADMAP.md](../../design/ROADMAP.md)、[KOTLIN.md](../../design/KOTLIN.md)

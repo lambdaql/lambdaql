@@ -1,7 +1,5 @@
+<a id="2-getting-started-kotlin"></a>
 # 2. 入门（Kotlin）
-
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/02-getting-started.md)。
 
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[1. 概述](../01-overview.md) | 下一章：[3. 条件](03-where.md) | [本页的 Java 版本](../java/02-getting-started.md)
 
@@ -9,6 +7,7 @@
 
 ---
 
+<a id="requirements"></a>
 ## 环境要求
 
 | 项目 | 版本 | 说明 |
@@ -44,6 +43,7 @@ cd lambdaql
 
 [`SelectQueryTest.java`](../../../../query/src/test/java/org/lambdaql/query/SelectQueryTest.java) 中的测试展示了 lambdaQL 目前能做什么：`qb.from(...).where(...)`、HQL、参数，以及在 H2、MariaDB 和 Oracle 上返回的行。[`ConditionDecodeTest.java`](../../../../query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java) 测试内部的条件解码器。这些测试是用 Java 编写的。Kotlin 测试还在计划中（`query/src/test/kotlin`）。
 
+<a id="use-the-local-build-in-your-project"></a>
 ### 在你的项目中使用本地构建
 
 把三个模块的 jar 发布到本地 Maven 仓库：
@@ -78,8 +78,8 @@ Maven：
 使用 Spring Data JPA 或 Spring Boot 时，请改用 `lambdaql-spring-boot-starter` 或 `lambdaql-spring-data-jpa`。它们会带入 `lambdaql-core`（见 [12.2](12-spring-data-jpa.md#122-modules)）。
 
 > [!WARNING]
-> 这些构件**尚未发布到 Maven Central**。
-> 版本 `1.0.0` 来自仓库的 `gradle.properties`，在首次发布前可能改变。lambdaQL 发布后请再次查看本页。
+> 版本 `1.0.0` 是仓库的 `gradle.properties` 中定义的值，在首次发布前可能改变。
+> lambdaQL 发布到 Maven Central 后，请再次查看本页。
 
 <a id="kotlin-compiler-settings"></a>
 ## Kotlin 编译器设置
@@ -158,6 +158,7 @@ class Item(
 | 不要在查询中使用 `@JvmField`、`internal` 属性、`value class` 属性或 `@get:JvmName`。 | lambdaQL 无法把它们映射到 JPA 属性（限制 KC15、KC16）。 |
 | `Boolean`、`Int`、`Long`、`Double`（不可空）是 JVM 基本类型。 | 它们永远不会存放 NULL。lambdaQL 知道这一点，可以生成更简单的 SQL。 |
 
+<a id="create-a-querybuilder"></a>
 ## 创建 QueryBuilder
 
 `QueryBuilder` 是入口。它需要一个 JPA `EntityManagerFactory` 或一个 `EntityManager`。
@@ -168,6 +169,7 @@ val qb = QueryBuilder(entityManagerFactory)
 
 创建一个 `QueryBuilder` 并重复使用它。不要为每个查询都创建一个新的。
 
+<a id="with-plain-jpa"></a>
 ### 使用纯 JPA
 
 ```kotlin
@@ -175,6 +177,7 @@ val emf = Persistence.createEntityManagerFactory("my-unit")
 val qb = QueryBuilder(emf)
 ```
 
+<a id="with-spring-boot"></a>
 ### 使用 Spring Boot
 
 使用 `lambdaql-spring-boot-starter` 时，Spring Boot 会为你创建 `QueryBuilder` bean（见 [12.8](12-spring-data-jpa.md#128-the-querybuilder-bean)）。
@@ -208,6 +211,7 @@ class OrderService(private val qb: QueryBuilder) {
 - 在 Spring 应用中不要使用接收 `EntityManagerFactory` 的构造函数。那样创建的 builder 会为每个查询打开自己的 `EntityManager`，位于 Spring 事务之外。
 - 如果要在 Spring Data 仓库中编写 lambdaQL 查询，请参阅 [12. Spring Data JPA](12-spring-data-jpa.md)。
 
+<a id="your-first-query"></a>
 ## 你的第一个查询
 
 ```kotlin
@@ -217,7 +221,7 @@ val orders = qb.from(Order::class.java)
 // HQL: select e0 from Order e0 where e0.status = 1 and e0.price > 100.0
 ```
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。 该测试使用 Java Lambda。含义相同的 Kotlin Lambda 生成相同的 HQL，因此 SQL 也相同。
+**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。该测试使用 Java Lambda。含义相同的 Kotlin Lambda 生成相同的 HQL，因此 SQL 也相同。
 
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `to-hql`：
 
@@ -237,6 +241,7 @@ where o1_0.status=1 and o1_0.price>100.0
 
 为什么 `1` 和 `100.0` 被直接写入 HQL，而不是绑定参数？它们是**写在 Lambda 中的常量**。lambdaQL 会把常量（数字、字符串、布尔值、`null`、enum 常量、`const val`）作为字面量写入 HQL。来自 Lambda 外部的值则不同：它们始终是绑定参数（见下一节和 [3.3](03-where.md#33-basic-form)）。
 
+<a id="use-values-from-outside-the-lambda"></a>
 ### 使用 Lambda 外部的值
 
 Lambda 可以使用局部值、属性和函数参数。这些是**捕获的值**。
@@ -259,6 +264,7 @@ from orders o1_0
 where o1_0.status=? and o1_0.price>=?
 ```
 
+<a id="many-where-calls"></a>
 ### 多次调用 `where`
 
 你可以多次调用 `where`。lambdaQL 用 `AND` 连接这些条件。
@@ -296,6 +302,7 @@ if (minPrice != null) {
 val orders = query.toList()
 ```
 
+<a id="paths-to-other-entities"></a>
 ### 指向其他实体的路径
 
 像 `it.customer?.name` 这样的路径指代关联实体的一个列。
@@ -322,7 +329,8 @@ where c1_0.name=?
 `it.customer!!.name` 生成相同的 HQL。使用你喜欢的写法即可。
 要查找没有客户的订单，请比较关联本身：`it.customer == null` 生成 `e0.customer is null`（不需要 join）。
 `it.customer?.name == null` **不会**包含它们。
-如果 null 守卫保留了没有客户的订单（`it.customer == null || ...`），lambdaQL 会使用 `left join`。见 [3.10](03-where.md#310-association-paths)。
+即使使用 null 守卫（`it.customer == null || ...`），没有客户的订单也不会保留，因为路径是内连接（决策 D48）。
+要保留这些订单，请使用 `leftJoin`（[6.8](06-select-group.md#68-explicit-joins)）。见 [3.10](03-where.md#310-association-paths)。
 
 <a id="getting-the-result"></a>
 ## 获取结果
@@ -505,6 +513,7 @@ val tags: List<Tag> = qb.from(Tag::class.java).toList()   // use toList() instea
 
 目前还没有针对 `toSet()` 的 Kotlin 测试。用 Java 写的同样的调用在 [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java) 中测试过（region `to-set` 和 `to-set-check`，H2、MariaDB 和 Oracle）。请看[本页的 Java 版本](../java/02-getting-started.md#toset)。
 
+<a id="things-to-know"></a>
 ## 需要知道的事
 
 | 规则 | 示例 |
@@ -518,6 +527,7 @@ val tags: List<Tag> = qb.from(Tag::class.java).toList()   // use toList() instea
 
 所有 Kotlin 限制见 [9. Kotlin 说明](09-kotlin-notes.md#914-kotlin-limits-kc1-to-kc21)。
 
+<a id="next"></a>
 ## 下一步
 
 - [3. 条件（`where`）](03-where.md)：所有运算符和 null 规则。

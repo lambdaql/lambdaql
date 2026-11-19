@@ -1,7 +1,7 @@
 <a id="4-sorting-and-paging-kotlin"></a>
 # 4. 排序与分页（Kotlin）
 
-[Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[3. 条件](03-where.md) | 下一章：[5. 子查询](05-subquery.md) | [本页的 Java 版本](../java/04-order-paging.md)
+[Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[3. 条件（`where`）](03-where.md) | 下一章：[5. 子查询](05-subquery.md) | [本页的 Java 版本](../java/04-order-paging.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
 
@@ -75,7 +75,8 @@ assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.active =
     + " order by e0.price desc, j1.name asc nulls first, e0.id asc", q.toHql().hql())
 ```
 
-测试使用 Java 测试实体：`price` 是基本类型 `double`（所以没有 `nulls` 部分），`active` 的 getter 是 `isActive()`（Kotlin 中为 `it.isActive`）。测试在 H2、MariaDB 和 Oracle 上执行查询，并把结果行与用 Kotlin 进行的同样排序作比较。
+测试使用 Java 测试实体：`price` 是基本类型 `double`（所以没有 `nulls` 部分），`active` 的 getter 是 `isActive()`（Kotlin 中为 `it.isActive`）。
+测试在 H2、MariaDB 和 Oracle 上执行查询，并把结果行与用 Kotlin 进行的同样排序作比较。
 更多用 Java 写的排序在 [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java) 中测试过。这些示例请看[本页的 Java 版本](../java/04-order-paging.md)。
 
 <a id="42-the-short-forms-one-key"></a>
@@ -96,7 +97,6 @@ lambdaQL 根据 Lambda 参数的个数（一个或两个）区分这些写法。
 
 Kotlin 属性引用（`Order::price`）尚未实现。目前请使用 Lambda（`{ it.price }`）。
 
-<a id="43-direction"></a>
 ## 4.3 `Direction`
 
 `Direction` 有六个值：
@@ -159,7 +159,7 @@ Lambda 只分析一次。每次执行查询时都会读取 `dir`（规则 S10）
 | `DESC` 默认 | NULL 在后 | NULL 在后 | NULL 在**前** |
 | SQL 中的 `NULLS FIRST/LAST` | 支持 | **不支持（语法错误）** | 支持 |
 
-lambdaQL 用一条策略解决这个问题：**NULL 是最小的值**（决定 D16）。
+lambdaQL 用一条策略解决这个问题：**NULL 是最小的值**（决策 D16）。
 
 - `ASC` = `ASC_NULLS_FIRST`
 - `DESC` = `DESC_NULLS_LAST`
@@ -170,7 +170,7 @@ lambdaQL 用一条策略解决这个问题：**NULL 是最小的值**（决定 D
 **lambdaQL 如何写出它。** 对于每个可能为 NULL 的排序键，lambdaQL 都会把 NULL 的位置写入 HQL，例如 `e0.description asc nulls first`。
 永远不会为 NULL 的排序键（像 `active: Boolean` 或 `qty: Int` 这样的 JVM 基本类型，或者 `@Id`）没有 `nulls` 部分。
 lambdaQL 看的是 JPA 元数据，而不是 Kotlin 类型。因此带 `@Id` 的 `id: Long?` 没有 `nulls` 部分，而 `price: Double?` 有。
-关联后面的列总是可能为 NULL（订单可能没有客户），因此它总会有 `nulls` 部分。
+关联后面的列在没有关联时为 NULL（订单可能没有客户），因此会有 `nulls` 部分。如果路径上的每一步关联都是必需的（`optional = false`），并且值不会为 NULL，就不会有这一部分。
 
 然后 Hibernate 为每种数据库生成 SQL。当该子句就是数据库的默认值时，Hibernate 会去掉它。
 MariaDB 没有 `NULLS` 语法，因此对于不是默认值的位置，Hibernate 会在那里写出 `CASE` 表达式。
@@ -193,7 +193,9 @@ MariaDB 没有 `NULLS` 语法，因此对于不是默认值的位置，Hibernate
 | 排序键 | 是否允许 | 说明 |
 |---|---|---|
 | 列：`o.price` | 是 | 可空排序键（`Double?`、`String?`）没有问题 |
-| 对一路径：`o.customer?.name`、`o.customer!!.name` | 是 | `left join`，见下文 |
+| 对一路径：`o.customer?.name`、`o.customer!!.name` | 是 | `left join`（必需关联使用 inner join），见下文 |
+| `@Lob` 列 | 是 | Oracle 会拒绝。`DEBUG` 级别的 `LQL-5010`，见下文 |
+| `@Enumerated(EnumType.STRING)` 枚举列 | 是 | 按名称排序（不是声明顺序）。`DEBUG` 级别的 `LQL-5011`，见下文 |
 | 算术运算：`o.price!! * 2`、`+`、`-` | 是 | |
 | 拓宽转换：`o.status!!.toLong()` | 是 | |
 | 非布尔值上的 Elvis：`o.description ?: ""` | 是 | `coalesce(e0.description, '')`。NULL 策略不适用于它 |
@@ -231,8 +233,46 @@ order by c1_0.name asc nulls first,o1_0.id
 
 在 SQL 中可以看到 NULL 策略。H2 和 MariaDB 在与自身默认值相同时省略该子句。Oracle 的默认值正好相反，所以写出 `asc nulls first` / `desc nulls last`。MariaDB 没有 `NULLS` 语法，所以对于不是默认值的位置，它先按 `case when … is null then … end` 排序。
 
+**必需关联使用 inner join。** 用 `optional = false` 映射的关联（例如 `@ManyToOne(optional = false)`）总有目标，因此 inner join 不会丢失行（A4）。
+所以即使路径只用于排序或 select，这类关联也使用 `join`。其他关联像上面一样使用 `left join`（规则 S8、J1）。
+如果路径上的每一步关联都是必需的，并且值不会为 NULL，排序也不会带 `nulls first/last`。
+
+目前还没有针对这一点的 Kotlin 测试。
+同样的规则已用 Java 测试（[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)，region `required-association`，见[本页的 Java 版本](../java/04-order-paging.md#45-what-a-sort-key-can-be)）。
+下面是设计示例：
+
+```kotlin
+// OrderLine.order is optional = false: a sort or select path through it is an inner join
+qb.from(OrderLine::class.java).orderBy { l, by -> by.asc(l.order.price) }
+// HQL: select e0 from OrderLine e0 join e0.order j1 order by j1.price asc
+qb.from(OrderLine::class.java).select { it.order.price }
+// HQL: select j1.price from OrderLine e0 join e0.order j1
+```
+
+**`@Lob` 列的排序。** 在 `orderBy`、`distinct`、`groupBy` 中使用 `@Lob` 列时，H2 和 MariaDB 会执行，Oracle 会拒绝（ORA-22848、ORA-22849，实测）。`=` 比较在三种数据库上都可以执行。
+lambdaQL 不修改查询，而是对每个列和每种用法记录一次 `DEBUG` 级别的 `LQL-5010`（B3）。
+
+Java 测试（[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)，region `lob`）检查这三种用法的日志。下面是设计示例：
+
+```kotlin
+// memo is @Lob: Oracle rejects it in order by, group by and distinct; lambdaQL logs LQL-5010 at DEBUG
+qb.from(OrderLine::class.java).orderBy { l, by -> by.asc(l.memo) }
+qb.from(OrderLine::class.java).select { it.memo }.distinct()
+```
+
+**`EnumType.STRING` 枚举的排序。** 对于用 `@Enumerated(EnumType.STRING)` 映射的枚举列，数据库按常量**名称**的字符串顺序排序。Java 的枚举比较遵循声明顺序，因此结果的顺序可能不同（B2）。
+lambdaQL 不修改查询，而是对每个列记录一次 `DEBUG` 级别的 `LQL-5011`。`ORDINAL`（或没有 `@Enumerated`）按声明顺序排序，因此不记录。
+
+Java 测试（[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)，region `enum-string-sort`）检查这一行为。下面是设计示例：
+
+```kotlin
+// kind is @Enumerated(EnumType.STRING): the database sorts by name, Kotlin by declaration order (LQL-5011, DEBUG)
+qb.from(Order::class.java).orderBy { o, by -> by.asc(o.kind) }
+// HQL: select e0 from Order e0 order by e0.kind asc nulls first
+```
+
 别名与 `where` 共享。如果 `where` 已经 join 了同一条路径，排序就会使用那个 join。
-大多数情况下它是内连接：`where` 条件已经去掉了没有客户的订单（决策 D36，见 [3.10](03-where.md#310-association-paths)）。
+这个 join 是 inner join。`where` 中的路径总是使用 inner join，因此没有客户的订单已经被排除（决策 D36、D48，见 [3.10](03-where.md#310-association-paths)）。
 
 <a id="46-rules-for-the-lambda-body"></a>
 ## 4.6 Lambda 主体的规则
@@ -240,7 +280,7 @@ order by c1_0.name asc nulls first,o1_0.id
 主体必须是**一条直接的 `by` 调用链**：
 
 ```kotlin
-// 可以
+// 允许
 .orderBy { o, by -> by.desc(o.price).asc(o.id) }
 
 // 会被拒绝：条件化的排序键
@@ -381,9 +421,20 @@ fetch first ? rows only
 规则：**当你使用分页，并且排序键中不包含 id 时，lambdaQL 会把根实体的 `@Id asc` 添加为最后一个排序键。**
 
 - 它只会添加一次。如果你的排序键已经包含 id（例如 `by.desc(o.id)`），就不会添加。
+- 如果排序键中有主实体上唯一且不为 NULL 的列，也不会添加（A5）。`nullable = false` 的 `@Column(unique = true)`、Hibernate `@NaturalId`、`@Id` 都属于这种列，因为仅凭这个键就能确定所有行的顺序。
+  可以为 NULL 的唯一列不属于这种列，因为多行可能都是 NULL。
 - 没有 `limit` 和 `offset` 时，不会添加任何东西。
 - 使用显式 join（`join`、`leftJoin`、`crossJoin`）时，也会按 join 的顺序添加每个被 join 实体的 id（已用 Java Lambda 测试，见 [6.8](06-select-group.md#68-explicit-joins)）。
 - 尚未实现：集合的 fetch join 与 `limit`/`offset` 一起使用时拒绝。
+
+目前还没有针对这一点的 Kotlin 测试。同样的规则已用 Java 测试（[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)，region `unique-key`）。
+下面是设计示例：
+
+```kotlin
+// OrderLine.code is @Column(unique = true, nullable = false): no id tie-breaker
+qb.from(OrderLine::class.java).orderBy { l, by -> by.asc(l.code) }.limit(2).toList()
+// HQL: select e0 from OrderLine e0 order by e0.code asc
+```
 
 <a id="49-strings-and-special-values"></a>
 ## 4.9 字符串与特殊值
@@ -507,10 +558,11 @@ qb.from(Order::class.java).orderBy(byName).toList()
 - `SortPolicy` 保存各实体的规则和一个模式（`SortMode`）。每个 `EntityManagerFactory`（即每个持久化单元）注册一个策略。使用该工厂的所有 `QueryBuilder` 和仓库都使用它。
 - 在实体字段上加 `@Sortable`，无需代码即可给出规则（见下面的[来自 `@Sortable` 的规则](#rules-from-sortable)）。
 
-一个实体的规则只来自**一个**地方，顺序如下：策略中的 `SortRules`（来自代码或 Spring `SortPolicy` bean）、Spring Boot 属性 `lambdaql.sort.*`（见 [12.5](12-spring-data-jpa.md#sort-policy-with-spring)）、实体的 `@Sortable` 字段。两个地方的规则不会合并。
+一个实体的规则只来自**一个**地方，顺序如下：策略中的 `SortRules`（来自代码或 Spring `SortPolicy` bean）、Spring Boot 属性 `lambdaql.sort.*`（见 [12.5](12-spring-data-jpa.md#sort-policy-with-spring)）、实体的 `@Sortable` 字段。
+两个地方的规则不会合并。
 
 **检查哪些排序。** 只检查由字符串生成的排序：`SortSpec.ofPath`，以及 Spring `Sort` 或 `Pageable`（Spring 模块使用 `ofPath`，见 [12.5](12-spring-data-jpa.md#sort-policy-with-spring)）。
-排序 Lambda（`orderBy { o, by -> ... }`、`SortSpec.of`）是你自己的代码，因此从不检查。
+排序 Lambda（`orderBy { o, by -> ... }`、`SortSpec.of`）是开发者的代码，因此不检查。
 
 | 规则 | 允许的外部名称 |
 |---|---|
@@ -541,7 +593,8 @@ qb.from(Order::class.java).orderBy(byName).toList()
 
 在 Spring Boot 中，请定义一个 `SortPolicy` bean，而不是调用 `register`（见 [12.5](12-spring-data-jpa.md#sort-policy-with-spring)）。
 
-目前还没有针对排序策略的 Kotlin 测试。用 Java 写的同样规则在 [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java) 中测试过（H2、MariaDB 和 Oracle）。已测试的示例请看[本页的 Java 版本](../java/04-order-paging.md#sort-policy)。
+目前还没有针对排序策略的 Kotlin 测试。
+用 Java 写的同样规则在 [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java) 中测试过（H2、MariaDB 和 Oracle）。已测试的示例请看[本页的 Java 版本](../java/04-order-paging.md#sort-policy)。
 下面是设计示例：
 
 ```kotlin
@@ -572,7 +625,8 @@ qb.from(Order::class.java).orderBy { o, by -> by.asc(o.description) }.toList()
 - 只有当策略中没有该实体的规则（来自代码、Spring bean 或 Spring Boot 属性）时，才使用注解。
 - 在没有注册策略的默认 `INFO` 模式下也有效。
 
-在 Kotlin 中请写 `@field:Sortable`，让注解落在 JVM 字段上。同样的规则已用 Java 测试（[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)，region `annotation`，见[本页的 Java 版本](../java/04-order-paging.md#rules-from-sortable)）。下面是设计示例：
+在 Kotlin 中请写 `@field:Sortable`，让注解落在 JVM 字段上。
+同样的规则已用 Java 测试（[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)，region `annotation`，见[本页的 Java 版本](../java/04-order-paging.md#rules-from-sortable)）。下面是设计示例：
 
 ```kotlin
 @Entity
@@ -635,8 +689,8 @@ SortPolicy.register(emf, SortPolicy.of(SortMode.STRICT,
 | S5 | 每个查询只调用一次 `orderBy`。`orderBy` 之后不能调用 `where`。`limit` 之后不能调用 `orderBy`（编译错误） | 已实现 |
 | S6 | 用 `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）重用。外部字符串由持久化单元的排序策略（`SortRules`、`SortPolicy`、`SortMode`，见 [4.10](#sort-policy)）检查 | `SortSpec` 和排序策略已实现（用 Java Lambda 测试）。`SortSpec` 的 join 写法尚未实现 |
 | S7 | 排序键：列、对一路径、`+ - *`、拓宽转换。不能有值分支。Kotlin 的 `?.` 被当作路径读取 | 已实现（未用 Kotlin Lambda 测试） |
-| S8 | 只在 `orderBy` 中使用的关联路径使用 `left join`，因此没有关联的行会被保留。如果 `where` 使用同一条路径，排序会使用 `where` 的 join | 已实现 |
-| S9 | 分页时，如果排序键不包含根实体的 `@Id`，会添加 `@Id asc`。集合 fetch join + 分页会被拒绝 | 根实体 id 和显式 join 实体的 id 部分已实现（用 Java Lambda 测试）。fetch join 检查尚未实现 |
+| S8 | 只在 `orderBy` 中使用的关联路径使用 `left join`，因此没有关联的行会被保留。必需关联（`optional = false`）不会丢失行，因此使用 inner join（A4）。如果 `where` 使用同一条路径，排序会使用 `where` 的 join | 已实现 |
+| S9 | 分页时，如果排序键不包含根实体的 `@Id`，会添加 `@Id asc`。如果排序键中有唯一且不为 NULL 的列（`unique = true` 且 `nullable = false`、`@NaturalId`），则不添加（A5）。集合 fetch join + 分页会被拒绝 | 根实体 id 和显式 join 实体的 id 部分已实现（用 Java Lambda 测试）。fetch join 检查尚未实现 |
 | S10 | 分析结果按 Lambda 缓存。捕获的 `Direction` 每次调用都会读取 | 已实现 |
 | S11 | Spring `Sort.Order` 与 `Direction` 一一对应（Spring 模块，见 [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。属性名经过排序策略检查，别名按原样传递 | Spring `Sort` 已实现，并用 Java 测试（尚不支持 `ignoreCase`），与排序策略一起使用的情况也已测试。读取 `"price,desc_nulls_last"` 这样的一段文本尚未实现 |
 | S12 | join 查询使用相同的形式：`{ o, c, by -> }`、`{ o, c, i, by -> }` | 已实现（用 Java Lambda 测试，见 [6.8](06-select-group.md#68-explicit-joins)） |
@@ -645,4 +699,4 @@ SortPolicy.register(emf, SortPolicy.of(SortMode.STRICT,
 
 ---
 
-[Kotlin 路线](README.md) | 上一章：[3. 条件](03-where.md) | 下一章：[5. 子查询](05-subquery.md) | [本页的 Java 版本](../java/04-order-paging.md)
+[Kotlin 路线](README.md) | 上一章：[3. 条件（`where`）](03-where.md) | 下一章：[5. 子查询](05-subquery.md) | [本页的 Java 版本](../java/04-order-paging.md)

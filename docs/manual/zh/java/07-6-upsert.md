@@ -94,6 +94,8 @@ values (excluded.id,excluded.price)
 
 键是 getter Lambda（`a -> a.getId()`）或 getter 方法引用（`Archive::getId`）。它必须是实体本身的列，不能是关联路径，并且数据库中该列需要有主键或唯一约束。
 
+`values` 和 `update` 使用带两个参数的 Lambda 时，可以用第二个参数 `sub` 构造子查询（决策 D49，在三种数据库上实测）。示例见 [7.5](07-5-insert.md#a-subquery-in-a-value)。
+
 <a id="keep-the-existing-row-onconflictkeyignore"></a>
 ## 保留已有行：`onConflict(key).ignore()`
 
@@ -130,7 +132,7 @@ Hibernate 自己的 `on conflict ... do nothing` 在 H2 和 Oracle 上会作为�
 <a id="the-row-count"></a>
 ## 行数
 
-`execute()` 原样返回数据库报告的行数（决定 D40）。测试会检查这些数字：
+`execute()` 原样返回数据库报告的行数（决策 D40）。测试会检查以下数字（实测）。
 
 | 数据库 | 插入 | 更新 | 忽略 |
 |---|---|---|---|
@@ -143,7 +145,8 @@ Hibernate 自己的 `on conflict ... do nothing` 在 H2 和 Oracle 上会作为�
 <a id="many-rows"></a>
 ## 多行
 
-`qb.upsert(X.class).values(list, (a, l) -> ...)` 以及在 `values(list, ...)` 之后的 `onConflict(...)` 会**每行执行一条语句**。`execute()` 返回总和。这还没有测试覆盖。
+`qb.upsert(X.class).values(list, (a, l) -> ...)` 以及在 `values(list, ...)` 之后的 `onConflict(...)` 会**每行执行一条语句**。`execute()` 返回总和。这种写法还没有测试（未测）。
+列表形式也像 `values(list, (a, l, sub) -> ...)` 这样，用第三个参数接收子查询（见 [7.5](07-5-insert.md#many-rows-from-a-list)）。
 
 ```java
 int n = qb.upsert(Archive.class)

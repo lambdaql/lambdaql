@@ -19,10 +19,10 @@ val u = qb.update(Order::class.java)
 val changed = u.execute()                      // number of updated rows
 ```
 
-`st` 是捕获值，所以它是绑定参数（`:p1`）。`!!` 会被忽略（D23）。常量 `2.0` 仍是字面量（决定 D37）。
+`st` 是捕获值，所以它是绑定参数（`:p1`）。`!!` 会被忽略（D23）。常量 `2.0` 仍是字面量（决策 D37）。
 `toHql()` 不执行语句，只给出 HQL 和参数。
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。 该测试使用 Java Lambda。含义相同的 Kotlin Lambda 生成相同的 HQL，因此 SQL 也相同。 标记为 **（计划中）** 的块来自 [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)。由于 lambdaQL 目前还不会生成这些语句，该测试把计划中的 HQL 直接交给 Hibernate。
+**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。该测试使用 Java Lambda。含义相同的 Kotlin Lambda 生成相同的 HQL，因此 SQL 也相同。标记为 **（计划中）** 的块来自 [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)。由于 lambdaQL 目前还不会生成这些语句，该测试把计划中的 HQL 直接交给 Hibernate。
 
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `update`：
 
@@ -160,41 +160,29 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 <a id="an-aggregate-from-a-subquery"></a>
 ## 来自子查询的聚合
 
-使用两个参数的 Lambda。第二个参数是上下文对象（`sub`）。
+使用带两个参数的 Lambda `set { o, sub -> ... }`。第二个参数是子查询的起点 `sub`（决策 D49）。
 这里不需要 `Agg`；子查询有 `sum`、`avg` 等，与 [5. 子查询](05-subquery.md) 中相同。
-这种写法**尚未实现**。目前只有 `where` 中的子查询可以使用。
+
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `update-sub`：
 
 ```kotlin
-qb.update(Order::class.java)
-    .set { o, sub ->
-        o.total = sub.from(Item::class.java).where { i -> i.order?.id == o.id }.sum { i -> i.price }
-    }
-    .where { it.status == 1 }
-    .execute()
+// the second parameter starts a subquery, as in where { o, sub -> ... } (D49)
+val u = qb.update(Order::class.java)
+    .set { o, sub -> o.price = sub.from(Item::class.java).where { i -> i.order?.id == o.id }.sum { it.price } }
+    .where { o, sub -> sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
+assertEquals("update Order e0 set e0.price = (select sum(s1.price) from Item s1 where s1.order.id = e0.id)"
+        + " where exists (select 1 from Item s1 where s1.order.id = e0.id)", u.toHql().hql())
 ```
 
-**各数据库的 SQL（计划中）** — Hibernate 对计划中 HQL 的翻译，由 `PlannedSqlTest` 记录；lambdaQL 目前还不会生成此查询。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `07-update-sum`：
-
-```sql
--- H2, MariaDB
-update orders o1_0
-set total=(select sum(i1_0.price) from items i1_0 where i1_0.order_id=o1_0.id)
-where o1_0.status=1
-
--- Oracle
-update orders o1_0
-set o1_0.total=(select sum(i1_0.price) from items i1_0 where i1_0.order_id=o1_0.id)
-where o1_0.status=1
-```
-
-如果订单没有订单项，`total` 会变成 NULL。这是 SQL 的行为。
+- 读取其他表的聚合和读取同一张表的聚合都可以使用（在 H2、MariaDB 10.11、Oracle 23.26 上实测）。在 `update` 中，MariaDB 也不会报错误 1093。
+- 没有匹配的行时，聚合为 NULL。如果是 NOT NULL 列，数据库会报错，因此请用 `Objects.requireNonNullElse(…, 0.0)` 包装，使其变成 `coalesce(...)`。
 
 一个参数的尾随 Lambda（`set { it... }`）和两个参数的尾随 Lambda（`set { o, sub -> ... }`）是不同的重载。Kotlin 会选择正确的那一个。
 
 <a id="where-with-paths-and-subqueries"></a>
 ## 带路径和子查询的 where
 
-`where` 与查询中的相同：
+`where` 与查询中的相同。
 
 ```kotlin
 qb.update(Order::class.java).set { it.status = 0 }.where { it.customer?.grade!! > 3 }.execute()
@@ -298,6 +286,7 @@ qb.update(Order::class.java).set { it.status = 0 }.execute()         // compile 
 ## 更新前几行：`limit`
 
 在 `where { ... }` 或 `all()` 之后写 `orderBy { ... }` 和 `limit(n)`，最多更新 `n` 行：即 `qb.from(X::class.java).where { same }.orderBy { same }` 的前 `n` 行。
+
 规则与删除相同（见 [7.4](07-4-delete.md#delete-the-first-rows-limit)）：没有 `orderBy` 时按 id 排序，id 总是最后一个排序键，没有 `limit` 的 `orderBy` 是错误。
 
 ```kotlin
@@ -331,12 +320,14 @@ set o1_0.description='top'
 where o1_0.id in (select t1_0.id from (select o2_0.id id from orders o2_0 join customers c1_0 on c1_0.id=o2_0.customer_id where c1_0.name='Kim' order by o2_0.price desc,o2_0.id fetch first 1 rows only) t1_0)
 ```
 
-路径 `it.customer?.name` 在内层 select 中是连接，与查询相同（决定 D36）。更新本身不读取其他表。
+路径 `it.customer?.name` 在内层 select 中是连接，与查询相同（决策 D36）。更新本身不读取其他表。
 
 <a id="update-exactly-one-row-executeone"></a>
 ## 只更新一行：`executeOne()`
 
-`executeOne()` 以单行保护执行更新。它读取匹配的 id（最多 2 个）。有 2 个 id 时，它什么都不改变，并抛出 `NonUniqueResultException`。有 1 个 id 时，它用 `id = :p and (你的条件)` 更新该行。步骤与删除相同（见 [7.4](07-4-delete.md#delete-exactly-one-row-executeone)）。
+`executeOne()` 以单行保护执行更新。它读取匹配的 id（最多 2 个）。
+
+有 2 个 id 时，它什么都不改变，并抛出 `NonUniqueResultException`。有 1 个 id 时，它用 `id = :p and (你的条件)` 更新该行。步骤与删除相同（见 [7.4](07-4-delete.md#delete-exactly-one-row-executeone)）。
 
 ```kotlin
 val one = qb.update(Order::class.java)
@@ -345,7 +336,8 @@ val one = qb.update(Order::class.java)
     .executeOne()                             // 0 or 1; 2 or more rows: NonUniqueResultException
 ```
 
-`execute-one` region 所在的 Java 测试方法（`DmlQueryTest` 中的 `executeOneProtects`）也检查了更新上的 `executeOne()`：有 2 行或更多时，什么都不改变。
+`execute-one` region 所在的 Java 测试方法（`DmlQueryTest` 中的 `executeOneProtects`）也检查了更新上的 `executeOne()`：有 2 行或更多匹配时，什么都不改变。
+
 在 Spring 仓库中，`updateOne({ ... }) { ... }` 做同样的事（见 [12.4](12-spring-data-jpa.md#one-row-protection-deleteone-and-updateone)）。
 
 ---

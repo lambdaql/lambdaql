@@ -1,7 +1,5 @@
+<a id="10-rules-and-limits-java"></a>
 # 10. 规则与限制（Java）
-
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/10-rules-and-limits.md)。
 
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[9. Java 说明](09-java-notes.md) | 下一章：[11. 错误与语言](../11-errors-and-languages.md) | [本页的 Kotlin 版本](../kotlin/10-rules-and-limits.md)
 
@@ -9,6 +7,7 @@
 
 ---
 
+<a id="contents"></a>
 ## 目录
 
 - [10.1 基本规则：Lambda 就是查询](#101-the-base-rule-a-lambda-is-a-query)
@@ -39,7 +38,7 @@ Lambda 是用 Java 语法编写的查询。因此：
 
 1. 像 `o.getCustomer().getName()` 这样的路径**表示一个列**，而不是一连串的调用。
    lambdaQL 不检查 customer 是否为 null（D20）。在 `where` 中，该路径默认是内连接，因此没有 customer 的订单不会被选中（D36）。
-   如果条件在没有 customer 时也可能为 true（null 守卫），该路径是 `left join`，因此结果与 Java 相同。
+   写了 null 守卫（`... == null || ...`）也一样：该路径仍是内连接（D48）。要保留没有 customer 的订单，请使用 `leftJoin`。
    要查找这些订单，请比较关联本身：`o.getCustomer() == null`。
 2. NULL **只在你写出的地方**处理（`== null`、`!= null`）（D22）。
    其他 NULL 遵循 SQL 规则：条件为 UNKNOWN，该行不会被选中。
@@ -61,6 +60,7 @@ Lambda 是用 Java 语法编写的查询。因此：
 | 3 | 如果语义确实需要在列上使用函数（例如忽略大小写），lambdaQL 会在启动时读取数据库元数据，并使用数据库已有的途径：列的排序规则、函数索引、语言索引。如果没有可用途径，它会在启动时按列记录一条 WARN（严格模式下为错误） |
 | 4 | 每条生成规则都在 H2、MariaDB 和 Oracle 上用 `EXPLAIN` 检查过 |
 
+<a id="examples"></a>
 ### 示例
 
 **忽略大小写**（D24）。设计中将此规则用于 Kotlin 的 `ignoreCase` 函数。列上的 Java 字符串函数已在计划中，也将遵循同一规则。
@@ -82,7 +82,7 @@ Lambda 是用 Java 语法编写的查询。因此：
 ```
 
 lambdaQL 永远不会写出 `is [not] distinct from`。在 Oracle 上它会变成 `decode(...)`，无法使用索引。
-实体值遵循 SQL 语义，因此普通的 `=` 或 `<>` 总是正确的。捕获的 `null` 生成 `is null` / `is not null`。
+实体值遵循 SQL 语义，因此普通的 `=` 或 `<>` 总是正确的。捕获的 `null` 作为 NULL 绑定，不匹配任何行（`WARN` 级别的 `LQL-4045`）。
 
 **比较两个布尔表达式**（D25）
 
@@ -94,8 +94,9 @@ lambdaQL 永远不会写出 `is [not] distinct from`。在 Oracle 上它会变�
 `CASE` 写法（`e0.active = case when ... end`）能得到正确的行，但需要全表扫描，
 因此 lambdaQL 不使用它。
 
-**带子查询的 NOT IN** 会写成 `NOT EXISTS`（反连接，并且是 null 安全的；见 10.3）。
+**带子查询的 NOT IN** 写成 `NOT IN`（SQL 语义，D48）。子查询中有 NULL 时不返回任何行。要跳过 NULL，请在子查询中加上 null 检查（见 10.3）。
 
+<a id="what-the-measurements-showed"></a>
 ### 测量结果
 
 MariaDB 10.11 和 Oracle 23ai，20,000 到 50,000 行：
@@ -109,6 +110,7 @@ MariaDB 10.11 和 Oracle 23ai，20,000 到 50,000 行：
 | 布尔 `==` 写成 `AND`/`OR` | range（350 行） | 2 次索引范围扫描 + bitmap OR | 是 |
 | 布尔 `==` 写成 `CASE` | 全索引扫描（49,648 行） | 全表扫描 | **否** |
 
+<a id="planned-items-under-the-same-rule"></a>
 ### 同一规则下的计划项
 
 | 写法 | 计划的 SQL |
@@ -122,7 +124,23 @@ MariaDB 10.11 和 Oracle 23ai，20,000 到 50,000 行：
 列一侧的数据库函数（`OrderFns.discount(o.getPrice()) > 10`）无法使用普通索引。
 lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在相同表达式的函数索引时不记录。
 在 MariaDB 上，`NOT DETERMINISTIC`（默认）的函数即使参数只有参数值（`o.getPrice() > OrderFns.discount(rate)`），也会导致全扫描，因此这种情况也会警告（`LQL-5007`）。
-严格模式（用错误代替警告）尚未实现。
+在 `SargableMode.STRICT` 下，分析会失败，而不是警告（`LQL-3066`，决策 D50）。
+
+**SARGable 模式**（决策 D50）。`SargableMode` 有三个值。
+
+- `OFF`：不检查，也不查询元数据。
+- `WARN`（默认）：记录警告。
+- `STRICT`：在 `WARN` 会记录警告的情况下（`LQL-5001`、`LQL-5007`、`LQL-5012`），分析以 `org.lambdaql.NonSargableException`（`LQL-3066`）失败。
+
+按 persistence unit 用 `SargablePolicy.register(emf, SargableMode.STRICT)` 指定，用 `SargablePolicy.unregister(emf)` 解除。在 Spring 中使用 `lambdaql.sargable.mode=STRICT`（见 [12](12-spring-data-jpa.md)）。
+检查在每个 Lambda 上执行一次，时机是把分析结果放入共享缓存时。因此请在第一个查询之前注册模式。
+
+**列上的算术**（决策 D50）。
+
+- 只由一个列和值组成的 `+ - * /`（`o.getCnt() * 2 > n`）可以移到值一侧。lambdaQL 以 `WARN` 级别记录 `LQL-5012`，在 `STRICT` 下为错误。
+- 列与列之间的算术（`o.getPrice() * o.getCnt() > n`）和 `%` 无法移动，因此只以 `DEBUG` 级别记录 `LQL-5013`。在 `STRICT` 下也允许。
+- 移动后的写法必须含义相同。请像 `o.getCnt() > n / 2.0` 这样用小数相除。整数除法 `n / 2` 在 `>=`、`=`、`<` 和负数 `n` 时会得到不同的行。如果乘的是负数，请反转比较方向。`LQL-5012` 的消息会给出这些提示。
+- 没有采用通过查询索引是否存在来减少警告的方式。原因是权限和同义词会使"没有索引"和"无法得知"混在一起，而且列上的算术是少见的写法。
 参见 [8. 存储过程与数据库函数](08-procedures-functions.md)。
 
 <a id="103-null-rules"></a>
@@ -131,34 +149,38 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 | Lambda | SQL | NULL 行为 |
 |---|---|---|
 | `o.getId() == 10L`（拆箱，一侧为基本类型） | `e0.id = 10` | NULL：UNKNOWN，不选中该行（Java 会抛出 NPE） |
-| `o.getId() == p`（两个对象：`Long`、`String`、枚举等） | `e0.id = :p1`；捕获的 `null`：`is null` | 列为 NULL：不选中。捕获的 `null` 遵循 Java（`is null`） |
-| `o.getDescription() != p` | `e0.description <> :p1`；捕获的 `null`：`is not null` | 列为 NULL：**不**选中（SQL 语义，D48；Java 会选中它） |
+| `o.getId() == p`（两个对象：`Long`、`String`、枚举等） | `e0.id = :p1` | 列为 NULL：不选中。捕获的 `null`：没有匹配的行（`= NULL`，`WARN` 级别的 `LQL-4045`） |
+| `o.getDescription() != p` | `e0.description <> :p1` | 列为 NULL：**不**选中（SQL 语义，D48；Java 会选中它）。捕获的 `null`：没有匹配的行 |
 | `o.getDescription() == o.getCustName()`（两个实体值） | `e0.description = e0.custName` | 任一侧为 NULL：不选中，NULL 与 NULL 也一样（SQL 语义，D48） |
 | `o.getDescription().equals(p)` | `e0.description = :p1` | description 为 NULL：UNKNOWN（Java 会抛出 NPE） |
 | `Objects.equals(o.getDescription(), p)`、`"x".equals(o.getDescription())`、`Boolean.TRUE.equals(o.getActive())` | 与 `==` 相同 | 与 `==` 相同 |
 | `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | NULL：不选中（SQL 语义） |
 | `!o.getActive()`（可空 `Boolean`） | `e0.active = false` | NULL：不选中（NULL 不是 false） |
 | `x == null`、`x != null` | `is null`、`is not null` | 二值 |
+| `o.getCnt() >= 2.5`（整数列，小数值） | 按写出的值比较：常量是字面量（`e0.cnt >= 2.5`），捕获值和 IN 列表以 `BigDecimal` 绑定（D48 B8） | 保持索引范围扫描（在 MariaDB 上实测）。不再像以前那样截断值而返回错误的行 |
+| 整个值对象（`@Embedded`）：`o.getAddress().equals(addr)`、`Objects.equals(o.getAddress(), addr)`、`!o.getAddress().equals(addr)` | 按列展开：`e0.address.city = :p1 and e0.address.zip = :p2`，否定为 `<> ... or ...`。`== null` 是所有列 `is null`（and），`!= null` 是 `is not null`（or） | 每列遵循 SQL 语义（D48）：NULL 列对 `=` 和 `<>` 都不匹配。捕获的对象为 `null` 时没有匹配的行（`WARN` 级别的 `LQL-4045`） |
 | 对永远不会是 NULL 的列（id、基本类型、`nullable = false`，且路径上没有关联步骤）写 `o.getId() == null` | `1=0`。与比较并列时，检查被去掉：`o.getId() != null && o.getId() == id` 得到 `e0.id = :p1`（已测试） | 该列没有 NULL。经过关联的路径（`o.getCustomer().getId()`）保留检查 |
 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR` | SQL 三值逻辑 |
 | `where` 中的 `o.getCustomer().getName()` | `j1.name` + `join e0.customer j1`（默认是内连接） | 没有 customer：该订单不会被选中 |
-| `o.getCustomer() == null \|\| o.getCustomer().getName().equals(p)` | `e0.customer is null or j1.name = :p1` + `left join e0.customer j1` | 没有 customer：会被选中，与 Java 相同 |
-| 只在 `orderBy` 或 `select` 中使用的 `o.getCustomer().getName()` | `j1.name` + `left join e0.customer j1` | 没有 customer：该列为 NULL |
+| `o.getCustomer() == null \|\| o.getCustomer().getName().equals(p)` | `e0.customer is null or j1.name = :p1` + `join e0.customer j1` | 没有 customer：**不**选中（内连接，D48；`DEBUG` 级别的 `LQL-5009`）。要保留，请使用 `leftJoin` |
+| 只在 `orderBy` 或 `select` 中使用的 `o.getCustomer().getName()` | `j1.name` + `left join e0.customer j1`。必需关联（`optional = false`）为 `join` | 没有 customer：该列为 NULL |
 | `o.getCustomer() == null`、`o.getCustomer() != null` | `e0.customer is null`、`e0.customer is not null`（外键列，不连接） | 没有 customer 的订单 / 有 customer 的订单 |
 | `o.getCustomer().getId()` | `e0.customer.id`（外键列，不连接） | 没有 customer：NULL |
 | `ids.contains(o.getId())` | `e0.id in (:p1)` | id 为 NULL：不选中 |
-| `!ids.contains(o.getId())` | `e0.id not in (:p1)`（id 不可能为 NULL）。可能为 NULL 的列：`(x is null or x not in (:p1))` | NULL 值（可为 NULL 的列）：会被选中，与 Java 相同 |
-| 带 `!...contains(x)` 的子查询 | `not exists (...)` | 即使子查询返回 NULL 也正确 |
+| `!ids.contains(o.getId())` | `e0.id not in (:p1)`。可能为 NULL 的列也一样 | NULL 值：**不**选中（SQL 语义，D48；`DEBUG` 级别的 `LQL-5009`；Java 会选中它） |
+| 带 `!...contains(x)` 的子查询 | `x not in (select ...)` | 子查询中有 NULL 时，不选中任何行（SQL 语义，D48） |
 | `Agg.sum`、`avg`、`min`、`max` | `sum(...)` …… | 没有行或所有值都为 NULL 时为 NULL |
 | `Agg.count()` | `count(*)` | 没有行时为 0 |
 
+<a id="captured-null-values"></a>
 ### 捕获的 null 值
 
 | 捕获值所在位置 | 允许 `null` 吗？ |
 |---|---|
-| 对象之间的 `==` / `!=`、`Objects.equals`、`"x".equals(col)` | 是。生成 `is null` / `is not null` |
-| 在同一值的 null 守卫之下：`p == null \|\| o.getStatus() > p` | 是。这个守卫会在查询执行时在 Java 中决定：`p == null` 时不过滤，其他值时为 `e0.status > :p1` |
-| `p.equals(col)` 的接收者、`col.equals(p)` 的参数、拆箱比较、`<` `<=` `>` `>=` | **否。** 绑定值时报错（Java 会抛出 NPE 或结果始终为 false） |
+| 对象之间的 `==` / `!=`、`Objects.equals`、`col.equals(p)`、`p.equals(col)` | 是，但没有匹配的行（`= NULL`）。查询执行时以 `WARN` 级别记录 `LQL-4045` |
+| 在同一值的 null 守卫之下：`p == null \|\| o.getStatus() > p` | 是。这个守卫会在查询执行时在 Java 中决定：`p == null` 时不过滤，其他值时为 `e0.status > :p1`。只含拆箱为自身基本类型的比较与守卫位置无关 |
+| 拆箱比较（`o.getPrice() > p`，`Double p`） | 是，但没有匹配的行（`> NULL`）。不执行拆箱为自身基本类型的操作。查询执行时以 `DEBUG` 级别记录 `LQL-4045` |
+| 对捕获值的方法调用（`p.trim()`）、转换为其他基本类型的拆箱（`p.intValue()`，`Double p`） | **否。** 在 Java 中计算值时报错（`LQL-4012`，Java 会抛出 NPE） |
 | `in` 中包含 `null` 元素的集合 | **否。** 绑定时报错 |
 | `NaN`、`Infinity` | **否。** 始终报错 |
 
@@ -170,7 +192,7 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 | # | Lambda 写法 | 含义 |
 |---|---|---|
 | R1 | 基本类型比较，或一侧为基本类型（`o.getId() == 10L`、`o.getStatus() > p`） | `=`、`<>`、`<` ……，SQL NULL 规则 |
-| R2 | 对象的 `==` / `!=`（`Long`、`String`、`Boolean`、枚举） | 值相等，不是对象同一性。按 SQL 语义的 `=` / `<>`（D48）；捕获的 `null` 生成 `is null` / `is not null` |
+| R2 | 对象的 `==` / `!=`（`Long`、`String`、`Boolean`、枚举） | 值相等，不是对象同一性。按 SQL 语义的 `=` / `<>`（D48）。捕获的 `null` 不匹配任何行 |
 | R3 | `x == null`、`x != null` | `IS NULL`、`IS NOT NULL` |
 | R4 | `a.equals(b)` | `a = b`，SQL NULL 规则 |
 | R5 | `Objects.equals(a, b)`、`"x".equals(a)`、`Boolean.TRUE.equals(a)` | 与 R2 相同 |
@@ -180,7 +202,7 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 | R9 | 捕获值 | 以运行时的值作为绑定参数 |
 | R10 | 属性访问 | getter 调用，映射到 JPA 属性 |
 | R11 到 R23 | Kotlin 规则 | 参见[本页的 Kotlin 版本](../kotlin/10-rules-and-limits.md) |
-| R24 | 关联路径（`o.getCustomer().getName()`） | 一个列。对一关联：where、order by、select 共用的别名。在 `where` 中默认是内连接，当 null 守卫保留没有关联的行时是 `left join`（D36）；只在 order by 或 select 中使用时是 `left join`。嵌入类型：同一张表。以目标 `@Id` 结尾，或关联本身与 `null` 比较：外键列，不连接。集合：错误 |
+| R24 | 关联路径（`o.getCustomer().getName()`） | 一个列。对一关联：where、order by、select 共用的别名。在 `where` 中始终是内连接（D48；要保留没有关联的行，请使用 `leftJoin`），只在 order by 或 select 中使用时是 `left join`（必需关联 `optional = false` 为内连接，A4）。嵌入类型：同一张表。以目标 `@Id` 结尾，或关联本身与 `null` 比较：外键列，不连接。集合：错误 |
 
 其他规则：
 
@@ -205,8 +227,8 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 |---|---|---|
 | G1 | 当 `status` 为 NULL 时，`!Objects.equals(status, 1)` 在 Java 中为 true；而 `status <> 1` 在 SQL 中为 UNKNOWN | 生成 `status <> 1`：SQL 语义（D48）。NULL 行被排除，并以 `DEBUG` 级别记录 `LQL-5009`。要保留它们，请写 `status == null \|\| ...` |
 | G2 | `!Boolean.TRUE.equals(active)`、`!active`（可空）与 Java 的差异 | 生成 `active <> :p1` 和 `active = false`：NULL 的 Boolean 不是 false（SQL 语义） |
-| G3 | 参数为 NULL 时，`name = ?` 返回 0 行 | 捕获的 `null` 生成 `name is null`（捕获的值适用 Java 规则） |
-| G4 | `status NOT IN (1, NULL)` 始终返回 0 行 | 捕获的集合中出现 `null` 是错误。子查询的 `NOT IN` 写成 `NOT EXISTS` |
+| G3 | 参数为 NULL 时，`name = ?` 返回 0 行 | 保持原样（SQL 语义，D48）。执行时以 `WARN` 级别记录 `LQL-4045`。要查找 NULL，请写 `x == null` |
+| G4 | `status NOT IN (1, NULL)` 始终返回 0 行 | 捕获的集合中出现 `null` 是错误。子查询的 `NOT IN` 保持 SQL 语义（D48）：请在子查询中加上 null 检查 |
 | G5 | Java 会抛出 NPE（拆箱、`o.getName().startsWith(...)`），SQL 只是返回行 | 已在文档中说明：实体的 NULL 遵循 SQL 规则 |
 | G6 | `NaN`：H2 把 NaN 当作最大值排序，且 `NaN = NaN` 为 true；MariaDB 无法存储它；Oracle 只能在 `BINARY_DOUBLE` 中存储它 | 捕获的 NaN 或 Infinity 是错误。已存储的 NaN 遵循数据库 |
 | G7 | `float` 列与 `double` 值比较：结果因数据库而异 | 对于 float/double，**不保证与 Java 逐位一致的结果**。lambdaQL 不会添加 `CAST`。请自行选择列映射（例如 Oracle 的 `binary_float` / `binary_double`） |
@@ -236,6 +258,7 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 
 lambdaQL 隐藏了许多差异，但有一些你必须了解。
 
+<a id="sorting-and-paging"></a>
 ### 排序与分页
 
 | 项目 | H2 | MariaDB | Oracle | lambdaQL |
@@ -244,15 +267,18 @@ lambdaQL 隐藏了许多差异，但有一些你必须了解。
 | NULL 位置，`DESC` | 最后 | 最后 | **最前** | 在所有数据库上 `DESC` 都表示 NULLS LAST（D16） |
 | `NULLS FIRST/LAST` 语法 | 支持 | **不支持**（语法错误） | 支持 | Hibernate 在 MariaDB 上用 `CASE` 模拟：排序**无法使用索引** |
 | 分页 SQL | `offset ? rows fetch first ? rows only` | `limit ?,?` | `offset ? rows fetch first ? rows only` | 交给 Hibernate（`setFirstResult` / `setMaxResults`） |
-| 相等行的顺序 | – | – | 随机 | 分页时，如果排序键不包含 id，lambdaQL 会添加根实体的 `@Id asc` |
+| 相等行的顺序 | – | – | 随机 | 分页时，如果排序键不包含 id，lambdaQL 会添加根实体的 `@Id asc`。有唯一且不可为 NULL 的键（`unique = true` 且 `nullable = false`、`@NaturalId`）时不添加（A5） |
 | 字符串顺序 | 区分大小写 | `_ci` | `NLS_SORT`（JVM 区域设置） | 遵循数据库 |
-| `order by` 中的隐式路径 | inner join（丢失行） | 相同 | 相同 | lambdaQL 使用 `left join`（或同一路径的 `where` join） |
+| `order by` 中的隐式路径 | inner join（丢失行） | 相同 | 相同 | lambdaQL 使用 `left join`（必需关联为内连接）（或同一路径的 `where` join） |
+| `order by`、`distinct`、`group by` 中的 `@Lob` 列 | 可用 | 可用 | **ORA-22848 / ORA-22849** | 不改变查询，以 `DEBUG` 级别记录 `LQL-5010`（B3） |
+| `@Enumerated(EnumType.STRING)` 枚举列的排序 | 按名称 | 按名称 | 按名称 | 不改变查询，以 `DEBUG` 级别记录 `LQL-5011`（B2）。只有 `ORDINAL` 映射按声明顺序 |
 
-对于每个可能为 NULL 的排序键，lambdaQL 都会把 `nulls first` / `nulls last` 写入 HQL。当它就是数据库的默认值时，Hibernate 会去掉它。
+对于每个可能为 NULL 的排序键，lambdaQL 都会把 `nulls first` / `nulls last` 写入 HQL。只经过必需关联且不可能为 NULL 的路径不写。当它就是数据库的默认值时，Hibernate 会去掉它。
 默认行为（`ASC` = NULLS FIRST，`DESC` = NULLS LAST）与 H2 和 MariaDB 相同，因此在这两种数据库上
 不需要额外的 SQL；只有 Oracle 会加上 `NULLS` 子句。要改变 NULL 的位置，请使用
 `by.asc(key, false)`（NULL 在后）或 `by.desc(key, true)`（NULL 在前）（D35）。在 MariaDB 上它们使用 `CASE` 模拟。
 
+<a id="conditions-and-values"></a>
 ### 条件与值
 
 | 项目 | H2 | MariaDB | Oracle |
@@ -266,6 +292,7 @@ lambdaQL 隐藏了许多差异，但有一些你必须了解。
 | 整数 `/` | 整数 | **小数**（`5/2 = 2.5`） | – |
 | 很大的 `IN` 列表（1,500 个值） | 可用 | 可用 | 在 23ai 上可用（Oracle 22 及更低版本的 1,000 个限制未测量） |
 
+<a id="subqueries"></a>
 ### 子查询
 
 | 项目 | 现象 | lambdaQL |
@@ -274,18 +301,20 @@ lambdaQL 隐藏了许多差异，但有一些你必须了解。
 | MariaDB `IN (... limit n)` | 不支持（错误 1235） | 自动包装：`in (select x.id from (... limit n) x)` |
 | MariaDB `lateral` | 结果错误（模拟实现） | 用 `row_number() over (...)` 重写（尚未实现） |
 
+<a id="update-insert-delete"></a>
 ### 更新、插入、删除
 
 | 项目 | 现象 | lambdaQL |
 |---|---|---|
 | `SET a = ..., b = a + 1`（设置某列后再读取它） | MariaDB 读取**新**值，H2 和 Oracle 读取旧值 | 分析时报错（U3） |
 | DML 中的关联路径（`o.getCustomer().getName()`） | Hibernate 在不同数据库上生成不同的连接，并**丢失**没有 customer 的行 | lambdaQL 写成关联标量子查询（在 `where` 和 SET 中）。在 `where` 中，查询会做内连接的路径还会加上 `customer.id is not null`，使 DML 作用于与查询相同的行（U9，已测试） |
-| 带有同表子查询的 `DELETE` | MariaDB 错误 1093 | 包装在派生表中（U17；尚未实现） |
+| 带有同表子查询的 `DELETE` | MariaDB 错误 1093 | 先通过派生表读取目标 id：`d0.id in (select t.id from (select e0.id as id … where <condition>) t)`（U17）。对关联子查询也可用，在三种数据库上删除相同的行（实测）。`update` 不包装（在 MariaDB 上也可用） |
 | 同一个枚举值只绑定一次，同时用于 STRING 列和 ORDINAL 列 | H2 和 MariaDB 会**不报错地存入错误的值** | 每个位置一个参数，从不共用（U7） |
 | `values(list, ...)` 中有很多行 | Oracle：绑定变量硬性上限 65,535（ORA-01745），远未达到上限前就已经很慢 | 拆分：每条语句最多 500 个值，全部在一个事务中执行（U13） |
 | 带 `order by ... limit` 的 `update` / `delete` | MariaDB 拒绝 `in` 子查询中的 `limit`（错误 1235）和读取目标表的子查询（错误 1093） | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`：派生表 `t` 在三个数据库上都可用。内层 select 使用查询的连接（D36），因此行与查询相同（已测试） |
 | `on conflict` / upsert | H2 和 Oracle：`merge`。MariaDB：`insert ... on duplicate key update`，更新的行计为 2。Hibernate 的 `do nothing` 在 H2 和 Oracle 上会失败 | `upsert` 和 `onConflict(...).update(...)` 使用 Hibernate 的形式。`ignore()` 写成 `insert ... select ... where not exists`。行数原样返回（D40，已测试） |
 
+<a id="procedures-and-functions"></a>
 ### 存储过程与函数
 
 | 项目 | H2 | MariaDB | Oracle |
@@ -303,6 +332,7 @@ lambdaQL 隐藏了许多差异，但有一些你必须了解。
 
 对于此列表中的每种写法，lambdaQL 都会抛出清晰的错误。"计划中"表示将在以后的版本中支持。
 
+<a id="lambda-form-and-loading"></a>
 ### Lambda 写法与加载
 
 | 不支持 | 替代写法 |
@@ -313,6 +343,7 @@ lambdaQL 隐藏了许多差异，但有一些你必须了解。
 | 由 ECJ（Eclipse 编译器）编译的 Lambda | 不保证。只用 javac 测试过 |
 | 为比捆绑的 ASM 所支持的版本更新的 JDK 编译的 Lambda | 升级 ASM（lambdaQL 不对它做 shade） |
 
+<a id="conditions"></a>
 ### 条件
 
 | 不支持 | 替代写法 |
@@ -322,6 +353,7 @@ lambdaQL 隐藏了许多差异，但有一些你必须了解。
 | 非短路的 `&`、`\|`、`^` | `&&`、`\|\|` |
 | 守卫之下的 `/`、`%`、`CAST`（`qty != 0 && total / qty > 2`） | 不用除法进行比较：`qty > 0 && total > 2 * qty` |
 | 实体 `==` 实体（`o.getCustomer() == c`） | `o.getCustomer().getId() == c.getId()`（计划中：标识符相等） |
+| 值对象（`@Embedded`）的大小比较、与其他类型的比较（`LQL-3012`） | 比较字段。支持与同一类型的相等比较（`equals`、`==`、`!=`、`null`） |
 | 集合路径（`o.getItems()...`、`@OneToMany`、`@ManyToMany`） | `exists()` 子查询或连接 |
 | `o.getItems().contains(x)` | `exists()` 子查询 |
 | 在 Lambda 内部构建的集合（`List.of(1, 2)`） | 在外部构建并捕获。（`groupBy` 键除外） |
@@ -332,6 +364,7 @@ lambdaQL 隐藏了许多差异，但有一些你必须了解。
 | 字符串拼接（`o.getDescription() + "_x"`，以及 `"A" + code`） | 在 Lambda 外部构建字符串。与列的拼接已在计划中 |
 | Lambda 中的 Stream 和其他 Lambda | 对捕获集合使用 `contains`，或使用子查询 |
 
+<a id="functions-and-strings"></a>
 ### 函数与字符串
 
 | 不支持（v0.1） | 替代写法 |
@@ -345,6 +378,7 @@ lambdaQL 隐藏了许多差异，但有一些你必须了解。
 | 用户自定义聚合函数或窗口函数 | 计划中 |
 | 在查询 Lambda 外部或在 `where` 中调用 `Agg.*` | 在 `select` / `having` 中使用 |
 
+<a id="sort-and-paging"></a>
 ### 排序与分页
 
 | 不支持 | 替代写法 |
@@ -354,11 +388,13 @@ lambdaQL 隐藏了许多差异，但有一些你必须了解。
 | 把实体作为排序键（`by.desc(o.getCustomer())`） | 使用列：`by.desc(o.getCustomer().getName())`（无法编译） |
 | 连接排序 Lambda 中的方法引用 | Lambda |
 | 把排序名称和方向放在一起的一段文本（`"price,desc_nulls_last"`），尚未实现 | 方向用 `Direction.parse(text)`，名称用 `SortSpec.ofPath`。名称由排序策略检查（[4.10](04-order-paging.md#sort-policy)） |
+| 在连接结果的 `distinct()` 中按被连接实体的列或关联路径排序（J7，`LQL-3046`） | 按主实体自身的列排序，或使用 `exists` 子查询 |
 | 带 `limit` / `offset` 的集合 fetch join | 先分页，再加载集合 |
 | Spring `Sort` 中的 `ignoreCase()`（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)），尚不支持 | 不带 `ignoreCase()` 的排序 |
 | 函数键（`lower(name)`） | 计划中 |
 | 按聚合别名排序（`by.desc(s.total())`） | 计划中 |
 
+<a id="limits-subqueries"></a>
 ### 子查询
 
 | 不支持 | 替代写法 |
@@ -366,6 +402,7 @@ lambdaQL 隐藏了许多差异，但有一些你必须了解。
 | 在不是单行的标量比较中使用 `first()` | 使用聚合（`max`、`min`、`avg`、`sum`、`count`）或 `orderBy(...).limit(1)...first()` |
 | 子查询中没有 `limit` 的 `orderBy` | 它不起作用，因此会被移除（WARN） |
 
+<a id="select-and-group-by"></a>
 ### 查询列与分组
 
 | 不支持 | 替代写法 |
@@ -374,6 +411,7 @@ lambdaQL 隐藏了许多差异，但有一些你必须了解。
 | 用普通 DTO 类作为派生表或 CTE 的行类型 | Java record |
 | 用 `Set.of(...)` 作为 `groupBy` 键 | `List.of(...)` |
 
+<a id="limits-update-insert-delete"></a>
 ### 更新、插入、删除
 
 | 不支持（v0.1） | 替代写法 |
@@ -387,6 +425,7 @@ lambdaQL 隐藏了许多差异，但有一些你必须了解。
 | 把 `null` 写入非可选列（`@Id`、`nullable = false`、基本类型） | – |
 | 自己写入 `@Version` 属性 | lambdaQL 会替你使用 `update versioned` |
 | 值中的字符串拼接 | 计划中 |
+| update 或 delete 中的显式连接 | 不添加（D51）。使用关联路径（U9）或 `sub`（D49） |
 | 带显式连接的 `insert ... select` | 计划中。在 v0.1 中请使用多对一路径 |
 | 并发插入时原子的 `onConflict(...).ignore()` | 捕获键重复错误（`ignore()` 使用 `not exists`，见 [7.6](07-6-upsert.md)） |
 | 基于 `insert ... select` 的 upsert | 用 `values(list, ...)` 逐行 upsert |
@@ -407,6 +446,7 @@ lambdaQL 隐藏了许多差异，但有一些你必须了解。
 JPA 的级联和 `orphanRemoval` 不适用。
 DML 语句需要事务：`QueryBuilder(EntityManagerFactory)` 会打开自己的事务；使用 `EntityManager`（包括 Spring 的共享 `EntityManager`）的构建器需要调用方的事务，没有事务时会在发送任何 SQL 之前失败。
 
+<a id="procedures"></a>
 ### 存储过程
 
 | 不支持 | 替代写法 |

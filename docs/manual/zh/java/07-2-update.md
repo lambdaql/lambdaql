@@ -21,7 +21,7 @@ assertEquals("update Order e0 set e0.status = :p1, e0.price = (e0.price * 2.0) w
 int changed = u.execute();
 ```
 
-`st` 是捕获的变量，所以它是绑定参数（`:p1`）。常量 `2` 写在 Lambda 中，所以它仍是字面量（`2.0`，决定 D37）。
+`st` 是捕获的变量，所以它是绑定参数（`:p1`）。常量 `2` 写在 Lambda 中，所以它仍是字面量（`2.0`，决策 D37）。
 `toHql()` 不执行语句，只给出 HQL 和参数。`execute()` 执行语句并返回修改的行数。
 
 **关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。 标记为 **（计划中）** 的块来自 [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)。由于 lambdaQL 目前还不会生成这些语句，该测试把计划中的 HQL 直接交给 Hibernate。
@@ -147,33 +147,29 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 <a id="an-aggregate-from-a-subquery"></a>
 ## 来自子查询的聚合
 
-使用两个参数的 Lambda。第二个参数是上下文对象（`sub`）。
+使用两个参数的 Lambda `set((o, sub) -> ...)`。第二个参数是子查询的起点 `sub`（决策 D49）。
 这里不需要 `Agg`；子查询本身有 `sum`、`avg` 等方法，与 [5. 子查询](05-subquery.md)相同。
-这种写法**尚未实现**。目前只有 `where` 中的子查询可以使用。
+
+**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `update-sub`：
 
 ```java
-qb.update(Order.class)
-  .set((o, sub) -> o.setTotal(
-      sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).sum(i -> i.getPrice())))
-  .where(o -> o.getStatus() == 1)
-  .execute();
+// the second parameter starts a subquery, as in where((o, sub) -> ...) (D49)
+ExecutableUpdate<Order> u = qb.update(Order.class)
+        .set((o, sub) -> o.setPrice(sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).sum(i -> i.getPrice())))
+        .where((o, sub) -> sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists());
+assertEquals("update Order e0 set e0.price = (select sum(s1.price) from Item s1 where s1.order.id = e0.id)"
+        + " where exists (select 1 from Item s1 where s1.order.id = e0.id)", u.toHql().hql());
+// sum gives NULL when there is no row; coalesce keeps a NOT NULL column valid for every row
+ExecutableUpdate<Order> all = qb.update(Order.class)
+        .set((o, sub) -> value(o.getPrice(), Objects.requireNonNullElse(
+                sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).sum(i -> i.getPrice()), 0.0)))
+        .all();
+assertEquals("update Order e0 set e0.price = coalesce((select sum(s1.price) from Item s1 where s1.order.id = e0.id), 0.0)",
+        all.toHql().hql());
 ```
 
-**各数据库的 SQL（计划中）** — Hibernate 对计划中 HQL 的翻译，由 `PlannedSqlTest` 记录；lambdaQL 目前还不会生成此查询。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `07-update-sum`：
-
-```sql
--- H2, MariaDB
-update orders o1_0
-set total=(select sum(i1_0.price) from items i1_0 where i1_0.order_id=o1_0.id)
-where o1_0.status=1
-
--- Oracle
-update orders o1_0
-set o1_0.total=(select sum(i1_0.price) from items i1_0 where i1_0.order_id=o1_0.id)
-where o1_0.status=1
-```
-
-如果订单没有明细，`total` 会变成 NULL。这是 SQL 的行为。
+- 其他表的聚合和同一张表的聚合都可以使用（在 H2、MariaDB 10.11、Oracle 23.26 上实测）。在 `update` 中，MariaDB 也不会报错误 1093。
+- 没有匹配行时，聚合为 NULL。如果是 NOT NULL 列，会出现数据库错误，请用 `Objects.requireNonNullElse(…, 0.0)` 包裹，使其变成 `coalesce(...)`。
 
 <a id="where-with-paths-and-subqueries"></a>
 ## 使用路径和子查询的 where
@@ -322,7 +318,7 @@ set o1_0.description='top'
 where o1_0.id in (select t1_0.id from (select o2_0.id id from orders o2_0 join customers c1_0 on c1_0.id=o2_0.customer_id where c1_0.name='Kim' order by o2_0.price desc,o2_0.id fetch first 1 rows only) t1_0)
 ```
 
-路径 `o.getCustomer().getName()` 在内层 select 中是连接，与查询相同（决定 D36）。更新本身不读取其他表。
+路径 `o.getCustomer().getName()` 在内层 select 中是连接，与查询相同（决策 D36）。更新本身不读取其他表。
 
 <a id="update-exactly-one-row-executeone"></a>
 ## 只更新一行：`executeOne()`

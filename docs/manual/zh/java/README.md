@@ -1,3 +1,4 @@
+<a id="lambdaql-manual-java-track"></a>
 # lambdaQL 手册：Java 路线
 
 **其他语言：** [English](../../en/java/README.md) | [한국어](../../ko/java/README.md) | [日本語](../../ja/java/README.md) | [简体中文](../../zh/java/README.md)
@@ -56,6 +57,7 @@ fetch first ? rows only
 > **关于示例。**
 > 示例均为设计示例。某个功能实现后，其示例将替换为取自测试套件的代码，并附上测试文件的链接。在 [3. 条件](03-where.md)、[4. 排序与分页](04-order-paging.md)、[5. 子查询](05-subquery.md)、[6. 查询列、聚合与分组](06-select-group.md)、[7. 更新、插入、删除](07-dml.md)、[8. 存储过程与数据库函数](08-procedures-functions.md)、[11. 错误与语言](../11-errors-and-languages.md) 和 [12. Spring Data JPA](12-spring-data-jpa.md) 中，这些示例标记为 **(已测试)**。
 
+<a id="contents"></a>
 ## 目录
 
 标记为"公共"的页面由 Java 和 Kotlin 两条路线共用。它们在不同小节中分别提供两种语言的小示例。
@@ -68,7 +70,7 @@ fetch first ? rows only
 | 4 | [排序与分页](04-order-paging.md) | `orderBy`、`Direction`、NULL 排序、`limit`、`offset` |
 | 5 | [子查询](05-subquery.md) | `exists`、`contains`（IN）、NOT EXISTS、标量子查询和关联子查询 |
 | 6 | [查询列、聚合与分组](06-select-group.md) | `select`、record 和 DTO、`Agg`、`groupBy`、`having`、join（`join`、`leftJoin`、`crossJoin`）、派生表、CTE |
-| 7 | [更新、插入、删除](07-dml.md) | `set`、`by.set`、`values`、`all()`、`execute()`、`limit`、`executeOne()` |
+| 7 | [更新、插入、删除](07-dml.md) | `set`、`Dml.value`、`values`、`all()`、`execute()`、`limit`、`executeOne()` |
 | 7.6 | [Upsert](07-6-upsert.md) | `upsert`、`onConflict(...).update(...)`、`onConflict(...).ignore()`、各数据库的行数 |
 | 8 | [存储过程与数据库函数](08-procedures-functions.md) | `@SqlProcedure`、`@SqlFunction`、`qb.call`、`qb.exec` |
 | 9 | [Java 说明](09-java-notes.md) | 装箱、对象上的 `==`、`String` 比较、`Objects.equals`、方法引用、`this` 捕获、编译器说明 |
@@ -76,6 +78,7 @@ fetch first ? rows only
 | 11 | [错误与语言](../11-errors-and-languages.md)（公共） | 错误码、异常、消息语言、日志 |
 | 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`、仓库默认方法、DML 快捷方法（`deleteAll`、`updateOne` 等）、Spring `Sort` 和 `Pageable`、模块、事务、`QueryBuilder` bean |
 
+<a id="example-entities"></a>
 ## 示例实体
 
 所有示例都使用以下三个实体。完整代码见[入门](02-getting-started.md#example-entities)。
@@ -86,6 +89,7 @@ fetch first ? rows only
 | `Customer` | `id`、`name`、`grade` |
 | `Item` | `order`（指向 `Order`）、`price`、`qty` |
 
+<a id="supported-environment"></a>
 ## 支持的环境
 
 | 项目 | 版本 |
@@ -96,9 +100,10 @@ fetch first ? rows only
 | 已验证的数据库 | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
 | Spring Boot（可选） | 3.4（已用 3.4.2 测试）。Spring Boot 4 尚未验证 |
 
+<a id="help-and-contributions"></a>
 ## 帮助与贡献
 
 - 源代码：<https://github.com/codebit0/lambdaql>
-- 英文手册是原始版本。韩文、日文和中文手册是翻译版本。
+- 韩文手册是原始版本。英文、日文和中文手册是翻译版本。
 - 如果你发现错误，请提交 issue 或 pull request。
 - 设计文档（韩文，面向贡献者）：[ROADMAP.md](../../../design/ROADMAP.md)、[KOTLIN.md](../../../design/KOTLIN.md)

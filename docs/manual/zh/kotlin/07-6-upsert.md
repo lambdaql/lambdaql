@@ -26,7 +26,7 @@ val again = qb.upsert(Archive::class.java).values { it.id = 100L; it.price = 2.0
 val updated = again.execute()                 // MariaDB counts an updated row as 2, H2 and Oracle as 1
 ```
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。 该测试使用 Java Lambda。含义相同的 Kotlin Lambda 生成相同的 HQL，因此 SQL 也相同。
+**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。该测试使用 Java Lambda。含义相同的 Kotlin Lambda 生成相同的 HQL，因此 SQL 也相同。
 
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `upsert`：
 
@@ -90,6 +90,8 @@ values (excluded.id,excluded.price)
 
 键是一个 Lambda（`{ it.id }`）。与 [4. 排序与分页](04-order-paging.md) 中一样，Kotlin 属性引用（`Archive::id`）尚未实现。键必须是实体本身的列，不能是关联路径，并且数据库中该列需要有主键或唯一约束。
 
+`values` 和 `update` 使用带两个参数的 Lambda 时，可以用第二个参数 `sub` 构造子查询（决策 D49，在三种数据库上实测）。示例见 [7.5](07-5-insert.md#a-subquery-in-a-value)。
+
 <a id="keep-the-existing-row-onconflictkeyignore"></a>
 ## 保留已有行：`onConflict(key).ignore()`
 
@@ -123,7 +125,7 @@ Hibernate 自己的 `on conflict ... do nothing` 在 H2 和 Oracle 上会作为�
 <a id="the-row-count"></a>
 ## 行数
 
-`execute()` 原样返回数据库报告的行数（决定 D40）。Java 测试会检查这些数字：
+`execute()` 原样返回数据库报告的行数（决策 D40）。Java 测试会检查以下数字（实测）。
 
 | 数据库 | 插入 | 更新 | 忽略 |
 |---|---|---|---|
@@ -136,7 +138,8 @@ Hibernate 自己的 `on conflict ... do nothing` 在 H2 和 Oracle 上会作为�
 <a id="many-rows"></a>
 ## 多行
 
-`qb.upsert(X::class.java).values(list) { a, l -> ... }` 以及在 `values(list) { ... }` 之后的 `onConflict { ... }` 会**每行执行一条语句**。`execute()` 返回总和。这还没有测试覆盖。
+`qb.upsert(X::class.java).values(list) { a, l -> ... }` 以及在 `values(list) { ... }` 之后的 `onConflict { ... }` 会**每行执行一条语句**。`execute()` 返回总和。这种写法还没有测试（未测）。
+列表形式也像 `values(list) { a, l, sub -> ... }` 这样，用第三个参数接收子查询（见 [7.5](07-5-insert.md#many-rows-from-a-list)）。
 
 ```kotlin
 val n = qb.upsert(Archive::class.java)

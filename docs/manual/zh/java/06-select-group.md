@@ -1,3 +1,4 @@
+<a id="6-select-aggregates-and-group-by-java"></a>
 # 6. 查询列、聚合与分组（Java）
 
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[5. 子查询](05-subquery.md) | 下一章：[7. 更新、插入、删除](07-dml.md) | [本页的 Kotlin 版本](../kotlin/06-select-group.md)
@@ -6,7 +7,7 @@
 
 ---
 
-本章说明如何选择查询返回**什么**：
+本章说明如何选择查询返回**什么**。
 
 - 每行一个值（`select(o -> o.getPrice())`）
 - Java record 或 DTO 类
@@ -15,15 +16,16 @@
 - 与其他实体的显式 join（`join`、`leftJoin`、`crossJoin`）
 - FROM 子句中的子查询（派生表）和 CTE（`with`）
 
+<a id="contents"></a>
 ## 目录
 
 - [6.1 示例实体与结果类型](#61-example-entities-and-result-types)
 - [6.2 查询一个值](#62-select-one-value)
 - [6.3 查询 record 或 DTO](#63-select-a-record-or-dto)
 - [6.4 聚合函数：`Agg`](#64-aggregate-functions-agg)
-- [6.5 Group by](#65-group-by)
-- [6.6 Having](#66-having)
-- [6.7 Distinct、分页与结果](#67-distinct-paging-and-results)
+- [6.5 分组（group by）](#65-group-by)
+- [6.6 having](#66-having)
+- [6.7 distinct、分页与结果](#67-distinct-paging-and-results)
 - [6.8 显式 join](#68-explicit-joins)
 - [6.9 派生表（FROM 中的子查询）](#69-derived-table-subquery-in-from)
 - [6.10 CTE（`with`）](#610-cte-with)
@@ -35,7 +37,7 @@
 <a id="61-example-entities-and-result-types"></a>
 ## 6.1 示例实体与结果类型
 
-示例使用以下实体（见 [2. 入门](02-getting-started.md#example-entities)）：
+示例使用以下实体（见 [2. 入门](02-getting-started.md#example-entities)）。
 
 | 实体 | 这里用到的字段 |
 |---|---|
@@ -45,9 +47,9 @@
 
 标记为 **(已测试)** 的示例是从 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) 中复制的。
 该测试检查 HQL，执行查询，并把返回的值与在 Java 中进行同样计算的结果进行比较。它在 H2、MariaDB 和 Oracle 上都能通过。
-它使用 [3.3](03-where.md#33-basic-form) 中的测试实体：`price` 是 `double`，`status` 是 `short`，`Customer.id` 是 `int`。测试数据中有一个没有客户的订单。
+测试使用 [3.3](03-where.md#33-basic-form) 中的测试实体。`price` 是 `double`，`status` 是 `short`，`Customer.id` 是 `int`。测试数据中有一个没有客户的订单。
 
-测试使用以下结果类型：
+测试使用以下结果类型。
 
 ```java
 record OrderView(Long id, String customerName, double price) {}
@@ -58,7 +60,7 @@ record Total(long count, Double average) {}
 
 > [!TIP]
 > 对可能为 NULL 的值使用装箱类型（`Double`、`Long`、`Integer`）。
-> 列或像 `sum` 这样的聚合可能是 NULL。基本类型 `double` 的参数无法保存 NULL：这时 lambdaQL 会抛出 `IllegalStateException`（规则 J4，见 [6.4](#null-in-aggregates-rule-j4)）。
+> 列或像 `sum` 这样的聚合可能是 NULL。基本类型 `double` 的参数无法保存 NULL，这时 lambdaQL 会抛出 `IllegalStateException`（规则 J4，见 [6.4](#null-in-aggregates-rule-j4)）。
 > `count` 永远不会是 NULL，所以 `long count` 没有问题。
 
 ---
@@ -79,7 +81,7 @@ ValueQuery<Double> q = qb.from(Order.class)
 assertEquals("select e0.price from Order e0 where e0.status = 1 order by e0.price asc", q.toHql().hql());
 ```
 
-**关于 SQL 块。** `?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。本章的重点是查询列，所以 select 列表没有缩短。
+**关于 SQL 块。** `?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。本章的重点是 select 列表，所以 select 列表没有缩短。
 
 **各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `value`：
 
@@ -91,7 +93,8 @@ where o1_0.status=1
 order by o1_0.price
 ```
 
-关联路径就是一个列，与 `where` 中相同（规则 R24）。在 `select` 中，lambdaQL 会添加一个 `left join`，因此没有客户的订单不会丢失（在 `where` 中，同一条路径默认是内连接）：
+关联路径就是一个列，与 `where` 中相同（规则 R24）。在 `select` 中，lambdaQL 会添加一个 `left join`，因此没有客户的订单不会丢失（在 `where` 中，同一条路径默认是内连接）。
+用 `optional = false` 映射的必需关联不会丢失行，所以在 `select` 中也是内连接（见 [4.5](04-order-paging.md#45-what-a-sort-key-can-be)）。
 
 ```java
 .select(o -> o.getCustomer().getName())
@@ -149,7 +152,7 @@ lambdaQL 会把每个值转换为构造函数参数的类型（例如把 Hiberna
 
 聚合函数是 **`org.lambdaql.Agg` 的静态方法**。
 它们是 SQL 标准函数，所以由 lambdaQL 提供。（自己的数据库函数见 [8. 存储过程与数据库函数](08-procedures-functions.md)。）
-`Agg` 是 lambdaQL 中唯一的静态辅助类。
+静态辅助类只有 `Agg` 和用于 DML 赋值的 `Dml`（决策 D49）两个。
 
 | 方法 | SQL |
 |---|---|
@@ -167,10 +170,10 @@ Java 类型：
 long count();
 <N extends Number> N sum(N x);
 Double avg(Number x);
-<R extends Comparable<?>> R min(R x);   // max 相同
+<R extends Comparable<?>> R min(R x);   // max 也相同
 ```
 
-静态导入是可选的。下面两行是等价的：
+静态导入是可选的。下面两行是等价的。
 
 ```java
 .select(o -> new Total(Agg.count(), Agg.avg(o.getPrice())))
@@ -186,6 +189,7 @@ import static org.lambdaql.Agg.*;
 - `Agg` 可以用在 `select`、`having` 以及 `insert ... select` 的值中（[7.5](07-5-insert.md)）。
 - 不能在 `where` 中使用 `Agg`。对聚合的条件请使用 `having`。在 `where` 中使用 `Agg` 会在分析时报错。
 
+<a id="aggregate-over-all-rows-no-group-by"></a>
 ### 对所有行聚合（不使用 group by）
 
 **(已测试)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `total`：
@@ -207,7 +211,7 @@ from orders o1_0
 where o1_0.status=1
 ```
 
-这个查询总是返回一行。测试用 `q.one()` 读取它。
+这个查询总是返回一行。测试用 `q.one()` 读取这一行。
 
 <a id="null-in-aggregates-rule-j4"></a>
 ### 聚合中的 NULL（规则 J4）
@@ -223,11 +227,12 @@ where o1_0.status=1
 ---
 
 <a id="65-group-by"></a>
-## 6.5 Group by
+## 6.5 分组（group by）
 
 用 `groupBy` 写出分组键。lambdaQL 不会猜测分组键。
 `groupBy` 返回分组查询。先调用 `having(...)`（可选），再调用 `select(...)`。
 
+<a id="one-key"></a>
 ### 一个键
 
 ```java
@@ -241,9 +246,10 @@ List<Stat> stats = qb.from(Order.class)
 键以 `@Id` 结尾，所以没有 join。没有客户的订单组成一个键为 NULL 的分组。
 带 `having` 的已测试示例见 [6.6](#66-having)。
 
+<a id="many-keys"></a>
 ### 多个键
 
-用 `List.of(...)` 返回键的列表：
+用 `List.of(...)` 返回键的列表。
 
 **(已测试)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `group-many`：
 
@@ -267,7 +273,7 @@ where o1_0.customer_id is not null
 group by o1_0.customer_id,o1_0.status
 ```
 
-键按你书写的顺序使用。
+键按书写的顺序使用。
 这是唯一允许在 Lambda 内部创建集合的地方。
 
 不允许作为键列表的写法：
@@ -276,6 +282,7 @@ group by o1_0.customer_id,o1_0.status
 |---|---|
 | `Set.of(a, b)` | Set 会去除重复且没有顺序 |
 
+<a id="every-non-aggregate-value-must-be-a-key-rule-j3"></a>
 ### 每个非聚合值都必须是键（规则 J3）
 
 当查询包含聚合时，`select` 和 `having` 中每个**不是**聚合的值都必须是 `groupBy` 的键。这是 SQL 的规则。lambdaQL 会在分析时检查它。
@@ -285,17 +292,16 @@ group by o1_0.customer_id,o1_0.status
 qb.from(Order.class)
   .groupBy(o -> o.getCustomer().getId())
   .select(o -> new KeyCount(o.getCustomer().getId(), o.getStatus(), Agg.count()));
-// → TranslationException (LQL-3035)
+// → TranslationException(LQL-3035)
 ```
 
 已测试的示例见 [6.11](#611-rules-j1-to-j8)。
 
 ---
 
-<a id="66-having"></a>
-## 6.6 Having
+## 6.6 having
 
-`having` 是针对分组的条件。它使用与 `where` 相同的 Lambda 规则（[3. 条件](03-where.md)），并且可以使用 `Agg`。
+`having` 是针对分组的条件。它使用与 `where` 相同的 Lambda 规则（[3. 条件（`where`）](03-where.md)），并且可以使用 `Agg`。
 `having` 可以调用多次。各个条件用 `AND` 连接。
 
 **(已测试)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `group-by`：
@@ -319,24 +325,24 @@ group by o1_0.customer_id
 having sum(o1_0.price)>200.0
 ```
 
-这里 `Agg.sum(o.getPrice())` 是 `double`，所以 javac 把它与 `200.0` 比较。该常量保留为字面量（决定 D37）。
+这里 `Agg.sum(o.getPrice())` 是 `double`，所以 javac 把它与 `200.0` 比较。该常量保留为字面量（决策 D37）。
 
 ---
 
 <a id="67-distinct-paging-and-results"></a>
-## 6.7 Distinct、分页与结果
+## 6.7 distinct、分页与结果
 
-`select(...)` 返回 `ValueQuery`。它有以下方法：
+`select(...)` 返回 `ValueQuery`。`ValueQuery` 有以下方法。
 
 | 方法 | 作用 |
 |---|---|
 | `distinct()` | `select distinct` |
 | `limit(n)`、`offset(n)` | 分页 |
-| `toList()` | 执行查询；按顺序返回值 |
-| `toSet()` | 用 `select distinct` 执行查询；按顺序返回 `SequencedSet` |
+| `toList()` | 执行查询，按顺序返回值 |
+| `toSet()` | 用 `select distinct` 执行查询，返回有顺序的 `SequencedSet` |
 | `first()` | 第一个值，或 `Optional.empty()` |
-| `one()` | 唯一的值，或 `Optional.empty()`。有两行或更多行时：`NonUniqueResultException` |
-| `toHql()` | HQL 和参数，不执行查询 |
+| `one()` | 唯一的值，或 `Optional.empty()`。有两行或更多行时为 `NonUniqueResultException` |
+| `toHql()` | 不执行查询，返回 HQL 和参数 |
 
 **(已测试)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `distinct`：
 
@@ -359,12 +365,14 @@ from orders o1_0
 order by o1_0.price desc
 ```
 
-- 使用 `distinct()` 时，每个排序键都必须是被查询的值（规则 J7）。否则 lambdaQL 会在分析时抛出 `TranslationException`（`LQL-3046`）。
-- 值查询上的 `toSet()` 总是使用 `select distinct`。这里出现重复值是预期的，所以没有数量检查（与实体上的 `toSet()` 不同，见 [2. 入门](02-getting-started.md#toset)）。
+- 使用 `distinct()` 时，每个排序键都必须是 select 的值（规则 J7）。否则 lambdaQL 会在分析时抛出 `TranslationException`（`LQL-3046`）。
+- 值查询上的 `toSet()` 总是使用 `select distinct`。这里出现重复值是正常的，所以不做数量检查（与实体上的 `toSet()` 不同，见 [2. 入门](02-getting-started.md#toset)）。
+- 把 `@Lob` 列用作 `distinct` 或 `groupBy` 键时，Oracle 会拒绝（ORA-22848、ORA-22849）。H2 和 MariaDB 会执行。lambdaQL 不修改查询，以 `DEBUG` 级别记录 `LQL-5010`（见 [4.5](04-order-paging.md#45-what-a-sort-key-can-be)）。
 
 **分页。** `limit` 和 `offset` 的用法与 [4. 排序与分页](04-order-paging.md) 中相同。
-分页时，lambdaQL 会把 `id` 作为最后一个排序键加上，这样各页之间不会重叠（规则 S9）。
-对分组查询或 `distinct` 查询不会加上它，因为 `id` 不在它们的 select 列表中。
+分页时，lambdaQL 会把 `id` 作为最后一个排序键加上，这样各页之间不会重叠（规则 S9）。如果排序键是唯一且不能为 NULL 的列，则不加（见 [4.8](04-order-paging.md#tie-breaker-automatic-id)）。
+`first()` 也只读取一行，所以会加上同样的辅助排序。排序键值相同的行有多个时，每次都返回 `id` 最小的那一行的值。
+对分组查询和 `distinct` 查询不会加上它，因为 `id` 不在这些查询的 select 列表中。
 
 ```java
 ValueQuery<Double> paged = qb.from(Order.class)
@@ -398,17 +406,17 @@ limit ?,?
 <a id="68-explicit-joins"></a>
 ## 6.8 显式 join
 
-关联路径（`o.getCustomer().getName()`）会自动 join 一个对一关联（见 [3.10](03-where.md#310-association-paths)）。
-要用你自己的条件，或者不带条件地 join 另一个实体，请使用 `join`、`leftJoin` 或 `crossJoin`（决定 D44、D45）。
+关联路径（`o.getCustomer().getName()`）会自动 join 对一关联（见 [3.10](03-where.md#310-association-paths)）。
+要用自己指定的条件，或者不带条件地 join 另一个实体，请使用 `join`、`leftJoin` 或 `crossJoin`（决策 D44、D45）。
 
 | 方法 | HQL | 行 |
 |---|---|---|
 | `join(Customer.class, (o, c) -> ...)` | `join Customer e1 on ...` | 内连接：只有匹配的行 |
 | `leftJoin(Customer.class, (o, c) -> ...)` | `left join Customer e1 on ...` | 没有匹配的主实体行也会保留 |
-| `crossJoin(Customer.class)` | `cross join Customer e1` | 所有行的每一种组合；条件写在 `where` 中 |
+| `crossJoin(Customer.class)` | `cross join Customer e1` | 所有行的组合。条件写在 `where` 中 |
 
-join 之后，每个 Lambda 都按 join 的顺序得到所有实体：
-`where((o, c) -> ...)`、`orderBy((o, c, by) -> ...)`（`by` 在最后，规则 S12）和 `select((o, c) -> ...)`。
+join 之后，每个 Lambda 都按 join 的顺序得到所有实体。
+即 `where((o, c) -> ...)`、`orderBy((o, c, by) -> ...)`（`by` 在最后，规则 S12）和 `select((o, c) -> ...)`。
 被 join 的实体得到别名 `e1`、`e2`。
 
 标记为 **(已测试)** 的示例是从 [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java) 中复制的。
@@ -443,8 +451,8 @@ assertEquals("select e0 from Order e0 left join Customer e1 on e0.customer.id = 
 ```
 
 - `c == null` 表示“没有匹配”。lambdaQL 把它写成 `e1.id is null`（被 join 实体的 `@Id`）。
-- `leftJoin` 之后，对被 join 实体的列的条件具有 **SQL 含义**。没有匹配时，该列是 NULL，条件不为真，这一行会被排除。
-  在 Java 中，对不存在的 `c` 调用 `c.getName()` 会抛出 `NullPointerException`。lambdaQL 不会照搬这一点。
+- `leftJoin` 之后，对被 join 实体的列的条件遵循 **SQL 含义**。没有匹配时，该列是 NULL，条件不为真，这一行会被排除。
+  在 Java 中，对不存在的 `c` 调用 `c.getName()` 会抛出 `NullPointerException`，但 lambdaQL 不遵循这一行为。
   要保留没有匹配的行，请像示例那样写 `c == null || ...`。
 
 <a id="sort-and-select"></a>
@@ -494,13 +502,13 @@ assertEquals("select e0 from Order e0 join Customer e1 on e0.customer.id = e1.id
 ```
 
 > [!WARNING]
-> 当 join 匹配多行时，**主实体的行会重复**：每个匹配一次。`toList()` 和 `count()` 会计入每一次重复（已测试）。
-> 如果每个订单只想要一次，请用 `exists()` 子查询（[5. 子查询](05-subquery.md)）代替 join，或者用 `distinct()` 查询值。
+> 当 join 条件匹配多行时，**主实体的行会重复**：每个匹配一次。`toList()` 和 `count()` 会计入每一次重复（已测试）。
+> 如果每个订单只需要一次，请用 `exists()` 子查询（[5. 子查询](05-subquery.md)）代替 join，或者对 join 查询使用 `distinct()`（见 [join 结果的 `distinct()`](#distinct-on-a-join)）。
 
 <a id="cross-join"></a>
 ### cross join
 
-`crossJoin` 没有 join 条件。这个名字表明你需要所有行的每一种组合。条件写在 `where` 中。
+`crossJoin` 没有 join 条件。方法名表明需要所有行的组合。条件写在 `where` 中。
 
 **(已测试)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `cross-join`：
 
@@ -513,12 +521,12 @@ assertEquals("select e0 from Order e0 cross join Customer e1 where e1.grade is n
         q.toHql().hql());
 ```
 
-lambdaQL 没有 `from(Order.class, Customer.class)`（逗号 join）。没有条件时它会不小心产生所有组合，而且不清楚哪个实体是结果（决定 D45）。这种情况请使用 `crossJoin`。
+lambdaQL 没有 `from(Order.class, Customer.class)`（逗号 join）。漏写条件时会意外得到所有组合，而且不清楚哪个实体是结果（决策 D45）。这种查询请使用 `crossJoin`。
 
 <a id="paging"></a>
 ### 分页
 
-分页时，lambdaQL 会把**每个**实体的 id 加为最后的排序键，所以各页永远不会重叠（规则 S9）：
+分页时，lambdaQL 会把**每个**实体的 id 加为最后的排序键，所以各页不会重叠（规则 S9）。
 
 **(已测试)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `cross-join-paging`：
 
@@ -532,24 +540,107 @@ assertEquals("select e0.id, e1.name from Order e0 cross join Customer e1 order b
         pairs.limit(5).toHql().hql());
 ```
 
-<a id="what-a-join-query-has"></a>
-### join 查询提供的方法
+<a id="distinct-on-a-join"></a>
+### join 结果的 `distinct()`
 
-| 之后 | 方法 |
+`SelectJoinQuery.distinct()` 和 `SelectJoin3Query.distinct()` 对因 join 而重复的主实体行只返回一次（决策 D51）。HQL 是 `select distinct e0`，`count()` 是 `count(distinct e0)`。
+
+- 排序键必须是主实体自身的列（J7，`LQL-3046`）。按被 join 实体的列或关联路径排序会报错。
+- 分页时只把主实体的 id 加为平局键。不加被 join 实体的 id。
+- 在 `distinct()` 之后使用 `select(...)` 时，用 `select distinct` 查询值。
+- 请先考虑 `exists` 子查询（[5. 子查询](05-subquery.md)）。它不产生重复，返回相同的行，而且很多情况下更快。
+
+**(已测试)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `join-distinct`：
+
+```java
+// an order with two matching items would come twice; distinct() returns it once
+SelectJoinQuery<Order, Item> q = qb.from(Order.class)
+        .join(Item.class, (o, i) -> i.getOrder().getId() == o.getId())
+        .where((o, i) -> i.getQty() > 0)
+        .distinct();
+assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.id where e1.qty > 0", q.toHql().hql());
+// a sort key must be a column of the main entity (J7)
+OrderedJoinQuery<Order, Item> sorted = q.orderBy((o, i, by) -> by.desc(o.getPrice()));
+assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.id where e1.qty > 0"
+        + " order by e0.price desc", sorted.toHql().hql());
+```
+
+<a id="join-a-derived-table-or-cte"></a>
+### 派生表与 CTE 的 join
+
+[6.9](#69-derived-table-subquery-in-from) 的派生表和 [6.10](#610-cte-with) 的 CTE 可以像实体一样 join（决策 D51）。
+写法是 `join(cte, (c, x) -> ...)`、`leftJoin(cte, ...)`、`join(qb.from(...)...select(new Row(...)), ...)`、`leftJoin(...)`，可以作为第二个或第三个根使用。
+
+- HQL 是 `with t as (...) ... join t e1 on ...` 或 `join (select ...) e1 on ...`。
+- 行类型是 record（J5）。访问器（`x.total()`）读取列。
+- 在一条语句中两次读取同一个 `Cte` 对象时，定义只写一次，两个 join 读取同一个名字：`join t e1 on ... left join t e2 on ...`。不同的 `Cte` 对象各自得到名字，例如 `with t as (...), t2 as (...)`（在三种数据库上实测）。
+- 派生行没有 id，所以 `x == null` 是错误（`LQL-3067`）。请像 `x.customerId() == null` 这样比较列。
+- Hibernate 6.6 接受实体的 `select distinct`、派生表和 CTE 的 inner/left join，以及子查询内的实体 join（在三种数据库上实测）。
+
+**(已测试)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `join-cte`：
+
+```java
+// the total of each customer, joined to the customer row
+Cte<Total> t = qb.with(qb.from(Order.class)
+        .where(o -> o.getCustomer() != null)
+        .groupBy(o -> o.getCustomer().getId())
+        .select(o -> new Total(o.getCustomer().getId(), Agg.sum(o.getPrice()))));
+ValueQuery<NameTotal> rows = qb.from(Customer.class)
+        .join(t, (c, x) -> x.customerId().equals(c.getId()))
+        .where((c, x) -> x.total() > 100)
+        .select((c, x) -> new NameTotal(c.getName(), x.total()));
+assertEquals("with t as (select d0.customer.id as customerId, sum(d0.price) as total from Order d0"
+        + " where d0.customer is not null group by d0.customer.id)"
+        + " select e0.name, e1.total from Customer e0 join t e1 on e1.customerId = e0.id where e1.total > 100.0",
+        rows.toHql().hql());
+```
+
+**(已测试)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `join-derived`：
+
+```java
+// a derived table without a name; a customer without orders has no row in it (left join)
+SelectJoinQuery<Customer, Total> small = qb.from(Customer.class)
+        .leftJoin(totals(), (c, x) -> x.customerId().equals(c.getId()))
+        .where((c, x) -> x.customerId() == null || x.total() < 210);
+assertEquals("select e0 from Customer e0 left join (select d0.customer.id as customerId, sum(d0.price) as total"
+        + " from Order d0 where d0.customer is not null group by d0.customer.id) e1 on e1.customerId = e0.id"
+        + " where e1.customerId is null or e1.total < 210.0", small.toHql().hql());
+```
+
+**(已测试)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `cte-reuse`：
+
+```java
+// the same CTE read twice is written once
+ValueQuery<NameTotal> reused = qb.from(Customer.class)
+        .join(t, (c, x) -> x.customerId().equals(c.getId()))
+        .leftJoin(t, (c, x, y) -> y.customerId().equals(c.getId()) && y.total() > 210)
+        .select((c, x, y) -> new NameTotal(c.getName(), y.total()));
+assertEquals("with t as (select d0.customer.id as customerId, sum(d0.price) as total from Order d0"
+        + " where d0.customer is not null group by d0.customer.id)"
+        + " select e0.name, e2.total from Customer e0 join t e1 on e1.customerId = e0.id"
+        + " left join t e2 on e2.customerId = e0.id and e2.total > 210.0", reused.toHql().hql());
+```
+
+<a id="what-a-join-query-has"></a>
+### join 查询的方法
+
+| 调用之后 | 方法 |
 |---|---|
-| `join`、`leftJoin`、`crossJoin` | `where`、`join` / `leftJoin` / `crossJoin`（最多三个实体）、`orderBy`、`select`、`limit`、`toList`、`toSet`、`first`、`count`、`exists`、`toHql` |
+| `join`、`leftJoin`、`crossJoin` | `where`、`join` / `leftJoin` / `crossJoin`（最多三个实体，包括派生表和 CTE）、`distinct`、`orderBy`、`select`、`limit`、`toList`、`toSet`、`first`、`count`、`exists`、`toHql` |
 | `orderBy((o, c, by) -> ...)` | `select`、`limit`、`offset`、`toList`、`first`，以及排序后查询的其他方法（[4. 排序与分页](04-order-paging.md)） |
 
-v0.1 中尚不支持：update、delete 和 insert 中的 join，子查询内的 join，超过三个实体，`SortSpec` 的 join 形式，以及与派生表的 join。
+子查询内的 join 见 [5. 子查询](05-subquery.md#joins-inside-a-subquery)（D51）。
+v0.1 中尚不支持：insert 中的 join，超过三个实体，`SortSpec` 的 join 形式。
+update 和 delete 中的 join 决定不再添加（D51）。请使用关联路径（U9）或 `sub`（D49）。
 
 ---
 
 <a id="69-derived-table-subquery-in-from"></a>
 ## 6.9 派生表（FROM 中的子查询）
 
-用 `select` 创建一个值查询（一个 record，见 [6.3](#63-select-a-record-or-dto)），然后把它传给 `qb.from(...)`。
-它的行会成为外层查询的表（决定 D46）。
-结果是 `DerivedQuery<R>`。`R` 是行类型。
+用 `select` 创建一个值查询（record，见 [6.3](#63-select-a-record-or-dto)），然后把它传给 `qb.from(...)`。
+它的行会成为外层查询的表（决策 D46）。
+结果是 `DerivedQuery<R>`，`R` 是行类型。
 
 **(已测试)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)，region `derived`：
 
@@ -569,12 +660,12 @@ assertEquals("select e0.customerId, e0.cnt, e0.total from (select d0.customer.id
 在这个测试中，`Stat` 是 `record Stat(Integer customerId, Long cnt, Double total)`。
 测试在 H2、MariaDB 和 Oracle 上执行查询，并把结果行和 `count()` 与用 Java 进行的同样计算作比较。
 
-- 内层查询使用别名 `d0`（其中的 join 为 `dj1` 等）。外层查询使用 `e0`。
-- 每个 record 组件为一列命名：`as customerId`、`as cnt`、`as total`（规则 J5）。
-- 在外层 Lambda 中，用 record 访问器读取列：`r.total()` 就是 `e0.total`。
+- 内层查询使用别名 `d0`（其中的 join 为 `dj1` 等），外层查询使用 `e0`。
+- 每个 record 组件决定一个列名：`as customerId`、`as cnt`、`as total`（规则 J5）。
+- 在外层 Lambda 中，用 record 访问器读取列。`r.total()` 就是 `e0.total`。
 - 外层查询提供 `where`、`orderBy`、`limit`、`offset`、`select`、`toList`、`first`、`count` 和 `toHql`。
 
-也可以查询行中的一个值。内层和外层的捕获值按顺序绑定：
+也可以 select 行中的一个值。内层和外层的捕获值按顺序绑定。
 
 **(已测试)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)，region `select`：
 
@@ -588,7 +679,7 @@ ValueQuery<Integer> ids = qb.from(qb.from(Order.class)
         .select(r -> r.customerId());
 ```
 
-内层查询的 `limit` 和 `offset` 保留在内层查询中（HQL `limit` 和 `offset`）。所以可以对前几行再次排序：
+内层查询的 `limit` 和 `offset` 保留在内层查询中（HQL `limit`、`offset`）。所以可以对前几行再次排序。
 
 **(已测试)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)，region `inner-limit`：
 
@@ -604,7 +695,7 @@ Optional<Priced> cheapestOfTop = qb.from(qb.from(Order.class)
 
 `Priced` 是 `record Priced(Long id, Double price)`。
 
-**关于 SQL 块。** [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) 把同样形式但更简单的 HQL 直接交给 Hibernate，并记录在 H2 2.3、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上得到的 SQL。如果 Hibernate 的 SQL 发生变化，测试就会失败。它展示了各数据库如何写派生表。
+**关于 SQL 块。** [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) 把同样形式但更简单的 HQL 直接交给 Hibernate，并记录在 H2 2.3、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上得到的 SQL。如果 Hibernate 的 SQL 发生变化，测试就会失败。从这个块可以看到各数据库如何写派生表。
 
 **各数据库的 SQL（Hibernate 对这种 HQL 形式生成的 SQL）** — 来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `06-derived`：
 
@@ -626,9 +717,9 @@ H2 把列清单放在别名上（`r1_0(customerId,cnt,total)`）。MariaDB 和 O
 
 规则：
 
-- 行类型必须是 **Java record**（Kotlin data class 也可以）（规则 J5）。
+- 行类型必须是 **Java record**（Kotlin data class 也可以，规则 J5）。
   lambdaQL 按顺序从 record 组件中取得列名。
-- 这里不允许普通 DTO 类或单个值：lambdaQL 无法为它的列命名。lambdaQL 会抛出 `TranslationException`（`LQL-3064`）。
+- 这里不能使用普通 DTO 类或单个值，因为 lambdaQL 无法确定列名。这时会抛出 `TranslationException`（`LQL-3064`）。
 
 **(已测试)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)，region `rules`：
 
@@ -638,14 +729,18 @@ assertEquals("LQL-3064", assertThrows(LambdaQLException.class,
         () -> qb.from(qb.from(Order.class).select(o -> o.getPrice()))).code());
 ```
 
-v0.1 中尚不支持：两个派生表之间的 join、派生表与实体的 join，以及在 update、delete 或 insert 中使用派生表。
+在实体查询中 join 派生表的写法见 [派生表与 CTE 的 join](#join-a-derived-table-or-cte)（D51）。
+
+v0.1 中尚不支持：派生表之间的 join，以及在 update、delete 或 insert 中使用派生表。
+
+实体的 `@SQLRestriction` 和 `@SoftDelete` 条件，Hibernate 也会加到实体 join 的 `on` 和派生表内部（在 MariaDB 10.11、Oracle 23.26 上实测）。lambdaQL 不单独处理这些条件。
 
 ---
 
 <a id="610-cte-with"></a>
 ## 6.10 CTE（`with`）
 
-用 `qb.with(valueQuery)` 创建一个类型为 `Cte<R>` 的句柄，然后用 `qb.from(句柄)` 读取它。
+用 `qb.with(valueQuery)` 创建一个类型为 `Cte<R>` 的句柄，然后用 `qb.from(handle)` 读取它。
 内层查询与派生表（6.9）相同。
 
 **(已测试)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)，region `cte`：
@@ -658,7 +753,7 @@ assertEquals("with t as (select d0.customer.id as customerId, count(*) as cnt, s
         + " select e0.customerId, e0.cnt, e0.total from t e0 where e0.cnt >= 2L", q.toHql().hql());
 ```
 
-`perCustomer()` 是测试中的一个辅助方法。它返回与 [6.9](#69-derived-table-subquery-in-from) 的内层查询相同的值查询：
+`perCustomer()` 是测试中的一个辅助方法。它返回与 [6.9](#69-derived-table-subquery-in-from) 的内层查询相同的值查询。
 
 ```java
 private ValueQuery<Stat> perCustomer() {
@@ -691,10 +786,12 @@ MariaDB 和 Oracle 执行真正的 `with`。列清单由 Hibernate 自己写出�
 说明：
 
 - CTE 的名字是 `t`。外层查询总是给它别名 `e0`（`from t e0`）。HQL 需要别名（规则 J6）。
-- CTE 的列用 select 别名命名（`as customerId`）。HQL 不接受 CTE 名后面的列清单；Hibernate 会在 SQL 中加上它（规则 J6）。
+- CTE 的列名由 select 别名（`as customerId`）决定。HQL 不接受 CTE 名后面的列清单，列清单由 Hibernate 加到 SQL 中（规则 J6）。
 - MariaDB 和 Oracle 执行真正的 `with`。在 H2 上，Hibernate 把它展开为派生表。结果相同（已在三种数据库上测试）。
 - 行类型的规则与派生表相同：record（J5）。
-- v0.1 中尚不支持：在一个查询中两次使用同一个 CTE，以及在 update、delete 或 insert 中使用 CTE。
+- 在实体查询中 join CTE 的写法见 [派生表与 CTE 的 join](#join-a-derived-table-or-cte)（D51）。
+- 同一个 CTE 可以在一个查询中读取两次。定义只写一次（见 [派生表与 CTE 的 join](#join-a-derived-table-or-cte)）。
+- v0.1 中尚不支持：在 update、delete 或 insert 中使用 CTE。
 
 ---
 
@@ -703,13 +800,13 @@ MariaDB 和 Oracle 执行真正的 `with`。列清单由 Hibernate 自己写出�
 
 | # | 规则 | 状态 |
 |---|---|---|
-| J1 | `select` 的 Lambda 返回**一个值表达式**或**一次构造函数调用**。每个构造函数参数都是一个值表达式（规则见 [3. 条件](03-where.md)）。只在 `select` 中使用的关联路径会变成 `left join` 别名，因此不会丢失行。如果 `where` 使用同一条路径，`select` 会使用 `where` 的 join（R24）。 | 已实现（已测试） |
+| J1 | `select` 的 Lambda 返回**一个值表达式**或**一次构造函数调用**。每个构造函数参数都是一个值表达式（[3. 条件（`where`）](03-where.md) 的规则）。只在 `select` 中使用的关联路径会变成 `left join` 别名，因此不会丢失行。必需关联（`optional = false`）是内连接（A4）。如果 `where` 使用同一条路径，`select` 会使用 `where` 的 join（R24）。 | 已实现（已测试） |
 | J2 | 对于构造函数，lambdaQL 只查询列，并在 Java 中调用构造函数。它不会写 `select new`。 | 已实现（已测试） |
 | J3 | 有聚合时，`select` 和 `having`（以及 `insert ... select` 的值）中每个非聚合值都必须是 `groupBy` 的键。否则会在分析时报错。 | 已实现（已测试）。错误是 `TranslationException`（`LQL-3035`，见 [11](../11-errors-and-languages.md)） |
 | J4 | 没有行或所有值都是 NULL 时，`sum`/`avg`/`min`/`max` 返回 NULL，`count` 返回 0。对可能为 NULL 的值请使用装箱类型。NULL 进入基本类型的构造函数参数时，会抛出指出该参数的 `IllegalStateException`。 | 已实现（已测试） |
-| J5 | 派生表或 CTE 的行类型：**Java record**（Kotlin 代码也可以使用 data class）。普通 DTO 类只允许用于简单 `select`。否则：`LQL-3064`。 | 已实现（已测试） |
-| J6 | 用 `qb.with(...)` 创建的 CTE 用 select 别名为列命名：`with t as (select d0.customer.id as customerId, ...) select e0.customerId ... from t e0`。HQL 不接受名称后面的列清单：Hibernate 会以 `SyntaxException` 拒绝 `with t (col list) as (...)`。列清单由 Hibernate 自己写进 SQL（在 MariaDB 和 Oracle 上为 `with t (customerId,cnt,total) as (...)`）；H2 把 CTE 变成派生表。外层查询总是为它使用别名（`from t e0`）。 | 已实现（已测试） |
-| J7 | `distinct()` 渲染为 `select distinct`。与排序一起使用时，排序键必须在查询列中（数据库的规则）。lambdaQL 会在分析时检查这一点。 | 已实现（已测试） |
+| J5 | 派生表或 CTE 的行类型：**Java record**（Kotlin 代码也可以使用 data class）。普通 DTO 类只允许用于简单 `select`。否则为 `LQL-3064`。也适用于被 join 的派生表和 CTE 的行（D51）。派生行不能与 `null` 比较（`LQL-3067`）。 | 已实现（已测试） |
+| J6 | 用 `qb.with(...)` 创建的 CTE 用 select 别名为列命名：`with t as (select d0.customer.id as customerId, ...) select e0.customerId ... from t e0`。HQL 不接受名称后面的列清单。Hibernate 会以 `SyntaxException` 拒绝 `with t (col list) as (...)`。列清单由 Hibernate 自己写进 SQL（在 MariaDB 和 Oracle 上为 `with t (customerId,cnt,total) as (...)`）。H2 把 CTE 变成派生表。外层查询总是使用别名（`from t e0`）。 | 已实现（已测试） |
+| J7 | `distinct()` 渲染为 `select distinct`。与排序一起使用时，排序键必须在 select 列表中（数据库的规则）。lambdaQL 会在分析时检查这一点。在 join 结果的 `distinct()` 中，排序键必须是主实体自身的列（D51）。 | 已实现（已测试） |
 | J8 | 查询列可以与排序（[4. 排序与分页](04-order-paging.md)）、分页和子查询（[5. 子查询](05-subquery.md)）一起使用。按聚合排序（`by.desc(s.total())`）是 v0.2 候选。 | 已实现，按聚合排序除外 |
 
 **(已测试)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `rules`：
@@ -733,7 +830,7 @@ assertThrows(IllegalStateException.class, () -> qb.from(Order.class)
         .select(o -> new Bad(null, Agg.sum(o.getPrice()))).toList());
 ```
 
-`Bad` 是 `record Bad(Integer customerId, double total)`。没有状态为 9 的订单，所以 `sum` 是 NULL，而基本类型 `double` 无法接收它。
+`Bad` 是 `record Bad(Integer customerId, double total)`。没有状态为 9 的订单，所以 `sum` 是 NULL，而基本类型 `double` 无法接收这个值。
 
 ---
 
@@ -742,12 +839,13 @@ assertThrows(IllegalStateException.class, () -> qb.from(Order.class)
 
 | 项目 | 状态 |
 |---|---|
-| 按聚合结果或查询列别名排序，例如 `orderBy((s, by) -> by.desc(s.total()))`，以及分组查询上的 `orderBy` | v0.2 候选 |
+| 按聚合结果或 select 别名排序（例如 `orderBy((s, by) -> by.desc(s.total()))`），以及分组查询上的 `orderBy` | v0.2 候选 |
 | 用户自定义聚合函数和窗口函数 | v0.2 候选 |
-| update、delete 和 insert 中的 join，子查询内的 join，超过三个实体，与派生表的 join | 以后 |
-| 在一个查询中两次使用同一个 CTE，在 DML 中使用派生表和 CTE | 以后 |
+| insert 中的 join，超过三个实体，子查询内超过三个实体 | 以后 |
+| update、delete 中的 join | 不添加（D51）。使用关联路径（U9）或 `sub`（D49） |
+| DML 中的派生表和 CTE | 以后 |
 
-本章的错误是带错误码的 `TranslationException`：`LQL-3035`（错误的分组键，J3）、`LQL-3005`（`where` 中的 `Agg`）、`LQL-3046`（使用 `distinct` 时排序键未被查询，J7）和 `LQL-3064`（派生表或 CTE 的行类型，J5）。见 [11. 错误与语言](../11-errors-and-languages.md)。
+本章的错误是带错误码的 `TranslationException`：错误的分组键（J3）为 `LQL-3035`，`where` 中的 `Agg` 为 `LQL-3005`，使用 `distinct` 时未 select 的排序键（J7）为 `LQL-3046`，派生表或 CTE 的行类型（J5）为 `LQL-3064`。见 [11. 错误与语言](../11-errors-and-languages.md)。
 
 ---
 

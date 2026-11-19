@@ -1,9 +1,6 @@
 <a id="74-delete"></a>
 # 7.4 删除（Java）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/07-4-delete.md)。
-
 [7. 更新、插入、删除（Java）](07-dml.md) | [7.2 更新](07-2-update.md) | **7.4 删除** | [7.5 插入](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Kotlin](../kotlin/07-4-delete.md)
 
 ---
@@ -50,23 +47,24 @@ where (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id) is n
 MariaDB 写成 `delete o1_0 from orders o1_0`。H2 和 Oracle 写成 `delete from orders o1_0`。
 
 第二条语句删除的行与 `qb.from(Order.class).where(o -> o.getCustomer().getName() == null)` 返回的**行相同**：客户没有名字的订单。测试会把删除的行与这个查询进行比较。
-**没有**客户的订单不会被删除（规则 U9，决策 D36）。要把它们也删除，请写 `o.getCustomer() == null || o.getCustomer().getName() == null`。有了这个 null 守卫，lambdaQL 不会加上 `e0.customer.id is not null`。
+**没有**客户的订单不会被删除（规则 U9，决策 D36）。使用 null 守卫（`o.getCustomer() == null || ...`）时也一样，因为在查询中该路径也是内连接（决策 D48）。
+要删除没有客户的订单，请以 `o.getCustomer() == null` 为条件再执行一次删除语句。
 
-删除所有行：必须写 `all()`（规则 U5）。
+删除所有行时必须写 `all()`（规则 U5）。
 
 ```java
 qb.delete(Order.class).all().execute();     // delete all rows
 qb.delete(Order.class).execute();           // compile error: no execute()
 ```
 
-按 id 列表删除（捕获的集合，决定 D29）：
+按 id 列表删除（捕获的集合，决策 D29）：
 
 ```java
 qb.delete(Item.class).where(i -> ids.contains(i.getId())).execute();
 ```
 
 `where` 中的子查询使用第二个 Lambda 参数 `sub`，与 [5. 子查询](05-subquery.md) 相同。
-删除没有任何明细的订单：
+删除没有明细的订单的示例：
 
 **(已测试)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)，region `dml-subquery`：
 
@@ -90,6 +88,39 @@ where not exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id)
 
 与所有 JPA 批量语句一样，删除不会执行 JPA 的 `cascade` 或 `orphanRemoval`，也不会修改已加载的实体（规则 U16）。
 删除需要事务（见 [7.8](07-dml.md#transactions)）。
+
+<a id="delete-with-a-subquery-on-the-same-table"></a>
+## 读取同一张表的子查询
+
+`where` 中的子查询可以读取删除目标实体（或同一继承层次中的实体）。子查询自身的 `from`、子查询中的连接、U9 的关联标量子查询都属于这种情况。
+这时 lambdaQL 先通过派生表读取目标 id，再按这些 id 删除（规则 U17）。
+
+```
+delete from Order d0 where d0.id in (select t.id from (select e0.id as id from Order e0 where <condition>) t)
+```
+
+- 原因：子查询读取目标表时，MariaDB 会拒绝 Hibernate 的 `delete t from …`（错误 1093，"specified twice"）。
+- 同样的形式也适用于关联子查询。只包装子查询的方式不能用于关联子查询。
+- 已在 H2、MariaDB 10.11、Oracle 23.26 上实测（非关联 `avg`，关联 `exists`、`max`，子查询中的连接）。三种数据库删除的行数相同，MariaDB 也不会失败。
+- 读取其他表的子查询保持原有形式（上面的 `not exists` 示例）。
+- `update` 不包装。读取自身表的子查询的 `update` 在三种数据库上都能运行（在 MariaDB 10.11 上实测）。
+- 复合 id 实体不包装。带 `limit` 的删除本来就使用下面的包装形式（别名 `x0`）。
+
+**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `delete-self-subquery`：
+
+```java
+// the subquery reads the target table: lambdaQL reads the matching ids through a derived table first (U17),
+// because MariaDB cannot delete from a table that a subquery reads (error 1093)
+ExecutableDelete<Order> d = qb.delete(Order.class)
+        .where((o, sub) -> o.getPrice() < sub.from(Order.class).avg(x -> x.getPrice()));
+assertEquals("delete from Order d0 where d0.id in (select t.id from (select e0.id as id from Order e0"
+        + " where e0.price < (select avg(s1.price) from Order s1)) t)", d.toHql().hql());
+// a subquery on another table keeps the plain form
+ExecutableDelete<Order> unused = qb.delete(Order.class)
+        .where((o, sub) -> !sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists());
+assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)",
+        unused.toHql().hql());
+```
 
 <a id="delete-the-first-rows-limit"></a>
 ## 删除前几行：`limit`
@@ -131,9 +162,9 @@ delete from orders o1_0
 where o1_0.id in (select t1_0.id from (select o2_0.id id from orders o2_0 where o2_0.status=1 order by o2_0.price,o2_0.id fetch first 1 rows only) t1_0)
 ```
 
-lambdaQL 把 limit 写成 `e0.id in (select t.id from (select x0.id as id from X x0 ... order by ... limit n) t)`：
+lambdaQL 把 limit 写成 `e0.id in (select t.id from (select x0.id as id from X x0 ... order by ... limit n) t)`。
 
-- 内层 select 遵循查询的规则，包括连接（决定 D36）。因此语句删除的正是查询返回的行。
+- 内层 select 遵循查询的规则，包括连接（决策 D36）。因此语句删除的正是查询返回的行。
 - 派生表 `t` 是为 MariaDB 准备的。没有它，MariaDB 会拒绝 `in` 子查询中的 `limit`（错误 1235）和读取目标表的子查询（错误 1093）。
 - H2 和 Oracle 写 `fetch first 1 rows only`，MariaDB 写 `limit 1`。
 

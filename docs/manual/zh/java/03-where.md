@@ -1,7 +1,5 @@
+<a id="3-conditions-where-java"></a>
 # 3. 条件（`where`）（Java）
-
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/03-where.md)。
 
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[2. 入门](02-getting-started.md) | 下一章：[4. 排序与分页](04-order-paging.md) | [本页的 Kotlin 版本](../kotlin/03-where.md)
 
@@ -9,6 +7,7 @@
 
 ---
 
+<a id="31-the-idea-in-one-sentence"></a>
 ## 3.1 一句话说明核心思想
 
 **lambdaQL 的 Lambda 是查询，不是代码。** lambdaQL 读取 Lambda 的字节码，从不执行它。
@@ -27,7 +26,7 @@ lambdaQL 使用它自己的规则。本章将解释这些规则。
     @Id Long id;
     Double price;
     Integer status;
-    boolean active;            // getter：isActive()
+    boolean active;            // getter: isActive()
     String description;
     @ManyToOne Customer customer;
     LocalDateTime updateAt;
@@ -138,7 +137,7 @@ where (o1_0.status=1 or o1_0.status=3) and o1_0.active=1
 | 计算出的值：`new BigDecimal("1.5")`、`form.getText().trim()`、`LocalDateTime.of(...)` | **绑定参数** | `:p1` |
 
 - 常量在每次调用时都相同。因此 SQL 文本不会改变，数据库在制定执行计划时也能看到这个值。
-- 字符串常量中的引号会被转义：`"O'Brien"` 变为 `'O''Brien'`。这没有 SQL 注入风险，因为该字符串是编译进你的类里的常量，而不是用户输入。
+- 字符串常量中的引号会被转义：`"O'Brien"` 变为 `'O''Brien'`。这没有 SQL 注入风险，因为该字符串是编译进类里的常量，而不是用户输入。
 - 捕获的值可能来自用户，因此它**总是**绑定参数。每次调用只有值会变化。
 
 enum 常量会带着完整的类名写入。
@@ -158,6 +157,7 @@ from orders o1_0
 where o1_0.kind='RUSH'
 ```
 
+<a id="34-comparisons"></a>
 ## 3.4 比较运算
 
 | Java | HQL | 说明 |
@@ -168,11 +168,45 @@ where o1_0.kind='RUSH'
 | `o.getUpdateAt().isAfter(since)` | `e0.updateAt > :p1` | `isBefore` 生成 `<` |
 | `o.getDescription().compareTo("m") < 0` | `e0.description < 'm'` | `compareTo(..) op 0` 变为 `op` |
 
-与数字比较（一侧是基本类型，例如 `== 1` 或 `> 100.0`）遵循 **SQL 语义**：
+与数字比较（一侧是基本类型，例如 `== 1` 或 `> 100.0`）遵循 **SQL 语义**。
 如果列为 NULL，结果为 UNKNOWN，该行不会被返回。（在 Java 中这会是 NullPointerException。）
 
-使用 `+`、`-`、`*` 的简单算术运算属于设计的一部分。
-避免整数 `/`：各数据库对结果的处理不一致（MariaDB 给出 `5/2 = 2.5`）。`/` 的最终规则尚未确定。
+可以使用 `+`、`-`、`*`、`/` 的简单算术运算。
+避免包含列的整数 `/`。它在 SQL 中计算，因此各数据库的结果不同（MariaDB 给出 `5/2 = 2.5`）。统一列侧 `/` 结果的规则尚未确定。
+捕获值之间的计算（下面的 `n / 2.0`）在查询之前于 Java 中进行，因此没有这种差异。
+
+下面示例中的 `cnt` 是测试实体 `Order` 的整数列（`Integer cnt`）。[3.2](#32-example-entities) 的示例实体中没有这个列。
+
+**对列的算术运算与索引**（决策 D50）。像 `o.getCnt() * 2 > n` 这样对列做算术运算时，无法使用索引。lambdaQL 以 `WARN` 级别记录 `LQL-5012`，在 `SargableMode.STRICT` 下分析失败（`LQL-3066`）。
+把运算移到值一侧时，请像 `o.getCnt() > n / 2.0` 这样用小数相除。整数除法 `n / 2` 会得到不同的行。如果乘的是负数，请反转比较方向。详见 [10.2](10-rules-and-limits.md#db-functions-on-a-column)。
+
+**整数列与小数值**（决策 D48 B8）。把整数列与小数值比较时，lambdaQL 按写出的值进行比较，不做四舍五入，也不排除该值。
+
+- 写在 Lambda 中的常量保留为字面量。`o.getCnt() >= 2.5` 变为 `e0.cnt >= 2.5`。
+- 捕获的值以 `BigDecimal`（Hibernate 类型 `BIG_DECIMAL`）绑定。HQL 为 `e0.cnt >= :p1`，`p1` 为 `2.5`。
+- 含有这种元素的 IN 列表，所有元素都以 `BigDecimal` 绑定（`[2.5, 3.0]`）。
+
+以前，值会被截断为列的类型，`2.5` 变成 `2`，从而返回错误的行。Hibernate 会拒绝以整数列类型绑定的小数（`CoercionException`），而对 IN 列表的元素则静默截断（在三种数据库上实测）。
+没有采用改写为整数比较（`>= 3`）的方式。那样执行的 SQL 与 Lambda 不同，而且当实体映射（`Integer`）与数据库列类型（例如带小数的 `DECIMAL`）不一致时，会得到错误的行。
+
+结果在 H2、MariaDB 10.11 和 Oracle 23.26 上正确（实测）。MariaDB 的 `EXPLAIN` 显示，int、`BigDecimal` 和 double 参数都使用索引范围扫描（`type=range`）（实测）。Oracle 的执行计划未测。
+
+**(已测试)** [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)，region `whole-number`：
+
+```java
+// cnt is a whole number; 2.5 is compared as written (it is never cut to 2)
+double half = 2.5;
+RenderedQuery atLeast = qb.from(Order.class).where(o -> o.getCnt() >= half).toHql();
+assertEquals("select e0 from Order e0 where e0.cnt >= :p1", atLeast.hql());
+assertEquals(Map.of("p1", new BigDecimal("2.5")), atLeast.parameters());    // bound as a decimal
+// a constant written in the lambda stays a literal
+assertEquals("select e0 from Order e0 where e0.cnt >= 2.5", qb.from(Order.class).where(o -> o.getCnt() >= 2.5).toHql().hql());
+// an IN list with such a value is bound as decimals
+List<Double> values = List.of(2.5, 3.0);
+RenderedQuery in = qb.from(Order.class).where(o -> values.contains(o.getCnt().doubleValue())).toHql();
+assertEquals("select e0 from Order e0 where e0.cnt in (:p1)", in.hql());
+assertEquals(Map.of("p1", List.of(new BigDecimal("2.5"), new BigDecimal("3.0"))), in.parameters());
+```
 
 **浮点数：** 对于 `float`/`double` 列，lambdaQL 不保证与 Java 完全一致到每一位的结果。
 捕获的 `NaN` 或 `Infinity` 值会在查询执行时被拒绝。
@@ -199,7 +233,7 @@ where o1_0.kind='RUSH'
 
 - 结果遵循 **SQL 三值逻辑**（TRUE / FALSE / UNKNOWN）。lambdaQL 已经验证，这在 H2、MariaDB 和 Oracle 上返回相同的行。
 - javac 有时会移动 `!` 的位置（德摩根定律，`!(x > y)` 变为 `x <= y`）。这不会改变结果。
-- lambdaQL **不会简化你的条件**。如果你写 `o.getPrice() > p || o.getPrice() <= p`，它会按原样发送。`price` 为 NULL 的行不会被返回。这是正常的 SQL 行为。
+- lambdaQL **不会简化条件**。如果写 `o.getPrice() > p || o.getPrice() <= p`，它会按原样发送。`price` 为 NULL 的行不会被返回。这是正常的 SQL 行为。
 - 请使用 `&&` 和 `||`。非短路运算符 `&`、`|`、`^` 会被拒绝。
 
 **布尔三元表达式。** 只允许三种简短写法。它们分别等同于 `AND`、`OR`、`NOT`：
@@ -223,23 +257,29 @@ qb.from(Order.class).where(o -> o.getStatus() == wanted).toList();
 
 这是最重要的部分。有两条简单的原则：
 
-1. **实体值按 SQL 语义比较**（决策 D48）。对象之间的 `==`、`equals`、`Objects.equals` 和 `!=` 变为 `=` 和 `<>`。值为 NULL 的行与两者都不匹配。当结果可能与 Java 不同时，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`。
-2. **捕获的值保留 Java 规则。** 它们先在 Java 中计算。捕获的 `null` 生成 `is null` 或 `is not null`。在 Java 会抛出异常的地方（拆箱、`null.equals(...)`），lambdaQL 也会抛出异常（见 [3.6.4](#364-captured-null-values)）。
+1. **实体值按 SQL 语义比较**（决策 D48）。对象之间的 `==`、`equals`、`Objects.equals` 和 `!=` 变为 `=` 和 `<>`。
+   值为 NULL 的行与两者都不匹配。
+   当结果可能与 Java 不同时，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`。
+2. **捕获的值先在 Java 中计算，比较同样遵循 SQL 语义。** 捕获的 `null` 以 NULL 绑定，因此 `= :p1` 和 `<> :p1` 不匹配任何行。
+   这时 lambdaQL 在执行时以 `WARN` 级别记录 `LQL-4045`。要查找 NULL，请写 `x == null`（生成 `is null`）。
+   只由捕获值组成的表达式（`p.trim()`、转换为其他基本类型的 `min.intValue()` 等）是在 Java 中计算的值，因此接收者为 `null` 时，会像 Java 一样抛出异常（`LQL-4012`）。
+   拆箱为自身基本类型（`min.doubleValue()`）与 javac 的自动拆箱是相同的字节码，因此不执行它，而是直接绑定装箱值（见 [3.6.4](#364-captured-null-values)）。
 
-lambdaQL **只在你写出 null 处理时才处理 null**（`== null`、`!= null`）。
-它永远不会替你添加隐藏的 null 检查。
+lambdaQL **只在写出 null 处理时才处理 null**（`== null`、`!= null`）。
+它永远不会代为添加隐藏的 null 检查。
 
+<a id="361-rule-table"></a>
 ### 3.6.1 规则表
 
 | # | Java 写法 | HQL | NULL 行为 |
 |---|---|---|---|
 | R1 | 一侧是基本类型：`o.getStatus() == 1`、`o.getPrice() > p` | `e0.status = 1`、`e0.price > :p1` | SQL 语义。列为 NULL：该行不返回 |
-| R2 | 两侧都是对象：`o.getStatus() == status`（`Integer == Integer`）、`String == String`、enum | `e0.status = :p1`。捕获的 `null`：`e0.status is null` | **值比较。** 列为 NULL：该行不返回 |
-| R2 | `o.getStatus() != status`（对象） | `e0.status <> :p1`。捕获的 `null`：`e0.status is not null` | SQL 语义：列为 NULL：该行**不**返回（Java 会返回它） |
-| R2 | 两个实体值：`o.getDescription() == o.getCustName()` | `e0.description = e0.custName` | SQL 语义：任一侧为 NULL：该行不返回（NULL 与 NULL 也一样） |
+| R2 | 两侧都是对象：`o.getStatus() == status`（`Integer == Integer`）、`String == String`、enum | `e0.status = :p1` | **值比较。** 列为 NULL：该行不返回。捕获的 `null`：没有匹配的行（`LQL-4045`） |
+| R2 | `o.getStatus() != status`（对象） | `e0.status <> :p1` | SQL 语义。列为 NULL：该行**不**返回（Java 会返回它）。捕获的 `null`：没有匹配的行（`LQL-4045`） |
+| R2 | 两个实体值：`o.getDescription() == o.getCustName()` | `e0.description = e0.custName` | SQL 语义。任一侧为 NULL：该行不返回（NULL 与 NULL 也一样） |
 | R3 | `x == null`、`x != null` | `x is null`、`x is not null` | |
-| R4 | `o.getDescription().equals(p)` | `e0.description = :p1` | SQL 语义。列为 NULL：该行不返回。`p == null`：异常 |
-| R5 | `Objects.equals(a, b)`、`"x".equals(a)`、`Boolean.TRUE.equals(a)` | 与 R2 相同：`a = b`、`a = :p1`，捕获的 `null` 为 `a is null` | 与 R2 相同 |
+| R4 | `o.getDescription().equals(p)` | `e0.description = :p1` | SQL 语义。列为 NULL：该行不返回。`p == null`：没有匹配的行（`LQL-4045`） |
+| R5 | `Objects.equals(a, b)`、`"x".equals(a)`、`Boolean.TRUE.equals(a)` | 与 R2 相同：`a = b`、`a = :p1` | 与 R2 相同 |
 | R9 | 捕获的值 | 绑定参数 | 见 [3.6.4](#364-captured-null-values) |
 
 哪些 Java 类型适用 R1、哪些适用 R2，见 [9. Java 说明](09-java-notes.md#93-equality-of-boxed-values)。
@@ -255,12 +295,14 @@ Lambda 是查询，因此 Java 的内存规则不适用。
 Integer status = request.getStatus();    // 可能为 null
 qb.from(Order.class).where(o -> o.getStatus() == status).toList();
 //   status = 3    -> HQL: e0.status = :p1    status 为 3 的行
-//   status = null -> HQL: e0.status is null  status 为 NULL 的行
+//   status = null -> HQL: e0.status = :p1    没有匹配的行：= NULL 不会为真（WARN 级别 LQL-4045）
 ```
+
+要查找 status 为 NULL 的行，请写出 null 检查。`o.getStatus() == null` 生成 `e0.status is null`。
 
 列永远不会被函数包裹，因此数据库可以使用索引。
 
-lambdaQL 在查询执行时查看捕获的值：`null` 生成 `is null`，其他任何值生成简单的 `= :p1`。
+lambdaQL 在查询执行时绑定捕获的值。`null` 以 NULL 绑定，没有可以匹配的行，因此 lambdaQL 以 `WARN` 级别记录 `LQL-4045`。
 **(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `null-safe`：
 
 ```java
@@ -297,16 +339,17 @@ where o1_0.description=?
 
 > [!TIP]
 > **IDE 警告。** IntelliJ 会对这种写法显示 "Number objects compared using `==`"。
-> 在 lambdaQL 的 Lambda 内部这是有意为之。你可以使用 `@SuppressWarnings("NumberEquality")`。
+> 在 lambdaQL 的 Lambda 内部这是有意为之。可以使用 `@SuppressWarnings("NumberEquality")`。
 
-**永远不会是 NULL 的列。** 有些列永远不会是 NULL：id、基本类型列，以及 `nullable = false` 的列。
-对这样的列，`is null` 总是假，因此 lambdaQL 把它折叠掉：
+**永远不会是 NULL 的列。** id、基本类型列以及 `nullable = false` 的列永远不会是 NULL。
+对这样的列，`is null` 总是假，因此 lambdaQL 把这个检查折叠为常量并去掉。
 
 - `o.getId() == null` 变为 `1=0`（没有行）。
 - `o.getId() != null && o.getId() == id` 变为 `e0.id = :p1`。null 检查消失，数据库可以使用索引。
 
-这也是 Kotlin 中 id 为 `Long?` 时 `it.id == id` 的字节码，因此 Kotlin 写法同样得到普通的 `e0.id = :p1`。
-该规则只在路径**没有关联步骤**时适用。`o.getCustomer().getId()` 可能是 NULL，因为订单可以没有客户，所以它的 null 检查会保留。
+Kotlin 中 id 为 `Long?` 时的 `it.id == id` 也编译为相同的字节码，因此 Kotlin 写法同样得到简单的 `e0.id = :p1`。
+
+该规则只在路径**没有关联步骤**时适用。订单可以没有客户，因此 `o.getCustomer().getId()` 可能是 NULL，这条路径的 null 检查会保留。
 
 **(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `never-null`：
 
@@ -338,13 +381,15 @@ assertEquals("select e0 from Order e0 where e0.customer.id is null",
 ```java
 .where(o -> o.getDescription().equals(text))     // HQL: e0.description = :p1
 .where(o -> Objects.equals(o.getDescription(), text))
-                                                 // HQL: e0.description = :p1（text 为 null 时：is null）
+                                                 // HQL: e0.description = :p1（text 为 null 时没有匹配的行）
 .where(o -> !Objects.equals(o.getStatus(), 1))   // HQL: e0.status <> 1
                                                  //      （不返回 NULL 行：SQL 语义）
 ```
 
-**实体值的 SQL 语义**（决策 D48）。两个实体值之间的比较，以及实体值与一个值的 `!=` 比较，都遵循 SQL：值为 NULL 的行既不匹配 `=`，也不匹配 `<>`。
-在 Java 中，`!text.equals(null)` 为 true，`Objects.equals(null, null)` 也为 true，因此 Java 会返回这些行。可能出现这种情况时，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`（每个条件一次）。要保留 NULL 行，请在 Lambda 中写出 null 检查。
+**实体值的 SQL 语义**（决策 D48）。两个实体值之间的比较，以及实体值与一个值的 `!=` 比较，都遵循 SQL。值为 NULL 的行既不匹配 `=`，也不匹配 `<>`。
+
+在 Java 中，`!text.equals(null)` 为 true，`Objects.equals(null, null)` 也为 true，因此 Java 会返回这些行。
+可能出现这种差异时，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`（每个条件一次）。要保留 NULL 行，请在 Lambda 中写出 null 检查。
 
 **(已测试)** [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)，region `sql-meaning`（H2、MariaDB 和 Oracle；各行的 description/custName 组合为 `a/a`、`a/b`、`null/a`、`null/null`、`b/null`，`text` 为 `"a"`）：
 
@@ -369,16 +414,25 @@ assertEquals(List.of("f"), qb.from(Coded.class).where(c -> !c.getVip()).toList()
 <a id="364-captured-null-values"></a>
 ### 3.6.4 捕获的 null 值
 
-| 写法 | 捕获的值为 `null` |
+| 写法 | 捕获的值为 `null` 时 |
 |---|---|
-| 与捕获的值进行 `==`、`!=` 和 `Objects.equals(...)` 比较（R2、R5）：`o.getStatus() == status` | 允许：`is null` / `is not null` |
-| `p.equals(o.getDescription())`（`p` 是接收者） | 查询执行时**抛出异常** |
-| `o.getDescription().equals(p)` | **抛出异常** |
-| Java 会对值拆箱的比较：`o.getPrice() > p`（`Double p`），以及所有 `<`、`<=`、`>`、`>=` | **抛出异常** |
+| 与捕获的值进行 `==`、`!=`、`Objects.equals(...)`、`o.getDescription().equals(p)` 比较 | 执行：以 NULL 绑定的 `= :p1` / `<> :p1`，因此**没有**匹配的行。`WARN` 级别 `LQL-4045` |
+| `p.equals(o.getDescription())`（`p` 是接收者） | 同上：`e0.description = :p1`（NULL），**没有**匹配的行。`WARN` 级别 `LQL-4045`。不抛出异常 |
+| Java 会对值拆箱的比较：`o.getPrice() > p`（`Double p`）、`i.getQty() == q`（`int qty`、`Integer q`） | 执行：`e0.price > :p1` 绑定 NULL，**没有**匹配的行。`DEBUG` 级别 `LQL-4045`。拆箱为自身基本类型（`p.doubleValue()`）不会被执行 |
+| 转换为其他基本类型的拆箱（`p.intValue()`、`Double p`）和方法调用（`p.trim()`） | 查询执行时**抛出异常**（`LQL-4012`）。因为值在 Java 中计算 |
 
-原因：在 Java 中，这些写法会抛出 NullPointerException，或者永远为 false。把它们转换为 `IS NULL` 会返回 Java 永远不会返回的行。
+**不推荐 `p.equals(o.getDescription())` 写法。** 在 SQL 中它与 `o.getDescription().equals(p)` 是相同的比较（`e0.description = :p1`），因此即使 `p` 为 `null` 也不会抛出异常。
+但作为 Java 代码阅读时，`null.equals(...)` 看起来像 NullPointerException，因此请把实体值放在前面，写成 `o.getDescription().equals(p)`。
 
-**规则的例外：null 守卫。** 如果先对同一个捕获值做了 null 检查，就允许 null。
+原因：Lambda 中的比较遵循 SQL 语义（决策 D48）。在 SQL 中，与 NULL 的 `=`、`<>` 不会为真。
+捕获的值是否为 null 只有在查询执行时才能知道，因此 lambdaQL 在执行时记录警告。
+
+只由捕获值组成的表达式是在查询之前于 Java 中计算的值。`p.trim()` 这样的方法调用，以及转换为其他基本类型的拆箱（`p.intValue()`、`Double p`）都属于这一类；值为 `null` 时会像 Java 一样抛出异常（`LQL-4012`）。
+但拆箱为自身基本类型（`Double.doubleValue()`、`Integer.intValue()`、`Long.longValue()` 等，包括其后的拓宽转换）不会被计算。
+javac 的自动拆箱与手写的调用是相同的字节码，因此 lambdaQL 把它视为自动拆箱并绑定装箱值。值为 `null` 时没有匹配的行，并以 `DEBUG` 级别记录 `LQL-4045`。
+要查找 NULL 行，请写 `x == null`。
+
+**用 null 守卫省略过滤。** 如果对同一个捕获值做了 null 检查，当值为 null 时，该条件会变成无过滤并消失。
 **(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `captured-null-guard`：
 
 ```java
@@ -412,17 +466,20 @@ where o1_0.price>?
 
 工作方式：
 
-- 只使用捕获值和常量的部分，会在查询执行时在 Java 中决定。决定的顺序是从左到右，并且像 Java 一样短路求值。
-- `min == null` 时，守卫为 true，所以整个条件为 true。不会有任何过滤。比较 `o.getPrice() > min` 永远不会被写出（Java 也永远不会执行它）。
+- 只使用捕获值和常量的部分，会在查询执行时在 Java 中决定。与 Java 一样从左到右、按短路求值处理。
+- `min == null` 时，守卫为 true，所以整个条件为 true。没有过滤。比较 `o.getPrice() > min` 不会写入 HQL（Java 也不会执行这个比较）。
 - `min = 100.0` 时，守卫为 false，所以只剩下 `e0.price > :p1`。
 - Lambda 仍然只分析一次。只有 HQL 文本取决于值。
-- 守卫必须写在前面。`o.getPrice() > min || min == null` 在 `min == null` 时会在查询执行时抛出异常，与 Java 的 NullPointerException 相同。
-- 使用 `&&` 时，守卫的作用相反：`min != null && o.getPrice() > min` 在 `min == null` 时不返回任何行（`where 1=0`）。
+- 这种情况下守卫的位置不影响结果。`min == null` 时，`o.getPrice() > min || min == null` 同样没有过滤。因为比较部分的拆箱不在 Java 中执行（Java 会抛出 NullPointerException）。
+- 对捕获值调用方法的比较（`o.getDescription().equals(p.trim())`）则不同。守卫写在后面时，会先计算 `p.trim()`，因此 `p == null` 时抛出异常（`LQL-4012`）。
+- 使用 `&&` 时，守卫的作用相反：`min == null` 时，`min != null && o.getPrice() > min` 不返回任何行（`where 1=0`）。
 
 <a id="365-converted-attributes-convert"></a>
 ### 3.6.5 转换的属性（`@Convert`）
 
-带有 JPA `AttributeConverter` 的属性按其 Java 值比较。Hibernate 6.6 会转换与这种属性比较的字面量，也会转换绑定参数。因此条件用 Java 值来写，并能找到存储的行（已在 H2、MariaDB 和 Oracle 上验证）。
+带有 JPA `AttributeConverter` 的属性按其 Java 值比较。Hibernate 6.6 会转换与这种属性比较的字面量，也会转换绑定参数。
+
+因此即使用 Java 值写条件，也能找到存储的行（已在 H2、MariaDB 和 Oracle 上验证）。
 
 **(已测试)** [`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java)，region `convert`：
 
@@ -490,7 +547,7 @@ H2 有真正的布尔类型，所以 SQL 中是 `true` / `false`。MariaDB 和 O
 
 - 对可空 `Boolean` 列使用 `!o.getActive()`，在 Java 中是一次拆箱调用（值为 NULL 时抛出 NullPointerException）。lambdaQL 使用 SQL 语义：NULL 行不返回。
 - lambdaQL 不使用 `is not true` 或 `coalesce(active, false)`。它们在 Oracle 上会失败（ORA-00932）。
-- 对较大条件的取反总是写作 `not (...)`。lambdaQL 永远不会在条件外面写 `(...) = false` 或 `(...) is null`，因为 Oracle 23 在 `WHERE` 中对它们的求值是错误的。
+- 对较大条件的取反总是写作 `not (...)`。lambdaQL 不会在条件外面写 `(...) = false` 或 `(...) is null`，因为 Oracle 23 在 `WHERE` 中对它们的求值是错误的。
 
 **比较两个布尔值**（`==`/`!=`）是支持的：
 
@@ -502,6 +559,7 @@ H2 有真正的布尔类型，所以 SQL 中是 `true` / `false`。MariaDB 和 O
 lambdaQL 用 `AND`/`OR`（而不是 `CASE`）来写，这样数据库可以使用索引。
 如果两侧共用同一个条件（例如 `o.isActive() == o.isActive()`），该写法会被拒绝。
 
+<a id="38-strings"></a>
 ## 3.8 字符串
 
 - 字符串上的 `equals`、`Objects.equals` 和 `==` 使用**数据库的排序规则（collation）**。
@@ -527,7 +585,7 @@ where o1_0.description='O''Brien'
 ```
 
 - `startsWith`、`endsWith`、`contains`（LIKE）以及 `trim()`、`toUpperCase()` 等作用于列的函数都在**计划中**，不在第一个版本中。
-- 字符串 `+` 在**计划中**。分析核心目前会拒绝 Lambda 内部的 `+`，即使只是连接捕获的值也会拒绝。请在 Lambda 之前构建字符串。
+- 字符串 `+` 在**计划中**。分析核心已经会拒绝 Lambda 内部的 `+`，即使只是连接捕获的值也会拒绝。请在 Lambda 之前构建字符串。
 
 <a id="39-in-with-a-captured-collection"></a>
 ## 3.9 使用捕获集合的 IN
@@ -561,7 +619,8 @@ from orders o1_0
 where o1_0.status in (?,?)
 ```
 
-`!contains` 会变成 `not in`。id 不可能为 NULL，所以没有 `is null` 部分。对于可能为 NULL 的列，lambdaQL 会加上 `x is null or`，因为当列表中没有 `null` 时，Java 的 `!contains` 对 NULL 值返回 true。
+`!contains` 会变成 `not in`。可能为 NULL 的列也是简单的 `not in`（SQL 语义，决策 D48）。
+值为 NULL 的行不匹配 `not in`，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`。Java 的 `!contains` 对 NULL 值为 true，因此要保留这些行，请写出 null 检查，例如 `o.getDescription() == null || !descs.contains(o.getDescription())`。
 **(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `not-in`：
 
 ```java
@@ -569,10 +628,10 @@ List<Long> ids = List.of(1L, 2L);
 // the id can never be NULL: a plain NOT IN
 assertEquals("select e0 from Order e0 where e0.id not in (:p1)",
         qb.from(Order.class).where(o -> !ids.contains(o.getId())).toHql().hql());
-// a column that can be NULL: Java keeps the rows with NULL (the list has no null), so "is null" is added
-// (List.of(...).contains(null) would throw NullPointerException in Java; Arrays.asList returns false)
+// a column that can be NULL: the SQL meaning (D48), a NULL value is not "not in" the list (DEBUG LQL-5009);
+// to keep those rows, write o.getDescription() == null || !descs.contains(o.getDescription())
 List<String> descs = Arrays.asList("a", "b");
-assertEquals("select e0 from Order e0 where (e0.description is null or e0.description not in (:p1))",
+assertEquals("select e0 from Order e0 where e0.description not in (:p1)",
         qb.from(Order.class).where(o -> !descs.contains(o.getDescription())).toHql().hql());
 ```
 
@@ -591,7 +650,7 @@ where o1_0.id not in (?,?)
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-where (o1_0.description is null or o1_0.description not in (?,?))
+where o1_0.description not in (?,?)
 ```
 
 | 情况 | 结果 |
@@ -612,10 +671,41 @@ lambdaQL 用 JPA Metamodel 检查路径的每一步：
 | 路径步骤 | HQL | 示例 |
 |---|---|---|
 | 对一关联（`@ManyToOne`、`@OneToOne`） | 带别名的 `join`（默认是内连接，见下文） | `o.getCustomer().getName()` -> `join e0.customer j1` ... `j1.name` |
-| 嵌入（`@Embedded`） | 同一张表，不需要 join | 如果 `Order` 有一个嵌入的 `address`：`o.getAddress().getCity()` -> `e0.address.city` |
+| 嵌入（`@Embedded`） | 同一张表，不需要 join。值对象整体的相等比较按列展开（见下文） | 如果 `Order` 有一个嵌入的 `address`：`o.getAddress().getCity()` -> `e0.address.city` |
 | 以目标 `@Id` 结尾的路径 | 外键列，不需要 join | `o.getCustomer().getId()` -> `e0.customer.id` |
 | 关联本身与 `null` 比较 | 外键列，不需要 join | `o.getCustomer() == null` -> `e0.customer is null` |
 | 集合（`@OneToMany`、`@ManyToMany`） | **拒绝** | `o.getItems()...` -> 请使用 `exists` 子查询 |
+
+**值对象整体的比较。** 对嵌入值对象（`@Embedded`）整体做相等比较时，lambdaQL 把它展开为每列一个比较（B6）。
+`o.getAddress().equals(addr)`、`Objects.equals(o.getAddress(), addr)`、`addr.equals(o.getAddress())` 都变为 `e0.address.city = :p1 and e0.address.zip = :p2`。
+
+- 取反（`!o.getAddress().equals(addr)`）为 `e0.address.city <> :p1 or e0.address.zip <> :p2`。
+- `o.getAddress() == null` 为 `e0.address.city is null and e0.address.zip is null`，`!= null` 为 `e0.address.city is not null or e0.address.zip is not null`。
+- 每一列都遵循 SQL 语义（D48）。NULL 列既不匹配 `=`，也不匹配 `<>`。例如 (Seoul, NULL) 行既不匹配相等比较，也不匹配取反（在三种数据库上实测）。
+- 捕获的值对象的各属性在查询执行时读取并绑定。捕获的对象为 `null` 时，所有列都绑定 NULL，因此没有匹配的行，并对每一列以 `WARN` 级别记录 `LQL-4045`。
+- 嵌套的值对象也会展开。
+- 大小比较（`<` 等）以及与其他类型的比较仍然是 `LQL-3012` 错误。请比较字段。
+
+**(已测试)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)，region `embedded-compare`：
+
+```java
+// address is @Embedded (city, zip): comparing the whole value object compares each column (D48)
+Address addr = new Address("Seoul", "04524");
+SelectQuery<Order> same = qb.from(Order.class).where(o -> o.getAddress().equals(addr));
+assertEquals("select e0 from Order e0 where e0.address.city = :p1 and e0.address.zip = :p2", same.toHql().hql());
+assertEquals(Map.of("p1", "Seoul", "p2", "04524"), same.toHql().parameters());
+// Objects.equals and addr.equals(...) are the same comparison
+assertEquals(same.toHql().hql(), qb.from(Order.class).where(o -> Objects.equals(o.getAddress(), addr)).toHql().hql());
+// null checks each column: "no address" means every column is NULL
+SelectQuery<Order> none = qb.from(Order.class).where(o -> o.getAddress() == null);
+assertEquals("select e0 from Order e0 where e0.address.city is null and e0.address.zip is null", none.toHql().hql());
+SelectQuery<Order> some = qb.from(Order.class).where(o -> o.getAddress() != null);
+assertEquals("select e0 from Order e0 where e0.address.city is not null or e0.address.zip is not null",
+        some.toHql().hql());
+// each column follows the SQL meaning: a NULL column matches neither = nor <>
+SelectQuery<Order> other = qb.from(Order.class).where(o -> !o.getAddress().equals(addr));
+assertEquals("select e0 from Order e0 where e0.address.city <> :p1 or e0.address.zip <> :p2", other.toHql().hql());
+```
 
 在 `where` 中，关联路径默认是**内连接（inner join）**（决策 D36）。
 **(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `inner-join`：
@@ -637,10 +727,11 @@ where c1_0.name=?
 ```
 
 - **没有客户的**订单不在结果中。因为没有可以连接的客户行。
-- lambdaQL 不会替你添加 null 检查。在路径前面不需要写 `o.getCustomer() != null &&`。
+- lambdaQL 不会代为添加 null 检查。在路径前面不需要写 `o.getCustomer() != null &&`。
 
-**null 守卫会保留没有客户的订单。** 如果条件对没有客户的订单也可能为 true，lambdaQL 会对该路径使用 `left join`。
-如果用内连接，Java 和 SQL 会给出不同的行：Java 会返回这个订单，但内连接会把它丢掉（决策 D36）。
+**null 守卫不会保留没有客户的订单。** `where` 中的路径总是内连接（SQL 语义，决策 D48）。
+因此 `o.getCustomer() == null || ...` 不匹配没有客户的订单，因为这些订单没有可以连接的客户行。对于这样的条件，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`。
+要保留没有客户的订单，请使用显式的 `leftJoin`（决策 D44，见 [6.8](06-select-group.md#68-explicit-joins)），并写 `c == null || ...`。
 **(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `null-guard`：
 
 ```java
@@ -679,10 +770,9 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is not null and c1_0.name=?
 ```
 
-在 `left join` 之后，Hibernate 把 `e0.customer is null` 写成 `c1_0.id is null`。含义相同：订单没有客户。
+Hibernate 把 `e0.customer is null` 写成 `c1_0.id is null`。在内连接之后，这个条件不会为真。
 
-- `||` 的其他部分也可能保留订单。`o.getStatus() == 1 || o.getCustomer().getName().equals(name)` 也会使用 `left join`，因为在 Java 中，状态为 1 的订单即使没有客户也会匹配。
-- 如果另一个 `where` 调用无论如何都会去掉这些订单（例如 `.where(o -> o.getCustomer().getName() != null)`），join 仍然是内连接。
+- `||` 的其他部分也一样。`o.getStatus() == 1 || o.getCustomer().getName().equals(name)` 同样使用内连接，因此 status 为 1 但没有客户的订单不会返回（Java 会返回它）。
 
 要查找**没有**客户的订单，请比较关联本身。这会检查外键列，不需要 join。
 **(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `no-association`：
@@ -718,10 +808,10 @@ from orders o1_0
 where o1_0.customer_id=1
 ```
 
-更多事实：
+补充说明：
 
 - 同一条路径只得到一个别名。`where`、`orderBy` 和 `select` 共享这个别名。
-- **只**在 `orderBy` 或 `select` 中使用的路径是 `left join`，因此那里不会丢失行（规则 S8 和 J1）。如果 `where` 也使用同一条路径，`orderBy` 和 `select` 会使用 `where` 的 join。它是内连接，除非 null 守卫把它变成了 `left join`。
+- **只**在 `orderBy` 或 `select` 中使用的路径是 `left join`，因此那里不会丢失行（规则 S8 和 J1）。如果 `where` 也使用同一条路径，`orderBy` 和 `select` 会使用 `where` 的 join，即内连接。
 - 比较两个实体（`o.getCustomer() == c`）在**计划中**。目前请比较 id：`o.getCustomer().getId() == c.getId()`（这里 `c` 是一个捕获的对象）。
 
 <a id="311-captured-values"></a>
@@ -740,7 +830,7 @@ LocalDateTime since = LocalDateTime.of(2026, 1, 1, 0, 0);
 规则：
 
 - 不使用实体的部分会在**每次执行查询时**在 Java 中计算。结果成为绑定参数。
-- 编译期常量（`static final int MAX = 5;`）不是捕获的值。javac 会把它复制到 Lambda 中，因此它和 `5` 一样是字面量（见 [3.3](#33-basic-form)）。
+- 编译期常量（`static final int MAX = 5;`）不是捕获的值。javac 会把值复制到 Lambda 中，因此它和 `5` 一样是字面量（见 [3.3](#33-basic-form)）。
 - Lambda 只分析一次，结果会被缓存。每次调用时都会读取新的捕获值。
 - 只有实体部分会变成 SQL。`form.getText().trim()` 是 Java；`o.getDescription().trim()` 则会是数据库函数（计划中）。
 - Java 要求捕获的局部变量是 effectively final 的。如果某个值会改变，请在 Lambda 之前把它计算到一个新变量中。
@@ -762,7 +852,7 @@ qb.from(Item.class)
 ## 3.13 会被拒绝的内容
 
 lambdaQL 会抛出带有 `[LQL-xxxx]` 错误码和源代码行号的异常。它不会猜测。
-大多数结构问题会在分析 Lambda 时（首次使用时）被发现。有问题的捕获值（null、NaN）会在查询执行时被发现。
+大多数结构问题会在分析 Lambda 时（首次使用时）被发现。有问题的捕获值（调用方法的 `null`、NaN、含有 `null` 元素的集合）会在查询执行时被发现。
 见 [11. 错误与语言](../11-errors-and-languages.md)。
 
 | 写法 | 示例 | 怎么做 |
@@ -777,8 +867,9 @@ lambdaQL 会抛出带有 `[LQL-xxxx]` 错误码和源代码行号的异常。它
 | 实体上的其他方法 | `o.calcSomething()` | 只使用 getter |
 | 实体集合路径 | `o.getItems().size() > 0` | `exists` 子查询 |
 | 实体与实体比较 | `o.getCustomer() == c` | 比较 id（计划中：实体比较） |
+| 值对象的大小比较、与其他类型的比较（`LQL-3012`） | `o.getAddress().compareTo(a) > 0`（`Address` 为 `Comparable` 时） | 比较字段。支持相等比较 |
 | 守卫之下的 `/`、`%`、类型转换 | 见 [3.12](#312-errors-that-depend-on-order-of-evaluation) | 去掉守卫或修改条件 |
-| R1/R4 写法中捕获的 null 值 | `p == null` 时的 `o.getDescription().equals(p)` | 使用 `Objects.equals` 或 null 守卫 |
+| 调用方法的 null 捕获值 | `p == null` 时的 `o.getDescription().equals(p.trim())`、`o.getStatus() > p.intValue()`（`Double p`） | 在前面写 null 守卫（`p == null \|\| ...`），或在查询之前检查 `p` |
 | 捕获的 `NaN` / `Infinity` 值 | `o.getPrice() > Double.NaN` | 不要发送 NaN |
 | 匿名类、不是 `Serializable` 的 Lambda | `new Where<Order>() { ... }`、`java.util.function.Predicate` | 使用 Lambda |
 

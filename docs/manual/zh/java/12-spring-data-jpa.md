@@ -1,3 +1,4 @@
+<a id="12-spring-data-jpa-java"></a>
 # 12. Spring Data JPA（Java）
 
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[11. 错误与语言](../11-errors-and-languages.md) | [本页的 Kotlin 版本](../kotlin/12-spring-data-jpa.md)
@@ -323,7 +324,7 @@ assertThrows(org.springframework.dao.IncorrectResultSizeDataAccessException.clas
 `deleteAll(where)` 不加载实体。与所有批量语句一样，它不会修改已加载的实体（规则 U16）。
 用它可以快速删除大量行。需要 cascade 或 `@PreRemove` 时，请使用 Spring Data 的方法。
 
-编译器按参数选择方法：无参数、`Iterable` 或 Lambda。这已在 javac 和 kotlinc 2.3.21 生成的字节码中检查过。
+编译器按参数选择方法：无参数、`Iterable` 或 Lambda。这已在 javac 和 kotlinc 2.3.21 生成的字节码中检查过（实测）。
 
 <a id="builders-for-complex-statements"></a>
 ### 用于复杂语句的构建器
@@ -437,7 +438,11 @@ Spring `Sort` 或 `Pageable` 始终是外部排序，因此策略会检查其中
 | `lambdaql.sort.allow.<Entity>` | 允许的路径，用逗号分隔，例如 `name,team.name` |
 | `lambdaql.sort.alias.<Entity>.<外部名称>` | 别名的路径，例如 `lambdaql.sort.alias.Member.level=grade` |
 
-`<Entity>` 是 JPA 实体名：默认是简单类名，也可以用 `@Entity(name = ...)` 指定。实体名在持久化单元中唯一（两个实体同名时 Hibernate 会在启动时失败），因此不同包中同名的类不会混淆。未知的名称会使应用启动失败，抛出 `IllegalStateException`（LQL-4042）。
+**SARGable 模式属性。** `lambdaql.sargable.mode` 取 `OFF`、`WARN`（默认值）、`STRICT` 之一（决策 D50）。自动配置以与 `lambdaql.sort.mode` 相同的方式注册它。为 `STRICT` 时，对无法使用索引的条件的分析会以 `NonSargableException`（`LQL-3066`）失败（见 [8.9](08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable)）。
+
+`<Entity>` 是 JPA 实体名：默认是简单类名，也可以用 `@Entity(name = ...)` 指定。
+
+实体名在持久化单元中唯一（两个实体同名时 Hibernate 会在启动时失败），因此不同包中同名的类不会混淆。未知的名称会使应用启动失败，抛出 `IllegalStateException`（LQL-4042）。
 路径会在第一次使用规则时与实体核对（见 4.10 中的[字符串形式的规则](04-order-paging.md#rules-as-strings)）。
 
 **(已测试)** [`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java)，region `properties`（测试的属性；在应用中写在 `application.properties` 或 `application.yaml` 中）：
@@ -515,7 +520,7 @@ public class SortErrorHandler {
 
 执行器使用 Spring 的共享 `EntityManager`，它绑定到当前事务。
 
-**lambdaQL 有意不在其方法上加 `@Transactional`**（决定 D41）。
+**lambdaQL 有意不在其方法上加 `@Transactional`**（决策 D41）。
 更新、删除、插入或 upsert 需要调用方的事务。快捷方法（`deleteAll`、`updateOne` 等）、构建器（`updateQuery()` 等）和 `QueryBuilder` bean 都是如此。
 请在你的服务方法上加 `@Transactional`，或者使用 `TransactionTemplate`。没有事务时，调用会在发送任何 SQL 之前失败。
 

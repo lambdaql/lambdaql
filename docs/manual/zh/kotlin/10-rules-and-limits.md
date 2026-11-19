@@ -1,12 +1,11 @@
+<a id="10-rules-and-limits-kotlin"></a>
 # 10. 规则与限制（Kotlin）
-
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/10-rules-and-limits.md)。
 
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[9. Kotlin 说明](09-kotlin-notes.md) | 下一章：[11. 错误与语言](../11-errors-and-languages.md) | [本页的 Java 版本](../java/10-rules-and-limits.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
 
+<a id="contents"></a>
 ## 目录
 
 - [10.1 基本规则：Lambda 就是查询](#101-the-base-rule-a-lambda-is-a-query)
@@ -38,9 +37,9 @@ Lambda 是用 Kotlin 语法写成的查询。因此：
 
 1. 像 `it.customer?.name` 这样的路径**指的是一个列**，而不是一串调用。
    lambdaQL 不会检查 customer 是否为 null（D20）。在 `where` 中，该路径默认是内连接，因此没有 customer 的订单不会被返回（D36）。
-   如果条件在没有 customer 时也可能为 true（null 保护），该路径是 `left join`，因此结果与 Kotlin 相同。
+   写了 null 保护（`... == null || ...`）也一样：该路径仍是内连接（D48）。要保留没有 customer 的订单，请使用 `leftJoin`。
    要查找这些订单，请比较关联本身：`it.customer == null`。`it.customer?.name == null` 不会返回它们。
-2. NULL **只在你写出的地方**处理（`== null`、`!= null`、`?.`、`?:`、两个可空值之间的 `==`）（D22）。
+2. NULL **只在你写出的地方**处理（`== null`、`!= null`、`?.`、`?:`）（D22）。
    Kotlin 编译器添加的 null 检查会被忽略。其他 NULL 遵循 SQL 规则：条件为 UNKNOWN，该行不会被返回。
 3. `!!` 被忽略（D23）。Kotlin 的内存规则（对象同一性、装箱）不适用。`==` 和 `===` 表示**值相等**（D12、R17）。
 4. **当某种写法没有对应规则时，lambdaQL 不会猜测。**它会抛出一个明确的错误，
@@ -59,6 +58,7 @@ Lambda 是用 Kotlin 语法写成的查询。因此：
 | 3 | 如果含义确实需要在列上使用函数（例如忽略大小写），lambdaQL 会在启动时读取数据库元数据，使用数据库已有的路径：列的排序规则、函数索引、语言索引。如果没有可用路径，它会在启动时对每个列记录一条 WARN（严格模式：报错） |
 | 4 | 每条渲染规则都在 H2、MariaDB 和 Oracle 上用 `EXPLAIN` 检查过 |
 
+<a id="examples"></a>
 ### 示例
 
 **忽略大小写**（`equals(s, ignoreCase = true)`、`startsWith(s, ignoreCase = true)`；D24）
@@ -80,7 +80,7 @@ Lambda 是用 Kotlin 语法写成的查询。因此：
 ```
 
 lambdaQL 永远不会写出 `is [not] distinct from`。在 Oracle 上它会变成 `decode(...)`，无法使用索引。
-实体值遵循 SQL 语义，因此普通的 `=` 或 `<>` 总是正确的。捕获的 `null` 生成 `is null` / `is not null`。
+实体值遵循 SQL 语义，因此普通的 `=` 或 `<>` 总是正确的。捕获的 `null` 作为 NULL 绑定，不匹配任何行（`WARN` 级别的 `LQL-4045`）。
 
 **比较两个布尔表达式**（D25）
 
@@ -100,8 +100,9 @@ lambdaQL 永远不会写出 `is [not] distinct from`。在 Oracle 上它会变�
 .where { it.description.isNullOrEmpty() }    // (o.description is null or e0.description = :p1)
 ```
 
-**带子查询的 NOT IN** 写成 `NOT EXISTS`（反连接，并且是 NULL 安全的；参见 [10.3](#103-null-rules)）。
+**带子查询的 NOT IN** 写成 `NOT IN`（SQL 语义，D48）。子查询中有 NULL 时不返回任何行。要跳过 NULL，请在子查询中加上 null 检查（参见 [10.3](#103-null-rules)）。
 
+<a id="what-the-measurements-showed"></a>
 ### 测量结果
 
 MariaDB 10.11 和 Oracle 23ai，20,000 到 50,000 行：
@@ -115,6 +116,7 @@ MariaDB 10.11 和 Oracle 23ai，20,000 到 50,000 行：
 | 布尔 `==` 写成 `AND`/`OR` | 范围扫描（350 行） | 2 次索引范围扫描 + 位图 OR | 可以 |
 | 布尔 `==` 写成 `CASE` | 全索引扫描（49,648 行） | 全表扫描 | **不可以** |
 
+<a id="planned-items-under-the-same-rule"></a>
 ### 遵循同一规则的计划项
 
 | 写法 | 计划的 SQL |
@@ -128,7 +130,23 @@ MariaDB 10.11 和 Oracle 23ai，20,000 到 50,000 行：
 列一侧的数据库函数（`OrderFns.discount(it.price)!! > 10`）无法使用普通索引。
 lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在相同表达式的函数索引时不记录。
 在 MariaDB 上，`NOT DETERMINISTIC`（默认）的函数即使参数只有参数值（`it.price!! > OrderFns.discount(rate)!!`），也会导致全扫描，因此这种情况也会警告（`LQL-5007`）。
-严格模式（用错误代替警告）尚未实现。
+在 `SargableMode.STRICT` 下，分析会失败，而不是警告（`LQL-3066`，决策 D50）。
+
+**SARGable 模式**（决策 D50）。`SargableMode` 有三个值。
+
+- `OFF`：不检查，也不查询元数据。
+- `WARN`（默认）：记录警告。
+- `STRICT`：在 `WARN` 会记录警告的情况下（`LQL-5001`、`LQL-5007`、`LQL-5012`），分析以 `org.lambdaql.NonSargableException`（`LQL-3066`）失败。
+
+按 persistence unit 用 `SargablePolicy.register(emf, SargableMode.STRICT)` 指定，用 `SargablePolicy.unregister(emf)` 解除。在 Spring 中使用 `lambdaql.sargable.mode=STRICT`（见 [12](12-spring-data-jpa.md)）。
+检查在每个 Lambda 上执行一次，时机是把分析结果放入共享缓存时。因此请在第一个查询之前注册模式。
+
+**列上的算术**（决策 D50）。
+
+- 只由一个列和值组成的 `+ - * /`（`it.cnt * 2 > n`）可以移到值一侧。lambdaQL 以 `WARN` 级别记录 `LQL-5012`，在 `STRICT` 下为错误。
+- 列与列之间的算术（`it.price!! * it.cnt > n`）和 `%` 无法移动，因此只以 `DEBUG` 级别记录 `LQL-5013`。在 `STRICT` 下也允许。
+- 移动后的写法必须含义相同。请像 `it.cnt > n / 2.0` 这样用小数相除。整数除法 `n / 2` 在 `>=`、`=`、`<` 和负数 `n` 时会得到不同的行。如果乘的是负数，请反转比较方向。`LQL-5012` 的消息会给出这些提示。
+- 没有采用通过查询索引是否存在来减少警告的方式。原因是权限和同义词会使"没有索引"和"无法得知"混在一起，而且列上的算术是少见的写法。
 参见 [8. 存储过程与数据库函数](08-procedures-functions.md)。
 
 <a id="103-null-rules"></a>
@@ -139,35 +157,39 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 | `it.status == 1`（`Int?` 与常量） | `e0.status = 1` | NULL：UNKNOWN，不返回该行。忽略编译器隐藏的 null 检查（D22） |
 | `it.status != 1` | `e0.status <> 1` | NULL：**不**返回该行 |
 | `it.price!! > p` | `e0.price > :p1` | NULL：不返回该行。`!!` 被忽略（D23） |
-| `it.status == q`（两侧都可空：`q: Int?`、`String?`、enum） | `e0.status = :p1`；捕获的 `null`：`is null` | 列为 NULL：不返回。捕获的 `null` 遵循 Kotlin（`is null`） |
-| `it.status != q`（两侧都可空） | `e0.status <> :p1`；捕获的 `null`：`is not null` | 列为 NULL：**不**返回（SQL 语义，D48；Kotlin 会返回它） |
+| `it.status == q`（两侧都可空：`q: Int?`、`String?`、enum） | `e0.status = :p1` | 列为 NULL：不返回。捕获的 `null`：没有匹配的行（`= NULL`，`WARN` 级别的 `LQL-4045`） |
+| `it.status != q`（两侧都可空） | `e0.status <> :p1` | 列为 NULL：**不**返回（SQL 语义，D48；Kotlin 会返回它）。捕获的 `null`：没有匹配的行 |
 | `it.description == it.custName`（两个实体值） | `e0.description = e0.custName` | 任一侧为 NULL：不返回，NULL 与 NULL 也一样（SQL 语义，D48） |
 | `it.description.equals(text)`（`String?`） | 与 `==` 相同 | 与 `==` 相同 |
 | `x == null`、`x != null` | `is null`、`is not null` | 二值 |
+| `it.cnt >= 2.5`（整数列，小数值） | 按写出的值比较：常量是字面量（`e0.cnt >= 2.5`），捕获值和 IN 列表以 `BigDecimal` 绑定（D48 B8） | 保持索引范围扫描（在 MariaDB 上实测）。不再像以前那样截断值而返回错误的行 |
+| 整个值对象（`@Embedded`）：`it.address == addr`、`it.address != addr` | 按列展开：`e0.address.city = :p1 and e0.address.zip = :p2`，否定为 `<> ... or ...`。`== null` 是所有列 `is null`（and），`!= null` 是 `is not null`（or） | 每列遵循 SQL 语义（D48）：NULL 列对 `=` 和 `<>` 都不匹配。捕获的对象为 `null` 时没有匹配的行（`WARN` 级别的 `LQL-4045`） |
 | `it.id == id`（`it.id` 是 `Long?`，`id` 是捕获的 `Long`）、`it.id == null`：永远不会是 NULL 的列（id、基本类型、`nullable = false`，且路径上没有关联步骤） | `e0.id = :p1`，而不是 `not (e0.id is null or e0.id <> :p1)`；`it.id == null` 得到 `1=0`（用 Java 测试） | 该列没有 NULL。经过关联的路径（`it.customer?.id`）保留检查 |
 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR` | SQL 三值逻辑 |
 | `it.flag == true` / `it.flag != true` | `e0.flag = true` / `e0.flag <> true` | NULL：不返回（SQL 语义，D48） |
 | `it.flag ?: false`（条件） | `(e0.flag is not null and e0.flag = true)` | NULL 视为 false |
 | `where` 中的 `it.customer?.name`、`it.customer!!.name` | `j1.name` + `join e0.customer j1`（默认是内连接） | 没有 customer：该订单不会被返回，`it.customer?.name == null` 也是如此 |
-| `it.customer == null \|\| it.customer?.name == p` | `e0.customer is null or j1.name = :p1` + `left join e0.customer j1` | 没有 customer：会被返回，与 Kotlin 相同 |
-| 只在 `orderBy` 或 `select` 中使用的同一路径 | `j1.name` + `left join e0.customer j1` | 没有 customer：该列为 NULL |
+| `it.customer == null \|\| it.customer?.name == p` | `e0.customer is null or j1.name = :p1` + `join e0.customer j1` | 没有 customer：**不**返回（内连接，D48；`DEBUG` 级别的 `LQL-5009`）。要保留，请使用 `leftJoin` |
+| 只在 `orderBy` 或 `select` 中使用的同一路径 | `j1.name` + `left join e0.customer j1`。必需关联（`optional = false`）为 `join` | 没有 customer：该列为 NULL |
 | `it.customer == null`、`it.customer != null` | `e0.customer is null`、`e0.customer is not null`（外键列，不需要 join） | 没有 customer 的订单 / 有 customer 的订单 |
 | `it.customer?.id` | `e0.customer.id`（外键列，不需要 join） | 没有 customer：NULL |
 | `a ?: b`（值） | 值中为 `coalesce(a, b)`；字符串条件中为 SARGable 写法 | 参见 [9.5](09-kotlin-notes.md#95-null-operators---and-) |
 | `it.id in ids` | `e0.id in (:p1)` | NULL id：不返回 |
-| `it.id !in ids` | `e0.id not in (:p1)`（id 不可能为 NULL）。可能为 NULL 的列：`(x is null or x not in (:p1))` | NULL 值（可为 NULL 的列）：会被返回，与 Kotlin 相同 |
+| `it.id !in ids` | `e0.id not in (:p1)`。可能为 NULL 的列也一样 | NULL 值：**不**返回（SQL 语义，D48；`DEBUG` 级别的 `LQL-5009`；Kotlin 会返回它） |
 | `it.status in 1..5`、`!in 1..5`、`when (it.status) { ... }` | `between`、`not (... between ...)`、`in (...)` | NULL 主体：不返回，在 `NOT` 之下也一样（没有保护，D22） |
-| 带 `x !in sub...` 的子查询 | `not exists (...)` | 即使子查询返回 NULL 也正确 |
+| 带 `x !in sub...` 的子查询 | `x not in (select ...)` | 子查询中有 NULL 时，不返回任何行（SQL 语义，D48） |
 | `Agg.sum`、`avg`、`min`、`max` | `sum(...)` ... | 没有行或所有值都为 NULL 时为 NULL |
 | `Agg.count()` | `count(*)` | 没有行时为 0 |
 
+<a id="captured-null-values"></a>
 ### 捕获的 null 值
 
 | 捕获值所在的位置 | 允许 `null` 吗？ |
 |---|---|
-| 两个可空值之间的 `==` / `!=` | 允许。生成 `is null` / `is not null` |
-| 在同一个值的 null 保护之下：`p == null \|\| it.status!! > p` | 允许。这个保护会在查询执行时在应用程序中决定：`p == null` 时不过滤，其他值时为 `e0.status > :p1` |
-| 带 `!!` 或在大小比较（`<` `<=` `>` `>=`）中：`it.price!! > p!!` | **不允许。**绑定该值时报错（Kotlin 会抛出 NPE） |
+| 两个可空值之间的 `==` / `!=` | 允许，但没有匹配的行（`= NULL`）。查询执行时以 `WARN` 级别记录 `LQL-4045` |
+| 在同一个值的 null 保护之下：`p == null \|\| it.status!! > p` | 允许。这个保护会在查询执行时在应用程序中决定：`p == null` 时不过滤，其他值时为 `e0.status > :p1`。只含 `!!` 和拆箱为自身基本类型的比较与保护位置无关 |
+| 带 `!!` 或在大小比较（`<` `<=` `>` `>=`）中：`it.price!! > p!!` | 允许，但没有匹配的行（`> NULL`）。不执行 `!!`（D23）和拆箱为自身基本类型的操作。以 `DEBUG` 级别记录 `LQL-4045` |
+| 对捕获值的方法调用（`p.trim()`、转换为其他基本类型的 `p.toInt()`） | **不允许。**计算值时报错（`LQL-4012`，Kotlin 会抛出 NPE） |
 | `in` 中带有 `null` 元素的集合 | **不允许。**绑定时报错 |
 | `NaN`、`Infinity` | **不允许。**总是报错 |
 
@@ -186,7 +208,7 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 | R8 | 实体 `==` 实体 | 计划：标识符相等。v0.1 不支持（KC13） |
 | R9 | 捕获值 | 以运行时的值作为绑定参数 |
 | R10 | 属性访问（`it.price`） | getter 调用，映射到 JPA 属性 |
-| R11 | 编译为 `Intrinsics.areEqual` 的 Kotlin `==`、`!=`（引用，或两侧都可空） | 值相等：按 SQL 语义的 `=` / `<>`（D48）；捕获的 `null` 生成 `is null` / `is not null` |
+| R11 | 编译为 `Intrinsics.areEqual` 的 Kotlin `==`、`!=`（引用，或两侧都可空） | 值相等：按 SQL 语义的 `=` / `<>`（D48）。捕获的 `null` 不匹配任何行 |
 | R12 | 可空基本类型与基本类型（`it.id == 1L`，`id: Long?`） | 忽略隐藏的 null 检查：`e0.id = 1`、`e0.id <> 1` |
 | R13 | `!!` 及其他编译器 null 检查 | 忽略（D23） |
 | R14 | `?.` | 带 NULL 传播的路径或值；与不带 `?.` 时是同一个列 |
@@ -194,12 +216,12 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 | R16 | 关联 join | 已被 R24 取代 |
 | R17 | `===`、`!==` | 值相等，与 `==` 相同 |
 | R18 | 区间 `in a..b`、`until`、`..<`、`downTo`、`!in` | `between`、`>= and <`、`not (...)`。不会自动添加 null 保护 |
-| R19 | 集合 `x in c`、`x !in c`（捕获的 `c`） | `x in (:p)`、`(x is null or x not in (:p))`。null 元素：报错。为空：FALSE / TRUE |
+| R19 | 集合 `x in c`、`x !in c`（捕获的 `c`） | `x in (:p)`、`x not in (:p)`（SQL 语义，D48）。null 元素：报错。为空：FALSE / TRUE |
 | R20 | 带常量分支并以 `true`/`false` 结尾的 `when (subject)` | `in (...)` 或比较的 `OR` |
 | R21 | Kotlin 字符串函数（`startsWith`、`endsWith`、`contains`、`equals(ignoreCase)`、`lowercase`、`length`、`isNullOrEmpty`） | `like ... escape '\'`、D24 的忽略大小写路径、`lower`、`length`、`(x is null or x = :p)` |
 | R22 | Kotlin 宿主值（捕获的 `var`、private 属性、`companion` 中的值） | 每次执行时读取。写入它们会被拒绝 |
 | R23 | 属性引用 `Order::price` | 与 getter 相同。在 `orderBy`（`orderBy(Order::price)`）中**尚未实现**：请使用 `orderBy { it.price }` |
-| R24 | 关联路径（`it.customer?.name`、`it.customer!!.name`、Java 实体的 `it.customer.name`） | 一个列。对一关联：where、order by、select 共用的别名。在 `where` 中默认是内连接，当 null 保护保留没有关联的行时是 `left join`（D36）；只在 order by 或 select 中使用时是 `left join`。嵌入类型：同一张表。以目标 `@Id` 结尾，或关联本身与 `null` 比较：外键列，不需要 join。集合：报错 |
+| R24 | 关联路径（`it.customer?.name`、`it.customer!!.name`、Java 实体的 `it.customer.name`） | 一个列。对一关联：where、order by、select 共用的别名。在 `where` 中始终是内连接（D48；要保留没有关联的行，请使用 `leftJoin`），只在 order by 或 select 中使用时是 `left join`（必需关联 `optional = false` 为内连接，A4）。嵌入类型：同一张表。以目标 `@Id` 结尾，或关联本身与 `null` 比较：外键列，不需要 join。集合：报错 |
 
 Java 专用规则 R4（对实体值使用 `equals`）和 R5（Java 的 null 安全辅助方法）在 [Java 路线](../java/10-rules-and-limits.md) 中。在 Kotlin 中，`==` 具有与 R5 相同的含义。
 
@@ -222,8 +244,8 @@ Java 专用规则 R4（对实体值使用 `equals`）和 R5（Java 的 null 安�
 |---|---|---|
 | G1 | 在 Kotlin 中 `null != 3` 为 true；SQL 的 `status <> 3` 为 UNKNOWN | `!=` 渲染为 `<>`：SQL 语义（D48）。NULL 行被排除，并以 `DEBUG` 级别记录 `LQL-5009`。要保留它们，请写 `it.status == null \|\| ...` |
 | G2 | `it.flag != true` 与 Kotlin 的差异 | 渲染为 `e0.flag <> true`：NULL 的 Boolean 不匹配（SQL 语义） |
-| G3 | 参数为 NULL 时 `name = ?` 返回 0 行 | 捕获的 `null` 生成 `name is null`（捕获的值适用 Kotlin 规则） |
-| G4 | `status NOT IN (1, NULL)` 总是返回 0 行 | 捕获集合中的 `null` 会报错。子查询的 `!in` 写成 `NOT EXISTS` |
+| G3 | 参数为 NULL 时 `name = ?` 返回 0 行 | 保持原样（SQL 语义，D48）。执行时以 `WARN` 级别记录 `LQL-4045`。要查找 NULL，请写 `x == null` |
+| G4 | `status NOT IN (1, NULL)` 总是返回 0 行 | 捕获集合中的 `null` 会报错。子查询的 `!in` 保持 SQL 语义（D48）：请在子查询中加上 null 检查 |
 | G5 | Kotlin 会抛出 NPE（`!!`、拆箱），SQL 只是比较 | 已写入文档：实体中的 NULL 遵循 SQL 规则 |
 | G6 | `NaN`：H2 把 NaN 排为最大值且 `NaN = NaN` 为 true；MariaDB 无法存储它；Oracle 只能在 `BINARY_DOUBLE` 中存储 | 捕获的 NaN 或 Infinity 会报错。存储的 NaN 遵循数据库 |
 | G7 | `Float` 列与 `Double` 值比较：结果因数据库而异 | 对于 `Float`/`Double`，**不保证与 Kotlin 的结果逐位一致**。lambdaQL 不添加 `CAST`。请自行选择列映射（例如 Oracle 的 `binary_float` / `binary_double`） |
@@ -255,6 +277,7 @@ Java 专用规则 R4（对实体值使用 `equals`）和 R5（Java 的 null 安�
 
 lambdaQL 隐藏了许多差异。有些你必须了解。
 
+<a id="sorting-and-paging"></a>
 ### 排序与分页
 
 | 项目 | H2 | MariaDB | Oracle | lambdaQL |
@@ -263,15 +286,18 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 | NULL 的位置，`DESC` | 在后 | 在后 | **在前** | 在所有数据库上 `DESC` 都表示 NULLS LAST（D16） |
 | `NULLS FIRST/LAST` 语法 | 支持 | **不支持**（语法错误） | 支持 | Hibernate 在 MariaDB 上用 `CASE` 模拟：排序**无法使用索引** |
 | 分页 SQL | `offset ? rows fetch first ? rows only` | `limit ?,?` | `offset ? rows fetch first ? rows only` | 交给 Hibernate（`setFirstResult` / `setMaxResults`） |
-| 相等行的顺序 | – | – | 随机 | 分页时，如果排序键不包含 id，lambdaQL 会添加根实体的 `@Id asc` |
+| 相等行的顺序 | – | – | 随机 | 分页时，如果排序键不包含 id，lambdaQL 会添加根实体的 `@Id asc`。有唯一且不可为 NULL 的键（`unique = true` 且 `nullable = false`、`@NaturalId`）时不添加（A5） |
 | 字符串顺序 | 区分大小写 | `_ci` | `NLS_SORT`（JVM 区域设置） | 遵循数据库 |
-| `order by` 中的隐式路径 | inner join（丢失行） | 相同 | 相同 | lambdaQL 使用 `left join`（或同一路径的 `where` join） |
+| `order by` 中的隐式路径 | inner join（丢失行） | 相同 | 相同 | lambdaQL 使用 `left join`（必需关联为内连接）（或同一路径的 `where` join） |
+| `order by`、`distinct`、`group by` 中的 `@Lob` 列 | 可用 | 可用 | **ORA-22848 / ORA-22849** | 不改变查询，以 `DEBUG` 级别记录 `LQL-5010`（B3） |
+| `@Enumerated(EnumType.STRING)` enum 列的排序 | 按名称 | 按名称 | 按名称 | 不改变查询，以 `DEBUG` 级别记录 `LQL-5011`（B2）。只有 `ORDINAL` 映射按声明顺序 |
 
-对于每个可能为 NULL 的排序键，lambdaQL 都会把 `nulls first` / `nulls last` 写入 HQL。当它就是数据库的默认值时，Hibernate 会去掉它。
+对于每个可能为 NULL 的排序键，lambdaQL 都会把 `nulls first` / `nulls last` 写入 HQL。只经过必需关联且不可能为 NULL 的路径不写。当它就是数据库的默认值时，Hibernate 会去掉它。
 默认值（`ASC` = NULLS FIRST，`DESC` = NULLS LAST）与 H2 和 MariaDB 相同，所以在它们上面
 不需要额外的 SQL；只有 Oracle 会加上 `NULLS` 子句。要改变 NULL 的位置，请使用
 `by.asc(key, false)`（NULL 在后）或 `by.desc(key, true)`（NULL 在前）（D35）。在 MariaDB 上它们使用 `CASE` 模拟。
 
+<a id="conditions-and-values"></a>
 ### 条件与值
 
 | 项目 | H2 | MariaDB | Oracle |
@@ -285,6 +311,7 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 | 整数 `/` | 整数 | **小数**（`5/2 = 2.5`） | – |
 | 很大的 `in` 列表（1,500 个值） | 可用 | 可用 | 在 23ai 上可用（未测量旧版 Oracle 的 1,000 个限制） |
 
+<a id="subqueries"></a>
 ### 子查询
 
 | 项目 | 现象 | lambdaQL |
@@ -293,18 +320,20 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 | MariaDB `IN (... limit n)` | 不支持（错误 1235） | 自动包装：`in (select x.id from (... limit n) x)` |
 | MariaDB `lateral` | 结果错误（模拟实现） | 用 `row_number() over (...)` 改写（尚未实现） |
 
+<a id="update-insert-delete"></a>
 ### 更新、插入、删除
 
 | 项目 | 现象 | lambdaQL |
 |---|---|---|
 | `SET a = ..., b = a + 1`（在设置某列之后又读取它） | MariaDB 读取**新**值，H2 和 Oracle 读取旧值 | 分析时报错（U3） |
 | DML 中的关联路径（`it.customer?.name`） | Hibernate 在各数据库上生成不同的 join，并且会**丢失**没有 customer 的行 | lambdaQL 写出关联标量子查询（在 `where` 和 SET 中）。在 `where` 中，查询会做内连接的路径还会加上 `customer.id is not null`，所以 DML 与查询命中相同的行（U9，已测试） |
-| 带有同一张表子查询的 `DELETE` | MariaDB 错误 1093 | 包装在派生表中（U17；尚未实现） |
+| 带有同一张表子查询的 `DELETE` | MariaDB 错误 1093 | 先通过派生表读取目标 id：`d0.id in (select t.id from (select e0.id as id … where <condition>) t)`（U17）。对关联子查询也可用，在三种数据库上删除相同的行（实测）。`update` 不包装（在 MariaDB 上也可用） |
 | 同一个 enum 值只绑定一次，同时用于 STRING 列和 ORDINAL 列 | H2 和 MariaDB 会**不报错地存入错误的值** | 每个位置使用一个参数，从不共用（U7） |
 | `values(list) { }` 中的大量行 | Oracle：绑定变量硬上限为 65,535（ORA-01745），远在达到之前就已非常慢 | 拆分：每条语句最多 500 个值，全部在一个事务中执行（U13） |
 | 带 `order by ... limit` 的 `update` / `delete` | MariaDB 拒绝 `in` 子查询中的 `limit`（错误 1235）和读取目标表的子查询（错误 1093） | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`：派生表 `t` 在三个数据库上都可用。内层 select 使用查询的连接（D36），因此行与查询相同（用 Java 测试） |
 | `on conflict` / upsert | H2 和 Oracle：`merge`。MariaDB：`insert ... on duplicate key update`，更新的行计为 2。Hibernate 的 `do nothing` 在 H2 和 Oracle 上会失败 | `upsert` 和 `onConflict(...).update(...)` 使用 Hibernate 的形式。`ignore()` 写成 `insert ... select ... where not exists`。行数原样返回（D40，已测试） |
 
+<a id="procedures-and-functions"></a>
 ### 存储过程与函数
 
 | 项目 | H2 | MariaDB | Oracle |
@@ -322,6 +351,7 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 
 对于此列表中的每种写法，lambdaQL 都会抛出明确的错误。"计划中"表示以后的版本。
 
+<a id="lambda-form-and-loading"></a>
 ### Lambda 写法与加载
 
 | 不支持 | 替代写法 |
@@ -335,6 +365,7 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 | `@JvmField`、`internal`、`value class`、`@get:JvmName` 属性（KC15、KC16） | 公开的普通属性 |
 | 针对比内置 ASM 所知更新的 JDK 编译的 Lambda | 更新 ASM（lambdaQL 不对它做 shade） |
 
+<a id="conditions"></a>
 ### 条件
 
 | 不支持 | 替代写法 |
@@ -344,6 +375,7 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 | 布尔中缀 `and`、`or`、`xor` | `&&`、`\|\|` |
 | 保护条件之下的 `/`、`%`、`CAST`（`it.qty != 0 && it.price!! / it.qty > 2`） | 不用除法比较：`it.qty > 0 && it.price!! > 2.0 * it.qty` |
 | 实体 `==` 实体（`it.customer == c`）（KC13） | `it.customer?.id == c.id`（计划：标识符相等） |
+| 值对象（`@Embedded`）的大小比较、与其他类型的比较（`LQL-3012`） | 比较字段。支持与同一类型的 `==`、`!=`、`null` 比较 |
 | 集合路径（`it.items...`、`@OneToMany`、`@ManyToMany`） | `exists()` 子查询，或 join |
 | `item in it.items` | `exists()` 子查询 |
 | 在 Lambda 内部构建的集合（`listOf(1, 2)`、`setOf(...)`）（KC8） | 在外部构建并捕获它。（`groupBy` 键是例外） |
@@ -355,6 +387,7 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 | 带实体值的字符串模板或 `+`（KC17） | 计划中 |
 | 实体路径上的 `it.tags["k"]`、`it.lines[0]` | – |
 
+<a id="functions-and-strings"></a>
 ### 函数与字符串
 
 | 不支持（v0.1） | 替代写法 |
@@ -369,6 +402,7 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 | 用户自定义的聚合函数或窗口函数 | 计划中 |
 | 在查询 Lambda 之外或在 `where` 中调用 `Agg.*` | 在 `select` / `having` 中使用 |
 
+<a id="sort-and-paging"></a>
 ### 排序与分页
 
 | 不支持 | 替代写法 |
@@ -379,12 +413,14 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 | join 排序 Lambda 中的属性引用 | Lambda |
 | `orderBy` 中的属性引用（`orderBy(Order::price)`，尚未实现） | Lambda：`orderBy { it.price }` |
 | 把排序名称和方向放在一起的一段文本（`"price,desc_nulls_last"`），尚未实现 | 方向用 `Direction.parse(text)`，名称用 `SortSpec.ofPath`。名称由排序策略检查（[4.10](04-order-paging.md#sort-policy)） |
+| 在连接结果的 `distinct()` 中按被连接实体的列或关联路径排序（J7，`LQL-3046`） | 按主实体自身的列排序，或使用 `exists` 子查询 |
 | 集合 fetch join 与 `limit` / `offset` 一起使用 | 先分页，再加载集合 |
 | Spring `Sort` 中的 `ignoreCase()`（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)），尚不支持 | 不带 `ignoreCase()` 的排序 |
 | 函数键（`lower(name)`） | 计划中 |
 | 按聚合别名排序（`by.desc(s.total)`） | 计划中 |
 | 以布尔 elvis 作为排序键（KC21） | 用键 `o.flag` 并指定 NULL 位置：`by.asc(o.flag, false)`（NULL 在后） |
 
+<a id="limits-subqueries"></a>
 ### 子查询
 
 | 不支持 | 替代写法 |
@@ -392,6 +428,7 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 | 在标量比较中使用 `first()`，但结果不是一行 | 使用聚合（`max`、`min`、`avg`、`sum`、`count`）或 `orderBy { }.limit(1)...first()` |
 | 子查询中不带 `limit` 的 `orderBy` | 它没有效果，所以会被移除（WARN） |
 
+<a id="select-and-group-by"></a>
 ### 查询列与分组
 
 | 不支持 | 替代写法 |
@@ -401,6 +438,7 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 | 用 `arrayOf(...)` / `setOf(...)` 作为 `groupBy` 键 | `listOf(...)`、`Pair`、`Triple` |
 | 以布尔 elvis 作为查询值（KC21） | 查询 `it.flag`，在 Kotlin 中处理 NULL |
 
+<a id="limits-update-insert-delete"></a>
 ### 更新、插入、删除
 
 | 不支持（v0.1） | 替代写法 |
@@ -411,12 +449,12 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 | 条件值（`if (c) a else b`、`when`、作为值的切换 `!it.active`） | 计划中（`CASE WHEN`）。使用两次带不同 `where` 的更新 |
 | 在 `set` Lambda 中用 `if` 选择要设置的列 | 多次调用 `set()` |
 | `set` 中的 `++`、`--`、`apply`、`with`、`also` | `it.cnt += 1`、直接赋值 |
-| `by[o.cnt] += 1` | `by[o.cnt] = o.cnt + 1` 或 `by.set(o.cnt, o.cnt + 1)` |
 | 赋值 Lambda 中的局部 `val` | 在每个位置写出表达式 |
 | 设置关联的非 `@Id` 属性（`it.customer?.name = x`） | 直接更新 `Customer` |
 | 向非可选列（`@Id`、`nullable = false`、基本类型）写入 `null` | – |
 | 自己写入 `@Version` 属性 | lambdaQL 会为你使用 `update versioned` |
 | 值中的字符串模板 | 计划中 |
+| update 或 delete 中的显式 join | 不添加（D51）。使用关联路径（U9）或 `sub`（D49） |
 | 带显式 join 的 `insert ... select` | 计划中。在 v0.1 中请使用多对一路径 |
 | 并发插入时原子的 `onConflict { ... }.ignore()` | 捕获键重复错误（`ignore()` 使用 `not exists`，见 [7.6](07-6-upsert.md)） |
 | 基于 `insert ... select` 的 upsert | 用 `values(list) { ... }` 逐行 upsert |
@@ -437,6 +475,7 @@ DML 还需注意：批量 DML 不经过持久化上下文。Hibernate 会先刷�
 JPA 的级联和 `orphanRemoval` 不适用。
 DML 语句需要事务：`QueryBuilder(EntityManagerFactory)` 会打开自己的事务；使用 `EntityManager`（包括 Spring 的共享 `EntityManager`）的构建器需要调用方的事务，没有事务时会在发送任何 SQL 之前失败。
 
+<a id="procedures"></a>
 ### 存储过程
 
 | 不支持 | 替代写法 |

@@ -1,9 +1,6 @@
 <a id="74-delete"></a>
 # 7.4 删除（Kotlin）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/07-4-delete.md)。
-
 [7. 更新、插入、删除（Kotlin）](07-dml.md) | [7.2 更新](07-2-update.md) | **7.4 删除** | [7.5 插入](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Java](../java/07-4-delete.md)
 
 ---
@@ -19,7 +16,7 @@ val byName = qb.delete(Order::class.java).where { it.customer?.name == null }
 // HQL: delete from Order e0 where (select s1.name from Customer s1 where s1.id = e0.customer.id) is null and e0.customer.id is not null
 ```
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。 该测试使用 Java Lambda。含义相同的 Kotlin Lambda 生成相同的 HQL，因此 SQL 也相同。
+**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。该测试使用 Java Lambda。含义相同的 Kotlin Lambda 生成相同的 HQL，因此 SQL 也相同。
 
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `delete`：
 
@@ -60,16 +57,17 @@ assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where
 更多用 Java 写的语句在 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中测试（H2、MariaDB 和 Oracle）。这些示例见[本页的 Java 版本](../java/07-4-delete.md)。
 
 第二条语句删除的行与 `qb.from(Order::class.java).where { it.customer?.name == null }` 返回的**行相同**：客户没有名字的订单。Java 测试会把删除的行与这个查询进行比较。
-**没有**客户的订单不会被删除（规则 U9，决策 D36）。要把它们也删除，请写 `it.customer == null || it.customer?.name == null`。有了这个 null 守卫，lambdaQL 不会加上 `e0.customer.id is not null`。
+**没有**客户的订单不会被删除（规则 U9，决策 D36）。写 null 守卫（`it.customer == null || ...`）也一样，因为在查询中这条路径也是 inner join（决策 D48）。
+要删除没有客户的订单，请用 `it.customer == null` 条件再执行一次删除语句。
 
-删除所有行：必须写 `all()`（规则 U5）。
+删除所有行时需要 `all()`（规则 U5）。
 
 ```kotlin
 qb.delete(Order::class.java).all().execute()     // delete all rows
 qb.delete(Order::class.java).execute()           // compile error: no execute()
 ```
 
-按 id 列表删除（捕获的集合，决定 D29）：
+按 id 列表删除（捕获的集合，决策 D29）：
 
 ```kotlin
 qb.delete(Item::class.java).where { it.id in ids }.execute()
@@ -101,6 +99,32 @@ where not exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id)
 
 与所有 JPA 批量语句一样，删除不会执行 JPA 的 `cascade` 或 `orphanRemoval`，也不会修改已加载的实体（规则 U16）。
 删除需要事务（见 [7.8](07-dml.md#transactions)）。
+
+<a id="delete-with-a-subquery-on-the-same-table"></a>
+## 读取同一张表的子查询
+
+`where` 中的子查询可以读取要删除的实体（或同一继承层次中的实体）。子查询自己的 `from`、子查询中的连接、U9 的关联标量子查询都属于这种情况。
+这时 lambdaQL 先通过派生表读取目标 id，再按这些 id 删除（规则 U17）。
+
+```
+delete from Order d0 where d0.id in (select t.id from (select e0.id as id from Order e0 where <condition>) t)
+```
+
+- 原因：子查询读取目标表时，MariaDB 会拒绝 Hibernate 的 `delete t from …`（错误 1093，“specified twice”）。
+- 关联子查询也能使用同样的形式。只包装子查询的方式不能用于关联子查询。
+- 已在 H2、MariaDB 10.11、Oracle 23.26 上实测（非关联 `avg`、关联 `exists`、`max`、子查询中的连接）。三种数据库删除的行数相同，MariaDB 也不会失败。
+- 读取其他表的子查询保持原来的形式（上面的 `not exists` 示例）。
+- `update` 不做包装。带有读取自身表的子查询的 `update` 在三种数据库上都能工作（在 MariaDB 10.11 上实测）。
+- 复合 id 实体不做包装。带 `limit` 的删除本来就使用下面的包装形式（别名 `x0`）。
+
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `delete-self-subquery`：
+
+```kotlin
+// the subquery reads the target table: the matching ids are read through a derived table first (U17, MariaDB 1093)
+val d = qb.delete(Order::class.java).where { o, sub -> o.price < sub.from(Order::class.java).avg { x -> x.price } }
+assertEquals("delete from Order d0 where d0.id in (select t.id from (select e0.id as id from Order e0"
+        + " where e0.price < (select avg(s1.price) from Order s1)) t)", d.toHql().hql())
+```
 
 <a id="delete-the-first-rows-limit"></a>
 ## 删除前几行：`limit`
@@ -143,7 +167,7 @@ where o1_0.id in (select t1_0.id from (select o2_0.id id from orders o2_0 where 
 
 lambdaQL 把 limit 写成 `e0.id in (select t.id from (select x0.id as id from X x0 ... order by ... limit n) t)`：
 
-- 内层 select 遵循查询的规则，包括连接（决定 D36）。因此语句删除的正是查询返回的行。
+- 内层 select 遵循查询的规则，包括连接（决策 D36）。因此语句删除的正是查询返回的行。
 - 派生表 `t` 是为 MariaDB 准备的。没有它，MariaDB 会拒绝 `in` 子查询中的 `limit`（错误 1235）和读取目标表的子查询（错误 1093）。
 - H2 和 Oracle 写 `fetch first 1 rows only`，MariaDB 写 `limit 1`。
 

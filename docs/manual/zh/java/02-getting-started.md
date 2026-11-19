@@ -1,7 +1,5 @@
+<a id="2-getting-started-java"></a>
 # 2. 入门（Java）
-
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/02-getting-started.md)。
 
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[1. 概述](../01-overview.md) | 下一章：[3. 条件](03-where.md) | [本页的 Kotlin 版本](../kotlin/02-getting-started.md)
 
@@ -9,6 +7,7 @@
 
 ---
 
+<a id="requirements"></a>
 ## 环境要求
 
 | 项目 | 版本 | 说明 |
@@ -52,6 +51,7 @@ cd lambdaql
 
 例如，`ConditionDecodeTest` 检查 `o -> o.getStatus() == 1 || o.getStatus() == 2 || o.getStatus() == 3` 是否被解码为一个包含三个比较运算的 `OR`，并保持源代码中的顺序。
 
+<a id="use-the-local-build-in-your-project"></a>
 ### 在你的项目中使用本地构建
 
 把三个模块的 jar 发布到本地 Maven 仓库：
@@ -88,8 +88,8 @@ Maven：
 使用 Spring Data JPA 或 Spring Boot 时，请改用 `lambdaql-spring-boot-starter` 或 `lambdaql-spring-data-jpa`。它们会带入 `lambdaql-core`（见 [12.2](12-spring-data-jpa.md#122-modules)）。
 
 > [!WARNING]
-> 这些构件**尚未发布到 Maven Central**。
-> 版本 `1.0.0` 来自仓库的 `gradle.properties`，在首次发布前可能改变。lambdaQL 发布后请再次查看本页。
+> 版本 `1.0.0` 是仓库的 `gradle.properties` 中定义的值，在首次发布前可能改变。
+> lambdaQL 发布到 Maven Central 后，请再次查看本页。
 
 <a id="recommended-compiler-option--parameters"></a>
 ### 推荐的编译器选项：`-parameters`
@@ -125,7 +125,7 @@ public class Order {
     private Long id;
     private Double price;
     private Integer status;
-    private boolean active;              // getter：isActive()
+    private boolean active;              // getter: isActive()
     private String description;
     @ManyToOne(fetch = FetchType.LAZY)
     private Customer customer;
@@ -165,6 +165,7 @@ public class Item {
 - 你不需要生成的代码（不需要 Q 类，也不需要静态元模型）。
 - 大多数字段是装箱类型（`Long`、`Double`、`Integer`）。这对 `==` 很重要。见 [9. Java 说明](09-java-notes.md#92-boxing-and-unboxing)。
 
+<a id="create-a-querybuilder"></a>
 ## 创建 QueryBuilder
 
 `QueryBuilder` 是入口。它需要一个 JPA `EntityManagerFactory` 或一个 `EntityManager`。
@@ -175,6 +176,7 @@ QueryBuilder qb = new QueryBuilder(entityManagerFactory);
 
 创建一个 `QueryBuilder` 并重复使用它。不要为每个查询都创建一个新的。
 
+<a id="with-plain-jpa"></a>
 ### 使用纯 JPA
 
 ```java
@@ -182,6 +184,7 @@ EntityManagerFactory emf = Persistence.createEntityManagerFactory("my-unit");
 QueryBuilder qb = new QueryBuilder(emf);
 ```
 
+<a id="with-spring-boot"></a>
 ### 使用 Spring Boot
 
 使用 `lambdaql-spring-boot-starter` 时，Spring Boot 会为你创建 `QueryBuilder` bean（见 [12.8](12-spring-data-jpa.md#128-the-querybuilder-bean)）。
@@ -223,6 +226,7 @@ public class OrderService {
 - 在 Spring 应用中不要使用接收 `EntityManagerFactory` 的构造函数。那样创建的 builder 会为每个查询打开自己的 `EntityManager`，位于 Spring 事务之外。
 - 如果要在 Spring Data 仓库中编写 lambdaQL 查询，请参阅 [12. Spring Data JPA](12-spring-data-jpa.md)。
 
+<a id="your-first-query"></a>
 ## 你的第一个查询
 
 ```java
@@ -253,6 +257,7 @@ where o1_0.status=1 and o1_0.price>100.0
 `price` 是 `Double`，所以 javac 把 `100` 编译为小数 `100.0`。
 来自 Lambda 外部的值则不同：它们始终是绑定参数（见下一节和 [3.3](03-where.md#33-basic-form)）。
 
+<a id="use-values-from-outside-the-lambda"></a>
 ### 使用 Lambda 外部的值
 
 Lambda 可以使用局部变量、字段和方法参数。这些是**捕获的值**。
@@ -276,6 +281,7 @@ from orders o1_0
 where o1_0.status=? and o1_0.price>=?
 ```
 
+<a id="many-where-calls"></a>
 ### 多次调用 `where`
 
 你可以多次调用 `where`。lambdaQL 用 `AND` 连接这些条件。
@@ -315,6 +321,7 @@ List<Order> orders = query.toList();
 
 构建器变量请使用 `var`。构建器类型的名称尚未最终确定。
 
+<a id="paths-to-other-entities"></a>
 ### 指向其他实体的路径
 
 像 `o.getCustomer().getName()` 这样的路径指代关联实体的一个列。
@@ -338,7 +345,8 @@ where c1_0.name=?
 ```
 
 要查找没有客户的订单，请比较关联本身：`o.getCustomer() == null` 生成 `e0.customer is null`（不需要 join）。
-如果 null 守卫保留了没有客户的订单（`o.getCustomer() == null || ...`），lambdaQL 会使用 `left join`。
+即使写了 null 守卫（`o.getCustomer() == null || ...`），没有客户的订单也不会保留，因为路径是内连接（决策 D48）。
+要保留这些订单，请使用 `leftJoin`（[6.8](06-select-group.md#68-explicit-joins)）。
 见 [3.10](03-where.md#310-association-paths)。
 
 <a id="getting-the-result"></a>
@@ -558,6 +566,7 @@ assertThrows(IllegalStateException.class, () -> qb.from(Tag.class).toSet());
 assertEquals(2, qb.from(Tag.class).toList().size());
 ```
 
+<a id="things-to-know"></a>
 ## 需要知道的事
 
 | 规则 | 示例 |
@@ -570,6 +579,7 @@ assertEquals(2, qb.from(Tag.class).toList().size());
 
 更多 Java 细节见 [9. Java 说明](09-java-notes.md)。
 
+<a id="next"></a>
 ## 下一步
 
 - [3. 条件（`where`）](03-where.md)：所有运算符和 NULL 规则。

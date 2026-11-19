@@ -1,3 +1,4 @@
+<a id="8-stored-procedures-and-db-functions-java"></a>
 # 8. 存储过程与数据库函数（Java）
 
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[7. 更新、插入、删除](07-dml.md) | 下一章：[9. Java 说明](09-java-notes.md) | [本页的 Kotlin 版本](../kotlin/08-procedures-functions.md)
@@ -16,6 +17,7 @@
 两种情况下，你都只需在 Java 接口中写**一次**签名。
 lambdaQL **从不执行**这些方法。它读取 Lambda 字节码中的调用，然后调用数据库。
 
+<a id="contents"></a>
 ## 目录
 
 - [8.1 声明存储过程](#81-declare-procedures)
@@ -83,7 +85,7 @@ interface MathFns {
 }
 ```
 
-测试在运行前会在 MariaDB 和 Oracle 上创建这些存储过程，例如（MariaDB）：
+测试在运行前会在 MariaDB 和 Oracle 上创建这些存储过程。例如（MariaDB）：
 
 ```sql
 CREATE OR REPLACE PROCEDURE SQ_PROC_CALC(IN p_cust INT, IN p_rate DOUBLE, OUT p_total DOUBLE)
@@ -133,6 +135,7 @@ qb.exec(OrderProcs.class, p -> p.purge(9)).execute();
 - 在 Java 中，两者都用 `call` 会成为有歧义的重载（编译错误）。
 - 没有选择 `run`：Kotlin 标准库中有同名函数，Kotlin 调用方可能会在没有任何错误的情况下误调用它。
 
+<a id="what-the-lambda-may-contain-rule-pr12"></a>
 ### Lambda 中可以包含什么（规则 PR12）
 
 Lambda 体是**对存根方法的一次调用**。除此之外什么都没有。
@@ -188,6 +191,7 @@ Adjusted adjusted = qb.call(OrderProcs.class, p -> p.adjust(5, 10)).execute();
 
 `@InOut` 必须恰好标在数据库中为 INOUT 的参数上。否则第一次调用会失败（`LQL-4036`）。
 
+<a id="result-set-element-type-t"></a>
 ### 结果集的元素类型 `T`
 
 | `T` 是 | lambdaQL 的读取方式 |
@@ -205,6 +209,7 @@ lambdaQL 从不按位置映射 record 组件，因为 MariaDB 和 Oracle 返回 
 - 无法对存储过程的结果分页。
 - 不支持 Oracle 的隐式结果（`DBMS_SQL.RETURN_RESULT`）。请使用 `SYS_REFCURSOR` OUT 参数。
 
+<a id="transactions-rule-pr9"></a>
 ### 事务（规则 PR9）
 
 - 存储过程中的 DML 是调用方事务的一部分，会随之回滚。
@@ -213,6 +218,7 @@ lambdaQL 从不按位置映射 record 组件，因为 MariaDB 和 Oracle 返回 
 - 调用之后，已加载的实体可能是过期的。请对这些实体使用 `refresh` 或 `evict`。
 - 存储过程中的 `COMMIT` 或 DDL 会破坏事务。lambdaQL 无法阻止这种情况。
 
+<a id="affected-rows-rule-pr10"></a>
 ### 受影响的行数（规则 PR10）
 
 存储过程没有通用的“受影响行数”结果（Oracle 返回 -1）。
@@ -239,7 +245,7 @@ lambdaQL 在第一次调用时检查的内容（来自 JDBC 元数据 `getProced
 | IN 和 INOUT 参数的个数 = 存根参数的个数 | 能，报错 `LQL-4036`（已测试） |
 | INOUT 参数 = 带 `@InOut` 的参数 | 能，报错 `LQL-4036` |
 | OUT 值和结果集的个数 = 返回类型的组成部分 | 能，报错 `LQL-4038` |
-| 类型 | **尚未实现** |
+| 类型的种类（数字、字符、日期时间、布尔、二进制） | 是，错误 `LQL-4036`（已测试）。同一种类内部的差异不比对（见下文“参数类型比对”） |
 | 相同的参数名以另一种顺序排列 | 是，错误 `LQL-4043`（已测试）。仅当能获得存根参数名时（见下文） |
 | Oracle 包存储过程名有多个重载 | 是，错误 `LQL-4044`（已在 Oracle 上测试） |
 
@@ -274,7 +280,7 @@ assertEquals("LQL-3060", assertThrows(LambdaQLException.class,
 - 名字相同但顺序不同：在调用之前抛出 `LambdaQLException` `LQL-4043`。
 - 名字不同（存根遵循另一种命名规则）：不报错。请加上 `@DbParam`，让检查仍然有效。
 - 类文件中没有名字，并且两个相邻参数类型相同：每个存储过程以 `INFO` 级别记录一次 `LQL-5004`。
-- 类型尚不比较。
+- 类型只比对种类（见下文“参数类型比对”）。两个同一种类的参数互换时，只能通过名字发现。
 
 **(已测试)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `names`（数据库存储过程是 `SQ_PROC_DIFF(p_to, p_from)`；测试存根用 `-parameters` 编译）：
 
@@ -289,6 +295,9 @@ interface DiffProcs {
 
     @SqlProcedure("SQ_PROC_DIFF")
     Integer named(@DbParam("p_to") Integer target, @DbParam("p_from") Integer source);   // another naming rule
+
+    @SqlProcedure("SQ_PROC_DIFF")
+    Integer text(String to, Integer from);                        // a string for a number parameter: LQL-4036
 }
 ```
 
@@ -303,6 +312,22 @@ assertEquals("LQL-4043", assertThrows(LambdaQLException.class,
 ```
 
 **建议：**用 `-parameters` 编译，并使用与数据库相同的名字（共同前缀可以省略），或者加上 `@DbParam`。这样就能发现顺序被交换的错误。
+
+**参数类型比对。** 第一次调用时，lambdaQL 比对每个参数的 Java 类型与数据库参数类型的种类。
+种类有数字、字符、日期时间、布尔、二进制五种。种类不同时，在调用之前以 `LQL-4036` 停止。
+
+- 布尔参数也视为与数字参数相符。MariaDB 的 `BOOLEAN` 是 `TINYINT(1)`，Oracle 23 之前没有 `BOOLEAN` 类型。
+- 无法确定种类的一方（enum、对象类型、游标）不比对。
+- 同一种类内部的差异（例如 `Integer` 参数与 `NUMBER(10,2)` 数据库参数）交给驱动转换。
+
+**(已测试)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `type-check`（MariaDB 和 Oracle）：
+
+```java
+// the kind of each argument is compared with the database parameter: a string for a number parameter stops
+LambdaQLException wrong = assertThrows(LambdaQLException.class,
+        () -> qb.call(DiffProcs.class, p -> p.text("10", 3)).execute());
+assertEquals("LQL-4036", wrong.code(), wrong.getMessage());
+```
 
 **Oracle 包重载。** Oracle 包中可以有多个同名的存储过程。
 lambdaQL 无法区分存根指的是哪一个，因此调用这样的名字会以 `LQL-4044` 停止。选择并调用某一个重载计划在以后提供。
@@ -337,13 +362,13 @@ Oracle 上真正的按名字绑定（`pass_procedure_paramater_names=true` 加�
 | # | 规则 | 状态 |
 |---|---|---|
 | PR1 | 名字：注解的值原样使用。值为空时：方法名转为 UPPER_SNAKE。可以使用包名或模式名（`SQ_PKG.CALC`、`LQL.SQ_CALC`）。为避免混淆，也可以写成 `@SqlProcedure(schema = ..., pkg = ..., value = ...)`。 | 已实现。模式名和包名没有测试覆盖 |
-| PR2 | 参数**按位置**绑定。第一次调用时，会对照数据库元数据检查 IN/INOUT 参数的个数和 `@InOut` 的位置。能获得名字时也检查名字，相同名字顺序不同即为错误。类型检查在计划中（见 [8.4](#84-warning-argument-order)）。无法读取元数据时，跳过这些检查，参数布局取自存根（见 [8.4](#when-the-metadata-cannot-be-read)）。 | 个数、`@InOut` 和名字检查已实现（已测试）。Oracle 包重载检测也已实现（已在 Oracle 上测试）。类型检查尚未实现。没有元数据时的降级行为（`LQL-5005`、`LQL-5006`）也已实现（已在 MariaDB 和 Oracle 上测试）。 |
+| PR2 | 参数**按位置**绑定。第一次调用时，会对照数据库元数据检查 IN/INOUT 参数的个数和 `@InOut` 的位置。能获得名字时也检查名字，相同名字顺序不同即为错误。也比对参数类型的种类（数字、字符、日期时间、布尔、二进制），不同即为错误（`LQL-4036`）（见 [8.4](#84-warning-argument-order)）。无法读取元数据时，跳过这些检查，参数布局取自存根（见 [8.4](#when-the-metadata-cannot-be-read)）。 | 个数、`@InOut` 和名字检查已实现（已测试）。Oracle 包重载检测也已实现（已在 Oracle 上测试）。类型比对也已实现（已在 MariaDB 和 Oracle 上测试）。没有元数据时的降级行为（`LQL-5005`、`LQL-5006`）也已实现（已在 MariaDB 和 Oracle 上测试）。 |
 | PR3 | 一个 OUT → 返回值。多个 OUT/INOUT → record。`@InOut` 标记 INOUT 参数。 | 已实现（已测试） |
 | PR4 | 一个结果集 → `List<T>`。实体通过 Hibernate；record 通过 JDBC 并按标签匹配。不能分页。 | 已实现（已用 record 测试） |
 | PR5 | 多个结果集 → record 的 `List` 组件，按顺序。不支持 Oracle 隐式结果。 | 已实现，没有测试覆盖 |
 | PR6 | 单独调用的数据库函数在不同数据库上使用不同的路径（见 [8.8](#88-call-a-db-function-alone)）。 | 已实现（已测试） |
 | PR7 | 查询中的数据库函数：见 [8.6](#86-declare-db-functions) 和规则 FN1 至 FN11。 | 已实现（已测试） |
-| PR8 | 条件中作用于列的数据库函数会产生 WARN，因为无法使用索引（见 [8.9](#89-warning-functions-on-columns-and-indexes-sargable)）。错误码为 `LQL-5001`。 | 已实现（已测试）。严格模式尚未实现 |
+| PR8 | 条件中作用于列的数据库函数会产生 WARN，因为无法使用索引（见 [8.9](#89-warning-functions-on-columns-and-indexes-sargable)）。错误码为 `LQL-5001`。 | 已实现（已测试）。在 `SargableMode.STRICT` 下为错误（`LQL-3066`，D50） |
 | PR9 | 存储过程在调用方的事务中运行。需要时 lambdaQL 会在调用前刷新。调用后已加载的实体可能是过期的。 | 已实现 |
 | PR10 | 没有通用的受影响行数。请使用 OUT 参数。 | – |
 | PR11 | IN 值为 `null` 没有问题。不能使用数据库参数的默认值。 | 已实现 |
@@ -482,6 +507,7 @@ where FN_DISCOUNT(o1_0.price)>10
 
 测试环境中有 `lambdaql.functions.classes` 设置。有了它，Hibernate 会保留函数名的大小写（`FN_DISCOUNT`），即使是没有注册的函数也一样（在全部三种数据库上观察到；原因尚不清楚）。完全没有注册时，Hibernate 可能会把名字写成小写。不带引号的名字两种情况下都能工作。
 
+<a id="how-lambdaql-renders-it"></a>
 ### lambdaQL 的渲染方式
 
 lambdaQL **总是**把数据库函数渲染为：
@@ -617,6 +643,39 @@ qb.from(Order.class).where(o -> OrderFns.discount(o.getPrice()) > 100).toHql();
 qb.from(Order.class).where(o -> o.getPrice() > OrderFns.nondet(base)).toHql();
 ```
 
+**SARGable 模式**（决策 D50）。`SargableMode` 有三个值：
+
+- `OFF`：不检查，也不查询元数据。
+- `WARN`（默认）：记录警告。
+- `STRICT`：在 `WARN` 会记录警告的情况下（`LQL-5001`、`LQL-5007`、`LQL-5012`），分析以 `org.lambdaql.NonSargableException`（`LQL-3066`）失败。
+
+每个 persistence unit 用 `SargablePolicy.register(emf, SargableMode.STRICT)` 指定，用 `SargablePolicy.unregister(emf)` 解除。在 Spring 中使用 `lambdaql.sargable.mode=STRICT`（见 [12](12-spring-data-jpa.md)）。
+检查在每个 Lambda 上只执行一次，在把分析结果放入共享缓存时进行。因此请在第一个查询之前注册模式。
+
+**列上的算术**（决策 D50）。
+
+- 只由一个列和值构成的 `+ - * /`（`o.getCnt() * 2 > n`）可以移到值一侧。lambdaQL 以 `WARN` 级别记录 `LQL-5012`，在 `STRICT` 下为错误。
+- 列与列之间的算术（`o.getPrice() * o.getCnt() > n`）和 `%` 无法移动，因此只以 `DEBUG` 级别记录 `LQL-5013`。在 `STRICT` 下也允许。
+- 移动后的形式必须含义相同。请像 `o.getCnt() > n / 2.0` 这样除以小数。整数除法 `n / 2` 在 `>=`、`=`、`<` 以及 `n` 为负数时会得到不同的行。如果乘以了负数，请反转比较方向。`LQL-5012` 的消息会给出这些提示。
+- 没有采用查询索引是否存在来减少警告的方式。因为权限和同义词会让“没有索引”与“无法得知”混在一起，而且列上的算术是少见的写法。
+
+**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `sargable-strict`：
+
+```java
+// STRICT: what WARN would log fails the analysis (NonSargableException, LQL-3066)
+SargablePolicy.register(emf, SargableMode.STRICT);
+NonSargableException fn = assertThrows(NonSargableException.class,
+        () -> qb.from(Order.class).where(o -> OrderFns.discount(o.getTotal()) > 100).toHql());
+assertEquals("LQL-3066", fn.code());
+assertThrows(NonSargableException.class, () -> qb.from(Order.class).where(o -> o.getCnt() * 2 > n).toHql());
+// the same meaning on the value side uses the index; divide by a decimal (n / 2 is integer division)
+var moved = qb.from(Order.class).where(o -> o.getCnt() > n / 2.0).toHql();
+assertEquals("select e0 from Order e0 where e0.cnt > :p1", moved.hql());
+assertEquals(Map.of("p1", new java.math.BigDecimal("2.5")), moved.parameters());   // 2.5, never cut to 2
+// arithmetic between columns cannot move, so STRICT allows it
+qb.from(Order.class).where(o -> o.getCnt() * o.getStatus() > n).toHql();
+```
+
 **建议：**
 
 - 尽可能把函数放在值这一侧：`o.getPrice() > OrderFns.discount(base)`。
@@ -636,11 +695,11 @@ qb.from(Order.class).where(o -> o.getPrice() > OrderFns.nondet(base)).toHql();
 | FN4 | 没有注解的调用，或 lambdaQL 无法识别的调用，是错误。它从不会被悄悄跳过。 | 已实现 |
 | FN5 | 参数遵循 [3. 条件](03-where.md)中的值规则。即使参数只由捕获值构成，也会被绑定并**在数据库中**求值。 | 已实现（已测试） |
 | FN6 | 装箱调用会被跳过。返回类型取自声明的方法，必须是 `Double`、`Integer`、`Long`、`BigDecimal`、`String`、`LocalDate`、`LocalDateTime` 或 `Boolean`（`LQL-3055`）。 | 已实现（已测试） |
-| FN7 | 作用于列的函数会产生 WARN（见 [8.9](#89-warning-functions-on-columns-and-indexes-sargable)）。在 MariaDB 上，值一侧的 `NOT DETERMINISTIC` 函数也会产生 WARN（`LQL-5007`）。 | 已实现（已测试）。严格模式尚未实现 |
+| FN7 | 作用于列的函数会产生 WARN（见 [8.9](#89-warning-functions-on-columns-and-indexes-sargable)）。在 MariaDB 上，值一侧的 `NOT DETERMINISTIC` 函数也会产生 WARN（`LQL-5007`）。 | 已实现（已测试）。在 `SargableMode.STRICT` 下为错误（`LQL-3066`，D50） |
 | FN8 | 与 Hibernate 内置函数（`COALESCE`、`ROUND`、`SYSDATE` 等）同名是错误（`LQL-3054`）。Hibernate 会悄悄使用内置函数。请使用前缀或模式名（`PUBLIC.SQ_FN`）。 | 已实现（已测试） |
 | FN9 | 仅限 Kotlin（默认参数、`inline`、`vararg`）。见 Kotlin 路线。 | 默认参数和 `vararg`：已实现。`inline`：已设计 |
 | FN10 | v0.1 只支持标量函数。用户自定义聚合函数和窗口函数计划在 v0.2 中提供。没有参数的函数渲染为 `fn()`。 | 标量函数已实现 |
-| FN11 | 已知的数据库差异：在 MariaDB 上，返回 VARCHAR 的函数可能与字符串字面量发生排序规则（collation）冲突。`BigDecimal` 结果的小数位数不同（MariaDB 和 Oracle 为 0，H2 为 1）。布尔结果需要 Oracle 23ai 及以上版本。 | 已用原型测量 |
+| FN11 | 已知的数据库差异：在 MariaDB 上，返回 VARCHAR 的函数可能与字符串字面量发生排序规则（collation）冲突。`BigDecimal` 结果的小数位数不同（MariaDB 和 Oracle 为 0，H2 为 1）。布尔结果需要 Oracle 23ai 及以上版本。 | 已用原型实测 |
 
 **(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `rules`：
 
@@ -683,7 +742,7 @@ assertEquals("LQL-3055", assertThrows(LambdaQLException.class,
 
 v0.1 中未计划的内容：用于动态存储过程名的字符串构建器（v0.2 候选）、选择并调用 Oracle 包存储过程的某个重载（重载检测已实现，`LQL-4044`）、表值函数、存储过程结果的分页。
 
-本章的错误是带有 `[LQL-xxxx]` 错误码的 `LambdaQLException`（或其子类）：读取 Lambda 时为 `LQL-3052` 至 `LQL-3063`，执行调用时为 `LQL-4034` 至 `LQL-4039`、`LQL-4043` 和 `LQL-4044`。调用时还可能以 `INFO` 级别记录 `LQL-5004`、`LQL-5005` 或 `LQL-5006`。见 [11. 错误与语言](../11-errors-and-languages.md)。
+本章的错误是带有 `[LQL-xxxx]` 错误码的 `LambdaQLException`（或其子类）：读取 Lambda 时为 `LQL-3052` 至 `LQL-3063`，以及在 `SargableMode.STRICT` 下无法使用索引的条件的 `LQL-3066`（`NonSargableException`，见 [8.9](#89-warning-functions-on-columns-and-indexes-sargable)）。执行调用时为 `LQL-4034` 至 `LQL-4039`、`LQL-4043` 和 `LQL-4044`。调用时还可能以 `INFO` 级别记录 `LQL-5004`、`LQL-5005` 或 `LQL-5006`。对于条件中的数据库函数，可能记录 `LQL-5001`、`LQL-5007`（`WARN`）和 `LQL-5008`（`INFO`）。见 [11. 错误与语言](../11-errors-and-languages.md)。
 
 ---
 
