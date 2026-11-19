@@ -333,7 +333,7 @@ lambdaQL에는 **static DSL이 없습니다**. 선택 사항인 `Agg` import를 
 | `captured.length`(캡처 값의 배열) | Java에서 계산됨 |
 | 레코드 | 결과 타입(`select`)으로, 그리고 파생 테이블과 CTE의 행 타입으로(`r.total()`로 읽음) |
 | `var` | 빌더 변수에 사용하십시오. 빌더 타입 이름은 확정되지 않음 |
-| 제네릭 `value(o.getStatus(), "abc")` | Java에서는 컴파일됨. 분석 시점의 타입 대조는 아직 구현되지 않음 |
+| 제네릭 `value(o.getStatus(), "abc")` | Java에서는 컴파일됨. 분석 시점에 컬럼 타입과 대조해 `LQL-3065` 오류 |
 | 자기 `value(...)` 메서드가 있는 클래스(예: `value` 컴포넌트가 있는 레코드) 안의 `value(...)` | 정적 import가 가려짐. `Dml.value(...)`로 작성 |
 | 중첩 람다에서 같은 파라미터 이름 | Java가 허용하지 않음. `sub2`, `i`, `x`를 사용하십시오 |
 

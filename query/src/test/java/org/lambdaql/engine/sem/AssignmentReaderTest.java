@@ -71,6 +71,20 @@ class AssignmentReaderTest {
     }
 
     @Test
+    void valueTypes() {
+        // @start region="value-type"
+        // value(V, V) compiles with any two types, so lambdaQL checks the value type against the column (U20)
+        assertEquals("[col0.status := 2, col0.price := 1]", setters(o -> { value(o.getStatus(), 2); value(o.getPrice(), 1); }));
+        String text = "abc";
+        LambdaQLException wrong = assertThrows(LambdaQLException.class, () -> setters(o -> value(o.getStatus(), text)));
+        assertEquals("LQL-3065", wrong.code(), wrong.getMessage());
+        // a decimal into a whole number column would lose the fraction
+        LambdaQLException fraction = assertThrows(LambdaQLException.class, () -> setters(o -> value(o.getStatus(), 1.5)));
+        assertEquals("LQL-3065", fraction.code(), fraction.getMessage());
+        // @end
+    }
+
+    @Test
     void rules() {
         // @start region="rules"
         // U1: only setters; no condition, no local variable

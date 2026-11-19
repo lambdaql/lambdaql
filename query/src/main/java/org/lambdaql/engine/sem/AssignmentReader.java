@@ -86,6 +86,7 @@ public final class AssignmentReader {
                         ref.classLoader(), ref.describe());
                 Expr value = Normalizer.normalizeValue(asHost(call.args().get(1), hostParam, ref), roots, model,
                         ref.classLoader(), ref.describe(), aggregates);
+                checkValueType(target, value, ref);
                 out.add(checkTarget(new Assignment(target, value), ref));
                 continue;
             }
@@ -192,6 +193,57 @@ public final class AssignmentReader {
             throw LqlMessage.ASSIGN_NULL_NOT_NULL.exceptionAt(ref.describe(), String.join(".", a.target().path()));
         }
         return a;
+    }
+
+    private static final List<Class<?>> INTEGRAL = List.of(Byte.class, Short.class, Integer.class, Long.class,
+            java.math.BigInteger.class);
+
+    /**
+     * U20: {@code <V> value(V, V)} lets any two types compile ({@code value(o.getStatus(), "abc")}), so the value type
+     * is checked against the column here. A number fits a number column as in SQL, but a decimal does not fit a whole
+     * number column (the fraction would be lost). An unknown type ({@code Object}) is not checked.
+     */
+    private static void checkValueType(Expr.Column target, Expr value, LambdaRef ref) {
+        if (value instanceof Expr.Const c && c.isNull()) return;
+        org.objectweb.asm.Type vt = value.type();
+        if (vt.getSort() == org.objectweb.asm.Type.OBJECT && vt.getInternalName().equals("java/lang/Object")) return;
+        Class<?> v;
+        try {
+            v = box(switch (vt.getSort()) {
+                case org.objectweb.asm.Type.BOOLEAN -> boolean.class;
+                case org.objectweb.asm.Type.CHAR -> char.class;
+                case org.objectweb.asm.Type.BYTE -> byte.class;
+                case org.objectweb.asm.Type.SHORT -> short.class;
+                case org.objectweb.asm.Type.INT -> int.class;
+                case org.objectweb.asm.Type.FLOAT -> float.class;
+                case org.objectweb.asm.Type.LONG -> long.class;
+                case org.objectweb.asm.Type.DOUBLE -> double.class;
+                default -> Class.forName(vt.getClassName(), false, ref.classLoader());
+            });
+        } catch (ClassNotFoundException | LinkageError e) {
+            return;
+        }
+        // an erased generic type (sum(...) gives Number, a generic method gives an interface) says too little
+        if (v == Number.class || v.isInterface()) return;
+        Class<?> t = box(target.javaType());
+        if (t.isAssignableFrom(v)) return;
+        if (Number.class.isAssignableFrom(t) && Number.class.isAssignableFrom(v)
+                && (!INTEGRAL.contains(t) || INTEGRAL.contains(v))) return;
+        throw LqlMessage.VALUE_TYPE.exceptionAt(ref.describe(), String.join(".", target.path()), t.getSimpleName(),
+                v.getSimpleName());
+    }
+
+    private static Class<?> box(Class<?> c) {
+        if (!c.isPrimitive()) return c;
+        if (c == int.class) return Integer.class;
+        if (c == long.class) return Long.class;
+        if (c == double.class) return Double.class;
+        if (c == float.class) return Float.class;
+        if (c == boolean.class) return Boolean.class;
+        if (c == short.class) return Short.class;
+        if (c == byte.class) return Byte.class;
+        if (c == char.class) return Character.class;
+        return c;
     }
 
     /** The getter call of {@code Dml.value}'s column argument, without boxing; null if it is not a getter call. */

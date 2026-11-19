@@ -153,7 +153,8 @@ qb.update(Order::class.java).set { o -> value(o.customer?.id, cid) }.where { it.
 - 같은 속성의 setter 규칙을 그대로 적용합니다. `value(o.x, v)`는 `o.x = v`와 같으므로 U1과 U6이 적용되고, 연관은 `@Id`만 대입할 수 있습니다(`LQL-3050`).
 - 속성 대입과 `value`는 **한 람다 안에서 섞어 쓸 수 있습니다**.
 - `value(column, value)`는 제네릭이므로 컴파일러는 값이 컬럼에 맞는지 검사하지 않습니다.
-  설계에서는 분석 시점에 컬럼 타입과 값 타입을 대조합니다. 이 검사는 아직 구현되지 않았습니다.
+  lambdaQL은 분석 시점에 컬럼 타입과 값 타입을 대조하고, 맞지 않으면 `LQL-3065` 오류를 냅니다.
+  숫자는 숫자 컬럼에 맞습니다. 다만 소수는 정수 컬럼에 맞지 않습니다. 타입을 알 수 없는 값(`Any`, 제네릭 집계의 `Number`)은 대조하지 않습니다.
 - 자기 `value(...)` 함수가 있는 클래스 안에서는 import한 `value`가 가려집니다. 그곳에서는 `Dml.value(...)`라고 쓰십시오.
 - `val` 속성에 `o.total = 1`처럼 쓰는 것은 컴파일 오류이므로 `value`를 씁니다.
 
@@ -366,7 +367,7 @@ lambdaQL은 이 조건을 따로 처리하지 않습니다.
 ## 7.9 모든 규칙 U1 ~ U21(요약)
 
 lambdaQL이 람다를 읽을 때 검사하는 규칙: U1, U3, U4, U6(Java 람다로 테스트함). 컴파일러가 검사하는 규칙: U5.
-U11, U12, U15에 대한 lambdaQL의 검사와 U20의 타입 대조는 아직 구현되지 않았습니다.
+U11, U12, U15에 대한 lambdaQL의 검사는 아직 구현되지 않았습니다.
 
 | # | 규칙 |
 |---|---|
@@ -389,7 +390,7 @@ U11, U12, U15에 대한 lambdaQL의 검사와 U20의 타입 대조는 아직 구
 | U17 | DELETE의 서브쿼리가 대상 엔티티(또는 같은 상속 계층)를 읽으면 lambdaQL은 대상 id를 파생 테이블로 먼저 읽습니다: `d0.id in (select t.id from (select e0.id as id from … where <condition>) t)`. 그렇지 않으면 MariaDB 오류 1093이 납니다. 상관 서브쿼리에도 동작하며, `update`와 복합 id 엔티티는 감싸지 않습니다([7.4](07-4-delete.md#delete-with-a-subquery-on-the-same-table) 참고). |
 | U18 | 상속: SINGLE_TABLE은 완전히 지원합니다. JOINED와 TABLE_PER_CLASS의 update/delete는 임시 테이블을 사용합니다. 그 하위 클래스에 대한 insert는 거부됩니다. |
 | U19 | 쿼리 캐시 키에는 진입점, 대상 엔티티, set 람다, where/all, versioned, 분할 크기가 들어갑니다. |
-| U20 | `Dml.value(column, value)`(D49): 첫 번째 인자는 대상(또는 `insert ... select`의 대상 `a`)에서 시작하는 속성 읽기여야 합니다(`LQL-3039`). 같은 속성의 setter 규칙(U1, U6, 연관은 `@Id`만)을 그대로 적용합니다. 타입 대조는 아직 구현되지 않았습니다. 속성 대입과 섞어 쓸 수 있습니다. |
+| U20 | `Dml.value(column, value)`(D49): 첫 번째 인자는 대상(또는 `insert ... select`의 대상 `a`)에서 시작하는 속성 읽기여야 합니다(`LQL-3039`). 같은 속성의 setter 규칙(U1, U6, 연관은 `@Id`만)을 그대로 적용합니다. 값의 타입은 컬럼 타입과 대조합니다(`LQL-3065`). 속성 대입과 섞어 쓸 수 있습니다. |
 | U21 | 각 람다는 한 번 분석되고 캐시됩니다. `set()` 호출 사이의 검사는 캐시된 요약만 비교합니다(프로토타입에서 약 0.1 ~ 0.2 µs). |
 
 업서트 규칙(결정 D40)은 [7.6 업서트](07-6-upsert.md#rules)에 있습니다.

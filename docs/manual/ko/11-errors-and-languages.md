@@ -33,7 +33,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 |---|---|---|---|
 | `LQL-1xxx` | 입력과 람다 로딩 | `LQL-1001`~`LQL-1013` | `LambdaAnalysisException` |
 | `LQL-2xxx` | 바이트코드 디코딩 | `LQL-2001`~`LQL-2025` | `UnsupportedLambdaShapeException` |
-| `LQL-3xxx` | 의미 해석과 Java에서 계산하는 값 | `LQL-3001`~`LQL-3064` | `TranslationException` |
+| `LQL-3xxx` | 의미 해석과 Java에서 계산하는 값 | `LQL-3001`~`LQL-3065` | `TranslationException` |
 | `LQL-4xxx` | 렌더링, 바인딩, 실행 | `LQL-4001`~`LQL-4045`, `LQL-4999`(내부 오류) | `LambdaQLException` 자체, 또는 JDK/JPA 표준 예외([예외](#exceptions) 참고). `LQL-4045`는 `WARN` 로그(자기 기본형 언박싱만 있는 비교는 `DEBUG`) |
 | `LQL-5xxx` | 경고(로그에 기록) | `LQL-5001`~`LQL-5011` | –(로그 한 줄. 레벨은 `WARN`이며, `LQL-5004`~`LQL-5006`, `LQL-5008`과 기본 정렬 모드의 `LQL-5003`은 `INFO`, `LQL-5009`~`LQL-5011`은 `DEBUG`) |
 
@@ -47,6 +47,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-3035` | `TranslationException` | 집계와 함께 쓰는 값은 groupBy 키여야 합니다(J3): {0} |
 | `LQL-3058` | `TranslationException` | DB 함수 {0}은 SQL 이름이 따로 있어 등록이 필요합니다. 클래스를 lambdaql.functions.classes 설정에 넣으세요. |
 | `LQL-3064` | `TranslationException` | 파생 테이블·CTE의 행 타입은 Java record나 Kotlin data class여야 합니다(J5): {0} |
+| `LQL-3065` | `TranslationException` | Dml.value: 값의 타입 {2}가 열 {0}({1})에 맞지 않습니다(U20) |
 | `LQL-4009` | `LambdaQLException` | null 값은 <, <=, >, >=로 비교할 수 없습니다(Java에서는 NullPointerException): {0} |
 | `LQL-4014` | `IllegalArgumentException` | limit은 0 이상이어야 합니다: {0} |
 | `LQL-4025` | `NonUniqueResultException` | one()의 조건에 맞는 행이 2개 이상입니다. 조건을 좁히거나 first()를 쓰세요: {0} |

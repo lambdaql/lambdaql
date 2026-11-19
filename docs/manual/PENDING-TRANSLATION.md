@@ -171,3 +171,11 @@ B6 대상 페이지: `java/03`·`kotlin/03`(임베디드 경로 절, 같음 비�
 
 대상 페이지: `README.md`, `java/README.md`, `kotlin/README.md`, `java/07-dml.md`·`kotlin/07-dml.md`, `kotlin/07-2-update.md`(와 `java/07-2-update.md`), `java/07-5-insert.md`·`kotlin/07-5-insert.md`, `java/09-java-notes.md`·`kotlin/09-kotlin-notes.md`, `java/10-rules-and-limits.md`·`kotlin/10-rules-and-limits.md`, `11-errors-and-languages.md`(코드 표).
 
+## 대기 항목: U20 `Dml.value` 타입 대조
+
+| 항목 | 내용 | 테스트 영역 |
+|---|---|---|
+| U20 타입 대조 구현 | `value(열, 값)`의 값 타입을 분석 시점에 열 타입과 대조, 어긋나면 `LQL-3065`. 숫자는 숫자 열에 허용, 소수→정수 열은 거부, 타입을 알 수 없는 값은 대조하지 않음 | `AssignmentReaderTest` `value-type` |
+
+대상 페이지: `java/07-dml.md`·`kotlin/07-dml.md`(7.3 규칙 목록, U20 행, "아직 구현되지 않았습니다" 문장), `java/09-java-notes.md`(제네릭 `value` 행), `11-errors-and-languages.md`(3xxx 범위 `LQL-3065`까지, 코드 표 행).
+
