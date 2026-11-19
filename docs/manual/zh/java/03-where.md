@@ -1,6 +1,9 @@
 <a id="3-conditions-where-java"></a>
 # 3. 条件（`where`）（Java）
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/03-where.md)。
+
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[2. 入门](02-getting-started.md) | 下一章：[4. 排序与分页](04-order-paging.md) | [本页的 Kotlin 版本](../kotlin/03-where.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)

@@ -1,6 +1,9 @@
 <a id="3-conditions-where-java"></a>
 # 3. Conditions (`where`) (Java)
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/java/03-where.md) for the latest rules.
+
 [Java track](README.md) | [Manual home](../README.md) | Previous: [2. Getting started](02-getting-started.md) | Next: [4. Sorting and paging](04-order-paging.md) | [Kotlin version of this page](../kotlin/03-where.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)

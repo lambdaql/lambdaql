@@ -138,7 +138,8 @@ where (o1_0.status=1 or o1_0.status=3) and o1_0.active=1
 
 - 상수는 호출할 때마다 같습니다. 그래서 SQL 문장이 바뀌지 않고, 데이터베이스는 쿼리 계획을 세울 때 값을 볼 수 있습니다.
 - 문자열 상수 안의 작은따옴표는 escape됩니다: `"O'Brien"`은 `'O''Brien'`이 됩니다. 이 문자열은 사용자 입력이 아니라 클래스에 컴파일된 상수이므로 SQL 주입 위험이 없습니다.
-- 캡처 값은 사용자에게서 올 수 있으므로 **항상** 바인드 파라미터입니다. 호출마다 값만 바뀝니다.
+- 캡처 값은 사용자에게서 올 수 있으므로 바인드 파라미터입니다. 호출마다 값만 바뀝니다.
+- 예외는 하나입니다. 정수 컬럼과 비교하는 소수 캡처 값은 소수 리터럴(`2.5BD`)로 씁니다([3.4](#34-comparisons)의 "정수 컬럼과 소수 값"). 숫자로 바꾼 값만 쓰므로 SQL 주입 위험은 없습니다.
 
 enum 상수는 전체 클래스 이름으로 씁니다.
 **(테스트됨)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), 영역 `enum`:
@@ -183,29 +184,31 @@ where o1_0.kind='RUSH'
 **정수 컬럼과 소수 값**(결정 D48 B8). 정수 컬럼을 소수 값과 비교하면 lambdaQL은 값을 적은 그대로 비교합니다. 반올림이나 값 제외는 하지 않습니다.
 
 - 람다에 적은 상수는 리터럴로 남습니다. `o.getCnt() >= 2.5`는 `e0.cnt >= 2.5`가 됩니다.
-- 캡처 값은 `BigDecimal`(Hibernate 타입 `BIG_DECIMAL`)로 바인딩합니다. `e0.cnt >= :p1`이고 `p1`은 `2.5`입니다.
-- 그런 요소가 있는 IN 목록은 모든 요소를 `BigDecimal`로 바인딩합니다(`[2.5, 3.0]`).
+- 캡처 값도 소수 리터럴로 씁니다. `e0.cnt >= 2.5BD`가 되고 바인드 파라미터는 없습니다. `BD`는 HQL의 `BigDecimal` 리터럴 접미사입니다.
+- 그런 요소가 있는 IN 목록은 모든 요소를 소수 리터럴로 씁니다(`e0.cnt in (2.5BD, 3.0BD)`).
 
-이전에는 값을 컬럼 타입으로 잘라 `2.5`가 `2`가 되었고, 잘못된 행을 반환했습니다. Hibernate는 정수 컬럼 타입으로 바인딩한 소수를 거부하고(`CoercionException`), IN 목록의 요소는 조용히 자릅니다(세 DB에서 실측).
+캡처 값을 바인드 파라미터로 보내는 원칙(D37)의 예외입니다. Hibernate 7은 정수 컬럼과 비교하는 파라미터에 소수를 바인딩하면 `BigDecimal` 타입을 지정해도 거부합니다(`QueryArgumentException`, 실측).
+
+이전에는 값을 컬럼 타입으로 잘라 `2.5`가 `2`가 되었고, 잘못된 행을 반환했습니다. Hibernate 6.6은 정수 컬럼 타입으로 바인딩한 소수를 거부하고(`CoercionException`), IN 목록의 요소는 조용히 자릅니다(세 DB에서 실측).
 정수 비교로 바꾸는 방식(`>= 3`)은 채택하지 않았습니다. 실행되는 SQL이 람다와 달라지고, 엔티티 매핑(`Integer`)과 DB 컬럼 타입(예: 소수가 있는 `DECIMAL`)이 다르면 잘못된 행을 냅니다.
 
-결과는 H2, MariaDB 10.11, Oracle 23.26에서 올바릅니다(실측). MariaDB의 `EXPLAIN`은 int, `BigDecimal`, double 파라미터 모두 인덱스 범위 스캔(`type=range`)을 보여 줍니다(실측). Oracle의 실행 계획은 미측정입니다.
+결과는 H2, MariaDB 10.11, Oracle 23.26에서 올바릅니다(실측). 세 DB 모두 SQL은 `cnt>=2.5`, `cnt in (2.5,3.0)`처럼 컬럼을 그대로 두고 소수와 비교합니다.
+MariaDB의 `EXPLAIN`은 인덱스 범위 스캔(`type=range`)을 보여 줍니다. Oracle은 컬럼에 변환이 붙지 않아 인덱스를 쓸 수 있는 형태입니다. 인덱스 힌트를 주면 `INDEX RANGE SCAN`이고, 3000행 테이블에서 힌트가 없으면 정수 리터럴(`cnt >= 99`)과 같게 전체 스캔을 고릅니다(모두 실측).
 
 **(테스트됨)** [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java), 영역 `whole-number`:
 
 ```java
-// cnt is a whole number; 2.5 is compared as written (it is never cut to 2)
+// cnt is a whole number; 2.5 is compared as written (it is never cut to 2): a decimal literal
 double half = 2.5;
 RenderedQuery atLeast = qb.from(Order.class).where(o -> o.getCnt() >= half).toHql();
-assertEquals("select e0 from Order e0 where e0.cnt >= :p1", atLeast.hql());
-assertEquals(Map.of("p1", new BigDecimal("2.5")), atLeast.parameters());    // bound as a decimal
+assertEquals("select e0 from Order e0 where e0.cnt >= 2.5BD", atLeast.hql());
+assertEquals(Map.of(), atLeast.parameters());                                // written as a decimal literal
 // a constant written in the lambda stays a literal
 assertEquals("select e0 from Order e0 where e0.cnt >= 2.5", qb.from(Order.class).where(o -> o.getCnt() >= 2.5).toHql().hql());
-// an IN list with such a value is bound as decimals
+// an IN list with such a value is written as decimal literals
 List<Double> values = List.of(2.5, 3.0);
 RenderedQuery in = qb.from(Order.class).where(o -> values.contains(o.getCnt().doubleValue())).toHql();
-assertEquals("select e0 from Order e0 where e0.cnt in (:p1)", in.hql());
-assertEquals(Map.of("p1", List.of(new BigDecimal("2.5"), new BigDecimal("3.0"))), in.parameters());
+assertEquals("select e0 from Order e0 where e0.cnt in (2.5BD, 3.0BD)", in.hql());
 ```
 
 **부동소수점:** `float`/`double` 컬럼에 대해 lambdaQL은 Java와 비트 단위까지 같은 결과를 약속하지 않습니다.

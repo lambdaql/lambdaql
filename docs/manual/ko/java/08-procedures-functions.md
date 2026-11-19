@@ -673,8 +673,7 @@ assertEquals("LQL-3066", fn.code());
 assertThrows(NonSargableException.class, () -> qb.from(Order.class).where(o -> o.getCnt() * 2 > n).toHql());
 // the same meaning on the value side uses the index; divide by a decimal (n / 2 is integer division)
 var moved = qb.from(Order.class).where(o -> o.getCnt() > n / 2.0).toHql();
-assertEquals("select e0 from Order e0 where e0.cnt > :p1", moved.hql());
-assertEquals(Map.of("p1", new java.math.BigDecimal("2.5")), moved.parameters());   // 2.5, never cut to 2
+assertEquals("select e0 from Order e0 where e0.cnt > 2.5BD", moved.hql());   // 2.5, never cut to 2
 // arithmetic between columns cannot move, so STRICT allows it
 qb.from(Order.class).where(o -> o.getCnt() * o.getStatus() > n).toHql();
 ```

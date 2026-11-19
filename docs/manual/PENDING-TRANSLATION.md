@@ -48,6 +48,14 @@
   - `java/09-java-notes.md`: 9.12 표의 ASM 행(행 이름이 "클래스 파일 읽기(ASM)"으로 바뀜)
 - 내용: ASM 버전 제약은 Java 21~23에서 실행할 때만 해당한다. Java 24 이상에서는 실행 중인 JDK의 `java.lang.classfile`로 읽어 ASM 버전과 관계가 없다(Multi-Release JAR)
 
+### 4. B8: 정수 컬럼과 소수 캡처 값은 소수 리터럴(2026-11-19)
+
+- 페이지와 위치
+  - `java/03-where.md`, `kotlin/03-where.md`: 3.3 "HQL 안의 값"의 목록(예외 항목 추가), 3.4 "정수 컬럼과 소수 값" 단락 전체와 실행 계획 문장. Java는 영역 `whole-number` 코드 블록도 바뀜
+  - `java/08-procedures-functions.md`: 영역 `sargable-strict` 코드 블록(`e0.cnt > 2.5BD`)
+  - `java/10-rules-and-limits.md`, `kotlin/10-rules-and-limits.md`: `cnt >= 2.5` 표 행, D37 목록의 예외 문장
+- 내용: 캡처 값과 IN 목록은 `BigDecimal` 바인딩이 아니라 소수 리터럴(`e0.cnt >= 2.5BD`, `in (2.5BD, 3.0BD)`)로 씀. D37의 예외. Hibernate 7은 `BigDecimal` 타입을 지정한 바인딩도 거부(`QueryArgumentException`). 실행 계획: MariaDB `type=range`, Oracle은 힌트로 `INDEX RANGE SCAN`, 힌트 없이 3000행에서는 정수 리터럴과 같게 전체 스캔
+
 ## 한국어 원본 다듬기(2026-11-19 네 언어에 반영 완료)
 
 번역 중 발견한 문구 문제 9건을 한국어 원본과 영어, 일본어, 중국어에 함께 고쳤습니다. 남은 대기 항목은 없습니다.

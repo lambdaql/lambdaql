@@ -1,6 +1,9 @@
 <a id="3-conditions-where-kotlin"></a>
 # 3. 条件（`where`）（Kotlin）
 
+> [!IMPORTANT]
+> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/03-where.md)を参照してください。
+
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [2. はじめよう](02-getting-started.md) | 次: [4. ソートとページング](04-order-paging.md) | [このページの Java 版](../java/03-where.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)

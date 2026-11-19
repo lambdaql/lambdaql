@@ -159,7 +159,7 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 | `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | NULL: 선택되지 않음(SQL 의미) |
 | `!o.getActive()`(nullable `Boolean`) | `e0.active = false` | NULL: 선택되지 않음(NULL은 false가 아님) |
 | `x == null`, `x != null` | `is null`, `is not null` | 2값 |
-| `o.getCnt() >= 2.5`(정수 컬럼, 소수 값) | 적은 값 그대로 비교: 상수는 리터럴(`e0.cnt >= 2.5`), 캡처 값과 IN 목록은 `BigDecimal`로 바인딩(D48 B8) | 인덱스 범위 스캔 유지(MariaDB에서 실측). 이전처럼 값을 잘라 잘못된 행을 반환하지 않음 |
+| `o.getCnt() >= 2.5`(정수 컬럼, 소수 값) | 적은 값 그대로 비교: 상수는 리터럴(`e0.cnt >= 2.5`), 캡처 값과 IN 목록도 소수 리터럴(`e0.cnt >= 2.5BD`, `in (2.5BD, 3.0BD)`, D48 B8) | 인덱스 범위 스캔 유지(MariaDB에서 실측). 이전처럼 값을 잘라 잘못된 행을 반환하지 않음 |
 | 값 객체(`@Embedded`) 전체: `o.getAddress().equals(addr)`, `Objects.equals(o.getAddress(), addr)`, `!o.getAddress().equals(addr)` | 컬럼마다 펼침: `e0.address.city = :p1 and e0.address.zip = :p2`, 부정은 `<> ... or ...`. `== null`은 모든 컬럼 `is null`(and), `!= null`은 `is not null`(or) | 컬럼마다 SQL 의미(D48): NULL 컬럼은 `=`에도 `<>`에도 불일치. 캡처한 객체가 `null`이면 일치하는 행 없음(`WARN` 수준 `LQL-4045`) |
 | NULL이 될 수 없는 컬럼(id, 기본형, `nullable = false`, 경로에 연관 단계 없음)의 `o.getId() == null` | `1=0`. 비교와 함께 쓰면 검사를 제거: `o.getId() != null && o.getId() == id`는 `e0.id = :p1`(테스트함) | 컬럼에 NULL이 없음. 연관을 거치는 경로(`o.getCustomer().getId()`)는 검사 유지 |
 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL 3값 논리 |
@@ -209,7 +209,7 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 그 밖의 규칙:
 
 - `x.compareTo(y) > 0`, `isBefore`, `isAfter`는 `x > y` 등이 됩니다.
-- 람다에 직접 쓴 상수(컴파일 시점 `static final` 상수 포함)는 리터럴입니다: `o.getPrice() > 100`은 `e0.price > 100.0`, `"O'Brien"`은 `'O''Brien'`. 캡처 값과 계산한 값(`new BigDecimal("1.5")`)은 바인드 파라미터입니다(D37).
+- 람다에 직접 쓴 상수(컴파일 시점 `static final` 상수 포함)는 리터럴입니다: `o.getPrice() > 100`은 `e0.price > 100.0`, `"O'Brien"`은 `'O''Brien'`. 캡처 값과 계산한 값(`new BigDecimal("1.5")`)은 바인드 파라미터입니다(D37). 예외: 정수 컬럼과 비교하는 소수 캡처 값은 소수 리터럴(`2.5BD`, D48 B8).
 - javac는 가끔 `!`의 위치를 옮깁니다(드 모르간, 이중 부정). 그래도 결과는 절대 바뀌지 않습니다.
   lambdaQL은 각 조건을 정확히 한 번씩 유지하며 논리를 "단순화"하지 않습니다.
 - Java에서 항상 참인 조건(`x > 5 || !(x > 5)`)을 작성해도 단순화하지 않습니다.

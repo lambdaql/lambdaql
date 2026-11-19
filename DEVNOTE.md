@@ -87,7 +87,7 @@ Javadoc 빌드는 `--snippet-path src/test/java`를 쓴다. Javadoc의 `{@snippe
 - **람다 안의 메서드와 비교는 모두 SQL 의미를 따른다(D48).** 결과가 Java와 다를 수 있으면 DEBUG `LQL-5009`. null 캡처 값과의 비교는 NULL을 바인딩하고 실행 시 WARN `LQL-4045`(일치형 자동 언박싱은 DEBUG).
 - where의 연관 경로는 inner join, 정렬·select 전용 경로는 left join(필수 연관은 inner, A4). DML의 비FK 연관 경로는 상관 스칼라 서브쿼리(U9).
 - DELETE의 서브쿼리가 대상 테이블을 읽으면 대상 id를 파생 테이블로 먼저 읽는다(U17, MariaDB 1093).
-- 정수 열과 정수 형태가 없는 값(2.5)의 비교는 적은 값 그대로(상수는 리터럴, 캡처 값은 BigDecimal 바인딩, D48 B8).
+- 정수 열과 정수 형태가 없는 값(2.5)의 비교는 적은 값 그대로(상수는 리터럴, 캡처 값은 `main`에서 BigDecimal 바인딩, `feature/boot4`에서 소수 리터럴 `2.5BD`, D48 B8).
 - 대입은 setter 또는 `Dml.value(열, 값)`. 대입 람다의 두 번째 인자(insert … select는 세 번째)는 서브쿼리 `sub`(D49).
 - 외부 정렬은 `SortPolicy`(OFF·INFO·WARN·STRICT, 기본 INFO, D43), SARGable은 `SargablePolicy`(OFF·WARN·STRICT, 기본 WARN, D50). 둘 다 EntityManagerFactory별 등록과 Spring 프로퍼티(`lambdaql.sort.*`, `lambdaql.sargable.mode`).
 - 분석 결과는 EntityManagerFactory별로 공유하는 캐시에 둔다(D47). 정책 검사(SARGable 등)는 캐시에 넣을 때 한 번 한다.
@@ -167,7 +167,7 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
   - Kotlin은 조건 jump 시점에 값 스택이 비어 있지 않은 패턴(`?.`, `?:`, 자동 null 확인)이 흔하다.
   - 자기 기본형으로 꺼내는 언박싱(`Double.doubleValue()`)은 javac의 자동 언박싱과 구분할 수 없어 자동 언박싱으로 본다(D48).
 - **Hibernate 함정(6.6.5 실측)**
-  - 정수 열의 파라미터에 소수를 바인딩하면 `CoercionException`, IN 목록은 조용히 자른다. BigDecimal 타입을 명시해 바인딩한다(B8).
+  - 정수 열의 파라미터에 소수를 바인딩하면 `CoercionException`, IN 목록은 조용히 자른다. BigDecimal 타입을 명시해 바인딩한다(B8). Hibernate 7.4는 그 바인딩도 `QueryArgumentException`으로 거부해 `feature/boot4`는 소수 리터럴(`2.5BD`)을 쓴다.
   - UPDATE·DELETE HQL에 조인 문법이 없다. 엔티티 `select distinct`, 파생 테이블·CTE 조인, 서브쿼리 안 엔티티 조인은 받는다(D51).
 - **DB 함정**
   - MariaDB: `NULLS FIRST/LAST` 없음(Hibernate가 CASE로 흉내), DELETE가 자기 테이블을 읽으면 1093(UPDATE는 10.11에서 동작), 기본 collation `_ci`, NaN 저장 불가.
@@ -187,7 +187,7 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 - Boot 4: `@EntityScan`이 `org.springframework.boot.persistence.autoconfigure`로 이동(테스트 25개 파일).
 - JUnit 6: `testRuntimeOnly 'org.junit.platform:junit-platform-launcher'`를 명시해야 함(Gradle 내장 런처는 버전이 맞지 않아 테스트 발견 실패).
 - Hibernate 7 SQL 차이: 파생 테이블 열 별칭 `t1_0(id)` → `t1_0(c0)`. SQL 정답 파일 6개를 다시 만듦.
-- B8(정수 열과 2.5): Hibernate 7은 BigDecimal 타입을 지정한 바인딩도 거부(`QueryArgumentException`). 숫자 리터럴(`e0.cnt >= 2.5BD`, IN은 `(2.5BD, 3.0BD)`)로 바꿈. Hibernate 6.6에서도 동작하는 형태. D37(캡처 값은 바인딩)의 예외다. 매뉴얼의 B8 설명(“BigDecimal로 바인딩”)은 아직 고치지 않았다.
+- B8(정수 열과 2.5): Hibernate 7은 BigDecimal 타입을 지정한 바인딩도 거부(`QueryArgumentException`). 숫자 리터럴(`e0.cnt >= 2.5BD`, IN은 `(2.5BD, 3.0BD)`)로 바꿈. Hibernate 6.6에서도 동작하는 형태. D37(캡처 값은 바인딩)의 예외다. 매뉴얼(한국어)의 B8 설명은 2026-11-19에 고침. 숫자 리터럴의 실행 계획(실측): 세 DB 모두 SQL은 `cnt>=2.5`처럼 열을 그대로 두고, MariaDB `type=range`, Oracle은 힌트로 `INDEX RANGE SCAN`(힌트 없이 3000행에서는 정수 리터럴 `>= 99`와 같게 전체 스캔).
 - `HibernateFunctions.tableAndColumn`: Hibernate 7에 없는 `getPropertyColumnNames` 대신 `findAttributeMapping` + `SelectableMapping`(6·7 공통)으로 바꿈.
 
 테스트 결과(2026-11-19, 10.2 수정 뒤): 세 DB 모두 241개 통과(건너뜀 H2 16·MariaDB 10·Oracle 9). D52 구현 뒤의 결과는 10.3.
