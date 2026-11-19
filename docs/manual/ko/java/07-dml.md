@@ -284,10 +284,10 @@ lambdaQL은 DML에서 FK가 아닌 연관 경로를 **상관 스칼라 서브쿼
 
 ```java
 .where(o -> o.getCustomer().getName().equals("Kim"))
-// → where (select s1.name from Customer s1 where s1.id = e0.customer.id) = 'Kim' and e0.customer.id is not null
+// → where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) = 'Kim' and e0.customer.id is not null
 
 o.setCustName(o.getCustomer().getName())
-// → set e0.custName = (select s1.name from Customer s1 where s1.id = e0.customer.id)
+// → set e0.custName = (select s1.name from Customer s1 where s1.id = fk(e0.customer))
 ```
 
 이렇게 하는 이유는 다음과 같습니다. lambdaQL이 경로를 Hibernate에 그대로 넘기면 Hibernate는 데이터베이스마다 다른 조인 SQL을 만듭니다

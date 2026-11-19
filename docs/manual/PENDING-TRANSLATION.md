@@ -24,6 +24,21 @@
 이전 대기 항목(D48~D51 등)은 모두 반영되어 지웠습니다. 내용은 git 기록에 있습니다.
 앞으로 한국어 원본이 바뀌면 이 문서에 다시 항목을 적습니다.
 
+## 대기 항목(Boot 4 브랜치 `feature/boot4`)
+
+아래 페이지의 번역본(en, ja, zh)에는 맨 위에 낡음 안내를 두었습니다.
+
+### 1. U9 연관 경로 서브쿼리의 FK 표기(2026-11-19)
+
+- 페이지: `java/07-dml.md`, `java/07-2-update.md`, `java/07-4-delete.md`, `kotlin/07-dml.md`, `kotlin/07-2-update.md`, `kotlin/07-4-delete.md`
+- 내용: 서브쿼리 안의 바깥 행 FK 참조 `s1.id = e0.customer.id`를 `s1.id = fk(e0.customer)`로 바꿈(HQL 예제와 주석). 조건의 `e0.customer.id is not null`은 그대로임
+- 옮길 방법: 코드 블록의 HQL 문자열만 바꾸면 됨. 본문 산문은 바뀌지 않음
+
+### 2. Oracle 함수 기반 인덱스의 숫자 변환(2026-11-19)
+
+- 페이지: `java/08-procedures-functions.md`, `kotlin/08-procedures-functions.md`의 SARGable 표 ① 행
+- 내용: 열 타입이 함수 인자 타입과 달라 Oracle이 넣은 숫자 변환(`FN(TO_NUMBER(COLUMN))` 등)도 같은 식으로 본다는 문장 추가
+
 ## 한국어 원본 다듬기(2026-11-19 네 언어에 반영 완료)
 
 번역 중 발견한 문구 문제 9건을 한국어 원본과 영어, 일본어, 중국어에 함께 고쳤습니다. 남은 대기 항목은 없습니다.

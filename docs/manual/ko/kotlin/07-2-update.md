@@ -47,7 +47,7 @@ val u = qb.update(Order::class.java)
     .set { it.status = st; it.price = it.price * 2 }
     .where { it.customer?.name == "Kim" }
 assertEquals("update Order e0 set e0.status = :p1, e0.price = (e0.price * 2.0)"
-    + " where (select s1.name from Customer s1 where s1.id = e0.customer.id) = 'Kim' and e0.customer.id is not null",
+    + " where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) = 'Kim' and e0.customer.id is not null",
     u.toHql().hql())
 ```
 
@@ -121,11 +121,11 @@ qb.update(Order::class.java).set { it.customer = customer }.where { it.id == id 
 val u = qb.update(Order::class.java)
     .set { it.custName = "K" }
     .where { it.customer?.name == "Kim" }
-// HQL: update Order e0 set e0.custName = 'K' where (select s1.name from Customer s1 where s1.id = e0.customer.id) = 'Kim' and e0.customer.id is not null
+// HQL: update Order e0 set e0.custName = 'K' where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) = 'Kim' and e0.customer.id is not null
 
 // a path in a value: a subquery; NULL when there is no customer
 val copy = qb.update(Order::class.java).set { it.custName = it.customer?.name }.all()
-// HQL: update Order e0 set e0.custName = (select s1.name from Customer s1 where s1.id = e0.customer.id)
+// HQL: update Order e0 set e0.custName = (select s1.name from Customer s1 where s1.id = fk(e0.customer))
 ```
 
 **데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `update-path`:

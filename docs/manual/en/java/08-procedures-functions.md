@@ -1,6 +1,9 @@
 <a id="8-stored-procedures-and-db-functions-java"></a>
 # 8. Stored procedures and DB functions (Java)
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/java/08-procedures-functions.md) for the latest rules.
+
 [Java track](README.md) | [Manual home](../README.md) | Previous: [7. Update, insert, delete](07-dml.md) | Next: [9. Java notes](09-java-notes.md) | [Kotlin version of this page](../kotlin/08-procedures-functions.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)

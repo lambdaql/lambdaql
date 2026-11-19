@@ -188,7 +188,7 @@ class KotlinQueryTest {
             .set { it.status = st; it.price = it.price * 2 }
             .where { it.customer?.name == "Kim" }
         assertEquals("update Order e0 set e0.status = :p1, e0.price = (e0.price * 2.0)"
-            + " where (select s1.name from Customer s1 where s1.id = e0.customer.id) = 'Kim' and e0.customer.id is not null",
+            + " where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) = 'Kim' and e0.customer.id is not null",
             u.toHql().hql())
         // @end
         val target = orders.filter { it.customer?.name == "Kim" }

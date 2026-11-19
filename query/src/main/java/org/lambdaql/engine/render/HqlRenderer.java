@@ -525,7 +525,7 @@ public final class HqlRenderer {
     /**
      * Renders {@code update [versioned] Entity e0 set ... [where ...]}.
      * <p>
-     * Association paths become correlated scalar subqueries ({@code (select s1.name from Customer s1 where s1.id = e0.customer.id)}),
+     * Association paths become correlated scalar subqueries ({@code (select s1.name from Customer s1 where s1.id = fk(e0.customer))}),
      * so the statement uses only its own table (ROADMAP U9; MariaDB cannot read the target table in a subquery).
      * In the condition, a path that an inner join would use (D36) also gets {@code e0.customer.id is not null},
      * so the rows are the same as {@code qb.from(...).where(same lambda)}.
@@ -897,7 +897,7 @@ public final class HqlRenderer {
      *
      * @param c   the column
      * @param hop index of the first association that needs a join
-     * @return for example {@code (select s1.name from Customer s1 where s1.id = e0.customer.id)}
+     * @return for example {@code (select s1.name from Customer s1 where s1.id = fk(e0.customer))}
      */
     private String subqueryPath(Expr.Column c, int hop) {
         List<String> names = c.path();
@@ -906,7 +906,10 @@ public final class HqlRenderer {
         String id = model.idName(owner).orElseThrow(() -> LqlMessage.COMPOSITE_KEY_DML_PATH.exception());
         String alias = "s" + (++subqueries);
         List<String> prefix = names.subList(0, hop + 1);
-        String fk = "e" + c.root() + "." + String.join(".", prefix) + "." + id;
+        // fk(...) reads the foreign key column of the outer row. The plain form "e0.customer.id" makes Hibernate 7
+        // add an unused join to the subquery on MariaDB ("from customers c1_0, customers c2_0"), which multiplies the
+        // rows (measured with Hibernate 7.4 on H2, MariaDB and Oracle; the SQL is the same on H2 and Oracle).
+        String fk = "fk(e" + c.root() + "." + String.join(".", prefix) + ")";
         if (collectGuards) {
             List<String> fkPath = new ArrayList<>(prefix);
             fkPath.add(id);

@@ -14,7 +14,7 @@ assertEquals("delete from Order e0 where e0.status = 3", d.toHql().hql());
 int deleted = d.execute();
 // a path: the same rows as qb.from(Order.class).where(same lambda) - orders without a customer stay
 ExecutableDelete<Order> byName = qb.delete(Order.class).where(o -> o.getCustomer().getName() == null);
-assertEquals("delete from Order e0 where (select s1.name from Customer s1 where s1.id = e0.customer.id) is null"
+assertEquals("delete from Order e0 where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) is null"
         + " and e0.customer.id is not null", byName.toHql().hql());
 ```
 

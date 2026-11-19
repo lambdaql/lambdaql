@@ -35,6 +35,8 @@ final class SargableCheck {
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(SargableCheck.class);
     private static final Map<String, Boolean> CACHE = new ConcurrentHashMap<>();
     private static final Set<String> SKIP_LOGGED = ConcurrentHashMap.newKeySet();
+    /** Oracle conversions that may wrap the column in a function-based index expression (numeric columns). */
+    private static final List<String> IMPLICIT_CONVERSIONS = List.of("TO_NUMBER", "TO_BINARY_DOUBLE", "TO_BINARY_FLOAT");
 
     /** One finding: a function on a column, or a value-side function next to a column. */
     private record Finding(Expr.Func fn, Expr.Column column, Class<?> entity, boolean onColumn) {
@@ -246,7 +248,16 @@ final class SargableCheck {
         }
         String[] tableColumn = HibernateFunctions.tableAndColumn(session.getSessionFactory(), f.entity(), String.join(".", col.path()));
         if (tableColumn == null) return false;
-        String want = normalize(f.fn().sql()) + "(" + normalize(tableColumn[1]) + ")";
+        String fn = normalize(f.fn().sql());
+        String column = normalize(tableColumn[1]);
+        String want = fn + "(" + column + ")";
+        // Oracle stores an implicit type conversion in the index expression when the column type is not the type of
+        // the function argument, for example FN(TO_NUMBER("PRICE")) for a BINARY_DOUBLE column (Hibernate 7 maps
+        // Double to BINARY_DOUBLE) and a NUMBER argument. The query FN(price) uses that index too (measured with
+        // EXPLAIN PLAN on Oracle 23.26.3: INDEX RANGE SCAN without a hint).
+        Set<String> accepted = new java.util.HashSet<>();
+        accepted.add(want);
+        for (String conversion : IMPLICIT_CONVERSIONS) accepted.add(fn + "(" + conversion + "(" + column + "))");
         String key = "ix|" + tableColumn[0] + "|" + want;
         Boolean hit = CACHE.get(key);
         if (hit != null) return hit;
@@ -257,7 +268,9 @@ final class SargableCheck {
                 while (rs.next()) {
                     String expr = normalize(String.valueOf(rs.getString(1)));
                     int dot = expr.indexOf('.');
-                    if (expr.equals(want) || (dot > 0 && expr.indexOf('(') > dot && expr.substring(dot + 1).equals(want))) found = true;
+                    if (accepted.contains(expr) || (dot > 0 && expr.indexOf('(') > dot && accepted.contains(expr.substring(dot + 1)))) {
+                        found = true;
+                    }
                 }
             }
         } catch (SQLException e) {

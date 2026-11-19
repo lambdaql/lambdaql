@@ -280,11 +280,11 @@ class DmlQueryTest {
         ExecutableUpdate<Order> u = qb.update(Order.class)
                 .set(o -> o.setCustName("K"))
                 .where(o -> o.getCustomer().getName().equals("Kim"));
-        assertEquals("update Order e0 set e0.custName = 'K' where (select s1.name from Customer s1 where s1.id = e0.customer.id) = 'Kim'"
+        assertEquals("update Order e0 set e0.custName = 'K' where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) = 'Kim'"
                 + " and e0.customer.id is not null", u.toHql().hql());
         // a path in a value: a subquery; NULL when there is no customer
         ExecutableUpdate<Order> copy = qb.update(Order.class).set(o -> o.setCustName(o.getCustomer().getName())).all();
-        assertEquals("update Order e0 set e0.custName = (select s1.name from Customer s1 where s1.id = e0.customer.id)", copy.toHql().hql());
+        assertEquals("update Order e0 set e0.custName = (select s1.name from Customer s1 where s1.id = fk(e0.customer))", copy.toHql().hql());
         // @end
         assertEquals(target.size(), u.execute());
         assertEquals(target, orders().stream().filter(o -> "K".equals(o.getCustName())).map(Order::getId).toList());
@@ -314,7 +314,7 @@ class DmlQueryTest {
         int deleted = d.execute();
         // a path: the same rows as qb.from(Order.class).where(same lambda) - orders without a customer stay
         ExecutableDelete<Order> byName = qb.delete(Order.class).where(o -> o.getCustomer().getName() == null);
-        assertEquals("delete from Order e0 where (select s1.name from Customer s1 where s1.id = e0.customer.id) is null"
+        assertEquals("delete from Order e0 where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) is null"
                 + " and e0.customer.id is not null", byName.toHql().hql());
         // @end
         assertEquals(1, deleted);

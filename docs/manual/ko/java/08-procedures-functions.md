@@ -630,7 +630,7 @@ where FN_DISCOUNT(o1_0.price)>10
 
 | 경우 | 코드 | H2 | MariaDB | Oracle |
 |---|---|---|---|---|
-| ① 함수가 열을 감쌈: `fn(o.price) > 10`, 열에 적용한 Boolean 함수, `IN`이나 `IS NULL` 안의 함수 | `LQL-5001`(WARN) | WARN | WARN(저장 함수는 인덱스에 쓸 수 없음) | WARN. **단**, `user_ind_expressions`에 같은 식 `FN(COLUMN)`의 함수 기반 인덱스가 그 테이블에 있으면 기록하지 않음 |
+| ① 함수가 열을 감쌈: `fn(o.price) > 10`, 열에 적용한 Boolean 함수, `IN`이나 `IS NULL` 안의 함수 | `LQL-5001`(WARN) | WARN | WARN(저장 함수는 인덱스에 쓸 수 없음) | WARN. **단**, `user_ind_expressions`에 같은 식 `FN(COLUMN)`의 함수 기반 인덱스가 그 테이블에 있으면 기록하지 않음. 열 타입이 함수 인자 타입과 달라 Oracle이 넣은 숫자 변환(`FN(TO_NUMBER(COLUMN))` 등)도 같은 식으로 봄 |
 | ② 값 쪽의 함수를 열과 비교: `o.price > fn(rate)` | `LQL-5007`(WARN) | 검사하지 않음 | `information_schema.routines.is_deterministic = 'NO'`(기본값!)이면 WARN. 이때 MariaDB는 인덱스 전체를 스캔함 | 검사하지 않음(Oracle은 어느 쪽이든 범위 스캔) |
 
 - Oracle 인덱스 대조에 쓰는 테이블·열 이름은 Hibernate 매핑에서 가져옵니다. 열 인자 하나인 함수만 대조합니다.

@@ -342,15 +342,15 @@ set description='done'
 where o1_0.status=2
 
 -- @example update-path
--- HQL: update Order e0 set e0.custName = 'K' where (select s1.name from Customer s1 where s1.id = e0.customer.id) = 'Kim' and e0.customer.id is not null
+-- HQL: update Order e0 set e0.custName = 'K' where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) = 'Kim' and e0.customer.id is not null
 update orders
 set cust_name='K'
-where (select c1_0.name from customers c1_0,customers c2_0 where c1_0.id=orders.customer_id)='Kim' and customer_id is not null
+where (select c1_0.name from customers c1_0 where c1_0.id=orders.customer_id)='Kim' and customer_id is not null
 
 -- @example update-path#2
--- HQL: update Order e0 set e0.custName = (select s1.name from Customer s1 where s1.id = e0.customer.id)
+-- HQL: update Order e0 set e0.custName = (select s1.name from Customer s1 where s1.id = fk(e0.customer))
 update orders
-set cust_name=(select c1_0.name from customers c1_0,customers c2_0 where c1_0.id=orders.customer_id)
+set cust_name=(select c1_0.name from customers c1_0 where c1_0.id=orders.customer_id)
 
 -- @example update-versioned
 -- HQL: update versioned VOrder e0 set e0.status = 2 where e0.id = 1L
@@ -364,9 +364,9 @@ delete o1_0 from orders o1_0
 where o1_0.status=3
 
 -- @example delete#2
--- HQL: delete from Order e0 where (select s1.name from Customer s1 where s1.id = e0.customer.id) is null and e0.customer.id is not null
+-- HQL: delete from Order e0 where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) is null and e0.customer.id is not null
 delete from orders
-where (select c1_0.name from customers c1_0,customers c2_0 where c1_0.id=orders.customer_id) is null and customer_id is not null
+where (select c1_0.name from customers c1_0 where c1_0.id=orders.customer_id) is null and customer_id is not null
 
 -- @example insert
 -- HQL: insert into Archive (id, price, customerName) values (100L, 9.5, 'Kim')

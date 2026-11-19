@@ -1,6 +1,6 @@
 # DEVNOTE — lambdaQL 개발 인계 노트
 
-> 최종 갱신: 2026-11-19 · 브랜치 `feature/engine-core`
+> 최종 갱신: 2026-11-19 · 브랜치 `feature/boot4`
 >
 > 이 문서는 작업을 이어받는 개발자와 에이전트를 위한 요약이다. 근거와 상세는 다음 문서에 있다.
 >
@@ -96,7 +96,7 @@ Javadoc 빌드는 `--snippet-path src/test/java`를 쓴다. Javadoc의 `{@snippe
 ## 5. 다음 작업
 
 1. **번역**: `PENDING-TRANSLATION.md`의 항목을 en → ja → zh 순서로 반영한다(작성자 결정, 언어마다 순서대로). 31쪽이 한국어와 달라져 있어 바뀐 페이지를 통째로 다시 옮기는 방식이 정확하다. 2026-11-19에 en 작업을 시작했다가 작성자 요청으로 중지했다(변경 없음).
-2. **Spring Boot 4 지원**: 작성자 요청으로 별도 브랜치에서 진행한다(미착수). Boot 4는 Hibernate 7·Jakarta Persistence 3.2 기반이라 HQL 렌더링과 Hibernate API 사용 부분(바인딩 타입, `unwrap`)의 확인이 필요하다(미측정).
+2. **Spring Boot 4 지원**: `feature/boot4` 브랜치에서 진행 중(10절). 세 DB 테스트 통과, 남은 일은 jar 하나(D52) 구현과 매뉴얼 갱신.
 3. **남은 미구현·v0.2 후보**(9절과 ROADMAP 기준): MariaDB `lateral` 재작성(Q4), `SortSpec`의 조인 형태, 집계 기준 정렬, Oracle 오버로드 선택, 조건부 값(CASE WHEN), 일반 `LIKE`, insert의 조인, 엔티티 4개 이상 조인, 복합 키 엔티티의 `limit`·`executeOne()`, U11·U12·U15 검사.
 
 ---
@@ -189,12 +189,12 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 - B8(정수 열과 2.5): Hibernate 7은 BigDecimal 타입을 지정한 바인딩도 거부(`QueryArgumentException`). 숫자 리터럴(`e0.cnt >= 2.5BD`, IN은 `(2.5BD, 3.0BD)`)로 바꿈. Hibernate 6.6에서도 동작하는 형태. D37(캡처 값은 바인딩)의 예외다. 매뉴얼의 B8 설명(“BigDecimal로 바인딩”)은 아직 고치지 않았다.
 - `HibernateFunctions.tableAndColumn`: Hibernate 7에 없는 `getPropertyColumnNames` 대신 `findAttributeMapping` + `SelectableMapping`(6·7 공통)으로 바꿈.
 
-테스트 결과(2026-11-19): H2 241개 통과, MariaDB 3개 실패, Oracle 1개 실패.
+테스트 결과(2026-11-19, 10.2 수정 뒤): 세 DB 모두 241개 통과(건너뜀 H2 16·MariaDB 10·Oracle 9).
 
-### 10.2 남은 실패
+### 10.2 Boot 4에서 고친 실패(2026-11-19 해결)
 
-1. **MariaDB UPDATE의 연관 경로(U9)**: `update … where (select s1.name from Customer s1 where s1.id = e0.customer.id) = 'Kim'`를 Hibernate 7이 `from SQ_customers c1_0, SQ_customers c2_0 where c1_0.id = SQ_orders.customer_id`로 만들어 쓰지 않는 `c2_0`가 곱해짐 → "Subquery returns more than 1 row". `DmlQueryTest`(2건)와 `KotlinQueryTest.update`. H2·Oracle은 통과. 후보: 서브쿼리 안의 외부 FK 참조를 `fk(e0.customer)` 등으로 바꿔 실측.
-2. **Oracle `FunctionTest.sargableWarnings`**: 함수 기반 인덱스가 있는데도 LQL-5001 경고. `tableAndColumn`을 고친 뒤에도 실패. `user_ind_expressions` 조회나 함수 SQL 이름(`fn.sql()`) 쪽을 Hibernate 7에서 확인해야 함.
+1. **MariaDB UPDATE·DELETE의 연관 경로(U9)**: 서브쿼리 안의 바깥 FK를 `e0.customer.id`로 쓰면 Hibernate 7.4가 MariaDB에서 `from SQ_customers c1_0, SQ_customers c2_0`처럼 쓰지 않는 조인을 붙여 "Subquery returns more than 1 row"가 났다. `s1.id = fk(e0.customer)`로 바꿈. 세 DB에서 실측: MariaDB는 `c2_0`가 사라지고, H2·Oracle은 이전과 같은 SQL. 조건의 `e0.customer.id is not null`은 세 DB 모두 조인 없이 렌더링되어 그대로 둠.
+2. **Oracle `FunctionTest.sargableWarnings`**: Hibernate 7.4는 `Double`을 `BINARY_DOUBLE`로 매핑한다(6.6은 `float(53)`). 함수 인자가 `NUMBER`라 Oracle이 인덱스 식을 `"LQL"."SQ_FN_DISCOUNT"(TO_NUMBER("PRICE"))`로 저장해 문자열 비교가 어긋났다. 쿼리 `SQ_FN_DISCOUNT(price) > 100`은 힌트 없이 `INDEX RANGE SCAN SQ_IX_DISCOUNT`(EXPLAIN PLAN 실측)라 인덱스가 쓰인다. `SargableCheck`가 열을 감싼 `TO_NUMBER`·`TO_BINARY_DOUBLE`·`TO_BINARY_FLOAT`도 같은 식으로 보도록 바꿈. `tableAndColumn`과 `fn.sql()`은 Hibernate 7에서도 기대값(`SQ_orders`, `price`, `SQ_FN_DISCOUNT`)을 돌려줌(실측).
 
 ### 10.3 ASM판·JVM판: jar 하나(Multi-Release JAR) 결정(D52)
 
@@ -251,5 +251,5 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 | 복합 키 엔티티의 `limit`·`executeOne()` | 미구현 |
 | U11, U12, U15 검사 | 미구현 |
 | Kotlin 전용 형태 `?:`, 범위, `when` | 설계됨, 프로토타입으로 바이트코드 확인. 빌드 안의 Kotlin 테스트 없음 |
-| Spring Boot 4 | 미착수(별도 브랜치 예정) |
+| Spring Boot 4 | `feature/boot4` 진행 중(10절) |
 | Maven Central 배포 | 미배포 |
