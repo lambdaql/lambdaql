@@ -1362,7 +1362,15 @@ public final class HqlRenderer {
         // decimals, so the database compares 2.5 itself (Hibernate would cut it to 2; D48 B8)
         boolean exact = HostEvaluator.integral(peer)
                 && c.stream().anyMatch(o -> o instanceof Number n && HostEvaluator.exactWhole(n, peer) == null);
-        for (Object o : c) list.add(exact && o instanceof Number n ? HostEvaluator.decimal(n) : HostEvaluator.convert(o, peer));
+        if (exact) {
+            List<String> literals = new ArrayList<>();
+            for (Object o : c) literals.add(o instanceof Number n ? decimalLiteral(n) : bind(o, peer));
+            String text = String.join(", ", literals);
+            if (positive) return x + " in (" + text + ")";
+            if (!nonNull(value)) sqlMeaning(x + " not in (...)");
+            return x + " not in (" + text + ")";
+        }
+        for (Object o : c) list.add(HostEvaluator.convert(o, peer));
         String param = bindRaw(list);
         if (positive) return x + " in (" + param + ")";
         // D48: the SQL meaning; a NULL value is not "not in" the list
@@ -1482,10 +1490,16 @@ public final class HqlRenderer {
 
     private String bind(Object v, Class<?> type) {
         Object x = HostEvaluator.convert(v, type);
-        // 2.5 or 1e20 for a whole-number column: bound as a decimal so the database compares the value itself
-        // (Hibernate would refuse it as the column type; D48 B8)
-        if (HostEvaluator.integral(type) && x instanceof Number n && !type.isInstance(x)) x = HostEvaluator.decimal(n);
+        // 2.5 or 1e20 for a whole-number column: written as a decimal literal, so the database compares the value
+        // itself. Hibernate types the parameter as the column type and would refuse or cut it (D48 B8; Hibernate 7
+        // also refuses a parameter bound with an explicit BigDecimal type). Only a number is written, never text.
+        if (HostEvaluator.integral(type) && x instanceof Number n && !type.isInstance(x)) return decimalLiteral(n);
         return bindRaw(x);
+    }
+
+    /** A number as an HQL decimal literal, for example {@code 2.5BD} (D48 B8). */
+    private static String decimalLiteral(Number n) {
+        return java.util.Objects.requireNonNull(HostEvaluator.decimal(n)).toPlainString() + "BD";
     }
 
     private String bindRaw(Object v) {

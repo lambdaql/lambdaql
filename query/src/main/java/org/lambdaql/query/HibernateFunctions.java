@@ -37,11 +37,11 @@ final class HibernateFunctions {
         try {
             var persister = sf.unwrap(org.hibernate.engine.spi.SessionFactoryImplementor.class)
                     .getMappingMetamodel().getEntityDescriptor(entity);
-            if (!(persister instanceof org.hibernate.persister.entity.AbstractEntityPersister p)) return null;
-            String[] cols = p.getPropertyColumnNames(path);
-            if (cols == null || cols.length != 1) return null;
-            String table = p.getTableName();
-            return new String[]{table.substring(table.lastIndexOf('.') + 1), cols[0]};
+            // the mapping API of Hibernate 6 and 7 (getPropertyColumnNames is gone in 7)
+            var attribute = persister.findAttributeMapping(path);
+            if (!(attribute instanceof org.hibernate.metamodel.mapping.SelectableMapping column)) return null;
+            String table = column.getContainingTableExpression();
+            return new String[]{table.substring(table.lastIndexOf('.') + 1), column.getSelectionExpression()};
         } catch (RuntimeException | LinkageError e) {
             return null;
         }

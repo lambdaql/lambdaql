@@ -84,9 +84,9 @@ having sum(o1_0.price)>1000
 
 -- @example 06-derived
 -- HQL: select r.customerId, r.cnt, r.total from (select o.customer.id as customerId, count(*) as cnt, sum(o.price) as total from Order o group by o.customer.id) r where r.total > 100
-select r1_0.customerId,r1_0.cnt,r1_0.total
-from (select o1_0.customer_id,count(*),sum(o1_0.price) from orders o1_0 group by o1_0.customer_id) r1_0(customerId,cnt,total)
-where r1_0.total>100
+select r1_0.c0,r1_0.c1,r1_0.c2
+from (select o1_0.customer_id,count(*),sum(o1_0.price) from orders o1_0 group by o1_0.customer_id) r1_0(c0,c1,c2)
+where r1_0.c2>100
 
 -- @example 06-cte
 -- HQL: with t as (select o.customer.id as customerId, count(*) as cnt, sum(o.price) as total from Order o group by o.customer.id) select x.customerId, x.cnt, x.total from t x where x.total > 100
@@ -162,7 +162,7 @@ where o1_0.id=(select o2_0.id from orders o2_0 where o2_0.customer_id is not dis
 
 -- @example 06-cte-columns
 -- HQL: with t (customerId, cnt, total) as (select o.customer.id, count(*), sum(o.price) from Order o group by o.customer.id) select x.customerId, x.cnt, x.total from t x where x.total > 100
--- NOT VALID HQL: SyntaxException: At 1:7 and token '(', no viable alternative at input 'with t *(customerId, cnt, total) as (select o.customer.id, count(*), sum(o.price) from Order o group by o.customer.id) select x.customerId, x.cnt, x.total from t x where x.total > 100'
+-- NOT VALID HQL: SyntaxException: At 1:7 and token '(', missing AS at '('
 
 -- @example 07-update-values
 -- HQL: update Order o set o.description = null, o.updateAt = :p1, o.active = true where o.id = :p2

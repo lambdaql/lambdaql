@@ -17,7 +17,7 @@ where o1_0.status=1 and o1_0.price>?
 -- HQL: select e0 from Order e0 where (e0.status = 1 or e0.status = 3) and e0.active = true
 select …
 from orders o1_0
-where (o1_0.status=1 or o1_0.status=3) and o1_0.active=1
+where (o1_0.status=1 or o1_0.status=3) and o1_0.active=true
 
 -- @example string-literal
 -- HQL: select e0 from Order e0 where e0.description = 'O''Brien'
@@ -91,13 +91,13 @@ where o1_0.status in (?,?)
 -- HQL: select e0 from Order e0 where e0.active = true
 select …
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 
 -- @example boolean#2
 -- HQL: select e0 from Order e0 where e0.active = false
 select …
 from orders o1_0
-where o1_0.active=0
+where o1_0.active=false
 
 -- @example enum
 -- HQL: select e0 from Order e0 where e0.kind = org.lambdaql.query.Order$Kind.RUSH
@@ -134,13 +134,13 @@ where o1_0.status=? and o1_0.price>=?
 -- HQL: select e0 from Order e0 where e0.active = true and (e0.status = 1 or e0.status = 2)
 select …
 from orders o1_0
-where o1_0.active=1 and (o1_0.status=1 or o1_0.status=2)
+where o1_0.active=true and (o1_0.status=1 or o1_0.status=2)
 
 -- @example many-where
 -- HQL: select e0 from Order e0 where e0.status = 1 and e0.active = true
 select …
 from orders o1_0
-where o1_0.status=1 and o1_0.active=1
+where o1_0.status=1 and o1_0.active=true
 
 -- @example this-capture
 -- HQL: select e0 from Order e0 where e0.status = :p1
@@ -172,7 +172,7 @@ where c1_0.id is null or c1_0.name is null
 -- HQL: select e0 from Order e0 where e0.active = true order by e0.price desc, e0.id asc
 select …
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.price desc,o1_0.id
 
 -- @example sort-nulls
@@ -243,7 +243,7 @@ limit ?,?
 -- HQL: select e0 from Order e0 where e0.active = true order by e0.id asc
 select …
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.id
 limit ?
 
@@ -251,7 +251,7 @@ limit ?
 -- HQL: select e0 from Order e0 where e0.active = true order by e0.description desc nulls last, e0.id asc
 select …
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.description desc,o1_0.id
 
 -- @example sort-spec-then
@@ -277,7 +277,7 @@ limit ?
 -- HQL: select e0 from Order e0 where e0.active = true order by e0.id asc
 select …
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.id
 limit ?
 
@@ -292,7 +292,7 @@ limit ?
 -- HQL: select count(e0) from Order e0 where e0.active = true
 select count(o1_0.id)
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 
 -- @example exists
 -- HQL: select 1 from Order e0 where e0.kind = org.lambdaql.query.Order$Kind.RUSH
@@ -316,7 +316,7 @@ limit ?
 select …
 from orders o1_0
 left join customers c1_0 on c1_0.id=o1_0.customer_id
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.price desc,c1_0.name,o1_0.id
 limit ?,?
 
@@ -343,14 +343,14 @@ where o1_0.status=2
 
 -- @example update-path
 -- HQL: update Order e0 set e0.custName = 'K' where (select s1.name from Customer s1 where s1.id = e0.customer.id) = 'Kim' and e0.customer.id is not null
-update orders o1_0
+update orders
 set cust_name='K'
-where (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)='Kim' and o1_0.customer_id is not null
+where (select c1_0.name from customers c1_0,customers c2_0 where c1_0.id=orders.customer_id)='Kim' and customer_id is not null
 
 -- @example update-path#2
 -- HQL: update Order e0 set e0.custName = (select s1.name from Customer s1 where s1.id = e0.customer.id)
-update orders o1_0
-set cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)
+update orders
+set cust_name=(select c1_0.name from customers c1_0,customers c2_0 where c1_0.id=orders.customer_id)
 
 -- @example update-versioned
 -- HQL: update versioned VOrder e0 set e0.status = 2 where e0.id = 1L
@@ -365,8 +365,8 @@ where o1_0.status=3
 
 -- @example delete#2
 -- HQL: delete from Order e0 where (select s1.name from Customer s1 where s1.id = e0.customer.id) is null and e0.customer.id is not null
-delete o1_0 from orders o1_0
-where (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id) is null and o1_0.customer_id is not null
+delete from orders
+where (select c1_0.name from customers c1_0,customers c2_0 where c1_0.id=orders.customer_id) is null and customer_id is not null
 
 -- @example insert
 -- HQL: insert into Archive (id, price, customerName) values (100L, 9.5, 'Kim')
@@ -508,15 +508,15 @@ having count(*)>=2
 -- @example delete-limit
 -- HQL: delete from Order e0 where e0.id in (select t.id from (select x0.id as id from Order x0 where x0.status = 1 order by x0.price asc, x0.id asc limit 1) t)
 delete o1_0 from orders o1_0
-where o1_0.id in (select t1_0.id from (select o2_0.id id from orders o2_0 where o2_0.status=1 order by o2_0.price,o2_0.id limit 1) t1_0)
+where o1_0.id in (select * from (select t1_0.c0 from (select * from (select o2_0.id c0 from orders o2_0 where o2_0.status=1 order by o2_0.price,o2_0.id limit 1) _sub_) t1_0) _sub_)
 
 -- @example dml-subquery
 -- HQL: delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)
-delete o1_0 from orders o1_0
-where not exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id)
+delete from orders
+where not exists(select 1 from items i1_0 where i1_0.order_id=orders.id)
 
 -- @example update-limit
 -- HQL: update Order e0 set e0.description = 'top' where e0.id in (select t.id from (select x0.id as id from Order x0 join x0.customer k1 where k1.name = 'Kim' order by x0.price desc, x0.id asc limit 1) t)
 update orders o1_0
 set description='top'
-where o1_0.id in (select t1_0.id from (select o2_0.id id from orders o2_0 join customers c1_0 on c1_0.id=o2_0.customer_id where c1_0.name='Kim' order by o2_0.price desc,o2_0.id limit 1) t1_0)
+where o1_0.id in (select * from (select t1_0.c0 from (select * from (select o2_0.id c0 from orders o2_0 join customers c1_0 on c1_0.id=o2_0.customer_id where c1_0.name='Kim' order by o2_0.price desc,o2_0.id limit 1) _sub_) t1_0) _sub_)

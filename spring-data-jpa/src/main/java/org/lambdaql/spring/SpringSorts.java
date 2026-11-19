@@ -4,7 +4,7 @@ import org.lambdaql.i18n.LqlMessage;
 import org.lambdaql.query.Direction;
 import org.lambdaql.query.SortSpec;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.mapping.PropertyPath;
+import org.springframework.data.core.PropertyPath;
 
 /**
  * Turns a Spring {@link Sort} into a lambdaQL {@link SortSpec}.
@@ -33,7 +33,7 @@ public final class SpringSorts {
      * @param <T>  the entity type
      * @return the same order as a spec
      * @throws IllegalArgumentException                                     if the sort has no order
-     * @throws org.springframework.data.mapping.PropertyReferenceException if a property does not exist
+     * @throws org.springframework.data.core.PropertyReferenceException if a property does not exist
      * @throws UnsupportedOperationException                                if an order uses {@code ignoreCase}
      */
     public static <T> SortSpec<T> toSpec(Class<T> type, Sort sort) {
@@ -50,7 +50,7 @@ public final class SpringSorts {
      * @param <T>    the entity type
      * @return the same order as a spec
      * @throws IllegalArgumentException                                     if the sort has no order
-     * @throws org.springframework.data.mapping.PropertyReferenceException if a property that is not an alias does not exist
+     * @throws org.springframework.data.core.PropertyReferenceException if a property that is not an alias does not exist
      * @throws UnsupportedOperationException                                if an order uses {@code ignoreCase}
      */
     public static <T> SortSpec<T> toSpec(Class<T> type, org.lambdaql.query.SortPolicy policy, Sort sort) {

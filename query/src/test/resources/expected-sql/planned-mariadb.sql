@@ -84,9 +84,9 @@ having sum(o1_0.price)>1000
 
 -- @example 06-derived
 -- HQL: select r.customerId, r.cnt, r.total from (select o.customer.id as customerId, count(*) as cnt, sum(o.price) as total from Order o group by o.customer.id) r where r.total > 100
-select r1_0.customerId,r1_0.cnt,r1_0.total
-from (select o1_0.customer_id customerId,count(*) cnt,sum(o1_0.price) total from orders o1_0 group by o1_0.customer_id) r1_0
-where r1_0.total>100
+select r1_0.c0,r1_0.c1,r1_0.c2
+from (select o1_0.customer_id c0,count(*) c1,sum(o1_0.price) c2 from orders o1_0 group by o1_0.customer_id) r1_0
+where r1_0.c2>100
 
 -- @example 06-cte
 -- HQL: with t as (select o.customer.id as customerId, count(*) as cnt, sum(o.price) as total from Order o group by o.customer.id) select x.customerId, x.cnt, x.total from t x where x.total > 100
@@ -115,24 +115,24 @@ where o1_0.id=?
 -- @example 07-update-fk
 -- HQL: update Order o set o.customer.id = :p1 where o.id = :p2
 update orders o1_0
-set customer_id=?
+set o1_0.customer_id=?
 where o1_0.id=?
 
 -- @example 07-update-fk-null
 -- HQL: update Order o set o.customer = null where o.id = :p1
 update orders o1_0
-set customer_id=null
+set o1_0.customer_id=null
 where o1_0.id=?
 
 -- @example 07-update-other-table
 -- HQL: update Order o set o.custName = (select c.name from Customer c where c.id = o.customer.id)
-update orders o1_0
-set cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)
+update orders
+set cust_name=(select c1_0.name from customers c1_0,customers c2_0 where c1_0.id=orders.customer_id)
 
 -- @example 07-delete-exists
 -- HQL: delete from Order o where exists (select 1 from Customer c where c.id = o.customer.id and c.name is null)
-delete o1_0 from orders o1_0
-where exists(select 1 from customers c1_0 where c1_0.id=o1_0.customer_id and c1_0.name is null)
+delete from orders
+where exists(select 1 from customers c1_0,customers c2_0 where c1_0.id=orders.customer_id and c1_0.name is null)
 
 -- @example 07-insert-select
 -- HQL: insert into Archive (id, price, customerName) select o.id, o.price, c.name from Order o left join o.customer c where o.status = 9
@@ -163,12 +163,12 @@ where o1_0.id=(select o2_0.id from orders o2_0 where o2_0.customer_id<=>o1_0.cus
 
 -- @example 06-cte-columns
 -- HQL: with t (customerId, cnt, total) as (select o.customer.id, count(*), sum(o.price) from Order o group by o.customer.id) select x.customerId, x.cnt, x.total from t x where x.total > 100
--- NOT VALID HQL: SyntaxException: At 1:7 and token '(', no viable alternative at input 'with t *(customerId, cnt, total) as (select o.customer.id, count(*), sum(o.price) from Order o group by o.customer.id) select x.customerId, x.cnt, x.total from t x where x.total > 100'
+-- NOT VALID HQL: SyntaxException: At 1:7 and token '(', missing AS at '('
 
 -- @example 07-update-values
 -- HQL: update Order o set o.description = null, o.updateAt = :p1, o.active = true where o.id = :p2
 update orders o1_0
-set description=null,update_at=?,active=1
+set description=null,update_at=?,active=true
 where o1_0.id=?
 
 -- @example 07-update-add
@@ -185,21 +185,21 @@ where o1_0.id=?
 
 -- @example 07-update-sum
 -- HQL: update Order o set o.total = (select sum(i.price) from Item i where i.order.id = o.id) where o.status = 1
-update orders o1_0
-set total=(select sum(i1_0.price) from items i1_0 where i1_0.order_id=o1_0.id)
-where o1_0.status=1
+update orders
+set total=(select sum(i1_0.price) from items i1_0 where i1_0.order_id=orders.id)
+where status=1
 
 -- @example 07-update-where-path
 -- HQL: update Order o set o.status = 0 where exists (select 1 from Customer c where c.id = o.customer.id and c.grade > 3)
-update orders o1_0
+update orders
 set status=0
-where exists(select 1 from customers c1_0 where c1_0.id=o1_0.customer_id and c1_0.grade>3)
+where exists(select 1 from customers c1_0,customers c2_0 where c1_0.id=orders.customer_id and c1_0.grade>3)
 
 -- @example 07-update-not-exists
 -- HQL: update Order o set o.status = 9 where not exists (select 1 from Item i where i.order.id = o.id)
-update orders o1_0
+update orders
 set status=9
-where not exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id)
+where not exists(select 1 from items i1_0 where i1_0.order_id=orders.id)
 
 -- @example 07-update-versioned
 -- HQL: update versioned VOrder o set o.status = 8 where o.id = :p1 and o.version = :p2
@@ -209,8 +209,8 @@ where v1_0.id=? and v1_0.version=?
 
 -- @example 07-delete-not-exists
 -- HQL: delete from Order o where not exists (select 1 from Item i where i.order.id = o.id)
-delete o1_0 from orders o1_0
-where not exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id)
+delete from orders
+where not exists(select 1 from items i1_0 where i1_0.order_id=orders.id)
 
 -- @example 07-delete-ids
 -- HQL: delete from Item i where i.id in (:p1)

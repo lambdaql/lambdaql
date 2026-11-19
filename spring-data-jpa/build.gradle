@@ -13,6 +13,7 @@ dependencies {
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testImplementation 'com.h2database:h2:2.3.230'
 	testRuntimeOnly 'org.mariadb.jdbc:mariadb-java-client:3.5.6'
 	testRuntimeOnly 'com.oracle.database.jdbc:ojdbc11:23.26.0.0.0'

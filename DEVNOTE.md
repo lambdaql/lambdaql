@@ -175,6 +175,38 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 
 ---
 
+## 10. Spring Boot 4 브랜치(`feature/boot4`, 2026-11-19 진행 중)
+
+`feature/engine-core`(커밋 `3e671bc`)에서 갈라졌다. 작성자 지시: Boot 4를 지원한 뒤 JDK를 올리고, ASM 대신 JVM 기본 기능(Class-File API, `java.lang.classfile`)으로 구현해 **Boot 4판은 ASM판과 JVM판 두 가지**를 둔다.
+
+### 10.1 Boot 4.1.2로 올린 내용(실측)
+
+- BOM `spring-boot-dependencies:4.1.2`: Hibernate 7.4.13, Spring Framework 7.0.10, Spring Data 2026.0, Jakarta Persistence 3.2, JUnit 6.0.3. 코어 메인 코드는 수정 없이 컴파일됨.
+- Spring Data 4: `PropertyPath`, `PropertyReferenceException`이 `org.springframework.data.core`로 이동.
+- Boot 4: `@EntityScan`이 `org.springframework.boot.persistence.autoconfigure`로 이동(테스트 25개 파일).
+- JUnit 6: `testRuntimeOnly 'org.junit.platform:junit-platform-launcher'`를 명시해야 함(Gradle 내장 런처는 버전이 맞지 않아 테스트 발견 실패).
+- Hibernate 7 SQL 차이: 파생 테이블 열 별칭 `t1_0(id)` → `t1_0(c0)`. SQL 정답 파일 6개를 다시 만듦.
+- B8(정수 열과 2.5): Hibernate 7은 BigDecimal 타입을 지정한 바인딩도 거부(`QueryArgumentException`). 숫자 리터럴(`e0.cnt >= 2.5BD`, IN은 `(2.5BD, 3.0BD)`)로 바꿈. Hibernate 6.6에서도 동작하는 형태. D37(캡처 값은 바인딩)의 예외다. 매뉴얼의 B8 설명(“BigDecimal로 바인딩”)은 아직 고치지 않았다.
+- `HibernateFunctions.tableAndColumn`: Hibernate 7에 없는 `getPropertyColumnNames` 대신 `findAttributeMapping` + `SelectableMapping`(6·7 공통)으로 바꿈.
+
+테스트 결과(2026-11-19): H2 241개 통과, MariaDB 3개 실패, Oracle 1개 실패.
+
+### 10.2 남은 실패
+
+1. **MariaDB UPDATE의 연관 경로(U9)**: `update … where (select s1.name from Customer s1 where s1.id = e0.customer.id) = 'Kim'`를 Hibernate 7이 `from SQ_customers c1_0, SQ_customers c2_0 where c1_0.id = SQ_orders.customer_id`로 만들어 쓰지 않는 `c2_0`가 곱해짐 → "Subquery returns more than 1 row". `DmlQueryTest`(2건)와 `KotlinQueryTest.update`. H2·Oracle은 통과. 후보: 서브쿼리 안의 외부 FK 참조를 `fk(e0.customer)` 등으로 바꿔 실측.
+2. **Oracle `FunctionTest.sargableWarnings`**: 함수 기반 인덱스가 있는데도 LQL-5001 경고. `tableAndColumn`을 고친 뒤에도 실패. `user_ind_expressions` 조회나 함수 SQL 이름(`fn.sql()`) 쪽을 Hibernate 7에서 확인해야 함.
+
+### 10.3 ASM판·JVM판 이중 구현 계획(미착수, 설계 결정 필요)
+
+- 현재 바이트코드 읽기(`engine.decode.Decoder`, `engine.load`)는 ASM 방문자 API를 쓰고, IR(`Expr`의 `type()`, `MethodRef`)도 ASM `org.objectweb.asm.Type`을 쓴다.
+- 순서 안:
+  1. IR에서 ASM 의존을 걷어 낸다(자체 타입 표현으로 교체).
+  2. 바이트코드 읽기를 인터페이스로 분리한다(명령어 스트림 → 같은 IR).
+  3. Class-File API 구현을 추가한다(JDK 24 이상, `java.lang.classfile` 정식).
+- 결정할 것: 아티팩트 구성(공통 엔진 + `-asm` / `-jdk` 또는 하나의 jar에서 실행 JDK로 선택), JVM판의 최소 JDK(24 또는 25 LTS), Gradle 8.10의 JDK 23 상한(JDK 24+ 빌드에는 Gradle 8.14 이상 필요).
+
+---
+
 ## 9. 기능별 구현·테스트 현황 (2026-11-19)
 
 매뉴얼에 있던 상태 노트와 README의 상태 표를 옮겨 현재 기준으로 합쳤다. 매뉴얼은 사용 방법만 다루고, 현황은 이 표에서 관리한다. 옮기기 전 원문은 커밋 `15f691e`, `ad202ed`에 있다.

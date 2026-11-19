@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.lambdaql.engine.render.HqlRenderer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.autoconfigure.domain.EntityScan;
+import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -126,18 +126,17 @@ class SqlMeaningTest {
         em.getTransaction().commit();
         em.close();
         // @start region="whole-number"
-        // cnt is a whole number; 2.5 is compared as written (it is never cut to 2)
+        // cnt is a whole number; 2.5 is compared as written (it is never cut to 2): a decimal literal
         double half = 2.5;
         RenderedQuery atLeast = qb.from(Order.class).where(o -> o.getCnt() >= half).toHql();
-        assertEquals("select e0 from Order e0 where e0.cnt >= :p1", atLeast.hql());
-        assertEquals(Map.of("p1", new BigDecimal("2.5")), atLeast.parameters());    // bound as a decimal
+        assertEquals("select e0 from Order e0 where e0.cnt >= 2.5BD", atLeast.hql());
+        assertEquals(Map.of(), atLeast.parameters());                                // written as a decimal literal
         // a constant written in the lambda stays a literal
         assertEquals("select e0 from Order e0 where e0.cnt >= 2.5", qb.from(Order.class).where(o -> o.getCnt() >= 2.5).toHql().hql());
-        // an IN list with such a value is bound as decimals
+        // an IN list with such a value is written as decimal literals
         List<Double> values = List.of(2.5, 3.0);
         RenderedQuery in = qb.from(Order.class).where(o -> values.contains(o.getCnt().doubleValue())).toHql();
-        assertEquals("select e0 from Order e0 where e0.cnt in (:p1)", in.hql());
-        assertEquals(Map.of("p1", List.of(new BigDecimal("2.5"), new BigDecimal("3.0"))), in.parameters());
+        assertEquals("select e0 from Order e0 where e0.cnt in (2.5BD, 3.0BD)", in.hql());
         // @end
         assertEquals(List.of(3), qb.from(Order.class).where(o -> o.getCnt() >= half).select(o -> o.getCnt()).toList());
         assertEquals(List.of(3), qb.from(Order.class).where(o -> o.getCnt() > half).select(o -> o.getCnt()).toList());

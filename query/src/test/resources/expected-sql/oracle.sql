@@ -17,7 +17,7 @@ where o1_0.status=1 and o1_0.price>?
 -- HQL: select e0 from Order e0 where (e0.status = 1 or e0.status = 3) and e0.active = true
 select …
 from orders o1_0
-where (o1_0.status=1 or o1_0.status=3) and o1_0.active=1
+where (o1_0.status=1 or o1_0.status=3) and o1_0.active=true
 
 -- @example string-literal
 -- HQL: select e0 from Order e0 where e0.description = 'O''Brien'
@@ -91,13 +91,13 @@ where o1_0.status in (?,?)
 -- HQL: select e0 from Order e0 where e0.active = true
 select …
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 
 -- @example boolean#2
 -- HQL: select e0 from Order e0 where e0.active = false
 select …
 from orders o1_0
-where o1_0.active=0
+where o1_0.active=false
 
 -- @example enum
 -- HQL: select e0 from Order e0 where e0.kind = org.lambdaql.query.Order$Kind.RUSH
@@ -134,13 +134,13 @@ where o1_0.status=? and o1_0.price>=?
 -- HQL: select e0 from Order e0 where e0.active = true and (e0.status = 1 or e0.status = 2)
 select …
 from orders o1_0
-where o1_0.active=1 and (o1_0.status=1 or o1_0.status=2)
+where o1_0.active=true and (o1_0.status=1 or o1_0.status=2)
 
 -- @example many-where
 -- HQL: select e0 from Order e0 where e0.status = 1 and e0.active = true
 select …
 from orders o1_0
-where o1_0.status=1 and o1_0.active=1
+where o1_0.status=1 and o1_0.active=true
 
 -- @example this-capture
 -- HQL: select e0 from Order e0 where e0.status = :p1
@@ -172,7 +172,7 @@ where c1_0.id is null or c1_0.name is null
 -- HQL: select e0 from Order e0 where e0.active = true order by e0.price desc, e0.id asc
 select …
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.price desc,o1_0.id
 
 -- @example sort-nulls
@@ -244,7 +244,7 @@ fetch first ? rows only
 -- HQL: select e0 from Order e0 where e0.active = true order by e0.id asc
 select …
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.id
 fetch first ? rows only
 
@@ -252,7 +252,7 @@ fetch first ? rows only
 -- HQL: select e0 from Order e0 where e0.active = true order by e0.description desc nulls last, e0.id asc
 select …
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.description desc nulls last,o1_0.id
 
 -- @example sort-spec-then
@@ -278,7 +278,7 @@ fetch first ? rows only
 -- HQL: select e0 from Order e0 where e0.active = true order by e0.id asc
 select …
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.id
 fetch first ? rows only
 
@@ -293,7 +293,7 @@ fetch first ? rows only
 -- HQL: select count(e0) from Order e0 where e0.active = true
 select count(o1_0.id)
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 
 -- @example exists
 -- HQL: select 1 from Order e0 where e0.kind = org.lambdaql.query.Order$Kind.RUSH
@@ -317,7 +317,7 @@ fetch first ? rows only
 select …
 from orders o1_0
 left join customers c1_0 on c1_0.id=o1_0.customer_id
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.price desc nulls last,c1_0.name asc nulls first,o1_0.id
 offset ? rows
 fetch first ? rows only
@@ -514,7 +514,7 @@ having count(*)>=2
 -- @example delete-limit
 -- HQL: delete from Order e0 where e0.id in (select t.id from (select x0.id as id from Order x0 where x0.status = 1 order by x0.price asc, x0.id asc limit 1) t)
 delete from orders o1_0
-where o1_0.id in (select t1_0.id from (select o2_0.id id from orders o2_0 where o2_0.status=1 order by o2_0.price,o2_0.id fetch first 1 rows only) t1_0)
+where o1_0.id in (select t1_0.c0 from (select o2_0.id c0 from orders o2_0 where o2_0.status=1 order by o2_0.price,o2_0.id fetch first 1 rows only) t1_0)
 
 -- @example dml-subquery
 -- HQL: delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)
@@ -525,4 +525,4 @@ where not exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id)
 -- HQL: update Order e0 set e0.description = 'top' where e0.id in (select t.id from (select x0.id as id from Order x0 join x0.customer k1 where k1.name = 'Kim' order by x0.price desc, x0.id asc limit 1) t)
 update orders o1_0
 set o1_0.description='top'
-where o1_0.id in (select t1_0.id from (select o2_0.id id from orders o2_0 join customers c1_0 on c1_0.id=o2_0.customer_id where c1_0.name='Kim' order by o2_0.price desc,o2_0.id fetch first 1 rows only) t1_0)
+where o1_0.id in (select t1_0.c0 from (select o2_0.id c0 from orders o2_0 join customers c1_0 on c1_0.id=o2_0.customer_id where c1_0.name='Kim' order by o2_0.price desc,o2_0.id fetch first 1 rows only) t1_0)
