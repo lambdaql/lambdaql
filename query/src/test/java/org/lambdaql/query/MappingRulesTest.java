@@ -52,6 +52,21 @@ class MappingRulesTest {
         prices = List.of(10.0, 20.0, 30.0);
     }
 
+    /**
+     * Loads entities inside a transaction. OrderLine has a @Lob column; on PostgreSQL Hibernate maps it to a large
+     * object (oid), which can be read only inside a transaction ("Unable to access lob stream" otherwise).
+     */
+    private <T> T inTransaction(java.util.function.Function<QueryBuilder, T> work) {
+        EntityManager em = emf.createEntityManager();
+        em.getTransaction().begin();
+        try {
+            return work.apply(new QueryBuilder(em));
+        } finally {
+            em.getTransaction().rollback();
+            em.close();
+        }
+    }
+
     @Test
     void requiredAssociation() {
         // @start region="required-association"
@@ -64,7 +79,7 @@ class MappingRulesTest {
         assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name asc nulls first",
                 qb.from(Order.class).orderBy((o, by) -> by.asc(o.getCustomer().getName())).toHql().hql());
         // @end
-        assertEquals(3, sorted.toList().size());
+        assertEquals(3, inTransaction(q -> q.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getOrder().getPrice())).toList()).size());
         assertEquals(prices, qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getOrder().getPrice()))
                 .select(l -> l.getOrder().getPrice()).toList());
         assertEquals(prices, values.toList().stream().sorted(Comparator.naturalOrder()).toList());
@@ -80,8 +95,8 @@ class MappingRulesTest {
         assertEquals("select e0 from OrderLine e0 join e0.order j1 order by j1.price asc, e0.id asc",
                 qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getOrder().getPrice())).limit(2).toHql().hql());
         // @end
-        assertEquals(List.of("memo-10.0", "memo-20.0"), qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getCode())).limit(2)
-                .toList().stream().map(OrderLine::getCode).toList());
+        assertEquals(List.of("memo-10.0", "memo-20.0"), inTransaction(q -> q.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getCode())).limit(2)
+                .toList().stream().map(OrderLine::getCode).toList()));
     }
 
     @Test

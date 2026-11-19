@@ -70,7 +70,7 @@ final class ProcedureRunner {
         List<DbParam> read = session.doReturningWork(c -> metadataOrNull(c, call));
         List<DbParam> params = read != null ? read
                 : session.doReturningWork(c -> inferred(call, ret == void.class ? List.of() : slots(ret),
-                        c.getMetaData().getDatabaseProductName().toLowerCase(Locale.ROOT).contains("oracle")));
+                        cursorResults(c.getMetaData().getDatabaseProductName())));
         if (read != null) checkArguments(call, params);
         List<DbParam> outs = params.stream().filter(p -> p.mode() != 1 && !p.cursor()).toList();
         long cursors = params.stream().filter(DbParam::cursor).count();
@@ -208,12 +208,41 @@ final class ProcedureRunner {
         return n.replace("_", "");
     }
 
+    /** Oracle and PostgreSQL give a result set of a procedure as a cursor OUT parameter. */
+    private static boolean cursorResults(String product) {
+        String p = product.toLowerCase(Locale.ROOT);
+        return p.contains("oracle") || p.contains("postgresql");
+    }
+
     private static Object[] runJdbc(Connection c, ProcedureReader.ProcCall call, List<DbParam> params, Object[] values,
                                     List<Slot> slots) throws SQLException {
+        boolean postgres = c.getMetaData().getDatabaseProductName().toLowerCase(Locale.ROOT).contains("postgresql");
+        boolean cursor = params.stream().anyMatch(DbParam::cursor);
+        // PostgreSQL: a refcursor can be read only inside a transaction (measured: "cursor does not exist" with
+        // auto-commit), so a call outside a transaction runs in a short one of its own
+        boolean ownTransaction = postgres && cursor && c.getAutoCommit();
+        if (ownTransaction) c.setAutoCommit(false);
+        try {
+            Object[] parts = runJdbcCall(c, postgres, call, params, values, slots);
+            if (ownTransaction) c.commit();
+            return parts;
+        } catch (SQLException | RuntimeException e) {
+            if (ownTransaction) c.rollback();
+            throw e;
+        } finally {
+            if (ownTransaction) c.setAutoCommit(true);
+        }
+    }
+
+    private static Object[] runJdbcCall(Connection c, boolean postgres, ProcedureReader.ProcCall call, List<DbParam> params,
+                                        Object[] values, List<Slot> slots) throws SQLException {
         List<Slot> scalarSlots = slots.stream().filter(s -> !s.list()).toList();
         List<Slot> listSlots = slots.stream().filter(Slot::list).toList();
         String marks = String.join(",", java.util.Collections.nCopies(params.size(), "?"));
-        try (CallableStatement cs = c.prepareCall("{call " + call.fullName() + "(" + marks + ")}")) {
+        // PostgreSQL: the JDBC escape {call p(?)} becomes "select * from p(?)", which works for functions only;
+        // a procedure needs CALL (PostgreSQL 14+ gives OUT parameters of procedures back through it, measured)
+        String sql = postgres ? "call " + call.fullName() + "(" + marks + ")" : "{call " + call.fullName() + "(" + marks + ")}";
+        try (CallableStatement cs = c.prepareCall(sql)) {
             Class<?>[] argTypes = call.stub().getParameterTypes();
             int arg = 0, scalar = 0;
             for (int i = 0; i < params.size(); i++) {
@@ -345,9 +374,9 @@ final class ProcedureRunner {
 
     /**
      * The parameter layout from the stub alone: IN and INOUT in stub order, then one OUT per scalar result part that
-     * is not an INOUT value, then (Oracle) one REF CURSOR per list part.
+     * is not an INOUT value, then (Oracle, PostgreSQL) one cursor per list part.
      */
-    private static List<DbParam> inferred(ProcedureReader.ProcCall call, List<Slot> slots, boolean oracle) {
+    private static List<DbParam> inferred(ProcedureReader.ProcCall call, List<Slot> slots, boolean cursorResults) {
         List<DbParam> out = new ArrayList<>();
         int inouts = 0;
         for (java.lang.reflect.Parameter p : call.stub().getParameters()) {
@@ -357,7 +386,7 @@ final class ProcedureRunner {
         }
         long scalars = slots.stream().filter(sl -> !sl.list()).count();
         for (long i = inouts; i < scalars; i++) out.add(new DbParam("out" + i, 4, false));
-        if (oracle) {
+        if (cursorResults) {
             long lists = slots.stream().filter(Slot::list).count();
             for (long i = 0; i < lists; i++) out.add(new DbParam("cursor" + i, 4, true));
         }
@@ -371,9 +400,14 @@ final class ProcedureRunner {
         List<DbParam> hit = META.get(key);
         if (hit != null) return hit;
         boolean oracle = product.contains("oracle"), maria = product.contains("maria") || product.contains("mysql");
-        String name = maria ? call.name() : call.name().toUpperCase(Locale.ROOT);
+        boolean postgres = product.contains("postgresql");
+        // unquoted names: Oracle and H2 store them in upper case, PostgreSQL in lower case; MariaDB and MySQL keep them
+        String name = maria ? call.name() : postgres ? call.name().toLowerCase(Locale.ROOT) : call.name().toUpperCase(Locale.ROOT);
         String catalog, schema;
-        if (oracle) {
+        if (postgres) {
+            catalog = null;
+            schema = call.schema() == null ? c.getSchema() : call.schema().toLowerCase(Locale.ROOT);
+        } else if (oracle) {
             catalog = call.pkg() == null ? "" : call.pkg().toUpperCase(Locale.ROOT);
             schema = call.schema() == null ? md.getUserName() : call.schema().toUpperCase(Locale.ROOT);
         } else if (maria) {

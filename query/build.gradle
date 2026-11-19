@@ -80,9 +80,11 @@ dependencies {
 	testImplementation("ch.qos.logback:logback-core:1.5.17")
 	testImplementation("com.h2database:h2:2.3.230")
 	testImplementation 'org.jinq:jinq-jpa:2.0.2'
-	// Optional verification on MariaDB / Oracle: ./gradlew :query:test -Dlql.db=mariadb|oracle
+	// Optional verification on other databases: ./gradlew test -Dlql.db=mariadb|oracle|postgresql|mysql
 	testRuntimeOnly 'org.mariadb.jdbc:mariadb-java-client:3.5.6'
 	testRuntimeOnly 'com.oracle.database.jdbc:ojdbc11:23.26.0.0.0'
+	testRuntimeOnly 'org.postgresql:postgresql'
+	testRuntimeOnly 'com.mysql:mysql-connector-j'
 
 	// Kotlin tests (src/test/kotlin)
 	kotlinTestImplementation 'org.jetbrains.kotlin:kotlin-stdlib:2.3.21'

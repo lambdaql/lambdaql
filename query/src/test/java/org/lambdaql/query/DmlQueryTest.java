@@ -100,8 +100,10 @@ class DmlQueryTest {
         return list.stream().map(Order::getId).sorted().toList();
     }
 
-    private static boolean mariadb() {
-        return System.getProperty("lql.db", "h2").toLowerCase(Locale.ROOT).equals("mariadb");
+    /** MariaDB and MySQL count a row changed by ON DUPLICATE KEY UPDATE as 2. */
+    private static boolean mysqlFamily() {
+        String db = System.getProperty("lql.db", "h2").toLowerCase(Locale.ROOT);
+        return db.equals("mariadb") || db.equals("mysql");
     }
 
     @Test
@@ -385,10 +387,10 @@ class DmlQueryTest {
         ExecutableInsert<Archive> again = qb.upsert(Archive.class).values(a -> { a.setId(100L); a.setPrice(2.0); });
         assertEquals("insert into Archive e0 (id, price) values (100L, 2.0) on conflict(id) do update set price = excluded.price",
                 again.toHql().get(0).hql());
-        int updated = again.execute();                     // MariaDB counts an updated row as 2, H2 and Oracle as 1
+        int updated = again.execute();                     // MariaDB and MySQL count an updated row as 2, the others as 1
         // @end
         assertEquals(1, inserted);
-        assertEquals(mariadb() ? 2 : 1, updated);
+        assertEquals(mysqlFamily() ? 2 : 1, updated);
         assertEquals(2.0, find(Archive.class, 100L).getPrice());
     }
 

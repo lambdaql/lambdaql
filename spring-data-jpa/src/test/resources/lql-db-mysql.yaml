@@ -1,0 +1,15 @@
+# Imported by application-test.yaml when the tests run with -Dlql.db=mysql (local MySQL verification schema).
+# The password is read from the environment variable LQL_DB_PASSWORD (never written to a file).
+spring:
+  datasource:
+    url: ${LQL_MYSQL_URL:jdbc:mysql://localhost:3307/lql_verify}
+    username: ${LQL_MYSQL_USER:root}
+    password: ${LQL_DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # every Spring test context keeps its own pool; small pools stay under max_connections (151)
+    hikari:
+      maximum-pool-size: 2
+      minimum-idle: 0
+  jpa:
+    properties:
+      hibernate.physical_naming_strategy: org.lambdaql.spring.sample.SqPrefixNamingStrategy

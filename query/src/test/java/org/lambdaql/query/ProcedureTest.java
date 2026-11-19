@@ -107,9 +107,7 @@ class ProcedureTest {
 
     private static final String DB = System.getProperty("lql.db", "h2");
 
-    private static final Map<String, List<String>> CREATE = Map.of(
-            "h2", List.of("CREATE ALIAS IF NOT EXISTS SQ_FN_HALF FOR \"org.lambdaql.query.H2Functions.half\""),
-            "mariadb", List.of(
+    private static final List<String> MARIADB = List.of(
                     "CREATE OR REPLACE FUNCTION SQ_FN_HALF(p DOUBLE) RETURNS DOUBLE DETERMINISTIC RETURN p / 2",
                     "CREATE OR REPLACE PROCEDURE SQ_PROC_CALC(IN p_cust INT, IN p_rate DOUBLE, OUT p_total DOUBLE)"
                             + " BEGIN SELECT COALESCE(SUM(price), 0) * p_rate INTO p_total FROM SQ_orders WHERE customer_id = p_cust; END",
@@ -120,7 +118,45 @@ class ProcedureTest {
                     "CREATE OR REPLACE PROCEDURE SQ_PROC_RECENT(IN p_cust INT)"
                             + " BEGIN SELECT id, price FROM SQ_orders WHERE customer_id = p_cust ORDER BY id; END",
                     "CREATE OR REPLACE PROCEDURE SQ_PROC_PURGE(IN p_status INT) BEGIN DELETE FROM SQ_orders WHERE status = p_status; END",
-                    "CREATE OR REPLACE PROCEDURE SQ_PROC_DIFF(IN p_to INT, IN p_from INT, OUT p_diff INT) BEGIN SET p_diff = p_to - p_from; END"),
+                    "CREATE OR REPLACE PROCEDURE SQ_PROC_DIFF(IN p_to INT, IN p_from INT, OUT p_diff INT) BEGIN SET p_diff = p_to - p_from; END");
+
+    private static final List<String> MARIADB_DROP = List.of("DROP FUNCTION IF EXISTS SQ_FN_HALF", "DROP PROCEDURE IF EXISTS SQ_PROC_CALC",
+            "DROP PROCEDURE IF EXISTS SQ_PROC_STAT", "DROP PROCEDURE IF EXISTS SQ_PROC_ADJUST",
+            "DROP PROCEDURE IF EXISTS SQ_PROC_RECENT", "DROP PROCEDURE IF EXISTS SQ_PROC_PURGE", "DROP PROCEDURE IF EXISTS SQ_PROC_DIFF");
+
+    /** MySQL: the MariaDB routines without OR REPLACE (MySQL does not have it), after dropping them. */
+    private static final List<String> MYSQL = java.util.stream.Stream.concat(MARIADB_DROP.stream(),
+            MARIADB.stream().map(sql -> sql.replace("CREATE OR REPLACE ", "CREATE "))).toList();
+
+    /**
+     * PostgreSQL 14+: procedures with OUT parameters, called with CALL. A result set comes back as a refcursor
+     * OUT parameter (a procedure cannot return rows otherwise). The bodies use = for assignment, not :=
+     * (Hibernate would read :name as a parameter of the native query).
+     */
+    private static final List<String> POSTGRESQL = List.of(
+            "CREATE OR REPLACE FUNCTION SQ_FN_HALF(p DOUBLE PRECISION) RETURNS DOUBLE PRECISION LANGUAGE plpgsql IMMUTABLE"
+                    + " AS $$ BEGIN RETURN p / 2; END $$",
+            "CREATE OR REPLACE PROCEDURE SQ_PROC_CALC(IN p_cust INT, IN p_rate DOUBLE PRECISION, OUT p_total DOUBLE PRECISION)"
+                    + " LANGUAGE plpgsql AS $$ BEGIN SELECT COALESCE(SUM(price), 0) * p_rate INTO p_total FROM SQ_orders"
+                    + " WHERE customer_id = p_cust; END $$",
+            "CREATE OR REPLACE PROCEDURE SQ_PROC_STAT(IN p_cust INT, OUT p_total DOUBLE PRECISION, OUT p_cnt INT)"
+                    + " LANGUAGE plpgsql AS $$ BEGIN SELECT SUM(price), COUNT(*) INTO p_total, p_cnt FROM SQ_orders"
+                    + " WHERE customer_id = p_cust; END $$",
+            "CREATE OR REPLACE PROCEDURE SQ_PROC_ADJUST(IN p_add INT, INOUT p_balance INT, OUT p_msg VARCHAR)"
+                    + " LANGUAGE plpgsql AS $$ BEGIN p_balance = p_balance + p_add; p_msg = 'ok'; END $$",
+            "CREATE OR REPLACE PROCEDURE SQ_PROC_RECENT(IN p_cust INT, OUT p_cur REFCURSOR)"
+                    + " LANGUAGE plpgsql AS $$ BEGIN OPEN p_cur FOR SELECT id, price FROM SQ_orders WHERE customer_id = p_cust"
+                    + " ORDER BY id; END $$",
+            "CREATE OR REPLACE PROCEDURE SQ_PROC_PURGE(IN p_status INT) LANGUAGE plpgsql"
+                    + " AS $$ BEGIN DELETE FROM SQ_orders WHERE status = p_status; END $$",
+            "CREATE OR REPLACE PROCEDURE SQ_PROC_DIFF(IN p_to INT, IN p_from INT, OUT p_diff INT) LANGUAGE plpgsql"
+                    + " AS $$ BEGIN p_diff = p_to - p_from; END $$");
+
+    private static final Map<String, List<String>> CREATE = Map.of(
+            "h2", List.of("CREATE ALIAS IF NOT EXISTS SQ_FN_HALF FOR \"org.lambdaql.query.H2Functions.half\""),
+            "mariadb", MARIADB,
+            "mysql", MYSQL,
+            "postgresql", POSTGRESQL,
             "oracle", List.of(
                     "CREATE OR REPLACE FUNCTION SQ_FN_HALF(p IN NUMBER) RETURN NUMBER DETERMINISTIC IS BEGIN RETURN p / 2; END;",
                     "CREATE OR REPLACE PROCEDURE SQ_PROC_CALC(p_cust IN NUMBER, p_rate IN NUMBER, p_total OUT NUMBER) IS"
@@ -141,7 +177,9 @@ class ProcedureTest {
 
     private static final Map<String, List<String>> DROP = Map.of(
             "h2", List.of("DROP ALIAS IF EXISTS SQ_FN_HALF"),
-            "mariadb", List.of("DROP FUNCTION IF EXISTS SQ_FN_HALF", "DROP PROCEDURE IF EXISTS SQ_PROC_CALC",
+            "mariadb", MARIADB_DROP,
+            "mysql", MARIADB_DROP,
+            "postgresql", List.of("DROP FUNCTION IF EXISTS SQ_FN_HALF", "DROP PROCEDURE IF EXISTS SQ_PROC_CALC",
                     "DROP PROCEDURE IF EXISTS SQ_PROC_STAT", "DROP PROCEDURE IF EXISTS SQ_PROC_ADJUST",
                     "DROP PROCEDURE IF EXISTS SQ_PROC_RECENT", "DROP PROCEDURE IF EXISTS SQ_PROC_PURGE", "DROP PROCEDURE IF EXISTS SQ_PROC_DIFF"),
             "oracle", List.of("DROP FUNCTION SQ_FN_HALF", "DROP PROCEDURE SQ_PROC_CALC", "DROP PROCEDURE SQ_PROC_STAT",

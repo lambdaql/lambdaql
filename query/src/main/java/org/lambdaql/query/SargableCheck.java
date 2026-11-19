@@ -22,10 +22,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * Warns about database functions that keep a condition from using an index (ROADMAP M11, PR8, SARGable rule 3.9).
  * Not public API. It runs once per condition lambda, when the analysis goes into the cache.
  * <ul>
- *   <li>A function on a column ({@code discount(o.getPrice()) > 100}): LQL-5001 at WARN, unless Oracle has a
- *       function-based index with the same expression.</li>
- *   <li>A function on values only, compared with a column ({@code o.getPrice() > discount(base)}): LQL-5007 at WARN on
- *       MariaDB when the function is NOT DETERMINISTIC.</li>
+ *   <li>A function on a column ({@code discount(o.getPrice()) > 100}): LQL-5001 at WARN, unless Oracle or PostgreSQL
+ *       has a function-based (expression) index with the same expression.</li>
+ *   <li>A function on values only, compared with a column ({@code o.getPrice() > discount(base)}): LQL-5007 at WARN
+ *       when the function is NOT DETERMINISTIC (MariaDB, MySQL) or VOLATILE (PostgreSQL). Measured: such a function is
+ *       computed for every row and the index on the column is not used (MariaDB 10.11, MySQL 8.4, PostgreSQL 17).</li>
  *   <li>When the metadata cannot be read (no permission ...): LQL-5008 at INFO; the column case still warns, the
  *       value case is not checked.</li>
  * </ul>
@@ -61,12 +62,18 @@ final class SargableCheck {
             String product = c.getMetaData().getDatabaseProductName().toLowerCase(Locale.ROOT);
             for (Finding f : findings) {
                 String column = String.join(".", f.column().path());
+                boolean postgres = product.contains("postgresql");
                 if (f.onColumn()) {
                     if (product.contains("oracle") && hasFunctionIndex(c, session, f)) continue;
+                    if (postgres && hasExpressionIndex(c, session, f)) continue;
                     report(LqlMessage.SARGABLE_COLUMN_FUNCTION.format(f.fn().key(), column, where), strict);
                 } else if (product.contains("maria") || product.contains("mysql")) {
                     Boolean det = deterministic(c, f.fn());
                     if (Boolean.FALSE.equals(det)) report(LqlMessage.SARGABLE_NONDETERMINISTIC.format(f.fn().key(), where), strict);
+                } else if (postgres) {
+                    if (Boolean.TRUE.equals(volatileFunction(c, f.fn()))) {
+                        report(LqlMessage.SARGABLE_NONDETERMINISTIC.format(f.fn().key(), where), strict);
+                    }
                 }
             }
         });
@@ -279,6 +286,72 @@ final class SargableCheck {
         }
         CACHE.put(key, found);
         return found;
+    }
+
+    /**
+     * PostgreSQL: is there an expression index {@code fn(column)} on the table of the column?
+     * {@code pg_get_expr} gives the expression as PostgreSQL stores it, for example {@code sq_fn_discount(price)} or,
+     * when the argument type differs, {@code sq_fn_discount((price)::numeric)}. Casts and parentheses around the column
+     * are ignored; a schema in front of the function name is ignored too.
+     */
+    private static boolean hasExpressionIndex(Connection c, Session session, Finding f) {
+        if (f.fn().args().size() != 1 || !(f.fn().args().get(0) instanceof Expr.Column col) || col.association().contains(true)
+                || f.entity() == null) {
+            return false;
+        }
+        String[] tableColumn = HibernateFunctions.tableAndColumn(session.getSessionFactory(), f.entity(), String.join(".", col.path()));
+        if (tableColumn == null) return false;
+        String fn = normalize(f.fn().sql());
+        fn = fn.substring(fn.lastIndexOf('.') + 1);
+        String want = fn + "(" + normalize(tableColumn[1]) + ")";
+        String key = "pgix|" + tableColumn[0] + "|" + want;
+        Boolean hit = CACHE.get(key);
+        if (hit != null) return hit;
+        boolean found = false;
+        try (PreparedStatement ps = c.prepareStatement("select pg_get_expr(i.indexprs, i.indrelid) from pg_index i"
+                + " join pg_class t on t.oid = i.indrelid where t.relname = ? and i.indexprs is not null"
+                + " and pg_table_is_visible(t.oid)")) {
+            // unquoted names are folded to lower case by PostgreSQL
+            ps.setString(1, tableColumn[0].toLowerCase(Locale.ROOT));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    String expr = normalize(String.valueOf(rs.getString(1))).replaceAll("::[A-Z_ ]+(\\([0-9, ]*\\))?", "");
+                    expr = expr.replaceAll("\\(\\(([A-Z0-9_]+)\\)\\)", "($1)");
+                    int open = expr.indexOf('(');
+                    int dot = expr.lastIndexOf('.', open);
+                    if (dot >= 0) expr = expr.substring(dot + 1);
+                    if (expr.equals(want)) found = true;
+                }
+            }
+        } catch (SQLException e) {
+            skipped(f.fn().key(), e);
+            return false;
+        }
+        CACHE.put(key, found);
+        return found;
+    }
+
+    /** PostgreSQL: is the function VOLATILE (the default)? Null when the metadata cannot be read. */
+    private static Boolean volatileFunction(Connection c, Expr.Func fn) {
+        String key = "pgvol|" + fn.sql();
+        Boolean hit = CACHE.get(key);
+        if (hit != null) return hit;
+        String name = fn.sql();
+        try (PreparedStatement ps = c.prepareStatement("select p.provolatile from pg_proc p where p.proname = ?"
+                + " and pg_function_is_visible(p.oid)")) {
+            ps.setString(1, name.substring(name.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT));
+            try (ResultSet rs = ps.executeQuery()) {
+                Boolean result = null;
+                // overloads: warn only when every visible function of that name is VOLATILE
+                while (rs.next()) result = (result == null || result) && "v".equals(rs.getString(1));
+                if (result == null) return null;
+                CACHE.put(key, result);
+                return result;
+            }
+        } catch (SQLException e) {
+            skipped(fn.key(), e);
+            return null;
+        }
     }
 
     /** MariaDB: is the function DETERMINISTIC? Null when the metadata cannot be read. */

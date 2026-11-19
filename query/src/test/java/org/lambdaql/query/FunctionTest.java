@@ -101,12 +101,25 @@ class FunctionTest {
                     "CREATE OR REPLACE FUNCTION SQ_FN_IS_GOLD(g INT) RETURNS BOOLEAN DETERMINISTIC RETURN g >= 5"),
             "oracle", List.of(
                     "CREATE OR REPLACE FUNCTION SQ_FN_DISCOUNT(p IN NUMBER) RETURN NUMBER DETERMINISTIC IS BEGIN RETURN p * 0.9; END;",
-                    "CREATE OR REPLACE FUNCTION SQ_FN_IS_GOLD(g IN NUMBER) RETURN BOOLEAN DETERMINISTIC IS BEGIN RETURN g >= 5; END;"));
+                    "CREATE OR REPLACE FUNCTION SQ_FN_IS_GOLD(g IN NUMBER) RETURN BOOLEAN DETERMINISTIC IS BEGIN RETURN g >= 5; END;"),
+            // MySQL has no CREATE OR REPLACE FUNCTION
+            "mysql", List.of(
+                    "DROP FUNCTION IF EXISTS SQ_FN_DISCOUNT", "DROP FUNCTION IF EXISTS SQ_FN_IS_GOLD",
+                    "CREATE FUNCTION SQ_FN_DISCOUNT(p DOUBLE) RETURNS DOUBLE DETERMINISTIC NO SQL RETURN p * 0.9",
+                    "CREATE FUNCTION SQ_FN_IS_GOLD(g INT) RETURNS BOOLEAN DETERMINISTIC NO SQL RETURN g >= 5"),
+            // plpgsql, not LANGUAGE sql: PostgreSQL inlines a simple SQL function, so it would not be a function call
+            "postgresql", List.of(
+                    "CREATE OR REPLACE FUNCTION SQ_FN_DISCOUNT(p DOUBLE PRECISION) RETURNS DOUBLE PRECISION LANGUAGE plpgsql IMMUTABLE"
+                            + " AS 'BEGIN RETURN p * 0.9; END'",
+                    "CREATE OR REPLACE FUNCTION SQ_FN_IS_GOLD(g INTEGER) RETURNS BOOLEAN LANGUAGE plpgsql IMMUTABLE"
+                            + " AS 'BEGIN RETURN g >= 5; END'"));
 
     private static final Map<String, List<String>> DROP = Map.of(
             "h2", List.of("DROP ALIAS IF EXISTS SQ_FN_DISCOUNT", "DROP ALIAS IF EXISTS SQ_FN_IS_GOLD"),
             "mariadb", List.of("DROP FUNCTION IF EXISTS SQ_FN_DISCOUNT", "DROP FUNCTION IF EXISTS SQ_FN_IS_GOLD"),
-            "oracle", List.of("DROP FUNCTION SQ_FN_DISCOUNT", "DROP FUNCTION SQ_FN_IS_GOLD", "PURGE RECYCLEBIN"));
+            "oracle", List.of("DROP FUNCTION SQ_FN_DISCOUNT", "DROP FUNCTION SQ_FN_IS_GOLD", "PURGE RECYCLEBIN"),
+            "mysql", List.of("DROP FUNCTION IF EXISTS SQ_FN_DISCOUNT", "DROP FUNCTION IF EXISTS SQ_FN_IS_GOLD"),
+            "postgresql", List.of("DROP FUNCTION IF EXISTS SQ_FN_DISCOUNT(DOUBLE PRECISION)", "DROP FUNCTION IF EXISTS SQ_FN_IS_GOLD(INTEGER)"));
 
     @Autowired
     private EntityManagerFactory emf;
@@ -273,8 +286,20 @@ class FunctionTest {
         log.addAppender(appender);
         EntityManager em = emf.createEntityManager();
         em.getTransaction().begin();
-        if (DB.equals("oracle")) em.createNativeQuery("CREATE INDEX SQ_IX_DISCOUNT ON SQ_orders (SQ_FN_DISCOUNT(price))").executeUpdate();
+        // a function-based (expression) index: Oracle and PostgreSQL; MariaDB and MySQL cannot index a stored function
+        if (DB.equals("oracle") || DB.equals("postgresql")) {
+            em.createNativeQuery("CREATE INDEX SQ_IX_DISCOUNT ON SQ_orders (SQ_FN_DISCOUNT(price))").executeUpdate();
+        }
         if (DB.equals("mariadb")) em.createNativeQuery("CREATE OR REPLACE FUNCTION SQ_FN_NONDET(p DOUBLE) RETURNS DOUBLE NOT DETERMINISTIC RETURN p").executeUpdate();
+        if (DB.equals("mysql")) {
+            em.createNativeQuery("DROP FUNCTION IF EXISTS SQ_FN_NONDET").executeUpdate();
+            em.createNativeQuery("CREATE FUNCTION SQ_FN_NONDET(p DOUBLE) RETURNS DOUBLE NOT DETERMINISTIC NO SQL RETURN p").executeUpdate();
+        }
+        // PostgreSQL: VOLATILE (the default) is the NOT DETERMINISTIC of MariaDB and MySQL
+        if (DB.equals("postgresql")) {
+            em.createNativeQuery("CREATE OR REPLACE FUNCTION SQ_FN_NONDET(p DOUBLE PRECISION) RETURNS DOUBLE PRECISION LANGUAGE plpgsql VOLATILE"
+                    + " AS 'BEGIN RETURN p; END'").executeUpdate();
+        }
         em.getTransaction().commit();
         try {
             double base = 100;
@@ -286,13 +311,19 @@ class FunctionTest {
             qb.from(Order.class).where(o -> o.getPrice() > OrderFns.nondet(base)).toHql();
             // @end
             List<String> codes = appender.list.stream().map(e -> e.getFormattedMessage().substring(1, 9)).toList();
-            assertEquals(DB.equals("oracle") ? List.of() : DB.equals("mariadb") ? List.of("LQL-5001", "LQL-5007") : List.of("LQL-5001"),
-                    codes, String.valueOf(appender.list));
+            List<String> expected = switch (DB) {
+                case "oracle" -> List.of();                              // function-based index
+                case "postgresql" -> List.of("LQL-5007");                // expression index; SQ_FN_NONDET is VOLATILE
+                case "mariadb", "mysql" -> List.of("LQL-5001", "LQL-5007");
+                default -> List.of("LQL-5001");
+            };
+            assertEquals(expected, codes, String.valueOf(appender.list));
         } finally {
             log.detachAppender(appender);
             em.getTransaction().begin();
-            if (DB.equals("oracle")) em.createNativeQuery("DROP INDEX SQ_IX_DISCOUNT").executeUpdate();
-            if (DB.equals("mariadb")) em.createNativeQuery("DROP FUNCTION IF EXISTS SQ_FN_NONDET").executeUpdate();
+            if (DB.equals("oracle") || DB.equals("postgresql")) em.createNativeQuery("DROP INDEX SQ_IX_DISCOUNT").executeUpdate();
+            if (DB.equals("mariadb") || DB.equals("mysql")) em.createNativeQuery("DROP FUNCTION IF EXISTS SQ_FN_NONDET").executeUpdate();
+            if (DB.equals("postgresql")) em.createNativeQuery("DROP FUNCTION IF EXISTS SQ_FN_NONDET(DOUBLE PRECISION)").executeUpdate();
             em.getTransaction().commit();
             em.close();
         }

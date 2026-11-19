@@ -1,0 +1,15 @@
+# Imported by application-test.yaml when the tests run with -Dlql.db=postgresql (local PostgreSQL verification database).
+# The password is read from the environment variable LQL_DB_PASSWORD (never written to a file).
+spring:
+  datasource:
+    url: ${LQL_POSTGRESQL_URL:jdbc:postgresql://localhost:5432/lql_verify}
+    username: ${LQL_POSTGRESQL_USER:lql}
+    password: ${LQL_DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    # every Spring test context keeps its own pool; small pools stay under max_connections (100)
+    hikari:
+      maximum-pool-size: 2
+      minimum-idle: 0
+  jpa:
+    properties:
+      hibernate.physical_naming_strategy: org.lambdaql.spring.sample.SqPrefixNamingStrategy

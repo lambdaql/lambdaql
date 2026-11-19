@@ -342,6 +342,9 @@ public class PlannedSqlTest {
             case "mariadb" -> "create function SQ_FN_DISCOUNT(p double) returns double deterministic return p * 0.9";
             case "oracle" -> "create or replace function SQ_FN_DISCOUNT(p number) return number deterministic"
                     + " is begin return p * 0.9; end;";
+            case "mysql" -> "create function SQ_FN_DISCOUNT(p double) returns double deterministic no sql return p * 0.9";
+            case "postgresql" -> "create function SQ_FN_DISCOUNT(p double precision) returns double precision language plpgsql"
+                    + " immutable as 'begin return p * 0.9; end'";
             default -> throw new IllegalStateException("unknown lql.db: " + db);
         });
     }
@@ -352,7 +355,11 @@ public class PlannedSqlTest {
      * @throws SQLException if the database rejects it
      */
     private void dropFunction() throws SQLException {
-        jdbc(db.equals("h2") ? "drop alias if exists SQ_FN_DISCOUNT" : "drop function if exists SQ_FN_DISCOUNT");
+        jdbc(switch (db) {
+            case "h2" -> "drop alias if exists SQ_FN_DISCOUNT";
+            case "postgresql" -> "drop function if exists SQ_FN_DISCOUNT(double precision)";
+            default -> "drop function if exists SQ_FN_DISCOUNT";
+        });
     }
 
     /**
