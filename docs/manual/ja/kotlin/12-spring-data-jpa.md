@@ -9,6 +9,7 @@
 ## 12.1 できること
 
 Spring Data JPA では、リポジトリのインターフェースを書きます。lambdaQL はインターフェースを 1 つ追加します。`LambdaQlExecutor<T>` です。
+
 リポジトリでこれを継承します。そして独自のクエリメソッドを、中で lambdaQL を使う **本体を持つインターフェースメソッド** として書きます。
 これらのメソッドのために `...RepositoryImpl` クラスを書く必要はありません。
 
@@ -130,7 +131,7 @@ interface MemberRepository : JpaRepository<Member, Long>, LambdaQlExecutor<Membe
 
 仕組み:
 
-- **本体を持つインターフェースメソッドは、Spring Data 自身が実行します。** Spring Data はそれらからクエリを作ろうとしません。本体を呼び出すだけです。lambdaQL はこの動きを変えません。古い Kotlin については [12.9](#129-kotlin-compile-settings) を参照してください。
+- **本体を持つインターフェースメソッドは、Spring Data 自身が実行します。** Spring Data はそれらからクエリを作ろうとしません。本体を呼び出すだけです。lambdaQL はこの動きを変えません。Kotlin 2.2 より前については [12.9](#129-kotlin-compile-settings) を参照してください。
 - **`LambdaQlExecutor<T>` は Spring Data のリポジトリのフラグメントです。** その実装は `lambdaql-spring-data-jpa` の `META-INF/spring.factories` に書かれています。Spring Data はこのファイルを読み、`LambdaQlExecutor<T>` を継承するすべてのリポジトリに実装を追加します。
 - **実行器のオブジェクトは 1 つで、すべてのリポジトリが共有します。** それでも、各呼び出しは自分のリポジトリのエンティティを使います。たとえば `TeamRepository` の `teams.count { ... }` は `Team` の行を数えます（Java でテスト済み、[`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)）。
 
@@ -146,7 +147,8 @@ interface MemberRepository : JpaRepository<Member, Long>, LambdaQlExecutor<Membe
 <a id="124-executor-methods"></a>
 ## 12.4 実行器のメソッド
 
-`Where<T>` は `where { ... }` と同じ条件のラムダです（[3. 条件](03-where.md) を参照）。`SortSpec<T>` は lambdaQL のソートです（[4.10](04-order-paging.md#410-reusable-and-external-sorts) を参照）。`Sort`、`Pageable`、`Page` は Spring Data の型です。
+`Where<T>` は `where { ... }` と同じ条件のラムダです（[3. 条件](03-where.md) を参照）。`SortSpec<T>` は lambdaQL のソートです（[4.10](04-order-paging.md#410-reusable-and-external-sorts) を参照）。
+`Sort`、`Pageable`、`Page` は Spring Data の型です。
 
 | メソッド | 戻り値 | 説明 |
 |---|---|---|
@@ -178,7 +180,7 @@ interface MemberRepository : JpaRepository<Member, Long>, LambdaQlExecutor<Membe
 | `insertQuery()` | `InsertQuery<T>` | 挿入を始めます: `insertQuery().values { ... }.execute()`（[7.5](07-5-insert.md) を参照）。トランザクションが必要です |
 | `upsertQuery()` | `UpsertQuery<T>` | `@Id` をキーとする upsert を始めます（[7.6](07-6-upsert.md) を参照）。トランザクションが必要です |
 
-短いメソッドは、`query()` に結果の関数を付けたものと同じです。`findAll(w)` は `query().where(w).toList()`、`findSet(w)` は `query().where(w).toSet()`、`findFirst(w)` は `query().where(w).first()`、`findOne(w)` は `query().where(w).one()` です（ほかも同様）。結果の関数は [結果を受け取る](02-getting-started.md#getting-the-result) で説明しています。
+短いメソッドは、`query()` に結果の関数を付けたものと同じです。`findAll(w)` は `query().where(w).toList()`、`findSet(w)` は `query().where(w).toSet()`、`findFirst(w)` は `query().where(w).first()`、`findOne(w)` は `query().where(w).one()` に当たります。結果の関数は [結果を受け取る](02-getting-started.md#getting-the-result) で説明しています。
 `findAll { ... }` と `count { ... }` は、`JpaRepository` の `findAll(Sort)`、`findAll(Example)`、`count()` とぶつかりません。引数の型が違うからです。
 メソッドは Java の `Optional` を返します。nullable な値がほしい場合は `.orElse(null)` を使ってください。
 
@@ -237,7 +239,7 @@ fun addMembers(rows: List<NewMember>): Int = insertAll(rows) { m, r -> m.name = 
 fun putMember(id: Long, name: String): Int = upsertOne { it.id = id; it.name = name; it.active = true }
 ```
 
-これらの Kotlin の書き方は kotlinc 2.3.21 でコンパイルしました（コンパイルの確認のみ）。ビルドにはまだ Kotlin のテストがありません。同じ呼び出しは Java で [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java) がテストしています（リージョン `dml-shortcuts` と `dml-one`）。
+これらの Kotlin の書き方は、kotlinc 2.3.21 でコンパイルだけを確認しました（実測）。ビルドにはまだ Kotlin のテストがありません（未測定）。同じ呼び出しは Java で [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java) がテストしています（リージョン `dml-shortcuts` と `dml-one`）。
 
 <a id="one-row-protection-deleteone-and-updateone"></a>
 ### 1 行保護: `deleteOne` と `updateOne`
@@ -247,9 +249,10 @@ fun putMember(id: Long, name: String): Int = upsertOne { it.id = id; it.name = n
 1. lambdaQL は一致する行の id を最大 2 つ読みます。
 2. id がない: 何も変更しません。結果は 0 です。
 3. id が 2 つ: 何も変更しません。メソッドは `IncorrectResultSizeDataAccessException` を投げます。
-4. id が 1 つ: lambdaQL はその行を `id = :p and (あなたの条件)` で変更します。結果は 1 です。その間に行が条件に一致しなくなった場合は 0 です。
+4. id が 1 つ: lambdaQL はその行を `id = :p and (条件)` で変更します。結果は 1 です。その間に行が条件に一致しなくなった場合は 0 です。
 
 文そのものが 1 つの id を指定するので、その間に別のトランザクションが一致する行を追加しても、2 行目を変更することはありません。この保護はロールバックに頼りません。
+
 コアの API にも同じ保護があります: `executeOne()`（[7.4](07-4-delete.md#delete-exactly-one-row-executeone) を参照）。
 
 ```kotlin
@@ -267,15 +270,18 @@ repository.deleteOne { it.active }   // two or more rows match: nothing changes,
 | `deleteAll { ... }`（`Where<T>`） | `LambdaQlExecutor<T>` | 1 つの SQL `delete` 文（一括） | **実行されない** |
 
 `deleteAll { ... }` はエンティティを読み込みません。すべての一括文と同じように、すでに読み込まれたエンティティは変更しません（ルール U16）。
+
 多くの行を速く削除するときに使ってください。cascade や `@PreRemove` が必要なときは Spring Data のメソッドを使ってください。
 
-コンパイラーは引数でメソッドを選びます。引数なし、`Iterable`、ラムダのどれかです。これは kotlinc 2.3.21 と javac のバイトコードで確認しました。
+コンパイラーは引数でメソッドを選びます。引数なし、`Iterable`、ラムダのどれかです。これは kotlinc 2.3.21 と javac のバイトコードで確認しました（実測）。
 
 <a id="builders-for-complex-statements"></a>
 ### 複雑な文のためのビルダー
 
 `updateQuery()`、`deleteQuery()`、`insertQuery()`、`upsertQuery()` は完全な文を始めます。短縮メソッドでできないことに使ってください: 複数回の `set`、`all()`、`orderBy { ... }.limit(n)`（[7.4](07-4-delete.md#delete-the-first-rows-limit) を参照）、`toHql()`、`onConflict { ... }`。
+
 名前が `Query` で終わるので、`delete(...)` のような `JpaRepository` のメソッドとぶつかりません。文は `QueryBuilder` のものと同じです（[7. 更新、挿入、削除](07-dml.md) を参照）。対象になる行は、同じ `where` ラムダの選択と同じです。
+
 短縮メソッドと同じく、呼び出し側のトランザクションが必要です。すべての JPA の一括文と同じように、トランザクションですでに読み込まれたエンティティは変更しません。
 
 12.3 の `gradeInactive`、`deleteWithoutTeam`、`addGuest` がこれらを使っています。同じメソッドは Java の [`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)（リージョン `dml`）で、upsert は [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)（リージョン `upsert`）でテストしています。
@@ -322,7 +328,9 @@ repository.findAll({ it.active }, Sort.by("nickname"))   // no such property: Pr
 val page: Page<Member> = repository.findAll({ it.active }, PageRequest.of(1, 2, Sort.by("name")))
 ```
 
-**リクエストパラメーターからのソート。** Spring MVC は、`?page=1&size=20&sort=name,desc` のようなリクエストパラメーターから `Pageable` を作れます。ソートポリシーも `@Sortable` フィールドもなければ、永続プロパティならどれでも受け付けるので、ユーザーはどのカラムでもソートできます。このとき lambdaQL は、エンティティと名前ごとに 1 回、`LQL-5003` を `INFO` レベルでログに出します。一部の名前だけを許可するには、次のソートポリシーを使ってください。
+**リクエストパラメーターからのソート。** Spring MVC は、`?page=1&size=20&sort=name,desc` のようなリクエストパラメーターから `Pageable` を作れます。
+ソートポリシーも `@Sortable` フィールドもなければ、永続プロパティならどれでも受け付けるので、ユーザーはどのカラムでもソートできます。このとき lambdaQL は、エンティティと名前ごとに 1 回、`LQL-5003` を `INFO` レベルでログに出します。
+一部の名前だけを許可するには、次のソートポリシーを使ってください。
 
 <a id="sort-policy-with-spring"></a>
 ### Spring でのソートポリシー
@@ -330,7 +338,8 @@ val page: Page<Member> = repository.findAll({ it.active }, PageRequest.of(1, 2, 
 ソートポリシー（決定 D43）は、どの外部のソートの名前を許可するかを決めます。`SortRules`、`SortMode` とルールは [4.10](04-order-paging.md#sort-policy) で説明しています。
 Spring の `Sort` や `Pageable` は常に外部のソートなので、ポリシーはその中の名前をすべてチェックします。ソートのラムダはチェックされません。
 
-**ルールの出どころ。** Spring Boot では、自動構成が `EntityManagerFactory` のポリシーを作り、すべてのシングルトン Bean ができた後で登録します。読むのは次の 3 か所です。
+**ルールの出どころ。** Spring Boot では、自動構成が `EntityManagerFactory` のポリシーを作り、すべてのシングルトン Bean ができた後で登録します。
+読むのは次の 3 か所です。
 
 | 出どころ | 与えるもの |
 |---|---|
@@ -351,10 +360,15 @@ Spring の `Sort` や `Pageable` は常に外部のソートなので、ポリ�
 | `lambdaql.sort.allow.<Entity>` | 許可するパスをカンマで区切ったもの。例: `name,team.name` |
 | `lambdaql.sort.alias.<Entity>.<外部の名前>` | エイリアスのパス。例: `lambdaql.sort.alias.Member.level=grade` |
 
-`<Entity>` には JPA のエンティティ名を書きます。既定は単純クラス名で、`@Entity(name = ...)` で変えられます。エンティティ名は永続化ユニットの中で一意です（同じ名前が 2 つあると Hibernate が起動時に止まります）。そのため、パッケージが違う同じ名前のクラスが混ざることはありません。知らない名前なら、アプリケーションの起動が `IllegalStateException`（LQL-4042）で止まります。
+**SARGable モードのプロパティ。** `lambdaql.sargable.mode` は `OFF`、`WARN`（デフォルト）、`STRICT` のいずれかです（決定 D50）。自動構成が `lambdaql.sort.mode` と同じ方法で登録します。`STRICT` では、インデックスを使えない条件の解析が `NonSargableException`（`LQL-3066`）で失敗します（[8.9](08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) を参照）。
+
+`<Entity>` には JPA のエンティティ名を書きます。既定は単純クラス名で、`@Entity(name = ...)` で変えられます。
+
+エンティティ名は永続化ユニットの中で一意です（同じ名前が 2 つあると Hibernate が起動時に止まります）。そのため、パッケージが違う同じ名前のクラスが混ざることはありません。知らない名前なら、アプリケーションの起動が `IllegalStateException`（LQL-4042）で止まります。
 パスは、ルールを最初に使うときにエンティティと照らし合わせられます（4.10 の [文字列によるルール](04-order-paging.md#rules-as-strings) を参照）。
 
-プロパティは Java でも Kotlin でも同じです。Java のテスト [`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java) で確かめています（リージョン `properties`、`properties-use`。[このページの Java 版](../java/12-spring-data-jpa.md#sort-policy-with-spring) を参照）。このテストは、自動構成がポリシーを登録することも確かめています。`application.properties` の例:
+プロパティは Java でも Kotlin でも同じです。Java のテスト [`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java) で確かめています（リージョン `properties`、`properties-use`。[このページの Java 版](../java/12-spring-data-jpa.md#sort-policy-with-spring) を参照）。このテストは、自動構成がポリシーを登録することも確かめています。
+`application.properties` の例:
 
 ```properties
 lambdaql.sort.mode=STRICT
@@ -371,7 +385,8 @@ repository.findAll({ it.active }, Sort.by("grade"))   // not in the rules: SortN
 ```
 
 **`SortPolicy` の Bean。** コンパイラーがチェックするルールを使うには、`SortPolicy` の Bean を定義してください。同じ自動構成の処理がそれを登録します。
-同じポリシーは Java で [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java) でテストされています（リージョン `sort-policy`、手で登録）。次は設計上の例です。
+同じポリシーは Java で [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java) でテストされています（リージョン `sort-policy`、手で登録）。
+次は設計上の例です。
 
 ```kotlin
 @Bean
@@ -411,8 +426,9 @@ class SortErrorHandler {
 
 実行器は Spring の共有 `EntityManager` を使います。これは現在のトランザクションに結び付いています。
 
-**lambdaQL は、意図的にメソッドに `@Transactional` を付けていません**（決定 D41）。
+**lambdaQL はメソッドに `@Transactional` を付けません。** これは意図した設計です（決定 D41）。
 更新、削除、挿入、upsert には呼び出し側のトランザクションが必要です。これは短縮メソッド（`deleteAll`、`updateOne` など）、ビルダー（`updateQuery()` など）、`QueryBuilder` の Bean のすべてに当てはまります。
+
 サービスのメソッドに `@Transactional` を付けるか、`TransactionTemplate` を使ってください。トランザクションがないと、呼び出しは SQL を送る前に失敗します。
 
 | ケース | どうなるか |
@@ -491,9 +507,11 @@ fun queryBuilder(entityManagerFactory: EntityManagerFactory) =
     QueryBuilder(SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory))
 ```
 
-`SharedEntityManagerCreator` は Spring のクラスです（`org.springframework.orm.jpa`）。Spring のアプリケーションでは `QueryBuilder(entityManagerFactory)` を使わないでください。そのビルダーはクエリごとに自分の `EntityManager` を開くので、Spring のトランザクションの外で実行されます。
+`SharedEntityManagerCreator` は Spring のクラスです（`org.springframework.orm.jpa`）。
+Spring のアプリケーションでは `QueryBuilder(entityManagerFactory)` を使わないでください。このビルダーはクエリごとに自分の `EntityManager` を開き、その `EntityManager` は Spring のトランザクションに参加しません。
 
-**`@DataJpaTest` を使うテスト。** `@DataJpaTest` のスライステストは、一部の自動構成だけを読み込みます。そこでもリポジトリのメソッドは動きますが、`QueryBuilder` の Bean は作られません。テストで必要な場合は、テストクラスに `@ImportAutoConfiguration(LambdaQlAutoConfiguration::class)` を付けてください（まだテストしていません）。
+**`@DataJpaTest` を使うテスト。** `@DataJpaTest` のスライステストは、一部の自動構成だけを読み込みます。そこでもリポジトリのメソッドは動きますが、`QueryBuilder` の Bean は作られません。
+テストでこの Bean が必要な場合は、テストクラスに `@ImportAutoConfiguration(LambdaQlAutoConfiguration::class)` を付けてください（まだテストしていません）。
 
 <a id="129-kotlin-compile-settings"></a>
 ## 12.9 Kotlin のコンパイル設定
@@ -515,14 +533,14 @@ kotlin {
 }
 ```
 
-これらの設定はプロトタイプで確認しました。kotlinc 2.3.21 と、2.2 より前の Kotlin の動きを再現する `-jvm-default=disable` です。lambdaQL のテストスイートには、まだ Kotlin のリポジトリがありません。
+これらの設定はプロトタイプで確認しました（実測）。kotlinc 2.3.21 を使い、Kotlin 2.2 より前の動きは `-jvm-default=disable` で再現しました。lambdaQL のテストスイートには、まだ Kotlin のリポジトリがありません。
 
 <a id="1210-not-implemented-yet"></a>
 ## 12.10 まだ実装されていないもの
 
 - **Spring Boot 4。** 自動構成は Spring Boot 4 のクラス名も書いていますが、テストしたのは Spring Boot 3.4.2 だけです。
 - Spring の `Sort` の **`ignoreCase()`**。
-- **Kotlin のリポジトリ** はまだテストしていません。
+- **Kotlin のリポジトリ** のテスト。
 
 ---
 

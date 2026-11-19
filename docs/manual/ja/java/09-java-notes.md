@@ -1,9 +1,6 @@
 <a id="9-java-notes"></a>
 # 9. Java の注意点
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/09-java-notes.md)を参照してください。
-
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [8. プロシージャと DB 関数](08-procedures-functions.md) | 次: [10. ルールと制限](10-rules-and-limits.md) | [このページの Kotlin 版](../kotlin/09-kotlin-notes.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -73,10 +70,12 @@ NULL についての意味:
 | `o.getStatus() == 1`、status が NULL | NullPointerException | SQL の意味: UNKNOWN、行は返らない（ルール R1） |
 | `o.getPrice() > 100`、price が NULL | NullPointerException | 行は返らない（R1） |
 | `!o.getActive()`（`Boolean`）、active が NULL | NullPointerException | 行は返らない |
-| `o.getPrice() > p`、キャプチャした `Double p` が `null` | NullPointerException | クエリの実行時に **例外** |
-| `i.getQty() == q`、`qty` は `int`、キャプチャした `Integer q` が `null` | NullPointerException | クエリの実行時に **例外** |
+| `o.getPrice() > p`、キャプチャした `Double p` が `null` | NullPointerException | `e0.price > :p1` に NULL をバインド、一致する行はない（`DEBUG` レベルの `LQL-4045`） |
+| `i.getQty() == q`、`qty` は `int`、キャプチャした `Integer q` が `null` | NullPointerException | `i.qty = :p1` に NULL をバインド、一致する行はない（`DEBUG` レベルの `LQL-4045`） |
+| `o.getStatus() > p.intValue()`、キャプチャした `Double p` が `null` | NullPointerException | クエリの実行時に **例外**（`LQL-4012`） |
 
-つまり、エンティティの値が NULL の場合は SQL に従います。アンボクシングされる位置でキャプチャ値が `null` の場合は、Java に結果がないのでエラーになります。
+つまり、NULL のエンティティの値は SQL に従います。キャプチャ値を自身のプリミティブ型にアンボクシングする呼び出し（`Double.doubleValue()`、`Integer.intValue()` など。その後の拡大変換を含む）は、javac の自動アンボクシングと同じバイトコードなので、実行せずにボクシングされた値をバインドします。
+別のプリミティブ型に変える呼び出し（`Double` の `intValue()`）は手で書いたときにだけ現れる計算なので、Java で実行します。`null` なら Java と同じくエラーです。
 
 NULL の行が欲しい場合は、チェックを自分で書いてください。
 
@@ -89,7 +88,8 @@ NULL の行が欲しい場合は、チェックを自分で書いてください
 ## 9.3 ボクシングされた値の等価性
 
 Java では、2 つの **オブジェクト** の間の `==` は同一性（メモリ上で同じオブジェクトか）を調べます。
-lambdaQL では、2 つのオブジェクトの間の `==` は **値の比較** です（決定 D12）。エンティティの値は SQL の意味に従い（決定 D48）、キャプチャした値は Java のルールをそのまま使います（[3.6](03-where.md#36-null-rules)）。
+lambdaQL では、2 つのオブジェクトの間の `==` は **値の比較** です（決定 D12）。
+エンティティの値とキャプチャ値は、どちらも SQL の意味に従います（決定 D48、[3.6](03-where.md#36-null-rules) を参照）。
 ボクシングのキャッシュ（-128 から 127 の `Integer` と `Long`）や `new String(...)` は関係ありません。
 
 どのルールになるかは、両辺の **Java の型** で決まります。
@@ -97,14 +97,15 @@ lambdaQL では、2 つのオブジェクトの間の `==` は **値の比較** 
 | 左辺 | 右辺 | javac が作るもの | lambdaQL のルール | HQL |
 |---|---|---|---|---|
 | `Integer` のカラム | `int` の定数または変数 | アンボクシング、数値の比較 | R1、SQL の意味 | `e0.status = 1` |
-| `Integer` のカラム | `Integer` の変数 | オブジェクトの比較 | R2 | `e0.status = :p1`（キャプチャした `null`: `e0.status is null`） |
+| `Integer` のカラム | `Integer` の変数 | オブジェクトの比較 | R2 | `e0.status = :p1` |
 | `Long` の `@Id` カラム | `Long` の変数 | オブジェクトの比較 | R2、ただし片側は決して NULL にならない | `e0.id = :p1` |
 | `Long` のカラム | `long` の変数 | アンボクシング | R1 | `e0.id = :p1` |
 | `String` | `String` | オブジェクトの比較 | R2 | `e0.description = :p1` |
-| `String` のカラム | `String` のカラム | オブジェクトの比較 | R2、SQL の意味 | `e0.description = e0.custName`（どちらかが NULL: 一致しない） |
+| `String` のカラム | `String` のカラム | オブジェクトの比較 | R2、SQL の意味 | `e0.description = e0.custName`（どちらかが NULL なら一致しない） |
 | enum | enum | オブジェクトの比較 | R2 | `x = :p1` |
 | `Boolean` のカラム | `Boolean.TRUE` | オブジェクトの比較 | R2 | `e0.active = :p1` |
 | `Boolean` のカラム | `true` | アンボクシング | R1 | `e0.active = true` |
+| 値オブジェクト（`@Embedded`） | 同じ型のキャプチャした値オブジェクト | `equals` / オブジェクトの比較 | カラムごとに展開（B6） | `e0.address.city = :p1 and e0.address.zip = :p2`（[3.10](03-where.md#310-association-paths) を参照） |
 | 何でも | `null` | null チェック | R3 | `x is null` |
 | エンティティ | エンティティ（`o.getCustomer() == c`） | オブジェクトの比較 | **v0.1 にはない** | –（代わりに id を比較する） |
 
@@ -113,39 +114,42 @@ lambdaQL では、2 つのオブジェクトの間の `==` は **値の比較** 
 | カラム | キャプチャ値 | HQL | 結果 |
 |---|---|---|---|
 | 3 | 3 | `e0.status = :p1` | true |
-| NULL | `null` | `e0.status is null` | **true**（キャプチャした `null` に対する Java のルール） |
+| NULL | `null` | `e0.status = :p1` | **false**: `= NULL` は真にならない（`WARN` レベルの `LQL-4045`） |
 | NULL | 3 | `e0.status = :p1` | false |
-| 3 | `null` | `e0.status is null` | false |
+| 3 | `null` | `e0.status = :p1` | false |
 
 ```java
 Integer wanted = request.getStatus();        // null の場合もある
 qb.from(Order.class).where(o -> o.getStatus() == wanted).toList();
 // wanted = 3    -> status が 3 の行
-// wanted = null -> status が NULL の行
+// wanted = null -> 一致する行はない（LQL-4045）。NULL を探すには o.getStatus() == null
 ```
 
 カラムを関数で包むことはないので、データベースはインデックスを使えます。
 
-オブジェクト間の `!=` は `<>` になります（キャプチャした `null`: `is not null`）。値が NULL の行は `<>` に一致しません（SQL の意味、D48）。Java ならその行を返します。そのような行を残すには `o.getStatus() == null || o.getStatus() != wanted` と書きます。
-エンティティの値どうし（`o.getDescription() == o.getCustName()`）は `=` と `<>` になります。どちらかが NULL なら一致しません。NULL と NULL も同じです。結果が Java と異なりうるとき、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します（[3.6.3](03-where.md#363-write-your-null-checks-yourself) を参照）。
+オブジェクト間の `!=` は `<>` になります。値が NULL の行は `<>` に一致しません（SQL の意味、D48）。Java ならその行を返します。
+そのような行を残すには `o.getStatus() == null || o.getStatus() != wanted` と書いてください。
+
+エンティティの値どうし（`o.getDescription() == o.getCustName()`）は `=` と `<>` になります。どちらかが NULL なら一致しません。NULL と NULL も同じです。
+結果が Java と異なりうるとき、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します（[3.6.3](03-where.md#363-write-your-null-checks-yourself) を参照）。
 
 <a id="94-strings"></a>
 ## 9.4 文字列
 
 | Java の書き方 | HQL | NULL のカラム | `p` が `null` |
 |---|---|---|---|
-| `o.getDescription() == p` | `e0.description = :p1`（`p` が `null`: `e0.description is null`） | `p == null` のときだけ一致 | 可 |
-| `o.getDescription().equals(p)` | `e0.description = :p1` | 行は返らない | **例外** |
-| `p.equals(o.getDescription())` | `e0.description = :p1` | 行は返らない | **例外** |
+| `o.getDescription() == p` | `e0.description = :p1` | 行は返らない | 実行される、一致する行はない（`LQL-4045`） |
+| `o.getDescription().equals(p)` | `e0.description = :p1` | 行は返らない | 実行される、一致する行はない（`LQL-4045`） |
+| `p.equals(o.getDescription())` | `e0.description = :p1` | 行は返らない | 実行される、一致する行はない（`LQL-4045`） |
 | `"abc".equals(o.getDescription())`（定数のレシーバー） | `e0.description = 'abc'`（定数は決して NULL にならないので単純な `=`） | 行は返らない | – |
-| `Objects.equals(o.getDescription(), p)` | `e0.description = :p1`（`p` が `null`: `e0.description is null`） | `p == null` のときだけ一致 | 可 |
-| `o.getDescription().compareTo(p) < 0` | `e0.description < :p1` | 行は返らない | **例外** |
+| `Objects.equals(o.getDescription(), p)` | `e0.description = :p1` | 行は返らない | 実行される、一致する行はない（`LQL-4045`） |
+| `o.getDescription().compareTo(p) < 0` | `e0.description < :p1` | 行は返らない | 実行される、一致する行はない（`LQL-4045`） |
 | `o.getDescription() == null` | `e0.description is null` | 返る | – |
 
 覚えておくこと:
 
 - 普通の Java では、文字列に `==` を使うのはバグです。lambdaQL のラムダでは、正しい値の比較です。
-- `equals` と `==` の動きが違うのは NULL のときだけです。欲しい NULL の動きで選んでください。
+- `==`、`equals`、`Objects.equals` は NULL に対して同じように動きます。カラムが NULL か `p` が `null` なら、一致する行はありません。NULL の行が欲しい場合は、`o.getDescription() == null` を自分で書いてください。
 - 比較は Java ではなく **データベースの照合順序（collation）** に従います。MariaDB の `_ci` の照合順序は、大文字と小文字や末尾の空白を区別しません。Oracle は `''` を NULL として保存します。
 - ラムダの中に書いた文字列定数は HQL のリテラルになり、引用符はエスケープされます（`'O''Brien'`）。キャプチャした文字列は常にバインドパラメーターです（[3.3](03-where.md#33-basic-form) を参照）。
 - カラムに対する文字列メソッド（`startsWith`、`contains`、`trim`、`toUpperCase`）は予定で、v0.1 にはありません。
@@ -159,11 +163,11 @@ qb.from(Order.class).where(o -> o.getDescription() == code).toList();
 <a id="95-null-safe-helpers"></a>
 ## 9.5 null-safe なヘルパー
 
-次の Java のヘルパーは `==` と同じルールに従います（ルール R5）。キャプチャした `null` は `is null` になり、エンティティの値は SQL の意味に従います（D48）。
+次の Java のヘルパーは `==` と同じルール、つまり SQL の意味に従います（ルール R5、D48）。キャプチャした `null` はどの行にも一致しません。
 
 | Java | HQL | 注意 |
 |---|---|---|
-| `Objects.equals(o.getStatus(), s)` | `e0.status = :p1`（`s` が `null`: `e0.status is null`） | |
+| `Objects.equals(o.getStatus(), s)` | `e0.status = :p1` | `s` が `null` なら一致する行はない（`LQL-4045`） |
 | `!Objects.equals(o.getStatus(), 1)` | `e0.status <> 1` | NULL の行は **返りません**（SQL の意味。Java なら返る） |
 | `Objects.equals(o.getDescription(), o.getCustomer().getName())` | `e0.description = j1.name` + `join e0.customer j1` | 2 つのカラム: どちらかが NULL なら一致しない |
 | `Boolean.TRUE.equals(o.getActive())` | `e0.active = :p1` | |
@@ -287,9 +291,9 @@ lambdaQL には **static な DSL がありません**。`Agg` の任意のイン
 |---|---|
 | `orderBy(asc(...), desc(...))` | `orderBy((o, by) -> by.asc(...).desc(...))`（[4](04-order-paging.md)） |
 | `exists(...)`、`in(...)`、`notIn(...)` | `(o, sub) -> sub.from(X.class).where(...).exists()` / `.select(...).contains(x)`（[5](05-subquery.md)） |
-| `set(path, value)` | `set(o -> o.setX(v))` または `set((o, by) -> by.set(o.getX(), v))`（[7](07-dml.md)） |
+| `set(path, value)` | `set(o -> o.setX(v))` または `set(o -> value(o.getX(), v))`（`Dml.value`、D49）（[7](07-dml.md)） |
 | Q クラス、`Order_.price` | getter: `o.getPrice()` |
-| `count()`、`sum(...)`、... | `Agg.count()`、`Agg.sum(...)`: **唯一の static ヘルパークラス**（[6](06-select-group.md)） |
+| `count()`、`sum(...)`、... | `Agg.count()`、`Agg.sum(...)`: static ヘルパークラスは `Agg` と `Dml` の 2 つだけ（[6](06-select-group.md)） |
 | `coalesce(a, b)` | `set` の値の中で `Objects.requireNonNullElse(a, b)` |
 | `like(...)`、`lower(...)`、`upper(...)` | 予定（カラムに対する文字列関数） |
 | `currentTimestamp()` | `LocalDateTime.now()`。アプリケーションで計算されてバインドされます |
@@ -319,7 +323,8 @@ lambdaQL には **static な DSL がありません**。`Agg` の任意のイン
 | `captured.length`（キャプチャ値の配列） | Java で計算される |
 | record | 結果の型（`select`）として、また派生テーブルと CTE の行の型として（`r.total()` で読む） |
 | `var` | ビルダーの変数に使ってください。ビルダーの型名は確定していません |
-| ジェネリックな `by.set(o.getStatus(), "abc")` | Java ではコンパイルが通ります。lambdaQL は解析時に型をチェックします |
+| ジェネリックな `value(o.getStatus(), "abc")` | Java ではコンパイルが通ります。解析時にカラムの型と照合され、`LQL-3065` エラーになります |
+| 独自の `value(...)` メソッドを持つクラス（たとえば `value` コンポーネントを持つ record）の中の `value(...)` | static インポートが隠れます。`Dml.value(...)` と書いてください |
 | 入れ子のラムダで同じ引数名 | Java では許されません。`sub2`、`i`、`x` を使ってください |
 
 <a id="912-compiler-and-build"></a>

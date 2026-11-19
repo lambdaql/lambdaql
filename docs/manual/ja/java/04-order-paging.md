@@ -1,7 +1,7 @@
 <a id="4-sorting-and-paging-java"></a>
 # 4. ソートとページング（Java）
 
-[Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [3. 条件](03-where.md) | 次: [5. サブクエリ](05-subquery.md) | [このページの Kotlin 版](../kotlin/04-order-paging.md)
+[Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [3. 条件（`where`）](03-where.md) | 次: [5. サブクエリ](05-subquery.md) | [このページの Kotlin 版](../kotlin/04-order-paging.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
 
@@ -64,10 +64,10 @@ fetch first ? rows only
 - キーとその方向は一緒に書きます。順序がずれることはありません。
 - lambdaQL はラムダを読み取ります。実行はしません。`by` のメソッドは順序を記述するだけです。
 
-**(テスト済み)** と書かれた例は、[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java) からコピーしたものです。
+**(テスト済み)** と書かれた例は、[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java) からそのままコピーしたものです。
 このテストは HQL をチェックし、クエリを実行して、同じソートを Java 側で行った結果と行の順序を比べます。H2、MariaDB、Oracle で通ります。
 テストでは [3.3](03-where.md#33-basic-form) のテスト用エンティティを使います。`price` は `double`、`status` は `short` です。これらのキーは NULL になることがないので、HQL に `nulls` の部分がありません。
-それ以外の例では、`price` は NULL になりうる `Double` です（[3.2](03-where.md#32-example-entities) を参照）。そのため `nulls first` または `nulls last` が付きます（[4.4](#44-null-ordering-is-the-same-on-every-database) を参照）。
+それ以外の例では、`price` は NULL になりうる `Double` なので（[3.2](03-where.md#32-example-entities) を参照）、`nulls first` または `nulls last` が付きます（[4.4](#44-null-ordering-is-the-same-on-every-database) を参照）。
 
 **(テスト済み)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-basic`:
 
@@ -158,10 +158,10 @@ order by o1_0.price desc
 
 `Direction` には補助メソッドが 2 つあります。
 
-- `Direction.parse(text)` は、テキスト（たとえばリクエストパラメーター）から方向を読み取ります。大文字と小文字は区別せず、`-`、`_`、空白は同じものとして扱います: `Direction.parse("desc-nulls-last")` は `DESC_NULLS_LAST` です。知らないテキストは `IllegalArgumentException` を投げます。
+- `Direction.parse(text)` は、リクエストパラメーターのようなテキストから方向を読み取ります。大文字と小文字は区別せず、`-`、`_`、空白は同じものとして扱います: `Direction.parse("desc-nulls-last")` は `DESC_NULLS_LAST` です。知らないテキストは `IllegalArgumentException` を投げます。
 - `reversed()` は逆の方向を返します。NULL の位置も反転するので、順序全体が逆になります: `ASC.reversed()` は `DESC`、`ASC_NULLS_LAST.reversed()` は `DESC_NULLS_FIRST` です。
 
-**NULL の位置を選ぶ** には、2 番目の `boolean` 引数を使います: `by.asc(key, nullsFirst)` と `by.desc(key, nullsFirst)`（決定 D35）。
+**NULL の位置を選ぶ** には、2 番目の `boolean` 引数を使います: `by.asc(key, nullsFirst)`、`by.desc(key, nullsFirst)`（決定 D35）。
 `true` は「NULL が先頭」、`false` は「NULL が末尾」という意味です。
 2 番目の引数がなければ、`asc(key)` と `desc(key)` はデフォルトの NULL のポリシーを使います（決定 D16、[4.4](#44-null-ordering-is-the-same-on-every-database) を参照）。
 
@@ -293,7 +293,7 @@ from orders o1_0
 order by o1_0.description,o1_0.id
 ```
 
-テストはこのコードを 2 回実行します。`text` は `"desc"` と `"asc_nulls_last"` です。
+テストはこのコードを、`text` を `"desc"` と `"asc_nulls_last"` に変えて 2 回実行します。
 HQL は `... order by e0.description desc nulls last, e0.id asc` と、次に `... order by e0.description asc nulls last, e0.id asc` になります。
 ラムダの解析は 1 回だけです。`dir` はクエリを実行するたびに読み取られます（ルール S10）。方向が `null` なら、クエリの実行時に例外になります。
 
@@ -322,7 +322,7 @@ lambdaQL は 1 つのポリシーでこれを解決します。**NULL は最も�
 
 **lambdaQL の書き方。** NULL になりうるキーにはすべて、lambdaQL が HQL に NULL の位置を書きます。たとえば `e0.description asc nulls first` です。
 NULL になることがないキー（`double` のようなプリミティブのカラムや `@Id`）には `nulls` の部分を付けません。
-関連の先にあるカラムは常に NULL になりえます（顧客のない注文がありうるため）。なので常に付けます。
+関連の先にあるカラムは、関連がなければ NULL になるので（顧客のない注文がありうるため）付けます。パスのすべての関連の段階が必須（`optional = false`）で、値が NULL になりえなければ付けません。
 
 その後、Hibernate がデータベースごとに SQL を書きます。データベースのデフォルトと同じなら、その句を省きます。
 MariaDB には `NULLS` 構文がないので、デフォルトと異なる位置には Hibernate が `CASE` 式を書きます。
@@ -345,7 +345,9 @@ MariaDB には `NULLS` 構文がないので、デフォルトと異なる位置
 | キー | 使えるか | 注意 |
 |---|---|---|
 | カラム: `o.getPrice()` | はい | テスト済み |
-| to-one のパス: `o.getCustomer().getName()` | はい | `left join`、下記を参照（テスト済み） |
+| to-one のパス: `o.getCustomer().getName()` | はい | `left join`（必須の関連は inner join）、下記を参照（テスト済み） |
+| `@Lob` カラム | はい | Oracle は拒否する。`DEBUG` レベルの `LQL-5010`、下記を参照（テスト済み） |
+| `@Enumerated(EnumType.STRING)` の enum カラム | はい | 名前の順にソートされる（宣言の順ではない）。`DEBUG` レベルの `LQL-5011`、下記を参照（テスト済み） |
 | 算術: `o.getPrice() * 2`、`+`、`-` | はい | まだテストされていない |
 | 拡大変換（`int` から `long`） | はい | まだテストされていない |
 | エンティティ: `by.desc(o.getCustomer())` | **コンパイルエラー** | エンティティは `Comparable` ではない |
@@ -353,7 +355,7 @@ MariaDB には `NULLS` 構文がないので、デフォルトと異なる位置
 | カラムへの関数: `lower(name)` | 予定 | |
 
 キーは `Comparable` でなければなりません。ボクシング型（`Double`、`Integer`、`Long`）、`String`、`java.time` の型は `Comparable` なので使えます。Java コンパイラーはエンティティのキーを拒否します。
-エンティティのクラスが `Comparable` を実装している場合は、lambdaQL がラムダを読み取るときにキーとして拒否します。
+エンティティのクラスが `Comparable` を実装していても、lambdaQL がラムダを読み取るときにキーとして拒否します。
 
 **関連のパスには `left join` を使います。** HQL の単純なパス `order by o.customer.name` は、3 つのデータベースすべてで inner join になります。顧客のない注文が消えてしまいます。
 lambdaQL は代わりに `left join` を追加します。顧客のない注文も結果に残ります。その `j1.name` は NULL なので、`asc` では先頭に来ます。
@@ -384,8 +386,49 @@ left join customers c1_0 on c1_0.id=o1_0.customer_id
 order by c1_0.name asc nulls first,o1_0.id
 ```
 
+**必須の関連には inner join を使います。** `optional = false` でマッピングした関連（たとえば `@ManyToOne(optional = false)`）は、相手が常にあるので、inner join でも行を失いません（A4）。
+そのため、ソートや select だけで使うパスでも、このような関連には `join` を使います。それ以外の関連は、上のように `left join` を使います（ルール S8、J1）。
+パスのすべての関連の段階が必須で、値が NULL になりえなければ、ソートに `nulls first/last` も付きません。
+
+**(テスト済み)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)、リージョン `required-association`（テスト用エンティティ `OrderLine` の `@ManyToOne(optional = false) Order order`）:
+
+```java
+// order is optional = false: a sort or select path through it cannot lose rows, so it is an inner join
+OrderedSelectQuery<OrderLine> sorted = qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getOrder().getPrice()));
+assertEquals("select e0 from OrderLine e0 join e0.order j1 order by j1.price asc", sorted.toHql().hql());
+ValueQuery<Double> values = qb.from(OrderLine.class).select(l -> l.getOrder().getPrice());
+assertEquals("select j1.price from OrderLine e0 join e0.order j1", values.toHql().hql());
+// an association that can be missing keeps the left join (Order.customer)
+assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name asc nulls first",
+        qb.from(Order.class).orderBy((o, by) -> by.asc(o.getCustomer().getName())).toHql().hql());
+```
+
+**`@Lob` カラムのソート。** `@Lob` カラムを `orderBy`、`distinct`、`groupBy` に使うと、H2 と MariaDB は実行しますが、Oracle は拒否します（ORA-22848、ORA-22849、実測）。`=` の比較は 3 つのデータベースすべてで動きます。
+lambdaQL はクエリを変えず、カラムと使う場所ごとに 1 回、`LQL-5010` を `DEBUG` レベルでログに出します（B3）。
+
+**(テスト済み)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)、リージョン `lob`（`OrderLine.memo` は `@Lob`）:
+
+```java
+// memo is @Lob: H2 and MariaDB sort and group it, Oracle rejects it (ORA-22848, ORA-22849).
+// lambdaQL keeps the query and logs LQL-5010 at DEBUG
+qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getMemo())).toHql();
+qb.from(OrderLine.class).groupBy(l -> l.getMemo()).select(l -> l.getMemo()).toHql();
+qb.from(OrderLine.class).select(l -> l.getMemo()).distinct().toHql();
+```
+
+**`EnumType.STRING` の enum のソート。** `@Enumerated(EnumType.STRING)` でマッピングした enum カラムは、データベースが定数の **名前** の文字列の順にソートします。Java の enum の比較は宣言の順に従うので、結果の順序が異なることがあります（B2）。
+lambdaQL はクエリを変えず、カラムごとに 1 回、`LQL-5011` を `DEBUG` レベルでログに出します。`ORDINAL`（または `@Enumerated` なし）は宣言の順にソートするので、ログに出しません。
+
+**(テスト済み)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)、リージョン `enum-string-sort`:
+
+```java
+// kind is @Enumerated(EnumType.STRING): the database sorts by name, Java by declaration order (LQL-5011, DEBUG)
+assertEquals("select e0 from Order e0 order by e0.kind asc nulls first",
+        qb.from(Order.class).orderBy((o, by) -> by.asc(o.getKind())).toHql().hql());
+```
+
 エイリアスは `where` と共有されます。同じパスを `where` がすでに結合していれば、ソートはその結合を使います。
-ほとんどの場合、それは内部結合です。`where` の条件が、顧客のない注文をすでに除いているからです（決定 D36、[3.10](03-where.md#310-association-paths) を参照）。
+この結合は inner join です。`where` のパスは常に inner join なので、顧客のない注文はすでに除かれています（決定 D36、D48、[3.10](03-where.md#310-association-paths) を参照）。
 
 **(テスト済み)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-path-where`:
 
@@ -424,7 +467,7 @@ order by c1_0.name desc nulls last,o1_0.price desc
 本体は **`by` 呼び出しのまっすぐなチェーン** でなければなりません。
 
 ```java
-// OK
+// 許可
 .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId()))
 
 // 拒否: 条件によって変わるキー
@@ -446,7 +489,7 @@ assertThrows(LambdaQLException.class, () -> qb.from(Order.class)
 assertThrows(LambdaQLException.class, () -> qb.from(Order.class).orderBy((o, by) -> by.asc(1)));
 ```
 
-実行時に方向を変える必要があるなら、変数として渡します: `by.sort(key, dir)`。キーそのものを変える必要があるなら、通常の Java コードの 2 つの分岐でクエリを組み立ててください。
+実行時に方向を変える必要があるなら、変数として渡します: `by.sort(key, dir)`。キーそのものを変える必要があるなら、通常の Java コードの 2 つの分岐でクエリを別々に組み立ててください。
 
 <a id="47-order-of-calls"></a>
 ## 4.7 呼び出しの順序
@@ -461,7 +504,7 @@ assertThrows(LambdaQLException.class, () -> qb.from(Order.class).orderBy((o, by)
 | `orderBy(...)` の後の `where(...)` | いいえ（コンパイルエラー） |
 | `limit(...)` の後の `orderBy(...)` | いいえ（コンパイルエラー） |
 
-`orderBy`、`limit`、`offset` の後、クエリの型は `OrderedSelectQuery` になります。使えるのは `limit`、`offset`、`toHql()`、`toList()`、`toSet()`、`first()` だけです。 `one()`、`count()`、`exists()` は `orderBy`、`limit`、`offset` の前だけで使えます（[結果を受け取る](02-getting-started.md#getting-the-result) を参照）。
+`orderBy`、`limit`、`offset` の後、クエリの型は `OrderedSelectQuery` になります。使えるのは `limit`、`offset`、`toHql()`、`toList()`、`toSet()`、`first()` だけです。`one()`、`count()`、`exists()` は `orderBy`、`limit`、`offset` の前だけで使えます（[結果を受け取る](02-getting-started.md#getting-the-result) を参照）。
 
 <a id="48-paging"></a>
 ## 4.8 ページング
@@ -536,9 +579,9 @@ order by o1_0.status,o1_0.id
 limit ?,?
 ```
 
-ページングの SQL はデータベースごとに違います。H2 と Oracle は `offset ? rows fetch first ? rows only`、MariaDB は `limit ?,?` になります。offset がなければ、`fetch first ? rows only` または `limit ?` だけになります（下の `page-only` を参照）。
+ページングの SQL はデータベースごとに違います。H2 と Oracle は `offset ? rows fetch first ? rows only`、MariaDB は `limit ?,?` を受け付けます。offset がなければ、`fetch first ? rows only` または `limit ?` だけを書きます（下の `page-only` を参照）。
 
-`limit` と `offset` には 0 以上の値を渡します。負の値は `IllegalArgumentException` を投げます。
+`limit` と `offset` には 0 以上の値を渡します。負の値を渡すと `IllegalArgumentException` が発生します。
 
 lambdaQL は HQL に `LIMIT` を書きません。Hibernate がデータベースごとに正しい SQL を書きます。
 
@@ -584,8 +627,8 @@ fetch first ? rows only
 
 **最初の行と合計の件数。**
 
-- `orderBy(...).first()` は、その順序で最初の行を `Optional` として返します。読むのは 1 行だけです。`offset` はそのまま使われます。`orderBy(...).offset(1).first()` は 2 番目の行を返します。
-- `count()` は where 段階（`orderBy`、`limit`、`offset` の前）にしかないので、いつも条件に合うすべての行を数えます。ページ付きの画面では、where 段階のクエリを変数に入れておきます。合計を得るにはそれに `count()` を呼び、ページを得るにはそれに `orderBy(...).limit(...).toList()` を呼びます。
+- `orderBy(...).first()` は、その順序で最初の行を `Optional` として返します。読むのは 1 行だけです。`offset` はそのまま使われます: `orderBy(...).offset(1).first()` は 2 番目の行を返します。
+- `count()` は where 段階（`orderBy`、`limit`、`offset` の前）にしかないので、いつも条件に合うすべての行を数えます。ページ付きの画面では、where 段階のクエリを変数に入れておきます。その変数で `count()` を呼んで合計を得て、続けて `orderBy(...).limit(...).toList()` を呼んでページを得ます。
 
 どちらもテスト済みです。[結果を受け取る](02-getting-started.md#getting-the-result) を参照してください。
 
@@ -600,9 +643,22 @@ fetch first ? rows only
 ルール: **ページングを使い、ソートキーに id が含まれていない場合、lambdaQL はルートの `@Id asc` を最後のキーとして追加します。**
 
 - 追加は 1 回だけです。キーにすでに id が含まれていれば（たとえば `by.desc(o.getId())`）、追加しません。
+- ソートキーに主エンティティの一意で NULL にならないカラムがあれば、追加しません（A5）。`nullable = false` の `@Column(unique = true)`、Hibernate の `@NaturalId`、`@Id` がこれに当たります。このキーだけですべての行の順序が決まるからです。
+  NULL になりうる一意のカラムは当たりません。NULL は複数の行にありうるからです。
 - `limit` と `offset` がなければ、何も追加しません。
 - 明示的な結合（`join`、`leftJoin`、`crossJoin`）では、結合したすべてのエンティティの id も結合の順に追加します（テスト済み、[6.8](06-select-group.md#68-explicit-joins) を参照）。
 - まだ実装されていないもの: コレクションの fetch join と `limit`/`offset` を一緒に使うと拒否されます。
+
+**(テスト済み)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)、リージョン `unique-key`（`OrderLine.code` は `@Column(unique = true, nullable = false)`）:
+
+```java
+// code is @Column(unique = true, nullable = false): it orders every row, so paging adds no id tie-breaker
+assertEquals("select e0 from OrderLine e0 order by e0.code asc",
+        qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getCode())).limit(2).toHql().hql());
+// a key that is not unique still gets the id tie-breaker (S9)
+assertEquals("select e0 from OrderLine e0 join e0.order j1 order by j1.price asc, e0.id asc",
+        qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getOrder().getPrice())).limit(2).toHql().hql());
+```
 
 <a id="49-strings-and-special-values"></a>
 ## 4.9 文字列と特殊な値
@@ -615,7 +671,7 @@ fetch first ? rows only
 ## 4.10 再利用できるソートと外部からのソート
 
 **`SortSpec`: 取っておけるソート。** `SortSpec` は、変数やフィールドに入れておき、多くのクエリで使えるソートです。
-`SortSpec.of(Order.class, (o, by) -> ...)` で作ります。ラムダは `orderBy((o, by) -> ...)` と同じなので、同じルールが当てはまります（[4.6](#46-rules-for-the-lambda-body) を参照）。
+`SortSpec.of(Order.class, (o, by) -> ...)` で作ります。ラムダは `orderBy((o, by) -> ...)` のラムダと同じなので、同じルールが当てはまります（[4.6](#46-rules-for-the-lambda-body) を参照）。
 それを `orderBy(spec)` に渡します。
 
 ```java
@@ -626,7 +682,7 @@ qb.from(Order.class).where(o -> o.isActive()).orderBy(NEWEST).limit(20).toList()
 // HQL: select e0 from Order e0 where e0.active = true order by e0.updateAt desc nulls last, e0.id asc
 ```
 
-- `SortSpec` は変更できません。`then()` と `reversed()` は新しい spec を返します。そのため、1 つの spec を多くのクエリやスレッドで安全に共有できます（たとえば `static final` フィールドとして）。
+- `SortSpec` は変更できません。`then()` と `reversed()` は新しい spec を返します。そのため、1 つの spec を多くのクエリやスレッドで安全に共有できます。たとえば `static final` フィールドにしてもかまいません。
 - lambdaQL は、spec が `orderBy` で使われたときにラムダをチェックします。各ラムダの解析は 1 回だけです。
 - キャプチャした値は、ラムダが作られた時点の値です。`static final` フィールドの spec は、その値をずっと持ち続けます。実行時に方向を変える必要があるなら、`orderBy((o, by) -> by.sort(key, dir))` を使ってください（[4.3](#43-direction) を参照）。
 - `orderBy(spec)` の後は、いつもどおりページングできます: `limit`、`offset`、`toList()`、`first()`。
@@ -662,9 +718,9 @@ where o1_0.active=1
 order by o1_0.description desc nulls last,o1_0.id
 ```
 
-SQL は、同じソートを `orderBy((o, by) -> ...)` で書いた場合と同じです。Oracle は `desc` の既定が逆なので、`nulls last` を加えます（[4.4](#44-null-ordering-is-the-same-on-every-database) を参照）。
+SQL は、同じソートを `orderBy((o, by) -> ...)` で書いた場合と同じです。Oracle は `desc` のデフォルトが逆なので、`nulls last` を加えます（[4.4](#44-null-ordering-is-the-same-on-every-database) を参照）。
 
-**`then()`: 今あるキーの後にキーを足す。** `a.then(b)` は、まず `a` のキーでソートします。等しい行は、次に `b` のキーでソートします。
+**`then()`: 今あるキーの後にキーを足す。** `a.then(b)` は、まず `a` のキーでソートします。値が等しい行は、次に `b` のキーでソートします。
 `then()` には別の `SortSpec` か、ソートのラムダを渡せます。
 
 **(テスト済み)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-spec-then`（テスト用エンティティでは `status` と `price` は NULL にならないので、`nulls` の部分はありません）:
@@ -688,7 +744,7 @@ from orders o1_0
 order by o1_0.status,o1_0.price desc
 ```
 
-**`reversed()`: すべてのキーを逆向きに。** `spec.reversed()` はすべてのキーを逆にします。NULL の位置も逆になります。`asc`（NULL が先頭）は `desc`（NULL が末尾）になります。だから行の順序全体がちょうど逆になります。
+**`reversed()`: すべてのキーを逆向きに。** `spec.reversed()` はすべてのキーを逆にします。NULL の位置も逆になります: `asc`（NULL が先頭）は `desc`（NULL が末尾）になります。そのため、行の順序全体がちょうど逆になります。
 これは `Direction.reversed()` と同じです（[4.3](#43-direction) を参照）。`spec.reversed().reversed()` は元の順序に戻ります。
 
 **(テスト済み)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-spec-reversed`:
@@ -716,14 +772,14 @@ order by o1_0.description desc nulls last,o1_0.id desc
 
 H2 と MariaDB は `desc` で NULL をもともと末尾に置くので、余分な句を書きません。Oracle は `nulls last` を加えます。
 
-**`SortSpec.ofPath`: プロパティ名からのソート。** ソートのキーが、コードの外からテキストとして来ることがあります。たとえば Spring の `Sort` です（Spring モジュールはそのために `ofPath` を使います。[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) を参照）。
+**`SortSpec.ofPath`: プロパティ名からのソート。** ソートのキーが、コードの外から文字列として来ることがあります。Spring の `Sort` がその例で、Spring モジュールは Spring の `Sort` を `ofPath` で変換します（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) を参照）。
 `SortSpec.ofPath(Order.class, "customer.name", Direction.DESC)` は、プロパティのパスと `Direction` から spec を作ります。
 
-- パスは、プロパティ名を `.` でつないだものです。どの部分も永続プロパティでなければなりません。途中は to-one の関連か埋め込み値、最後は基本型の値です。
-- それ以外はエラーです（spec を `orderBy` で使ったときに `IllegalArgumentException`）。そのため、テキストが別の HQL になることはありません。
+- パスは、プロパティ名を `.` でつないだ文字列です。どの部分も永続プロパティでなければなりません。途中は to-one の関連か埋め込み値、最後は基本型の値です。
+- それ以外のパスはエラーです（spec を `orderBy` に渡したときに `IllegalArgumentException`）。そのため、文字列が別の HQL に変換されることはありません。
 - どの名前を許可するかは、永続化ユニットのソートポリシーが決めます（下の [ソートポリシー](#sort-policy) を参照）。
   ポリシーも `@Sortable` フィールドもなければ、永続プロパティなら **どれでも** 受け付け、lambdaQL は `LQL-5003` をログに出します（デフォルトは `INFO` レベル）。
-- 関連のパスは、ソートのラムダと同じように `left join` を使います（ルール S8）。`then()` は `ofPath` の spec とラムダの spec をつなげます。
+- 関連のパスは、ソートのラムダと同じように `left join`（必須の関連は inner join）を使います（ルール S8）。`then()` で `ofPath` の spec とラムダの spec をつなげられます。
 
 **(テスト済み)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-spec-path`:
 
@@ -745,29 +801,30 @@ assertThrows(IllegalArgumentException.class,
 コードの外から来たソートの名前（リクエストパラメーター、Spring の `Sort` や `Pageable`）は、どの永続プロパティでも指せます。
 どの名前を許可するかは **ソートポリシー** が決めます。
 
-- `SortRules<T>` は、1 つのエンティティで許可する名前のリストです。各カラムをラムダで書くので、コンパイラーがチェックします。
+- `SortRules<T>` は、1 つのエンティティで許可する名前のリストです。各カラムをラムダで指定するので、コンパイラーがチェックします。
 - `SortPolicy` は、エンティティごとのルールとモード（`SortMode`）を持ちます。ポリシーは `EntityManagerFactory`、つまり永続化ユニットごとに 1 つ登録します。そのファクトリーを使うすべての `QueryBuilder` とリポジトリーがこのポリシーを使います。
-- エンティティのフィールドに `@Sortable` を付けると、コードなしでルールを書けます（下の [`@Sortable` によるルール](#rules-from-sortable) を参照）。
+- エンティティのフィールドに `@Sortable` を付けると、コードなしでルールを指定できます（下の [`@Sortable` によるルール](#rules-from-sortable) を参照）。
 
-エンティティのルールは、次の順で **1 か所** からだけ取られます: ポリシーの `SortRules`（コードか Spring の `SortPolicy` Bean）、Spring Boot のプロパティ `lambdaql.sort.*`（[12.5](12-spring-data-jpa.md#sort-policy-with-spring) を参照）、エンティティの `@Sortable` フィールド。2 か所のルールは合わせられません。
+エンティティのルールは、次の順で **1 か所** からだけ取られます: ポリシーの `SortRules`（コードか Spring の `SortPolicy` Bean）、Spring Boot のプロパティ `lambdaql.sort.*`（[12.5](12-spring-data-jpa.md#sort-policy-with-spring) を参照）、エンティティの `@Sortable` フィールド。
+2 か所のルールは合わせません。
 
-**チェックの対象。** 文字列から作ったソートだけです: `SortSpec.ofPath`、そして Spring の `Sort` や `Pageable`（Spring モジュールは `ofPath` を使います。[12.5](12-spring-data-jpa.md#sort-policy-with-spring) を参照）。
-ソートのラムダ（`orderBy((o, by) -> ...)`、`SortSpec.of`）は自分のコードなので、チェックされません。
+**チェックの対象。** 文字列から作ったソートだけをチェックします: `SortSpec.ofPath`、そして Spring の `Sort` や `Pageable`（Spring モジュールは `ofPath` を使います。[12.5](12-spring-data-jpa.md#sort-policy-with-spring) を参照）。
+ソートのラムダ（`orderBy((o, by) -> ...)`、`SortSpec.of`）は開発者のコードなので、チェックしません。
 
 | ルール | 許可する外部の名前 |
 |---|---|
 | `allow(o -> o.getPrice())` | `price`（カラムのパス） |
-| `allow(o -> o.getCustomer().getName())` | `customer.name`。関連を通るパスは、このように書いたときだけ許可されます |
-| `alias("newest", o -> o.getUpdateAt())` | `newest`。`updateAt` でソートします。このときパス `updateAt` そのものは外部の名前では **ありません**。そのため、クライアントにプロパティ名が見えません |
+| `allow(o -> o.getCustomer().getName())` | `customer.name`。関連を通るパスは、このように明示したときだけ許可します |
+| `alias("newest", o -> o.getUpdateAt())` | `newest`。`updateAt` でソートします。このときパス `updateAt` そのものは外部の名前では **ない** ので、クライアントにプロパティ名が見えません |
 
 ルールはエンティティのカラムでなければなりません。
-それ以外のキーは、ルールを最初に使うときに `LQL-4041` で拒否されます（まだテストされていません）。
+それ以外のキーは、ルールを最初に使うときに `LQL-4041` で拒否します（まだテストされていません）。
 
 | `SortMode` | ルールが許可しない名前の扱い |
 |---|---|
 | `OFF` | ソートを実行します。チェックしません |
 | `INFO` | ソートを実行し、エンティティと名前ごとに 1 回、`LQL-5003` を `INFO` レベルでログに出します。**これがデフォルトです:** 登録されたポリシーがなければ `INFO` を使い、ルールは `@Sortable` からだけ取ります |
-| `WARN` | `INFO` と同じですが、ログレベルが `WARN` です |
+| `WARN` | `INFO` と同じですが、ログレベルだけが `WARN` です |
 | `STRICT` | `SortNotAllowedException`（`LQL-4040`）で拒否します。ルールも `@Sortable` フィールドもないエンティティは、すべての名前を拒否します |
 
 そのため、ポリシーを登録するまでは、`@Sortable` が許可しない外部のソートの名前ごとに、エンティティごとに 1 回 `LQL-5003` が出ます。
@@ -779,7 +836,7 @@ assertThrows(IllegalArgumentException.class,
 | `SortPolicy.register(emf, policy)` | 永続化ユニットのポリシーを登録する。前のポリシーは置き換えられる |
 | `SortPolicy.unregister(emf)` | ポリシーを取り除く。デフォルト（`INFO`、ルールは `@Sortable` だけ）に戻る |
 | `SortPolicy.find(emf)` | 登録されたポリシーを返す（`Optional`） |
-| `SortPolicy.effective(emf)` | 有効なポリシーを返す。登録されたものがなければデフォルト |
+| `SortPolicy.effective(emf)` | 適用中のポリシーを返す。登録されたものがなければデフォルト |
 
 Spring Boot では、`register` を呼ぶ代わりに `SortPolicy` の Bean を定義してください（[12.5](12-spring-data-jpa.md#sort-policy-with-spring) を参照）。
 
@@ -836,9 +893,9 @@ assertEquals("select e0 from Order e0 order by e0.description asc nulls first", 
 | フィールド `grade` の `@Sortable("level")` | `level`。`grade` でソートします（エイリアス） |
 | 関連フィールド `customer` の `@Sortable(path = "name")` | `customer.name` |
 
-- lambdaQL が読むのは、`from(...)` に書いたエンティティのアノテーションだけです。別のエンティティのアノテーションでは関連のパスは許可されないので、関連フィールドに `path` を書いてください。
+- lambdaQL が読むのは、`from(...)` に指定したエンティティのアノテーションだけです。別のエンティティのアノテーションでは関連のパスは許可されないので、関連フィールドに `path` を指定してください。
 - アノテーションは、ポリシーにそのエンティティのルール（コード、Spring の Bean、Spring Boot のプロパティ）がないときだけ使われます。
-- ポリシーを登録していないデフォルトの `INFO` モードでも働きます。
+- ポリシーを登録していないデフォルトの `INFO` モードでも動きます。
 
 **(テスト済み)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)、リージョン `annotation`（上の `STRICT` のポリシーは `Order` のルールだけを持ちます）:
 
@@ -854,8 +911,8 @@ assertThrows(SortNotAllowedException.class,
 ```
 
 <a id="rules-as-strings"></a>
-**文字列によるルール。** `allowPath(String...)` と `aliasPath(name, path)` は、プロパティのパスを文字列で受け取ります。設定ファイル向けで、[12.5](12-spring-data-jpa.md#sort-policy-with-spring) の Spring Boot のプロパティがこれを使います。
-パスは、ルールを最初に使うときにエンティティと照らし合わせられます。コードでは、コンパイラーがチェックするラムダの `allow` と `alias` を使ってください。
+**文字列によるルール。** `allowPath(String...)` と `aliasPath(name, path)` は、プロパティのパスを文字列で受け取ります。設定ファイル向けで、[12.5](12-spring-data-jpa.md#sort-policy-with-spring) の Spring Boot のプロパティがこの形を使います。
+パスは、ルールを最初に使うときにエンティティと照らし合わせます。コードでは、コンパイラーがチェックするラムダの `allow` と `alias` を使ってください。
 
 **(テスト済み)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)、リージョン `string-paths`:
 
@@ -867,7 +924,7 @@ assertEquals("select e0 from Order e0 order by e0.updateAt desc nulls last", hql
 assertThrows(SortNotAllowedException.class, () -> hql("description", Direction.ASC));
 ```
 
-- チェックは、spec を `orderBy` で使ったとき、パスを読む前に行われます。
+- チェックは、spec を `orderBy` に渡したとき、パスを読む前に行われます。
   そのため `STRICT` モードでは、ルールにない名前は、プロパティでなくても `SortNotAllowedException` になります。
 - ルールは 1 つのエンティティクラスに属します。同じクラスの `SortRules` を 2 つ渡すと、最後のものが使われます。
 - `SortNotAllowedException` は `LambdaQLException` です（[11. エラーと言語](../11-errors-and-languages.md#exceptions) を参照）。
@@ -884,8 +941,8 @@ assertThrows(SortNotAllowedException.class, () -> hql("description", Direction.A
 
 **実装済み**（マイルストーン M8-1、[5. サブクエリ](05-subquery.md) のサブクエリとともに）。MariaDB の `lateral` の書き換えはまだ実装されていません。
 
-サブクエリの中のソートは、`limit`（top-1 または top-N）と一緒に使ったときだけ残ります。
-`limit` がなければ結果は変わらないので、lambdaQL はそのソートを削除し、警告をログに出します。
+サブクエリの中のソートは、`limit` と一緒に使ったとき（top-1 または top-N）だけ残ります。
+`limit` がなければ結果に影響しないので、lambdaQL はそのソートを削除し、警告をログに出します。
 [5. サブクエリ](05-subquery.md#59-sorting-inside-a-subquery) を参照してください。
 
 <a id="412-rules-summary-s1-to-s14"></a>
@@ -893,21 +950,21 @@ assertThrows(SortNotAllowedException.class, () -> hql("description", Direction.A
 
 | # | ルール | 状況 |
 |---|---|---|
-| S1 | ソートは 1 つのラムダ: `(o, by) -> by...`。キーが 1 つなら: `o -> key` と、省略可能な `Direction`。結合なら: `(o, c, by) -> by...`（`by` は常に最後） | 実装済み。結合の書き方 `(o, c, by)` も（テスト済み） |
+| S1 | ソートは 1 つのラムダ: `(o, by) -> by...`。キーが 1 つなら: `o -> key` と、省略可能な `Direction`。結合なら: `(o, c, by) -> by...`（`by` は常に最後） | 実装済み。結合の書き方 `(o, c, by)` も実装済み（テスト済み） |
 | S2 | キーは `Comparable`。エンティティはキーにできない（コンパイルエラー）。キーはエンティティを使わなければならない | 実装済み |
 | S3 | 方向は `asc` / `desc` または `sort(key, Direction)` で決まる。`asc(key)`/`desc(key)`（`ASC`/`DESC`）は NULL のポリシーを使い、`asc(key, nullsFirst)`、`desc(key, nullsFirst)`、`*_NULLS_*` は書いたとおりに使う | 実装済み |
 | S4 | 本体は `by` 呼び出しのまっすぐなチェーンだけ。`if`、三項演算子、ループは不可 | 実装済み |
 | S5 | `orderBy` はクエリごとに 1 回。`orderBy` の後に `where` は不可。`limit` の後に `orderBy` は不可（コンパイルエラー） | 実装済み |
 | S6 | 再利用は `SortSpec` で（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。外部の文字列は永続化ユニットのソートポリシー（`SortRules`、`SortPolicy`、`SortMode`。[4.10](#sort-policy) を参照）がチェックする | `SortSpec` とソートポリシーは実装済み、テスト済み。`SortSpec` の結合の書き方はまだ実装されていない |
 | S7 | キー: カラム、to-one のパス、`+ - *`、拡大変換。値の分岐は不可 | 実装済み。カラムと to-one のパスはテスト済み |
-| S8 | `orderBy` だけで使う関連のパスは `left join` を使うので、関連のない行も残る。同じパスを `where` が使うと、ソートは `where` の結合を使う | 実装済み |
-| S9 | ページングでは、キーに id が含まれていなければルートの `@Id asc` を追加。コレクションの fetch join + ページングは拒否 | ルートの id と、明示的に結合したエンティティの id については実装済み（テスト済み）。fetch join のチェックはまだ実装されていない |
-| S10 | 解析はラムダごとにキャッシュされる。キャプチャした `Direction` は呼び出しのたびに読み取られる | 実装済み |
+| S8 | `orderBy` だけで使う関連のパスは `left join` を使うので、関連のない行も残る。必須の関連（`optional = false`）は行を失わないので inner join（A4）。同じパスを `where` で使うと、ソートは `where` の結合を使う | 実装済み |
+| S9 | ページングでは、キーに id が含まれていなければルートの `@Id asc` を追加。キーに一意で NULL にならないカラム（`unique = true` かつ `nullable = false`、`@NaturalId`）があれば追加しない（A5）。コレクションの fetch join + ページングは拒否 | ルートの id と、明示的に結合したエンティティの id については実装済み（テスト済み）。fetch join のチェックはまだ実装されていない |
+| S10 | 解析結果はラムダごとにキャッシュされる。キャプチャした `Direction` は呼び出しのたびに読み取られる | 実装済み |
 | S11 | Spring の `Sort.Order` は `Direction` に 1:1 で対応（Spring モジュール。[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) を参照）。プロパティ名はソートポリシーのチェックを通り、エイリアスはそのまま渡される | Spring の `Sort` は実装済み、テスト済み（`ignoreCase` はまだサポートしていない）。ソートポリシーと合わせた場合もテスト済み。`"price,desc_nulls_last"` のような 1 つの文字列の読み取りはまだ実装されていない |
 | S12 | 結合クエリも同じ形: `(o, c, by)`、`(o, c, i, by)` | 実装済み（テスト済み、[6.8](06-select-group.md#68-explicit-joins) を参照） |
-| S13 | メソッド参照は、キーが 1 つの短い書き方でだけ使える。コンパイルはできるが意味が間違っているメソッド参照は拒否される（[9. Java の注意点](09-java-notes.md#99-method-references) を参照） | 実装済み（getter の参照） |
-| S14 | サブクエリのソート: `limit` があれば残し、`limit` がなければ警告を出して削除。データベースの違いは lambdaQL が処理する（5 章を参照） | 実装済み（テスト済み）。MariaDB の `lateral` の書き換えはまだ実装されていない |
+| S13 | メソッド参照は、キーが 1 つの短い書き方でだけ使う。コンパイルはできるが意味が間違っているメソッド参照は拒否される（[9. Java の注意点](09-java-notes.md#99-method-references) を参照） | 実装済み（getter の参照） |
+| S14 | サブクエリのソート: `limit` があれば残し、なければ警告を出して削除。データベースの違いは lambdaQL が処理する（5 章を参照） | 実装済み（テスト済み）。MariaDB の `lateral` の書き換えはまだ実装されていない |
 
 ---
 
-[Java トラック](README.md) | 前: [3. 条件](03-where.md) | 次: [5. サブクエリ](05-subquery.md) | [このページの Kotlin 版](../kotlin/04-order-paging.md)
+[Java トラック](README.md) | 前: [3. 条件（`where`）](03-where.md) | 次: [5. サブクエリ](05-subquery.md) | [このページの Kotlin 版](../kotlin/04-order-paging.md)

@@ -26,9 +26,9 @@ val again = qb.upsert(Archive::class.java).values { it.id = 100L; it.price = 2.0
 val updated = again.execute()                 // MariaDB counts an updated row as 2, H2 and Oracle as 1
 ```
 
-**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。 このテストは Java のラムダを使います。意味が同じ Kotlin のラムダは同じ HQL になるので、SQL も同じです。
+**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。このテストは Java のラムダを使います。意味が同じ Kotlin のラムダは同じ HQL になるので、SQL も同じです。
 
-**データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `upsert`:
+**データベースごとの SQL（Java のテスト実行結果。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `upsert`:
 
 ```sql
 -- H2
@@ -46,7 +46,7 @@ set a1_0.price=excluded.price when not matched then insert (id,price)
 values (excluded.id,excluded.price)
 ```
 
-Kotlin のテストはまだありません。Java で書いた同じ文は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) でテストしています（H2、MariaDB、Oracle）。テスト済みの例は [このページの Java 版](../java/07-6-upsert.md) を見てください。
+Kotlin のテストはまだありません。Java で書いた同じ文は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) でテストしています（H2、MariaDB、Oracle）。テスト済みの例は [このページの Java 版](../java/07-6-upsert.md) を参照してください。
 
 SQL はデータベースごとに違います。H2 と Oracle は `merge` 文になります。H2 は新しい行を `values (...)` から、Oracle は `select 100 id,2.0 price` から読みます。MariaDB は `insert ... on duplicate key update` になり、新しい値を `values(price)` で読みます。
 
@@ -68,7 +68,7 @@ add.execute()                                 // inserted: 5.0
 add.execute()                                 // conflict: 5.0 + 5.0
 ```
 
-**データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `on-conflict`:
+**データベースごとの SQL（Java のテスト実行結果。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `on-conflict`:
 
 ```sql
 -- H2
@@ -90,6 +90,8 @@ values (excluded.id,excluded.price)
 
 キーはラムダ（`{ it.id }`）です。[4. ソートとページング](04-order-paging.md) と同じく、Kotlin のプロパティ参照（`Archive::id`）はまだ実装されていません。キーは関連のパスではなく、エンティティ自身のカラムでなければならず、データベースではそのカラムに主キーか一意制約が必要です。
 
+`values` と `update` に引数 2 つのラムダを書くと、2 番目の引数 `sub` でサブクエリを作れます（決定 D49、3 つのデータベースで実測）。例は [7.5](07-5-insert.md#a-subquery-in-a-value) を参照してください。
+
 <a id="keep-the-existing-row-onconflictkeyignore"></a>
 ## 既存の行を残す: `onConflict(key).ignore()`
 
@@ -104,7 +106,7 @@ val second = qb.insert(Archive::class.java).values { it.id = 300L; it.price = 2.
     .onConflict { it.id }.ignore().execute()  // 0: the row exists, nothing changes
 ```
 
-**データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `insert-ignore`:
+**データベースごとの SQL（Java のテスト実行結果。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `insert-ignore`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -123,7 +125,7 @@ Hibernate 自身の `on conflict ... do nothing` は、H2 と Oracle では普�
 <a id="the-row-count"></a>
 ## 行数
 
-`execute()` は、データベースが報告した行数をそのまま返します（決定 D40）。Java のテストでは次の数を確認しています。
+`execute()` は、データベースが報告した行数をそのまま返します（決定 D40）。Java のテストでは次の値を確認しています（実測）。
 
 | データベース | 挿入 | 更新 | 無視 |
 |---|---|---|---|
@@ -136,7 +138,8 @@ Hibernate 自身の `on conflict ... do nothing` は、H2 と Oracle では普�
 <a id="many-rows"></a>
 ## 複数行
 
-`qb.upsert(X::class.java).values(list) { a, l -> ... }` と、`values(list) { ... }` のあとの `onConflict { ... }` は、**1 行ごとに 1 つの文** を実行します。`execute()` は合計を返します。これはまだテストで確認していません。
+`qb.upsert(X::class.java).values(list) { a, l -> ... }` と、`values(list) { ... }` のあとの `onConflict { ... }` は、**1 行ごとに 1 つの文** を実行します。`execute()` は合計を返します。この書き方のテストはまだありません（未測定）。
+リスト形式も `values(list) { a, l, sub -> ... }` のように 3 番目の引数でサブクエリを受け取ります（[7.5](07-5-insert.md#many-rows-from-a-list) を参照）。
 
 ```kotlin
 val n = qb.upsert(Archive::class.java)

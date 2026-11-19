@@ -1,9 +1,6 @@
 <a id="2-getting-started-java"></a>
 # 2. はじめよう（Java）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/02-getting-started.md)を参照してください。
-
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [1. 概要](../01-overview.md) | 次: [3. 条件](03-where.md) | [このページの Kotlin 版](../kotlin/02-getting-started.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -91,8 +88,8 @@ Maven:
 Spring Data JPA や Spring Boot を使う場合は、代わりに `lambdaql-spring-boot-starter` か `lambdaql-spring-data-jpa` を使ってください。どちらも `lambdaql-core` を持ち込みます（[12.2](12-spring-data-jpa.md#122-modules) を参照）。
 
 > [!WARNING]
-> アーティファクトは **まだ Maven Central に公開していません**。
-> バージョン `1.0.0` はリポジトリの `gradle.properties` から来ています。最初のリリースまでに変わることがあります。lambdaQL が公開されたら、このページをもう一度確認してください。
+> バージョン `1.0.0` はリポジトリの `gradle.properties` で定義した値で、最初のリリースまでに変わることがあります。
+> lambdaQL が Maven Central に公開されたら、このページをもう一度確認してください。
 
 <a id="recommended-compiler-option--parameters"></a>
 ### 推奨するコンパイラーオプション: `-parameters`
@@ -226,7 +223,7 @@ public class OrderService {
 ```
 
 - 共有 `EntityManager` は現在のトランザクションに結び付いています。`@Transactional` の中では、lambdaQL は同じトランザクションで実行されます。
-- Spring のアプリケーションでは、`EntityManagerFactory` を受け取るコンストラクターを使わないでください。そのビルダーはクエリごとに自分の `EntityManager` を開くので、Spring のトランザクションの外で実行されます。
+- Spring のアプリケーションでは、`EntityManagerFactory` を受け取るコンストラクターを使わないでください。このコンストラクターで作ったビルダーはクエリごとに自分の `EntityManager` を開き、その `EntityManager` は Spring のトランザクションに参加しません。
 - Spring Data のリポジトリの中で lambdaQL のクエリを書く方法は、[12. Spring Data JPA](12-spring-data-jpa.md) を参照してください。
 
 <a id="your-first-query"></a>
@@ -348,7 +345,8 @@ where c1_0.name=?
 ```
 
 customer のない注文を探すには、関連を比較してください。`o.getCustomer() == null` は `e0.customer is null` になります（結合なし）。
-null ガードが customer のない注文を残す場合（`o.getCustomer() == null || ...`）、lambdaQL は `left join` を使います。
+null ガード（`o.getCustomer() == null || ...`）を書いても、customer のない注文は残りません。パスは内部結合だからです（決定 D48）。
+そのような注文を残すには `leftJoin` を使ってください（[6.8](06-select-group.md#68-explicit-joins)）。
 [3.10](03-where.md#310-association-paths) を参照してください。
 
 <a id="getting-the-result"></a>

@@ -142,38 +142,34 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 ```
 
 注文に顧客がない場合、`custName` は NULL になります。
-`where` では lambdaQL が `e0.customer.id is not null` を加えるので、この更新は `qb.from(Order.class).where(同じラムダ)` と同じ行を変更します（決定 D36）。テストでこれを確認しています。
+`where` では lambdaQL が `e0.customer.id is not null` を加えます。そのため、更新の対象行は `qb.from(Order.class).where(同じラムダ)` の結果と同じです（決定 D36）。テストでこれを確認しています。
 
 <a id="an-aggregate-from-a-subquery"></a>
 ## サブクエリの集約
 
-引数が 2 つのラムダを使います。2 番目の引数はコンテキストオブジェクト（`sub`）です。
+引数が 2 つのラムダ `set((o, sub) -> ...)` を使います。2 番目の引数はサブクエリの起点 `sub` です（決定 D49）。
 ここでは `Agg` は必要ありません。サブクエリには [5. サブクエリ](05-subquery.md) と同じように `sum`、`avg`、... があります。
-この書き方は **まだ実装されていません**。現在動くのは `where` の中のサブクエリだけです。
+
+**(テスト済み)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `update-sub`:
 
 ```java
-qb.update(Order.class)
-  .set((o, sub) -> o.setTotal(
-      sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).sum(i -> i.getPrice())))
-  .where(o -> o.getStatus() == 1)
-  .execute();
+// the second parameter starts a subquery, as in where((o, sub) -> ...) (D49)
+ExecutableUpdate<Order> u = qb.update(Order.class)
+        .set((o, sub) -> o.setPrice(sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).sum(i -> i.getPrice())))
+        .where((o, sub) -> sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists());
+assertEquals("update Order e0 set e0.price = (select sum(s1.price) from Item s1 where s1.order.id = e0.id)"
+        + " where exists (select 1 from Item s1 where s1.order.id = e0.id)", u.toHql().hql());
+// sum gives NULL when there is no row; coalesce keeps a NOT NULL column valid for every row
+ExecutableUpdate<Order> all = qb.update(Order.class)
+        .set((o, sub) -> value(o.getPrice(), Objects.requireNonNullElse(
+                sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).sum(i -> i.getPrice()), 0.0)))
+        .all();
+assertEquals("update Order e0 set e0.price = coalesce((select sum(s1.price) from Item s1 where s1.order.id = e0.id), 0.0)",
+        all.toHql().hql());
 ```
 
-**データベースごとの SQL（予定）** — 予定の HQL を Hibernate が変換したもので、`PlannedSqlTest` が記録しました。lambdaQL はまだこのクエリを作りません。`expected-sql/` の [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)、例 `07-update-sum`:
-
-```sql
--- H2, MariaDB
-update orders o1_0
-set total=(select sum(i1_0.price) from items i1_0 where i1_0.order_id=o1_0.id)
-where o1_0.status=1
-
--- Oracle
-update orders o1_0
-set o1_0.total=(select sum(i1_0.price) from items i1_0 where i1_0.order_id=o1_0.id)
-where o1_0.status=1
-```
-
-注文に明細がない場合、`total` は NULL になります。これは SQL の動作です。
+- 別のテーブルの集約も、同じテーブルの集約も使えます（H2、MariaDB 10.11、Oracle 23.26 で実測）。`update` では MariaDB もエラー 1093 を出しません。
+- 一致する行がない場合、集約は NULL です。NOT NULL カラムでは DB エラーになるので、`Objects.requireNonNullElse(…, 0.0)` で囲んで `coalesce(...)` にしてください。
 
 <a id="where-with-paths-and-subqueries"></a>
 ## パスとサブクエリを使う where
@@ -244,7 +240,7 @@ int n = qb.update(VOrder.class)
 if (n == 0) throw new OptimisticLockException();   // checking the result is your job
 ```
 
-`@Version` フィールドに自分で代入しないでください（ルール U15）。
+`@Version` フィールドに直接代入しないでください（ルール U15）。
 
 <a id="many-set-calls-patch"></a>
 ## `set()` を何回も呼ぶ（PATCH）
@@ -270,7 +266,7 @@ assertThrows(LambdaQLException.class,
         () -> qb.update(Order.class).set(o -> o.setStatus((short) 1)).set(o -> o.setStatus((short) 2)));
 ```
 
-`set()` は `UpdateSet` を返します。`set`、`where`、`all` はありますが、`execute()` はありません。
+`set()` は `UpdateSet` を返します。この型には `set`、`where`、`all` があり、`execute()` はありません。
 
 <a id="update-all-rows-all"></a>
 ## すべての行を更新する: `all()`
@@ -288,6 +284,7 @@ qb.update(Order.class).set(o -> o.setStatus(0)).execute();             // compil
 ## 先頭の行を更新する: `limit`
 
 `where(...)` または `all()` の後に `orderBy(...)` と `limit(n)` を付けると、最大 `n` 行を変更します。対象は `qb.from(X.class).where(同じ).orderBy(同じ)` の先頭 `n` 行です。
+
 ルールは削除と同じです（[7.4](07-4-delete.md#delete-the-first-rows-limit) を参照）。`orderBy` がなければ id 順、id は常に最後のソートキー、`limit` のない `orderBy` はエラーです。
 
 **(テスト済み)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `update-limit`:
@@ -322,12 +319,14 @@ set o1_0.description='top'
 where o1_0.id in (select t1_0.id from (select o2_0.id id from orders o2_0 join customers c1_0 on c1_0.id=o2_0.customer_id where c1_0.name='Kim' order by o2_0.price desc,o2_0.id fetch first 1 rows only) t1_0)
 ```
 
-パス `o.getCustomer().getName()` は、select と同じように内側の select で結合になります（決定 D36）。更新そのものはほかのテーブルを読みません。
+パス `o.getCustomer().getName()` は、select と同じように内側の select で結合になります（決定 D36）。更新文そのものはほかのテーブルを読みません。
 
 <a id="update-exactly-one-row-executeone"></a>
 ## ちょうど 1 行を更新する: `executeOne()`
 
-`executeOne()` は 1 行保護付きで更新を実行します。一致する id を最大 2 つ読みます。id が 2 つなら何も変更せず、`NonUniqueResultException` を投げます。id が 1 つなら、その行を `id = :p and (あなたの条件)` で変更します。手順は削除と同じです（[7.4](07-4-delete.md#delete-exactly-one-row-executeone) を参照）。
+`executeOne()` は 1 行保護付きで更新を実行します。一致する id を最大 2 つ読みます。
+
+id が 2 つなら何も変更せず、`NonUniqueResultException` を投げます。id が 1 つなら、その行を `id = :p and (条件)` で変更します。手順は削除と同じです（[7.4](07-4-delete.md#delete-exactly-one-row-executeone) を参照）。
 
 ```java
 int one = qb.update(Order.class)
@@ -337,7 +336,8 @@ int one = qb.update(Order.class)
 ```
 
 `execute-one` リージョンのテストメソッド（`DmlQueryTest` の `executeOneProtects`）は、更新での `executeOne()` も確認しています。2 行以上に一致すると何も変更しません。
-Spring のリポジトリでは、`updateOne(where, set)` が同じことをします（[12.4](12-spring-data-jpa.md#one-row-protection-deleteone-and-updateone) を参照）。
+
+Spring のリポジトリでは、`updateOne(where, set)` が同じ動作をします（[12.4](12-spring-data-jpa.md#one-row-protection-deleteone-and-updateone) を参照）。
 
 ---
 

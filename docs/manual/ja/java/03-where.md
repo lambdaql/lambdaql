@@ -1,9 +1,6 @@
 <a id="3-conditions-where-java"></a>
 # 3. 条件（`where`）（Java）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/03-where.md)を参照してください。
-
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [2. はじめよう](02-getting-started.md) | 次: [4. ソートとページング](04-order-paging.md) | [このページの Kotlin 版](../kotlin/03-where.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -62,7 +59,7 @@ from orders o1_0
 where o1_0.status=1 and o1_0.price>100.0
 ```
 
-**(テスト済み)** と書かれた例は、[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java) からコピーしたものです。
+**(テスト済み)** と書かれた例は、[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java) からそのままコピーしたものです。
 このテストは HQL をチェックし、クエリを実行して、同じ条件で Java 側で絞り込んだ行と比べます。H2、MariaDB、Oracle で通ります。
 テストのエンティティは 3.2 と少し違います。`price` は `double`、`status` は `short`、`Customer.id` は `int` で、`Order` には enum の `kind`（`Order.Kind`: `NORMAL`、`RUSH`）があります。
 
@@ -140,7 +137,7 @@ where (o1_0.status=1 or o1_0.status=3) and o1_0.active=1
 | 計算した値: `new BigDecimal("1.5")`、`form.getText().trim()`、`LocalDateTime.of(...)` | **バインドパラメーター** | `:p1` |
 
 - 定数は呼び出しのたびに同じです。そのため SQL の文字列は変わらず、データベースはクエリの計画を立てるときに値を見ることができます。
-- 文字列定数の中の引用符はエスケープされます。`"O'Brien"` は `'O''Brien'` になります。文字列はユーザーの入力ではなく、クラスにコンパイルされた定数なので、SQL インジェクションの危険はありません。
+- 文字列定数の中の引用符はエスケープされます。`"O'Brien"` は `'O''Brien'` になります。この文字列はユーザーの入力ではなく、クラスにコンパイルされた定数なので、SQL インジェクションの危険はありません。
 - キャプチャした値はユーザーから来ることがあるので、**常に** バインドパラメーターです。呼び出しごとに変わるのは値だけです。
 
 enum 定数は、完全なクラス名で書かれます。
@@ -174,14 +171,47 @@ where o1_0.kind='RUSH'
 数値との比較（`== 1` や `> 100.0` のように片方がプリミティブ）は **SQL の意味** に従います。
 カラムが NULL なら結果は UNKNOWN になり、その行は返されません。（Java なら NullPointerException になります。）
 
-`+`、`-`、`*` による簡単な計算は設計に含まれています。
-整数の `/` は避けてください。データベースによって結果が違います（MariaDB では `5/2 = 2.5`）。`/` の最終的なルールはまだ決まっていません。
+`+`、`-`、`*`、`/` による簡単な計算を使えます。
+カラムを含む整数の `/` は避けてください。SQL で計算するので、データベースによって結果が違います（MariaDB では `5/2 = 2.5`）。カラム側の `/` の結果をそろえるルールはまだ決まっていません。
+キャプチャした値どうしの計算（下の `n / 2.0`）はクエリの前に Java で行うので、この違いはありません。
+
+下の例の `cnt` は、テストのエンティティ `Order` の整数カラム（`Integer cnt`）です。[3.2](#32-example-entities) の例のエンティティにはありません。
+
+**カラムに対する計算とインデックス**（決定 D50）。`o.getCnt() * 2 > n` のようにカラムに計算をかけると、インデックスを使えません。lambdaQL は `LQL-5012` を `WARN` レベルでログに出し、`SargableMode.STRICT` では解析が失敗します（`LQL-3066`）。
+値の側へ移すときは、`o.getCnt() > n / 2.0` のように小数で割ってください。整数の割り算 `n / 2` では返る行が変わります。負の数を掛けていた場合は、比較の向きを逆にしてください。詳しくは [10.2](10-rules-and-limits.md#db-functions-on-a-column) を参照してください。
+
+**整数カラムと小数の値**（決定 D48 B8）。整数カラムを小数の値と比べると、lambdaQL は値を書いたとおりに比べます。丸めや値の除外はしません。
+
+- ラムダに書いた定数はリテラルのままです。`o.getCnt() >= 2.5` は `e0.cnt >= 2.5` になります。
+- キャプチャした値は `BigDecimal`（Hibernate の型 `BIG_DECIMAL`）でバインドします。`e0.cnt >= :p1` で、`p1` は `2.5` です。
+- そのような要素を含む IN リストは、すべての要素を `BigDecimal` でバインドします（`[2.5, 3.0]`）。
+
+以前は値をカラムの型に切り詰めていたので `2.5` が `2` になり、誤った行を返していました。Hibernate は整数カラムの型でバインドした小数を拒否し（`CoercionException`）、IN リストの要素は何も知らせずに切り詰めます（3 つの DB で実測）。
+整数の比較に書き換える方法（`>= 3`）は採用しませんでした。実行される SQL がラムダと違ってしまい、エンティティのマッピング（`Integer`）と DB のカラム型（たとえば小数を持つ `DECIMAL`）が違うと誤った行を返すからです。
+
+結果は H2、MariaDB 10.11、Oracle 23.26 で正しいです（実測）。MariaDB の `EXPLAIN` は、int、`BigDecimal`、double のどのパラメーターでもインデックスの範囲スキャン（`type=range`）を示します（実測）。Oracle の実行計画は未測定です。
+
+**(テスト済み)** [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)、リージョン `whole-number`:
+
+```java
+// cnt is a whole number; 2.5 is compared as written (it is never cut to 2)
+double half = 2.5;
+RenderedQuery atLeast = qb.from(Order.class).where(o -> o.getCnt() >= half).toHql();
+assertEquals("select e0 from Order e0 where e0.cnt >= :p1", atLeast.hql());
+assertEquals(Map.of("p1", new BigDecimal("2.5")), atLeast.parameters());    // bound as a decimal
+// a constant written in the lambda stays a literal
+assertEquals("select e0 from Order e0 where e0.cnt >= 2.5", qb.from(Order.class).where(o -> o.getCnt() >= 2.5).toHql().hql());
+// an IN list with such a value is bound as decimals
+List<Double> values = List.of(2.5, 3.0);
+RenderedQuery in = qb.from(Order.class).where(o -> values.contains(o.getCnt().doubleValue())).toHql();
+assertEquals("select e0 from Order e0 where e0.cnt in (:p1)", in.hql());
+assertEquals(Map.of("p1", List.of(new BigDecimal("2.5"), new BigDecimal("3.0"))), in.parameters());
+```
 
 **浮動小数点:** `float`/`double` のカラムについて、lambdaQL は Java とビット単位で同じ結果になることを約束しません。
 キャプチャした値が `NaN` や `Infinity` の場合は、クエリの実行時に拒否されます。
 
-<a id="35-and-or-not"></a>
-## 3.5 AND、OR、NOT
+## 3.5 AND, OR, NOT
 
 | Java | HQL |
 |---|---|
@@ -213,7 +243,7 @@ where o1_0.kind='RUSH'
 | `c ? true : x` | `c \|\| x` |
 | `c ? false : true` | `!c` |
 
-それ以外の三項演算子（`c ? x : y`）や、値を選ぶ三項演算子（`o.getStatus() == (flag ? 1 : 2)`）は拒否されます。
+それ以外の三項演算子（`c ? x : y`）や、値を選ぶ三項演算子（`o.getStatus() == (flag ? 1 : 2)`）は、どちらも拒否されます。
 選択がキャプチャした値だけで決まるなら、ラムダの前で値を計算してください。
 
 ```java
@@ -226,24 +256,29 @@ qb.from(Order.class).where(o -> o.getStatus() == wanted).toList();
 
 ここがいちばん重要な部分です。簡単な原則が 2 つあります。
 
-1. **エンティティの値は SQL の意味で比べます**（決定 D48）。オブジェクト同士の `==`、`equals`、`Objects.equals`、`!=` は `=` と `<>` になります。値が NULL の行はどちらにも一致しません。結果が Java と異なりうるとき、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します。
-2. **キャプチャした値は Java のルールをそのまま使います。** キャプチャした値は先に Java で計算されます。キャプチャした `null` は `is null` または `is not null` になります。Java なら例外を投げる場合（アンボクシング、`null.equals(...)`）、lambdaQL も例外を投げます（[3.6.4](#364-captured-null-values) を参照）。
+1. **エンティティの値は SQL の意味で比べます**（決定 D48）。オブジェクト同士の `==`、`equals`、`Objects.equals`、`!=` は `=` と `<>` になります。
+   値が NULL の行はどちらにも一致しません。
+   結果が Java と異なりうるとき、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します。
+2. **キャプチャした値は先に Java で計算し、比較はやはり SQL の意味に従います。** キャプチャした `null` は NULL としてバインドされるので、`= :p1` と `<> :p1` はどの行にも一致しません。
+   この場合、lambdaQL は実行時に `LQL-4045` を `WARN` レベルでログに出します。NULL を探すには `x == null` と書いてください（`is null` になります）。
+   キャプチャした値だけでできた式（`p.trim()`、別のプリミティブ型に変える `min.intValue()` など）は Java で計算した値なので、レシーバーが `null` なら Java と同じく例外（`LQL-4012`）を投げます。
+   自分のプリミティブ型へのアンボクシング（`min.doubleValue()`）は javac の自動アンボクシングと同じバイトコードなので、実行せずにボクシングした値をそのままバインドします（[3.6.4](#364-captured-null-values) を参照）。
 
-lambdaQL が null を扱うのは **あなたが書いたときだけ** です（`== null`、`!= null`）。
-隠れた null チェックを勝手に追加することはありません。
+lambdaQL が null を扱うのは、**直接書いたときだけ** です（`== null`、`!= null`）。
+隠れた null チェックを代わりに追加することはありません。
 
 <a id="361-rule-table"></a>
 ### 3.6.1 ルール表
 
 | # | Java の書き方 | HQL | NULL の動作 |
 |---|---|---|---|
-| R1 | 片方がプリミティブ: `o.getStatus() == 1`、`o.getPrice() > p` | `e0.status = 1`、`e0.price > :p1` | SQL の意味。カラムが NULL: 行は返されない |
-| R2 | 両方がオブジェクト: `o.getStatus() == status`（`Integer == Integer`）、`String == String`、enum | `e0.status = :p1`。キャプチャした `null`: `e0.status is null` | **値の比較。** カラムが NULL: 行は返されない |
-| R2 | `o.getStatus() != status`（オブジェクト） | `e0.status <> :p1`。キャプチャした `null`: `e0.status is not null` | SQL の意味。カラムが NULL: 行は **返されない**（Java なら返される） |
-| R2 | エンティティの値どうし: `o.getDescription() == o.getCustName()` | `e0.description = e0.custName` | SQL の意味。どちらかが NULL: 行は返されない（NULL と NULL も同じ） |
+| R1 | 片方がプリミティブ: `o.getStatus() == 1`、`o.getPrice() > p` | `e0.status = 1`、`e0.price > :p1` | SQL の意味。カラムが NULL なら行は返されない |
+| R2 | 両方がオブジェクト: `o.getStatus() == status`（`Integer == Integer`）、`String == String`、enum | `e0.status = :p1` | **値の比較。** カラムが NULL なら行は返されない。キャプチャした `null`: 一致する行なし（`LQL-4045`） |
+| R2 | `o.getStatus() != status`（オブジェクト） | `e0.status <> :p1` | SQL の意味。カラムが NULL なら行は **返されない**（Java なら返される）。キャプチャした `null`: 一致する行なし（`LQL-4045`） |
+| R2 | エンティティの値どうし: `o.getDescription() == o.getCustName()` | `e0.description = e0.custName` | SQL の意味。どちらかが NULL なら行は返されない（NULL と NULL も同じ） |
 | R3 | `x == null`、`x != null` | `x is null`、`x is not null` | |
-| R4 | `o.getDescription().equals(p)` | `e0.description = :p1` | SQL の意味。カラムが NULL: 行は返されない。`p == null`: 例外 |
-| R5 | `Objects.equals(a, b)`、`"x".equals(a)`、`Boolean.TRUE.equals(a)` | R2 と同じ: `a = b`、`a = :p1`、キャプチャした `null` なら `a is null` | R2 と同じ |
+| R4 | `o.getDescription().equals(p)` | `e0.description = :p1` | SQL の意味。カラムが NULL なら行は返されない。`p == null` なら一致する行なし（`LQL-4045`） |
+| R5 | `Objects.equals(a, b)`、`"x".equals(a)`、`Boolean.TRUE.equals(a)` | R2 と同じ: `a = b`、`a = :p1` | R2 と同じ |
 | R9 | キャプチャした値 | バインドパラメーター | [3.6.4](#364-captured-null-values) を参照 |
 
 どの Java の型が R1 になり、どの型が R2 になるかは、[9. Java の注意点](09-java-notes.md#93-equality-of-boxed-values) で説明しています。
@@ -259,12 +294,14 @@ lambdaQL では、これは **値の比較** です。127 を超える `Long` �
 Integer status = request.getStatus();    // null かもしれない
 qb.from(Order.class).where(o -> o.getStatus() == status).toList();
 //   status = 3    -> HQL: e0.status = :p1    status が 3 の行
-//   status = null -> HQL: e0.status is null  status が NULL の行
+//   status = null -> HQL: e0.status = :p1    一致する行なし: = NULL は真にならない（WARN レベルの LQL-4045）
 ```
+
+status が NULL の行を探すには、null チェックを書いてください。`o.getStatus() == null` は `e0.status is null` になります。
 
 カラムを関数で包むことはないので、データベースはインデックスを使えます。
 
-lambdaQL は、クエリの実行時にキャプチャした値を見ます。`null` なら `is null`、それ以外の値なら単純な `= :p1` になります。
+lambdaQL は、クエリの実行時にキャプチャした値をバインドします。`null` は NULL としてバインドされ、一致しうる行がないので、lambdaQL は `LQL-4045` を `WARN` レベルでログに出します。
 **(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `null-safe`:
 
 ```java
@@ -303,14 +340,15 @@ where o1_0.description=?
 > **IDE の警告。** IntelliJ はこの書き方に対して「Number objects compared using `==`」と表示します。
 > lambdaQL のラムダの中では、これは意図した書き方です。`@SuppressWarnings("NumberEquality")` を使えます。
 
-**NULL になれないカラム。** NULL になれないカラムがあります。id、プリミティブのカラム、`nullable = false` のカラムです。
-このようなカラムでは `is null` は常に偽なので、lambdaQL はそれを畳み込んで取り除きます。
+**NULL になれないカラム。** id、プリミティブのカラム、`nullable = false` のカラムは NULL になれません。
+このようなカラムの `is null` は常に偽なので、lambdaQL はこのチェックを定数に畳み込んで取り除きます。
 
 - `o.getId() == null` は `1=0`（行なし）になります。
-- `o.getId() != null && o.getId() == id` は `e0.id = :p1` になります。null チェックがなくなり、データベースはインデックスを使えます。
+- `o.getId() != null && o.getId() == id` は `e0.id = :p1` になります。null チェックがなくなるので、データベースはインデックスを使えます。
 
-これは `Long?` の id に対する Kotlin の `it.id == id` のバイトコードでもあるので、Kotlin の書き方も単純な `e0.id = :p1` になります。
-このルールは、パスに **関連のステップがない** ときだけ適用されます。注文には顧客がないこともあるので `o.getCustomer().getId()` は NULL になりえます。そのため、その null チェックは残ります。
+`Long?` の id に対する Kotlin の `it.id == id` も同じバイトコードにコンパイルされるので、Kotlin の書き方も単純な `e0.id = :p1` になります。
+
+このルールは、パスに **関連のステップがない** ときだけ適用されます。顧客のない注文があるので `o.getCustomer().getId()` は NULL になりえます。そのため、このパスの null チェックは残ります。
 
 **(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `never-null`:
 
@@ -342,13 +380,15 @@ assertEquals("select e0 from Order e0 where e0.customer.id is null",
 ```java
 .where(o -> o.getDescription().equals(text))     // HQL: e0.description = :p1
 .where(o -> Objects.equals(o.getDescription(), text))
-                                                 // HQL: e0.description = :p1（text が null なら is null）
+                                                 // HQL: e0.description = :p1（text が null なら一致する行なし）
 .where(o -> !Objects.equals(o.getStatus(), 1))   // HQL: e0.status <> 1
                                                  //      （NULL の行は返されない: SQL の意味）
 ```
 
-**エンティティの値に対する SQL の意味**（決定 D48）。エンティティの値どうし、およびエンティティの値と値の `!=` による比較は SQL に従います。値が NULL の行は `=` にも `<>` にも一致しません。
-Java では `!text.equals(null)` も `Objects.equals(null, null)` も true なので、Java ならそれらの行を返します。このようなことが起こりうるとき、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します（条件ごとに 1 回）。NULL の行を残すには、ラムダの中に null チェックを書いてください。
+**エンティティの値に対する SQL の意味**（決定 D48）。エンティティの値どうしの比較と、エンティティの値を値と `!=` で比べる場合は SQL に従います。値が NULL の行は `=` にも `<>` にも一致しません。
+
+Java では `!text.equals(null)` も `Objects.equals(null, null)` も true なので、Java ならそれらの行を返します。
+このような違いが起こりうるとき、lambdaQL は `LQL-5009` を `DEBUG` レベルで条件ごとに 1 回ログに出します。NULL の行を残すには、ラムダの中に null チェックを直接書いてください。
 
 **(テスト済み)** [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)、リージョン `sql-meaning`（H2、MariaDB、Oracle。行は description/custName の組 `a/a`、`a/b`、`null/a`、`null/null`、`b/null` で、`text` は `"a"`）:
 
@@ -375,14 +415,23 @@ assertEquals(List.of("f"), qb.from(Coded.class).where(c -> !c.getVip()).toList()
 
 | 書き方 | キャプチャした値が `null` のとき |
 |---|---|
-| キャプチャした値との `==`、`!=`、`Objects.equals(...)`（R2、R5）: `o.getStatus() == status` | 許可: `is null` / `is not null` |
-| `p.equals(o.getDescription())`（`p` がレシーバー） | クエリの実行時に **例外** |
-| `o.getDescription().equals(p)` | **例外** |
-| Java が値をアンボクシングする比較: `o.getPrice() > p`（`Double p`）、そしてすべての `<`、`<=`、`>`、`>=` | **例外** |
+| キャプチャした値との `==`、`!=`、`Objects.equals(...)`、`o.getDescription().equals(p)` | 実行される: NULL をバインドした `= :p1` / `<> :p1` なので、一致する行は **ない**。`WARN` レベルの `LQL-4045` |
+| `p.equals(o.getDescription())`（`p` がレシーバー） | 上と同じ: `e0.description = :p1`（NULL）、一致する行は **ない**。`WARN` レベルの `LQL-4045`。例外はない |
+| Java が値をアンボクシングする比較: `o.getPrice() > p`（`Double p`）、`i.getQty() == q`（`int qty`、`Integer q`） | 実行される: `e0.price > :p1` に NULL をバインドし、一致する行は **ない**。`DEBUG` レベルの `LQL-4045`。自分のプリミティブ型へのアンボクシング（`p.doubleValue()`）は実行しない |
+| 別のプリミティブ型に変えるアンボクシング（`p.intValue()`、`Double p`）とメソッド呼び出し（`p.trim()`） | クエリの実行時に **例外**（`LQL-4012`）。Java で値を計算するため |
 
-理由: Java では、これらの書き方は NullPointerException を投げるか、常に false になります。これを `IS NULL` に変えると、Java では決して返らない行が返ってしまいます。
+**`p.equals(o.getDescription())` の書き方は勧めません。** SQL としては `o.getDescription().equals(p)` と同じ比較（`e0.description = :p1`）なので、`p` が `null` でも例外にはなりません。
+Java のコードとして読むと `null.equals(...)` が NullPointerException のように見えるので、エンティティの値を前に置く `o.getDescription().equals(p)` と書いてください。
 
-**ルールの例外: null ガード。** 同じキャプチャした値を先に null チェックしていれば、null は許可されます。
+理由: ラムダの中の比較は SQL の意味に従います（決定 D48）。SQL では、NULL との `=`、`<>` は真になりません。
+キャプチャした値が null かどうかはクエリの実行時にしか分からないので、lambdaQL は実行時に警告をログに出します。
+
+キャプチャした値だけでできた式は、クエリの前に Java で計算する値です。`p.trim()` のようなメソッド呼び出しと、別のプリミティブ型に変えるアンボクシング（`p.intValue()`、`Double p`）がこれにあたり、`null` なら Java と同じく例外（`LQL-4012`）を投げます。
+ただし、自分のプリミティブ型へのアンボクシング（`Double.doubleValue()`、`Integer.intValue()`、`Long.longValue()` など。後に続く拡大変換も含む）は計算しません。
+javac の自動アンボクシングと手で書いた呼び出しは同じバイトコードなので、lambdaQL はこれを自動アンボクシングとみなし、ボクシングした値をバインドします。`null` なら一致する行はなく、`LQL-4045` を `DEBUG` レベルでログに出します。
+NULL の行を探すには `x == null` と書いてください。
+
+**null ガードによる絞り込みの省略。** 同じキャプチャ値を null チェックすると、値が null のとき、その条件は絞り込みなしで消えます。
 **(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `captured-null-guard`:
 
 ```java
@@ -416,17 +465,20 @@ where o1_0.price>?
 
 しくみ:
 
-- キャプチャした値と定数だけを使う部分は、クエリの実行時に Java の中で決まります。Java と同じく、左から右へ、短絡評価で決めます。
-- `min == null` なら、ガードが true なので条件全体が true です。絞り込みはありません。比較 `o.getPrice() > min` は書かれません（Java でも実行されません）。
-- `min = 100.0` なら、ガードが false なので、`e0.price > :p1` だけが残ります。
+- キャプチャした値と定数だけを使う部分は、クエリの実行時に Java で決まります。Java と同じく、左から右へ、短絡評価（short-circuit）で決めます。
+- `min == null` なら、ガードが真なので条件全体が真です。絞り込みはありません。比較 `o.getPrice() > min` は HQL に書かれません（Java でもこの比較は実行されません）。
+- `min = 100.0` なら、ガードが偽なので、`e0.price > :p1` だけが残ります。
 - ラムダの解析は 1 回だけです。値によって変わるのは HQL のテキストだけです。
-- ガードは先に書かなければなりません。`min == null` のとき `o.getPrice() > min || min == null` はクエリの実行時に例外を投げます。Java の NullPointerException と同じです。
-- `&&` では、ガードは逆に働きます: `min == null` のとき `min != null && o.getPrice() > min` は行を返しません（`where 1=0`）。
+- この場合、ガードの位置は結果に影響しません。`min == null` のとき、`o.getPrice() > min || min == null` も絞り込みなしです。比較の部分のアンボクシングを Java で実行しないからです（Java なら NullPointerException）。
+- キャプチャした値のメソッドを呼ぶ比較（`o.getDescription().equals(p.trim())`）は違います。ガードが後ろにあると `p.trim()` を先に計算するので、`p == null` のとき例外（`LQL-4012`）を投げます。
+- `&&` では、ガードは逆に働きます。`min == null` のとき、`min != null && o.getPrice() > min` は行を返しません（`where 1=0`）。
 
 <a id="365-converted-attributes-convert"></a>
 ### 3.6.5 変換される属性（`@Convert`）
 
-JPA の `AttributeConverter` を持つ属性は、Java の値で比べます。Hibernate 6.6 は、このような属性と比べるリテラルを変換し、バインドパラメーターも変換します。そのため条件は Java の値で書き、保存された行を見つけられます（H2、MariaDB、Oracle で確認済み）。
+JPA の `AttributeConverter` を持つ属性は、Java の値で比べます。Hibernate 6.6 は、このような属性と比べるリテラルを変換し、バインドパラメーターも変換します。
+
+そのため、条件を Java の値で書いても、保存された行を見つけられます（H2、MariaDB、Oracle で確認済み）。
 
 **(テスト済み)** [`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java)、リージョン `convert`:
 
@@ -445,8 +497,8 @@ assertEquals(List.of("abc"), codes(literal.toList()));       // Hibernate conver
 
 | Java | HQL | NULL の行 |
 |---|---|---|
-| `o.isActive()` | `e0.active = true` | –（プリミティブの `boolean` は決して NULL にならない） |
-| `!o.isActive()` | `e0.active = false` | –（プリミティブの `boolean` は決して NULL にならない） |
+| `o.isActive()` | `e0.active = true` | –（プリミティブの `boolean` は NULL にならない） |
+| `!o.isActive()` | `e0.active = false` | –（プリミティブの `boolean` は NULL にならない） |
 | `Boolean.TRUE.equals(o.getActive())`（nullable な `Boolean`） | `e0.active = :p1`（`:p1` は `true`） | 返されない |
 | `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | **返されない**（SQL の意味、D48。Java なら返される） |
 | `!o.getActive()`（nullable な `Boolean`） | `e0.active = false` | **返されない**（SQL の意味: NULL は false ではない） |
@@ -503,7 +555,7 @@ H2 には本物の boolean 型があるので、SQL は `true` / `false` にな�
 // HQL: (e0.active = true and e0.status > :p1) or (e0.active = false and e0.status <= :p1)
 ```
 
-lambdaQL はこれを（`CASE` ではなく）`AND`/`OR` で書くので、データベースはインデックスを使えます。
+lambdaQL はこれを `CASE` ではなく `AND`/`OR` で書くので、データベースはインデックスを使えます。
 両辺が同じ条件を共有している場合（たとえば `o.isActive() == o.isActive()`）、その書き方は拒否されます。
 
 <a id="38-strings"></a>
@@ -511,7 +563,7 @@ lambdaQL はこれを（`CASE` ではなく）`AND`/`OR` で書くので、デ�
 
 - 文字列の `equals`、`Objects.equals`、`==` は **データベースの照合順序（collation）** を使います。
   - MariaDB の `_ci` 照合順序は、大文字と小文字の違いや末尾の空白を無視します。
-  - Oracle は `''`（空文字列）を NULL として保存します。そのため、Oracle では `"".equals(o.getDescription())` が Java と違う結果になります。
+  - Oracle は `''`（空文字列）を NULL として保存します。そのため、Oracle では `"".equals(o.getDescription())` が Java と違う動作になります。
 - 2 つの文字列の `==` は、同一性の比較ではなく値の比較です（ルール R2）。[9.4](09-java-notes.md#94-strings) を参照してください。
 - ラムダの中の文字列定数はリテラルとして書かれます。引用符はエスケープされます（`''`）。
 
@@ -532,12 +584,12 @@ where o1_0.description='O''Brien'
 ```
 
 - `startsWith`、`endsWith`、`contains`（LIKE）や、`trim()`、`toUpperCase()` のようなカラムに対する関数は **予定** で、最初のバージョンには入りません。
-- 文字列の `+` は **予定** です。解析コアは、ラムダの中の `+` を、キャプチャした値だけをつなぐ場合も含めて、すでに拒否します。文字列はラムダの前で組み立ててください。
+- 文字列の `+` は **予定** です。解析コアは、ラムダの中の `+` をすでに拒否します。キャプチャした値だけをつなぐ場合も同じです。文字列はラムダの前で組み立ててください。
 
 <a id="39-in-with-a-captured-collection"></a>
 ## 3.9 キャプチャしたコレクションでの IN
 
-コレクションをラムダの **外** で作り、それに対して `contains` を呼びます。
+コレクションをラムダの **外** で作り、そのコレクションの `contains` を呼んでください。
 
 ```java
 List<Long> ids = List.of(1L, 2L, 3L);
@@ -566,7 +618,8 @@ from orders o1_0
 where o1_0.status in (?,?)
 ```
 
-`!contains` は `not in` になります。id は NULL にならないので、`is null` の部分はありません。NULL になりうるカラムでは、lambdaQL は `x is null or` を加えます。リストに `null` がなければ、Java の `!contains` は NULL の値に対して true になるからです。
+`!contains` は `not in` になります。NULL になりうるカラムも単純な `not in` です（SQL の意味、決定 D48）。
+値が NULL の行は `not in` に一致せず、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します。Java の `!contains` は NULL の値に対して true なので、そのような行を残すには `o.getDescription() == null || !descs.contains(o.getDescription())` のように null チェックを書いてください。
 **(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `not-in`:
 
 ```java
@@ -574,10 +627,10 @@ List<Long> ids = List.of(1L, 2L);
 // the id can never be NULL: a plain NOT IN
 assertEquals("select e0 from Order e0 where e0.id not in (:p1)",
         qb.from(Order.class).where(o -> !ids.contains(o.getId())).toHql().hql());
-// a column that can be NULL: Java keeps the rows with NULL (the list has no null), so "is null" is added
-// (List.of(...).contains(null) would throw NullPointerException in Java; Arrays.asList returns false)
+// a column that can be NULL: the SQL meaning (D48), a NULL value is not "not in" the list (DEBUG LQL-5009);
+// to keep those rows, write o.getDescription() == null || !descs.contains(o.getDescription())
 List<String> descs = Arrays.asList("a", "b");
-assertEquals("select e0 from Order e0 where (e0.description is null or e0.description not in (:p1))",
+assertEquals("select e0 from Order e0 where e0.description not in (:p1)",
         qb.from(Order.class).where(o -> !descs.contains(o.getDescription())).toHql().hql());
 ```
 
@@ -596,7 +649,7 @@ where o1_0.id not in (?,?)
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-where (o1_0.description is null or o1_0.description not in (?,?))
+where o1_0.description not in (?,?)
 ```
 
 | ケース | 結果 |
@@ -611,16 +664,47 @@ where (o1_0.description is null or o1_0.description not in (?,?))
 <a id="310-association-paths"></a>
 ## 3.10 関連のパス
 
-`o.getCustomer().getName()` は **実行されません**。これは「結合した customer の `name` カラム」というカラムを指定するだけです。
+`o.getCustomer().getName()` は **実行されません**。これは「結合した顧客の `name` カラム」というカラムを指すだけです。
 lambdaQL は JPA Metamodel で各ステップをチェックします。
 
 | パスのステップ | HQL | 例 |
 |---|---|---|
 | 対一の関連（`@ManyToOne`、`@OneToOne`） | エイリアス付きの `join`（デフォルトは内部結合、下記を参照） | `o.getCustomer().getName()` -> `join e0.customer j1` ... `j1.name` |
-| 埋め込み（`@Embedded`） | 同じテーブル、結合なし | `Order` に埋め込みの `address` があれば: `o.getAddress().getCity()` -> `e0.address.city` |
+| 埋め込み（`@Embedded`） | 同じテーブル、結合なし。値オブジェクト全体の等価比較はカラムごとに展開（下記を参照） | `Order` に埋め込みの `address` があれば: `o.getAddress().getCity()` -> `e0.address.city` |
 | 対象の `@Id` で終わるパス | 外部キーのカラム、結合なし | `o.getCustomer().getId()` -> `e0.customer.id` |
 | 関連そのものを `null` と比較 | 外部キーのカラム、結合なし | `o.getCustomer() == null` -> `e0.customer is null` |
 | コレクション（`@OneToMany`、`@ManyToMany`） | **拒否** | `o.getItems()...` -> `exists` サブクエリを使う |
+
+**値オブジェクト全体の比較。** 埋め込みの値オブジェクト（`@Embedded`）全体を等価で比べると、lambdaQL はカラムごとに 1 つの比較に展開します（B6）。
+`o.getAddress().equals(addr)`、`Objects.equals(o.getAddress(), addr)`、`addr.equals(o.getAddress())` は、どれも `e0.address.city = :p1 and e0.address.zip = :p2` になります。
+
+- 否定（`!o.getAddress().equals(addr)`）は `e0.address.city <> :p1 or e0.address.zip <> :p2` です。
+- `o.getAddress() == null` は `e0.address.city is null and e0.address.zip is null` で、`!= null` は `e0.address.city is not null or e0.address.zip is not null` です。
+- 各カラムは SQL の意味に従います（D48）。NULL のカラムは `=` にも `<>` にも一致しません。たとえば (Seoul, NULL) の行は、等価比較にも否定にも一致しません（3 つの DB で実測）。
+- キャプチャした値オブジェクトの各属性は、クエリの実行時に読んでバインドします。キャプチャしたオブジェクトが `null` なら、すべてのカラムに NULL をバインドするので一致する行はなく、カラムごとに `LQL-4045` を `WARN` レベルでログに出します。
+- 入れ子の値オブジェクトも展開します。
+- 大小比較（`<` など）や別の型との比較は、これまでどおり `LQL-3012` のエラーです。フィールドを比べてください。
+
+**(テスト済み)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)、リージョン `embedded-compare`:
+
+```java
+// address is @Embedded (city, zip): comparing the whole value object compares each column (D48)
+Address addr = new Address("Seoul", "04524");
+SelectQuery<Order> same = qb.from(Order.class).where(o -> o.getAddress().equals(addr));
+assertEquals("select e0 from Order e0 where e0.address.city = :p1 and e0.address.zip = :p2", same.toHql().hql());
+assertEquals(Map.of("p1", "Seoul", "p2", "04524"), same.toHql().parameters());
+// Objects.equals and addr.equals(...) are the same comparison
+assertEquals(same.toHql().hql(), qb.from(Order.class).where(o -> Objects.equals(o.getAddress(), addr)).toHql().hql());
+// null checks each column: "no address" means every column is NULL
+SelectQuery<Order> none = qb.from(Order.class).where(o -> o.getAddress() == null);
+assertEquals("select e0 from Order e0 where e0.address.city is null and e0.address.zip is null", none.toHql().hql());
+SelectQuery<Order> some = qb.from(Order.class).where(o -> o.getAddress() != null);
+assertEquals("select e0 from Order e0 where e0.address.city is not null or e0.address.zip is not null",
+        some.toHql().hql());
+// each column follows the SQL meaning: a NULL column matches neither = nor <>
+SelectQuery<Order> other = qb.from(Order.class).where(o -> !o.getAddress().equals(addr));
+assertEquals("select e0 from Order e0 where e0.address.city <> :p1 or e0.address.zip <> :p2", other.toHql().hql());
+```
 
 `where` の中では、関連のパスはデフォルトで **内部結合（inner join）** です（決定 D36）。
 **(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `inner-join`:
@@ -641,11 +725,12 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.name=?
 ```
 
-- **customer のない** 注文は結果に入りません。結合する customer の行がないからです。
+- **顧客のない注文** は結果に入りません。結合する顧客の行がないからです。
 - lambdaQL は null チェックを代わりに追加しません。パスの前に `o.getCustomer() != null &&` を書く必要はありません。
 
-**null ガードは customer のない注文を残します。** customer のない注文で条件が true になりうるなら、lambdaQL はそのパスに `left join` を使います。
-内部結合では、Java と SQL で返る行が違ってしまいます。Java はその注文を返しますが、内部結合では失われるからです（決定 D36）。
+**null ガードでは顧客のない注文は残りません。** `where` のパスは常に内部結合です（SQL の意味、決定 D48）。
+そのため、`o.getCustomer() == null || ...` は顧客のない注文に一致しません。その注文には結合する顧客の行がないからです。このような条件について、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します。
+顧客のない注文を残すには、明示的な `leftJoin`（決定 D44、[6.8](06-select-group.md#68-explicit-joins) を参照）を使い、`c == null || ...` と書いてください。
 **(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `null-guard`:
 
 ```java
@@ -684,12 +769,11 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is not null and c1_0.name=?
 ```
 
-`left join` の後では、Hibernate は `e0.customer is null` を `c1_0.id is null` と書きます。意味は同じで、customer のない注文です。
+Hibernate は `e0.customer is null` を `c1_0.id is null` と書きます。内部結合の後では、この条件は真になりません。
 
-- `||` の他の部分も注文を残すことがあります。`o.getStatus() == 1 || o.getCustomer().getName().equals(name)` も `left join` を使います。Java では、status が 1 の注文は customer がなくても条件に合うからです。
-- 別の `where` 呼び出しがその注文をどのみち除く場合（たとえば `.where(o -> o.getCustomer().getName() != null)`）、結合は内部結合のままです。
+- `||` の他の部分も同じです。`o.getStatus() == 1 || o.getCustomer().getName().equals(name)` も内部結合を使うので、status が 1 でも顧客のない注文は返されません（Java なら返される）。
 
-customer の **ない** 注文を探すには、関連そのものを比較してください。これは外部キーのカラムをチェックし、結合はしません。
+顧客の **ない** 注文を探すには、関連そのものを比較してください。結合せずに外部キーのカラムをチェックします。
 **(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `no-association`:
 
 ```java
@@ -723,10 +807,10 @@ from orders o1_0
 where o1_0.customer_id=1
 ```
 
-その他の事実:
+補足:
 
-- 同じパスには 1 つのエイリアスが付きます。それは `where`、`orderBy`、`select` で共有されます。
-- `orderBy` か `select` **だけ** で使うパスは `left join` なので、そこでは行が失われません（ルール S8、J1）。同じパスを `where` でも使うと、`orderBy` と `select` は `where` の結合を使います。null ガードが `left join` にしていない限り、それは内部結合です。
+- 同じパスには 1 つのエイリアスが付きます。このエイリアスは `where`、`orderBy`、`select` で共有されます。
+- `orderBy` か `select` **だけ** で使うパスは `left join` なので、そこでは行が失われません（ルール S8、J1）。同じパスを `where` でも使うと、`orderBy` と `select` は `where` の結合、つまり内部結合を使います。
 - 2 つのエンティティの比較（`o.getCustomer() == c`）は **予定** です。今は id を比較してください: `o.getCustomer().getId() == c.getId()`（ここで `c` はキャプチャしたオブジェクトです）。
 
 <a id="311-captured-values"></a>
@@ -744,11 +828,11 @@ LocalDateTime since = LocalDateTime.of(2026, 1, 1, 0, 0);
 
 ルール:
 
-- エンティティを使わない部分は、**クエリを実行するたびに** Java 側で計算されます。その結果がバインドパラメーターになります。
-- コンパイル時の定数（`static final int MAX = 5;`）はキャプチャした値ではありません。javac がラムダの中にコピーするので、`5` と同じくリテラルになります（[3.3](#33-basic-form) を参照）。
+- エンティティを使わない部分は、**クエリを実行するたびに** Java で計算されます。その結果がバインドパラメーターになります。
+- コンパイル時の定数（`static final int MAX = 5;`）はキャプチャした値ではありません。javac がラムダの中に値をコピーするので、`5` と同じくリテラルになります（[3.3](#33-basic-form) を参照）。
 - ラムダは 1 回だけ解析され、結果はキャッシュされます。新しいキャプチャ値は呼び出しのたびに読まれます。
 - SQL になるのはエンティティの部分だけです。`form.getText().trim()` は Java です。`o.getDescription().trim()` ならデータベースの関数になります（予定）。
-- Java では、キャプチャするローカル変数は実質的に final でなければなりません。値が変わる場合は、ラムダの前で新しい変数に計算してください。
+- Java では、キャプチャするローカル変数は実質的に final でなければなりません。値が変わる場合は、ラムダの前で新しい変数に計算しておいてください。
 - フィールドを使うラムダは `this` をキャプチャします。[9.8](09-java-notes.md#98-lambdas-in-instance-methods-capture-this) を参照してください。
 
 <a id="312-errors-that-depend-on-order-of-evaluation"></a>
@@ -766,36 +850,37 @@ qb.from(Item.class)
 <a id="313-what-is-rejected"></a>
 ## 3.13 拒否されるもの
 
-lambdaQL は、コード `[LQL-xxxx]` とソースの行を付けて例外を投げます。推測はしません。
-ほとんどの形は、ラムダを解析するとき（最初に使うとき）に見つかります。問題のあるキャプチャ値（null、NaN）は、クエリの実行時に見つかります。
+lambdaQL は、コード `[LQL-xxxx]` とソースの行番号を含む例外を投げます。推測はしません。
+ほとんどの形は、ラムダを解析するとき（最初に使うとき）に見つかります。問題のあるキャプチャ値（メソッドを呼んだ `null`、NaN、`null` の要素を含むコレクション）は、クエリの実行時に見つかります。
 [11. エラーと言語](../11-errors-and-languages.md) を参照してください。
 
-| 書き方 | 例 | どうするか |
+| 書き方 | 例 | 対処 |
 |---|---|---|
 | ブロックラムダの中のループ、`switch`、ローカル変数 | `o -> { int x = 1; return ...; }` | 1 つの式で書く |
 | 値の三項演算子 | `o.getStatus() == (flag ? 1 : 2)` | ラムダの前で値を計算する |
 | 一般的な boolean の三項演算子 | `c ? x : y` | [3.5](#35-and-or-not) の許される形を使う |
 | 短絡評価しない演算子 | `a & b`、`a \| b`、`a ^ b` | `&&`、`\|\|` を使う |
-| 文字列の `+` | `o.getDescription() == "A" + code` | ラムダの前で文字列を組み立てる（カラムに対しては予定） |
+| 文字列の `+` | `o.getDescription() == "A" + code` | ラムダの前で文字列を組み立てる（カラム用は予定） |
 | ラムダの中のラムダやストリーム | `o -> list.stream().anyMatch(...)` | `contains`（[3.9](#39-in-with-a-captured-collection)）かサブクエリを使う |
 | カラムに対する文字列関数 | `o.getDescription().startsWith("A")` | 予定 |
 | エンティティのその他のメソッド | `o.calcSomething()` | getter だけを使う |
 | エンティティのコレクションのパス | `o.getItems().size() > 0` | `exists` サブクエリ |
-| エンティティとエンティティの比較 | `o.getCustomer() == c` | id を比較する（予定: エンティティの比較） |
+| エンティティとエンティティの比較 | `o.getCustomer() == c` | id を比較する（エンティティの比較は予定） |
+| 値オブジェクトの大小比較、別の型との比較（`LQL-3012`） | `o.getAddress().compareTo(a) > 0`（`Address` が `Comparable` のとき） | フィールドを比べる。等価比較はサポート |
 | ガードの下の `/`、`%`、キャスト | [3.12](#312-errors-that-depend-on-order-of-evaluation) を参照 | ガードを取り除くか、条件を変える |
-| R1/R4 の書き方での null のキャプチャ値 | `p == null` のときの `o.getDescription().equals(p)` | `Objects.equals` か null ガードを使う |
+| メソッドを呼ぶ null のキャプチャ値 | `p == null` のときの `o.getDescription().equals(p.trim())`、`o.getStatus() > p.intValue()`（`Double p`） | 前に null ガード（`p == null \|\| ...`）を書くか、クエリの前に `p` を確認する |
 | `NaN` / `Infinity` のキャプチャ値 | `o.getPrice() > Double.NaN` | NaN を送らない |
 | 匿名クラス、`Serializable` でないラムダ | `new Where<Order>() { ... }`、`java.util.function.Predicate` | ラムダを使う |
 
 例外の型（すべて `LambdaQLException` を継承）:
 
-| 例外 | いつ |
+| 例外 | 発生する時点 |
 |---|---|
-| `LambdaAnalysisException` | ラムダを読めない（シリアライズ可能なラムダではない、など） |
-| `UnsupportedLambdaShapeException` | 形がサポートされていない（ループ、値の三項演算子、...） |
-| `TranslationException` | 意味を変換できない（不明なメソッド、コレクションのパス、...） |
+| `LambdaAnalysisException` | ラムダを読めないとき（シリアライズ可能なラムダではない、など） |
+| `UnsupportedLambdaShapeException` | 形がサポートされていないとき（ループ、値の三項演算子、...） |
+| `TranslationException` | 意味を変換できないとき（不明なメソッド、コレクションのパス、...） |
 
-Java 固有の詳細は [9. Java の注意点](09-java-notes.md) にあります。すべてのルールを 1 か所にまとめたもの: [10. ルールと制限](10-rules-and-limits.md)。
+Java 固有の詳細は [9. Java の注意点](09-java-notes.md) にあります。すべてのルールを 1 か所で見るには: [10. ルールと制限](10-rules-and-limits.md)。
 
 ---
 

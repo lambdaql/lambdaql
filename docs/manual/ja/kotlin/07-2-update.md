@@ -7,7 +7,7 @@
 
 
 <a id="basic-form"></a>
-## 基本の形
+## 基本形
 
 ```kotlin
 val st = 5
@@ -22,7 +22,7 @@ val changed = u.execute()                      // number of updated rows
 `st` はキャプチャ値なので、バインドパラメーター（`:p1`）になります。`!!` は無視されます（D23）。定数 `2.0` はリテラルのままです（決定 D37）。
 `toHql()` は文を実行せずに HQL とパラメーターを返します。
 
-**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。 このテストは Java のラムダを使います。意味が同じ Kotlin のラムダは同じ HQL になるので、SQL も同じです。 **（予定）** と書かれたブロックは [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) から取っています。lambdaQL はまだこれらの文を作らないので、このテストが予定の HQL を Hibernate に直接渡します。
+**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。このテストは Java のラムダを使います。意味が同じ Kotlin のラムダは同じ HQL になるので、SQL も同じです。 **（予定）** と書かれたブロックは [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) から取っています。lambdaQL はまだこれらの文を作らないので、このテストが予定の HQL を Hibernate に直接渡します。
 
 **データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `update`:
 
@@ -51,8 +51,8 @@ assertEquals("update Order e0 set e0.status = :p1, e0.price = (e0.price * 2.0)"
     u.toHql().hql())
 ```
 
-`st` はキャプチャした `Short`（`7`）です。テストのエンティティの `price` はプリミティブの `double` なので、`!!` はありません。update の `where` の中のパス `it.customer?.name` はサブクエリになります（下の [パスとサブクエリを使った where](#where-with-paths-and-subqueries) を参照）。テストは文を実行し、行を読み直します。
-Java で書いたほかの文は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) でテストしています（H2、MariaDB、Oracle）。それらの例は [このページの Java 版](../java/07-2-update.md) を見てください。
+`st` はキャプチャした `Short`（`7`）です。テストのエンティティの `price` はプリミティブの `double` なので、`!!` はありません。update の `where` の中のパス `it.customer?.name` はサブクエリになります（下の [パスとサブクエリを使う where](#where-with-paths-and-subqueries) を参照）。テストは文を実行した後、行を読み直して確認します。
+Java で書いたほかの文は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) でテストしています（H2、MariaDB、Oracle）。それらの例は [このページの Java 版](../java/07-2-update.md) を参照してください。
 
 <a id="values-null-date-boolean"></a>
 ## 値: null、日付、boolean
@@ -67,7 +67,7 @@ qb.update(Order::class.java)
 enum の値も同じように使えます。同じ値を 2 回使う場合でも、キャプチャ値ごとに **専用のパラメーター** が作られます（ルール U7）。
 
 <a id="add-to-a-value-default-for-null"></a>
-## 値に足す、NULL のときのデフォルト
+## 値に加算する、NULL のときのデフォルト
 
 ```kotlin
 qb.update(Order::class.java).set { it.cnt += 1 }.where { it.status == 1 }.execute()
@@ -94,7 +94,7 @@ qb.update(Order::class.java).set { it.address = addr }.where { it.id == id }.exe
 ```
 
 <a id="change-an-association-foreign-key"></a>
-## 関連（外部キー）を変える
+## 関連（外部キー）を変更する
 
 ```kotlin
 qb.update(Order::class.java).set { it.customer?.id = cid }.where { it.id == id }.execute()
@@ -108,7 +108,7 @@ qb.update(Order::class.java).set { it.customer = customer }.where { it.id == id 
 ```
 
 関連エンティティに設定できるのは `@Id`（FK）だけです。
-`it.customer?.name = x` はエラーです。別のテーブルを変更することになるからです（ルール U6）。
+`it.customer?.name = x` はエラーです。別のテーブルを変更してしまうからです（ルール U6）。
 
 <a id="a-value-from-another-table"></a>
 ## 別のテーブルの値
@@ -154,45 +154,33 @@ update orders o1_0
 set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)
 ```
 
-顧客がいない注文では、`custName` は NULL になります。
-`where` では lambdaQL が `e0.customer.id is not null` を加えるので、この更新は `qb.from(Order::class.java).where { 同じラムダ }` と同じ行を変更します（決定 D36）。Java のテストでこれを確認しています。
+注文に顧客がない場合、`custName` は NULL になります。
+`where` では lambdaQL が `e0.customer.id is not null` を加えます。そのため、更新の対象行は `qb.from(Order::class.java).where { 同じラムダ }` の結果と同じです（決定 D36）。Java のテストでこれを確認しています。
 
 <a id="an-aggregate-from-a-subquery"></a>
-## サブクエリからの集約
+## サブクエリの集約
 
-引数が 2 つのラムダを使います。2 つ目の引数はコンテキストオブジェクト（`sub`）です。
-ここでは `Agg` は必要ありません。[5. サブクエリ](05-subquery.md) と同じく、サブクエリに `sum`、`avg`、... があります。
-この書き方は **まだ実装されていません**。現在動くのは `where` の中のサブクエリだけです。
+引数が 2 つのラムダ `set { o, sub -> ... }` を使います。2 番目の引数はサブクエリの起点 `sub` です（決定 D49）。
+ここでは `Agg` は必要ありません。サブクエリには [5. サブクエリ](05-subquery.md) と同じように `sum`、`avg`、... があります。
+
+**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `update-sub`:
 
 ```kotlin
-qb.update(Order::class.java)
-    .set { o, sub ->
-        o.total = sub.from(Item::class.java).where { i -> i.order?.id == o.id }.sum { i -> i.price }
-    }
-    .where { it.status == 1 }
-    .execute()
+// the second parameter starts a subquery, as in where { o, sub -> ... } (D49)
+val u = qb.update(Order::class.java)
+    .set { o, sub -> o.price = sub.from(Item::class.java).where { i -> i.order?.id == o.id }.sum { it.price } }
+    .where { o, sub -> sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
+assertEquals("update Order e0 set e0.price = (select sum(s1.price) from Item s1 where s1.order.id = e0.id)"
+        + " where exists (select 1 from Item s1 where s1.order.id = e0.id)", u.toHql().hql())
 ```
 
-**データベースごとの SQL（予定）** — 予定の HQL を Hibernate が変換したもので、`PlannedSqlTest` が記録しました。lambdaQL はまだこのクエリを作りません。`expected-sql/` の [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)、例 `07-update-sum`:
+- 別のテーブルの集約も、同じテーブルの集約も使えます（H2、MariaDB 10.11、Oracle 23.26 で実測）。`update` では MariaDB もエラー 1093 を出しません。
+- 一致する行がない場合、集約は NULL です。NOT NULL カラムでは DB エラーになるので、`Objects.requireNonNullElse(…, 0.0)` で囲んで `coalesce(...)` にしてください。
 
-```sql
--- H2, MariaDB
-update orders o1_0
-set total=(select sum(i1_0.price) from items i1_0 where i1_0.order_id=o1_0.id)
-where o1_0.status=1
-
--- Oracle
-update orders o1_0
-set o1_0.total=(select sum(i1_0.price) from items i1_0 where i1_0.order_id=o1_0.id)
-where o1_0.status=1
-```
-
-item がない注文では、`total` は NULL になります。これは SQL の動作です。
-
-引数が 1 つのトレイリングラムダ（`set { it... }`）と引数が 2 つのもの（`set { o, sub -> ... }`）は、別々のオーバーロードです。Kotlin が正しい方を選びます。
+引数が 1 つのトレイリングラムダ（`set { it... }`）と引数が 2 つのトレイリングラムダ（`set { o, sub -> ... }`）は、別々のオーバーロードです。Kotlin が適切な方を選びます。
 
 <a id="where-with-paths-and-subqueries"></a>
-## パスとサブクエリを使った where
+## パスとサブクエリを使う where
 
 `where` は選択クエリと同じです。
 
@@ -226,7 +214,7 @@ where not exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id)
 <a id="optimistic-locking-version"></a>
 ## 楽観的ロック（`@Version`）
 
-エンティティに `@Version` プロパティがあると、lambdaQL は `update versioned` を出力します。データベースがバージョンに 1 を足します。
+エンティティに `@Version` プロパティがあると、lambdaQL は `update versioned` を出力します。データベースがバージョンに 1 を加えます。
 
 ```kotlin
 // an entity with a version property (@Version): the version goes up too
@@ -258,12 +246,12 @@ val n = qb.update(VOrder::class.java)
 if (n == 0) throw OptimisticLockException()   // checking the result is your job
 ```
 
-`@Version` プロパティを自分で代入しないでください（ルール U15）。
+`@Version` プロパティに直接代入しないでください（ルール U15）。
 
 <a id="many-set-calls-patch"></a>
-## `set()` を何度も呼ぶ（PATCH）
+## `set()` を何回も呼ぶ（PATCH）
 
-`set()` は何度でも呼べます。すべての代入は、呼び出した順に 1 つの SET リストにまとめられます（ルール U14）。
+`set()` は何回でも呼べます。すべての代入は、呼び出した順に 1 つの SET リストにまとめられます（ルール U14）。
 ルール U3 と U4 は、`set()` 呼び出しをまたいでも適用されます。
 
 ```kotlin
@@ -280,12 +268,12 @@ qb.update(Order::class.java).set { it.price = 1.0; it.total = it.price }
 qb.update(Order::class.java).set { it.status = 1 }.set { it.status = 2 }
 ```
 
-`set()` は `UpdateSet` を返します。`set`、`where`、`all` はありますが、`execute()` はありません。
+`set()` は `UpdateSet` を返します。この型には `set`、`where`、`all` があり、`execute()` はありません。
 
 <a id="update-all-rows-all"></a>
 ## すべての行を更新する: `all()`
 
-`where` のない更新では、`all()` と書く必要があります。`where` も `all()` もないと、コードは **コンパイルできません**（ルール U5）。
+`where` のない更新には `all()` が必要です。`where` も `all()` もない場合、コードは **コンパイルできません**（ルール U5）。
 
 ```kotlin
 qb.update(Order::class.java).set { it.status = 0 }.all().execute()   // OK
@@ -298,6 +286,7 @@ qb.update(Order::class.java).set { it.status = 0 }.execute()         // compile 
 ## 先頭の行を更新する: `limit`
 
 `where { ... }` または `all()` の後に `orderBy { ... }` と `limit(n)` を付けると、最大 `n` 行を変更します。対象は `qb.from(X::class.java).where { 同じ }.orderBy { 同じ }` の先頭 `n` 行です。
+
 ルールは削除と同じです（[7.4](07-4-delete.md#delete-the-first-rows-limit) を参照）。`orderBy` がなければ id 順、id は常に最後のソートキー、`limit` のない `orderBy` はエラーです。
 
 ```kotlin
@@ -310,7 +299,7 @@ val u = qb.update(Order::class.java)
 // HQL: update Order e0 set e0.description = 'top' where e0.id in (select t.id from (select x0.id as id from Order x0 join x0.customer k1 where k1.name = 'Kim' order by x0.price desc, x0.id asc limit 1) t)
 ```
 
-同じ文を Java で [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) がテストしています（リージョン `update-limit`）。
+同じ文を Java で書いたテストが [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) にあります（リージョン `update-limit`）。
 
 **データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `update-limit`:
 
@@ -331,12 +320,14 @@ set o1_0.description='top'
 where o1_0.id in (select t1_0.id from (select o2_0.id id from orders o2_0 join customers c1_0 on c1_0.id=o2_0.customer_id where c1_0.name='Kim' order by o2_0.price desc,o2_0.id fetch first 1 rows only) t1_0)
 ```
 
-パス `it.customer?.name` は、select と同じように内側の select で結合になります（決定 D36）。更新そのものはほかのテーブルを読みません。
+パス `it.customer?.name` は、select と同じように内側の select で結合になります（決定 D36）。更新文そのものはほかのテーブルを読みません。
 
 <a id="update-exactly-one-row-executeone"></a>
 ## ちょうど 1 行を更新する: `executeOne()`
 
-`executeOne()` は 1 行保護付きで更新を実行します。一致する id を最大 2 つ読みます。id が 2 つなら何も変更せず、`NonUniqueResultException` を投げます。id が 1 つなら、その行を `id = :p and (あなたの条件)` で変更します。手順は削除と同じです（[7.4](07-4-delete.md#delete-exactly-one-row-executeone) を参照）。
+`executeOne()` は 1 行保護付きで更新を実行します。一致する id を最大 2 つ読みます。
+
+id が 2 つなら何も変更せず、`NonUniqueResultException` を投げます。id が 1 つなら、その行を `id = :p and (条件)` で変更します。手順は削除と同じです（[7.4](07-4-delete.md#delete-exactly-one-row-executeone) を参照）。
 
 ```kotlin
 val one = qb.update(Order::class.java)
@@ -345,8 +336,9 @@ val one = qb.update(Order::class.java)
     .executeOne()                             // 0 or 1; 2 or more rows: NonUniqueResultException
 ```
 
-`execute-one` リージョンの Java のテストメソッド（`DmlQueryTest` の `executeOneProtects`）は、更新での `executeOne()` も確認しています。2 行以上に一致すると何も変更しません。
-Spring のリポジトリでは、`updateOne({ ... }) { ... }` が同じことをします（[12.4](12-spring-data-jpa.md#one-row-protection-deleteone-and-updateone) を参照）。
+Java のテストメソッド `executeOneProtects`（`DmlQueryTest`、リージョン `execute-one` を含むメソッド）は、更新での `executeOne()` も確認しています。2 行以上に一致すると何も変更しません。
+
+Spring のリポジトリでは、`updateOne({ ... }) { ... }` が同じ動作をします（[12.4](12-spring-data-jpa.md#one-row-protection-deleteone-and-updateone) を参照）。
 
 ---
 

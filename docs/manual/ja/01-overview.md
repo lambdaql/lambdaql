@@ -1,9 +1,6 @@
 <a id="1-overview"></a>
 # 1. 概要
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../ko/01-overview.md)を参照してください。
-
 [マニュアルのホーム](README.md) | トラック: [Java](java/README.md) | [Kotlin](kotlin/README.md) | 次: 2. はじめよう（[Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md)）
 
 このページは両方の言語向けです。コードは **Java** と **Kotlin** の別々のセクションに分けて載せています。
@@ -64,7 +61,8 @@ where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 2 つの `where` 呼び出しは `AND` でつながります。
 定数 `"Kim"` はリテラルになり、キャプチャした `minPrice` はバインドパラメーター（`:p1`）になります。
 `where` の中の `o.getCustomer().getName()` のようなパスは、デフォルトで内部結合の `join` になります。customer のない注文は返されません。
-ここでは `left join` になります。status が 1 の注文は、customer がなくても条件に合うからです（Java でもその注文を返します）。
+この例も同じです。Java なら status が 1 の注文は customer がなくても条件に合いますが、lambdaQL は SQL の意味を使います（決定 D48）。
+このような注文も残すには `leftJoin` を使ってください。
 
 ラムダは普通の Java や Kotlin のコードに見えます。
 しかし実際は、Java や Kotlin の構文で書く **クエリ言語** です。
@@ -132,11 +130,10 @@ lambdaQL に渡す Kotlin のラムダリテラルは、Java のラムダと同�
 名前は自由に付けられます。このマニュアルでは `by` と `sub` を使います。
 
 <a id="no-static-helpers-except-agg"></a>
-### static ヘルパーは使わない（`Agg` を除く）
+### static ヘルパーは使わない（`Agg` と `Dml` を除く）
 
-lambdaQL のために static import をする必要はありません。
-static ヘルパークラスは、集計（`count`、`sum`、`avg`、`min`、`max`、`countDistinct`）用の `org.lambdaql.Agg` だけです。
-`Agg` の static import は任意です。
+static ヘルパークラスは 2 つだけです。集計（`count`、`sum`、`avg`、`min`、`max`、`countDistinct`）用の `org.lambdaql.Agg` と、setter のないエンティティに値を代入する `org.lambdaql.Dml`（`Dml.value(column, value)`、決定 D49）です。
+どちらのクラスも static import は任意です。
 
 #### Java
 
@@ -162,9 +159,9 @@ lambdaQL は Java や Kotlin の実行時のルールではなく、ドキュメ
 
 | 書いたもの | lambdaQL での意味 | 理由 |
 |---|---|---|
-| `o.getId() == id`（2 つの `Long` オブジェクト） | 値の等価比較: `e0.id = :p1`。キャプチャした `id` が null なら `e0.id is null` | クエリでは、オブジェクトの `==` は「同じオブジェクト」ではなく「同じ値」を意味します。キャプチャした値は Java のルールをそのまま使います。 |
+| `o.getId() == id`（2 つの `Long` オブジェクト） | 値の等価比較: `e0.id = :p1` | クエリでは、オブジェクトの `==` は「同じオブジェクト」ではなく「同じ値」を意味します。キャプチャした値の `null` は NULL としてバインドされ、どの行にも一致しません（`WARN` レベルの `LQL-4045`）。NULL を探すには `o.getId() == null` と書きます。 |
 | `Objects.equals(o.getDescription(), o.getCustName())`、`!text.equals(o.getDescription())` | `e0.description = e0.custName`、`e0.description <> :p1`（SQL の意味） | エンティティの値どうし、または値との `!=` では、値が NULL の行は一致しません。Java ならこれらの行の一部を返します。残すには `o.getDescription() == null \|\| ...` と書きます。 |
-| `o.getCustomer().getName()` | 結合した customer の `name` カラム（`where` の中ではデフォルトで内部結合の `join`） | パスはカラムを指定します。lambdaQL は customer が null かどうかをチェックしません。`where` の中では、customer のない注文は返されません。それらを探すには `o.getCustomer() == null` と書きます。null ガード（`o.getCustomer() == null \|\| ...`）があるとパスは `left join` になるので、Java と SQL で同じ行が返ります。 |
+| `o.getCustomer().getName()` | 結合した customer の `name` カラム（`where` の中ではデフォルトで内部結合の `join`） | パスはカラムを指定します。lambdaQL は customer が null かどうかをチェックしません。`where` の中では、customer のない注文は返されません。それらを探すには `o.getCustomer() == null` と書きます。null ガード（`o.getCustomer() == null \|\| ...`）を書いても同じです（SQL の意味、D48）。このような注文も残すには `leftJoin` を使ってください。 |
 | `status` が NULL のときの `o.getStatus() == 1` | その行は一致しない（SQL の意味） | Java なら `NullPointerException` を投げます。SQL は UNKNOWN を返します。 |
 | `o.getDescription() == null` | `e0.description is null` | null チェックを書いたので、lambdaQL はそれを使います。 |
 
@@ -176,18 +173,18 @@ lambdaQL は Java や Kotlin の実行時のルールではなく、ドキュメ
 
 | 書いたもの | lambdaQL での意味 | 理由 |
 |---|---|---|
-| `it.id == id`（`id: Long?`、nullable な変数） | 値の等価比較: `e0.id = :p1`。`id` が null なら `e0.id is null` | Kotlin の `==` はもともと「同じ値」を意味します。キャプチャした値は Kotlin のルールをそのまま使います。 |
+| `it.id == id`（`id: Long?`、nullable な変数） | 値の等価比較: `e0.id = :p1` | Kotlin の `==` はもともと「同じ値」を意味します。キャプチャした値の `null` は NULL としてバインドされ、どの行にも一致しません（`WARN` レベルの `LQL-4045`）。 |
 | `it.description == it.custName`、`it.description != text` | `e0.description = e0.custName`、`e0.description <> :p1`（SQL の意味） | エンティティの値どうし、または値との `!=` では、値が NULL の行は一致しません。そのような行を残すには `it.description == null \|\| ...` と書きます。 |
-| `it.customer?.name` または `it.customer!!.name` | 結合した customer の `name` カラム（`where` の中ではデフォルトで内部結合の `join`） | パスはカラムを指定します。`?.` や `!!` でカラムは変わりません。`!!` はラムダをコンパイルするためだけにあります。`where` の中では、customer のない注文は返されません。それらを探すには `it.customer == null` と書きます。null ガード（`it.customer == null \|\| ...`）があるとパスは `left join` になります。 |
+| `it.customer?.name` または `it.customer!!.name` | 結合した customer の `name` カラム（`where` の中ではデフォルトで内部結合の `join`） | パスはカラムを指定します。`?.` や `!!` でカラムは変わりません。`!!` はラムダをコンパイルするためだけにあります。`where` の中では、customer のない注文は返されません。それらを探すには `it.customer == null` と書きます。null ガード（`it.customer == null \|\| ...`）を書いても同じです（SQL の意味、D48）。このような注文も残すには `leftJoin` を使ってください。 |
 | `price` が NULL のときの `it.price!! > 100.0` | その行は一致しない（SQL の意味） | Kotlin なら `!!` で `NullPointerException` を投げます。lambdaQL は `!!` を無視し、SQL は UNKNOWN を返します。 |
 | `it.description == null` | `e0.description is null` | null チェックを書いたので、lambdaQL はそれを使います。 |
 
-lambdaQL が null を扱うのは **あなたが書いた場所だけ** です。
-エンティティの値は SQL の意味で比べます（決定 D48）。結果が Java や Kotlin と異なりうるとき、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します。
+lambdaQL が null を扱うのは **自分で書いた場所だけ** です。
+ラムダの中の比較とメソッドは、すべて SQL の意味に従います（決定 D48）。キャプチャした値と関連のパスも同じです。
+結果が Java や Kotlin と異なりうるとき、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します。`=` や `<>` にキャプチャした値の `null` が使われると、`LQL-4045` を `WARN` レベルでログに出します。
 3. 条件（[Java](java/03-where.md) | [Kotlin](kotlin/03-where.md)）
 と 10. ルールと制限（[Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md)）を参照してください。
 
-<a id="sargable-sql"></a>
 ### SARGable な SQL
 
 lambdaQL はインデックスを使える SQL（「SARGable」）を書きます。
@@ -198,15 +195,15 @@ lambdaQL はインデックスを使える SQL（「SARGable」）を書きま�
 
 #### Java
 
-| 書いたもの | lambdaQL が書かない SQL | lambdaQL が書く SQL |
+| 書いたもの | lambdaQL が書か**ない** SQL | lambdaQL が書く SQL |
 |---|---|---|
-| `!sub.from(Customer.class).where(c -> c.getGrade() > 3).select(c -> c.getId()).contains(o.getCustomer().getId())` | `o.customer.id not in (select ...)` | `not exists (select 1 ...)` |
+| `o.getId() != null && o.getId() == id` | `e0.id is not null and e0.id = :p1` | `e0.id = :p1`（id は NULL になれない） |
+| `o.getDescription() == text` | `e0.description is not distinct from :p1`（Oracle では `decode(...)`、インデックスなし） | `e0.description = :p1` |
 
 #### Kotlin
 
-| 書いたもの | lambdaQL が書かない SQL | lambdaQL が書く SQL |
+| 書いたもの | lambdaQL が書か**ない** SQL | lambdaQL が書く SQL |
 |---|---|---|
-| `o.customer?.id !in sub.from(Customer::class.java).where { c -> c.grade!! > 3 }.select { c -> c.id }` | `o.customer.id not in (select ...)` | `not exists (select 1 ...)` |
 | `(it.description ?: "") == "x"` | `coalesce(e0.description, '') = 'x'` | `e0.description = 'x'` |
 | `it.description.isNullOrEmpty()` | `(e0.description is null or length(e0.description) = 0)` | `(e0.description is null or e0.description = :p1)` |
 | `it.id == id`（`it.id` は `Long?`） | `not (e0.id is null or e0.id <> :p1)` | `e0.id = :p1`（id は NULL になれない） |

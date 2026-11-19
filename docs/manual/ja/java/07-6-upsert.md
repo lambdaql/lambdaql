@@ -94,6 +94,8 @@ values (excluded.id,excluded.price)
 
 キーは getter のラムダ（`a -> a.getId()`）または getter のメソッド参照（`Archive::getId`）です。関連のパスではなく、エンティティ自身のカラムでなければならず、データベースではそのカラムに主キーか一意制約が必要です。
 
+`values` と `update` に引数 2 つのラムダを書くと、2 番目の引数 `sub` でサブクエリを作れます（決定 D49、3 つのデータベースで実測）。例は [7.5](07-5-insert.md#a-subquery-in-a-value) を参照してください。
+
 <a id="keep-the-existing-row-onconflictkeyignore"></a>
 ## 既存の行を残す: `onConflict(key).ignore()`
 
@@ -130,7 +132,7 @@ Hibernate 自身の `on conflict ... do nothing` は、H2 と Oracle では普�
 <a id="the-row-count"></a>
 ## 行数
 
-`execute()` は、データベースが報告した行数をそのまま返します（決定 D40）。テストでは次の数を確認しています。
+`execute()` は、データベースが報告した行数をそのまま返します（決定 D40）。テストでは次の値を確認しています（実測）。
 
 | データベース | 挿入 | 更新 | 無視 |
 |---|---|---|---|
@@ -143,7 +145,8 @@ Hibernate 自身の `on conflict ... do nothing` は、H2 と Oracle では普�
 <a id="many-rows"></a>
 ## 複数行
 
-`qb.upsert(X.class).values(list, (a, l) -> ...)` と、`values(list, ...)` のあとの `onConflict(...)` は、**1 行ごとに 1 つの文** を実行します。`execute()` は合計を返します。これはまだテストで確認していません。
+`qb.upsert(X.class).values(list, (a, l) -> ...)` と、`values(list, ...)` のあとの `onConflict(...)` は、**1 行ごとに 1 つの文** を実行します。`execute()` は合計を返します。この書き方のテストはまだありません（未測定）。
+リスト形式も `values(list, (a, l, sub) -> ...)` のように 3 番目の引数でサブクエリを受け取ります（[7.5](07-5-insert.md#many-rows-from-a-list) を参照）。
 
 ```java
 int n = qb.upsert(Archive.class)

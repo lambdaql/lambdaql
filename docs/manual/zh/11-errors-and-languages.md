@@ -59,7 +59,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-5006` | –（`INFO` 日志） | 无法检查 {0} 的重载（{1}）；不做检查继续调用。 |
 | `LQL-5007` | –（`WARN` 日志） | MariaDB 函数 {0} 是 NOT DETERMINISTIC，因此会逐行计算，比较列上的索引无法用于范围查找。如果它是确定性的，请声明为 DETERMINISTIC：{1} |
 | `LQL-5008` | –（`INFO` 日志） | 无法读取 {0} 的索引或函数元数据（{1}）；在没有元数据的情况下继续 SARGable 检查。 |
-| `LQL-5009` | –（`DEBUG` 日志） | SQL 语义：在 {0} 中，值为 NULL 的行不满足条件（与 Java 的 null 处理不同）。要包含这些行，请写出 null 检查，例如 x == null || ...。 |
+| `LQL-5009` | –（`DEBUG` 日志） | SQL 语义：在 {0} 中，值为 NULL 的行不满足条件（与 Java 的 null 处理不同）。要包含这些行，请写出 null 检查，例如 `x == null \|\| ...`。 |
 
 `{0}` 和 `{1}` 是参数，例如表达式或存储过程名。
 完整列表见消息文件（见[致译者](#for-translators)）。

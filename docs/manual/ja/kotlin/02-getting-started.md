@@ -1,9 +1,6 @@
 <a id="2-getting-started-kotlin"></a>
 # 2. はじめよう（Kotlin）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/02-getting-started.md)を参照してください。
-
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [1. 概要](../01-overview.md) | 次: [3. 条件](03-where.md) | [このページの Java 版](../java/02-getting-started.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -81,8 +78,8 @@ Maven:
 Spring Data JPA や Spring Boot を使う場合は、代わりに `lambdaql-spring-boot-starter` か `lambdaql-spring-data-jpa` を使ってください。どちらも `lambdaql-core` を持ち込みます（[12.2](12-spring-data-jpa.md#122-modules) を参照）。
 
 > [!WARNING]
-> アーティファクトは **まだ Maven Central に公開していません**。
-> バージョン `1.0.0` はリポジトリの `gradle.properties` から来ています。最初のリリースまでに変わることがあります。lambdaQL が公開されたら、このページをもう一度確認してください。
+> バージョン `1.0.0` はリポジトリの `gradle.properties` で定義した値で、最初のリリースまでに変わることがあります。
+> lambdaQL が Maven Central に公開されたら、このページをもう一度確認してください。
 
 <a id="kotlin-compiler-settings"></a>
 ## Kotlin コンパイラーの設定
@@ -211,7 +208,7 @@ class OrderService(private val qb: QueryBuilder) {
 ```
 
 - 共有 `EntityManager` は現在のトランザクションに結び付いています。`@Transactional` の中では、lambdaQL は同じトランザクションで実行されます。
-- Spring のアプリケーションでは、`EntityManagerFactory` を受け取るコンストラクターを使わないでください。そのビルダーはクエリごとに自分の `EntityManager` を開くので、Spring のトランザクションの外で実行されます。
+- Spring のアプリケーションでは、`EntityManagerFactory` を受け取るコンストラクターを使わないでください。このコンストラクターで作ったビルダーはクエリごとに自分の `EntityManager` を開き、その `EntityManager` は Spring のトランザクションに参加しません。
 - Spring Data のリポジトリの中で lambdaQL のクエリを書く方法は、[12. Spring Data JPA](12-spring-data-jpa.md) を参照してください。
 
 <a id="your-first-query"></a>
@@ -224,7 +221,7 @@ val orders = qb.from(Order::class.java)
 // HQL: select e0 from Order e0 where e0.status = 1 and e0.price > 100.0
 ```
 
-**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。 このテストは Java のラムダを使います。意味が同じ Kotlin のラムダは同じ HQL になるので、SQL も同じです。
+**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。このテストは Java のラムダを使います。意味が同じ Kotlin のラムダは同じ HQL になるので、SQL も同じです。
 
 **データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `to-hql`:
 
@@ -332,7 +329,8 @@ where c1_0.name=?
 `it.customer!!.name` でも同じ HQL になります。好きな書き方を使ってください。
 customer のない注文を探すには、関連を比較してください。`it.customer == null` は `e0.customer is null` になります（結合なし）。
 `it.customer?.name == null` ではそれらの注文は **含まれません**。
-null ガードが customer のない注文を残す場合（`it.customer == null || ...`）、lambdaQL は `left join` を使います。[3.10](03-where.md#310-association-paths) を参照してください。
+null ガード（`it.customer == null || ...`）を書いても、customer のない注文は残りません。パスは内部結合だからです（決定 D48）。
+そのような注文を残すには `leftJoin` を使ってください（[6.8](06-select-group.md#68-explicit-joins)）。[3.10](03-where.md#310-association-paths) を参照してください。
 
 <a id="getting-the-result"></a>
 ## 結果を受け取る

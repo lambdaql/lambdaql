@@ -60,7 +60,7 @@ Some real codes:
 | `LQL-5006` | – (`INFO` log) | The overloads of {0} could not be checked ({1}); the call goes on without the check. |
 | `LQL-5007` | – (`WARN` log) | The MariaDB function {0} is NOT DETERMINISTIC, so it is computed for every row and an index on the compared column is not used for a range. Declare it DETERMINISTIC if it is: {1} |
 | `LQL-5008` | – (`INFO` log) | The index or function metadata for {0} could not be read ({1}); the SARGable check goes on without it. |
-| `LQL-5009` | – (`DEBUG` log) | SQL meaning: in {0}, a row whose value is NULL does not match (Java would treat null differently). Add a null check such as x == null || ... to include it. |
+| `LQL-5009` | – (`DEBUG` log) | SQL meaning: in {0}, a row whose value is NULL does not match (Java would treat null differently). Add a null check such as `x == null \|\| ...` to include it. |
 | `LQL-5010` | – (`DEBUG` log) | The column {0} is a @Lob column; some databases (for example Oracle) cannot use a LOB in {1}. |
 | `LQL-5011` | – (`DEBUG` log) | The enum column {0} is stored as text (@Enumerated(STRING)), so the database sorts it by name, not by the declaration order of the enum. |
 | `LQL-5012` | – (`WARN` log) | Arithmetic on the column {0} keeps the condition from using an index. Move it to the value side with the same meaning: divide by a decimal (o.getQty() > n / 2.0 for o.getQty() * 2 > n; n / 2 would be integer division), and reverse the comparison for a negative factor: {1} |

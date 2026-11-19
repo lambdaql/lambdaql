@@ -70,7 +70,7 @@ fetch first ? rows only
 | 4 | [ソートとページング](04-order-paging.md) | `orderBy`、`Direction`、NULL の順序、`limit`、`offset` |
 | 5 | [サブクエリ](05-subquery.md) | `exists`、`contains`（IN）、NOT EXISTS、スカラーサブクエリと相関サブクエリ |
 | 6 | [選択、集計、グループ化](06-select-group.md) | `select`、record と DTO、`Agg`、`groupBy`、`having`、結合（`join`、`leftJoin`、`crossJoin`）、派生テーブル、CTE |
-| 7 | [更新、挿入、削除](07-dml.md) | `set`、`by.set`、`values`、`all()`、`execute()`、`limit`、`executeOne()` |
+| 7 | [更新、挿入、削除](07-dml.md) | `set`、`Dml.value`、`values`、`all()`、`execute()`、`limit`、`executeOne()` |
 | 7.6 | [Upsert](07-6-upsert.md) | `upsert`、`onConflict(...).update(...)`、`onConflict(...).ignore()`、データベースごとの行数 |
 | 8 | [プロシージャと DB 関数](08-procedures-functions.md) | `@SqlProcedure`、`@SqlFunction`、`qb.call`、`qb.exec` |
 | 9 | [Java の注意点](09-java-notes.md) | ボクシング、オブジェクトの `==`、`String` の比較、`Objects.equals`、メソッド参照、`this` のキャプチャ、コンパイラーの注意 |
@@ -104,6 +104,6 @@ fetch first ? rows only
 ## ヘルプと貢献
 
 - ソースコード: <https://github.com/codebit0/lambdaql>
-- 英語のマニュアルが原本です。韓国語、日本語、中国語のマニュアルは翻訳です。
+- 韓国語のマニュアルが原本です。英語、日本語、中国語のマニュアルは翻訳です。
 - 間違いを見つけたら、issue か pull request を作成してください。
 - 設計ドキュメント（韓国語、コントリビューター向け）: [ROADMAP.md](../../../design/ROADMAP.md)、[KOTLIN.md](../../../design/KOTLIN.md)

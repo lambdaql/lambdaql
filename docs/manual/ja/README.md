@@ -168,6 +168,6 @@ manual/ja/
 ## ヘルプと貢献
 
 - ソースコード: <https://github.com/codebit0/lambdaql>
-- 英語のマニュアルが原本です。韓国語、日本語、中国語のマニュアルは翻訳です。
+- 韓国語のマニュアルが原本です。英語、日本語、中国語のマニュアルは翻訳です。
 - どの言語でも、間違いを見つけたら issue か pull request を作成してください。翻訳の手伝いも歓迎します。
 - 設計ドキュメント（韓国語、コントリビューター向け）: [ROADMAP.md](../../design/ROADMAP.md)、[KOTLIN.md](../../design/KOTLIN.md)

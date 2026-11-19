@@ -1,9 +1,6 @@
 <a id="10-rules-and-limits-java"></a>
 # 10. ルールと制限（Java）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/10-rules-and-limits.md)を参照してください。
-
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [9. Java の注意点](09-java-notes.md) | 次: [11. エラーと言語](../11-errors-and-languages.md) | [このページの Kotlin 版](../kotlin/10-rules-and-limits.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -41,7 +38,7 @@ lambdaQL は **ラムダを決して実行しません**。バイトコードを
 
 1. `o.getCustomer().getName()` のようなパスは **カラムを指します**。呼び出しの連鎖ではありません。
    lambdaQL は customer が null かどうかを確認しません（D20）。`where` の中ではパスはデフォルトで内部結合なので、customer のない注文は選ばれません（D36）。
-   customer がなくても条件が true になりうるなら（null ガード）、パスは `left join` になるので、結果は Java と同じになります。
+   null ガード（`... == null || ...`）を書いても同じです。パスは内部結合のまま残ります（D48）。customer のない注文を残すには `leftJoin` を使ってください。
    それらの注文を探すには、関連そのものを比較します: `o.getCustomer() == null`。
 2. NULL は **書いた場所でだけ** 扱われます（`== null`、`!= null`）（D22）。
    それ以外の NULL は SQL のルールに従います。条件は UNKNOWN になり、その行は選ばれません。
@@ -85,7 +82,7 @@ lambdaQL は **ラムダを決して実行しません**。バイトコードを
 ```
 
 lambdaQL は `is [not] distinct from` を書きません。Oracle ではこれが `decode(...)` になり、インデックスを使えないからです。
-エンティティの値は SQL の意味に従うので、普通の `=` や `<>` が常に正しい形です。キャプチャした `null` は `is null` / `is not null` になります。
+エンティティの値は SQL の意味に従うので、普通の `=` や `<>` が常に正しい形です。キャプチャした `null` は NULL としてバインドされ、どの行にも一致しません（`WARN` レベルの `LQL-4045`）。
 
 **2 つの boolean 式の比較**（D25）
 
@@ -97,7 +94,7 @@ lambdaQL は `is [not] distinct from` を書きません。Oracle ではこれ�
 `CASE` の書き方（`e0.active = case when ... end`）は正しい行を返しますが、フルスキャンが必要になります。
 そのため lambdaQL はこれを使いません。
 
-**サブクエリを使う NOT IN** は `NOT EXISTS` として書かれます（アンチジョインで、NULL に対して安全です。10.3 を参照）。
+**サブクエリを使う NOT IN** は `NOT IN` として書かれます（SQL の意味、D48）。サブクエリに NULL があると、行は返りません。NULL を飛ばすには、サブクエリに null のチェックを加えてください（10.3 を参照）。
 
 <a id="what-the-measurements-showed"></a>
 ### 測定で分かったこと
@@ -127,7 +124,23 @@ MariaDB 10.11 と Oracle 23ai、20,000〜50,000 行:
 カラム側の DB 関数（`OrderFns.discount(o.getPrice()) > 10`）は通常のインデックスを使えません。
 lambdaQL は **WARN**（`LQL-5001`）をログに出します。例外: Oracle では、同じ式の関数ベースのインデックスがあれば出しません。
 MariaDB では、`NOT DETERMINISTIC`（デフォルト）の関数は、引数がパラメーターだけでもフルスキャンになります（`o.getPrice() > OrderFns.discount(rate)`）。そのため、その場合も警告します（`LQL-5007`）。
-厳格モード（警告の代わりにエラー）はまだ実装されていません。
+`SargableMode.STRICT` では、警告の代わりに解析が失敗します（`LQL-3066`、決定 D50）。
+
+**SARGable モード**（決定 D50）。`SargableMode` には 3 つの値があります。
+
+- `OFF`: チェックせず、メタデータも読みません。
+- `WARN`（デフォルト）: 警告をログに出します。
+- `STRICT`: `WARN` なら警告を出す場合（`LQL-5001`、`LQL-5007`、`LQL-5012`）に、解析が `org.lambdaql.NonSargableException`（`LQL-3066`）で失敗します。
+
+persistence unit ごとに `SargablePolicy.register(emf, SargableMode.STRICT)` で指定し、`SargablePolicy.unregister(emf)` で解除します。Spring では `lambdaql.sargable.mode=STRICT` を使います（[12](12-spring-data-jpa.md) を参照）。
+チェックはラムダごとに 1 回、解析結果を共有キャッシュに入れるときに実行されます。そのため、最初のクエリの前にモードを登録してください。
+
+**カラムに対する算術**（決定 D50）。
+
+- カラム 1 つと値だけの `+ - * /`（`o.getCnt() * 2 > n`）は、値の側に移せます。lambdaQL は `LQL-5012` を `WARN` レベルでログに出し、`STRICT` ではエラーになります。
+- カラム同士の算術（`o.getPrice() * o.getCnt() > n`）と `%` は移せないので、`LQL-5013` を `DEBUG` レベルでログに出すだけです。`STRICT` でも許可します。
+- 移した形は同じ意味でなければなりません。`o.getCnt() > n / 2.0` のように小数で割ってください。整数の除算 `n / 2` は、`>=`、`=`、`<` と負の `n` で違う行を返します。負の数を掛けた場合は、比較の向きを逆にしてください。`LQL-5012` のメッセージがこれを案内します。
+- インデックスの有無を調べて警告を減らす方式は採用していません。権限とシノニムのために「インデックスなし」と「不明」が混ざり、カラムの算術はまれな書き方だからです。
 [8. プロシージャと DB 関数](08-procedures-functions.md) を参照してください。
 
 <a id="103-null-rules"></a>
@@ -136,24 +149,26 @@ MariaDB では、`NOT DETERMINISTIC`（デフォルト）の関数は、引数�
 | ラムダ | SQL | NULL の動作 |
 |---|---|---|
 | `o.getId() == 10L`（アンボクシング、片方がプリミティブ） | `e0.id = 10` | NULL: UNKNOWN で、行は選ばれない（Java なら NPE を投げる） |
-| `o.getId() == p`（2 つのオブジェクト: `Long`、`String`、enum、...） | `e0.id = :p1`。キャプチャした `null`: `is null` | カラムが NULL: 選ばれない。キャプチャした `null` は Java に従う（`is null`） |
-| `o.getDescription() != p` | `e0.description <> :p1`。キャプチャした `null`: `is not null` | カラムが NULL: 選ば **れない**（SQL の意味、D48。Java なら選ばれる） |
+| `o.getId() == p`（2 つのオブジェクト: `Long`、`String`、enum、...） | `e0.id = :p1` | カラムが NULL: 選ばれない。キャプチャした `null`: 一致する行なし（`= NULL`、`WARN` レベルの `LQL-4045`） |
+| `o.getDescription() != p` | `e0.description <> :p1` | カラムが NULL: 選ば **れない**（SQL の意味、D48。Java なら選ばれる）。キャプチャした `null`: 一致する行なし |
 | `o.getDescription() == o.getCustName()`（エンティティの値どうし） | `e0.description = e0.custName` | どちらかが NULL: 選ばれない。NULL と NULL も同じ（SQL の意味、D48） |
 | `o.getDescription().equals(p)` | `e0.description = :p1` | description が NULL: UNKNOWN（Java なら NPE を投げる） |
 | `Objects.equals(o.getDescription(), p)`、`"x".equals(o.getDescription())`、`Boolean.TRUE.equals(o.getActive())` | `==` と同じ | `==` と同じ |
 | `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | NULL: 選ばれない（SQL の意味） |
 | `!o.getActive()`（nullable な `Boolean`） | `e0.active = false` | NULL: 選ばれない（NULL は false ではない） |
 | `x == null`、`x != null` | `is null`、`is not null` | 2 値 |
+| `o.getCnt() >= 2.5`（整数カラム、小数の値） | 書いた値のまま比較する: 定数はリテラル（`e0.cnt >= 2.5`）、キャプチャ値と IN リストは `BigDecimal` でバインド（D48 B8） | インデックスの範囲スキャンを保つ（MariaDB で実測）。以前のように値を切り捨てて間違った行を返すことはない |
+| 値オブジェクト（`@Embedded`）全体: `o.getAddress().equals(addr)`、`Objects.equals(o.getAddress(), addr)`、`!o.getAddress().equals(addr)` | カラムごとに展開: `e0.address.city = :p1 and e0.address.zip = :p2`、否定は `<> ... or ...`。`== null` はすべてのカラムの `is null`（and）、`!= null` は `is not null`（or） | カラムごとに SQL の意味（D48）: NULL のカラムは `=` にも `<>` にも一致しない。キャプチャしたオブジェクトが `null` なら一致する行なし（`WARN` レベルの `LQL-4045`） |
 | NULL になれないカラム（id、プリミティブ、`nullable = false`、パスに関連のステップがない）での `o.getId() == null` | `1=0`。比較と並ぶとチェックは取り除かれる: `o.getId() != null && o.getId() == id` は `e0.id = :p1`（テスト済み） | カラムに NULL はない。関連を通るパス（`o.getCustomer().getId()`）ではチェックが残る |
 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR` | SQL の 3 値論理 |
 | `where` の中の `o.getCustomer().getName()` | `j1.name` + `join e0.customer j1`（デフォルトで内部結合） | customer がない: 注文は選ばれない |
-| `o.getCustomer() == null \|\| o.getCustomer().getName().equals(p)` | `e0.customer is null or j1.name = :p1` + `left join e0.customer j1` | customer がない: Java と同じく選ばれる |
-| `orderBy` か `select` だけで使う `o.getCustomer().getName()` | `j1.name` + `left join e0.customer j1` | customer がない: カラムは NULL |
+| `o.getCustomer() == null \|\| o.getCustomer().getName().equals(p)` | `e0.customer is null or j1.name = :p1` + `join e0.customer j1` | customer がない: 選ば **れない**（内部結合、D48。`DEBUG` レベルの `LQL-5009`）。残すには `leftJoin` を使う |
+| `orderBy` か `select` だけで使う `o.getCustomer().getName()` | `j1.name` + `left join e0.customer j1`。必須の関連（`optional = false`）は `join` | customer がない: カラムは NULL |
 | `o.getCustomer() == null`、`o.getCustomer() != null` | `e0.customer is null`、`e0.customer is not null`（FK カラム、結合なし） | customer のない注文 / customer がある注文 |
 | `o.getCustomer().getId()` | `e0.customer.id`（FK カラム、結合なし） | customer がない: NULL |
 | `ids.contains(o.getId())` | `e0.id in (:p1)` | id が NULL: 選ばれない |
-| `!ids.contains(o.getId())` | `e0.id not in (:p1)`（id は NULL にならない）。NULL になりうるカラム: `(x is null or x not in (:p1))` | NULL の値（NULL になりうるカラム）: 選択される。Java と同じ |
-| `!...contains(x)` を使うサブクエリ | `not exists (...)` | サブクエリが NULL を返しても正しい |
+| `!ids.contains(o.getId())` | `e0.id not in (:p1)`。NULL になりうるカラムも同じ | NULL の値: 選ば **れない**（SQL の意味、D48。`DEBUG` レベルの `LQL-5009`。Java なら選ばれる） |
+| `!...contains(x)` を使うサブクエリ | `x not in (select ...)` | サブクエリに NULL があると、どの行も選ばれない（SQL の意味、D48） |
 | `Agg.sum`、`avg`、`min`、`max` | `sum(...)` ... | 行がない場合、またはすべての値が NULL の場合は NULL |
 | `Agg.count()` | `count(*)` | 行がない場合は 0 |
 
@@ -162,9 +177,10 @@ MariaDB では、`NOT DETERMINISTIC`（デフォルト）の関数は、引数�
 
 | キャプチャ値の場所 | `null` を使えるか |
 |---|---|
-| オブジェクト同士の `==` / `!=`、`Objects.equals`、`"x".equals(col)` | はい。`is null` / `is not null` になる |
-| 同じ値に対する null ガードの下: `p == null \|\| o.getStatus() > p` | はい。ガードはクエリの実行時に Java の中で決まる: `p == null` なら絞り込みなし、それ以外の値なら `e0.status > :p1` |
-| `p.equals(col)` のレシーバー、`col.equals(p)` の引数、アンボクシングの比較、`<` `<=` `>` `>=` | **いいえ。** 値をバインドするときにエラー（Java なら NPE を投げるか、常に false） |
+| オブジェクト同士の `==` / `!=`、`Objects.equals`、`col.equals(p)`、`p.equals(col)` | はい。ただし一致する行はない（`= NULL`）。クエリの実行時に `LQL-4045` を `WARN` レベルでログに出す |
+| 同じ値に対する null ガードの下: `p == null \|\| o.getStatus() > p` | はい。ガードはクエリの実行時に Java の中で決まる: `p == null` なら絞り込みなし、それ以外の値なら `e0.status > :p1`。自分のプリミティブ型へのアンボクシングだけの比較は、ガードの位置に関係しない |
+| アンボクシングの比較（`o.getPrice() > p`、`Double p`） | はい。ただし一致する行はない（`> NULL`）。自分のプリミティブ型へのアンボクシングは実行しない。クエリの実行時に `LQL-4045` を `DEBUG` レベルでログに出す |
+| キャプチャ値に対するメソッド呼び出し（`p.trim()`）、別のプリミティブ型に変えるアンボクシング（`p.intValue()`、`Double p`） | **いいえ。** Java で値を計算するときにエラー（`LQL-4012`、Java なら NPE） |
 | `in` で使う、`null` 要素を含むコレクション | **いいえ。** バインドするときにエラー |
 | `NaN`、`Infinity` | **いいえ。** 常にエラー |
 
@@ -176,7 +192,7 @@ MariaDB では、`NOT DETERMINISTIC`（デフォルト）の関数は、引数�
 | # | ラムダの書き方 | 意味 |
 |---|---|---|
 | R1 | プリミティブの比較、または片方がプリミティブ（`o.getId() == 10L`、`o.getStatus() > p`） | `=`、`<>`、`<`、... SQL の NULL のルール |
-| R2 | オブジェクトの `==` / `!=`（`Long`、`String`、`Boolean`、enum） | 値の等価（オブジェクトの同一性ではない）。SQL の意味による `=` / `<>`（D48）。キャプチャした `null` は `is null` / `is not null` になる |
+| R2 | オブジェクトの `==` / `!=`（`Long`、`String`、`Boolean`、enum） | 値の等価（オブジェクトの同一性ではない）。SQL の意味による `=` / `<>`（D48）。キャプチャした `null` はどの行にも一致しない |
 | R3 | `x == null`、`x != null` | `IS NULL`、`IS NOT NULL` |
 | R4 | `a.equals(b)` | `a = b`、SQL の NULL のルール |
 | R5 | `Objects.equals(a, b)`、`"x".equals(a)`、`Boolean.TRUE.equals(a)` | R2 と同じ |
@@ -186,7 +202,7 @@ MariaDB では、`NOT DETERMINISTIC`（デフォルト）の関数は、引数�
 | R9 | キャプチャ値 | 実行時の値を持つバインドパラメーター |
 | R10 | プロパティへのアクセス | getter の呼び出し。JPA 属性にマッピングされる |
 | R11〜R23 | Kotlin のルール | [このページの Kotlin 版](../kotlin/10-rules-and-limits.md) を参照 |
-| R24 | 関連のパス（`o.getCustomer().getName()`） | カラム。to-one の関連: where、order by、select で共有するエイリアス。`where` ではデフォルトで内部結合、null ガードが関連のない行を残すときは `left join`（D36）。order by か select だけで使うなら `left join`。Embedded: 同じテーブル。ターゲットの `@Id` で終わる、または関連を `null` と比較する: FK カラム、結合なし。コレクション: エラー |
+| R24 | 関連のパス（`o.getCustomer().getName()`） | カラム。to-one の関連: where、order by、select で共有するエイリアス。`where` では常に内部結合（D48。関連のない行を残すには `leftJoin` を使う）、order by か select だけで使うなら `left join`（必須の関連 `optional = false` は内部結合、A4）。Embedded: 同じテーブル。ターゲットの `@Id` で終わる、または関連を `null` と比較する: FK カラム、結合なし。コレクション: エラー |
 
 その他のルール:
 
@@ -211,8 +227,8 @@ MariaDB では、`NOT DETERMINISTIC`（デフォルト）の関数は、引数�
 |---|---|---|
 | G1 | `status` が NULL のとき、Java では `!Objects.equals(status, 1)` は true。SQL では `status <> 1` は UNKNOWN | `status <> 1` を出力する: SQL の意味（D48）。NULL の行は除かれ、`LQL-5009` が `DEBUG` レベルでログに出る。残すには `status == null \|\| ...` と書く |
 | G2 | `!Boolean.TRUE.equals(active)`、`!active`（nullable）と Java の違い | `active <> :p1` と `active = false` を出力する: NULL の Boolean は false ではない（SQL の意味） |
-| G3 | NULL パラメーターでの `name = ?` は 0 行を返す | キャプチャした `null` は `name is null` になる（キャプチャした値に対する Java のルール） |
-| G4 | `status NOT IN (1, NULL)` は常に 0 行を返す | キャプチャしたコレクションの `null` はエラー。サブクエリの `NOT IN` は `NOT EXISTS` |
+| G3 | NULL パラメーターでの `name = ?` は 0 行を返す | そのまま保つ（SQL の意味、D48）。実行時に `LQL-4045` を `WARN` レベルでログに出す。NULL を探すには `x == null` と書く |
+| G4 | `status NOT IN (1, NULL)` は常に 0 行を返す | キャプチャしたコレクションの `null` はエラー。サブクエリの `NOT IN` は SQL の意味を保つ（D48）: サブクエリに null のチェックを加える |
 | G5 | Java は NPE を投げる（アンボクシング、`o.getName().startsWith(...)`）が、SQL はただ行を返す | ドキュメントに記載: エンティティの NULL は SQL のルールに従う |
 | G6 | `NaN`: H2 は NaN を最大の値としてソートし、`NaN = NaN` は true。MariaDB は保存できない。Oracle は `BINARY_DOUBLE` でだけ保存できる | キャプチャした NaN や Infinity はエラー。保存された NaN は DB に従う |
 | G7 | `float` カラムと `double` の値の比較: 結果が DB ごとに違う | float/double について **Java とビット単位で同じ結果は約束しません**。lambdaQL は `CAST` を追加しません。カラムのマッピングを選んでください（たとえば Oracle の `binary_float` / `binary_double`） |
@@ -251,11 +267,13 @@ lambdaQL は多くの違いを隠します。知っておく必要があるも�
 | NULL の位置、`DESC` | 末尾 | 末尾 | **先頭** | すべての DB で `DESC` は NULLS LAST（D16） |
 | `NULLS FIRST/LAST` の構文 | あり | **なし**（構文エラー） | あり | MariaDB では Hibernate が `CASE` でエミュレートする: ソートに **インデックスを使えない** |
 | ページングの SQL | `offset ? rows fetch first ? rows only` | `limit ?,?` | `offset ? rows fetch first ? rows only` | Hibernate に渡す（`setFirstResult` / `setMaxResults`） |
-| 等しい行の順序 | – | – | ランダム | ページングでキーに id が含まれていない場合、lambdaQL はルートの `@Id asc` を追加する |
+| 等しい行の順序 | – | – | ランダム | ページングでキーに id が含まれていない場合、lambdaQL はルートの `@Id asc` を追加する。一意で NULL になれないキー（`unique = true` かつ `nullable = false`、`@NaturalId`）があれば追加しない（A5） |
 | 文字列の順序 | 大文字小文字を区別 | `_ci` | `NLS_SORT`（JVM のロケール） | DB に従う |
-| `order by` の暗黙のパス | inner join（行が失われる） | 同じ | 同じ | lambdaQL は `left join`（または同じパスの `where` の結合）を使う |
+| `order by` の暗黙のパス | inner join（行が失われる） | 同じ | 同じ | lambdaQL は `left join`（必須の関連は内部結合）を使う（または同じパスの `where` の結合） |
+| `order by`、`distinct`、`group by` での `@Lob` カラム | 動く | 動く | **ORA-22848 / ORA-22849** | クエリを変えずに `LQL-5010` を `DEBUG` レベルでログに出す（B3） |
+| `@Enumerated(EnumType.STRING)` の enum カラムのソート | 名前順 | 名前順 | 名前順 | クエリを変えずに `LQL-5011` を `DEBUG` レベルでログに出す（B2）。宣言順になるのは `ORDINAL` のマッピングだけ |
 
-lambdaQL は、NULL になりうるすべてのキーについて HQL に `nulls first` / `nulls last` を書きます。それがデータベースのデフォルトと同じなら、Hibernate が省きます。
+lambdaQL は、NULL になりうるすべてのキーについて HQL に `nulls first` / `nulls last` を書きます。必須の関連だけを通り、NULL になれないパスには書きません。それがデータベースのデフォルトと同じなら、Hibernate が省きます。
 デフォルト（`ASC` = NULLS FIRST、`DESC` = NULLS LAST）は H2 と MariaDB と同じなので、そこでは SQL を追加する
 必要はありません。`NULLS` 句が付くのは Oracle だけです。NULL の位置を変えるには、
 `by.asc(key, false)`（NULL が末尾）か `by.desc(key, true)`（NULL が先頭）を使います（D35）。MariaDB ではこれらは `CASE` のエミュレーションを使います。
@@ -290,7 +308,7 @@ lambdaQL は、NULL になりうるすべてのキーについて HQL に `nulls
 |---|---|---|
 | `SET a = ..., b = a + 1`（設定した後にカラムを読む） | MariaDB は **新しい** 値を読み、H2 と Oracle は古い値を読む | 解析時にエラー（U3） |
 | DML での関連のパス（`o.getCustomer().getName()`） | Hibernate は DB ごとに違う結合を作り、customer がない行が **失われる** | lambdaQL は相関スカラーサブクエリ（`where` の中と SET の中）を書く。`where` では、選択が内部結合するパスに `customer.id is not null` も加えるので、DML はクエリと同じ行に当たる（U9、テスト済み） |
-| 同じテーブルへのサブクエリを使う `DELETE` | MariaDB のエラー 1093 | 派生テーブルで包む（U17。まだ実装されていない） |
+| 同じテーブルへのサブクエリを使う `DELETE` | MariaDB のエラー 1093 | 対象の id を先に派生テーブルで読む: `d0.id in (select t.id from (select e0.id as id … where <condition>) t)`（U17）。相関サブクエリでも動き、3 つの DB で同じ行を削除する（実測）。`update` は包まない（MariaDB でも動く） |
 | 同じ enum 値を STRING と ORDINAL のカラムに 1 回だけバインドする | H2 と MariaDB は **エラーを出さずに間違った値** を保存する | 場所ごとに 1 つのパラメーターを使い、共有しない（U7） |
 | `values(list, ...)` の多数の行 | Oracle: バインド数の上限 65,535（ORA-01745）。それよりずっと前からとても遅い | 分割する: 1 文あたり最大 500 個の値、すべて 1 つのトランザクションで実行（U13） |
 | `order by ... limit` を使う `update` / `delete` | MariaDB は `in` サブクエリの中の `limit`（エラー 1235）と、対象テーブルへのサブクエリ（エラー 1093）を拒否する | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: 派生テーブル `t` は 3 つのデータベースすべてで動く。内側の select は select の結合を使う（D36）ので、行は select と同じ（テスト済み） |
@@ -335,6 +353,7 @@ H2 には OUT パラメーターがないので、プロシージャの機能は
 | 短絡評価しない `&`、`\|`、`^` | `&&`、`\|\|` |
 | ガードの下の `/`、`%`、`CAST`（`qty != 0 && total / qty > 2`） | 除算を使わずに比較する: `qty > 0 && total > 2 * qty` |
 | エンティティ `==` エンティティ（`o.getCustomer() == c`） | `o.getCustomer().getId() == c.getId()`（予定: 識別子の等価） |
+| 値オブジェクト（`@Embedded`）の大小比較、別の型との比較（`LQL-3012`） | フィールドを比較する。同じ型との等価比較（`equals`、`==`、`!=`、`null`）はサポートする |
 | コレクションのパス（`o.getItems()...`、`@OneToMany`、`@ManyToMany`） | `exists()` サブクエリ、または結合 |
 | `o.getItems().contains(x)` | `exists()` サブクエリ |
 | ラムダの中で作るコレクション（`List.of(1, 2)`） | 外で作ってキャプチャする（`groupBy` のキーは例外） |
@@ -369,12 +388,13 @@ H2 には OUT パラメーターがないので、プロシージャの機能は
 | ソートキーとしてのエンティティ（`by.desc(o.getCustomer())`） | カラム: `by.desc(o.getCustomer().getName())`（コンパイルできません） |
 | 結合のソートのラムダでのメソッド参照 | ラムダ |
 | 名前と方向を 1 つにまとめた文字列（`"price,desc_nulls_last"`）、まだ実装されていない | 方向は `Direction.parse(text)`、名前は `SortSpec.ofPath`。名前はソートポリシーがチェックする（[4.10](04-order-paging.md#sort-policy)） |
+| 結合結果の `distinct()` で、結合したエンティティのカラムや関連のパスでソートする（J7、`LQL-3046`） | 主エンティティ自身のカラムでソートするか、`exists` サブクエリを使う |
 | `limit` / `offset` を使うコレクションのフェッチ結合 | 先にページングし、その後でコレクションを読み込む |
 | Spring の `Sort` の `ignoreCase()`（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）、まだサポートしていない | `ignoreCase()` を使わないソート |
 | 関数のキー（`lower(name)`） | 予定 |
 | 集約のエイリアスでのソート（`by.desc(s.total())`） | 予定 |
 
-<a id="subqueries"></a>
+<a id="limits-subqueries"></a>
 ### サブクエリ
 
 | サポートしない | 代わりの書き方 |
@@ -391,7 +411,7 @@ H2 には OUT パラメーターがないので、プロシージャの機能は
 | 派生テーブルや CTE の行の型としての普通の DTO クラス | Java の record |
 | `groupBy` のキーとしての `Set.of(...)` | `List.of(...)` |
 
-<a id="update-insert-delete"></a>
+<a id="limits-update-insert-delete"></a>
 ### 更新、挿入、削除
 
 | サポートしない（v0.1） | 代わりの書き方 |
@@ -405,6 +425,7 @@ H2 には OUT パラメーターがないので、プロシージャの機能は
 | 省略できないカラム（`@Id`、`nullable = false`、プリミティブ）への `null` | – |
 | `@Version` のプロパティを自分で書く | lambdaQL が代わりに `update versioned` を使う |
 | 値での文字列の連結 | 予定 |
+| update や delete での明示的な結合 | 追加しない（D51）。関連のパス（U9）か `sub`（D49）を使う |
 | 明示的な結合を使う `insert ... select` | 予定。v0.1 では many-to-one のパスを使う |
 | 同時の挿入に対してアトミックな `onConflict(...).ignore()` | キー重複のエラーを捕捉する（`ignore()` は `not exists` を使う。[7.6](07-6-upsert.md) を参照） |
 | `insert ... select` からの upsert | `values(list, ...)` で 1 行ずつ upsert する |
@@ -414,7 +435,7 @@ H2 には OUT パラメーターがないので、プロシージャの機能は
 | update や delete での `offset` | 予定なし（D42）。DML にあるのは `limit(n)` だけ。`where`、`orderBy(...)`、`limit(n)` で対象の行を選ぶ |
 | 複合キーのエンティティでの `limit` や `executeOne()` | まだ対応していない。先に id を取得し、その後 `delete ... where ids.contains(id)` |
 | トランザクションなしで Spring の共有 `EntityManager` を使う DML（lambdaQL は `@Transactional` を付けない、D41） | `@Transactional` か `TransactionTemplate` の中で呼ぶ |
-| リポジトリのメソッド `deleteAll(where)`（一括削除）での cascade や `@PreRemove` | Spring Data の `deleteAll(Iterable)` か `delete(entity)`（[12.4](12-spring-data-jpa.md#deleteallwhere-is-not-spring-datas-deleteall) を参照） |
+| リポジトリのメソッド `deleteAll(where)`（一括削除）での cascade や `@PreRemove` | Spring Data の `deleteAll(Iterable)` か `delete(entity)` を使う（[12.4](12-spring-data-jpa.md#deleteallwhere-is-not-spring-datas-deleteall) を参照） |
 | `returning` | DML の後にもう一度クエリを実行する |
 | DB の時刻（`current_timestamp`） | アプリの時刻を渡す（`LocalDateTime.now()` は値としてバインドされる） |
 | `TABLE` の ID ジェネレーターを使う `insert ... select` | `values(...)`、または IDENTITY / SEQUENCE を使う |
@@ -423,7 +444,7 @@ H2 には OUT パラメーターがないので、プロシージャの機能は
 DML についての注意: 一括 DML は永続化コンテキストを通りません。Hibernate は先にフラッシュしますが、
 同じセッションの管理されたエンティティは、その後も古い値を持ったままです。`clear()`（または `refresh`）を呼んでください。
 JPA のカスケードと `orphanRemoval` は適用されません。
-DML の文にはトランザクションが必要です。`QueryBuilder(EntityManagerFactory)` は自分でトランザクションを開きます。`EntityManager` を使うビルダー（Spring の共有のものも含む）では呼び出し側のトランザクションが必要で、それがなければ SQL を送る前に失敗します。
+DML の文にはトランザクションが必要です。`QueryBuilder(EntityManagerFactory)` は自分でトランザクションを開きます。`EntityManager` を使うビルダー（Spring の共有 `EntityManager` も含む）は呼び出し側のトランザクションを使い、トランザクションがなければ SQL を送る前に失敗します。
 
 <a id="procedures"></a>
 ### プロシージャ
@@ -444,7 +465,7 @@ DML の文にはトランザクションが必要です。`QueryBuilder(EntityMa
 | 項目 | ルール |
 |---|---|
 | キャッシュするもの | 解析の結果: HQL のテンプレートとパラメーターの取得元のリスト。失敗もキャッシュする |
-| キャッシュのキー | ラムダの実装クラスとメソッド（名前、シグネチャ、種類）、その型、エンティティのクラス、そして **ClassLoader** |
+| キャッシュのキー | ラムダの実装クラスとメソッド（名前、シグネチャ、種類）、ラムダの型、エンティティのクラス、そして **ClassLoader** |
 | サイズ | 上限あり（LRU）。そのため無限に大きくならず、クラスローダーをリークしない |
 | キャッシュしないもの | バイトコードそのもの（もう一度読むのは安く、保持すると大きい） |
 | キャプチャ値 | **キャッシュしない。** クエリを実行するたびに読み、バインドする |
@@ -454,11 +475,11 @@ DML の文にはトランザクションが必要です。`QueryBuilder(EntityMa
 | DML | ラムダのクラスごとに 1 回解析する。`set()` の呼び出し間のチェックには小さな要約を使う |
 
 プロトタイプ（JDK 21）での測定: 新しいラムダの最初の解析は約 **0.2 ms** かかります。
-その後は、`set()` を 2 回呼ぶ更新でも、キャッシュの検索、値の取り出し、チェックにかかるのは
-200 万回実行した後でも約 **0.1〜0.2 µs** です。目標: 同じラムダを 1,000 回呼んでも、バイトコードを読むのは
+その後は、`set()` を 2 回呼ぶ更新で、キャッシュの検索、値の取り出し、チェックにかかるのは約 **0.1〜0.2 µs** です。
+200 万回実行した後でも同じです。目標: 同じラムダを 1,000 回呼んでも、バイトコードを読むのは
 1 回だけにすることです。Hibernate もクエリプランを HQL 文字列ごとにキャッシュします。
 
-これがどういう意味か:
+これが利用者にとって意味すること:
 
 ```java
 // 良い例: ラムダは 1 つで、値が変わる
@@ -479,9 +500,9 @@ List<Order> list = flag
 | 項目 | バージョン |
 |---|---|
 | Java | 21（javac）。ECJ は保証しない |
-| Hibernate | 6.6（設計は 6.6.5 で確認）。HQL の拡張（たとえば `function(...)` や `nulls first`）を使う。他の JPA プロバイダーは保証しない |
+| Hibernate | 6.6（設計は 6.6.5 で確認）。HQL の拡張（たとえば `function(...)` や `nulls first`）を使うので、他の JPA 実装は保証しない |
 | データベース | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
-| Spring | Spring Boot 3.4.2 と Spring Data JPA 3.4.2（Spring モジュール、[12](12-spring-data-jpa.md)）。Spring Boot 4 はまだ検証していません |
+| Spring | Spring Boot 3.4.2、Spring Data JPA 3.4.2（Spring モジュール、[12](12-spring-data-jpa.md)）。Spring Boot 4 はまだ検証していない |
 | テストしていない | PostgreSQL、SQL Server、Oracle 19c 以前（たとえば PL/SQL の `BOOLEAN` パラメーター） |
 
 ---

@@ -1,9 +1,6 @@
 <a id="5-subqueries-java"></a>
 # 5. サブクエリ（Java）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/05-subquery.md)を参照してください。
-
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [4. ソートとページング](04-order-paging.md) | 次: [6. 選択、集計、グループ化](06-select-group.md) | [このページの Kotlin 版](../kotlin/05-subquery.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -31,9 +28,10 @@ lambdaQL は引数の数で 2 つの形を区別します。
 | `sub.from(X.class).where(...).exists()` | 条件 | `exists (select 1 from X x where ...)` |
 | `!sub.from(X.class).where(...).exists()` | 条件 | `not exists (...)` |
 | `sub.from(X.class).where(...).select(x -> v).contains(y)` | 条件 | `y in (select x.v from X x where ...)` |
-| `!... .contains(y)` | 条件 | `not exists (... and x.v = y)` |
+| `!... .contains(y)` | 条件 | `y not in (select x.v from X x where ...)` |
 | `sub.from(X.class).avg(x -> v)`（`sum`、`min`、`max`、`count()` も） | 値 | `(select avg(x.v) from X x)` |
 | `sub.from(X.class)...orderBy(...).limit(1).select(x -> v).first()` | 値 | top-1 サブクエリ |
+| `sub.from(A.class).join(B.class, (a, b) -> ...).where((a, b) -> ...).exists()` | 条件 | `exists (select 1 from A a join B b on ... where ...)`（[サブクエリの中の結合](#joins-inside-a-subquery)） |
 
 > [!NOTE]
 > 戻り値（`boolean`、`Double`、...）は、コードをコンパイルできるようにするための仮の値にすぎません。
@@ -43,9 +41,9 @@ lambdaQL は引数の数で 2 つの形を区別します。
 
 HQL では、サブクエリのルートのエイリアスは `s1`、`s2`、... です（外側のルートは `e0`）。サブクエリの中の結合には `s1j1` のようなエイリアスが付きます。
 
-**(テスト済み)** と書かれた例は、[`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) からコピーしたものです。
+**(テスト済み)** と書かれた例は、[`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) からそのままコピーしたものです。
 このテストは HQL をチェックし、クエリを実行して、同じ条件で Java 側で絞り込んだ行と比べます。H2、MariaDB、Oracle で通ります。
-テストは [3.3](03-where.md#33-basic-form) のテスト用エンティティを使います。`price` は `double`、`status` は `short`、`Customer.id` は `int` です。`Customer.grade` は `Integer` です。テストデータには 5、2、NULL のグレードと、顧客のない注文が 1 件あります。
+テストは [3.3](03-where.md#33-basic-form) のテスト用エンティティを使います。`price` は `double`、`status` は `short`、`Customer.id` は `int` で、`Customer.grade` は `Integer` です。テストデータには 5、2、NULL のグレードと、顧客のない注文が 1 件あります。
 
 ## 5.2 EXISTS
 
@@ -124,9 +122,9 @@ where o1_0.customer_id in (select c2_0.id from customers c2_0 where c2_0.grade i
 自分で書いた null チェック（`c.getGrade() != null`）は、HQL に `s1.grade is not null` として残ります。
 
 <a id="55-not-in-is-written-as-not-exists"></a>
-## 5.5 NOT IN は NOT EXISTS として書かれる
+## 5.5 NOT IN と NULL
 
-`!values.contains(x)` は `NOT IN` として出力され **ません**。lambdaQL は `NOT EXISTS` を書きます。
+`!values.contains(x)` は SQL の意味のまま `NOT IN` として出力されます（決定 D48）。
 
 **(テスト済み)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)、リージョン `not-in`:
 
@@ -152,9 +150,9 @@ where o1_0.status not in (select c2_0.grade from customers c2_0)
 
 理由:
 
-- `x NOT IN (subquery)` は、サブクエリが NULL を 1 つでも返すと **1 行も返しません**。これは SQL のよくある落とし穴です。
-- `NOT EXISTS` にはこの問題がありません。データベースも（アンチ結合として）効率よく実行します。
-- 結果: このクエリは Java の `!grades.contains(status)` と同じ行を返します。テストはデータに NULL のグレードを入れてこれを確認します。
+- `x NOT IN (subquery)` は、サブクエリが NULL を 1 つでも返すと **1 行も返しません**。lambdaQL はこの SQL の意味を保ち（決定 D48）、`LQL-5009` を `DEBUG` レベルで記録します。
+- NULL を除外するには、テストの 2 つ目のクエリのように、サブクエリに `where(c -> c.getGrade() != null)` を書いてください。そうすると、NULL のグレードを除いた Java の `!grades.contains(status)` と同じ結果になります。
+- `!sub...exists()` は引き続き `NOT EXISTS` として書かれます。
 
 <a id="56-correlated-subqueries"></a>
 ## 5.6 相関サブクエリ
@@ -172,7 +170,7 @@ lambdaQL が内側のラムダのキャプチャ値をどう読むか:
 | 内側のラムダでキャプチャしたもの | 変換後 |
 |---|---|
 | 外側のエンティティ（`o`） | 外側のエイリアスへの参照（`e0.id`） |
-| それ以外の値（ローカル変数、フィールド、...） | バインドパラメーター（[3.11](03-where.md#311-captured-values) と同じ） |
+| それ以外の値（ローカル変数、フィールド、...） | [3.11](03-where.md#311-captured-values) と同じバインドパラメーター |
 
 ```java
 int minQty = 10;
@@ -181,7 +179,7 @@ int minQty = 10;
                       .exists())
 // HQL: select e0 from Order e0
 //      where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > :p1)
-// parameters: {p1=10}
+// パラメーター: {p1=10}
 ```
 
 [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) のテストメソッド `capturedValueInside` が、この HQL、パラメーター、行を確認します。
@@ -195,7 +193,7 @@ from orders o1_0
 where exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id and i1_0.qty>?)
 ```
 
-**相関での `==`。** `i.getOrder().getId() == o.getId()` は 2 つの `Long` オブジェクトを比較します。エンティティの値どうしは SQL の意味で比べるので（決定 D48、[3.6](03-where.md#36-null-rules) を参照）、lambdaQL は単純な `=` を書きます（`!=` には `<>`）。
+**相関条件での `==`。** `i.getOrder().getId() == o.getId()` は 2 つの `Long` オブジェクトを比較します。エンティティの値どうしは SQL の意味で比べるので（決定 D48、[3.6](03-where.md#36-null-rules) を参照）、lambdaQL は単純な `=` を書きます（`!=` には `<>`）。
 データベースはインデックスを使えます。
 
 <a id="57-scalar-subqueries"></a>
@@ -285,7 +283,7 @@ where o1_0.id=(select o2_0.id from orders o2_0 where o2_0.customer_id=o1_0.custo
 ```
 
 lambdaQL は最後のソートキーとして `id`（`s1.id asc`）を追加するので、先頭の行は常に同じです（ルール S9）。
-相関は顧客のエンティティではなく外部キー（`getCustomer().getId()`）を比較します。[5.10](#510-paths-and-null-inside-subqueries) を参照してください。
+相関条件は顧客のエンティティではなく外部キー（`getCustomer().getId()`）を比較します。[5.10](#510-paths-and-null-inside-subqueries) を参照してください。
 
 集計の NULL は SQL に従います。行がないとき、`sum`、`avg`、`min`、`max` は NULL を返します。`count` は 0 を返します。
 
@@ -333,37 +331,68 @@ Java では、入れ子のラムダで同じ名前を 2 回使えません。階
 <a id="510-paths-and-null-inside-subqueries"></a>
 ## 5.10 サブクエリの中のパスと NULL
 
-サブクエリの中では、条件、パス、NULL は **外側のクエリとまったく同じように** 動きます（[3. 条件](03-where.md)）。
+サブクエリの中では、条件、パス、NULL は **外側のクエリとまったく同じように** 動きます（[3. 条件（`where`）](03-where.md)）。
 
-- オブジェクトに対する `==` は SQL の意味による値の比較です（D48）。キャプチャした `null` は `is null` になります。
-- サブクエリ自身のエンティティの関連のパスは、外側の `where` と同じ結合のルールに従います（決定 D36）。デフォルトは内部結合の `join` で、null ガードが関連のない行を残す場合は `left join` です。
+- オブジェクトに対する `==` は SQL の意味による値の比較です（D48）。キャプチャ値の `null` はどの行にも一致しません（`LQL-4045`）。
+- サブクエリ自身のエンティティの関連のパスは、外側の `where` と同じ結合のルールに従います。常に内部結合の `join` です（決定 D48）。
 - `@Id` で終わるパスは外部キーのカラムです（結合なし）。
-- **外側のエンティティ** は、自身のカラムと外部キーの id（`o.getId()`、`o.getCustomer().getId()`）でだけ使えます。結合が必要な外側のエンティティのパス（`o.getCustomer().getName()`）は解析時にエラーになります。代わりに外部キーの id を比較してください。
+- **外側のエンティティ** は、自身のカラムと外部キーの id（`o.getId()`、`o.getCustomer().getId()`）だけを使えます。結合が必要な外側のエンティティのパス（`o.getCustomer().getName()`）は解析時にエラーになります。代わりに外部キーの id を比較してください。
 - コレクションのパス（`o.getItems()`）は拒否されます。コレクションについて問い合わせるにはサブクエリを使います。
+- エンティティの `@SQLRestriction` と `@SoftDelete` の条件は、サブクエリ（`exists`、`in`）の中にも Hibernate が付けます（MariaDB 10.11、Oracle 23.26 で実測）。lambdaQL はこの条件を別に扱いません。
 
 ```java
 // o.getItems().size() > 0（拒否される）の代わりに:
 .where((o, sub) -> sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists())
 ```
 
+<a id="joins-inside-a-subquery"></a>
+### サブクエリの中の結合
+
+サブクエリの中でも 2 つのエンティティを結合できます（決定 D51）。形は `sub.from(A.class).join(B.class, (a, b) -> ...)` と `leftJoin(...)` で、結果は `From2<A, B>` です。
+`From2` のすべてのラムダは 2 つの行を受け取ります: `where((a, b) -> ...)`、`exists()`、`count()`、`select((a, b) -> v)` の後の `contains(x)` や `first()`、`max`、`min`、`avg`、`sum((a, b) -> v)`。
+
+- HQL は `exists (select 1 from Order s1 join Item s2 on s2.order.id = s1.id where ...)` のようになります。
+- ON 条件の中の関連のパスは `left join` になります。パスの結合は、そのパスが始まるルートの直後に置きます。
+- サブクエリの中のエンティティは 2 つまでです。結合の形では `orderBy` と `limit` を使えません。
+- `exists`、結合した行の `sum`、`left join` と ON の中の関連のパスを使った `in` を、3 つの DB で実測しました。
+
+**(テスト済み)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)、リージョン `sub-join`:
+
+```java
+// customers with an order that has an item of quantity > 10: the subquery joins Order and Item (D51)
+SelectQuery<Customer> q = qb.from(Customer.class).where((c, sub) -> sub.from(Order.class)
+        .join(Item.class, (o, i) -> i.getOrder().getId() == o.getId())
+        .where((o, i) -> o.getCustomer().getId() == c.getId() && i.getQty() > 10)
+        .exists());
+assertEquals("select e0 from Customer e0 where exists (select 1 from Order s1 join Item s2 on s2.order.id = s1.id"
+        + " where s1.customer.id = e0.id and s2.qty > 10)", q.toHql().hql());
+// an aggregate over the joined rows
+SelectQuery<Customer> total = qb.from(Customer.class).where((c, sub) -> sub.from(Order.class)
+        .join(Item.class, (o, i) -> i.getOrder().getId() == o.getId())
+        .where((o, i) -> o.getCustomer().getId() == c.getId())
+        .sum((o, i) -> i.getQty()) > 30);
+assertEquals("select e0 from Customer e0 where (select sum(s2.qty) from Order s1 join Item s2 on s2.order.id = s1.id"
+        + " where s1.customer.id = e0.id) > 30", total.toHql().hql());
+```
+
 <a id="511-subqueries-in-other-places"></a>
 ## 5.11 ほかの場所でのサブクエリ
 
 - **UPDATE / DELETE の中のサブクエリ**: `where` で同じ `sub` の構文を使います。実装済みで、テスト済みです（リージョン `dml-subquery`）。[7.4 削除](07-4-delete.md) と [7.2 更新](07-2-update.md) を参照してください。
-- **`set` の値の中のサブクエリ**（`o.setTotal(sub.from(...).sum(...))`）: まだ実装されていません。[7.2 更新](07-2-update.md) を参照してください。
-- **`from` の中のサブクエリ（派生テーブル）と CTE**: 実装済みです（マイルストーン M8-2）。`sub` は使いません: 値のクエリを `qb.from(...)` か `qb.with(...)` に渡します。[6.9 派生テーブル](06-select-group.md#69-derived-table-subquery-in-from) と [6.10 CTE](06-select-group.md#610-cte-with) を参照してください。
+- **`set` の値の中のサブクエリ**（`o.setTotal(sub.from(...).sum(...))`）: 代入ラムダの 2 つ目の引数 `sub` で書きます（決定 D49）。[7.2 更新](07-2-update.md#an-aggregate-from-a-subquery) を参照してください。
+- **`from` の中のサブクエリ（派生テーブル）と CTE**: 実装済みです（マイルストーン M8-2）。`sub` は使わず、値のクエリを `qb.from(...)` か `qb.with(...)` に渡します。[6.9 派生テーブル](06-select-group.md#69-derived-table-subquery-in-from) と [6.10 CTE](06-select-group.md#610-cte-with) を参照してください。
 
 <a id="512-rules-summary-q1-to-q6"></a>
 ## 5.12 ルールのまとめ（Q1〜Q6）
 
 | # | ルール |
 |---|---|
-| Q1 | サブクエリの中の条件、パス、NULL のルールは外側と同じ。条件の中の関連のパスも同じ結合のルールを使う（デフォルトは内部結合の `join`）。結合が必要な外側のエンティティのパスはエラー。外部キーの id は使える |
-| Q2 | **NOT IN は NOT EXISTS として出力される**: `!values.contains(x)` は `not exists (select 1 from C c where <condition> and c.sel = x)` になる。これで `NOT IN` + NULL の落とし穴を避ける |
-| Q3 | スカラーサブクエリは 1 行を返さなければならない: 集計（`max`、`min`、`avg`、`sum`、`count`）または `orderBy(...).limit(1)...first()`。それ以外の `first()` はエラー |
-| Q4 | サブクエリのソート: `limit` があれば残し、`limit` がなければ警告を出して削除。`IN (... limit)` は派生テーブルに包む。MariaDB の `lateral` の `row_number()` による書き換えはまだ実装されていない |
-| Q5 | 相関では、`==` を `=`、`!=` を `<>` として書く（SQL の意味、D48）。どちらかが NULL なら一致しない。これでインデックスを使える |
-| Q6 | サブクエリの `where` は自分の `sub` 引数を受け取れる: `where((i, sub2) -> ...)`。どの階層でも同じルールが適用される |
+| Q1 | サブクエリの中の条件、パス、NULL のルールは外側と同じです。条件の中の関連のパスも同じ結合のルール（デフォルトは内部結合の `join`）に従います。結合が必要な外側のエンティティのパスはエラーで、外部キーの id は使えます |
+| Q2 | **NOT IN は SQL の意味を保ちます**（D48）: `!values.contains(x)` は `x not in (select c.sel from C c where <condition>)` になります。サブクエリに NULL があると行は返りません（`DEBUG` レベルの `LQL-5009`）。NULL を除外するには、サブクエリに `c.sel != null` を追加します |
+| Q3 | スカラーサブクエリは 1 行を返さなければなりません: 集計（`max`、`min`、`avg`、`sum`、`count`）または `orderBy(...).limit(1)...first()`。それ以外の `first()` はエラーです |
+| Q4 | サブクエリのソート: `limit` があれば残し、なければ警告を出して削除します。`IN (... limit)` は派生テーブルに包みます。`row_number()` を使う MariaDB の `lateral` の書き換えはまだ実装されていません |
+| Q5 | 相関条件では、`==` を `=`、`!=` を `<>` として書きます（SQL の意味、D48）。どちらかが NULL なら一致しません。インデックスを使えます |
+| Q6 | サブクエリの `where` は自分の `sub` 引数を受け取れます: `where((i, sub2) -> ...)`。どの階層でも同じルールが適用されます |
 
 ---
 

@@ -1,9 +1,6 @@
 <a id="lambdaql-manual-kotlin-track"></a>
 # lambdaQL マニュアル: Kotlin トラック
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/README.md)を参照してください。
-
 **他の言語:** [English](../../en/kotlin/README.md) | [한국어](../../ko/kotlin/README.md) | [日本語](../../ja/kotlin/README.md) | [简体中文](../../zh/kotlin/README.md)
 
 [マニュアルのホーム](../README.md) | [Java トラック](../java/README.md) | 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -64,9 +61,9 @@ fetch first ? rows only
 | 2 | [はじめよう](02-getting-started.md) | 必要な環境、Gradle の設定、Kotlin のエンティティ、最初のクエリ |
 | 3 | [条件（`where`）](03-where.md) | 演算子、null のルール、`?.` `?:` `!!`、範囲、`when`、キャプチャした値 |
 | 4 | [ソートとページング](04-order-paging.md) | `orderBy`、`Direction`、`limit`、`offset` |
-| 5 | [サブクエリ](05-subquery.md) | `exists()`、`x in sub...`、スカラーサブクエリと相関サブクエリ |
+| 5 | [サブクエリ](05-subquery.md) | `exists()`、`x in sub...`、スカラーサブクエリと相関サブクエリ、サブクエリの中の結合 |
 | 6 | [選択、集計、グループ化](06-select-group.md) | `select`、data class、`Pair`、`groupBy`、`having`、`Agg`、結合、派生テーブル、CTE |
-| 7 | [更新、挿入、削除](07-dml.md) | プロパティへの代入、`by.set`、`values`、`all()`、`execute()`、`limit`、`executeOne()` |
+| 7 | [更新、挿入、削除](07-dml.md) | プロパティへの代入、`Dml.value`、`values`、`all()`、`execute()`、`limit`、`executeOne()` |
 | 7.6 | [Upsert](07-6-upsert.md) | `upsert`、`onConflict { ... }.update { ... }`、`onConflict { ... }.ignore()`、データベースごとの行数 |
 | 8 | [プロシージャと DB 関数](08-procedures-functions.md) | `@SqlProcedure`、`companion object` の中の `@SqlFunction`、`qb.call`、`qb.exec` |
 | 9 | [Kotlin の注意点](09-kotlin-notes.md) | Kotlin で特別なこと: `?.` `?:` `!!`、`==`、`in`、`when`、演算子、制限 KC1 から KC21 |
@@ -102,8 +99,8 @@ fetch first ? rows only
 | Kotlin | lambdaQL のラムダの中では |
 |---|---|
 | `it.price!! > 100.0` | `!!` は無視されます。コードをコンパイルするためだけにあります。ラムダは実行されないので、`NullPointerException` は起きません。 |
-| `it.customer?.name == "Kim"` | `it.customer?.name` は結合した customer のカラムを指定します。`where` の中ではデフォルトで内部結合の `join` なので、customer のない注文は返されません。null ガード（`it.customer == null \|\| ...`）があると `left join` になります。`it.customer!!.name` も同じカラムを意味します。 |
-| `status: Int?` のときの `it.status == 1` | `e0.status = 1`。`status` が NULL の行は一致しません（SQL の意味）。lambdaQL は Kotlin コンパイラーが追加する null チェックを無視します。意味を持つのは **あなたが書いた** null チェックだけです。 |
+| `it.customer?.name == "Kim"` | `it.customer?.name` は結合した customer のカラムを指定します。`where` の中ではデフォルトで内部結合の `join` なので、customer のない注文は返されません。null ガード（`it.customer == null \|\| ...`）を書いても同じです（D48）。このような注文も残すには `leftJoin` を使ってください。`it.customer!!.name` も同じカラムを意味します。 |
+| `status: Int?` のときの `it.status == 1` | `e0.status = 1`。`status` が NULL の行は一致しません（SQL の意味）。lambdaQL は Kotlin コンパイラーが追加する null チェックを無視します。意味を持つのは **自分で書いた** null チェックだけです。 |
 
 詳細: [9. Kotlin の注意点](09-kotlin-notes.md)。
 
@@ -127,6 +124,6 @@ fetch first ? rows only
 ## ヘルプと貢献
 
 - ソースコード: <https://github.com/codebit0/lambdaql>
-- 英語のマニュアルが原本です。他の言語は翻訳です。
+- 韓国語のマニュアルが原本です。他の言語は翻訳です。
 - 間違いを見つけたら、issue か pull request を作成してください。
 - 設計ドキュメント（韓国語、コントリビューター向け）: [ROADMAP.md](../../../design/ROADMAP.md)、[KOTLIN.md](../../../design/KOTLIN.md)
