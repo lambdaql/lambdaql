@@ -4,7 +4,7 @@
 >
 > 이 문서는 작업을 이어받는 개발자와 에이전트를 위한 요약이다. 근거와 상세는 다음 문서에 있다.
 >
-> - [`docs/design/ROADMAP.md`](docs/design/ROADMAP.md): 결정 사항(D1~D51), 마일스톤, 규칙 표(U, J, S, Q, PR, FN 등), 세 DB 실측 기록
+> - [`docs/design/ROADMAP.md`](docs/design/ROADMAP.md): 결정 사항(D1~D53), 마일스톤, 규칙 표(U, J, S, Q, PR, FN 등), 세 DB 실측 기록
 > - [`docs/design/KOTLIN.md`](docs/design/KOTLIN.md): Kotlin 지원 설계(바이트코드 패턴, 제약 KC1~KC21)
 > - [`docs/manual/ko`](docs/manual/ko): 사용자 매뉴얼. 한국어가 원본이고 `en`·`ja`·`zh`는 번역이다.
 > - [`docs/manual/PENDING-TRANSLATION.md`](docs/manual/PENDING-TRANSLATION.md): 번역본에 아직 옮기지 않은 변경 목록
@@ -47,9 +47,10 @@ qb.from(Order.class)
 - 저장 프로시저와 DB 함수(M11), SARGable 경고와 모드(PR8, D50)
 - 메시지: `[LQL-xxxx]` 코드, 영어·일본어·중국어·한국어(D33)
 - 분석 캐시: EntityManagerFactory별 공유(D47)
-- Spring Data JPA 모듈(M12): Spring Boot 3.4.2로 테스트
+- Spring Data JPA 모듈(M12): `main`은 Spring Boot 3.4.2, `feature/boot4`는 Spring Boot 4.1.2로 테스트
+- 클래스 파일 읽기(`feature/boot4`, D52): Java 21~23은 ASM, Java 24 이상은 `java.lang.classfile`(Multi-Release JAR)
 
-테스트: 세 DB(H2 2.3.230, MariaDB 10.11.18, Oracle Free 23.26.3)에서 모듈 전체 241개 통과(2026-11-19 실측, 건너뜀은 DB별 H2 16·MariaDB 10·Oracle 9). Kotlin 람다 테스트는 `query/src/test/kotlin`에 별도 소스 세트로 있다.
+테스트: 세 DB(H2 2.3.230, MariaDB 10.11.18, Oracle Free 23.26.3)에서 모듈 전체 통과(2026-11-19 실측). `main` 241개. `feature/boot4`는 `test`(JDK 21, ASM) 244개와 `testClassFile`(JDK 25, ClassFile) 244개. 건너뜀은 DB별 H2 16·MariaDB 10·Oracle 9. Kotlin 람다 테스트는 `query/src/test/kotlin`에 별도 소스 세트로 있다.
 
 아직 Maven Central에 배포하지 않았다. 버전 `1.0.0`은 `gradle.properties`의 값이며 첫 릴리스 전에 바뀔 수 있다.
 
@@ -70,12 +71,12 @@ qb.from(Order.class)
 
 ```bash
 ./gradlew -q test -Dlql.db=h2                      # 전체(모든 모듈), DB: h2 | mariadb | oracle
-./gradlew -q test testClassFile -Dlql.db=h2        # feature/boot4: JDK 21(ASM)과 JDK 25 + jar(ClassFile) 둘 다
+                                                   # feature/boot4: test(JDK 21, ASM) 뒤에 testClassFile(JDK 25 + jar)이 이어서 돎
 ./gradlew -q :query:test --tests '*JoinQueryTest*' -Dlql.db=oracle
 ./gradlew -q :query:test --tests '*SqlByDatabaseTest*' -Dlql.db=mariadb -Dlql.sql.update=true   # SQL 정답 파일 갱신
 ```
 
-결과는 `*/build/test-results/test/*.xml`(`testClassFile`은 `query/build/test-results/testClassFile/*.xml`)에서 읽는다. SQL 정답 파일은 `query/src/test/resources/expected-sql/{h2,mariadb,oracle}.sql`이고, 매뉴얼의 DB별 SQL은 여기서 옮긴다. SQL이 바뀌면 테스트가 실패하므로 확인한 뒤 DB마다 `-Dlql.sql.update=true`로 다시 쓴다.
+결과는 `*/build/test-results/test/*.xml`과 `*/build/test-results/testClassFile/*.xml`에서 읽는다. `--tests` 필터는 `testClassFile`에도 넘어간다. SQL 정답 파일은 `query/src/test/resources/expected-sql/{h2,mariadb,oracle}.sql`이고, 매뉴얼의 DB별 SQL은 여기서 옮긴다. SQL이 바뀌면 테스트가 실패하므로 확인한 뒤 DB마다 `-Dlql.sql.update=true`로 다시 쓴다.
 
 Javadoc 빌드는 `--snippet-path src/test/java`를 쓴다. Javadoc의 `{@snippet ... region="이름"}`이 가리키는 테스트 구간이 없으면 빌드가 실패한다.
 
@@ -140,6 +141,8 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 | `i18n/catalog.py`, `i18n/gen.py` | 메시지 카탈로그 생성기(7절) |
 | `docs/check_ko.py` | 한국어 매뉴얼 검사(링크, 앵커, 일부 테스트 구간) |
 | `docs/check_translation.py <lang>` | 번역 검사(낡음 안내, 앵커, 코드 블록, 남은 한글, 링크) |
+| `docs/sync_sql.py check\|diff\|write [rev]` | 한국어 매뉴얼의 DB별 SQL 블록을 `expected-sql`에서 다시 만듦 |
+| `docs/check_regions.py` | 한국어 매뉴얼의 테스트 구간 사본 전체를 테스트 소스와 대조 |
 
 `.claude/`는 전역 gitignore(`~/.gitignore_global`)로 git에서 제외하므로 이 도구들은 저장소에 없고 작업 PC에만 있다. 실행 방법은 `.claude/tools/README.md`에 있다. 다른 PC에서 작업하려면 이 폴더를 따로 복사한다.
 
@@ -205,13 +208,19 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
   - Decoder 입력은 그대로 ASM 트리 `MethodNode`다. 버전 검사는 ASM `ClassReader`에만 있고 트리 클래스는 자료 구조라 버전 제한이 없다. 그래서 읽기만 나눴다.
   - `org.lambdaql.engine.load.MethodReader`(패키지 전용) 두 벌: `src/main/java`는 ASM `ClassReader`, `src/main/java24`는 `java.lang.classfile`로 읽어 같은 `MethodNode`를 만든다(짧은·넓은 형태는 ASM과 같은 정규 opcode로, 프레임·지역 변수 표·try-catch는 복사하지 않음). `BytecodeLoader`가 이것을 부르고, `BytecodeLoader.readerName()`이 `asm`/`classfile`을 돌려준다.
   - `query/build.gradle`: `java24` 소스 세트(JDK 25 툴체인, `--release 24`), jar의 `META-INF/versions/24`와 `Multi-Release: true`, 소스 jar도 같은 배치. jar 안 클래스 버전: 기본 major 65, versions/24 major 68(실측).
-  - 테스트 태스크 `testClassFile`: JDK 25에서 main 클래스 폴더 대신 jar를 클래스패스에 둬 MR 선택을 그대로 쓴다. `check`가 의존한다. `query` 모듈만 대상(226개), `spring-data-jpa`는 `test`(JDK 21)만.
+  - 테스트 태스크 `testClassFile`(`gradle/classfile-test.gradle`, `query`와 `spring-data-jpa`가 적용): JDK 25에서 lambdaql-core jar를 클래스패스에 둬 MR 선택을 그대로 쓴다. `test`가 끝나면 이어서 돌고(`finalizedBy`), `--tests` 필터를 넘겨받는다. `check`도 의존한다. `spring-data-jpa`의 `ReaderSelectionTest`, `query`의 `LoadExamplesTest.readerName`이 기대 리더(`lql.reader.expected`)를 확인한다.
   - `ReaderEquivalenceTest`: main·Java 테스트·Kotlin 테스트 클래스의 모든 메서드(1000개 이상)를 활성 리더와 ASM `ClassReader`로 각각 읽어 명령어(opcode, 피연산자, 점프 대상, 줄 번호)를 비교한다. 줄 번호를 1 바꾼 변조로 실패하는 것을 확인함.
   - 함정: 리더 이름을 `static final String` 상수로 두면 javac가 호출하는 쪽에 값을 복사해 MR 교체가 보이지 않는다. 메서드로 둔다.
-  - 결과(2026-11-19): 세 DB 모두 `test` 243개, `testClassFile` 226개 통과. JDK 24 실행은 이 PC에 JDK 24가 없어 미측정(JDK 25.0.5.1로 확인).
+  - 결과(2026-11-19): 세 DB 모두 `test` 244개, `testClassFile` 244개 통과. JDK 24 실행은 이 PC에 JDK 24가 없어 미측정(JDK 25.0.5.1로 확인).
 - **최소 JDK**: ClassFile API는 JDK 24에서 정식(JEP 484). 24부터 지원하되 실행 확인은 25만(24는 미측정).
 - **ASM 의존 범위**: `api` → `implementation`(작성자 지시, 2026-11-19). 배포 POM에서 `runtime` 범위라 사용자의 컴파일 클래스패스에는 없다. 새 ASM이 필요하면 사용자가 자기 의존성으로 올릴 수 있다.
 - **Gradle**: 9.9.1로 올렸다(2026-11-19). Gradle 9에서 프로젝트 수준 `sourceCompatibility`가 없어져 `java { }` 안으로 옮겼다.
+
+### 10.4 매뉴얼 기준(D53, 2026-11-19)
+
+- 이 브랜치의 매뉴얼은 Boot 4판(Hibernate 7.4) 기준이다. 요구 사항, 빌드 안내, DB별 SQL 블록(155개)을 Boot 4 정답 파일에 맞췄다.
+- DB별 SQL 블록은 로컬 도구로 정답 파일에서 다시 만든다(`.claude/tools/docs/sync_sql.py check|diff|write`. 분기 전 커밋 `3e671bc`의 정답 파일로 만든 결과가 당시 매뉴얼과 155개 모두 일치해 형식 규칙을 확인함). 테스트 구간 사본 대조는 `.claude/tools/docs/check_regions.py`.
+- 7.4에서 실측하지 않은 Hibernate 동작 설명(프로시저 이름 바인딩, JOINED 하위 클래스 insert)은 "6.6.5 실측, 7.4 미측정"으로 둔다.
 
 ---
 

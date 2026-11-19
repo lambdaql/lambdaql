@@ -1,6 +1,9 @@
 <a id="75-insert"></a>
 # 7.5 插入（Kotlin）
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/07-5-insert.md)。
+
 [7. 更新、插入、删除（Kotlin）](07-dml.md) | [7.2 更新](07-2-update.md) | [7.4 删除](07-4-delete.md) | **7.5 插入** | [7.6 Upsert](07-6-upsert.md) | [Java](../java/07-5-insert.md)
 
 ---

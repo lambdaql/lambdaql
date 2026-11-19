@@ -1,6 +1,9 @@
 <a id="4-sorting-and-paging-kotlin"></a>
 # 4. 排序与分页（Kotlin）
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/04-order-paging.md)。
+
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[3. 条件（`where`）](03-where.md) | 下一章：[5. 子查询](05-subquery.md) | [本页的 Java 版本](../java/04-order-paging.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)

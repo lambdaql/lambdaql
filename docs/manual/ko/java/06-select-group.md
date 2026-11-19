@@ -81,7 +81,7 @@ ValueQuery<Double> q = qb.from(Order.class)
 assertEquals("select e0.price from Order e0 where e0.status = 1 order by e0.price asc", q.toHql().hql());
 ```
 
-**SQL 블록 읽는 법.** `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 6.6.5로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다. 이 장에서는 select 목록이 핵심이므로 줄여 쓰지 않습니다.
+**SQL 블록 읽는 법.** `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다. 이 장에서는 select 목록이 핵심이므로 줄여 쓰지 않습니다.
 
 **데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `value`:
 
@@ -576,7 +576,7 @@ assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.
 - 행 타입은 레코드입니다(J5). 접근자(`x.total()`)가 컬럼을 읽습니다.
 - 같은 `Cte` 객체를 한 문장에서 두 번 읽으면 정의를 한 번만 쓰고, 두 조인이 같은 이름을 읽습니다: `join t e1 on ... left join t e2 on ...`. 서로 다른 `Cte` 객체는 `with t as (...), t2 as (...)`처럼 이름을 따로 받습니다(세 DB에서 실측).
 - 파생 행에는 id가 없으므로 `x == null`은 오류(`LQL-3067`)입니다. `x.customerId() == null`처럼 컬럼을 비교하십시오.
-- Hibernate 6.6은 엔티티의 `select distinct`, 파생 테이블과 CTE의 inner/left join, 서브쿼리 안의 엔티티 조인을 받아들입니다(세 DB에서 실측).
+- Hibernate 7.4(이전 6.6도)는 엔티티의 `select distinct`, 파생 테이블과 CTE의 inner/left join, 서브쿼리 안의 엔티티 조인을 받아들입니다(세 DB에서 실측).
 
 **(테스트됨)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), 영역 `join-cte`:
 
@@ -696,7 +696,7 @@ Optional<Priced> cheapestOfTop = qb.from(qb.from(Order.class)
 
 `Priced`는 `record Priced(Long id, Double price)`입니다.
 
-**SQL 블록 읽는 법.** [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)는 같은 형태의 더 단순한 HQL을 Hibernate에 직접 넘기고, H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 6.6.5)에서 나온 SQL을 기록합니다. Hibernate의 SQL이 바뀌면 테스트가 실패합니다. 이 블록에서 데이터베이스마다 파생 테이블을 쓰는 방식을 확인할 수 있습니다.
+**SQL 블록 읽는 법.** [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)는 같은 형태의 더 단순한 HQL을 Hibernate에 직접 넘기고, H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 7.4)에서 나온 SQL을 기록합니다. Hibernate의 SQL이 바뀌면 테스트가 실패합니다. 이 블록에서 데이터베이스마다 파생 테이블을 쓰는 방식을 확인할 수 있습니다.
 
 **데이터베이스별 SQL(이 형태의 HQL에 대한 Hibernate SQL)** — `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `06-derived`:
 
@@ -704,14 +704,14 @@ Optional<Priced> cheapestOfTop = qb.from(qb.from(Order.class)
 -- HQL: select r.customerId, r.cnt, r.total from (select o.customer.id as customerId, count(*) as cnt, sum(o.price) as total from Order o group by o.customer.id) r where r.total > 100
 
 -- H2
-select r1_0.customerId,r1_0.cnt,r1_0.total
-from (select o1_0.customer_id,count(*),sum(o1_0.price) from orders o1_0 group by o1_0.customer_id) r1_0(customerId,cnt,total)
-where r1_0.total>100
+select r1_0.c0,r1_0.c1,r1_0.c2
+from (select o1_0.customer_id,count(*),sum(o1_0.price) from orders o1_0 group by o1_0.customer_id) r1_0(c0,c1,c2)
+where r1_0.c2>100
 
 -- MariaDB, Oracle
-select r1_0.customerId,r1_0.cnt,r1_0.total
-from (select o1_0.customer_id customerId,count(*) cnt,sum(o1_0.price) total from orders o1_0 group by o1_0.customer_id) r1_0
-where r1_0.total>100
+select r1_0.c0,r1_0.c1,r1_0.c2
+from (select o1_0.customer_id c0,count(*) c1,sum(o1_0.price) c2 from orders o1_0 group by o1_0.customer_id) r1_0
+where r1_0.c2>100
 ```
 
 H2는 컬럼 목록을 별칭에 붙입니다(`r1_0(customerId,cnt,total)`). MariaDB와 Oracle은 서브쿼리 안에 컬럼 별칭을 씁니다.

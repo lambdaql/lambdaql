@@ -50,7 +50,7 @@ val list = qb.from(Order::class.java)
 // HQL: select e0 from Order e0 where e0.status = 1 and e0.price > 100.0
 ```
 
-**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 6.6.5로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다. 이 테스트는 Java 람다를 사용합니다. 의미가 같은 Kotlin 람다는 같은 HQL을 만들므로 SQL도 같습니다.
+**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다. 이 테스트는 Java 람다를 사용합니다. 의미가 같은 Kotlin 람다는 같은 HQL을 만들므로 SQL도 같습니다.
 
 **데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `to-hql`:
 
@@ -84,15 +84,10 @@ qb.from(Order::class.java)
 **데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `many-where`:
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
 where o1_0.status=1 and o1_0.active=true
-
--- MariaDB, Oracle
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.active=1
 ```
 
 **HQL 안의 값.** 값이 어디에서 왔는지에 따라 규칙이 정해집니다(결정 D37).
@@ -382,7 +377,7 @@ where o1_0.price>?
 <a id="365-converted-attributes-convert"></a>
 ### 3.6.5 변환 속성(`@Convert`)
 
-JPA `AttributeConverter`가 붙은 속성은 Kotlin 값으로 비교합니다. Hibernate 6.6은 이런 속성과 비교하는 리터럴을 변환하고, 바인드 파라미터도 변환합니다(H2, MariaDB, Oracle에서 확인함).
+JPA `AttributeConverter`가 붙은 속성은 Kotlin 값으로 비교합니다. Hibernate(7.4, 이전 6.6도)는 이런 속성과 비교하는 리터럴을 변환하고, 바인드 파라미터도 변환합니다(H2, MariaDB, Oracle에서 확인함).
 
 테스트는 Java로 작성했습니다([`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java), 영역 `convert`). 다음은 설계 예제입니다.
 

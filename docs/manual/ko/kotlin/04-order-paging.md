@@ -24,7 +24,7 @@ qb.from(Order::class.java)
 //      order by e0.price desc nulls last, j1.name asc nulls first, e0.id asc
 ```
 
-**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 6.6.5로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다. 이 테스트는 Java 람다를 사용합니다. 의미가 같은 Kotlin 람다는 같은 HQL을 만들므로 SQL도 같습니다.
+**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다. 이 테스트는 Java 람다를 사용합니다. 의미가 같은 Kotlin 람다는 같은 HQL을 만들므로 SQL도 같습니다.
 
 **데이터베이스별 SQL (이 HQL에 대한 Hibernate의 SQL, Kotlin도 같은 HQL을 만듦)** — 매뉴얼의 `Order`에는 NULL이 될 수 있는 `price`가 있지만 테스트의 `Order`에는 없으므로, `SqlByDatabaseTest`가 이 HQL을 Hibernate에 직접 넘깁니다. `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `sort-overview`:
 
@@ -44,7 +44,7 @@ fetch first ? rows only
 select …
 from orders o1_0
 left join customers c1_0 on c1_0.id=o1_0.customer_id
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.price desc,c1_0.name,o1_0.id
 limit ?,?
 
@@ -53,7 +53,7 @@ limit ?,?
 select …
 from orders o1_0
 left join customers c1_0 on c1_0.id=o1_0.customer_id
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.price desc nulls last,c1_0.name asc nulls first,o1_0.id
 offset ? rows
 fetch first ? rows only
@@ -379,7 +379,7 @@ qb.from(Order::class.java)
 **데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `page-only`:
 
 ```sql
--- H2
+-- H2, Oracle
 select …
 from orders o1_0
 where o1_0.active=true
@@ -389,16 +389,9 @@ fetch first ? rows only
 -- MariaDB
 select …
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.id
 limit ?
-
--- Oracle
-select …
-from orders o1_0
-where o1_0.active=1
-order by o1_0.id
-fetch first ? rows only
 ```
 
 페이징 SQL은 데이터베이스마다 다릅니다. H2와 Oracle은 `fetch first ? rows only`, MariaDB는 `limit ?`를 받습니다. offset이 있으면 H2와 Oracle은 `offset ? rows`를 더하고, MariaDB는 `limit ?,?`를 씁니다.
@@ -474,22 +467,16 @@ qb.from(Order::class.java).where { it.active }.orderBy(byDescription).toList()
 **데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `sort-spec`:
 
 ```sql
--- H2
+-- H2, MariaDB
 select …
 from orders o1_0
 where o1_0.active=true
 order by o1_0.description desc,o1_0.id
 
--- MariaDB
-select …
-from orders o1_0
-where o1_0.active=1
-order by o1_0.description desc,o1_0.id
-
 -- Oracle
 select …
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.description desc nulls last,o1_0.id
 ```
 

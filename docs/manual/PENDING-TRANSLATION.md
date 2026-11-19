@@ -56,6 +56,14 @@
   - `java/10-rules-and-limits.md`, `kotlin/10-rules-and-limits.md`: `cnt >= 2.5` 표 행, D37 목록의 예외 문장
 - 내용: 캡처 값과 IN 목록은 `BigDecimal` 바인딩이 아니라 소수 리터럴(`e0.cnt >= 2.5BD`, `in (2.5BD, 3.0BD)`)로 씀. D37의 예외. Hibernate 7은 `BigDecimal` 타입을 지정한 바인딩도 거부(`QueryArgumentException`). 실행 계획: MariaDB `type=range`, Oracle은 힌트로 `INDEX RANGE SCAN`, 힌트 없이 3000행에서는 정수 리터럴과 같게 전체 스캔
 
+### 5. 매뉴얼을 Boot 4판 기준으로(2026-11-19, D53)
+
+- DB별 SQL 블록: 한국어 원본의 155개 블록을 Boot 4 정답 파일(`expected-sql`)에서 다시 만듦(33개 변경). 번역본의 같은 블록도 같은 내용으로 바꾸면 됨(SQL과 `-- H2` 같은 라벨은 언어와 무관)
+- 버전 표기: "Hibernate 6.6" → 7.4, Jakarta Persistence 3.1 → 3.2, Spring Boot 3.4 → 4.1(4.1.2), Spring Data JPA 3.4.2 → 4.1.2. "SQL 블록 읽는 법" 문장의 "Hibernate 6.6.5" → "Hibernate 7.4"
+- 빌드 안내(`java/02-getting-started.md`, `kotlin/02-getting-started.md`의 "소스에서 빌드"): Gradle 9.9.1, 빌드에 JDK 21과 JDK 24 이상 하나 필요(`-Plql.classfile.jdk`, `org.gradle.java.installations.paths`)
+- 7.4에서 실측하지 않은 설명에 "(실측, 7.4는 미측정)" 추가: 08장 8.4(프로시저 이름 바인딩), 10장의 JOINED·TABLE_PER_CLASS insert 행
+- 12장: Spring Boot 버전 문장(이 판은 4.1.2로 테스트, Boot 3은 이 판에서 검증하지 않음), 환경 표의 Hibernate 7.4
+
 ## 한국어 원본 다듬기(2026-11-19 네 언어에 반영 완료)
 
 번역 중 발견한 문구 문제 9건을 한국어 원본과 영어, 일본어, 중국어에 함께 고쳤습니다. 남은 대기 항목은 없습니다.

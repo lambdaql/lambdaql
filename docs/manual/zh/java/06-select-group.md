@@ -1,6 +1,9 @@
 <a id="6-select-aggregates-and-group-by-java"></a>
 # 6. 查询列、聚合与分组（Java）
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/06-select-group.md)。
+
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[5. 子查询](05-subquery.md) | 下一章：[7. 更新、插入、删除](07-dml.md) | [本页的 Kotlin 版本](../kotlin/06-select-group.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)

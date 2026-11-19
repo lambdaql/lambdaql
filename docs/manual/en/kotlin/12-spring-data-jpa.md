@@ -1,6 +1,9 @@
 <a id="12-spring-data-jpa-kotlin"></a>
 # 12. Spring Data JPA (Kotlin)
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/12-spring-data-jpa.md) for the latest rules.
+
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [11. Errors and languages](../11-errors-and-languages.md) | [Java version of this page](../java/12-spring-data-jpa.md)
 
 ---

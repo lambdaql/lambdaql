@@ -1,6 +1,9 @@
 <a id="lambdaql-user-manual-english"></a>
 # lambdaQL 用户手册（简体中文）
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../ko/README.md)。
+
 **其他语言：** [English](../en/README.md) | [한국어](../ko/README.md) | [日本語](../ja/README.md) | [简体中文](../zh/README.md)
 
 lambdaQL 是一个面向 Java 和 Kotlin 的查询库。

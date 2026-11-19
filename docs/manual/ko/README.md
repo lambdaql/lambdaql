@@ -4,7 +4,7 @@
 **다른 언어:** [English](../en/README.md) | [한국어](../ko/README.md) | [日本語](../ja/README.md) | [简体中文](../zh/README.md)
 
 lambdaQL은 Java와 Kotlin용 쿼리 라이브러리입니다.
-평소처럼 람다를 작성하면 lambdaQL이 람다의 바이트코드를 읽어 Hibernate 6.6 HQL 쿼리를 만듭니다.
+평소처럼 람다를 작성하면 lambdaQL이 람다의 바이트코드를 읽어 Hibernate 7 HQL 쿼리를 만듭니다.
 람다는 절대 실행되지 않습니다.
 
 <a id="a-first-look"></a>
@@ -39,7 +39,7 @@ where e0.status = 1 and e0.price > :p1
 order by e0.price desc nulls last, e0.id asc
 ```
 
-**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 6.6.5로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다.
+**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다.
 
 **데이터베이스별 SQL (이 HQL에 대한 Hibernate의 SQL)** — 매뉴얼의 `Order`에는 NULL이 될 수 있는 `Double price`가 있지만 테스트의 `Order`에는 없으므로, `SqlByDatabaseTest`가 이 HQL을 Hibernate에 직접 넘깁니다. `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `readme-first`:
 
@@ -138,7 +138,7 @@ fetch first ? rows only
 |---|---|
 | Java | 21 |
 | Kotlin | 2.x |
-| Hibernate ORM | 6.6 (설계는 6.6.5로 검증) |
+| Hibernate ORM | 7.4 (Spring Boot 4.1.2의 7.4.13으로 테스트) |
 | 검증한 데이터베이스 | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
 | Spring Boot(선택) | 3.4(3.4.2로 테스트). Spring Boot 4는 아직 검증하지 않음 |
 

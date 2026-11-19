@@ -83,7 +83,7 @@ dependencies {
 | Java(JVM) | 21 |
 | Spring Boot | 3.4 이상(3.4.2로 테스트). Spring Boot 4는 아직 검증하지 않음 |
 | Spring Data JPA | 3.4 이상 |
-| Hibernate | 6.6(Spring Boot 3.4에 포함) |
+| Hibernate | 7.4(Spring Boot 4.1에 포함) |
 | Kotlin | 2.2 이상. 이전 버전은 [12.9](#129-kotlin-compile-settings) 참고 |
 | `kotlin-reflect` | Spring Data의 Kotlin 지원에 필요 |
 
@@ -538,7 +538,7 @@ kotlin {
 <a id="1210-not-implemented-yet"></a>
 ## 12.10 미구현 기능
 
-- **Spring Boot 4.** 자동 구성에는 Spring Boot 4의 클래스 이름도 지정되어 있지만, 테스트한 버전은 Spring Boot 3.4.2뿐입니다.
+- **Spring Boot 버전.** 이 판은 Spring Boot 4.1.2로 테스트합니다. 자동 구성에는 Spring Boot 3의 클래스 이름도 지정되어 있지만, Spring Boot 3은 이 판에서 검증하지 않습니다.
 - Spring `Sort`의 **`ignoreCase()`**.
 - **Kotlin 리포지토리** 테스트.
 

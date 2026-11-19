@@ -79,7 +79,7 @@ dependencies {
 | Java | 21 |
 | Spring Boot | 3.4 이상(3.4.2로 테스트). Spring Boot 4는 아직 검증하지 않음 |
 | Spring Data JPA | 3.4 이상 |
-| Hibernate | 6.6(Spring Boot 3.4에 포함) |
+| Hibernate | 7.4(Spring Boot 4.1에 포함) |
 
 Spring Data JPA 3.3 이하는 **지원하지 않습니다**. lambdaQL은 실행기를 `META-INF/spring.factories`에 등록하며, Spring Data는 3.4부터 이 파일에서 리포지토리 프래그먼트를 읽습니다.
 
@@ -625,7 +625,7 @@ Kotlin으로 작성한 리포지토리에는 컴파일러 설정이 필요합니
 <a id="1210-not-implemented-yet"></a>
 ## 12.10 미구현 기능
 
-- **Spring Boot 4.** 자동 구성에는 Spring Boot 4의 클래스 이름도 지정되어 있지만, 테스트한 버전은 Spring Boot 3.4.2뿐입니다.
+- **Spring Boot 버전.** 이 판은 Spring Boot 4.1.2로 테스트합니다. 자동 구성에는 Spring Boot 3의 클래스 이름도 지정되어 있지만, Spring Boot 3은 이 판에서 검증하지 않습니다.
 - Spring `Sort`의 **`ignoreCase()`**.
 - **Kotlin 리포지토리** 테스트.
 

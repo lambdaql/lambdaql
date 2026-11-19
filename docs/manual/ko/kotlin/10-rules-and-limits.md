@@ -469,7 +469,7 @@ lambdaQL은 이 목록의 모든 형태에 대해 명확한 오류를 던집니�
 | `returning` | DML 후에 다시 조회 |
 | DB 시간(`current_timestamp`) | 애플리케이션 시간을 전달(`LocalDateTime.now()`는 값으로 바인딩됨) |
 | `TABLE` id 생성기를 사용하는 `insert ... select` | `values { }` 또는 IDENTITY / SEQUENCE 사용 |
-| JOINED 또는 TABLE_PER_CLASS 하위 클래스에 `insert` | 지원하지 않음(Hibernate 6.6.5가 실패함) |
+| JOINED 또는 TABLE_PER_CLASS 하위 클래스에 `insert` | 지원하지 않음(Hibernate 6.6.5가 실패함, 7.4는 미측정) |
 
 DML에 대해 하나 더 알아 둘 점: 벌크 DML은 영속성 컨텍스트를 거치지 않습니다. Hibernate가 먼저 flush하지만,
 같은 세션의 관리 엔티티는 그 뒤에도 이전 값을 유지합니다. `clear()`(또는 `refresh`)를 호출하십시오.
@@ -539,9 +539,9 @@ val list = if (flag) {
 |---|---|
 | Kotlin | 2.x (설계는 kotlinc 1.7.22, 2.1.10, 2.2.21, 2.3.0, 2.3.21로 확인) |
 | Java (JVM) | 21 |
-| Hibernate | 6.6 (설계는 6.6.5로 확인). HQL 확장(예: `function(...)`, `nulls first`)을 사용하므로 다른 JPA 구현체는 보장하지 않음 |
+| Hibernate | 7.4 (7.4.13으로 테스트). HQL 확장(예: `function(...)`, `nulls first`)을 사용하므로 다른 JPA 구현체는 보장하지 않음 |
 | 데이터베이스 | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
-| Spring | Spring Boot 3.4.2, Spring Data JPA 3.4.2(Spring 모듈, [12](12-spring-data-jpa.md); Java 리포지토리만). Spring Boot 4는 아직 검증하지 않음 |
+| Spring | Spring Boot 4.1.2, Spring Data JPA 4.1.2(Spring 모듈, [12](12-spring-data-jpa.md); Java 리포지토리만). Spring Boot 3은 이 판에서 검증하지 않음 |
 | Kotlin 행 단위 확인 | 지금까지는 H2만. Kotlin 사례의 MariaDB와 Oracle 실행은 계획 중 |
 | 테스트하지 않음 | 2.3보다 새로운 Kotlin, Kotlin Multiplatform, PostgreSQL, SQL Server, Oracle 19c 이하(예: PL/SQL `BOOLEAN` 파라미터) |
 

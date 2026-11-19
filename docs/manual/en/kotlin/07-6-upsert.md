@@ -1,6 +1,9 @@
 <a id="76-upsert"></a>
 # 7.6 Upsert (Kotlin)
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/07-6-upsert.md) for the latest rules.
+
 [7. Update, insert, delete (Kotlin)](07-dml.md) | [7.2 Update](07-2-update.md) | [7.4 Delete](07-4-delete.md) | [7.5 Insert](07-5-insert.md) | **7.6 Upsert** | [Java](../java/07-6-upsert.md)
 
 ---

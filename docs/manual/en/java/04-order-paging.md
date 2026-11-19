@@ -1,6 +1,9 @@
 <a id="4-sorting-and-paging-java"></a>
 # 4. Sorting and paging (Java)
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/java/04-order-paging.md) for the latest rules.
+
 [Java track](README.md) | [Manual home](../README.md) | Previous: [3. Conditions (`where`)](03-where.md) | Next: [5. Subqueries](05-subquery.md) | [Kotlin version of this page](../kotlin/04-order-paging.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)

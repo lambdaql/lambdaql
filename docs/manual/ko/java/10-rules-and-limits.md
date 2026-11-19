@@ -441,7 +441,7 @@ lambdaQL은 이 목록의 모든 형태에 대해 명확한 오류를 던집니�
 | `returning` | DML 뒤에 다시 조회 |
 | DB 시각(`current_timestamp`) | 앱 시각을 전달(`LocalDateTime.now()`는 값으로 바인딩됨) |
 | `TABLE` id 생성기를 쓰는 `insert ... select` | `values(...)`나 IDENTITY / SEQUENCE 사용 |
-| JOINED나 TABLE_PER_CLASS 하위 클래스로의 `insert` | 지원하지 않음(Hibernate 6.6.5가 실패) |
+| JOINED나 TABLE_PER_CLASS 하위 클래스로의 `insert` | 지원하지 않음(Hibernate 6.6.5가 실패, 7.4는 미측정) |
 
 DML에 대해 하나 더: 벌크 DML은 영속성 컨텍스트를 거치지 않습니다. Hibernate가 먼저 flush하지만,
 같은 세션의 관리되는 엔티티는 그 후에도 이전 값을 유지합니다. `clear()`(또는 `refresh`)를 호출하십시오.
@@ -502,9 +502,9 @@ List<Order> list = flag
 | 항목 | 버전 |
 |---|---|
 | Java | 21 (javac). ECJ는 보장하지 않음 |
-| Hibernate | 6.6 (설계는 6.6.5로 확인). HQL 확장(예: `function(...)`, `nulls first`)을 사용하므로 다른 JPA 구현체는 보장하지 않음 |
+| Hibernate | 7.4 (7.4.13으로 테스트). HQL 확장(예: `function(...)`, `nulls first`)을 사용하므로 다른 JPA 구현체는 보장하지 않음 |
 | 데이터베이스 | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
-| Spring | Spring Boot 3.4.2, Spring Data JPA 3.4.2(Spring 모듈, [12](12-spring-data-jpa.md)). Spring Boot 4는 아직 검증하지 않음 |
+| Spring | Spring Boot 4.1.2, Spring Data JPA 4.1.2(Spring 모듈, [12](12-spring-data-jpa.md)). Spring Boot 3은 이 판에서 검증하지 않음 |
 | 테스트하지 않음 | PostgreSQL, SQL Server, Oracle 19c 이하(예: PL/SQL `BOOLEAN` 파라미터) |
 
 ---

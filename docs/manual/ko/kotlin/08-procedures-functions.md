@@ -190,7 +190,7 @@ MariaDB와 Oracle은 `SELECT *`의 컬럼을 서로 다른 순서로 반환하�
 > **스텁 함수 파라미터의 순서는 데이터베이스의 순서와 같아야 합니다.**
 
 lambdaQL은 인자를 **위치로** 바인딩합니다(규칙 PR2).
-Hibernate 6.6.5는 이름을 등록해도 위치로 바인딩합니다.
+Hibernate 6.6.5는 이름을 등록해도 위치로 바인딩합니다(실측, 7.4는 미측정).
 MariaDB와 H2 드라이버는 이름 있는 파라미터를 지원하지 않습니다.
 그래서 순서가 틀리면 **아무 오류 없이 잘못된 결과**를 얻을 수 있습니다.
 
@@ -386,7 +386,7 @@ qb.update(Order::class.java).set { it.price = OrderFns.discount(it.price) }.all(
 
 Java 테스트는 같은 형태를 이름 `SQ_FN_DISCOUNT`로 확인합니다. 예: `select e0 from Order e0 where function('SQ_FN_DISCOUNT' as Double, e0.price) > 100.0`. 테스트는 각 쿼리를 실행하고, 결과 행을 Java로 같은 계산을 한 결과와 비교합니다.
 
-**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)는 같은 형태의 HQL(이름 `FN_DISCOUNT`)을 Hibernate에 직접 넘기고, H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 6.6.5)에서 나온 SQL을 기록합니다. Hibernate의 SQL이 바뀌면 테스트가 실패합니다.
+**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)는 같은 형태의 HQL(이름 `FN_DISCOUNT`)을 Hibernate에 직접 넘기고, H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 7.4)에서 나온 SQL을 기록합니다. Hibernate의 SQL이 바뀌면 테스트가 실패합니다.
 
 **데이터베이스별 SQL(이 형태의 HQL에 대한 Hibernate SQL)** — `PlannedSqlTest`가 기록했습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `08-function`:
 

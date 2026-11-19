@@ -1,6 +1,9 @@
 <a id="12-spring-data-jpa-java"></a>
 # 12. Spring Data JPA（Java）
 
+> [!IMPORTANT]
+> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/12-spring-data-jpa.md)を参照してください。
+
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [11. エラーと言語](../11-errors-and-languages.md) | [このページの Kotlin 版](../kotlin/12-spring-data-jpa.md)
 
 ---

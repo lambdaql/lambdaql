@@ -15,10 +15,10 @@
 | Kotlin | 2.x | 설계는 kotlinc 1.7.22, 2.1.10, 2.2.21, 2.3.0, 2.3.21로 확인했습니다. |
 | JVM | Java 21 | lambdaQL을 빌드하는 데 필요합니다. |
 | `-jvm-target` | 1.8, 11, 17 또는 21 | 네 가지 모두 쿼리 람다를 같은 방식으로 컴파일합니다. |
-| JPA 구현체 | Hibernate ORM 6.6 | lambdaQL은 Hibernate 6 HQL을 만듭니다. 설계는 6.6.5로 검증했습니다. 다른 JPA 구현체는 지원하지 않습니다. |
-| Jakarta Persistence | 3.1 | Hibernate 6.6에 포함되어 있습니다. |
+| JPA 구현체 | Hibernate ORM 7.4 | lambdaQL은 Hibernate 7 HQL을 만듭니다. 7.4.13으로 테스트했습니다. 다른 JPA 구현체는 지원하지 않습니다. |
+| Jakarta Persistence | 3.2 | Hibernate 7.4에 포함되어 있습니다. |
 | 데이터베이스 | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) | 이 세 가지를 검증했습니다. 다른 데이터베이스도 동작할 수 있지만 테스트하지 않았습니다. |
-| Spring Boot | 3.4 | 선택 사항입니다. 프로젝트 테스트는 Spring Boot 3.4를 사용합니다. |
+| Spring Boot | 4.1 | 선택 사항입니다. 프로젝트 테스트는 Spring Boot 4.1.2를 사용합니다. |
 | Kotlin 런타임 | – | lambdaQL은 의존성에 `kotlin-stdlib`나 `kotlin-reflect`를 추가하지 않습니다. |
 
 <a id="build-from-source"></a>
@@ -30,8 +30,8 @@ cd lambdaql
 ./gradlew build
 ```
 
-- Gradle 래퍼(8.10)는 **JDK 23 이하**에서만 실행됩니다. JDK 21을 사용하십시오.
-- 저장소에 `gradle/gradle-daemon-jvm.properties`가 있으므로 Gradle 데몬은 Java 21을 사용합니다.
+- Gradle 래퍼는 9.9.1입니다. 저장소에 `gradle/gradle-daemon-jvm.properties`가 있으므로 Gradle 데몬은 Java 21을 사용합니다.
+- 빌드에는 JDK 21과 **JDK 24 이상** 하나가 필요합니다. JDK 24 이상은 `java.lang.classfile` 리더(`src/main/java24`)를 컴파일하고 그 리더로 테스트를 한 번 더 돌립니다. 기본 버전은 25이며 `-Plql.classfile.jdk=24`처럼 바꿀 수 있습니다. Gradle이 JDK를 찾지 못하면 `~/.gradle/gradle.properties`의 `org.gradle.java.installations.paths`에 경로를 적으십시오.
 - IntelliJ IDEA에서는 **Settings > Build Tools > Gradle > Gradle JVM**을 Java 21 JDK로 설정하십시오.
 - 빌드는 세 모듈로 구성됩니다. `query`(아티팩트 `lambdaql-core`), `spring-data-jpa`(`lambdaql-spring-data-jpa`), `spring-boot-starter`(`lambdaql-spring-boot-starter`)입니다. Spring 모듈은 [12. Spring Data JPA](12-spring-data-jpa.md)에서 설명합니다.
 
@@ -221,7 +221,7 @@ val orders = qb.from(Order::class.java)
 // HQL: select e0 from Order e0 where e0.status = 1 and e0.price > 100.0
 ```
 
-**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 6.6.5로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다. 이 테스트는 Java 람다를 사용합니다. 의미가 같은 Kotlin 람다는 같은 HQL을 만들므로 SQL도 같습니다.
+**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다. 이 테스트는 Java 람다를 사용합니다. 의미가 같은 Kotlin 람다는 같은 HQL을 만들므로 SQL도 같습니다.
 
 **데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `to-hql`:
 
@@ -281,15 +281,10 @@ qb.from(Order::class.java)
 **데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `start-many-where`:
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
 where o1_0.active=true and (o1_0.status=1 or o1_0.status=2)
-
--- MariaDB, Oracle
-select …
-from orders o1_0
-where o1_0.active=1 and (o1_0.status=1 or o1_0.status=2)
 ```
 
 조건을 단계별로 추가할 때 유용합니다.
@@ -377,7 +372,7 @@ val firstActive = qb.from(Order::class.java).where { it.active }.first()
 **데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `first#2`(`firstActive`):
 
 ```sql
--- H2
+-- H2, Oracle
 select …
 from orders o1_0
 where o1_0.active=true
@@ -387,16 +382,9 @@ fetch first ? rows only
 -- MariaDB
 select …
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.id
 limit ?
-
--- Oracle
-select …
-from orders o1_0
-where o1_0.active=1
-order by o1_0.id
-fetch first ? rows only
 ```
 
 `first()`는 한 행을 읽으므로 페이징 쿼리입니다. lambdaQL은 `id`를 마지막 정렬 키로 추가하고([4.8](04-order-paging.md#tie-breaker-automatic-id) 참고), Hibernate는 데이터베이스마다 페이징을 씁니다: H2와 Oracle은 `fetch first ? rows only`, MariaDB는 `limit ?`입니다. `?`는 1입니다.
@@ -452,15 +440,10 @@ val page = active.orderBy { o, by -> by.desc(o.price) }.limit(20).toList()
 **데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `count`:
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select count(o1_0.id)
 from orders o1_0
 where o1_0.active=true
-
--- MariaDB, Oracle
-select count(o1_0.id)
-from orders o1_0
-where o1_0.active=1
 ```
 
 Hibernate는 `count(e0)`를 `select count(o1_0.id)`로 바꿉니다. 즉 id 열을 셉니다. count 쿼리에는 페이징이 없습니다.
