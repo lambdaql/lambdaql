@@ -219,3 +219,12 @@ B6 대상 페이지: `java/03`·`kotlin/03`(임베디드 경로 절, 같음 비�
 
 서브쿼리 안 조인 대상 페이지: `java/05-subquery.md`·`kotlin/05-subquery.md`(새 절, 미구현 목록), `java/06-select-group.md`·`kotlin/06-select-group.md`("서브쿼리 안의 조인: 이후" 문구).
 
+## 대기 항목: 시작하기 페이지의 노트 정리
+
+| 항목 | 내용 |
+|---|---|
+| 상태 노트 | 기능별 상태 목록을 지우고 세 줄로 줄임: 배포 전이라 소스에서 빌드, 이 장의 기능은 세 DB에서 테스트, 장별 현황은 트랙 README(Java `#status`, Kotlin `#contents`) |
+| 배포 경고 | "Maven Central에 배포되지 않음" 중복 문장 삭제, 버전 `1.0.0`이 바뀔 수 있다는 안내만 남김 |
+
+대상 페이지: `java/02-getting-started.md`·`kotlin/02-getting-started.md`.
+

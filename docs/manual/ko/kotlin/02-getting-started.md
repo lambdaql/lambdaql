@@ -2,15 +2,9 @@
 # 2. 시작하기 (Kotlin)
 
 > [!NOTE]
-> **상태:** 현재 lambdaQL을 소스에서 빌드하고 테스트를 실행할 수 있습니다.
-> `where` 조건과 `toList()`는 처음부터 끝까지 동작합니다. H2, MariaDB, Oracle에서 주로 **Java** 람다로 테스트했습니다. Kotlin 람다는 `?.` 경로, 캡처 값, `in`, 서브쿼리, 데이터 클래스와 `groupBy`를 쓰는 `select`, update, insert, delete를 테스트했습니다([`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)).
-> 결과 함수 `first()`, `one()`, `count()`, `exists()`, `toSet()`도 동작합니다([결과 가져오기](#getting-the-result) 참고, 이것도 Java 람다로만 테스트함).
-> 정렬과 페이징(`orderBy`, `limit`, `offset`, `SortSpec`)의 핵심 기능도 동작합니다(Kotlin 정렬 하나를 테스트했고, 나머지는 Java 람다로 테스트함).
-> Spring Data JPA 모듈(리포지토리 실행기와 Spring Boot 자동 구성)도 동작합니다([12. Spring Data JPA](12-spring-data-jpa.md) 참고, Java 리포지토리로만 테스트함).
-> 수정, 삽입, 삭제, 업서트도 동작합니다([7. 수정, 삽입, 삭제](07-dml.md) 참고, 업서트는 Java 람다로만 테스트함).
-> 서브쿼리와 `select`(`groupBy`, `having`, `Agg` 포함)도 동작합니다([5. 서브쿼리](05-subquery.md), [6. 조회, 집계, 그룹화](06-select-group.md) 참고).
-> 명시적 조인, 파생 테이블, CTE, 저장 프로시저, DB 함수도 동작합니다([6](06-select-group.md#68-explicit-joins), [8](08-procedures-functions.md) 참고, Java 람다로만 테스트함).
-> 아직 Maven Central에 배포된 아티팩트는 없습니다. 아래 절차대로 소스에서 빌드하십시오.
+> **상태:** lambdaQL은 아직 Maven Central에 배포되지 않았습니다. [소스에서 빌드](#build-from-source)해서 사용하십시오.
+> 이 장에서 다루는 `where`, `toList()`, 결과 함수는 H2, MariaDB, Oracle에서 테스트했습니다.
+> 장별 구현·테스트 현황(Kotlin 람다로 테스트한 범위 포함)은 [Kotlin 트랙의 목차](README.md#contents)에 모아 둡니다.
 
 [Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [1. 개요](../01-overview.md) | 다음: [3. 조건](03-where.md) | [이 페이지의 Java 버전](../java/02-getting-started.md)
 
@@ -89,8 +83,8 @@ Maven:
 Spring Data JPA나 Spring Boot를 사용하면 `lambdaql-spring-boot-starter` 또는 `lambdaql-spring-data-jpa`를 대신 추가하십시오. 두 아티팩트는 `lambdaql-core`를 함께 가져옵니다([12.2](12-spring-data-jpa.md#122-modules) 참고).
 
 > [!WARNING]
-> 아티팩트는 **아직 Maven Central에 배포되지 않았습니다**.
-> 버전 `1.0.0`은 저장소의 `gradle.properties`에 정의된 값이며, 첫 릴리스 전에 바뀔 수 있습니다. lambdaQL이 배포되면 이 페이지를 다시 확인하십시오.
+> 버전 `1.0.0`은 저장소의 `gradle.properties`에 정의된 값이며, 첫 릴리스 전에 바뀔 수 있습니다.
+> lambdaQL이 Maven Central에 배포되면 이 페이지를 다시 확인하십시오.
 
 <a id="kotlin-compiler-settings"></a>
 ## Kotlin 컴파일러 설정
