@@ -98,7 +98,6 @@ Javadoc 빌드는 `--snippet-path src/test/java`를 쓴다. Javadoc의 `{@snippe
 1. **번역**: `PENDING-TRANSLATION.md`의 항목을 en → ja → zh 순서로 반영한다(작성자 결정, 언어마다 순서대로). 31쪽이 한국어와 달라져 있어 바뀐 페이지를 통째로 다시 옮기는 방식이 정확하다. 2026-11-19에 en 작업을 시작했다가 작성자 요청으로 중지했다(변경 없음).
 2. **Spring Boot 4 지원**: 작성자 요청으로 별도 브랜치에서 진행한다(미착수). Boot 4는 Hibernate 7·Jakarta Persistence 3.2 기반이라 HQL 렌더링과 Hibernate API 사용 부분(바인딩 타입, `unwrap`)의 확인이 필요하다(미측정).
 3. **남은 미구현·v0.2 후보**(9절과 ROADMAP 기준): MariaDB `lateral` 재작성(Q4), `SortSpec`의 조인 형태, 집계 기준 정렬, Oracle 오버로드 선택, 조건부 값(CASE WHEN), 일반 `LIKE`, insert의 조인, 엔티티 4개 이상 조인, 복합 키 엔티티의 `limit`·`executeOne()`, U11·U12·U15 검사.
-4. **메시지 생성기의 저장소 편입**: 7절 참고.
 
 ---
 
@@ -123,27 +122,33 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 
 **한 번에 한 세션만 테스트한다.** 빌드 폴더(`query/build`)와 두 DB 스키마를 공유하므로 두 세션이 동시에 돌리면 결과 파일이 지워지고 서로의 테이블을 지운다(2026-11-19 발생). 다른 세션이 작업 트리의 미커밋 파일을 함께 커밋한 일도 있었다.
 
-### 6.2 실측 근거와 작업 도구의 위치(⚠️ `/tmp`, 재부팅하면 사라질 수 있음)
+### 6.2 실측 근거의 위치(⚠️ `/tmp`, 재부팅하면 사라질 수 있음)
 
 | 주제 | 경로 |
 |---|---|
 | 초기 조사(ExTree·FluentJPA·Jinq 소스, **이 안에서 빌드 실행 금지**) | `/tmp/lql-research/` |
 | NOT·3값 논리, 정렬 문법, Kotlin 패턴, D20 실측 | `/tmp/lql-notlogic/`, `/tmp/lql-sort/`, `/tmp/lql-kt/`, `/tmp/lql-d20/` |
 | DML 의미 실측 | `/tmp/lql-dml/` |
-| 메시지 카탈로그 생성기 | `/tmp/lql-i18n-gen/`(7절) |
-| 한국어 매뉴얼 검사(링크, 일부 테스트 구간) | `/tmp/d48/check_ko.py` |
-| 번역 검사(언어별 링크, 앵커, 코드 블록, 한글 잔존) | `/tmp/tr/check.py <lang>`, 대상 목록 `/tmp/tr_pages.txt` |
 
 장기 보존이 필요하면 소스(`*.java`, `*.kt`, `*.py`)와 요약(`*.md`)만 저장소로 옮긴다.
+
+### 6.3 개발 도구(`.claude/tools/`)
+
+| 도구 | 용도 |
+|---|---|
+| `i18n/catalog.py`, `i18n/gen.py` | 메시지 카탈로그 생성기(7절) |
+| `docs/check_ko.py` | 한국어 매뉴얼 검사(링크, 앵커, 일부 테스트 구간) |
+| `docs/check_translation.py <lang>` | 번역 검사(낡음 안내, 앵커, 코드 블록, 남은 한글, 링크) |
+
+실행 방법은 [`.claude/tools/README.md`](.claude/tools/README.md)에 있다. 개인 설정(`.claude/settings.local.json`)은 git에서 제외한다.
 
 ---
 
 ## 7. 메시지 카탈로그 생성기
 
-`LqlMessage.java`와 `LqlMessages{,_ja,_ko,_zh}.properties`는 생성 결과다. 원본은 `/tmp/lql-i18n-gen/catalog.py`(항목: 키, 코드, 인자 수, en, ko, ja, zh)이고 `python3 /tmp/lql-i18n-gen/gen.py`로 다시 쓴다.
+`LqlMessage.java`와 `LqlMessages{,_ja,_ko,_zh}.properties`는 생성 결과다. 원본은 `.claude/tools/i18n/catalog.py`(항목: 키, 코드, 인자 수, en, ko, ja, zh)이고 `python3 .claude/tools/i18n/gen.py`로 다시 쓴다. 생성 결과를 직접 고치지 않는다.
 
 - 코드를 추가할 때 3xxx는 `# ---- 4xxx rendering and running` 앞, 4xxx는 `("INTERNAL_ERROR"` 앞, 5xxx는 목록 끝에 넣는다.
-- **생성기가 저장소 밖에 있다.** `/tmp`가 지워지면 메시지를 추가할 수단이 없어진다. 저장소(예: `tools/i18n/`)로 옮기는 것을 권한다(미실시).
 - 쓰지 않게 된 코드는 지운다(예: LQL-3040). 같은 번호를 다른 뜻으로 다시 쓰지 않는다.
 
 ---
