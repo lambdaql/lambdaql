@@ -65,9 +65,10 @@ subprojects { subproject ->
 //                languageVersion.set(JavaLanguageVersion.of(javaVersion))
 //            }
             [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
+            // Gradle 9: the project-level properties are gone; set them on the java extension
+            sourceCompatibility = JavaVersion.toVersion(javaVersion)
+            targetCompatibility = JavaVersion.toVersion(javaVersion)
         }
-        sourceCompatibility = javaVersion
-        targetCompatibility = javaVersion
     }
 
     // a module can choose its artifact name with lql.artifactName in its gradle.properties

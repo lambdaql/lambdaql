@@ -196,14 +196,16 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 1. **MariaDB UPDATE의 연관 경로(U9)**: `update … where (select s1.name from Customer s1 where s1.id = e0.customer.id) = 'Kim'`를 Hibernate 7이 `from SQ_customers c1_0, SQ_customers c2_0 where c1_0.id = SQ_orders.customer_id`로 만들어 쓰지 않는 `c2_0`가 곱해짐 → "Subquery returns more than 1 row". `DmlQueryTest`(2건)와 `KotlinQueryTest.update`. H2·Oracle은 통과. 후보: 서브쿼리 안의 외부 FK 참조를 `fk(e0.customer)` 등으로 바꿔 실측.
 2. **Oracle `FunctionTest.sargableWarnings`**: 함수 기반 인덱스가 있는데도 LQL-5001 경고. `tableAndColumn`을 고친 뒤에도 실패. `user_ind_expressions` 조회나 함수 SQL 이름(`fn.sql()`) 쪽을 Hibernate 7에서 확인해야 함.
 
-### 10.3 ASM판·JVM판 이중 구현 계획(미착수, 설계 결정 필요)
+### 10.3 ASM판·JVM판: jar 하나(Multi-Release JAR) 결정(D52)
 
-- 현재 바이트코드 읽기(`engine.decode.Decoder`, `engine.load`)는 ASM 방문자 API를 쓰고, IR(`Expr`의 `type()`, `MethodRef`)도 ASM `org.objectweb.asm.Type`을 쓴다.
-- 순서 안:
-  1. IR에서 ASM 의존을 걷어 낸다(자체 타입 표현으로 교체).
-  2. 바이트코드 읽기를 인터페이스로 분리한다(명령어 스트림 → 같은 IR).
-  3. Class-File API 구현을 추가한다(JDK 24 이상, `java.lang.classfile` 정식).
-- 결정할 것: 아티팩트 구성(공통 엔진 + `-asm` / `-jdk` 또는 하나의 jar에서 실행 JDK로 선택), JVM판의 최소 JDK(24 또는 25 LTS), Gradle 8.10의 JDK 23 상한(JDK 24+ 빌드에는 Gradle 8.14 이상 필요).
+- **결정**: jar 하나. 기본 클래스는 Java 21 + ASM, `META-INF/versions/24/`에 `java.lang.classfile` 리더. JDK 24 이상에서 실행하면 ClassFile 리더를 쓴다.
+- **근거**: 성능 차이는 µs 단위라 선택 요인이 아니고(ROADMAP 2.6.1), 실제 문제는 ASM의 버전 추적(2.6.2)이다. ClassFile API는 실행 중인 JDK의 클래스 파일을 항상 읽는다.
+- **구현 순서**:
+  1. Decoder의 입력을 ASM 방문자에서 떼어 내고, ClassFile 명령어를 같은 입력으로 옮기는 어댑터를 만든다(해석 규칙은 하나).
+  2. `query/build.gradle`에 JDK 24 툴체인으로 컴파일하는 `java24` 소스 세트를 두고 jar의 `META-INF/versions/24`에 넣는다(`Multi-Release: true`).
+  3. 테스트를 JDK 21(ASM)과 JDK 24 이상(ClassFile)에서 모두 돌린다. 이 PC에는 JDK 21과 26만 있다.
+- **최소 JDK**: ClassFile API는 JDK 24에서 정식(JEP 484). 25와의 차이는 확인하지 못해 24부터 지원(미측정).
+- **Gradle**: 9.9.1로 올렸다(2026-11-19). Gradle 9에서 프로젝트 수준 `sourceCompatibility`가 없어져 `java { }` 안으로 옮겼다.
 
 ---
 
