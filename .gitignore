@@ -87,3 +87,4 @@ Thumbs.db
 ### Claude Code (personal files; .claude/tools is shared) ###
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+__pycache__/
