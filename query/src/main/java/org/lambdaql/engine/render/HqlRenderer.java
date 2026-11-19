@@ -1175,46 +1175,9 @@ public final class HqlRenderer {
             nullCaptured(nulled, (isHostLike(a) && autoUnboxed(a)) || (isHostLike(b) && autoUnboxed(b)));
             return nulled;
         }
-        if (isHostLike(b) && !isHostLike(a) && eval(b) != null) {
-            String fit = integralFit(op, a, eval(b));
-            if (fit != null) return fit;
-        } else if (isHostLike(a) && !isHostLike(b) && eval(a) != null) {
-            String fit = integralFit(op.flip(), b, eval(a));
-            if (fit != null) return fit;
-        }
         String text = value(a, peerType(b)) + " " + op.symbol() + " " + value(b, peerType(a));
         if ((op == CmpOp.EQ || op == CmpOp.NE) && !isHostLike(a) && !isHostLike(b) && (!nonNull(a) || !nonNull(b))) sqlMeaning(text);
         return text;
-    }
-
-    /**
-     * A whole-number column compared with a value that has no exact whole-number form ({@code 2.5}, {@code 1e20}).
-     * Binding it would cut the value (Hibernate rejects a fraction, and cuts IN list elements; measured), so the
-     * comparison is rewritten to the same meaning with a whole number: {@code c > 2.5} is {@code c > 2},
-     * {@code c >= 2.5} is {@code c >= 3}, {@code c = 2.5} matches no row, {@code c <> 2.5} is {@code c is not null}
-     * (the SQL meaning, D48). The index can still be used.
-     *
-     * @param op     the operator, with the column on the left
-     * @param column the column side
-     * @param v      the value, not null
-     * @return the condition, or null when the value fits the column (the normal rendering)
-     */
-    private String integralFit(CmpOp op, Expr column, Object v) {
-        Class<?> type = peerType(column);
-        if (!(v instanceof Number n) || !HostEvaluator.integral(type) || HostEvaluator.exactWhole(n, type) != null) return null;
-        java.math.BigDecimal d = HostEvaluator.decimal(n);
-        if (d == null) return null;                                   // NaN and the infinities are rejected elsewhere (D13)
-        String col = value(column, null);
-        String all = nonNull(column) ? "1=1" : col + " is not null";
-        if (op == CmpOp.EQ) return "1=0";
-        if (op == CmpOp.NE) return all;
-        boolean up = op == CmpOp.GE || op == CmpOp.LT;               // c >= 2.5 is c >= 3, c < 2.5 is c < 3
-        java.math.BigDecimal whole = d.setScale(0, up ? java.math.RoundingMode.CEILING : java.math.RoundingMode.FLOOR);
-        java.math.BigDecimal[] range = HostEvaluator.range(type);
-        boolean greater = op == CmpOp.GT || op == CmpOp.GE;
-        if (range != null && whole.compareTo(range[1]) > 0) return greater ? "1=0" : all;
-        if (range != null && whole.compareTo(range[0]) < 0) return greater ? all : "1=0";
-        return col + " " + op.symbol() + " " + bind(whole, type);
     }
 
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(HqlRenderer.class);
@@ -1250,8 +1213,6 @@ public final class HqlRenderer {
             nullCaptured(text, autoUnboxed(host));
             return text;
         }
-        String fit = integralFit(op, column, v);
-        if (fit != null) return fit;
         String param = host instanceof Expr.Const c ? literal(c, peerType(column)) : bind(v, peerType(column));
         if (op == CmpOp.EQ) return col + " = " + param;
         // an entity value compared with a non-null value: the SQL meaning (D48), a NULL column does not match
@@ -1295,12 +1256,11 @@ public final class HqlRenderer {
         String x = value(value, null);
         List<Object> list = new ArrayList<>();
         Class<?> peer = peerType(value);
-        for (Object o : c) {
-            // an element with no exact whole-number form can never equal a whole-number column (2.5 would be cut to 2)
-            if (o instanceof Number n && HostEvaluator.integral(peer) && HostEvaluator.exactWhole(n, peer) == null) continue;
-            list.add(HostEvaluator.convert(o, peer));
-        }
-        if (list.isEmpty()) return positive ? "1=0" : nonNull(value) ? "1=1" : x + " is not null";
+        // an element with no exact whole-number form (2.5) for a whole-number column: the whole list is bound as
+        // decimals, so the database compares 2.5 itself (Hibernate would cut it to 2; D48 B8)
+        boolean exact = HostEvaluator.integral(peer)
+                && c.stream().anyMatch(o -> o instanceof Number n && HostEvaluator.exactWhole(n, peer) == null);
+        for (Object o : c) list.add(exact && o instanceof Number n ? HostEvaluator.decimal(n) : HostEvaluator.convert(o, peer));
         String param = bindRaw(list);
         if (positive) return x + " in (" + param + ")";
         // D48: the SQL meaning; a NULL value is not "not in" the list
@@ -1419,7 +1379,11 @@ public final class HqlRenderer {
     // ------------------------------------------------------------------ helpers
 
     private String bind(Object v, Class<?> type) {
-        return bindRaw(HostEvaluator.convert(v, type));
+        Object x = HostEvaluator.convert(v, type);
+        // 2.5 or 1e20 for a whole-number column: bound as a decimal so the database compares the value itself
+        // (Hibernate would refuse it as the column type; D48 B8)
+        if (HostEvaluator.integral(type) && x instanceof Number n && !type.isInstance(x)) x = HostEvaluator.decimal(n);
+        return bindRaw(x);
     }
 
     private String bindRaw(Object v) {

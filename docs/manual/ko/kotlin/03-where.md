@@ -140,19 +140,16 @@ nullable 컬럼과의 비교는 **SQL 의미**를 따릅니다.
 **컬럼에 대한 산술과 인덱스**(결정 D50). `it.qty * 2 > n`처럼 컬럼에 산술을 걸면 인덱스를 쓸 수 없습니다. lambdaQL은 `LQL-5012`를 `WARN` 수준으로 기록하고, `SargableMode.STRICT`에서는 분석이 실패합니다(`LQL-3066`).
 값 쪽으로 옮길 때는 `it.qty > n / 2.0`처럼 소수로 나누십시오. 정수 나눗셈 `n / 2`는 다른 행을 냅니다. 음수를 곱했다면 비교 방향을 바꾸십시오. 자세한 내용은 [10.2](10-rules-and-limits.md#db-functions-on-a-column)를 참고하십시오.
 
-**정수 컬럼과 소수 값**(결정 D48 B8). 정수 컬럼을 정수로 나타낼 수 없는 값과 비교하면, lambdaQL은 같은 의미의 정수 비교로 바꿉니다. 인덱스는 그대로 쓸 수 있고, 리터럴도 같게 처리합니다.
+**정수 컬럼과 소수 값**(결정 D48 B8). 정수 컬럼을 소수 값과 비교하면 lambdaQL은 값을 적은 그대로 비교합니다. 반올림이나 값 제외는 하지 않습니다.
 
-| 비교 | 바꾼 형태 |
-|---|---|
-| `>=`, `<` | 올림: `cnt >= 2.5`는 `cnt >= 3` |
-| `>`, `<=` | 내림: `cnt > 2.5`는 `cnt > 2` |
-| `==` | 일치하는 행 없음(`1=0`) |
-| `!=` | `cnt is not null`(SQL 의미) |
-| 범위를 벗어난 값(`1e20`) | 일치하는 행 없음, 또는 `is not null` |
-| IN 목록 | 그런 요소는 뺌 |
+- 람다에 적은 상수는 리터럴로 남습니다. `it.cnt >= 2.5`는 `e0.cnt >= 2.5`가 됩니다.
+- 캡처 값은 `BigDecimal`(Hibernate 타입 `BIG_DECIMAL`)로 바인딩합니다. `e0.cnt >= :p1`이고 `p1`은 `2.5`입니다.
+- 그런 요소가 있는 IN 목록은 모든 요소를 `BigDecimal`로 바인딩합니다(`[2.5, 3.0]`).
 
-이전에는 값을 컬럼 타입으로 잘라 `it.cnt >= 2.5`가 `cnt >= 2`가 되었고, 잘못된 행을 반환했습니다.
-Hibernate는 정수 파라미터에 바인딩한 소수를 거부하고(`CoercionException`), IN 목록의 요소는 조용히 자릅니다(세 DB에서 실측).
+이전에는 값을 컬럼 타입으로 잘라 `2.5`가 `2`가 되었고, 잘못된 행을 반환했습니다. Hibernate는 정수 컬럼 타입으로 바인딩한 소수를 거부하고(`CoercionException`), IN 목록의 요소는 조용히 자릅니다(세 DB에서 실측).
+정수 비교로 바꾸는 방식(`>= 3`)은 채택하지 않았습니다. 실행되는 SQL이 람다와 달라지고, 엔티티 매핑(`Integer`)과 DB 컬럼 타입(예: 소수가 있는 `DECIMAL`)이 다르면 잘못된 행을 냅니다.
+
+결과는 H2, MariaDB 10.11, Oracle 23.26에서 올바릅니다(실측). MariaDB의 `EXPLAIN`은 int, `BigDecimal`, double 파라미터 모두 인덱스 범위 스캔(`type=range`)을 보여 줍니다(실측). Oracle의 실행 계획은 미측정입니다.
 
 이에 대한 Kotlin 테스트는 없습니다. Java 테스트([`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java), 영역 `whole-number`)가 확인합니다.
 

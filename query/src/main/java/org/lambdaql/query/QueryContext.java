@@ -188,6 +188,24 @@ public final class QueryContext {
     }
 
     /**
+     * Binds one parameter. A {@code BigDecimal} (or a list of them) is bound with its own type: the renderer uses it
+     * for a value such as 2.5 compared with a whole-number column, which Hibernate would otherwise refuse or cut to
+     * the column type (D48 B8).
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    static void bindParameter(jakarta.persistence.Query q, String name, Object value) {
+        if (value instanceof java.math.BigDecimal d) {
+            q.unwrap(org.hibernate.query.Query.class).setParameter(name, d, org.hibernate.type.StandardBasicTypes.BIG_DECIMAL);
+        } else if (value instanceof java.util.Collection<?> c && !c.isEmpty()
+                && c.stream().allMatch(java.math.BigDecimal.class::isInstance)) {
+            @SuppressWarnings("unchecked") java.util.Collection<java.math.BigDecimal> list = (java.util.Collection<java.math.BigDecimal>) c;
+            q.unwrap(org.hibernate.query.Query.class).setParameterList(name, list, org.hibernate.type.StandardBasicTypes.BIG_DECIMAL);
+        } else {
+            q.setParameter(name, value);
+        }
+    }
+
+    /**
      * Analyzes a condition lambda (cached per lambda class).
      *
      * @param ref   the lambda
@@ -295,7 +313,7 @@ public final class QueryContext {
         if (limit != null && limit == 0) return List.of();
         return withEntityManager(em -> {
             var q = em.createQuery(query.hql());
-            query.parameters().forEach(q::setParameter);
+            query.parameters().forEach((k, v) -> bindParameter(q, k, v));
             if (offset > 0) q.setFirstResult(offset);
             if (limit != null) q.setMaxResults(limit);
             return q.getResultList();
@@ -354,7 +372,7 @@ public final class QueryContext {
     int executeOne(RenderedQuery ids, java.util.function.Function<Object, RenderedQuery> byId) {
         return inTransaction(em -> {
             var q = em.createQuery(ids.hql());
-            ids.parameters().forEach(q::setParameter);
+            ids.parameters().forEach((k, v) -> bindParameter(q, k, v));
             q.setMaxResults(2);
             List<?> found = q.getResultList();
             if (found.size() > 1) {
@@ -409,7 +427,7 @@ public final class QueryContext {
         int n = 0;
         for (RenderedQuery q : statements) {
             var query = em.createQuery(q.hql());
-            q.parameters().forEach(query::setParameter);
+            q.parameters().forEach((k, v) -> bindParameter(query, k, v));
             n += query.executeUpdate();
         }
         return n;
@@ -429,7 +447,7 @@ public final class QueryContext {
         if (limit != null && limit == 0) return List.of();
         return withEntityManager(em -> {
             TypedQuery<T> q = em.createQuery(query.hql(), type);
-            query.parameters().forEach(q::setParameter);
+            query.parameters().forEach((k, v) -> bindParameter(q, k, v));
             if (offset > 0) q.setFirstResult(offset);
             if (limit != null) q.setMaxResults(limit);
             return q.getResultList();

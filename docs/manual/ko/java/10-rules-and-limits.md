@@ -166,7 +166,7 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 | `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | NULL: 선택되지 않음(SQL 의미) |
 | `!o.getActive()`(nullable `Boolean`) | `e0.active = false` | NULL: 선택되지 않음(NULL은 false가 아님) |
 | `x == null`, `x != null` | `is null`, `is not null` | 2값 |
-| `o.getCnt() >= 2.5`(정수 컬럼, 소수 값) | 같은 의미의 정수 비교: `>=`, `<`는 올림(`e0.cnt >= 3`), `>`, `<=`는 내림, `==`는 `1=0`, `!=`는 `is not null`. IN 목록에서는 그런 요소를 뺌(D48 B8) | 인덱스 사용 가능. 이전처럼 값을 잘라 잘못된 행을 반환하지 않음 |
+| `o.getCnt() >= 2.5`(정수 컬럼, 소수 값) | 적은 값 그대로 비교: 상수는 리터럴(`e0.cnt >= 2.5`), 캡처 값과 IN 목록은 `BigDecimal`로 바인딩(D48 B8) | 인덱스 범위 스캔 유지(MariaDB에서 실측). 이전처럼 값을 잘라 잘못된 행을 반환하지 않음 |
 | 값 객체(`@Embedded`) 전체: `o.getAddress().equals(addr)`, `Objects.equals(o.getAddress(), addr)`, `!o.getAddress().equals(addr)` | 컬럼마다 펼침: `e0.address.city = :p1 and e0.address.zip = :p2`, 부정은 `<> ... or ...`. `== null`은 모든 컬럼 `is null`(and), `!= null`은 `is not null`(or) | 컬럼마다 SQL 의미(D48): NULL 컬럼은 `=`에도 `<>`에도 불일치. 캡처한 객체가 `null`이면 일치하는 행 없음(`WARN` 수준 `LQL-4045`) |
 | NULL이 될 수 없는 컬럼(id, 기본형, `nullable = false`, 경로에 연관 단계 없음)의 `o.getId() == null` | `1=0`. 비교와 함께 쓰면 검사를 제거: `o.getId() != null && o.getId() == id`는 `e0.id = :p1`(테스트함) | 컬럼에 NULL이 없음. 연관을 거치는 경로(`o.getCustomer().getId()`)는 검사 유지 |
 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL 3값 논리 |

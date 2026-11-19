@@ -14,6 +14,7 @@ import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.math.BigDecimal;
 import java.util.List;
 import org.lambdaql.engine.render.RenderedQuery;
 import java.util.Map;
@@ -125,31 +126,29 @@ class SqlMeaningTest {
         em.getTransaction().commit();
         em.close();
         // @start region="whole-number"
-        // cnt is a whole number; 2.5 has no whole-number form, so the comparison keeps its meaning with one
-        // (binding 2.5 as 2 would change the rows)
+        // cnt is a whole number; 2.5 is compared as written (it is never cut to 2)
         double half = 2.5;
         RenderedQuery atLeast = qb.from(Order.class).where(o -> o.getCnt() >= half).toHql();
         assertEquals("select e0 from Order e0 where e0.cnt >= :p1", atLeast.hql());
-        assertEquals(Map.of("p1", 3), atLeast.parameters());                         // cnt >= 2.5 is cnt >= 3
-        RenderedQuery more = qb.from(Order.class).where(o -> o.getCnt() > half).toHql();
-        assertEquals(Map.of("p1", 2), more.parameters());                            // cnt > 2.5 is cnt > 2
-        assertEquals("select e0 from Order e0 where 1=0", qb.from(Order.class).where(o -> o.getCnt() == half).toHql().hql());
-        // an IN list drops what can never equal a whole number
+        assertEquals(Map.of("p1", new BigDecimal("2.5")), atLeast.parameters());    // bound as a decimal
+        // a constant written in the lambda stays a literal
+        assertEquals("select e0 from Order e0 where e0.cnt >= 2.5", qb.from(Order.class).where(o -> o.getCnt() >= 2.5).toHql().hql());
+        // an IN list with such a value is bound as decimals
         List<Double> values = List.of(2.5, 3.0);
         RenderedQuery in = qb.from(Order.class).where(o -> values.contains(o.getCnt().doubleValue())).toHql();
         assertEquals("select e0 from Order e0 where e0.cnt in (:p1)", in.hql());
-        assertEquals(Map.of("p1", List.of(3)), in.parameters());
+        assertEquals(Map.of("p1", List.of(new BigDecimal("2.5"), new BigDecimal("3.0"))), in.parameters());
         // @end
         assertEquals(List.of(3), qb.from(Order.class).where(o -> o.getCnt() >= half).select(o -> o.getCnt()).toList());
         assertEquals(List.of(3), qb.from(Order.class).where(o -> o.getCnt() > half).select(o -> o.getCnt()).toList());
         assertEquals(List.of(), qb.from(Order.class).where(o -> o.getCnt() == half).toList());
-        // a constant written in the lambda gets the same rewrite
-        RenderedQuery literal = qb.from(Order.class).where(o -> o.getCnt() >= 2.5).toHql();
-        assertEquals("select e0 from Order e0 where e0.cnt >= :p1", literal.hql());
-        assertEquals(Map.of("p1", 3), literal.parameters());
         assertEquals(List.of(3), qb.from(Order.class).where(o -> o.getCnt() >= 2.5).select(o -> o.getCnt()).toList());
         assertEquals(List.of(2, 2, 3), qb.from(Order.class).where(o -> o.getCnt() < 3.5).select(o -> o.getCnt()).toList()
                 .stream().sorted().toList());
+        assertEquals(List.of(3), qb.from(Order.class).where(o -> values.contains(o.getCnt().doubleValue())).select(o -> o.getCnt()).toList());
+        // a value out of the column range is compared as written too
+        double huge = 1e20;
+        assertEquals(List.of(), qb.from(Order.class).where(o -> o.getCnt() >= huge).toList());
     }
 
     /** Minimal Spring context: the datasource chosen by application-test.yaml and the test entities. */
