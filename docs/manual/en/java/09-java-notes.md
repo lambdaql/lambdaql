@@ -1,7 +1,5 @@
+<a id="9-java-notes"></a>
 # 9. Java notes
-
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/java/09-java-notes.md) for the latest rules.
 
 [Java track](README.md) | [Manual home](../README.md) | Previous: [8. Procedures and DB functions](08-procedures-functions.md) | Next: [10. Rules and limits](10-rules-and-limits.md) | [Kotlin version of this page](../kotlin/09-kotlin-notes.md)
 
@@ -13,6 +11,7 @@ This page collects the things that are special about **Java** code in lambdaQL l
 The main idea is always the same: **a lambdaQL lambda is a query, not code.**
 lambdaQL reads what you wrote. It does not run it. So some Java run-time rules do not apply.
 
+<a id="contents"></a>
 ## Contents
 
 - [9.1 Lambdas must be serializable lambdas](#91-lambdas-must-be-serializable-lambdas)
@@ -31,6 +30,7 @@ lambdaQL reads what you wrote. It does not run it. So some Java run-time rules d
 
 ---
 
+<a id="91-lambdas-must-be-serializable-lambdas"></a>
 ## 9.1 Lambdas must be serializable lambdas
 
 lambdaQL finds the body of your lambda through Java serialization (`SerializedLambda`).
@@ -46,10 +46,11 @@ It does not use `setAccessible`. It does not really serialize your captured valu
 
 Notes:
 
-- Captured values (and a captured `this`) do **not** need to be `Serializable`. lambdaQL reads them, it does not serialize them.
+- Captured values (and a captured `this`) do **not** need to be `Serializable`. lambdaQL reads them. It does not serialize them.
 - Inner lambdas of subqueries (`sub.from(Item.class).where(i -> ...)`) do not need to be `Serializable` on their own. lambdaQL finds them in the bytecode of the outer lambda.
 - The names of the lambdaQL functional interfaces are not final yet. Pass the lambda directly when you can.
 
+<a id="92-boxing-and-unboxing"></a>
 ## 9.2 Boxing and unboxing
 
 The example entities use boxed types: `Long id`, `Double price`, `Integer status`.
@@ -69,25 +70,29 @@ What this means for NULL:
 | `o.getStatus() == 1`, status is NULL | NullPointerException | SQL meaning: UNKNOWN, row not returned (rule R1) |
 | `o.getPrice() > 100`, price is NULL | NullPointerException | row not returned (R1) |
 | `!o.getActive()` (`Boolean`), active is NULL | NullPointerException | row not returned |
-| `o.getPrice() > p`, captured `Double p` is `null` | NullPointerException | **exception** when the query runs |
-| `i.getQty() == q`, `qty` is `int`, captured `Integer q` is `null` | NullPointerException | **exception** when the query runs |
+| `o.getPrice() > p`, captured `Double p` is `null` | NullPointerException | NULL bound to `e0.price > :p1`, no row matches (`LQL-4045` at `DEBUG` level) |
+| `i.getQty() == q`, `qty` is `int`, captured `Integer q` is `null` | NullPointerException | NULL bound to `i.qty = :p1`, no row matches (`LQL-4045` at `DEBUG` level) |
+| `o.getStatus() > p.intValue()`, captured `Double p` is `null` | NullPointerException | **exception** when the query runs (`LQL-4012`) |
 
-So: an entity value that is NULL follows SQL. A captured value that is `null` in an unboxing place is an error, because Java has no result for it.
+So an entity value that is NULL follows SQL. A call that unboxes a captured value to its own primitive type (`Double.doubleValue()`, `Integer.intValue()` and others, including a widening conversion after it) is the same bytecode as javac's automatic unboxing. So lambdaQL does not run it and binds the boxed value.
+A call that converts to a different primitive type (`intValue()` on a `Double`) can only be written by hand, so it is a computation. lambdaQL runs it in Java, and a `null` is an error, as in Java.
 
-If you want NULL rows, write the check yourself:
+If you want NULL rows, write the check yourself.
 
 ```java
 .where(o -> o.getStatus() == null || o.getStatus() != 1)
 // HQL: e0.status is null or e0.status <> 1
 ```
 
+<a id="93-equality-of-boxed-values"></a>
 ## 9.3 Equality of boxed values
 
 In Java, `==` between two **objects** checks identity (the same object in memory).
-In lambdaQL, `==` between two objects is a **value compare** (decision D12). Values of the entity and captured values follow the SQL meaning (decision D48, see [3.6](03-where.md#36-null-rules)).
+In lambdaQL, `==` between two objects is a **value compare** (decision D12).
+Values of the entity and captured values both follow the SQL meaning (decision D48, see [3.6](03-where.md#36-null-rules)).
 The boxing cache (`Integer` and `Long` from -128 to 127) and `new String(...)` do not matter.
 
-Which rule you get depends on the **Java types** of the two sides:
+Which rule you get depends on the **Java types** of the two sides.
 
 | Left side | Right side | javac makes | lambdaQL rule | HQL |
 |---|---|---|---|---|
@@ -100,6 +105,7 @@ Which rule you get depends on the **Java types** of the two sides:
 | enum | enum | object compare | R2 | `x = :p1` |
 | `Boolean` column | `Boolean.TRUE` | object compare | R2 | `e0.active = :p1` |
 | `Boolean` column | `true` | unboxing | R1 | `e0.active = true` |
+| value object (`@Embedded`) | captured value object of the same type | `equals` / object compare | expanded per column (B6) | `e0.address.city = :p1 and e0.address.zip = :p2` (see [3.10](03-where.md#310-association-paths)) |
 | anything | `null` | null check | R3 | `x is null` |
 | entity | entity (`o.getCustomer() == c`) | object compare | **not in v0.1** | – (compare ids instead) |
 
@@ -108,7 +114,7 @@ With a captured value:
 | Column | Captured value | HQL | Result |
 |---|---|---|---|
 | 3 | 3 | `e0.status = :p1` | true |
-| NULL | `null` | `e0.status = :p1` | **false**: `= NULL` is never true (`LQL-4045` at `WARN`) |
+| NULL | `null` | `e0.status = :p1` | **false**: `= NULL` is never true (`LQL-4045` at `WARN` level) |
 | NULL | 3 | `e0.status = :p1` | false |
 | 3 | `null` | `e0.status = :p1` | false |
 
@@ -116,47 +122,52 @@ With a captured value:
 Integer wanted = request.getStatus();        // may be null
 qb.from(Order.class).where(o -> o.getStatus() == wanted).toList();
 // wanted = 3    -> rows with status 3
-// wanted = null -> rows with status NULL
+// wanted = null -> no matching row (LQL-4045). To find NULL, use o.getStatus() == null
 ```
 
-The column is never wrapped, so the database can use an index.
+The column is never wrapped in a function, so the database can use an index.
 
-`!=` between objects gives `<>`. A row whose value is NULL does not match `<>` (SQL meaning, D48). Java would return it. To keep such rows, write `o.getStatus() == null || o.getStatus() != wanted`.
-Two values of the entity (`o.getDescription() == o.getCustName()`) give `=` and `<>`. A NULL on either side does not match, also NULL and NULL. lambdaQL logs `LQL-5009` at `DEBUG` level when the result can differ from Java (see [3.6.3](03-where.md#363-write-your-null-checks-yourself)).
+`!=` between objects gives `<>`. A row whose value is NULL does not match `<>` (SQL meaning, D48). Java would return it.
+To keep such rows, write `o.getStatus() == null || o.getStatus() != wanted`.
 
+Two values of the entity (`o.getDescription() == o.getCustName()`) give `=` and `<>`. A NULL on either side does not match, and NULL and NULL do not match either.
+lambdaQL logs `LQL-5009` at `DEBUG` level when the result can differ from Java (see [3.6.3](03-where.md#363-write-your-null-checks-yourself)).
+
+<a id="94-strings"></a>
 ## 9.4 Strings
 
 | Java form | HQL | NULL column | `p` is `null` |
 |---|---|---|---|
-| `o.getDescription() == p` | `e0.description = :p1` | row not returned | runs, no row (`LQL-4045`) |
-| `o.getDescription().equals(p)` | `e0.description = :p1` | row not returned | runs, no row (`LQL-4045`) |
-| `p.equals(o.getDescription())` | `e0.description = :p1` | row not returned | **exception** |
+| `o.getDescription() == p` | `e0.description = :p1` | row not returned | runs, no matching row (`LQL-4045`) |
+| `o.getDescription().equals(p)` | `e0.description = :p1` | row not returned | runs, no matching row (`LQL-4045`) |
+| `p.equals(o.getDescription())` | `e0.description = :p1` | row not returned | runs, no matching row (`LQL-4045`) |
 | `"abc".equals(o.getDescription())` (constant receiver) | `e0.description = 'abc'` (the constant is never NULL, so a plain `=`) | row not returned | – |
-| `Objects.equals(o.getDescription(), p)` | `e0.description = :p1` | row not returned | runs, no row (`LQL-4045`) |
-| `o.getDescription().compareTo(p) < 0` | `e0.description < :p1` | row not returned | **exception** |
+| `Objects.equals(o.getDescription(), p)` | `e0.description = :p1` | row not returned | runs, no matching row (`LQL-4045`) |
+| `o.getDescription().compareTo(p) < 0` | `e0.description < :p1` | row not returned | runs, no matching row (`LQL-4045`) |
 | `o.getDescription() == null` | `e0.description is null` | returned | – |
 
 Points to remember:
 
 - In normal Java, `==` on strings is a bug. In a lambdaQL lambda, it is a valid value compare.
-- `equals` and `==` behave differently only for NULL. Choose by the NULL behavior you want.
+- `==`, `equals` and `Objects.equals` behave the same for NULL. If the column is NULL or `p` is `null`, no row matches. If you want NULL rows, write `o.getDescription() == null` yourself.
 - The compare follows the **database collation**, not Java. MariaDB `_ci` collations ignore case and trailing spaces. Oracle stores `''` as NULL.
-- A string constant written in the lambda is an HQL literal; a quote is escaped (`'O''Brien'`). Captured strings are always bind parameters (see [3.3](03-where.md#33-basic-form)).
+- A string constant written in the lambda becomes an HQL literal, and a quote is escaped (`'O''Brien'`). Captured strings are always bind parameters (see [3.3](03-where.md#33-basic-form)).
 - String methods on a column (`startsWith`, `contains`, `trim`, `toUpperCase`) are planned, not in v0.1.
-- String `+` is rejected in v0.1, even with only captured values (javac compiles `+` with `invokedynamic`). Build the string before the lambda:
+- String `+` is rejected in v0.1, even with only captured values (javac compiles `+` with `invokedynamic`). Build the string before the lambda.
 
 ```java
 String code = "A" + suffix;                                  // outside: normal Java
 qb.from(Order.class).where(o -> o.getDescription() == code).toList();
 ```
 
+<a id="95-null-safe-helpers"></a>
 ## 9.5 Null-safe helpers
 
-These Java helpers follow the same rules as `==` (rule R5): the SQL meaning (D48). A captured `null` matches no row:
+These Java helpers follow the same rules as `==`, that is, the SQL meaning (rule R5, D48). A captured `null` matches no row.
 
 | Java | HQL | Note |
 |---|---|---|
-| `Objects.equals(o.getStatus(), s)` | `e0.status = :p1` | `s` is `null`: no row (`LQL-4045`) |
+| `Objects.equals(o.getStatus(), s)` | `e0.status = :p1` | `s` is `null`: no matching row (`LQL-4045`) |
 | `!Objects.equals(o.getStatus(), 1)` | `e0.status <> 1` | NULL rows **not returned** (SQL meaning; Java would return them) |
 | `Objects.equals(o.getDescription(), o.getCustomer().getName())` | `e0.description = j1.name` + `join e0.customer j1` | two columns: a NULL on either side does not match |
 | `Boolean.TRUE.equals(o.getActive())` | `e0.active = :p1` | |
@@ -172,28 +183,31 @@ Compare with `!=`:
 .where(o -> o.getStatus() == null || !Objects.equals(o.getStatus(), 1))   // NULL rows returned
 ```
 
+<a id="96-small-types-char-short-byte-and-boolean"></a>
 ## 9.6 Small types: char, short, byte and boolean
 
 The JVM has no separate compare instructions for `char`, `short`, `byte` and `boolean`. javac compiles them as `int`.
-lambdaQL knows this:
+lambdaQL knows this.
 
 - Compares of `long`, `int`, `short`, `byte`, `char`, `float` and `double` values are supported (rule R1).
 - A constant is converted to the type of its column. For example, the `int` constant `10` becomes a `short` value for a `short` column.
 - A `boolean` getter alone is a condition: `o.isActive()` becomes `e0.active = true`.
 - `o.isActive() == (o.getStatus() > s)` (two boolean expressions) is supported. It becomes `AND`/`OR` (see [3.7](03-where.md#37-boolean-columns)).
-- A primitive property (`boolean active`, `int qty`) counts as "never NULL", like an `@Id` or a `nullable = false` column. Then lambdaQL can drop a null check on it, and `o.getId() == null` becomes `1=0` ([3.6.2](03-where.md#362--on-objects-compares-values)).
+- A primitive property (`boolean active`, `int qty`) counts as "never NULL", like an `@Id` or a `nullable = false` column. So lambdaQL can drop a null check on it, and `o.getId() == null` becomes `1=0` ([3.6.2](03-where.md#362--on-objects-compares-values)).
 
+<a id="97-float-double-and-bigdecimal"></a>
 ## 9.7 float, double and BigDecimal
 
 | Topic | Rule |
 |---|---|
 | `float` / `double` constants (`100.0`, `1.5f`) | written into the HQL as literals (`100.0`, `1.5F`), like other constants in the lambda (D37). A `BigDecimal` made in the lambda (`new BigDecimal("1.5")`) is a computed value, so it is a bind parameter |
-| Bit-exact results | **not promised**. Databases store and compare `float` and `double` differently. lambdaQL adds no `CAST`. Choose your column mapping (for example Oracle `binary_float` / `binary_double`) |
+| Bit-exact results | **not promised**. Databases store and compare `float` and `double` differently. lambdaQL adds no `CAST`. Choose your column mapping yourself (for example Oracle `binary_float` / `binary_double`) |
 | Captured `NaN`, `Infinity` | **exception** when the query runs |
 | `NaN` stored in the database | follows the database (H2 sorts it as the largest value; MariaDB cannot store it) |
 | `BigDecimal` equality | Java `equals` compares the scale (`1.0` is not `1.00`). lambdaQL compares the **value** |
 | Integer `/` | databases do not agree (MariaDB `5/2 = 2.5`). The final rule is not decided. Avoid it |
 
+<a id="98-lambdas-in-instance-methods-capture-this"></a>
 ## 9.8 Lambdas in instance methods capture this
 
 When a lambda in an instance method uses a field, javac makes the lambda body an **instance method** and captures `this`.
@@ -237,7 +251,7 @@ What lambdaQL does:
 - Your class does not need to be `Serializable`.
 - Method calls on `this` that do not use the entity (`this.minPrice()`) are also computed in Java each time the query runs. Keep them free of side effects.
 
-A local variable is different: Java copies it when the lambda is created. Java needs it to be effectively final.
+A local variable is different. Java copies its value when the lambda is created. Java needs a local variable to be effectively final.
 
 ```java
 int st = defaultStatus;                                   // copied now
@@ -246,6 +260,7 @@ qb.from(Order.class).where(o -> o.getStatus() == st).toList();
 
 Both forms give the same HQL.
 
+<a id="99-method-references"></a>
 ## 9.9 Method references
 
 | Method reference | Same as | Status |
@@ -257,7 +272,7 @@ Both forms give the same HQL.
 
 lambdaQL detects a method reference when it loads it. It does not read the body of the referenced method. It builds the call `o.isActive()` itself.
 
-Some method references compile but have the wrong meaning. lambdaQL rejects them at analysis time (rule S13):
+Some method references compile but have the wrong meaning. lambdaQL rejects them at analysis time (rule S13).
 
 - a one-argument instance method used as a two-argument lambda (the second argument would become the method argument),
 - a two-argument static method used as a two-argument lambda.
@@ -266,30 +281,32 @@ In `orderBy`, only a getter of the entity is allowed. A static method, a method 
 
 Use a lambda for anything that is not a simple getter.
 
+<a id="910-static-helpers-you-should-not-expect"></a>
 ## 9.10 Static helpers you should not expect
 
-lambdaQL has **no static DSL**. You do not need `import static` for lambdaQL, except the optional import of `Agg`.
+lambdaQL has **no static DSL**. Except for the optional import of `Agg`, you do not need `import static` for lambdaQL.
 Helpers come in as **lambda arguments** (`by`, `sub`), or you write normal Java.
 
 | You might expect | The lambdaQL way |
 |---|---|
 | `orderBy(asc(...), desc(...))` | `orderBy((o, by) -> by.asc(...).desc(...))` ([4](04-order-paging.md)) |
 | `exists(...)`, `in(...)`, `notIn(...)` | `(o, sub) -> sub.from(X.class).where(...).exists()` / `.select(...).contains(x)` ([5](05-subquery.md)) |
-| `set(path, value)` | `set(o -> o.setX(v))` or `set((o, by) -> by.set(o.getX(), v))` ([7](07-dml.md)) |
+| `set(path, value)` | `set(o -> o.setX(v))` or `set(o -> value(o.getX(), v))` (`Dml.value`, D49) ([7](07-dml.md)) |
 | Q-classes, `Order_.price` | getters: `o.getPrice()` |
-| `count()`, `sum(...)`, ... | `Agg.count()`, `Agg.sum(...)`: **the only static helper class** ([6](06-select-group.md)) |
-| `coalesce(a, b)` | `Objects.requireNonNullElse(a, b)` in `set` values |
+| `count()`, `sum(...)`, ... | `Agg.count()`, `Agg.sum(...)`: the only static helper classes are `Agg` and `Dml` ([6](06-select-group.md)) |
+| `coalesce(a, b)` | `Objects.requireNonNullElse(a, b)` in a `set` value |
 | `like(...)`, `lower(...)`, `upper(...)` | planned (string functions on columns) |
 | `currentTimestamp()` | `LocalDateTime.now()`. It is computed in the application and bound |
-| Your own static utility methods on entity values | **rejected**, unless the method is a DB function with `@SqlFunction` ([8](08-procedures-functions.md)) |
+| Your own static utility methods on entity values | **rejected**, except DB functions with `@SqlFunction` ([8](08-procedures-functions.md)) |
 
-Static methods that use **only captured values** are fine. They run in Java each time the query runs:
+Static methods that use **only captured values** are fine. They run in Java each time the query runs.
 
 ```java
 .where(o -> o.getUpdateAt().isAfter(LocalDateTime.of(2026, 1, 1, 0, 0)))   // OK: computed in Java
 .where(o -> MyUtil.normalize(o.getDescription()) == text)                   // rejected: uses the entity
 ```
 
+<a id="911-other-java-forms"></a>
 ## 9.11 Other Java forms
 
 | Java form | In a lambdaQL lambda |
@@ -305,25 +322,28 @@ Static methods that use **only captured values** are fine. They run in Java each
 | `compareTo(...) < 0`, `isBefore`, `isAfter` | become `<`, `>` |
 | `captured.length` (array of a captured value) | computed in Java |
 | Records | as result types (`select`), and as row types of derived tables and CTE (read with `r.total()`) |
-| `var` | use it for builder variables; the builder type names are not final |
-| Generic `by.set(o.getStatus(), "abc")` | compiles in Java; lambdaQL checks the types at analysis time |
+| `var` | use it for builder variables. The builder type names are not final |
+| Generic `value(o.getStatus(), "abc")` | compiles in Java. At analysis time lambdaQL checks it against the column type and reports the error `LQL-3065` |
+| `value(...)` inside a class that has its own `value(...)` method (for example a record with a `value` component) | the static import is hidden. Write `Dml.value(...)` |
 | The same parameter name in nested lambdas | not allowed by Java. Use `sub2`, `i`, `x` |
 
+<a id="912-compiler-and-build"></a>
 ## 9.12 Compiler and build
 
 | Topic | What to know |
 |---|---|
 | Compiler | lambdaQL is tested with **javac**. Lambdas compiled by **ECJ** (the Eclipse compiler) are not guaranteed. The Eclipse IDE and other tools based on Eclipse JDT use ECJ. Run your tests with Gradle or Maven (javac) |
 | JDK version | Java 21 |
-| ASM | lambdaQL reads class files with ASM 9.11.1 (up to Java 28 class files). If you compile with a newer JDK, update ASM. lambdaQL does not shade ASM, so you can do this yourself |
+| ASM | lambdaQL reads class files with ASM 9.11.1 (up to Java 28 class files). If you compile with a newer JDK, update ASM. lambdaQL does not shade ASM, so you can update it yourself |
 | `-parameters` | recommended. It lets lambdaQL check procedure argument names ([8.4](08-procedures-functions.md#84-warning-argument-order)) |
 | Debug information | keep line numbers (the javac default). lambdaQL puts the source line into error messages |
 | IntelliJ "Number objects compared using `==`" | intended in a lambdaQL lambda. You can use `@SuppressWarnings("NumberEquality")` |
 | IntelliJ warning for `==` on strings | also intended in a lambdaQL lambda |
 
+<a id="913-what-you-can-check-today"></a>
 ## 9.13 What you can check today
 
-The analysis core is implemented. Most of these tests use internal classes, not the user API, but they show the Java behavior on this page:
+The analysis core is implemented. Most of these tests use internal classes, not the user API, but they show the Java behavior on this page.
 
 | Test | Shows |
 |---|---|

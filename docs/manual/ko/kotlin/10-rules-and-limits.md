@@ -143,9 +143,9 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 
 **컬럼에 대한 산술**(결정 D50).
 
-- 컬럼 하나와 값만으로 된 `+ - * /`(`it.qty * 2 > n`)는 값 쪽으로 옮길 수 있습니다. lambdaQL은 `LQL-5012`를 `WARN` 수준으로 기록하고, `STRICT`에서는 오류입니다.
-- 컬럼끼리의 산술(`it.price!! * it.qty > n`)과 `%`는 옮길 수 없으므로 `LQL-5013`을 `DEBUG` 수준으로만 기록합니다. `STRICT`에서도 허용합니다.
-- 옮긴 형태는 의미가 같아야 합니다. `it.qty > n / 2.0`처럼 소수로 나누십시오. 정수 나눗셈 `n / 2`는 `>=`, `=`, `<`와 음수 `n`에서 다른 행을 냅니다. 음수를 곱했다면 비교 방향을 바꾸십시오. `LQL-5012` 메시지가 이를 안내합니다.
+- 컬럼 하나와 값만으로 된 `+ - * /`(`it.cnt * 2 > n`)는 값 쪽으로 옮길 수 있습니다. lambdaQL은 `LQL-5012`를 `WARN` 수준으로 기록하고, `STRICT`에서는 오류입니다.
+- 컬럼끼리의 산술(`it.price!! * it.cnt > n`)과 `%`는 옮길 수 없으므로 `LQL-5013`을 `DEBUG` 수준으로만 기록합니다. `STRICT`에서도 허용합니다.
+- 옮긴 형태는 의미가 같아야 합니다. `it.cnt > n / 2.0`처럼 소수로 나누십시오. 정수 나눗셈 `n / 2`는 `>=`, `=`, `<`와 음수 `n`에서 다른 행을 냅니다. 음수를 곱했다면 비교 방향을 바꾸십시오. `LQL-5012` 메시지가 이를 안내합니다.
 - 인덱스가 있는지 조회해 경고를 줄이는 방식은 채택하지 않았습니다. 권한과 시노님 때문에 "인덱스 없음"과 "알 수 없음"이 섞이고, 컬럼 산술은 드문 형태이기 때문입니다.
 [8. 프로시저와 DB 함수](08-procedures-functions.md)를 참고하십시오.
 
@@ -420,7 +420,7 @@ lambdaQL은 이 목록의 모든 형태에 대해 명확한 오류를 던집니�
 | 집계 별칭으로 정렬(`by.desc(s.total)`) | 계획 중 |
 | 정렬 키로 쓴 boolean 엘비스(KC21) | 키 `o.flag`에 NULL 위치를 지정: `by.asc(o.flag, false)`(NULL이 마지막) |
 
-<a id="subqueries"></a>
+<a id="limits-subqueries"></a>
 ### 서브쿼리
 
 | 지원하지 않음 | 대신 작성할 것 |
@@ -438,7 +438,7 @@ lambdaQL은 이 목록의 모든 형태에 대해 명확한 오류를 던집니�
 | `groupBy` 키로 쓴 `arrayOf(...)` / `setOf(...)` | `listOf(...)`, `Pair`, `Triple` |
 | select 값으로 쓴 boolean 엘비스(KC21) | `it.flag`를 조회하고 NULL은 Kotlin에서 처리 |
 
-<a id="update-insert-delete"></a>
+<a id="limits-update-insert-delete"></a>
 ### 수정, 삽입, 삭제
 
 | 지원하지 않음(v0.1) | 대신 작성할 것 |

@@ -1,9 +1,6 @@
 <a id="74-delete"></a>
 # 7.4 Delete (Java)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/java/07-4-delete.md) for the latest rules.
-
 [7. Update, insert, delete (Java)](07-dml.md) | [7.2 Update](07-2-update.md) | **7.4 Delete** | [7.5 Insert](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Kotlin](../kotlin/07-4-delete.md)
 
 ---
@@ -50,9 +47,10 @@ where (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id) is n
 MariaDB writes `delete o1_0 from orders o1_0`. H2 and Oracle write `delete from orders o1_0`.
 
 The second statement deletes **the same rows** that `qb.from(Order.class).where(o -> o.getCustomer().getName() == null)` returns: orders whose customer has no name. The test compares the deleted rows with this select.
-Orders **without** a customer are not deleted (rule U9, decision D36). A null guard (`o.getCustomer() == null || ...`) does not change this, because the path is an inner join in the select too (decision D48). To delete orders without a customer, run a second delete with `o.getCustomer() == null`.
+Orders **without** a customer are not deleted (rule U9, decision D36). A null guard (`o.getCustomer() == null || ...`) does not change this, because the path is an inner join in the select too (decision D48).
+To delete orders without a customer, run one more delete with the condition `o.getCustomer() == null`.
 
-Delete all rows: `all()` is required (rule U5).
+To delete all rows, you need `all()` (rule U5).
 
 ```java
 qb.delete(Order.class).all().execute();     // delete all rows
@@ -66,7 +64,7 @@ qb.delete(Item.class).where(i -> ids.contains(i.getId())).execute();
 ```
 
 A subquery in `where` uses a second lambda argument `sub`, as in [5. Subqueries](05-subquery.md).
-Delete the orders that have no items:
+An example that deletes the orders that have no items:
 
 **(tested)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java), region `dml-subquery`:
 
@@ -91,9 +89,43 @@ where not exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id)
 Like every JPA bulk statement, a delete does not run JPA `cascade` or `orphanRemoval`, and it does not change entities already loaded (rule U16).
 A delete needs a transaction (see [7.8](07-dml.md#transactions)).
 
+<a id="delete-with-a-subquery-on-the-same-table"></a>
+## A subquery that reads the same table
+
+A subquery in `where` can read the entity being deleted (or an entity of the same inheritance hierarchy). This covers the subquery's own `from`, a join inside the subquery, and a correlated scalar subquery of rule U9.
+In this case lambdaQL first reads the target ids into a derived table, then deletes by those ids (rule U17).
+
+```
+delete from Order d0 where d0.id in (select t.id from (select e0.id as id from Order e0 where <condition>) t)
+```
+
+- Reason: when a subquery reads the target table, MariaDB rejects Hibernate's `delete t from …` (error 1093, "specified twice").
+- The same form works for a correlated subquery. Wrapping only the subquery does not work for a correlated subquery.
+- Measured on H2, MariaDB 10.11 and Oracle 23.26 (non-correlated `avg`, correlated `exists`, `max`, a join inside the subquery). The three databases delete the same number of rows, and MariaDB does not fail.
+- A subquery that reads another table keeps the usual form (the `not exists` example above).
+- `update` is not wrapped. An `update` with a subquery that reads its own table works on all three databases (measured on MariaDB 10.11).
+- Entities with a composite id are not wrapped. A delete with `limit` already uses the wrapped form below (alias `x0`).
+
+**(tested)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `delete-self-subquery`:
+
+```java
+// the subquery reads the target table: lambdaQL reads the matching ids through a derived table first (U17),
+// because MariaDB cannot delete from a table that a subquery reads (error 1093)
+ExecutableDelete<Order> d = qb.delete(Order.class)
+        .where((o, sub) -> o.getPrice() < sub.from(Order.class).avg(x -> x.getPrice()));
+assertEquals("delete from Order d0 where d0.id in (select t.id from (select e0.id as id from Order e0"
+        + " where e0.price < (select avg(s1.price) from Order s1)) t)", d.toHql().hql());
+// a subquery on another table keeps the plain form
+ExecutableDelete<Order> unused = qb.delete(Order.class)
+        .where((o, sub) -> !sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists());
+assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)",
+        unused.toHql().hql());
+```
+
+<a id="delete-the-first-rows-limit"></a>
 ## Delete the first rows: `limit`
 
-`orderBy(...)` and `limit(n)` after `where(...)` or `all()` delete at most `n` rows: the first `n` rows of `qb.from(X.class).where(same).orderBy(same)`.
+`orderBy(...)` and `limit(n)` after `where(...)` or `all()` delete at most `n` rows. The target is the first `n` rows of `qb.from(X.class).where(same).orderBy(same)`.
 Use it to work through many rows in small steps.
 
 - Without `orderBy`, the order is by the id.
@@ -130,22 +162,23 @@ delete from orders o1_0
 where o1_0.id in (select t1_0.id from (select o2_0.id id from orders o2_0 where o2_0.status=1 order by o2_0.price,o2_0.id fetch first 1 rows only) t1_0)
 ```
 
-lambdaQL writes the limit as `e0.id in (select t.id from (select x0.id as id from X x0 ... order by ... limit n) t)`:
+lambdaQL renders the limit as `e0.id in (select t.id from (select x0.id as id from X x0 ... order by ... limit n) t)`.
 
 - The inner select follows the select rules, joins included (decision D36). So the statement deletes exactly the rows that the select returns.
 - The derived table `t` is there for MariaDB. Without it, MariaDB rejects `limit` in an `in` subquery (error 1235) and a subquery that reads the target table (error 1093).
-- H2 and Oracle write `fetch first 1 rows only`, MariaDB writes `limit 1`.
+- H2 and Oracle write `fetch first 1 rows only`. MariaDB writes `limit 1`.
 
+<a id="delete-exactly-one-row-executeone"></a>
 ## Delete exactly one row: `executeOne()`
 
-`executeOne()` runs the delete with the **one-row protection**. Use it instead of `execute()` when the condition should match one row, for example a unique key.
+`executeOne()` runs the delete with the **one-row protection**. Use it instead of `execute()` when the condition should match one row (for example, a unique key).
 
-1. lambdaQL reads the ids of the rows that match, at most 2.
-2. No id: nothing changes. The result is 0.
-3. 2 ids: nothing changes. `executeOne()` throws JPA's `NonUniqueResultException`.
-4. 1 id: lambdaQL deletes that row with `id = :p and (your condition)`. The result is 1, or 0 if the row stopped matching in the meantime.
+1. lambdaQL reads the ids of the matching rows, at most 2.
+2. With no id, nothing changes and the result is 0.
+3. With 2 ids, nothing changes and it throws JPA's `NonUniqueResultException`.
+4. With 1 id, it deletes that row with `id = :p and (condition)` and returns 1. If the row stopped matching in the meantime, it returns 0.
 
-The statement names one id, so it never changes more than one row. The protection does not rely on a rollback.
+The statement names one id, so it never changes 2 or more rows. The protection does not rely on a rollback.
 
 **(tested)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `execute-one`:
 

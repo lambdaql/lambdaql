@@ -1,7 +1,5 @@
+<a id="lambdaql-manual-kotlin-track"></a>
 # lambdaQL Manual: Kotlin track
-
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/README.md) for the latest rules.
 
 **Other languages:** English | [한국어](../../ko/kotlin/README.md) | [日本語](../../ja/kotlin/README.md) | [简体中文](../../zh/kotlin/README.md)
 
@@ -54,6 +52,7 @@ fetch first ? rows only
 > [!NOTE]
 > **About the examples.** Examples are design examples. When a feature is implemented, its examples are replaced by code taken from the test suite, with a link to the test file. Examples copied from the Kotlin tests are marked **(tested)** (chapters 3 to 7).
 
+<a id="contents"></a>
 ## Contents
 
 | # | Page | What you learn |
@@ -62,9 +61,9 @@ fetch first ? rows only
 | 2 | [Getting started](02-getting-started.md) | Requirements, Gradle setup, Kotlin entities, first query |
 | 3 | [Conditions (`where`)](03-where.md) | Operators, null rules, `?.` `?:` `!!`, ranges, `when`, captured values |
 | 4 | [Sorting and paging](04-order-paging.md) | `orderBy`, `Direction`, `limit`, `offset` |
-| 5 | [Subqueries](05-subquery.md) | `exists()`, `x in sub...`, scalar and correlated subqueries |
+| 5 | [Subqueries](05-subquery.md) | `exists()`, `x in sub...`, scalar and correlated subqueries, joins inside a subquery |
 | 6 | [Select, aggregates and group by](06-select-group.md) | `select`, data classes, `Pair`, `groupBy`, `having`, `Agg`, joins, derived tables, CTE |
-| 7 | [Update, insert, delete](07-dml.md) | Property assignment, `by.set`, `values`, `all()`, `execute()`, `limit`, `executeOne()` |
+| 7 | [Update, insert, delete](07-dml.md) | Property assignment, `Dml.value`, `values`, `all()`, `execute()`, `limit`, `executeOne()` |
 | 7.6 | [Upsert](07-6-upsert.md) | `upsert`, `onConflict { ... }.update { ... }`, `onConflict { ... }.ignore()`, row counts per database |
 | 8 | [Procedures and DB functions](08-procedures-functions.md) | `@SqlProcedure`, `@SqlFunction` in a `companion object`, `qb.call`, `qb.exec` |
 | 9 | [Kotlin notes](09-kotlin-notes.md) | What is special in Kotlin: `?.` `?:` `!!`, `==`, `in`, `when`, operators, limits KC1 to KC21 |
@@ -72,6 +71,7 @@ fetch first ? rows only
 | 11 | [Errors and languages](../11-errors-and-languages.md) (common) | Error codes, exceptions, message language, logging |
 | 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`, repository methods with a body, DML shortcuts (`deleteAll`, `updateOne`, ...), Spring `Sort` and `Pageable`, modules, transactions, Kotlin 2.2 / `-Xjvm-default=all` |
 
+<a id="where-to-start"></a>
 ## Where to start
 
 1. Read the common [Overview](../01-overview.md) to understand the idea: a lambda is a **query**, not code. lambdaQL reads its bytecode and never runs it.
@@ -79,6 +79,7 @@ fetch first ? rows only
 3. Learn conditions in [3. Conditions](03-where.md). This is the most important chapter.
 4. Read [9. Kotlin notes](09-kotlin-notes.md) once. It explains the Kotlin forms that work differently in a query (`!!`, `?.`, `?:`, `==`, `===`).
 
+<a id="example-entities"></a>
 ## Example entities
 
 All pages in this track use these Kotlin entities. The full code is in [2. Getting started](02-getting-started.md#example-entities).
@@ -92,16 +93,18 @@ All pages in this track use these Kotlin entities. The full code is in [2. Getti
 Most properties are nullable `var` properties, because a database column can be NULL.
 `active` and `qty` are Kotlin `Boolean` and `Int`. These are JVM primitives, so they can never be NULL.
 
+<a id="three-things-to-know-first"></a>
 ## Three things to know first
 
 | Kotlin | In a lambdaQL lambda |
 |---|---|
 | `it.price!! > 100.0` | `!!` is ignored. It is only there so that the code compiles. There is no `NullPointerException`, because the lambda never runs. |
-| `it.customer?.name == "Kim"` | `it.customer?.name` names a column of the joined customer. In `where` it is an inner `join` by default: orders without a customer are not returned. A null guard (`it.customer == null \|\| ...`) does not change this (D48); use `leftJoin`. `it.customer!!.name` means the same column. |
+| `it.customer?.name == "Kim"` | `it.customer?.name` names a column of the joined customer. In `where` it is an inner `join` by default: orders without a customer are not returned. A null guard (`it.customer == null \|\| ...`) does not change this (D48). To keep these orders, use `leftJoin`. `it.customer!!.name` means the same column. |
 | `it.status == 1` with `status: Int?` | `e0.status = 1`. A NULL `status` does not match (SQL meaning). lambdaQL ignores the null checks that the Kotlin compiler adds. Only the null checks **you write** count. |
 
 Details: [9. Kotlin notes](09-kotlin-notes.md).
 
+<a id="supported-environment"></a>
 ## Supported environment
 
 | Item | Version |
@@ -112,13 +115,15 @@ Details: [9. Kotlin notes](09-kotlin-notes.md).
 | Databases verified in the design | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
 | Spring Boot (optional) | 3.4 (tested with 3.4.2, Java tests). Spring Boot 4 is not verified yet |
 
+<a id="other-languages"></a>
 ## Other languages
 
 Every language folder (`en`, `ko`, `ja`, `zh`) has the same layout. To read a page in another language, change `en` to `ko`, `ja` or `zh` in its address. The links are at the top of this page.
 
+<a id="help-and-contributions"></a>
 ## Help and contributions
 
 - Source code: <https://github.com/codebit0/lambdaql>
-- The English manual is the source. The other languages are translations.
+- The Korean manual is the source. The other languages are translations.
 - If you find a mistake, please open an issue or a pull request.
 - Design documents (Korean, for contributors): [ROADMAP.md](../../../design/ROADMAP.md), [KOTLIN.md](../../../design/KOTLIN.md)

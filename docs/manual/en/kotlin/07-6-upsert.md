@@ -7,14 +7,15 @@
 
 
 An upsert inserts a row. If a row with the same key already exists, it changes that row instead, or it keeps the row as it is.
-lambdaQL has three forms:
+lambdaQL has three forms.
 
 | Form | Key | When the key exists |
 |---|---|---|
 | `qb.upsert(X::class.java).values { ... }` | the `@Id` | the other assigned columns get the new values |
 | `qb.insert(X::class.java).values { ... }.onConflict { key }.update { ... }` | a column with a primary key or unique constraint | the assignments in `update { ... }` run on the existing row |
-| `qb.insert(X::class.java).values { ... }.onConflict { key }.ignore()` | the same | nothing: the existing row stays |
+| `qb.insert(X::class.java).values { ... }.onConflict { key }.ignore()` | the same | no change: the existing row stays |
 
+<a id="short-form-upsert"></a>
 ## Short form: `upsert`
 
 ```kotlin
@@ -45,15 +46,16 @@ set a1_0.price=excluded.price when not matched then insert (id,price)
 values (excluded.id,excluded.price)
 ```
 
-There are no Kotlin tests yet. The same statements written in Java are tested in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/07-6-upsert.md) for the tested examples.
+There is no Kotlin test yet. The same statements written in Java are tested in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/07-6-upsert.md) for the tested examples.
 
-The SQL is different on each database. H2 and Oracle get a `merge` statement: H2 reads the new row from `values (...)`, Oracle from `select 100 id,2.0 price`. MariaDB gets `insert ... on duplicate key update` and reads the new value with `values(price)`.
+The SQL is different on each database. H2 and Oracle get a `merge` statement. H2 reads the new row from `values (...)`, and Oracle reads it from `select 100 id,2.0 price`. MariaDB gets `insert ... on duplicate key update` and reads the new value with `values(price)`.
 
-The row must assign the `@Id`. If it assigns only the `@Id`, there is nothing to change, and lambdaQL writes the `ignore()` form below.
+The row must assign the `@Id`. If it assigns only the `@Id`, there is no column to change, so lambdaQL writes the `ignore()` form below.
 
+<a id="your-own-change-onconflictkeyupdate"></a>
 ## Your own change: `onConflict(key).update(...)`
 
-Use this form when the change is not "take the new values", for example a counter.
+Use this form when the change is not "replace with the new values", for example a counter.
 
 ```kotlin
 // on conflict, change the existing row: a property read here reads the existing row
@@ -84,10 +86,13 @@ set a1_0.price=(a1_0.price+5.0) when not matched then insert (id,price)
 values (excluded.id,excluded.price)
 ```
 
-In `update { ... }`, a property read reads the **existing** row: `it.price!! + 5.0` is the old price plus 5. In the SQL, H2 and Oracle write the alias (`a1_0.price`), and MariaDB writes the table name (`archive.price`).
+In `update { ... }`, a property read reads the **existing** row. `it.price!! + 5.0` is the old price plus 5. In the SQL, H2 and Oracle write the alias (`a1_0.price`), and MariaDB writes the table name (`archive.price`).
 
-The key is a lambda (`{ it.id }`). Kotlin property references (`Archive::id`) are not implemented yet, as in [4. Sorting and paging](04-order-paging.md). The key must be a column of the entity itself, not an association path, and the database needs a primary key or unique constraint on it.
+The key is a lambda (`{ it.id }`). Kotlin property references (`Archive::id`) are not implemented yet, as in [4. Sorting and paging](04-order-paging.md). The key must be a column of the entity itself, not an association path, and the database needs a primary key or unique constraint on that column.
 
+With a two-argument lambda in `values` and `update`, the second argument `sub` makes a subquery (decision D49, measured on three databases). See [7.5](07-5-insert.md#a-subquery-in-a-value) for an example.
+
+<a id="keep-the-existing-row-onconflictkeyignore"></a>
 ## Keep the existing row: `onConflict(key).ignore()`
 
 ```kotlin
@@ -114,12 +119,13 @@ Hibernate's own `on conflict ... do nothing` runs as a plain insert on H2 and Or
 So lambdaQL writes `insert ... select ... where not exists (...)` itself. The SQL is the same on all three databases.
 
 > [!WARNING]
-> **`ignore()` is not atomic.** Two transactions that insert the same key at the same moment can both pass the `not exists` check.
-> Then one of them gets a duplicate key error. If this can happen in your application, catch the error.
+> **`ignore()` is not atomic.** Two transactions that insert the same key at the same time can both pass the `not exists` check.
+> Then one of them gets a duplicate key error. If this can happen in your application, handle this error.
 
+<a id="the-row-count"></a>
 ## The row count
 
-`execute()` returns the row count that the database reports, as it is (decision D40). The Java test checks these numbers:
+`execute()` returns the row count that the database reports, as it is (decision D40). The Java test checks these values (measured).
 
 | Database | Inserted | Updated | Ignored |
 |---|---|---|---|
@@ -129,9 +135,11 @@ So lambdaQL writes `insert ... select ... where not exists (...)` itself. The SQ
 
 So on MariaDB, `execute() == 1` does not mean "updated". Use `execute() > 0` to check that a row was written.
 
+<a id="many-rows"></a>
 ## Many rows
 
-`qb.upsert(X::class.java).values(list) { a, l -> ... }` and `onConflict { ... }` after `values(list) { ... }` run **one statement per row**. `execute()` returns the sum. This is not covered by a test yet.
+`qb.upsert(X::class.java).values(list) { a, l -> ... }` and `onConflict { ... }` after `values(list) { ... }` run **one statement per row**. `execute()` returns the sum. This form has no test yet (not measured).
+The list form also takes a subquery with a third argument, as in `values(list) { a, l, sub -> ... }` (see [7.5](07-5-insert.md#many-rows-from-a-list)).
 
 ```kotlin
 val n = qb.upsert(Archive::class.java)
@@ -139,13 +147,14 @@ val n = qb.upsert(Archive::class.java)
     .execute()
 ```
 
+<a id="rules"></a>
 ## Rules
 
 - The row must assign the key. `upsert(X::class.java)` uses the `@Id` as the key.
 - The key must be a column of the entity itself. An association path is an error.
-- A value in `values { ... }` cannot read the row (it is a new row). Only `update { ... }` reads the existing row.
+- A value in `values { ... }` cannot read the row, because it is a new row. Only `update { ... }` reads the existing row.
 - The assignment rules of update and insert apply (U1, U3, U4, U6; see [7.9](07-dml.md#79-all-rules-u1-to-u21-summary)).
-- There is no upsert from `insert ... select`.
+- There is no upsert with `insert ... select`.
 - Like the other DML statements, an upsert needs a transaction and does not change entities already loaded (see [7.8](07-dml.md#transactions)).
 
 ---

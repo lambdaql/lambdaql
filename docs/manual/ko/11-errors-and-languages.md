@@ -395,8 +395,9 @@ lambdaQL은 **SLF4J API**로 로그를 남깁니다.
 
 - lambdaQL은 `slf4j-api`에만 의존합니다. 로깅 백엔드(Logback, Log4j 2 등)는 직접 고릅니다.
 - Spring Boot에는 이미 SLF4J와 Logback이 들어 있으므로 아무것도 추가할 필요가 없습니다.
-- 경고는 `WARN` 레벨을 사용하며 `LQL-5xxx` 범위의 코드로 시작합니다.
-- `WARN` 레벨이 꺼져 있으면 lambdaQL은 메시지 텍스트를 만들지 않습니다.
+- 경고 메시지는 코드로 시작합니다. 코드는 대부분 `LQL-5xxx` 범위이고, `LQL-4045`도 로그로만 기록합니다.
+- 레벨(`WARN`, `INFO`, `DEBUG`)은 코드마다 다릅니다. 아래 표에 코드별 레벨을 적었습니다.
+- 그 레벨이 꺼져 있으면 lambdaQL은 메시지 텍스트를 만들지 않습니다.
 
 현재 lambdaQL이 기록하는 경고:
 
@@ -414,8 +415,8 @@ lambdaQL은 **SLF4J API**로 로그를 남깁니다.
 | `LQL-5009` | 조건이 엔티티 값을 SQL 의미로 비교해(결정 D48) Java·Kotlin에서는 맞는 NULL 행이 빠질 수 있을 때: 엔티티 값끼리의 `==`/`equals`, 값과의 `!=`, NULL 가능 `Boolean`의 `!`, 연관 경로의 null guard(경로는 INNER JOIN 유지), 서브쿼리 `NOT IN`. 조건 문장마다 한 번 `DEBUG` 레벨로 기록(3.6.3 참고: [Java](java/03-where.md#363-write-your-null-checks-yourself) \| [Kotlin](kotlin/03-where.md#363-write-your-null-checks-yourself)) |
 | `LQL-5010` | `@Lob` 컬럼을 `order by`, `distinct`, `group by`에 쓸 때. H2와 MariaDB는 실행하지만 Oracle은 거부함(ORA-22848, ORA-22849). `=` 비교는 세 DB 모두 동작. lambdaQL은 쿼리를 바꾸지 않음. 컬럼과 사용처마다 한 번 `DEBUG` 레벨로 기록([4.5](java/04-order-paging.md#45-what-a-sort-key-can-be) 참고) |
 | `LQL-5011` | `@Enumerated(EnumType.STRING)` enum 컬럼으로 정렬할 때. DB는 이름 순으로, Java·Kotlin은 선언 순서로 정렬하므로 순서가 다를 수 있음. lambdaQL은 쿼리를 바꾸지 않음. 컬럼마다 한 번 `DEBUG` 레벨로 기록. `ORDINAL`은 기록하지 않음([4.5](java/04-order-paging.md#45-what-a-sort-key-can-be) 참고) |
-| `LQL-5012` | 컬럼 하나와 값만으로 된 산술(`+ - * /`)이 조건의 컬럼 쪽에 있을 때(`o.getQty() * 2 > n`). 값 쪽으로 옮길 수 있음. `WARN` 레벨로 기록. `SargableMode.STRICT`에서는 `LQL-3066` 오류(결정 D50, [8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) 참고) |
-| `LQL-5013` | 컬럼끼리의 산술이나 `%`가 조건에 있을 때(`o.getPrice() * o.getQty() > n`). 옮길 수 없으므로 `DEBUG` 레벨로만 기록. `STRICT`에서도 허용 |
+| `LQL-5012` | 컬럼 하나와 값만으로 된 산술(`+ - * /`)이 조건의 컬럼 쪽에 있을 때(`o.getCnt() * 2 > n`). 값 쪽으로 옮길 수 있음. `WARN` 레벨로 기록. `SargableMode.STRICT`에서는 `LQL-3066` 오류(결정 D50, [8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) 참고) |
+| `LQL-5013` | 컬럼끼리의 산술이나 `%`가 조건에 있을 때(`o.getPrice() * o.getCnt() > n`). 옮길 수 없으므로 `DEBUG` 레벨로만 기록. `STRICT`에서도 허용 |
 
 ```
 WARN  [LQL-5002] limit 없는 서브쿼리 정렬은 결과에 영향이 없어 제거했습니다(Q4): ...
@@ -425,8 +426,11 @@ WARN  [LQL-5002] limit 없는 서브쿼리 정렬은 결과에 영향이 없어 
 
 - 대소문자를 구분하지 않는 비교에 맞는 인덱스나 콜레이션이 그 컬럼에 없을 때
 
-이런 경고를 오류로 바꾸는 "엄격 모드"가 계획되어 있습니다.
-외부 정렬에는 이미 같은 기능이 있습니다. `SortMode.STRICT`에서는 `LQL-5003`의 경우에 `SortNotAllowedException`(`LQL-4040`)이 발생합니다.
+모든 경고를 한꺼번에 오류로 바꾸는 일반 엄격 모드는 구현되지 않았습니다.
+대신 두 영역에 각자의 `STRICT` 모드가 있습니다.
+
+- 정렬 정책(결정 D43): `SortMode.STRICT`에서는 `LQL-5003`의 경우에 `SortNotAllowedException`(`LQL-4040`)이 발생합니다.
+- SARGable(결정 D50): `SargableMode.STRICT`에서는 `LQL-5001`, `LQL-5007`, `LQL-5012`의 경우에 `NonSargableException`(`LQL-3066`)이 발생합니다.
 
 > [!NOTE]
 > `lambdaql-core`는 Spring에 의존하지 않습니다. 로깅 의존성은 `slf4j-api` 하나이므로 로깅 구현체는 사용자가 선택합니다. Spring 모듈(`lambdaql-spring-data-jpa`, `lambdaql-spring-boot-starter`)은 Spring Data JPA를 가져오고, 스타터는 `spring-boot-starter-data-jpa`와 Logback도 함께 가져옵니다.

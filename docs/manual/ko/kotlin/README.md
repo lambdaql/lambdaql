@@ -124,6 +124,6 @@ fetch first ? rows only
 ## 도움말과 기여
 
 - 소스 코드: <https://github.com/codebit0/lambdaql>
-- 영어 매뉴얼이 원본입니다. 다른 언어는 번역본입니다.
+- 한국어 매뉴얼이 원본입니다. 다른 언어는 번역본입니다.
 - 잘못된 내용을 발견하면 이슈나 풀 리퀘스트를 열어 주십시오.
 - 설계 문서(한국어, 기여자용): [ROADMAP.md](../../../design/ROADMAP.md), [KOTLIN.md](../../../design/KOTLIN.md)

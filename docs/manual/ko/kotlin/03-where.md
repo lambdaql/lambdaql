@@ -126,11 +126,14 @@ where o1_0.status=1 and o1_0.active=1
 nullable 컬럼과의 비교는 **SQL 의미**를 따릅니다.
 컬럼이 NULL이면 결과는 UNKNOWN이고 행은 반환되지 않습니다. (Kotlin 코드를 실행한다면 `!!`가 `NullPointerException`을 던집니다.)
 
-**산술.** `+`, `-`, `*`, 단항 `-`를 지원합니다. `%`는 `mod`로 씁니다.
-정수 `/`는 피하십시오. 데이터베이스마다 결과가 다릅니다(MariaDB는 `5/2 = 2.5`, Kotlin은 `2`). `/`의 최종 규칙은 아직 정해지지 않았으며, 첫 버전에서는 거부될 수 있습니다.
+**산술.** `+`, `-`, `*`, `/`, 단항 `-`를 지원합니다. `%`는 `mod`로 씁니다.
+`/`도 쓸 수 있지만, 컬럼이 들어간 정수 `/`는 피하십시오. SQL에서 계산하므로 데이터베이스마다 결과가 다릅니다(MariaDB는 `5/2 = 2.5`, Kotlin은 `2`). 컬럼 쪽 `/`의 결과를 맞추는 규칙은 아직 정해지지 않았습니다.
+캡처 값끼리의 계산(아래의 `n / 2.0`)은 쿼리 전에 하므로 이 차이가 없습니다.
 
-**컬럼에 대한 산술과 인덱스**(결정 D50). `it.qty * 2 > n`처럼 컬럼에 산술을 걸면 인덱스를 쓸 수 없습니다. lambdaQL은 `LQL-5012`를 `WARN` 수준으로 기록하고, `SargableMode.STRICT`에서는 분석이 실패합니다(`LQL-3066`).
-값 쪽으로 옮길 때는 `it.qty > n / 2.0`처럼 소수로 나누십시오. 정수 나눗셈 `n / 2`는 다른 행을 냅니다. 음수를 곱했다면 비교 방향을 바꾸십시오. 자세한 내용은 [10.2](10-rules-and-limits.md#db-functions-on-a-column)를 참고하십시오.
+아래 예의 `cnt`는 테스트 엔티티 `Order`(Java)의 정수 컬럼(`Integer cnt`)입니다. [3.2](#32-example-entities)의 예제 엔티티에는 없습니다.
+
+**컬럼에 대한 산술과 인덱스**(결정 D50). `it.cnt * 2 > n`처럼 컬럼에 산술을 걸면 인덱스를 쓸 수 없습니다. lambdaQL은 `LQL-5012`를 `WARN` 수준으로 기록하고, `SargableMode.STRICT`에서는 분석이 실패합니다(`LQL-3066`).
+값 쪽으로 옮길 때는 `it.cnt > n / 2.0`처럼 소수로 나누십시오. 정수 나눗셈 `n / 2`는 다른 행을 냅니다. 음수를 곱했다면 비교 방향을 바꾸십시오. 자세한 내용은 [10.2](10-rules-and-limits.md#db-functions-on-a-column)를 참고하십시오.
 
 **정수 컬럼과 소수 값**(결정 D48 B8). 정수 컬럼을 소수 값과 비교하면 lambdaQL은 값을 적은 그대로 비교합니다. 반올림이나 값 제외는 하지 않습니다.
 
@@ -489,7 +492,7 @@ lambdaQL은 JPA Metamodel로 각 단계를 확인합니다.
 | 컬렉션(`@OneToMany`, `@ManyToMany`) | **거부됨** | `it.items...` -> `exists()` 서브쿼리 사용 |
 
 **값 객체 전체의 비교.** 임베디드 값 객체(`@Embedded`) 전체를 같음으로 비교하면 lambdaQL은 컬럼마다 비교 하나로 펼칩니다(B6).
-`it.address == addr`는 모두 `e0.address.city = :p1 and e0.address.zip = :p2`가 됩니다.
+`it.address == addr`는 `e0.address.city = :p1 and e0.address.zip = :p2`가 됩니다.
 
 - 부정(`it.address != addr`)은 `e0.address.city <> :p1 or e0.address.zip <> :p2`입니다.
 - `it.address == null`은 `e0.address.city is null and e0.address.zip is null`이고, `!= null`은 `e0.address.city is not null or e0.address.zip is not null`입니다.

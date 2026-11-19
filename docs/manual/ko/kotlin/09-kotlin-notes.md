@@ -210,7 +210,7 @@ SQL `=`는 값만 비교합니다. **lambdaQL은 값 비교를 사용합니다.*
 | `it.price!! > 10.0` | `!!`는 무시됨. 컴파일러를 위한 것일 뿐 | `e0.price > 10.0` |
 | `it.description ?: ""`(값) | 기본값 | `coalesce(e0.description, '')` |
 | `it.flag ?: false`(조건) | NULL은 false로 취급 | `(e0.flag is not null and e0.flag = true)` |
-| `lo!!`(캡처 값) | `!!`는 무시됨. `lo`가 null이면 쿼리가 실행될 때 오류 | `:p1` |
+| `lo!!`(캡처 값) | `!!`는 무시됨. `lo`가 null이면 NULL을 바인딩하므로 일치하는 행이 없음(`DEBUG` 수준 `LQL-4045`, [9.8](#98-captured-values) 참고) | `:p1` |
 
 <a id="-and--on-association-paths"></a>
 ### 연관 경로의 `?.`와 `!!`
@@ -427,7 +427,7 @@ class OrderRepo(private val qb: QueryBuilder) {
 
     fun open(lo: Int?) = qb.from(Order::class.java)
         .where { it.status!! >= minStatus }
-        .where { lo == null || it.status!! > lo }   // lo == null: 필터 없음, 그 외에는 o.status > :p2
+        .where { lo == null || it.status!! > lo }   // lo == null: 필터 없음, 그 외에는 e0.status > :p2
         .toList()
 }
 ```

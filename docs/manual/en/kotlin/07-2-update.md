@@ -6,6 +6,7 @@
 ---
 
 
+<a id="basic-form"></a>
 ## Basic form
 
 ```kotlin
@@ -37,7 +38,7 @@ set o1_0.status=?,o1_0.price=(o1_0.price*2.0)
 where o1_0.status=1
 ```
 
-Oracle writes the alias in `set` (`set o1_0.status=?`); H2 and MariaDB do not.
+Oracle writes the alias in `set` (`set o1_0.status=?`). H2 and MariaDB do not.
 
 **(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `update`:
 
@@ -53,6 +54,7 @@ assertEquals("update Order e0 set e0.status = :p1, e0.price = (e0.price * 2.0)"
 `st` is a captured `Short` (`7`). The test entity's `price` is a primitive `double`, so there is no `!!`. The path `it.customer?.name` in the `where` of an update becomes a subquery (see [Where with paths and subqueries](#where-with-paths-and-subqueries) below). The test runs the statement and reads the rows back.
 More statements written in Java are tested in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/07-2-update.md) for those examples.
 
+<a id="values-null-date-boolean"></a>
 ## Values: null, date, boolean
 
 ```kotlin
@@ -64,6 +66,7 @@ qb.update(Order::class.java)
 
 An enum value works the same way. Each captured value gets **its own parameter**, even when the same value is used twice (rule U7).
 
+<a id="add-to-a-value-default-for-null"></a>
 ## Add to a value, default for NULL
 
 ```kotlin
@@ -77,8 +80,9 @@ qb.update(Order::class.java)
 // → set o.price = coalesce(o.price, 0.0) + 1.0
 ```
 
-`+=` needs a non-null property in Kotlin (`cnt: Int`). For a nullable property, write `it.total = it.total!! + 1` or use `?:` as above.
+In Kotlin, `+=` needs a non-null property (`cnt: Int`). For a nullable property, write `it.total = it.total!! + 1` or use `?:` as above.
 
+<a id="embedded-fields"></a>
 ## Embedded fields
 
 ```kotlin
@@ -89,6 +93,7 @@ qb.update(Order::class.java).set { it.address = addr }.where { it.id == id }.exe
 // → sets all columns of the embedded value (city, zip)
 ```
 
+<a id="change-an-association-foreign-key"></a>
 ## Change an association (foreign key)
 
 ```kotlin
@@ -103,8 +108,9 @@ qb.update(Order::class.java).set { it.customer = customer }.where { it.id == id 
 ```
 
 You can only set the `@Id` of an associated entity (the FK).
-`it.customer?.name = x` is an error: it would change another table (rule U6).
+`it.customer?.name = x` is an error, because it would change another table (rule U6).
 
+<a id="a-value-from-another-table"></a>
 ## A value from another table
 
 Read the value through the association path. lambdaQL renders it as a **correlated scalar subquery** (rule U9).
@@ -149,44 +155,34 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 ```
 
 If an order has no customer, `custName` becomes NULL.
-In `where`, lambdaQL adds `e0.customer.id is not null`, so the update changes the same rows as `qb.from(Order::class.java).where { same lambda }` (decision D36). The Java test checks this.
+In `where`, lambdaQL adds `e0.customer.id is not null`. So the update changes the same rows as `qb.from(Order::class.java).where { same lambda }` returns (decision D36). The Java test checks this.
 
+<a id="an-aggregate-from-a-subquery"></a>
 ## An aggregate from a subquery
 
-Use a two-argument lambda. The second argument is the context object (`sub`).
-`Agg` is not needed here; the subquery has `sum`, `avg`, ... as in [5. Subqueries](05-subquery.md).
-This form is **not implemented yet**. Only subqueries in `where` work today.
+Use a two-argument lambda `set { o, sub -> ... }`. The second argument is `sub`, the starting point for subqueries (decision D49).
+`Agg` is not needed here. The subquery has `sum`, `avg`, ... as in [5. Subqueries](05-subquery.md).
+
+**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `update-sub`:
 
 ```kotlin
-qb.update(Order::class.java)
-    .set { o, sub ->
-        o.total = sub.from(Item::class.java).where { i -> i.order?.id == o.id }.sum { i -> i.price }
-    }
-    .where { it.status == 1 }
-    .execute()
+// the second parameter starts a subquery, as in where { o, sub -> ... } (D49)
+val u = qb.update(Order::class.java)
+    .set { o, sub -> o.price = sub.from(Item::class.java).where { i -> i.order?.id == o.id }.sum { it.price } }
+    .where { o, sub -> sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
+assertEquals("update Order e0 set e0.price = (select sum(s1.price) from Item s1 where s1.order.id = e0.id)"
+        + " where exists (select 1 from Item s1 where s1.order.id = e0.id)", u.toHql().hql())
 ```
 
-**SQL by database (planned)** — Hibernate's translation of the planned HQL, recorded by `PlannedSqlTest`; lambdaQL does not make this query yet. From `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql), example `07-update-sum`:
+- An aggregate over another table and an aggregate over the same table both work (measured on H2, MariaDB 10.11 and Oracle 23.26). In an `update`, MariaDB does not raise error 1093 either.
+- If no row matches, the aggregate is NULL. For a NOT NULL column this is a database error, so wrap it in `Objects.requireNonNullElse(…, 0.0)` to get `coalesce(...)`.
 
-```sql
--- H2, MariaDB
-update orders o1_0
-set total=(select sum(i1_0.price) from items i1_0 where i1_0.order_id=o1_0.id)
-where o1_0.status=1
+A trailing lambda with one argument (`set { it... }`) and a trailing lambda with two arguments (`set { o, sub -> ... }`) are different overloads. Kotlin picks the right one.
 
--- Oracle
-update orders o1_0
-set o1_0.total=(select sum(i1_0.price) from items i1_0 where i1_0.order_id=o1_0.id)
-where o1_0.status=1
-```
-
-If an order has no items, `total` becomes NULL. This is SQL behavior.
-
-A trailing lambda with one argument (`set { it... }`) and with two arguments (`set { o, sub -> ... }`) are different overloads. Kotlin picks the right one.
-
+<a id="where-with-paths-and-subqueries"></a>
 ## Where with paths and subqueries
 
-`where` is the same as in select queries:
+`where` is the same as in select queries.
 
 ```kotlin
 qb.update(Order::class.java).set { it.status = 0 }.where { it.customer?.grade!! > 3 }.execute()
@@ -198,8 +194,8 @@ qb.update(Order::class.java).set { it.status = 9 }
 
 Both examples work today.
 The first example follows the tested rule above: the path becomes a scalar subquery.
-The second one uses `sub`, as in [5. Subqueries](05-subquery.md). Its HQL is `update Order e0 set e0.status = 9 where not exists (select 1 from Item s1 where s1.order.id = e0.id)`.
-The same `where` on a delete is tested with Java lambdas (region `dml-subquery`, see [7.4](07-4-delete.md)). The update form is not covered by its own test yet.
+The second example uses `sub`, as in [5. Subqueries](05-subquery.md). Its HQL is `update Order e0 set e0.status = 9 where not exists (select 1 from Item s1 where s1.order.id = e0.id)`.
+The same `where` on a delete is tested with Java lambdas (region `dml-subquery`, see [7.4](07-4-delete.md)). The update form has no test of its own yet.
 
 **SQL by database (Hibernate's SQL for this HQL)** — recorded by [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java), which gives the same statement to Hibernate directly. From `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql), example `07-update-not-exists`:
 
@@ -215,6 +211,7 @@ set o1_0.status=9
 where not exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id)
 ```
 
+<a id="optimistic-locking-version"></a>
 ## Optimistic locking (`@Version`)
 
 If the entity has a `@Version` property, lambdaQL renders `update versioned`. The database adds 1 to the version.
@@ -239,7 +236,7 @@ set v1_0.status=2,v1_0.version=(v1_0.version+1)
 where v1_0.id=1
 ```
 
-Hibernate adds `version=(v1_0.version+1)` to the SET list. To use the version as an optimistic lock, put it in `where` and check the result:
+Hibernate adds `version=(v1_0.version+1)` to the SET list. To use the version as an optimistic lock, put it in `where` and check the result.
 
 ```kotlin
 val n = qb.update(VOrder::class.java)
@@ -251,6 +248,7 @@ if (n == 0) throw OptimisticLockException()   // checking the result is your job
 
 Do not assign the `@Version` property yourself (rule U15).
 
+<a id="many-set-calls-patch"></a>
 ## Many `set()` calls (PATCH)
 
 You can call `set()` many times. All assignments join into one SET list, in call order (rule U14).
@@ -272,6 +270,7 @@ qb.update(Order::class.java).set { it.status = 1 }.set { it.status = 2 }
 
 `set()` returns an `UpdateSet`. It has `set`, `where` and `all`, but no `execute()`.
 
+<a id="update-all-rows-all"></a>
 ## Update all rows: `all()`
 
 An update without `where` must say `all()`. Without `where` or `all()`, the code **does not compile** (rule U5).
@@ -283,10 +282,12 @@ qb.update(Order::class.java).set { it.status = 0 }.execute()         // compile 
 
 An update needs a transaction (see [7.8](07-dml.md#transactions)).
 
+<a id="update-the-first-rows-limit"></a>
 ## Update the first rows: `limit`
 
-`orderBy { ... }` and `limit(n)` after `where { ... }` or `all()` change at most `n` rows: the first `n` rows of `qb.from(X::class.java).where { same }.orderBy { same }`.
-The rules are the same as for delete (see [7.4](07-4-delete.md#delete-the-first-rows-limit)): the order is by the id without `orderBy`, the id is always the last sort key, and `orderBy` without `limit` is an error.
+`orderBy { ... }` and `limit(n)` after `where { ... }` or `all()` change at most `n` rows. The target is the first `n` rows of `qb.from(X::class.java).where { same }.orderBy { same }`.
+
+The rules are the same as for delete (see [7.4](07-4-delete.md#delete-the-first-rows-limit)). Without `orderBy`, the order is by the id. The id is always the last sort key. `orderBy` without `limit` is an error.
 
 ```kotlin
 // a path in the condition: the nested select joins, so the rows are the same as the select
@@ -319,11 +320,14 @@ set o1_0.description='top'
 where o1_0.id in (select t1_0.id from (select o2_0.id id from orders o2_0 join customers c1_0 on c1_0.id=o2_0.customer_id where c1_0.name='Kim' order by o2_0.price desc,o2_0.id fetch first 1 rows only) t1_0)
 ```
 
-The path `it.customer?.name` is a join in the inner select, as in a select (decision D36). The update itself reads no other table.
+The path `it.customer?.name` becomes a join in the inner select, as in a select (decision D36). The update statement itself reads no other table.
 
+<a id="update-exactly-one-row-executeone"></a>
 ## Update exactly one row: `executeOne()`
 
-`executeOne()` runs the update with the one-row protection. It reads the matching ids (at most 2). With 2 ids it changes nothing and throws `NonUniqueResultException`. With 1 id it changes that row with `id = :p and (your condition)`. The steps are the same as for delete (see [7.4](07-4-delete.md#delete-exactly-one-row-executeone)).
+`executeOne()` runs the update with the one-row protection. It reads at most 2 matching ids.
+
+With 2 ids it changes nothing and throws `NonUniqueResultException`. With 1 id it changes that row with `id = :p and (condition)`. The steps are the same as for delete (see [7.4](07-4-delete.md#delete-exactly-one-row-executeone)).
 
 ```kotlin
 val one = qb.update(Order::class.java)
@@ -332,7 +336,8 @@ val one = qb.update(Order::class.java)
     .executeOne()                             // 0 or 1; 2 or more rows: NonUniqueResultException
 ```
 
-The Java test method of the `execute-one` region (`executeOneProtects` in `DmlQueryTest`) also checks `executeOne()` on an update: with 2 or more rows nothing changes.
+The Java test method `executeOneProtects` (in `DmlQueryTest`, the method of the `execute-one` region) also checks `executeOne()` on an update. When 2 or more rows match, nothing changes.
+
 In a Spring repository, `updateOne({ ... }) { ... }` does the same (see [12.4](12-spring-data-jpa.md#one-row-protection-deleteone-and-updateone)).
 
 ---

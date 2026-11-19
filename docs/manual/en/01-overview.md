@@ -1,12 +1,11 @@
+<a id="1-overview"></a>
 # 1. Overview
-
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../ko/01-overview.md) for the latest rules.
 
 [Manual home](README.md) | Tracks: [Java](java/README.md) | [Kotlin](kotlin/README.md) | Next: 2. Getting started ([Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md))
 
 This page is for both languages. Code is shown in separate **Java** and **Kotlin** sections.
 
+<a id="what-is-lambdaql"></a>
 ## What is lambdaQL?
 
 lambdaQL is a query library for Java and Kotlin on top of JPA and Hibernate 6.6.
@@ -39,6 +38,7 @@ val orders = qb.from(Order::class.java)
     .toList()
 ```
 
+<a id="hql-the-same-for-both"></a>
 ### HQL (the same for both)
 
 ```
@@ -60,13 +60,15 @@ where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 
 Two `where` calls are joined with `AND`.
 The constant `"Kim"` is a literal; the captured `minPrice` is a bind parameter (`:p1`).
-A path like `o.getCustomer().getName()` in `where` is an inner `join` by default: orders without a customer are not returned.
-This holds here too, even though an order with status 1 would match in Java without a customer: lambdaQL uses the SQL meaning (decision D48). Use `leftJoin` to keep such orders.
+A path like `o.getCustomer().getName()` in `where` is an inner `join` by default. Orders without a customer are not returned.
+This example is the same. In Java, an order with status 1 would match even without a customer, but lambdaQL uses the SQL meaning (decision D48).
+To keep such orders, use `leftJoin`.
 
 The lambdas look like normal Java or Kotlin code.
 But they are a **query language** written with Java or Kotlin syntax.
 `o.getCustomer().getName()` (Kotlin `it.customer?.name`) does not call a getter. It **names a column**.
 
+<a id="why-lambdaql"></a>
 ## Why lambdaQL?
 
 | Goal | How lambdaQL does it |
@@ -78,6 +80,7 @@ But they are a **query language** written with Java or Kotlin syntax.
 | Lambdas are not run | No entity objects are created. No getters are called. There is no `NullPointerException` from the lambda. |
 | Clear errors | If a lambda has a form that lambdaQL cannot translate, it throws an error with a code. It does not guess. |
 
+<a id="how-it-works-5-steps"></a>
 ## How it works (5 steps)
 
 ```
@@ -99,8 +102,10 @@ Reading one lambda takes a few microseconds. With the cache, lambdaQL reads the 
 A Kotlin lambda literal that you pass to lambdaQL compiles to the same kind of serializable lambda as a Java lambda.
 This is why one engine can read both languages.
 
+<a id="design-principles"></a>
 ## Design principles
 
+<a id="one-lambda-per-clause"></a>
 ### One lambda per clause
 
 Each clause takes **one** lambda. You do not write one lambda per column.
@@ -124,11 +129,11 @@ Each clause takes **one** lambda. You do not write one lambda per column.
 Helpers like the sort builder `by` and the subquery factory `sub` are **lambda arguments**.
 You can give them any name. This manual uses `by` and `sub`.
 
-### No static helpers, except `Agg`
+<a id="no-static-helpers-except-agg"></a>
+### No static helpers, except `Agg` and `Dml`
 
-You do not need a static import for lambdaQL.
-The only static helper class is `org.lambdaql.Agg` for aggregates (`count`, `sum`, `avg`, `min`, `max`, `countDistinct`).
-A static import of `Agg` is optional.
+There are only two static helper classes: `org.lambdaql.Agg` for aggregates (`count`, `sum`, `avg`, `min`, `max`, `countDistinct`), and `org.lambdaql.Dml` (`Dml.value(column, value)`, decision D49), which assigns a value to an entity without setters.
+A static import of either class is optional.
 
 #### Java
 
@@ -145,6 +150,7 @@ A static import of `Agg` is optional.
 Your own database functions are also static methods, but you declare them yourself
 (see 8. Procedures and DB functions: [Java](java/08-procedures-functions.md) | [Kotlin](kotlin/08-procedures-functions.md)).
 
+<a id="a-lambda-is-a-query-not-code"></a>
 ### A lambda is a query, not code
 
 lambdaQL follows its own documented rules, not the run-time rules of Java or Kotlin.
@@ -155,7 +161,7 @@ lambdaQL follows its own documented rules, not the run-time rules of Java or Kot
 |---|---|---|
 | `o.getId() == id` (two `Long` objects) | value equality: `e0.id = :p1` | In a query, `==` on objects means "same value", not "same object". A captured `null` is bound as NULL and matches no row (`LQL-4045` at `WARN`); write `o.getId() == null` to find NULL. |
 | `Objects.equals(o.getDescription(), o.getCustName())`, `!text.equals(o.getDescription())` | `e0.description = e0.custName`, `e0.description <> :p1` (SQL meaning) | Two values of the entity, or `!=` against a value: a row whose value is NULL does not match. Java would return some of these rows. To keep them, write `o.getDescription() == null \|\| ...`. |
-| `o.getCustomer().getName()` | the `name` column of the joined customer (in `where`: inner `join` by default) | A path names a column. lambdaQL does not check if the customer is null. In `where`, orders without a customer are not returned; to find them, write `o.getCustomer() == null`. A null guard (`o.getCustomer() == null \|\| ...`) does not change this (SQL meaning, D48); use `leftJoin` to keep those orders. |
+| `o.getCustomer().getName()` | the `name` column of the joined customer (in `where`: inner `join` by default) | A path names a column. lambdaQL does not check if the customer is null. In `where`, orders without a customer are not returned; to find them, write `o.getCustomer() == null`. A null guard (`o.getCustomer() == null \|\| ...`) does not change this (SQL meaning, D48). To keep these orders, use `leftJoin`. |
 | `o.getStatus() == 1` when `status` is NULL | the row does not match (SQL meaning) | Java would throw `NullPointerException`. SQL returns UNKNOWN. |
 | `o.getDescription() == null` | `e0.description is null` | You wrote the null check, so lambdaQL uses it. |
 
@@ -169,12 +175,13 @@ lambdaQL follows its own documented rules, not the run-time rules of Java or Kot
 |---|---|---|
 | `it.id == id` (`id: Long?`, a nullable variable) | value equality: `e0.id = :p1` | Kotlin `==` already means "same value". A captured `null` is bound as NULL and matches no row (`LQL-4045` at `WARN`). |
 | `it.description == it.custName`, `it.description != text` | `e0.description = e0.custName`, `e0.description <> :p1` (SQL meaning) | Two values of the entity, or `!=` against a value: a row whose value is NULL does not match. To keep such rows, write `it.description == null \|\| ...`. |
-| `it.customer?.name` or `it.customer!!.name` | the `name` column of the joined customer (in `where`: inner `join` by default) | A path names a column. `?.` and `!!` do not change the column. `!!` is only there so the lambda compiles. In `where`, orders without a customer are not returned; to find them, write `it.customer == null`. A null guard (`it.customer == null \|\| ...`) does not change this (SQL meaning, D48); use `leftJoin`. |
+| `it.customer?.name` or `it.customer!!.name` | the `name` column of the joined customer (in `where`: inner `join` by default) | A path names a column. `?.` and `!!` do not change the column. `!!` is only there so the lambda compiles. In `where`, orders without a customer are not returned; to find them, write `it.customer == null`. A null guard (`it.customer == null \|\| ...`) does not change this (SQL meaning, D48). To keep these orders, use `leftJoin`. |
 | `it.price!! > 100.0` when `price` is NULL | the row does not match (SQL meaning) | Kotlin would throw `NullPointerException` at `!!`. lambdaQL ignores `!!`, and SQL returns UNKNOWN. |
 | `it.description == null` | `e0.description is null` | You wrote the null check, so lambdaQL uses it. |
 
 lambdaQL handles null **only where you write it**.
-All comparisons and methods in a lambda have the SQL meaning (decision D48), also with captured values and association paths. When the result can differ from Java or Kotlin, lambdaQL logs `LQL-5009` at `DEBUG` level, or `LQL-4045` at `WARN` level for a captured `null` in `=` or `<>`.
+All comparisons and methods in a lambda have the SQL meaning (decision D48). This also holds for captured values and association paths.
+When the result can differ from Java or Kotlin, lambdaQL logs `LQL-5009` at `DEBUG` level. When a captured `null` is used in `=` or `<>`, it logs `LQL-4045` at `WARN` level.
 See 3. Conditions ([Java](java/03-where.md) | [Kotlin](kotlin/03-where.md))
 and 10. Rules and limits ([Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md)).
 
@@ -201,6 +208,7 @@ lambdaQL writes SQL that can use indexes ("SARGable").
 | `it.description.isNullOrEmpty()` | `(e0.description is null or length(e0.description) = 0)` | `(e0.description is null or e0.description = :p1)` |
 | `it.id == id` (`it.id` is a `Long?`) | `not (e0.id is null or e0.id <> :p1)` | `e0.id = :p1` (the id can never be NULL) |
 
+<a id="java-and-kotlin"></a>
 ### Java and Kotlin
 
 Java and Kotlin use **the same engine**.
@@ -208,6 +216,7 @@ A Kotlin lambda and a Java lambda with the same meaning give the same HQL.
 Some Kotlin forms are not supported. lambdaQL throws a clear error for them (see [9. Kotlin notes](kotlin/09-kotlin-notes.md)).
 Java-only details are in [9. Java notes](java/09-java-notes.md).
 
+<a id="fail-loudly"></a>
 ### Fail loudly
 
 If lambdaQL does not know the meaning of a form, it does not guess.
@@ -222,6 +231,7 @@ Examples of forms that are rejected:
 | Not a lambda | an anonymous class | an `object : ...` expression, or a Kotlin function-type value (`val f: (Order) -> Boolean`) |
 | A method call that has no meaning in SQL | yes, rejected | yes, rejected (also your own non-inline extension functions) |
 
+<a id="comparison-with-other-approaches"></a>
 ## Comparison with other approaches
 
 This table is a short, neutral summary. Each tool is good for different needs.
@@ -236,6 +246,7 @@ This table is a short, neutral summary. Each tool is good for different needs.
 | Kotlin | Strings | Works, verbose | Works | Supported (same engine) |
 | Maturity | Standard | Standard | Mature, widely used | Early development, not released |
 
+<a id="next"></a>
 ## Next
 
 - 2. Getting started: build lambdaQL and write your first query. [Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md)

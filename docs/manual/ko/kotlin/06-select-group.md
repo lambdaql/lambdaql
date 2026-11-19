@@ -476,8 +476,8 @@ limit ?,?
 `where { o, c -> ... }`, `orderBy { o, c, by -> ... }`(`by`는 마지막, 규칙 S12), `select { o, c -> ... }`입니다.
 조인한 엔티티의 별칭은 `e1`, `e2`입니다.
 
-조인은 [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)에서 **Java** 람다로 테스트했습니다(H2, MariaDB, Oracle). Kotlin 조인 테스트는 아직 없습니다.
-아래 Kotlin 코드는 테스트한 Java 쿼리를 Kotlin 문법으로 옮긴 것이고, HQL은 Java 테스트의 결과입니다. 테스트 코드는 [이 페이지의 Java 버전](../java/06-select-group.md#68-explicit-joins)을 참고하십시오.
+조인은 [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)에서 **Java** 람다로 테스트했습니다(H2, MariaDB, Oracle). 조인 결과의 `distinct()`와 CTE의 조인은 Kotlin 람다로도 테스트했습니다([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `join-distinct`, `join-cte`).
+그 밖의 아래 Kotlin 코드는 테스트한 Java 쿼리를 Kotlin 문법으로 옮긴 것이고, HQL은 Java 테스트의 결과입니다. 테스트 코드는 [이 페이지의 Java 버전](../java/06-select-group.md#68-explicit-joins)을 참고하십시오.
 
 ```kotlin
 val q = qb.from(Order::class.java)

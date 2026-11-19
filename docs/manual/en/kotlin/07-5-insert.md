@@ -6,6 +6,7 @@
 ---
 
 
+<a id="one-row"></a>
 ## One row
 
 ```kotlin
@@ -39,17 +40,38 @@ assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where
 The first two lines insert one row with a Kotlin lambda. The delete part is explained in [7.4](07-4-delete.md).
 More statements written in Java are tested in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/07-5-insert.md) for those examples.
 
-The constants in the lambda stay literals (decision D37). A value cannot read the new row: `it.price = it.price` is an error.
+The constants in the lambda stay literals (decision D37). A value cannot read the new row. `it.price = it.price` is an error.
 
-The `by.set` form works for one row too, for `val` properties:
+A `val` property is written in a single row with `Dml.value` (decision D49, see [7.3](07-dml.md#73-two-ways-to-assign-property-or-dmlvalue)).
 
 ```kotlin
-qb.insert(Order::class.java).values { o, by -> by.set(o.id, id).set(o.status, 1) }.execute()
+qb.insert(Order::class.java).values { o -> value(o.id, id); value(o.status, 1) }.execute()
 ```
 
+<a id="a-subquery-in-a-value"></a>
+### A subquery in a value
+
+With a two-argument lambda such as `values { a, sub -> ... }`, the second argument `sub` makes a subquery (decision D49).
+The same holds for `values { a, sub -> ... }` and `onConflict { ... }.update { a, sub -> ... }` of an upsert (see [7.6](07-6-upsert.md#your-own-change-onconflictkeyupdate)).
+
+**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `insert-values-sub`:
+
+```kotlin
+// values { a, sub -> ... }: a subquery can read captured values, not the new row (D49)
+val i = qb.insert(Archive::class.java)
+    .values { a, sub -> a.id = 100L; a.price = sub.from(Item::class.java).sum { it.price } }
+assertEquals("insert into Archive (id, price) values (100L, (select sum(s1.price) from Item s1))", i.toHql()[0].hql())
+```
+
+- An aggregate over another table (with or without captured parameters), many rows, and a subquery that reads the target table itself all work (measured on H2, MariaDB 10.11 and Oracle 23.26; no MariaDB error 1093).
+- The subquery can read captured values, but it cannot read the new row being inserted.
+- The list form can also use a subquery (see [Many rows from a list](#many-rows-from-a-list)).
+- A subquery in the insert values of an upsert and in `do update set` also works. On Oracle, Hibernate runs it as a `merge` (measured). The upsert form is checked by a Java test ([`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `insert-values-sub`).
+
+<a id="many-rows-from-a-list"></a>
 ## Many rows from a list
 
-One row for each element of the list. The second lambda argument is the element.
+lambdaQL inserts one row for each element of the list. The second lambda argument is the element.
 
 ```kotlin
 val lines = listOf(Line(201L, 1.0), Line(202L, 2.0))
@@ -68,11 +90,17 @@ values (?,?), (?,?)
 lambdaQL reads the properties of the element in Java, so every value is a bind parameter.
 It writes one statement with many VALUES rows. A long list is split so that one statement has at most 500 values (see [7.8](07-dml.md#batching-for-many-rows)). An empty list runs no SQL and returns 0.
 
+**A subquery in the list form.** A third argument makes a subquery, as in `values(list) { a, l, sub -> ... }` (decision D49). The same holds for `qb.upsert(X::class.java).values(list) { a, l, sub -> ... }`.
+The subquery can read the values of the element. lambdaQL reads those values before the query and binds them as one parameter per row. The subquery cannot read the new row being inserted (measured on three databases).
+The HQL is `values (:p1, (select sum(s1.price) from Item s1 where s1.order.id = :p2)), (:p3, ...)`. A Java test ([`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `insert-list-sub`) checks it.
+
+<a id="generated-id"></a>
 ## Generated id
 
 If the id uses IDENTITY or SEQUENCE, you can leave out the id (rule U12).
-The `IdOrder` line in the first example does this: `IdOrder` has a generated id.
+The `IdOrder` line in the first example is this case. `IdOrder` has a generated id.
 
+<a id="insert--select"></a>
 ## Insert ... select
 
 Copy rows from another entity. The `select` lambda gets the target (`a`) and the source (`o`).
@@ -99,18 +127,28 @@ where o1_0.status=1
 
 lambdaQL uses an explicit `left join` for source paths, so orders without a customer are not lost (rule U10). The SQL is the same on all three databases.
 
-The design also has a `by.set` form, with the context object as the third argument. It is **not implemented yet**:
+For a `val` property of the target, use `Dml.value`. The first argument is a property of the target `a`.
 
 ```kotlin
 qb.insert(Archive::class.java).from(Order::class.java).where { it.status == 9 }
-    .select { a, o, by -> by.set(a.id, o.id).set(a.customerName, o.customer?.name) }
+    .select { a, o -> value(a.id, o.id); value(a.customerName, o.customer?.name) }
     .execute()
 ```
 
+**Subqueries.** The source `where` gets `sub`, the starting point for subqueries, as its second argument, and `select` gets it as its third argument (decision D49). A Java test ([`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `insert-select-sub`) checks this. The following is a design example.
+
+```kotlin
+qb.insert(Archive::class.java).from(Order::class.java)
+    .where { o, sub -> sub.from(Item::class.java).where { x -> x.order?.id == o.id }.exists() }
+    .select { a, o, sub -> a.id = o.id; a.price = sub.from(Item::class.java).where { x -> x.order?.id == o.id }.sum { it.price } }
+    .execute()
+```
+
+<a id="insert--select-with-aggregates"></a>
 ## Insert ... select with aggregates
 
 Use `groupBy`, `having` and the `Agg` functions from [6. Select, aggregates and group by](06-select-group.md).
-The order is `from(...)`, `where { }`, `groupBy { }`, `having { }`, `select { }`. `where`, `groupBy` and `having` are optional.
+The call order is `from(...)`, `where { }`, `groupBy { }`, `having { }`, `select { }`. `where`, `groupBy` and `having` are optional.
 
 ```kotlin
 // INSERT ... SELECT with groupBy: one summary row per customer

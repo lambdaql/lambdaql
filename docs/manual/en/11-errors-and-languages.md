@@ -1,16 +1,15 @@
+<a id="11-errors-and-languages"></a>
 # 11. Errors and languages
-
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../ko/11-errors-and-languages.md) for the latest rules.
 
 [Manual home](README.md) | Tracks: [Java](java/README.md) | [Kotlin](kotlin/README.md) | Previous: 10. Rules and limits ([Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md)) | Next: 12. Spring Data JPA ([Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md))
 
 This page is for both languages. Code is shown in separate **Java** and **Kotlin** sections.
 
+<a id="error-codes"></a>
 ## Error codes
 
 Every lambdaQL message starts with a code in the form `[LQL-xxxx]`.
-The code does not depend on the language. The text after the code is translated.
+The code does not depend on the language. Only the text after the code is translated.
 
 **(tested)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), region `format`:
 
@@ -27,9 +26,9 @@ All messages are the values of the enum `org.lambdaql.i18n.LqlMessage`. Each val
 |---|---|---|---|
 | `LQL-1xxx` | Input and lambda loading | `LQL-1001` to `LQL-1013` | `LambdaAnalysisException` |
 | `LQL-2xxx` | Decoding the bytecode | `LQL-2001` to `LQL-2025` | `UnsupportedLambdaShapeException` |
-| `LQL-3xxx` | Meaning and values computed in Java | `LQL-3001` to `LQL-3064` | `TranslationException` |
-| `LQL-4xxx` | Rendering, binding and running | `LQL-4001` to `LQL-4045`, `LQL-4999` (internal error) | `LambdaQLException` itself, or a JDK/JPA standard exception (see [Exceptions](#exceptions)). `LQL-4045` is a `WARN` log |
-| `LQL-5xxx` | Warnings (in the log) | `LQL-5001` to `LQL-5009` | – (a log line: `WARN`, or `INFO` for `LQL-5004` to `LQL-5006` and `LQL-5008` and for `LQL-5003` in the default sort mode, `DEBUG` for `LQL-5009`) |
+| `LQL-3xxx` | Meaning and values computed in Java | `LQL-3001` to `LQL-3067` | `TranslationException` (`LQL-3066` uses the subclass `NonSargableException`) |
+| `LQL-4xxx` | Rendering, binding and running | `LQL-4001` to `LQL-4045`, `LQL-4999` (internal error) | `LambdaQLException` itself, or a JDK/JPA standard exception (see [Exceptions](#exceptions)). `LQL-4045` is a `WARN` log (`DEBUG` for a comparison that has only an unboxing to its own primitive type) |
+| `LQL-5xxx` | Warnings (in the log) | `LQL-5001` to `LQL-5013` | – (a log line. The level is `WARN`; `INFO` for `LQL-5004` to `LQL-5006`, `LQL-5008` and for `LQL-5003` in the default sort mode; `DEBUG` for `LQL-5009` to `LQL-5011` and `LQL-5013`) |
 
 Some real codes:
 
@@ -41,6 +40,9 @@ Some real codes:
 | `LQL-3035` | `TranslationException` | A value used with aggregates must be a groupBy key (J3): {0} |
 | `LQL-3058` | `TranslationException` | The DB function {0} has its own SQL name, so it must be registered. Add its class to the setting lambdaql.functions.classes. |
 | `LQL-3064` | `TranslationException` | The row type of a derived table or CTE must be a Java record or a Kotlin data class (J5): {0} |
+| `LQL-3065` | `TranslationException` | Dml.value: the value type {2} does not fit the column {0} ({1}) (U20) |
+| `LQL-3066` | `NonSargableException` | The condition cannot use an index, and the SARGable mode is STRICT: {0} |
+| `LQL-3067` | `TranslationException` | A row of a derived table or CTE has no id, so it cannot be compared with null. Compare one of its columns, for example x.customerId() == null: {0} |
 | `LQL-4009` | `LambdaQLException` | A null value cannot be compared with <, <=, > or >= (Java would throw NullPointerException): {0} |
 | `LQL-4014` | `IllegalArgumentException` | limit must be 0 or more: {0} |
 | `LQL-4025` | `NonUniqueResultException` | Two or more rows match one(). Narrow the condition or use first(): {0} |
@@ -49,7 +51,7 @@ Some real codes:
 | `LQL-4040` | `SortNotAllowedException` | Sorting by this name is not allowed for {0}: {1}. Allow it with SortRules (allow or alias). |
 | `LQL-4043` | `LambdaQLException` | The stub arguments of {0} have the database parameter names in another order. Stub: {1}, database: {2} |
 | `LQL-4044` | `LambdaQLException` | The Oracle package has several procedures with this name (overloads); lambdaQL cannot tell which one to call: {0} |
-| `LQL-4045` | – (`WARN` log, when the query runs) | A captured value is null in {0}. In SQL, = NULL and <> NULL match no row; use x == null in the lambda, or check the value before the query. |
+| `LQL-4045` | – (`WARN` log when the query runs; `DEBUG` for a comparison through an unboxing to its own primitive type) | A captured value is null in {0}. In SQL, = NULL and <> NULL match no row; use x == null in the lambda, or check the value before the query. |
 | `LQL-5001` | – (`WARN` log) | The function {0} is applied to the column {1}, so a normal index on the column cannot be used and the query may scan the whole table. Compare the column with a value instead, or (Oracle) create a function-based index: {2} |
 | `LQL-5002` | – (`WARN` log) | A subquery sort without limit does not change the result, so it was removed (Q4): {0} |
 | `LQL-5003` | – (`INFO` or `WARN` log) | An outside sort is not in the sort rules of {0}: {1}. It runs now; with SortMode.STRICT it would be rejected. |
@@ -59,6 +61,10 @@ Some real codes:
 | `LQL-5007` | – (`WARN` log) | The MariaDB function {0} is NOT DETERMINISTIC, so it is computed for every row and an index on the compared column is not used for a range. Declare it DETERMINISTIC if it is: {1} |
 | `LQL-5008` | – (`INFO` log) | The index or function metadata for {0} could not be read ({1}); the SARGable check goes on without it. |
 | `LQL-5009` | – (`DEBUG` log) | SQL meaning: in {0}, a row whose value is NULL does not match (Java would treat null differently). Add a null check such as x == null || ... to include it. |
+| `LQL-5010` | – (`DEBUG` log) | The column {0} is a @Lob column; some databases (for example Oracle) cannot use a LOB in {1}. |
+| `LQL-5011` | – (`DEBUG` log) | The enum column {0} is stored as text (@Enumerated(STRING)), so the database sorts it by name, not by the declaration order of the enum. |
+| `LQL-5012` | – (`WARN` log) | Arithmetic on the column {0} keeps the condition from using an index. Move it to the value side with the same meaning: divide by a decimal (o.getQty() > n / 2.0 for o.getQty() * 2 > n; n / 2 would be integer division), and reverse the comparison for a negative factor: {1} |
+| `LQL-5013` | – (`DEBUG` log) | The condition computes on the columns {0}, so it cannot use an index on them: {1} |
 
 `{0}` and `{1}` are the arguments, for example the expression or the procedure name.
 The full list is in the message files (see [For translators](#for-translators)).
@@ -68,6 +74,7 @@ Rules for codes:
 - A code is never reused after a release. You can safely search for a code or check it in code.
 - A unit test checks that every code is unique and has the form `LQL-` + four digits.
 
+<a id="exceptions"></a>
 ## Exceptions
 
 All lambdaQL exceptions extend `org.lambdaql.LambdaQLException`. It is a `RuntimeException`, so Kotlin and Java handle it the same way.
@@ -75,16 +82,17 @@ The exception class comes from the code range.
 
 | Exception | Codes | When | Example |
 |---|---|---|---|
-| `LambdaQLException` | `LQL-4xxx` | Base class of all lambdaQL exceptions. lambdaQL throws this class itself for rendering, binding and running problems | A `null` captured value in an order compare (`LQL-4009`). A procedure stub that does not match the database (`LQL-4036`). Stub arguments with the database names in another order (`LQL-4043`, see `@DbParam` in [8.4](java/08-procedures-functions.md#84-warning-argument-order)). |
+| `LambdaQLException` | `LQL-4xxx` | Base class of all lambdaQL exceptions. lambdaQL throws this class itself for rendering, binding and running problems | A procedure stub that does not match the database (`LQL-4036`). Stub arguments with the database names in another order (`LQL-4043`, see `@DbParam` in [8.4](java/08-procedures-functions.md#84-warning-argument-order)). |
 | `LambdaAnalysisException` | `LQL-1xxx` | lambdaQL cannot load the lambda | An anonymous class (Kotlin `object : ...`) instead of a lambda. A non-serializable lambda (`LQL-1002`). |
 | `UnsupportedLambdaShapeException` | `LQL-2xxx` | The bytecode has a shape that lambdaQL does not support | A loop (`LQL-2004`). A value ternary or value `if`/`when`. A general boolean ternary `c ? x : y`. |
-| `TranslationException` | `LQL-3xxx` | The lambda has no defined meaning in HQL | An entity method that is not a getter. Comparing two entities with `==` (not supported yet). A non-aggregated value that is not a `groupBy` key (`LQL-3035`). |
+| `TranslationException` | `LQL-3xxx` | The lambda has no defined meaning in HQL | An entity method that is not a getter. Comparing two entities with `==` (not supported yet). An order comparison of value objects (`LQL-3012`). A non-aggregated value that is not a `groupBy` key (`LQL-3035`). |
 | `DbOnlyException` | `LQL-4034` | Your `@SqlFunction` method was called in Java, outside a lambdaQL lambda | `OrderFns.discount(1.0)` (see [Placeholders called outside a lambda](#placeholders-called-outside-a-lambda)) |
+| `NonSargableException` | `LQL-3066` | In `SargableMode.STRICT`, lambdaQL analyzes a condition that cannot use an index (the cases of `LQL-5001`, `LQL-5007` and `LQL-5012`). A subclass of `TranslationException` | `OrderFns.discount(o.getTotal()) > 100`, `o.getCnt() * 2 > n` (decision D50) |
 | `SortNotAllowedException` | `LQL-4040` | In `SortMode.STRICT`, an outside sort (a Spring `Sort`, `SortSpec.ofPath`) uses a name that the sort rules do not allow | `Sort.by("grade")` when only `name` is allowed (see [4.10 the sort policy](java/04-order-paging.md#sort-policy)). A web application usually answers it with HTTP 400 ([12.5](java/12-spring-data-jpa.md#sort-policy-with-spring)) |
 
 All these classes are in the package `org.lambdaql`.
 
-**Standard exceptions keep their type.** In some cases Java code expects a JDK or JPA exception. Then lambdaQL throws that type, and only the message has a code:
+**Standard exceptions keep their type.** When Java code expects a JDK or JPA exception, lambdaQL throws that type, and only the message has a code.
 
 | Exception | Example | Code |
 |---|---|---|
@@ -118,7 +126,8 @@ assertEquals("[LQL-2004] Loops are not supported in a lambda. Build the list out
         + " — app.Repo.lambda$find$0 (line 12)", e.getMessage(Locale.ROOT));
 ```
 
-The test makes the exception directly. In your code, lambdaQL makes it when it reads a lambda. Catch it like this (design examples):
+The test makes the exception directly. In your code, lambdaQL makes it when it reads a lambda.
+You handle it like this (design examples).
 
 ### Java
 
@@ -146,13 +155,15 @@ try {
 }
 ```
 
+<a id="what-a-message-has"></a>
 ### What a message has
 
 - The code, then the text in the selected language.
-- At the end, the place of the lambda in a fixed format: ` — ` and then the method that holds the lambda body and the **source line number** (also in `where()`).
+- At the end, the place of the lambda in a fixed format: ` — ` and then the method that holds the lambda body and the **source line number** (also available from `where()`).
 - For decode errors, extra lines with a bytecode dump can follow. These extra lines are not translated.
 - Most messages also tell you how to fix the problem. For example, a Kotlin message says to build a list outside the lambda and capture it.
 
+<a id="in-tests-check-the-code"></a>
 ### In tests, check the code
 
 The message text can change, and it depends on the language. The code does not change.
@@ -173,6 +184,7 @@ assertEquals("LQL-2004", e.code())      // good
 // assertEquals("Loops are ...", e.message)          // do not do this
 ```
 
+<a id="when-errors-happen"></a>
 ## When errors happen
 
 lambdaQL finds problems at three moments.
@@ -186,6 +198,7 @@ lambdaQL finds problems at three moments.
 Analysis-time errors do not depend on your data. The same lambda always fails the same way.
 lambdaQL also caches failed results, so a bad lambda fails fast the next time.
 
+<a id="compile-time-examples"></a>
 ### Compile-time examples
 
 #### Java
@@ -200,6 +213,7 @@ lambdaQL also caches failed results, so a bad lambda fails fast the next time.
 .orderBy { o, by -> by.desc(o.customer) }        // compile error: an entity is not a sort key
 ```
 
+<a id="analysis-time-errors-that-only-kotlin-has"></a>
 ### Analysis-time errors that only Kotlin has
 
 Some Kotlin forms do not give lambdaQL a lambda that it can read. lambdaQL rejects them with a clear error.
@@ -212,33 +226,38 @@ The full list is in [9. Kotlin notes](kotlin/09-kotlin-notes.md).
 | `it.status in listOf(1, 2, 3)` (list built inside the lambda) | `val ids = listOf(1, 2, 3)` outside, then `it.status in ids` |
 | Compiling with `-Xsam-conversions=class` | Keep the default `-Xsam-conversions=indy` |
 
+<a id="null-captured-values"></a>
 ### Null captured values
 
 Some forms accept a `null` captured value, some do not.
-A captured `null` in `=` or `<>` matches no row (the SQL meaning, decision D48), and lambdaQL logs `LQL-4045` at `WARN` level when it runs. To match NULL, write the null check yourself.
+A captured `null` in `=` or `<>` matches no row (the SQL meaning, decision D48). In this case lambdaQL logs `LQL-4045` at `WARN` level when the query runs. When the comparison goes through an unboxing to its own primitive type (`min.doubleValue()`), as in an order comparison, the level is `DEBUG`.
+To match NULL, write the null check yourself.
 All null rules are in 3. Conditions ([Java](java/03-where.md) | [Kotlin](kotlin/03-where.md)).
 
 #### Java
 
 | Form | `name` is `null` | Result |
 |---|---|---|
-| `o.getDescription() == name` (reference `==`) | runs | `e0.description = :p1` with NULL: no row. `LQL-4045` at `WARN` |
+| `o.getDescription() == name` (reference `==`) | runs | `e0.description = :p1` with NULL: no row matches. `LQL-4045` at `WARN` level |
 | `Objects.equals(o.getDescription(), name)` | runs | the same as above |
 | `o.getDescription().equals(name)` | runs | the same as above |
-| `name.equals(o.getDescription())` | error at binding | In Java this throws `NullPointerException`. |
-| `o.getStatus() > minStatus` (`minStatus` is `null`) | error at binding | An order comparison with null has no Java meaning. |
+| `name.equals(o.getDescription())` | runs | the same as above |
+| `o.getStatus() > minStatus` (`minStatus` is `null`) | runs | `e0.status > :p1` with NULL: no row matches. The unboxing to its own primitive type (`minStatus.intValue()`) is not run. `LQL-4045` at `DEBUG` level |
+| A method call on a captured value, such as `name.trim()` or `minStatus.longValue()` (an `Integer` to another primitive type) | error (`LQL-4012`) | This step prepares the value in Java before the query, so it is a `NullPointerException` as in Java. |
 
-To find NULL: `o.getDescription() == null`. To skip the filter when `name` is null: `name == null || o.getDescription().equals(name)` (the guard is decided before the query).
+To find NULL, write `o.getDescription() == null`.
+To skip the filter when `name` is null, write `name == null || o.getDescription().equals(name)` (the guard is decided before the query runs).
 
 #### Kotlin
 
 | Form | Captured value is `null` | Result |
 |---|---|---|
-| `it.description == name` | runs | `e0.description = :p1` with NULL: no row. `LQL-4045` at `WARN` |
+| `it.description == name` | runs | `e0.description = :p1` with NULL: no row matches. `LQL-4045` at `WARN` level |
 | `minPrice == null \|\| it.price!! > minPrice` | allowed | You wrote the null check, so lambdaQL uses it. |
-| `it.price!! > minPrice!!` (`minPrice` is `null`) | error at binding | An order comparison with null has no meaning. |
+| `it.price!! > minPrice!!` (`minPrice` is `null`) | runs | `e0.price > :p1` with NULL: no row matches. `!!` and the unboxing are not run. `LQL-4045` at `DEBUG` level |
 | `it.id in ids` (`ids` has a `null` element) | error at binding | `IN` with a null element is a trap in SQL. |
 
+<a id="placeholders-called-outside-a-lambda"></a>
 ### Placeholders called outside a lambda
 
 Some methods exist only to be read inside a lambda. Their return values are placeholders.
@@ -267,9 +286,10 @@ interface OrderFns { companion object {
 } }
 ```
 
+<a id="message-language"></a>
 ## Message language
 
-lambdaQL has messages in **four languages**:
+lambdaQL has messages in **four languages**.
 
 | Language | Locale |
 |---|---|
@@ -278,9 +298,10 @@ lambdaQL has messages in **four languages**:
 | Chinese (Simplified) | `zh` |
 | Korean | `ko` |
 
+<a id="how-lambdaql-chooses-the-language"></a>
 ### How lambdaQL chooses the language
 
-lambdaQL checks these three places, in this order. The first one that is set wins.
+lambdaQL checks these three places, in this order. The first one that is set is used.
 
 | Order | Setting | Example |
 |---|---|---|
@@ -288,7 +309,7 @@ lambdaQL checks these three places, in this order. The first one that is set win
 | 2 | The system property `lambdaql.locale` | `java -Dlambdaql.locale=ja -jar app.jar` |
 | 3 | The JVM default locale | `Locale.getDefault()` |
 
-Then lambdaQL looks only at the **language** of that locale:
+Then lambdaQL looks only at the **language** of that locale.
 
 | Language of the locale | Messages in |
 |---|---|
@@ -341,9 +362,10 @@ Notes:
 - Traditional Chinese messages can be added if users ask for them.
 - The Japanese and Chinese texts were first written by the authors, not by native speakers. Help to improve them is welcome.
 
+<a id="for-translators"></a>
 ### For translators
 
-Message files are UTF-8 properties files in the jar:
+Message files are UTF-8 properties files in the jar.
 
 ```
 org/lambdaql/i18n/LqlMessages.properties      English (root)
@@ -366,29 +388,35 @@ assertEquals("a null b", LqlMessages.fill("a {0} b", (Object) null));
 assertEquals("{x} {9}", LqlMessages.fill("{x} {9}", "unused"));
 ```
 
+<a id="logging"></a>
 ## Logging
 
 lambdaQL logs through the **SLF4J API**.
 
 - lambdaQL depends only on `slf4j-api`. You choose the logging backend (Logback, Log4j 2, and others).
 - Spring Boot already includes SLF4J and Logback, so you do not need to add anything.
-- Warnings use the `WARN` level and start with a code from the `LQL-5xxx` range.
-- If the `WARN` level is off, lambdaQL does not build the message text.
+- A warning message starts with a code. Most codes are in the `LQL-5xxx` range. `LQL-4045` is also only logged.
+- The level (`WARN`, `INFO`, `DEBUG`) depends on the code. The table below lists the level of each code.
+- If that level is off, lambdaQL does not build the message text.
 
-The warnings that lambdaQL has today:
+The warnings that lambdaQL logs today:
 
 | Code | When |
 |---|---|
-| `LQL-4045` | A captured value is `null` in `=` or `<>` (`==`, `!=`, `equals`, `Objects.equals`), so no row can match (the SQL meaning, decision D48). Known only when the query runs. Logged at `WARN` level. Write `x == null` to find NULL (see 3.6: [Java](java/03-where.md#36-null-rules) \| [Kotlin](kotlin/03-where.md#36-null-rules)) |
-| `LQL-5001` | A DB function wraps a column in a condition (`OrderFns.discount(o.getPrice()) > 10`, a Boolean function on a column, a function inside `IN` or `IS NULL`), so a normal index cannot be used. Logged at `WARN` level, once per `where` lambda. Not on Oracle when a function-based index with the same expression exists (see [8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable)) |
-| `LQL-5002` | A subquery has `orderBy` but no `limit`, so lambdaQL removes the sort (it has no effect, rule Q4) |
-| `LQL-5003` | An outside sort (a Spring `Sort`, `SortSpec.ofPath`) uses a name that is not in the sort rules, and the mode is `SortMode.INFO` (the default, logged at `INFO` level) or `SortMode.WARN` (logged at `WARN` level). The sort runs. The message is logged once for each entity and name (see [4.10 the sort policy](java/04-order-paging.md#sort-policy)) |
+| `LQL-4045` | A captured value is `null` in `=` or `<>` (`==`, `!=`, `equals`, `Objects.equals`), so no row can match (the SQL meaning, decision D48). Known only when the query runs. Logged at `WARN` level. When the comparison goes through an unboxing to its own primitive type (`min.doubleValue()`), as in an order comparison, it is logged at `DEBUG` level. Write `x == null` to find NULL (see 3.6: [Java](java/03-where.md#36-null-rules) \| [Kotlin](kotlin/03-where.md#36-null-rules)) |
+| `LQL-5001` | A DB function wraps a column in a condition (`OrderFns.discount(o.getPrice()) > 10`, a Boolean function on a column, a function inside `IN` or `IS NULL`), so a normal index cannot be used. Logged at `WARN` level, once per `where` lambda. Not logged on Oracle when a function-based index with the same expression exists (see [8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable)) |
+| `LQL-5002` | A subquery has `orderBy` but no `limit`, so lambdaQL removes the sort (it has no effect on the result, rule Q4) |
+| `LQL-5003` | An outside sort (a Spring `Sort`, `SortSpec.ofPath`) uses a name that is not in the sort rules, and the mode is `SortMode.INFO` (the default, logged at `INFO` level) or `SortMode.WARN` (logged at `WARN` level). The sort runs. Logged once for each entity and name (see [4.10 the sort policy](java/04-order-paging.md#sort-policy)) |
 | `LQL-5004` | A procedure stub has no argument names in the class file (compiled without `-parameters`, Kotlin `-java-parameters`, and without `@DbParam`), and two neighbouring arguments have the same type. Logged at `INFO` level, once per procedure (see [8.4](java/08-procedures-functions.md#84-warning-argument-order)) |
 | `LQL-5005` | The procedure metadata cannot be read (the lookup fails, for example without permission on the dictionary views or `information_schema`). The stub is not checked, and the parameter layout comes from the stub. Logged at `INFO` level, once per procedure (see [8.4](java/08-procedures-functions.md#when-the-metadata-cannot-be-read)) |
 | `LQL-5006` | Only the Oracle overload lookup (`all_arguments`) fails. The call goes on without the overload check. Logged at `INFO` level |
 | `LQL-5007` | MariaDB only: a `NOT DETERMINISTIC` DB function on the value side is compared with a column (`o.getPrice() > OrderFns.nondet(base)`), so the index is not used for a range. Logged at `WARN` level |
 | `LQL-5008` | The index or function metadata for the SARGable check cannot be read (for example without permission). Logged at `INFO` level. `LQL-5001` is still logged; `LQL-5007` is not checked |
-| `LQL-5009` | A condition compares values of the entity with the SQL meaning (decision D48), so a row whose value is NULL does not match where Java or Kotlin would match it: two entity values with `==`/`equals`, `!=` against a value, `!` on a nullable `Boolean`, a null guard on an association path (the path stays an inner join), `NOT IN` with a subquery. Logged at `DEBUG` level, once per condition text (see 3.6.3: [Java](java/03-where.md#363-write-your-null-checks-yourself) \| [Kotlin](kotlin/03-where.md#363-write-your-null-checks-yourself)) |
+| `LQL-5009` | A condition compares values of the entity with the SQL meaning (decision D48), so a NULL row that Java or Kotlin would match can be left out: two entity values with `==`/`equals`, `!=` against a value, `!` on a nullable `Boolean`, a null guard on an association path (the path stays an INNER JOIN), `NOT IN` with a subquery. Logged at `DEBUG` level, once per condition text (see 3.6.3: [Java](java/03-where.md#363-write-your-null-checks-yourself) \| [Kotlin](kotlin/03-where.md#363-write-your-null-checks-yourself)) |
+| `LQL-5010` | A `@Lob` column is used in `order by`, `distinct` or `group by`. H2 and MariaDB run it, but Oracle rejects it (ORA-22848, ORA-22849). An `=` comparison works on all three databases. lambdaQL does not change the query. Logged at `DEBUG` level, once per column and use (see [4.5](java/04-order-paging.md#45-what-a-sort-key-can-be)) |
+| `LQL-5011` | A query sorts by an enum column with `@Enumerated(EnumType.STRING)`. The database sorts by name, and Java and Kotlin sort by declaration order, so the order can differ. lambdaQL does not change the query. Logged at `DEBUG` level, once per column. Not logged for `ORDINAL` (see [4.5](java/04-order-paging.md#45-what-a-sort-key-can-be)) |
+| `LQL-5012` | Arithmetic (`+ - * /`) with only one column and values is on the column side of a condition (`o.getCnt() * 2 > n`). It can be moved to the value side. Logged at `WARN` level. In `SargableMode.STRICT` it is the error `LQL-3066` (decision D50, see [8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable)) |
+| `LQL-5013` | A condition has arithmetic between columns, or `%` (`o.getPrice() * o.getCnt() > n`). It cannot be moved, so it is logged only at `DEBUG` level. Allowed also in `STRICT` |
 
 ```
 WARN  [LQL-5002] A subquery sort without limit does not change the result, so it was removed (Q4): ...
@@ -396,13 +424,18 @@ WARN  [LQL-5002] A subquery sort without limit does not change the result, so it
 
 Planned warnings (not implemented yet):
 
-- a case-insensitive comparison has no matching index or collation for that column.
+- A case-insensitive comparison has no matching index or collation for that column.
 
-A "strict mode" that turns these warnings into errors is planned. For outside sorts there is one already: with `SortMode.STRICT`, the case of `LQL-5003` throws `SortNotAllowedException` (`LQL-4040`).
+There is no general strict mode that turns all warnings into errors at once.
+Instead, two areas have their own `STRICT` mode.
+
+- Sort policy (decision D43): with `SortMode.STRICT`, the case of `LQL-5003` throws `SortNotAllowedException` (`LQL-4040`).
+- SARGable (decision D50): with `SargableMode.STRICT`, the cases of `LQL-5001`, `LQL-5007` and `LQL-5012` throw `NonSargableException` (`LQL-3066`).
 
 > [!NOTE]
 > `lambdaql-core` has no Spring dependency. For logging it brings only `slf4j-api`, so you choose the logging backend. The Spring modules (`lambdaql-spring-data-jpa`, `lambdaql-spring-boot-starter`) bring Spring Data JPA, and the starter also brings `spring-boot-starter-data-jpa` with Logback.
 
+<a id="summary"></a>
 ## Summary
 
 | Question | Answer |

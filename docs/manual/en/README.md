@@ -1,3 +1,4 @@
+<a id="lambdaql-user-manual-english"></a>
 # lambdaQL User Manual (English)
 
 **Other languages:** English | [한국어](../ko/README.md) | [日本語](../ja/README.md) | [简体中文](../zh/README.md)
@@ -6,6 +7,7 @@ lambdaQL is a query library for Java and Kotlin.
 You write normal lambdas. lambdaQL reads the bytecode of the lambda and builds a Hibernate 6.6 HQL query.
 The lambda is never run.
 
+<a id="a-first-look"></a>
 ## A first look
 
 ### Java
@@ -28,6 +30,7 @@ val orders = qb.from(Order::class.java)
     .toList()
 ```
 
+<a id="hql-the-same-for-both"></a>
 ### HQL (the same for both)
 
 ```
@@ -66,6 +69,7 @@ order by o1_0.price desc nulls last,o1_0.id
 fetch first ? rows only
 ```
 
+<a id="choose-your-track"></a>
 ## Choose your track
 
 The manual has **two tracks**: one for Java and one for Kotlin.
@@ -80,6 +84,7 @@ Both tracks use the same engine, so the same query gives the same HQL in both la
 The two tracks have the same chapter numbers and file names. Only chapter 9 is different (Java notes or Kotlin notes).
 Every track page has a link to the same page in the other track, so you can switch at any time.
 
+<a id="common-pages"></a>
 ## Common pages
 
 These pages are for both languages. They show code in separate Java and Kotlin sections.
@@ -89,6 +94,7 @@ These pages are for both languages. They show code in separate Java and Kotlin s
 | [1. Overview](01-overview.md) | What lambdaQL is, why it exists, how it works, design principles |
 | [11. Errors and languages](11-errors-and-languages.md) | Error codes, exceptions, message language, logging |
 
+<a id="table-of-contents"></a>
 ## Table of contents
 
 | # | Chapter | Java | Kotlin |
@@ -107,10 +113,12 @@ These pages are for both languages. They show code in separate Java and Kotlin s
 | 11 | Errors and languages (common) | [11-errors-and-languages.md](11-errors-and-languages.md) | [11-errors-and-languages.md](11-errors-and-languages.md) |
 | 12 | Spring Data JPA: `LambdaQlExecutor<T>`, DML shortcuts, Spring `Sort` and `Pageable`, modules, transactions, `QueryBuilder` bean | [Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md) |
 
+<a id="about-the-examples"></a>
 ## About the examples
 
 Examples are design examples. When a feature is implemented, its examples are replaced by code taken from the test suite, with a link to the test file. In 3. Conditions, 4. Sorting and paging, 5. Subqueries, 6. Select, aggregates and group by, 7. Update, insert, delete, 8. Procedures and DB functions, 11. Errors and languages and 12. Spring Data JPA (Java), these examples are marked **(tested)**. The Kotlin track marks the examples from the Kotlin tests the same way.
 
+<a id="example-entities"></a>
 ## Example entities
 
 All examples in this manual use these three entities.
@@ -123,6 +131,7 @@ All examples in this manual use these three entities.
 
 The full entity code is in Getting started: [Java](java/02-getting-started.md#example-entities) | [Kotlin](kotlin/02-getting-started.md#example-entities).
 
+<a id="supported-environment"></a>
 ## Supported environment
 
 | Item | Version |
@@ -133,6 +142,7 @@ The full entity code is in Getting started: [Java](java/02-getting-started.md#ex
 | Databases verified | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
 | Spring Boot (optional) | 3.4 (tested with 3.4.2). Spring Boot 4 is not verified yet |
 
+<a id="folder-layout"></a>
 ## Folder layout
 
 ```
@@ -154,9 +164,10 @@ manual/en/
 
 Every language folder (`en`, `ko`, `ja`, `zh`) has the same file names. To switch the language, change the folder name in the link.
 
+<a id="help-and-contributions"></a>
 ## Help and contributions
 
 - Source code: <https://github.com/codebit0/lambdaql>
-- The English manual is the source. The Korean, Japanese and Chinese manuals are translations.
+- The Korean manual is the source. The English, Japanese and Chinese manuals are translations.
 - If you find a mistake in any language, please open an issue or a pull request. Help with translations is welcome.
 - Design documents (Korean, for contributors): [ROADMAP.md](../../design/ROADMAP.md), [KOTLIN.md](../../design/KOTLIN.md)

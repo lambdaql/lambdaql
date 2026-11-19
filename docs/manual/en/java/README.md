@@ -1,3 +1,4 @@
+<a id="lambdaql-manual-java-track"></a>
 # lambdaQL Manual: Java track
 
 **Other languages:** English | [한국어](../../ko/java/README.md) | [日本語](../../ja/java/README.md) | [简体中文](../../zh/java/README.md)
@@ -56,6 +57,7 @@ fetch first ? rows only
 > **About the examples.**
 > Examples are design examples. When a feature is implemented, its examples are replaced by code taken from the test suite, with a link to the test file. In [3. Conditions](03-where.md), [4. Sorting and paging](04-order-paging.md), [5. Subqueries](05-subquery.md), [6. Select, aggregates and group by](06-select-group.md), [7. Update, insert, delete](07-dml.md), [8. Procedures and DB functions](08-procedures-functions.md), [11. Errors and languages](../11-errors-and-languages.md) and [12. Spring Data JPA](12-spring-data-jpa.md), these examples are marked **(tested)**.
 
+<a id="contents"></a>
 ## Contents
 
 The pages marked "common" are shared by the Java and Kotlin tracks. They have small examples in both languages, in separate sections.
@@ -68,7 +70,7 @@ The pages marked "common" are shared by the Java and Kotlin tracks. They have sm
 | 4 | [Sorting and paging](04-order-paging.md) | `orderBy`, `Direction`, NULL order, `limit`, `offset` |
 | 5 | [Subqueries](05-subquery.md) | `exists`, `contains` (IN), NOT EXISTS, scalar and correlated subqueries |
 | 6 | [Select, aggregates and group by](06-select-group.md) | `select`, records and DTOs, `Agg`, `groupBy`, `having`, joins (`join`, `leftJoin`, `crossJoin`), derived tables, CTE |
-| 7 | [Update, insert, delete](07-dml.md) | `set`, `by.set`, `values`, `all()`, `execute()`, `limit`, `executeOne()` |
+| 7 | [Update, insert, delete](07-dml.md) | `set`, `Dml.value`, `values`, `all()`, `execute()`, `limit`, `executeOne()` |
 | 7.6 | [Upsert](07-6-upsert.md) | `upsert`, `onConflict(...).update(...)`, `onConflict(...).ignore()`, row counts per database |
 | 8 | [Procedures and DB functions](08-procedures-functions.md) | `@SqlProcedure`, `@SqlFunction`, `qb.call`, `qb.exec` |
 | 9 | [Java notes](09-java-notes.md) | Boxing, `==` on objects, `String` compare, `Objects.equals`, method references, `this` capture, compiler notes |
@@ -76,6 +78,7 @@ The pages marked "common" are shared by the Java and Kotlin tracks. They have sm
 | 11 | [Errors and languages](../11-errors-and-languages.md) (common) | Error codes, exceptions, message language, logging |
 | 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`, repository default methods, DML shortcuts (`deleteAll`, `updateOne`, ...), Spring `Sort` and `Pageable`, modules, transactions, `QueryBuilder` bean |
 
+<a id="example-entities"></a>
 ## Example entities
 
 All examples use these three entities. The full code is in [Getting started](02-getting-started.md#example-entities).
@@ -86,6 +89,7 @@ All examples use these three entities. The full code is in [Getting started](02-
 | `Customer` | `id`, `name`, `grade` |
 | `Item` | `order` (to `Order`), `price`, `qty` |
 
+<a id="supported-environment"></a>
 ## Supported environment
 
 | Item | Version |
@@ -96,9 +100,10 @@ All examples use these three entities. The full code is in [Getting started](02-
 | Databases verified | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
 | Spring Boot (optional) | 3.4 (tested with 3.4.2). Spring Boot 4 is not verified yet |
 
+<a id="help-and-contributions"></a>
 ## Help and contributions
 
 - Source code: <https://github.com/codebit0/lambdaql>
-- The English manual is the source. The Korean, Japanese and Chinese manuals are translations.
+- The Korean manual is the source. The English, Japanese and Chinese manuals are translations.
 - If you find a mistake, please open an issue or a pull request.
 - Design documents (Korean, for contributors): [ROADMAP.md](../../../design/ROADMAP.md), [KOTLIN.md](../../../design/KOTLIN.md)

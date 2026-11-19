@@ -202,7 +202,7 @@ Kotlin의 이름 있는 인자(`calc(rate = rate, id = id)`)는 이를 바꾸지
 | IN·INOUT 파라미터 개수 = 스텁 인자 개수 | 예, 오류 `LQL-4036`(Java로 테스트함) |
 | INOUT 파라미터 = `@InOut`을 붙인 인자 | 예, 오류 `LQL-4036` |
 | OUT 값과 결과 집합의 개수 = 반환 타입의 구성 요소 수 | 예, 오류 `LQL-4038` |
-| 타입 | **아직 구현되지 않음** |
+| 타입의 종류(숫자, 문자, 날짜·시간, 불리언, 이진) | 예, 오류 `LQL-4036`(테스트함). 같은 종류 안의 차이는 대조하지 않음(아래 "인자 타입 대조" 참고) |
 | 같은 파라미터 이름이 다른 순서로 놓임 | 예, 오류 `LQL-4043`(Java로 테스트함). 스텁 인자 이름을 알 수 있을 때만(아래 참고) |
 | Oracle 패키지 프로시저 이름에 오버로드가 여러 개 | 예, 오류 `LQL-4044`(Oracle에서 Java로 테스트함) |
 
@@ -221,7 +221,7 @@ Kotlin의 이름 있는 인자(`calc(rate = rate, id = id)`)는 이를 바꾸지
 - 이름은 같고 순서만 다르면 호출 전에 `LambdaQLException` `LQL-4043`이 발생합니다.
 - 이름이 다르면(스텁이 다른 명명 규칙을 따름) 오류가 아닙니다. 검사가 동작하도록 `@DbParam`을 붙이십시오.
 - 클래스 파일에 이름이 없고 이웃한 두 인자의 타입이 같으면, 프로시저마다 한 번 `LQL-5004`를 `INFO` 레벨로 기록합니다.
-- 타입은 아직 비교하지 않습니다.
+- 타입은 종류만 대조합니다(아래 "인자 타입 대조" 참고). 같은 종류의 인자 두 개가 뒤바뀐 경우는 이름으로만 찾을 수 있습니다.
 
 같은 스텁을 Java로 테스트했습니다([`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `names`, `name-check`, MariaDB와 Oracle. [이 페이지의 Java 버전](../java/08-procedures-functions.md#84-warning-argument-order) 참고).
 Kotlin에서 이름을 남기려면 `-java-parameters`가 필요합니다. 다음은 설계 예제입니다.
@@ -244,6 +244,15 @@ qb.call(DiffProcs::class.java) { it.swapped(3, 10) }.execute()    // LambdaQLExc
 ```
 
 **권장:** `-java-parameters`로 컴파일하고 DB와 같은 이름을 쓰거나(공통 접두사는 생략 가능) `@DbParam`을 붙이십시오. 그러면 뒤바뀐 순서를 검출합니다.
+
+**인자 타입 대조.** 첫 호출 때 각 인자의 타입과 DB 파라미터 타입의 종류를 대조합니다.
+종류는 숫자, 문자, 날짜·시간, 불리언, 이진 다섯 가지이며, 다르면 호출 전에 `LQL-4036`으로 중단합니다.
+
+- 불리언 인자는 숫자 파라미터에도 맞는 것으로 봅니다. MariaDB의 `BOOLEAN`은 `TINYINT(1)`이고, Oracle 23 이전에는 `BOOLEAN` 타입이 없습니다.
+- 종류를 정할 수 없는 쪽(enum, 객체 타입, 커서)은 대조하지 않습니다.
+- 같은 종류 안의 차이(`Int?` 인자와 `NUMBER(10,2)` 파라미터 등)는 드라이버 변환에 맡깁니다.
+
+Java 테스트([`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `type-check`, MariaDB와 Oracle)가 숫자 파라미터에 문자열을 넘기면 `LQL-4036`으로 중단되는 것을 확인합니다.
 
 **Oracle 패키지 오버로드.** Oracle 패키지에는 같은 이름의 프로시저가 여러 개 있을 수 있습니다.
 lambdaQL은 스텁이 어느 것을 가리키는지 구분할 수 없으므로, 그런 이름을 호출하면 `LQL-4044`로 중단합니다. 오버로드 하나를 골라 호출하는 기능은 이후 계획입니다.
@@ -529,9 +538,9 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 
 **컬럼에 대한 산술**(결정 D50).
 
-- 컬럼 하나와 값만으로 된 `+ - * /`(`it.qty * 2 > n`)는 값 쪽으로 옮길 수 있습니다. lambdaQL은 `LQL-5012`를 `WARN` 수준으로 기록하고, `STRICT`에서는 오류입니다.
-- 컬럼끼리의 산술(`it.price!! * it.qty > n`)과 `%`는 옮길 수 없으므로 `LQL-5013`을 `DEBUG` 수준으로만 기록합니다. `STRICT`에서도 허용합니다.
-- 옮긴 형태는 의미가 같아야 합니다. `it.qty > n / 2.0`처럼 소수로 나누십시오. 정수 나눗셈 `n / 2`는 `>=`, `=`, `<`와 음수 `n`에서 다른 행을 냅니다. 음수를 곱했다면 비교 방향을 바꾸십시오. `LQL-5012` 메시지가 이를 안내합니다.
+- 컬럼 하나와 값만으로 된 `+ - * /`(`it.cnt * 2 > n`)는 값 쪽으로 옮길 수 있습니다. lambdaQL은 `LQL-5012`를 `WARN` 수준으로 기록하고, `STRICT`에서는 오류입니다.
+- 컬럼끼리의 산술(`it.price!! * it.cnt > n`)과 `%`는 옮길 수 없으므로 `LQL-5013`을 `DEBUG` 수준으로만 기록합니다. `STRICT`에서도 허용합니다.
+- 옮긴 형태는 의미가 같아야 합니다. `it.cnt > n / 2.0`처럼 소수로 나누십시오. 정수 나눗셈 `n / 2`는 `>=`, `=`, `<`와 음수 `n`에서 다른 행을 냅니다. 음수를 곱했다면 비교 방향을 바꾸십시오. `LQL-5012` 메시지가 이를 안내합니다.
 - 인덱스가 있는지 조회해 경고를 줄이는 방식은 채택하지 않았습니다. 권한과 시노님 때문에 "인덱스 없음"과 "알 수 없음"이 섞이고, 컬럼 산술은 드문 형태이기 때문입니다.
 
 이에 대한 Kotlin 테스트는 없습니다. Java 테스트([`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `sargable-strict`)가 `STRICT` 모드를 확인합니다.
@@ -583,7 +592,7 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 
 v0.1에 계획되지 않은 것: 동적 프로시저 이름을 위한 문자열 빌더(v0.2 후보), Oracle 패키지 프로시저의 오버로드 하나를 골라 호출하는 기능(오버로드 검출은 구현됨, `LQL-4044`), 테이블 반환 함수, 프로시저 결과 페이징.
 
-이 장의 오류는 `[LQL-xxxx]` 코드가 있는 `LambdaQLException`(또는 그 하위 클래스)입니다. 람다를 읽을 때는 `LQL-3052`~`LQL-3063`, 호출을 실행할 때는 `LQL-4034`~`LQL-4039`, `LQL-4043`, `LQL-4044`입니다. 호출 중에 `LQL-5004`, `LQL-5005`, `LQL-5006`을 `INFO` 레벨로 기록할 수도 있습니다. [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
+이 장의 오류는 `[LQL-xxxx]` 코드가 있는 `LambdaQLException`(또는 그 하위 클래스)입니다. 람다를 읽을 때는 `LQL-3052`~`LQL-3063`과, `SargableMode.STRICT`에서 인덱스를 쓸 수 없는 조건의 `LQL-3066`(`NonSargableException`, [8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고)입니다. 호출을 실행할 때는 `LQL-4034`~`LQL-4039`, `LQL-4043`, `LQL-4044`입니다. 호출 중에 `LQL-5004`, `LQL-5005`, `LQL-5006`을 `INFO` 레벨로 기록할 수도 있습니다. 조건 안의 DB 함수에 대해서는 `LQL-5001`, `LQL-5007`(`WARN`)과 `LQL-5008`(`INFO`)을 기록할 수 있습니다. [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
 
 ---
 
