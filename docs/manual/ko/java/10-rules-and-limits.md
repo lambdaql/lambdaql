@@ -343,7 +343,7 @@ lambdaQL은 이 목록의 모든 형태에 대해 명확한 오류를 던집니�
 | 지역 변수, 반복문, `switch`, `try`가 있는 블록 람다 | 식 하나. 값은 람다 밖에서 계산 |
 | 캡처한 변수에 쓰기 | 람다 밖에서 계산(Java도 캡처한 지역 변수가 사실상 final이어야 함) |
 | ECJ(Eclipse 컴파일러)로 컴파일한 람다 | 보장하지 않음. javac로만 테스트 |
-| 번들된 ASM이 모르는 더 새로운 JDK용으로 컴파일한 람다 | ASM 업데이트(lambdaQL은 ASM을 셰이딩하지 않음) |
+| Java 21~23에서 실행할 때, 번들된 ASM이 모르는 더 새로운 JDK용으로 컴파일한 람다 | ASM 업데이트(lambdaQL은 ASM을 셰이딩하지 않음). Java 24 이상에서 실행하면 해당 없음(`java.lang.classfile` 사용) |
 
 <a id="conditions"></a>
 ### 조건

@@ -1,6 +1,9 @@
 <a id="1-overview"></a>
 # 1. 概述
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../ko/01-overview.md)。
+
 [手册首页](README.md) | 路线：[Java](java/README.md) | [Kotlin](kotlin/README.md) | 下一章：2. 入门（[Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md)）
 
 本页适用于两种语言。代码分别展示在 **Java** 和 **Kotlin** 两个小节中。

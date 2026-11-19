@@ -575,7 +575,7 @@ assertEquals(2, qb.from(Tag.class).toList().size());
 | 람다는 식 하나여야 합니다(조건, 정렬, 조회). | 람다 안의 반복문과 지역 변수는 거부됩니다. |
 | 반드시 실행되어야 하는 코드를 람다에 넣지 마십시오. 람다는 실행되지 않습니다. | `System.out.println(...)`처럼 부수 효과가 있는 호출은 거부됩니다. |
 | javac로 컴파일하십시오. | ECJ 출력은 보장하지 않습니다. |
-| 새 JDK 버전에는 그에 맞는 ASM 버전이 필요합니다. | lambdaQL은 ASM 9.11.1을 사용합니다(Java 28까지의 클래스 파일을 읽음). 더 새로운 JDK로 컴파일한다면 ASM을 업데이트하십시오. |
+| Java 21~23에서 실행하면 새 JDK로 컴파일한 클래스에 맞는 ASM 버전이 필요합니다. | lambdaQL은 Java 21~23에서 ASM 9.11.1을 사용합니다(Java 28까지의 클래스 파일을 읽음). 더 새로운 JDK로 컴파일한다면 ASM을 업데이트하십시오. Java 24 이상에서는 실행 중인 JDK의 `java.lang.classfile`로 읽으므로 ASM 버전과 관계가 없습니다. |
 
 Java에 관한 더 자세한 내용은 [9. Java 노트](09-java-notes.md)에 있습니다.
 

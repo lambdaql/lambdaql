@@ -59,22 +59,23 @@ qb.from(Order.class)
 
 | 항목 | 값 / 주의 |
 |---|---|
-| JDK | **21**(`jvm.version=21`) |
-| Gradle | wrapper **8.10**. Java 23 이하에서만 실행된다. 데몬 JVM은 `gradle/gradle-daemon-jvm.properties`(`toolchainVersion=21`)로 고정 |
-| IntelliJ | Gradle JVM이 최신 JDK로 잡히면 "Gradle 8.10 is incompatible" 오류. Gradle JVM을 21로 지정 |
+| JDK | **21**(`jvm.version=21`) + **24 이상 하나**(`feature/boot4`, D52). 21은 기본 컴파일과 `test`, 24 이상은 `src/main/java24` 컴파일(`--release 24`)과 `testClassFile`. 버전은 `-Plql.classfile.jdk`(기본 25). Gradle이 찾을 수 있게 `~/.gradle/gradle.properties`의 `org.gradle.java.installations.paths`에 등록(이 PC: Homebrew `openjdk@25`) |
+| Gradle | wrapper **9.9.1**(`feature/boot4`, 2026-11-19. `main`은 8.10). 데몬 JVM은 `gradle/gradle-daemon-jvm.properties`(`toolchainVersion=21`)로 고정 |
+| IntelliJ | Gradle JVM을 21로 지정(`main`의 Gradle 8.10은 최신 JDK에서 "incompatible" 오류) |
 | 의존성 | `feature/boot4`: Spring Boot BOM 4.1.2(Hibernate ORM 7.4.13), Kotlin 2.3.21(테스트만), ASM 9.11.1(`implementation`: 사용자에게는 런타임 전용, 2026-11-19) |
-| ASM | 새 JDK 릴리스마다 최신 ASM으로 갱신한다. 구버전은 새 클래스 파일 버전을 읽지 못한다(D9) |
+| ASM | 새 JDK 릴리스마다 최신 ASM으로 갱신한다. 구버전은 새 클래스 파일 버전을 읽지 못한다(D9). `feature/boot4`에서는 Java 21~23 실행에서만 쓰고, 24 이상은 `java.lang.classfile`(D52) |
 | 테스트 DB | `application-test.yaml`(H2, `ddl-auto: create-drop`). `-Dlql.db=mariadb|oracle`이면 `lql-db-<이름>.yaml`을 `spring.config.import`로 읽는다. 테이블은 `SqPrefixNamingStrategy`로 `SQ_` 접두가 붙는다 |
 
 자주 쓰는 명령:
 
 ```bash
 ./gradlew -q test -Dlql.db=h2                      # 전체(모든 모듈), DB: h2 | mariadb | oracle
+./gradlew -q test testClassFile -Dlql.db=h2        # feature/boot4: JDK 21(ASM)과 JDK 25 + jar(ClassFile) 둘 다
 ./gradlew -q :query:test --tests '*JoinQueryTest*' -Dlql.db=oracle
 ./gradlew -q :query:test --tests '*SqlByDatabaseTest*' -Dlql.db=mariadb -Dlql.sql.update=true   # SQL 정답 파일 갱신
 ```
 
-결과는 `*/build/test-results/test/*.xml`에서 읽는다. SQL 정답 파일은 `query/src/test/resources/expected-sql/{h2,mariadb,oracle}.sql`이고, 매뉴얼의 DB별 SQL은 여기서 옮긴다. SQL이 바뀌면 테스트가 실패하므로 확인한 뒤 DB마다 `-Dlql.sql.update=true`로 다시 쓴다.
+결과는 `*/build/test-results/test/*.xml`(`testClassFile`은 `query/build/test-results/testClassFile/*.xml`)에서 읽는다. SQL 정답 파일은 `query/src/test/resources/expected-sql/{h2,mariadb,oracle}.sql`이고, 매뉴얼의 DB별 SQL은 여기서 옮긴다. SQL이 바뀌면 테스트가 실패하므로 확인한 뒤 DB마다 `-Dlql.sql.update=true`로 다시 쓴다.
 
 Javadoc 빌드는 `--snippet-path src/test/java`를 쓴다. Javadoc의 `{@snippet ... region="이름"}`이 가리키는 테스트 구간이 없으면 빌드가 실패한다.
 
@@ -189,7 +190,7 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 - B8(정수 열과 2.5): Hibernate 7은 BigDecimal 타입을 지정한 바인딩도 거부(`QueryArgumentException`). 숫자 리터럴(`e0.cnt >= 2.5BD`, IN은 `(2.5BD, 3.0BD)`)로 바꿈. Hibernate 6.6에서도 동작하는 형태. D37(캡처 값은 바인딩)의 예외다. 매뉴얼의 B8 설명(“BigDecimal로 바인딩”)은 아직 고치지 않았다.
 - `HibernateFunctions.tableAndColumn`: Hibernate 7에 없는 `getPropertyColumnNames` 대신 `findAttributeMapping` + `SelectableMapping`(6·7 공통)으로 바꿈.
 
-테스트 결과(2026-11-19, 10.2 수정 뒤): 세 DB 모두 241개 통과(건너뜀 H2 16·MariaDB 10·Oracle 9).
+테스트 결과(2026-11-19, 10.2 수정 뒤): 세 DB 모두 241개 통과(건너뜀 H2 16·MariaDB 10·Oracle 9). D52 구현 뒤의 결과는 10.3.
 
 ### 10.2 Boot 4에서 고친 실패(2026-11-19 해결)
 
@@ -200,11 +201,15 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 
 - **결정**: jar 하나. 기본 클래스는 Java 21 + ASM, `META-INF/versions/24/`에 `java.lang.classfile` 리더. JDK 24 이상에서 실행하면 ClassFile 리더를 쓴다.
 - **근거**: 성능 차이는 µs 단위라 선택 요인이 아니고(ROADMAP 2.6.1), 실제 문제는 ASM의 버전 추적(2.6.2)이다. ClassFile API는 실행 중인 JDK의 클래스 파일을 항상 읽는다.
-- **구현 순서**:
-  1. Decoder의 입력을 ASM 방문자에서 떼어 내고, ClassFile 명령어를 같은 입력으로 옮기는 어댑터를 만든다(해석 규칙은 하나).
-  2. `query/build.gradle`에 JDK 24 툴체인으로 컴파일하는 `java24` 소스 세트를 두고 jar의 `META-INF/versions/24`에 넣는다(`Multi-Release: true`).
-  3. 테스트를 JDK 21(ASM)과 JDK 24 이상(ClassFile)에서 모두 돌린다. 이 PC에는 JDK 21과 26만 있다.
-- **최소 JDK**: ClassFile API는 JDK 24에서 정식(JEP 484). 25와의 차이는 확인하지 못해 24부터 지원(미측정).
+- **구현(2026-11-19, 실측)**:
+  - Decoder 입력은 그대로 ASM 트리 `MethodNode`다. 버전 검사는 ASM `ClassReader`에만 있고 트리 클래스는 자료 구조라 버전 제한이 없다. 그래서 읽기만 나눴다.
+  - `org.lambdaql.engine.load.MethodReader`(패키지 전용) 두 벌: `src/main/java`는 ASM `ClassReader`, `src/main/java24`는 `java.lang.classfile`로 읽어 같은 `MethodNode`를 만든다(짧은·넓은 형태는 ASM과 같은 정규 opcode로, 프레임·지역 변수 표·try-catch는 복사하지 않음). `BytecodeLoader`가 이것을 부르고, `BytecodeLoader.readerName()`이 `asm`/`classfile`을 돌려준다.
+  - `query/build.gradle`: `java24` 소스 세트(JDK 25 툴체인, `--release 24`), jar의 `META-INF/versions/24`와 `Multi-Release: true`, 소스 jar도 같은 배치. jar 안 클래스 버전: 기본 major 65, versions/24 major 68(실측).
+  - 테스트 태스크 `testClassFile`: JDK 25에서 main 클래스 폴더 대신 jar를 클래스패스에 둬 MR 선택을 그대로 쓴다. `check`가 의존한다. `query` 모듈만 대상(226개), `spring-data-jpa`는 `test`(JDK 21)만.
+  - `ReaderEquivalenceTest`: main·Java 테스트·Kotlin 테스트 클래스의 모든 메서드(1000개 이상)를 활성 리더와 ASM `ClassReader`로 각각 읽어 명령어(opcode, 피연산자, 점프 대상, 줄 번호)를 비교한다. 줄 번호를 1 바꾼 변조로 실패하는 것을 확인함.
+  - 함정: 리더 이름을 `static final String` 상수로 두면 javac가 호출하는 쪽에 값을 복사해 MR 교체가 보이지 않는다. 메서드로 둔다.
+  - 결과(2026-11-19): 세 DB 모두 `test` 243개, `testClassFile` 226개 통과. JDK 24 실행은 이 PC에 JDK 24가 없어 미측정(JDK 25.0.5.1로 확인).
+- **최소 JDK**: ClassFile API는 JDK 24에서 정식(JEP 484). 24부터 지원하되 실행 확인은 25만(24는 미측정).
 - **ASM 의존 범위**: `api` → `implementation`(작성자 지시, 2026-11-19). 배포 POM에서 `runtime` 범위라 사용자의 컴파일 클래스패스에는 없다. 새 ASM이 필요하면 사용자가 자기 의존성으로 올릴 수 있다.
 - **Gradle**: 9.9.1로 올렸다(2026-11-19). Gradle 9에서 프로젝트 수준 `sourceCompatibility`가 없어져 `java { }` 안으로 옮겼다.
 

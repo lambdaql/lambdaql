@@ -16,6 +16,14 @@ sourceSets {
 	test {
 		kotlin.srcDirs = []
 	}
+	// Multi-Release JAR (ROADMAP D52): the java.lang.classfile reader for Java 24 and later.
+	// It goes to META-INF/versions/24 of the jar and replaces the ASM reader class of the same name there.
+	java24 {
+		java.srcDirs = ['src/main/java24']
+		kotlin.srcDirs = []
+		resources.srcDirs = []
+		compileClasspath += sourceSets.main.output
+	}
 	kotlinTest {
 		kotlin.srcDir 'src/test/kotlin'
 		java.srcDirs = []
@@ -26,6 +34,8 @@ sourceSets {
 }
 
 configurations {
+	java24Implementation.extendsFrom implementation
+	java24CompileOnly.extendsFrom compileOnly
 	kotlinTestImplementation.extendsFrom testImplementation
 	kotlinTestRuntimeOnly.extendsFrom testRuntimeOnly
 }
@@ -38,11 +48,10 @@ kotlin {
 
 dependencies {
 
-	// ASM 9.11.1: class file major 72(Java 28)까지 읽음. 9.7은 Java 23(major 67)까지라 JDK 24+로 컴파일된 람다를 읽지 못함.
-	// LambdaPredicateVisitor 등이 ASM 타입(MethodVisitor)을 공개 API로 노출하므로 api 로 선언.
-	// 새 JDK 릴리스(6개월 주기)마다 최신 ASM으로 갱신 필요.
-	// ASM reads the lambda bytecode (JDK 21-23; D52). implementation: users get it at run time only (Maven scope
-	// runtime), not on their compile class path. A newer ASM can still be forced by the user's own dependency.
+	// ASM 9.11.1 reads class files up to major 72 (Java 28). It reads the lambda bytecode on Java 21-23; Java 24 and
+	// later use java.lang.classfile (src/main/java24, D52), but the ASM tree and Type classes are used there too.
+	// implementation: users get it at run time only (Maven scope runtime), not on their compile class path.
+	// A newer ASM can still be forced by the user's own dependency. Update ASM for each new JDK release.
 	implementation 'org.ow2.asm:asm:9.11.1'
 	implementation 'org.ow2.asm:asm-tree:9.11.1'
 	implementation 'org.ow2.asm:asm-util:9.11.1'   // opcode names in error messages
@@ -79,6 +88,32 @@ dependencies {
 
 }
 
+// The JDK that compiles src/main/java24 (with --release 24) and runs the testClassFile task.
+// It must be 24 or later. Gradle finds it among the installed JDKs (org.gradle.java.installations.paths).
+def classFileJdk = JavaLanguageVersion.of((findProperty('lql.classfile.jdk') ?: '25') as int)
+
+tasks.named('compileJava24Java', JavaCompile) {
+	javaCompiler = javaToolchains.compilerFor { languageVersion = classFileJdk }
+	options.release = 24
+	options.encoding = 'UTF-8'
+}
+
+jar {
+	into('META-INF/versions/24') {
+		from sourceSets.java24.output
+	}
+	manifest {
+		attributes('Multi-Release': 'true')
+	}
+}
+
+// the sources jar (maven-publish, withSourcesJar) keeps the same layout
+tasks.matching { it.name == 'sourcesJar' }.configureEach {
+	into('META-INF/versions/24') {
+		from sourceSets.java24.allJava
+	}
+}
+
 // stub argument names for the procedure name check (ROADMAP M11, PR2): the test stubs are compiled with -parameters
 compileTestJava {
 	options.compilerArgs << '-parameters'
@@ -95,10 +130,35 @@ test{
 	// -Dlql.sql.update=true makes SqlByDatabaseTest write src/test/resources/expected-sql/<db>.sql again
 	systemProperty 'lql.sql.update', System.getProperty('lql.sql.update', 'false')
 
+	// the class directories (not the jar) are on the class path, so the ASM reader is used
+	systemProperty 'lql.reader.expected', 'asm'
+
 	testLogging {
 		events "passed", "skipped", "failed"
 	}
 }
+
+// The same tests with the jar on JDK 25 (ROADMAP D52): the JVM takes the java.lang.classfile reader from
+// META-INF/versions/24 of the Multi-Release JAR. Results: build/test-results/testClassFile
+//   ./gradlew :query:testClassFile -Dlql.db=h2|mariadb|oracle
+def testClassFile = tasks.register('testClassFile', Test) {
+	description = 'Runs the tests with the Multi-Release JAR on JDK 24+, so the java.lang.classfile reader is used.'
+	group = 'verification'
+	javaLauncher = javaToolchains.launcherFor { languageVersion = classFileJdk }
+	useJUnitPlatform()
+	testClassesDirs = tasks.test.testClassesDirs
+	classpath = files(tasks.jar) + tasks.test.classpath - sourceSets.main.output
+	systemProperty 'lql.db', System.getProperty('lql.db', 'h2')
+	// the SQL files are written by the test task only
+	systemProperty 'lql.sql.update', 'false'
+	systemProperty 'lql.reader.expected', 'classfile'
+	// one database schema is shared, so this task never runs at the same time as test
+	mustRunAfter tasks.test
+	testLogging {
+		events "passed", "skipped", "failed"
+	}
+}
+tasks.named('check') { dependsOn testClassFile }
 
 javadoc {
 	// Javadoc examples come from the test code:

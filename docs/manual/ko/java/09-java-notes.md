@@ -334,7 +334,7 @@ lambdaQL에는 **static DSL이 없습니다**. 선택 사항인 `Agg` import를 
 |---|---|
 | 컴파일러 | lambdaQL은 **javac**로 테스트합니다. **ECJ**(Eclipse 컴파일러)로 컴파일한 람다는 보장하지 않습니다. Eclipse IDE와 Eclipse JDT 기반의 다른 도구는 ECJ를 사용합니다. 테스트는 Gradle이나 Maven(javac)으로 실행하십시오 |
 | JDK 버전 | Java 21 |
-| ASM | lambdaQL은 ASM 9.11.1로 클래스 파일을 읽습니다(Java 28 클래스 파일까지). 더 새로운 JDK로 컴파일한다면 ASM을 업데이트하십시오. lambdaQL은 ASM을 셰이딩하지 않으므로 직접 업데이트할 수 있습니다 |
+| 클래스 파일 읽기(ASM) | Java 21~23에서는 ASM 9.11.1로 클래스 파일을 읽습니다(Java 28 클래스 파일까지). 더 새로운 JDK로 컴파일한다면 ASM을 업데이트하십시오. lambdaQL은 ASM을 셰이딩하지 않으므로 직접 업데이트할 수 있습니다. Java 24 이상에서는 실행 중인 JDK의 `java.lang.classfile`로 읽으므로 ASM 버전과 관계가 없습니다. lambdaQL jar는 Multi-Release JAR이며 JVM이 실행 버전에 맞는 쪽을 고릅니다 |
 | `-parameters` | 권장. lambdaQL이 프로시저 인자 이름을 확인할 수 있습니다([8.4](08-procedures-functions.md#84-warning-argument-order)) |
 | 디버그 정보 | 줄 번호를 유지하십시오(javac 기본값). lambdaQL은 오류 메시지에 소스 줄을 넣습니다 |
 | IntelliJ "Number objects compared using `==`" | lambdaQL 람다 안에서는 의도한 동작입니다. `@SuppressWarnings("NumberEquality")`를 사용할 수 있습니다 |

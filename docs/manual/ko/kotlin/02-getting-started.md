@@ -523,7 +523,7 @@ val tags: List<Tag> = qb.from(Tag::class.java).toList()   // use toList() instea
 | 쿼리 람다를 `inline fun` 안에서 만들지 마십시오. | 거부됩니다(KC2). 헬퍼를 non-inline으로 만들거나, 호출하는 쪽에서 람다를 전달하십시오. |
 | 람다는 식 하나여야 합니다(조건, 정렬, 조회). | 람다 안의 반복문과 지역 `val`/`var`는 거부됩니다. |
 | 반드시 실행되어야 하는 코드를 람다에 넣지 마십시오. 람다는 실행되지 않습니다. | `println(...)`처럼 부수 효과가 있는 호출은 거부됩니다. |
-| 새 JDK 버전에는 그에 맞는 ASM 버전이 필요합니다. | lambdaQL은 ASM 9.11.1을 사용합니다(Java 28까지의 클래스 파일을 읽음). |
+| Java 21~23에서 실행하면 새 JDK로 컴파일한 클래스에 맞는 ASM 버전이 필요합니다. | lambdaQL은 Java 21~23에서 ASM 9.11.1을 사용합니다(Java 28까지의 클래스 파일을 읽음). Java 24 이상에서는 실행 중인 JDK의 `java.lang.classfile`로 읽으므로 ASM 버전과 관계가 없습니다. |
 
 Kotlin의 모든 제한은 [9. Kotlin 노트](09-kotlin-notes.md#914-kotlin-limits-kc1-to-kc21)에 있습니다.
 

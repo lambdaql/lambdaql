@@ -92,7 +92,7 @@ where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 | 단계 | 하는 일 | 상태 |
 |---|---|---|
 | 1. 람다 본문 찾기 | 람다는 `Serializable`입니다. lambdaQL은 직렬화 훅을 통해 `SerializedLambda`를 얻습니다(`setAccessible` 없음). 이를 통해 어떤 메서드가 람다 본문을 담고 있는지, 어떤 값이 캡처되었는지 알 수 있습니다. | 구현됨 |
-| 2. 바이트코드 읽기 | lambdaQL은 ASM으로 그 메서드 하나만 읽습니다. 클래스 파일을 읽을 뿐 코드를 실행하지 않습니다. | 구현됨 |
+| 2. 바이트코드 읽기 | lambdaQL은 그 메서드 하나만 읽습니다. Java 21~23에서는 ASM을, Java 24 이상에서는 JDK의 `java.lang.classfile`을 씁니다. 클래스 파일을 읽을 뿐 코드를 실행하지 않습니다. | 구현됨 |
 | 3. 조건 다시 만들기 | Java와 Kotlin은 `&&`, `\|\|`, `!`를 점프로 컴파일합니다. lambdaQL은 이 점프로부터 원래의 논리 트리를 다시 만듭니다. | Java 람다는 구현됨. Kotlin은 `?.`, `!!`, `in`을 테스트함. 나머지 Kotlin 전용 형태(`?:`, 범위, `when`)는 설계됨. |
 | 4. HQL 만들기 | getter와 속성은 JPA 속성 경로가 됩니다(`o.getPrice()` 또는 `it.price` → `e0.price`). 람다 안의 상수는 리터럴이 되고, 캡처 값은 파라미터(`:p1`)가 됩니다. | `where`와 `orderBy`에 대해 구현됨, H2·MariaDB·Oracle에서 테스트함 |
 | 5. 실행 | lambdaQL은 파라미터를 바인딩하고 Hibernate로 HQL을 실행합니다. 각 람다의 분석 결과는 캐시되므로 바이트코드는 한 번만 읽습니다. | `toList()`와 `toSet()`(`limit` / `offset` 포함), `first()`, `one()`, `count()`, `exists()`에 대해 구현됨 |

@@ -39,6 +39,15 @@
 - 페이지: `java/08-procedures-functions.md`, `kotlin/08-procedures-functions.md`의 SARGable 표 ① 행
 - 내용: 열 타입이 함수 인자 타입과 달라 Oracle이 넣은 숫자 변환(`FN(TO_NUMBER(COLUMN))` 등)도 같은 식으로 본다는 문장 추가
 
+### 3. 클래스 파일 읽기: Java 24 이상은 `java.lang.classfile`(2026-11-19, D52)
+
+- 페이지와 위치
+  - `01-overview.md`: 처리 단계 표의 "2. 바이트코드 읽기" 행
+  - `java/02-getting-started.md`, `kotlin/02-getting-started.md`: "알아 둘 점" 표의 ASM 행
+  - `java/10-rules-and-limits.md`, `kotlin/10-rules-and-limits.md`: "지원하지 않음" 표의 ASM 행
+  - `java/09-java-notes.md`: 9.12 표의 ASM 행(행 이름이 "클래스 파일 읽기(ASM)"으로 바뀜)
+- 내용: ASM 버전 제약은 Java 21~23에서 실행할 때만 해당한다. Java 24 이상에서는 실행 중인 JDK의 `java.lang.classfile`로 읽어 ASM 버전과 관계가 없다(Multi-Release JAR)
+
 ## 한국어 원본 다듬기(2026-11-19 네 언어에 반영 완료)
 
 번역 중 발견한 문구 문제 9건을 한국어 원본과 영어, 일본어, 중국어에 함께 고쳤습니다. 남은 대기 항목은 없습니다.

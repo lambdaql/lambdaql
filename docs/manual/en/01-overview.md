@@ -1,6 +1,9 @@
 <a id="1-overview"></a>
 # 1. Overview
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../ko/01-overview.md) for the latest rules.
+
 [Manual home](README.md) | Tracks: [Java](java/README.md) | [Kotlin](kotlin/README.md) | Next: 2. Getting started ([Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md))
 
 This page is for both languages. Code is shown in separate **Java** and **Kotlin** sections.

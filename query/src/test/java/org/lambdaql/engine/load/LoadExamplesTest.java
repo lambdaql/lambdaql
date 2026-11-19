@@ -93,4 +93,16 @@ class LoadExamplesTest {
                 getClass().getClassLoader(), "org/lambdaql/query/Order", "noSuchMethod", "()V"));
         // @end
     }
+
+    @Test
+    void readerName() {
+        // @start region="reader-name"
+        // Java 21 to 23 read class files with ASM; Java 24 and later with java.lang.classfile (from the jar, D52)
+        String reader = BytecodeLoader.readerName();
+        assertTrue(reader.equals("asm") || reader.equals("classfile"));
+        // @end
+        // the Gradle tasks say which reader they expect: test (class folders) -> asm, testClassFile (jar, JDK 25) -> classfile
+        String expected = System.getProperty("lql.reader.expected");
+        if (expected != null) assertEquals(expected, reader, Runtime.version() + " " + BytecodeLoader.class.getProtectionDomain().getCodeSource().getLocation());
+    }
 }
