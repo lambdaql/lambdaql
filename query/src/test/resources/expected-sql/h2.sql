@@ -1,4 +1,4 @@
--- SQL that Hibernate 6.6 makes for the manual examples on h2.
+-- SQL that Hibernate 7.4 makes for the manual examples on h2.
 -- Made by SqlByDatabaseTest; the select list is shortened to … and the test table prefix is removed.
 
 -- @example to-hql

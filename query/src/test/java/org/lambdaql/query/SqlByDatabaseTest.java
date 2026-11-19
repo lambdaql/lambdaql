@@ -385,7 +385,7 @@ class SqlByDatabaseTest {
         String db = System.getProperty("lql.db", "h2").toLowerCase(Locale.ROOT);
         Path file = Path.of("src/test/resources/expected-sql/" + db + ".sql");
         StringBuilder text = new StringBuilder()
-                .append("-- SQL that Hibernate 6.6 makes for the manual examples on ").append(db).append(".\n")
+                .append("-- SQL that Hibernate ").append(hibernateVersion()).append(" makes for the manual examples on ").append(db).append(".\n")
                 .append("-- Made by SqlByDatabaseTest; the select list is shortened to … and the test table prefix is removed.\n");
         out.forEach((id, sql) -> text.append("\n-- @example ").append(id).append('\n').append(sql).append('\n'));
         if (Boolean.getBoolean("lql.sql.update")) {
@@ -401,5 +401,11 @@ class SqlByDatabaseTest {
     @EnableAutoConfiguration
     @EntityScan("org.lambdaql.query")
     static class Context {
+    }
+
+    /** The major and minor version of the Hibernate on the class path, for example {@code 7.4}. */
+    private static String hibernateVersion() {
+        String[] parts = org.hibernate.Version.getVersionString().split("\\.");
+        return parts[0] + "." + parts[1];
     }
 }

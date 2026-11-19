@@ -1,4 +1,4 @@
--- SQL that Hibernate 6.6 makes for the manual examples on mariadb.
+-- SQL that Hibernate 7.4 makes for the manual examples on mariadb.
 -- Made by SqlByDatabaseTest; the select list is shortened to … and the test table prefix is removed.
 
 -- @example to-hql

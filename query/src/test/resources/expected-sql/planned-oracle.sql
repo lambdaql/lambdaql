@@ -1,4 +1,4 @@
--- SQL that Hibernate 6.6 makes on oracle for the PLANNED HQL in the manual (lambdaQL does not make these queries yet).
+-- SQL that Hibernate 7.4 makes on oracle for the PLANNED HQL in the manual (lambdaQL does not make these queries yet).
 -- Made by PlannedSqlTest: the HQL is given to Hibernate directly. The select list of entity queries
 -- is shortened to …, and the test prefix SQ_ is removed.
 -- "NOT VALID HQL": Hibernate rejected the HQL. "DB ERROR": Hibernate made the SQL, but the database rejected it.

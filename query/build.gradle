@@ -59,7 +59,8 @@ dependencies {
 
 	// lambdaql-core has no Spring dependency (ROADMAP D34). JPA and Hibernate are given by the user at run time.
 	compileOnly 'jakarta.persistence:jakarta.persistence-api'
-	// Hibernate 6.6 is given by the user at run time; core uses it only for DB function registration (ROADMAP M11)
+	// Hibernate (7.4 on this Boot 4 branch) is given by the user at run time; core uses it only for DB function
+	// registration and mapping lookups (ROADMAP M11)
 	compileOnly 'org.hibernate.orm:hibernate-core'
 	implementation 'org.slf4j:slf4j-api'
 

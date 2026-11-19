@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Constants compared with converted columns ({@code @Convert}) go through the converter (ROADMAP D48, B1).
- * lambdaQL writes a constant from the lambda as a literal (D37); Hibernate 6.6 converts a literal that is compared
+ * lambdaQL writes a constant from the lambda as a literal (D37); Hibernate (6.6 and 7.4) converts a literal that is compared
  * with a converted attribute, so the result is right on H2, MariaDB and Oracle (measured).
  * The region markers are used by Javadoc snippet tags.
  */

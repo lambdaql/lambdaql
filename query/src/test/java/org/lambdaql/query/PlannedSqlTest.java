@@ -392,7 +392,7 @@ public class PlannedSqlTest {
     private void compare() throws IOException {
         Path file = Path.of("src/test/resources/expected-sql/planned-" + db + ".sql");
         StringBuilder text = new StringBuilder()
-                .append("-- SQL that Hibernate 6.6 makes on ").append(db)
+                .append("-- SQL that Hibernate ").append(hibernateVersion()).append(" makes on ").append(db)
                 .append(" for the PLANNED HQL in the manual (lambdaQL does not make these queries yet).\n")
                 .append("-- Made by PlannedSqlTest: the HQL is given to Hibernate directly. The select list of entity queries\n")
                 .append("-- is shortened to …, and the test prefix SQ_ is removed.\n")
@@ -414,5 +414,11 @@ public class PlannedSqlTest {
     @EnableAutoConfiguration
     @EntityScan("org.lambdaql.query")
     static class Context {
+    }
+
+    /** The major and minor version of the Hibernate on the class path, for example {@code 7.4}. */
+    private static String hibernateVersion() {
+        String[] parts = org.hibernate.Version.getVersionString().split("\\.");
+        return parts[0] + "." + parts[1];
     }
 }
