@@ -39,6 +39,10 @@ class DmlQueryTest {
     record Line(long id, double price) {
     }
 
+    /** A list element that names an order, for {@code values(list, (a, r, sub) -> ...)}. */
+    record Ref(long id, long orderId) {
+    }
+
     @BeforeEach
     void seed() {
         qb = new QueryBuilder(emf);
@@ -195,6 +199,25 @@ class DmlQueryTest {
         List<Long> ids = orders().stream().map(Order::getId).toList();
         assertEquals(30.0, find(Archive.class, ids.get(0)).getPrice());
         assertEquals(5.0, find(Archive.class, ids.get(2)).getPrice());
+    }
+
+    @Test
+    void insertListWithSubquery() {
+        items();
+        List<Order> all = orders();
+        List<Ref> refs = List.of(new Ref(301, all.get(0).getId()), new Ref(302, all.get(2).getId()));
+        // @start region="insert-list-sub"
+        // one row per element; the subquery reads the element's value (D49)
+        ExecutableInsert<Archive> i = qb.insert(Archive.class).values(refs, (a, r, sub) -> {
+            a.setId(r.id());
+            a.setPrice(sub.from(Item.class).where(x -> x.getOrder().getId() == r.orderId()).sum(x -> x.getPrice()));
+        });
+        assertEquals("insert into Archive (id, price) values (:p1, (select sum(s1.price) from Item s1 where s1.order.id = :p2)),"
+                + " (:p3, (select sum(s1.price) from Item s1 where s1.order.id = :p4))", i.toHql().get(0).hql());
+        // @end
+        assertEquals(2, i.execute());
+        assertEquals(30.0, find(Archive.class, 301L).getPrice());
+        assertEquals(5.0, find(Archive.class, 302L).getPrice());
     }
 
     @Test

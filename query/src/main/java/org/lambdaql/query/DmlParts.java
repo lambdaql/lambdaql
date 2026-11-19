@@ -38,7 +38,7 @@ final class DmlParts {
     }
 
     /** One row per element: the element is added after the captured values of the lambda. */
-    static <L> List<HqlRenderer.AssignBound> each(QueryContext context, Class<?> type, Collection<L> rows, AssignEach<?, L> assign) {
+    static <L> List<HqlRenderer.AssignBound> each(QueryContext context, Class<?> type, Collection<L> rows, Object assign) {
         LambdaRef ref = QueryContext.read(assign);
         List<Assignment> items = context.analyzeSetters(ref, List.of(type), 1);
         Object[] base = ref.capturedArgs();

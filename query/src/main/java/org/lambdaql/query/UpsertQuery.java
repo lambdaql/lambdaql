@@ -61,6 +61,18 @@ public class UpsertQuery<T> {
         return plan(DmlParts.each(context, entityClass, rows, assign));
     }
 
+    /**
+     * Upserts one row per list element, with values that may use subqueries: {@code (a, l, sub) -> ...} (ROADMAP D49).
+     *
+     * @param rows   the elements
+     * @param assign the assignment lambda
+     * @param <L>    the element type
+     * @return the runnable upsert
+     */
+    public <L> ExecutableInsert<T> values(Collection<L> rows, AssignEachSub<T, L> assign) {
+        return plan(DmlParts.each(context, entityClass, rows, assign));
+    }
+
     private ExecutableInsert<T> plan(List<HqlRenderer.AssignBound> rows) {
         if (!rows.isEmpty()) {
             DmlParts.noTargetRead(rows.get(0));

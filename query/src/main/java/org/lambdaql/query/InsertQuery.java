@@ -69,6 +69,21 @@ public class InsertQuery<T> {
     }
 
     /**
+     * Inserts one row per list element, with values that may use subqueries: {@code (a, l, sub) -> ...} (ROADMAP D49).
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert-list-sub"}
+     *
+     * @param rows   the elements; an empty list inserts nothing
+     * @param assign the assignment lambda
+     * @param <L>    the element type
+     * @return the runnable INSERT
+     */
+    public <L> InsertValues<T> values(Collection<L> rows, AssignEachSub<T, L> assign) {
+        return InsertValues.of(entityClass, context, DmlParts.each(context, entityClass, rows, assign));
+    }
+
+    /**
      * Starts INSERT ... SELECT from another entity.
      *
      * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):

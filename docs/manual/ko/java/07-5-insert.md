@@ -3,7 +3,6 @@
 
 > [!NOTE]
 > **상태: 구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, 마일스톤 M10). `insert ... select`의 `groupBy`, `having`, `Agg`(마일스톤 M9)도 포함합니다.
-> **아직 구현되지 않음:** 리스트 형태 `values(list, (a, l) -> ...)` 안의 서브쿼리.
 > **(테스트됨)** 표시가 있는 예제는 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)와 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)에서 그대로 가져온 것입니다. 나머지 예제는 설계를 따르며 아직 테스트가 없습니다.
 > 전체 상태는 [Java 트랙 README](README.md#status)를 참고하십시오.
 
@@ -72,7 +71,7 @@ assertEquals("insert into Archive e0 (id, price) values (100L, (select sum(s1.pr
 
 - 다른 테이블의 집계(캡처 파라미터가 있든 없든), 여러 행, 대상 테이블 자신을 읽는 서브쿼리(MariaDB 오류 1093 없음)가 모두 동작합니다(H2, MariaDB 10.11, Oracle 23.26에서 실측).
 - 서브쿼리는 캡처 값을 읽을 수 있지만 새로 삽입하는 행은 읽을 수 없습니다.
-- 리스트 형태 `values(list, (a, l) -> ...)` 안의 서브쿼리는 아직 지원하지 않습니다.
+- 리스트 형태에서도 서브쿼리를 쓸 수 있습니다([리스트에서 여러 행](#many-rows-from-a-list) 참고).
 - upsert의 삽입 값과 `do update set` 안의 서브쿼리도 동작합니다. Oracle에서는 Hibernate가 `merge`로 실행합니다(실측).
 
 <a id="many-rows-from-a-list"></a>
@@ -98,6 +97,21 @@ values (?,?), (?,?)
 
 lambdaQL은 요소의 getter를 Java에서 읽으므로, 모든 값이 바인드 파라미터가 됩니다.
 VALUES 행이 여러 개인 문장 하나를 씁니다. 리스트가 길면 문장 하나에 값이 500개 이하가 되도록 나눕니다([7.8](07-dml.md#batching-for-many-rows) 참고). 빈 리스트는 SQL을 실행하지 않고 0을 반환합니다.
+
+**리스트 형태의 서브쿼리.** `values(list, (a, l, sub) -> ...)`처럼 세 번째 인자로 서브쿼리를 만들 수 있습니다(결정 D49). `qb.upsert(X.class).values(list, (a, l, sub) -> ...)`도 같습니다.
+서브쿼리는 요소의 값을 읽을 수 있습니다. 그 값은 Java에서 읽어 행마다 파라미터 하나로 바인딩합니다. 새로 삽입하는 행은 읽을 수 없습니다(세 DB에서 실측).
+
+**(테스트됨)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `insert-list-sub`:
+
+```java
+// one row per element; the subquery reads the element's value (D49)
+ExecutableInsert<Archive> i = qb.insert(Archive.class).values(refs, (a, r, sub) -> {
+    a.setId(r.id());
+    a.setPrice(sub.from(Item.class).where(x -> x.getOrder().getId() == r.orderId()).sum(x -> x.getPrice()));
+});
+assertEquals("insert into Archive (id, price) values (:p1, (select sum(s1.price) from Item s1 where s1.order.id = :p2)),"
+        + " (:p3, (select sum(s1.price) from Item s1 where s1.order.id = :p4))", i.toHql().get(0).hql());
+```
 
 <a id="generated-id"></a>
 ## 생성되는 id

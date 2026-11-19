@@ -269,7 +269,10 @@ public final class AssignmentReader {
         return "set" + Character.toUpperCase(getter.charAt(0)) + getter.substring(1);
     }
 
-    /** Replaces the host parameter with a captured slot after the real captured values. */
+    /**
+     * Replaces the host parameter with a captured slot after the real captured values. A parameter after it (the
+     * {@code sub} of {@code (a, l, sub)}) moves down by one, so it comes right after the entities as everywhere else.
+     */
     private static Expr asHost(Expr e, int hostParam, LambdaRef ref) {
         if (hostParam < 0) return e;
         return replaceParam(e, hostParam, new Expr.Captured(ref.capturedCount(), org.objectweb.asm.Type.getType(Object.class)));
@@ -277,7 +280,9 @@ public final class AssignmentReader {
 
     private static Expr replaceParam(Expr e, int index, Expr with) {
         return switch (e) {
-            case Expr.Param p -> p.index() == index ? with : p;
+            case Expr.Param p -> p.index() == index ? with : p.index() > index ? new Expr.Param(p.index() - 1, p.type()) : p;
+            case Expr.Lambda l -> new Expr.Lambda(l.owner(), l.method(), l.descriptor(), l.isStatic(),
+                    l.captured().stream().map(a -> replaceParam(a, index, with)).toList(), l.type());
             case Expr.Invoke i -> new Expr.Invoke(i.receiver() == null ? null : replaceParam(i.receiver(), index, with),
                     i.method(), i.args().stream().map(a -> replaceParam(a, index, with)).toList());
             case Expr.GetField f -> f.receiver() == null ? f

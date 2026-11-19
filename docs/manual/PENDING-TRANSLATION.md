@@ -192,6 +192,7 @@ B6 대상 페이지: `java/03`·`kotlin/03`(임베디드 경로 절, 같음 비�
 | 항목 | 내용 | 테스트 영역 |
 |---|---|---|
 | insert values·upsert 서브쿼리 | `values((a, sub) -> …)`, upsert `values((a, sub) -> …)`, `onConflict(…).update((a, sub) -> …)`. 서브쿼리는 캡처 값만 읽음. 세 DB 실측 | `DmlQueryTest` `insert-values-sub`, `KotlinQueryTest` `insert-values-sub` |
+| 목록 형태 서브쿼리 | `values(list, (a, l, sub) -> …)`(insert·upsert), 서브쿼리는 원소 값을 읽을 수 있음. 세 DB 실측 | `DmlQueryTest` `insert-list-sub` |
 
 대상 페이지: `java/07-dml.md`·`kotlin/07-dml.md`(미구현 목록과 7.3 서브쿼리 절), `java/07-5-insert.md`·`kotlin/07-5-insert.md`(values·upsert 절).
 
