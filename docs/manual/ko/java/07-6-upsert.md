@@ -99,6 +99,8 @@ values (excluded.id,excluded.price)
 
 키는 getter 람다(`a -> a.getId()`)나 getter 메서드 레퍼런스(`Archive::getId`)로 지정합니다. 키는 연관 경로가 아니라 엔티티 자신의 컬럼이어야 하고, 데이터베이스에 그 컬럼의 기본 키나 유니크 제약이 있어야 합니다.
 
+`values`와 `update`에 인자가 둘인 람다를 쓰면 두 번째 인자 `sub`로 서브쿼리를 만들 수 있습니다(결정 D49, 세 DB에서 실측). 예제는 [7.5](07-5-insert.md#a-subquery-in-a-value)를 참고하십시오.
+
 <a id="keep-the-existing-row-onconflictkeyignore"></a>
 ## 기존 행 유지: `onConflict(key).ignore()`
 

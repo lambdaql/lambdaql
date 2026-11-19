@@ -241,6 +241,17 @@ class KotlinQueryTest {
     }
 
     @Test
+    fun insertValuesWithSubquery() {
+        // @start region="insert-values-sub"
+        // values { a, sub -> ... }: a subquery can read captured values, not the new row (D49)
+        val i = qb.insert(Archive::class.java)
+            .values { a, sub -> a.id = 100L; a.price = sub.from(Item::class.java).sum { it.price } }
+        assertEquals("insert into Archive (id, price) values (100L, (select sum(s1.price) from Item s1))", i.toHql()[0].hql())
+        // @end
+        assertEquals(1, i.execute())
+    }
+
+    @Test
     fun deleteWithSelfSubquery() {
         // @start region="delete-self-subquery"
         // the subquery reads the target table: the matching ids are read through a derived table first (U17, MariaDB 1093)

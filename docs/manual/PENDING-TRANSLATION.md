@@ -187,3 +187,11 @@ B6 대상 페이지: `java/03`·`kotlin/03`(임베디드 경로 절, 같음 비�
 
 대상 페이지: `README.md`, `java/README.md`, `kotlin/README.md`(기능 표의 "타입 대조: 아직 구현되지 않음"), `java/08-procedures-functions.md`(8.4 스텁 코드, "인자 타입 대조" 문단, PR2 행), `kotlin/08-procedures-functions.md`(PR2 행).
 
+## 대기 항목: insert values·upsert의 서브쿼리(D49 보완)
+
+| 항목 | 내용 | 테스트 영역 |
+|---|---|---|
+| insert values·upsert 서브쿼리 | `values((a, sub) -> …)`, upsert `values((a, sub) -> …)`, `onConflict(…).update((a, sub) -> …)`. 서브쿼리는 캡처 값만 읽음. 세 DB 실측 | `DmlQueryTest` `insert-values-sub`, `KotlinQueryTest` `insert-values-sub` |
+
+대상 페이지: `java/07-dml.md`·`kotlin/07-dml.md`(미구현 목록과 7.3 서브쿼리 절), `java/07-5-insert.md`·`kotlin/07-5-insert.md`(values·upsert 절).
+

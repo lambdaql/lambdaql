@@ -3,7 +3,7 @@
 
 > [!NOTE]
 > **상태: 구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, 마일스톤 M10). `insert ... select`의 `groupBy`, `having`, `Agg`(마일스톤 M9)도 포함합니다.
-> **아직 구현되지 않음:** `values(...)` 안의 서브쿼리.
+> **아직 구현되지 않음:** 리스트 형태 `values(list, (a, l) -> ...)` 안의 서브쿼리.
 > **(테스트됨)** 표시가 있는 예제는 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)와 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)에서 그대로 가져온 것입니다. 나머지 예제는 설계를 따르며 아직 테스트가 없습니다.
 > 전체 상태는 [Java 트랙 README](README.md#status)를 참고하십시오.
 
@@ -43,6 +43,37 @@ setter가 없는 엔티티는 `Dml.value`로 한 행을 삽입합니다(결정 D
 ```java
 qb.insert(Order.class).values(o -> { value(o.getId(), id); value(o.getStatus(), 1); }).execute();
 ```
+
+<a id="a-subquery-in-a-value"></a>
+### 값 안의 서브쿼리
+
+`values((a, sub) -> ...)`처럼 인자가 둘인 람다를 쓰면 두 번째 인자 `sub`로 서브쿼리를 만들 수 있습니다(결정 D49).
+upsert의 `values((a, sub) -> ...)`와 `onConflict(...).update((a, sub) -> ...)`도 같습니다([7.6](07-6-upsert.md#your-own-change-onconflictkeyupdate) 참고).
+
+**(테스트됨)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `insert-values-sub`:
+
+```java
+// values((a, sub) -> ...): a subquery can read captured values, not the new row (D49)
+ExecutableInsert<Archive> i = qb.insert(Archive.class)
+        .values((a, sub) -> {
+            a.setId(100L);
+            a.setPrice(sub.from(Item.class).where(x -> x.getOrder().getId() == first).sum(x -> x.getPrice()));
+        });
+assertEquals("insert into Archive (id, price) values (100L, (select sum(s1.price) from Item s1 where s1.order.id = :p1))",
+        i.toHql().get(0).hql());
+// upsert: a subquery in the inserted value and in the update on conflict
+ExecutableInsert<Archive> up = qb.insert(Archive.class)
+        .values((a, sub) -> { a.setId(100L); a.setPrice(sub.from(Item.class).sum(x -> x.getPrice())); })
+        .onConflict(a -> a.getId())
+        .update((a, sub) -> a.setPrice(sub.from(Order.class).max(o -> o.getPrice())));
+assertEquals("insert into Archive e0 (id, price) values (100L, (select sum(s1.price) from Item s1))"
+        + " on conflict(id) do update set price = (select max(s1.price) from Order s1)", up.toHql().get(0).hql());
+```
+
+- 다른 테이블의 집계(캡처 파라미터가 있든 없든), 여러 행, 대상 테이블 자신을 읽는 서브쿼리(MariaDB 오류 1093 없음)가 모두 동작합니다(H2, MariaDB 10.11, Oracle 23.26에서 실측).
+- 서브쿼리는 캡처 값을 읽을 수 있지만 새로 삽입하는 행은 읽을 수 없습니다.
+- 리스트 형태 `values(list, (a, l) -> ...)` 안의 서브쿼리는 아직 지원하지 않습니다.
+- upsert의 삽입 값과 `do update set` 안의 서브쿼리도 동작합니다. Oracle에서는 Hibernate가 `merge`로 실행합니다(실측).
 
 <a id="many-rows-from-a-list"></a>
 ## 리스트에서 여러 행

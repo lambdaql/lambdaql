@@ -5,7 +5,7 @@
 > **상태**
 > - **구현됨, 테스트함:** H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 6.6.5, 마일스톤 M10, 결정 D28·D40). 대상은 update(setter, `Dml.value`, 여러 번의 `set()` 호출, `@Version`, `set` 값 안의 서브쿼리), delete, insert(한 행, 리스트, 생성 id, `insert ... select`), upsert, 규칙 U1·U3·U4·U6 검사, update와 delete의 `limit`, 1행 보호 `executeOne()`(결정 D41)입니다.
 > - **함께 구현됨, 테스트함:** 수정·삭제 `where` 안의 서브쿼리(`sub`)(마일스톤 M8, [7.4](07-4-delete.md) 참고), `insert ... select`의 `groupBy`, `having`, `Agg`(마일스톤 M9, [7.5](07-5-insert.md) 참고).
-> - **아직 구현되지 않음:** insert `values(...)`와 upsert 안의 서브쿼리, 복합 키 엔티티의 `limit` / `executeOne()`.
+> - **아직 구현되지 않음:** 복합 키 엔티티의 `limit` / `executeOne()`, 리스트 형태 `values(list, ...)` 안의 서브쿼리.
 > - **(테스트됨)** 표시가 있는 예제는 테스트 코드에서 그대로 가져온 것입니다. 나머지 예제는 설계를 따르며 아직 테스트가 없습니다. 이 예제들의 HQL은 세부 사항(예: `e0` 같은 별칭 이름)이 다를 수 있습니다.
 > - 전체 상태는 [Java 트랙 README](README.md#status)를 참고하십시오.
 
@@ -192,7 +192,7 @@ assertEquals("update Order e0 set e0.price = coalesce((select sum(s1.price) from
 
 - 다른 테이블의 집계와 같은 테이블의 집계를 모두 `set` 값으로 쓸 수 있습니다(H2, MariaDB 10.11, Oracle 23.26에서 실측). `update`에서는 MariaDB도 오류 1093을 내지 않습니다.
 - 일치하는 행이 없으면 `sum` 등은 NULL을 돌려줍니다. NOT NULL 컬럼이면 DB 오류가 나므로 `Objects.requireNonNullElse(…, 0.0)`로 감싸십시오. `coalesce(...)`가 됩니다.
-- insert의 `values(...)`와 upsert 안의 서브쿼리는 지원하지 않습니다.
+- insert의 `values((a, sub) -> ...)`와 upsert(`onConflict(...).update((a, sub) -> ...)`)에서도 같은 방식으로 서브쿼리를 씁니다([7.5](07-5-insert.md#a-subquery-in-a-value) 참고). 리스트 형태 `values(list, (a, l) -> ...)` 안의 서브쿼리는 지원하지 않습니다.
 
 ---
 

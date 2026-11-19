@@ -3,7 +3,7 @@
 
 > [!NOTE]
 > **상태: 구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, 마일스톤 M10). `insert ... select`의 `groupBy`, `having`, `Agg`(마일스톤 M9)도 포함합니다. 테스트는 대부분 **Java** 람다를 사용합니다. `values`를 쓰는 insert는 Kotlin 람다로도 테스트했습니다([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), **(테스트됨)** 표시).
-> **아직 구현되지 않음:** `values { }` 안의 서브쿼리.
+> **아직 구현되지 않음:** 리스트 형태 `values(list) { a, l -> ... }` 안의 서브쿼리.
 > Kotlin 코드는 테스트된 Java 문장을 Kotlin 문법으로 옮긴 것이고, HQL은 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)와 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)의 Java 테스트에서 가져왔습니다. HQL이 없는 예제는 설계를 따릅니다.
 > 전체 상태는 [트랙 README](README.md)를 참고하십시오.
 
@@ -53,6 +53,26 @@ assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where
 ```kotlin
 qb.insert(Order::class.java).values { o -> value(o.id, id); value(o.status, 1) }.execute()
 ```
+
+<a id="a-subquery-in-a-value"></a>
+### 값 안의 서브쿼리
+
+`values { a, sub -> ... }`처럼 인자가 둘인 람다를 쓰면 두 번째 인자 `sub`로 서브쿼리를 만들 수 있습니다(결정 D49).
+upsert의 `values { a, sub -> ... }`와 `onConflict { ... }.update { a, sub -> ... }`도 같습니다([7.6](07-6-upsert.md#your-own-change-onconflictkeyupdate) 참고).
+
+**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `insert-values-sub`:
+
+```kotlin
+// values { a, sub -> ... }: a subquery can read captured values, not the new row (D49)
+val i = qb.insert(Archive::class.java)
+    .values { a, sub -> a.id = 100L; a.price = sub.from(Item::class.java).sum { it.price } }
+assertEquals("insert into Archive (id, price) values (100L, (select sum(s1.price) from Item s1))", i.toHql()[0].hql())
+```
+
+- 다른 테이블의 집계(캡처 파라미터가 있든 없든), 여러 행, 대상 테이블 자신을 읽는 서브쿼리(MariaDB 오류 1093 없음)가 모두 동작합니다(H2, MariaDB 10.11, Oracle 23.26에서 실측).
+- 서브쿼리는 캡처 값을 읽을 수 있지만 새로 삽입하는 행은 읽을 수 없습니다.
+- 리스트 형태 `values(list) {{ a, l -> ... }}` 안의 서브쿼리는 아직 지원하지 않습니다.
+- upsert의 삽입 값과 `do update set` 안의 서브쿼리도 동작합니다. Oracle에서는 Hibernate가 `merge`로 실행합니다(실측). upsert 형태는 Java 테스트([`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `insert-values-sub`)가 확인합니다.
 
 <a id="many-rows-from-a-list"></a>
 ## 리스트에서 여러 행
