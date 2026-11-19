@@ -28,6 +28,10 @@ test {
 	}
 }
 
+// testClassFile: the same tests on JDK 24+, where lambdaql-core reads lambdas with java.lang.classfile (D52).
+// The test class path already has the lambdaql-core jar (a project dependency), so nothing else is needed.
+apply from: rootProject.file('gradle/classfile-test.gradle')
+
 javadoc {
 	// Javadoc examples come from the test code ({@snippet ... region="..."})
 	options.addStringOption('-snippet-path', file('src/test/java').absolutePath)

@@ -88,9 +88,8 @@ dependencies {
 
 }
 
-// The JDK that compiles src/main/java24 (with --release 24) and runs the testClassFile task.
-// It must be 24 or later. Gradle finds it among the installed JDKs (org.gradle.java.installations.paths).
-def classFileJdk = JavaLanguageVersion.of((findProperty('lql.classfile.jdk') ?: '25') as int)
+// testClassFile (JDK 24+ with the jar) and classFileJdk, the JDK that compiles src/main/java24 with --release 24
+apply from: rootProject.file('gradle/classfile-test.gradle')
 
 tasks.named('compileJava24Java', JavaCompile) {
 	javaCompiler = javaToolchains.compilerFor { languageVersion = classFileJdk }
@@ -130,35 +129,16 @@ test{
 	// -Dlql.sql.update=true makes SqlByDatabaseTest write src/test/resources/expected-sql/<db>.sql again
 	systemProperty 'lql.sql.update', System.getProperty('lql.sql.update', 'false')
 
-	// the class directories (not the jar) are on the class path, so the ASM reader is used
-	systemProperty 'lql.reader.expected', 'asm'
-
 	testLogging {
 		events "passed", "skipped", "failed"
 	}
 }
 
-// The same tests with the jar on JDK 25 (ROADMAP D52): the JVM takes the java.lang.classfile reader from
-// META-INF/versions/24 of the Multi-Release JAR. Results: build/test-results/testClassFile
-//   ./gradlew :query:testClassFile -Dlql.db=h2|mariadb|oracle
-def testClassFile = tasks.register('testClassFile', Test) {
-	description = 'Runs the tests with the Multi-Release JAR on JDK 24+, so the java.lang.classfile reader is used.'
-	group = 'verification'
-	javaLauncher = javaToolchains.launcherFor { languageVersion = classFileJdk }
-	useJUnitPlatform()
-	testClassesDirs = tasks.test.testClassesDirs
-	classpath = files(tasks.jar) + tasks.test.classpath - sourceSets.main.output
-	systemProperty 'lql.db', System.getProperty('lql.db', 'h2')
-	// the SQL files are written by the test task only
-	systemProperty 'lql.sql.update', 'false'
-	systemProperty 'lql.reader.expected', 'classfile'
-	// one database schema is shared, so this task never runs at the same time as test
-	mustRunAfter tasks.test
-	testLogging {
-		events "passed", "skipped", "failed"
-	}
+// testClassFile (gradle/classfile-test.gradle) runs the same tests, the Kotlin ones too, with this module's jar in
+// place of its class folders: the JVM then takes the java.lang.classfile reader from META-INF/versions/24.
+tasks.named('testClassFile', Test) {
+	classpath = files(tasks.jar) + files({ tasks.test.classpath }) - sourceSets.main.output
 }
-tasks.named('check') { dependsOn testClassFile }
 
 javadoc {
 	// Javadoc examples come from the test code:
