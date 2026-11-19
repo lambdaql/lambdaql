@@ -1,9 +1,6 @@
 <a id="2-getting-started-java"></a>
 # 2. 入门（Java）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/02-getting-started.md)。
-
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[1. 概述](../01-overview.md) | 下一章：[3. 条件](03-where.md) | [本页的 Kotlin 版本](../kotlin/02-getting-started.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -16,10 +13,10 @@
 | 项目 | 版本 | 说明 |
 |---|---|---|
 | Java | 21 | 构建和使用 lambdaQL 都需要。 |
-| JPA 提供者 | Hibernate ORM 6.6 | lambdaQL 生成 Hibernate 6 HQL。设计已用 6.6.5 验证。不支持其他 JPA 提供者。 |
-| Jakarta Persistence | 3.1 | 随 Hibernate 6.6 一起提供。 |
+| JPA 提供者 | Hibernate ORM 7.4 | lambdaQL 生成 Hibernate 7 HQL。已用 7.4.13 测试。不支持其他 JPA 提供者。 |
+| Jakarta Persistence | 3.2 | 随 Hibernate 7.4 一起提供。 |
 | 数据库 | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) | 这三种已验证。其他数据库可能可用，但未经测试。 |
-| Spring Boot | 3.4 | 可选。项目的测试使用 Spring Boot 3.4。 |
+| Spring Boot | 4.1 | 可选。项目的测试使用 Spring Boot 4.1.2。 |
 | 编译器 | javac | 不保证支持由 ECJ（Eclipse 编译器）编译的 Lambda。见 [9. Java 说明](09-java-notes.md#912-compiler-and-build)。 |
 
 <a id="build-from-source"></a>
@@ -31,8 +28,8 @@ cd lambdaql
 ./gradlew build
 ```
 
-- Gradle wrapper（8.10）只能在 **JDK 23 或更低版本**上运行。请使用 JDK 21。
-- 仓库中有 `gradle/gradle-daemon-jvm.properties`，因此 Gradle 守护进程会使用 Java 21。
+- Gradle wrapper 为 9.9.1。仓库中有 `gradle/gradle-daemon-jvm.properties`，因此 Gradle 守护进程会使用 Java 21。
+- 构建需要 JDK 21 和一个 **JDK 24 或更高版本**。JDK 24 或更高版本用于编译 `java.lang.classfile` 读取器（`src/main/java24`），并用该读取器再运行一次测试。默认版本是 25，可以像 `-Plql.classfile.jdk=24` 这样更改。如果 Gradle 找不到 JDK，请把路径写入 `~/.gradle/gradle.properties` 的 `org.gradle.java.installations.paths`。
 - 在 IntelliJ IDEA 中，把 **Settings > Build Tools > Gradle > Gradle JVM** 设置为 Java 21 JDK。
 - 构建包含三个模块：`query`（构件 `lambdaql-core`）、`spring-data-jpa`（`lambdaql-spring-data-jpa`）和 `spring-boot-starter`（`lambdaql-spring-boot-starter`）。Spring 模块的说明见 [12. Spring Data JPA](12-spring-data-jpa.md)。
 
@@ -239,7 +236,7 @@ List<Order> orders = qb.from(Order.class)
 // HQL: select e0 from Order e0 where e0.status = 1 and e0.price > 100.0
 ```
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
+**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 7.4 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
 
 **各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `to-hql`：
 
@@ -301,15 +298,10 @@ qb.from(Order.class)
 **各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `start-many-where`：
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
 where o1_0.active=true and (o1_0.status=1 or o1_0.status=2)
-
--- MariaDB, Oracle
-select …
-from orders o1_0
-where o1_0.active=1 and (o1_0.status=1 or o1_0.status=2)
 ```
 
 当你逐步添加条件时，这很有用：
@@ -411,7 +403,7 @@ limit ?
 **各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `first#2`（`firstActive`）：
 
 ```sql
--- H2
+-- H2, Oracle
 select …
 from orders o1_0
 where o1_0.active=true
@@ -421,16 +413,9 @@ fetch first ? rows only
 -- MariaDB
 select …
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.id
 limit ?
-
--- Oracle
-select …
-from orders o1_0
-where o1_0.active=1
-order by o1_0.id
-fetch first ? rows only
 ```
 
 `first()` 只读取一行，因此它是一个分页查询。lambdaQL 会把 `id` 添加为最后一个排序键（见 [4.8](04-order-paging.md#tie-breaker-automatic-id)），Hibernate 会为每个数据库写出分页 SQL：H2 和 Oracle 上是 `fetch first ? rows only`，MariaDB 上是 `limit ?`。这里的 `?` 是 1。
@@ -487,15 +472,10 @@ List<Order> page = active.orderBy((o, by) -> by.desc(o.getPrice())).limit(2).toL
 **各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `count`：
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select count(o1_0.id)
 from orders o1_0
 where o1_0.active=true
-
--- MariaDB, Oracle
-select count(o1_0.id)
-from orders o1_0
-where o1_0.active=1
 ```
 
 HQL 是 `select count(e0) from Order e0 where e0.active = true`。Hibernate 把 `count(e0)` 变成 `select count(o1_0.id)`：它统计 id 列。计数查询没有分页。
@@ -578,7 +558,7 @@ assertEquals(2, qb.from(Tag.class).toList().size());
 | Lambda 必须是一个表达式（用于条件、排序和 select 时）。 | Lambda 内部的循环和局部变量会被拒绝。 |
 | 不要在 Lambda 中放必须执行的代码。Lambda 永远不会被执行。 | 有副作用的调用，例如 `System.out.println(...)`，会被拒绝。 |
 | 使用 javac 编译。 | 不保证支持 ECJ 的输出。 |
-| 新的 JDK 版本需要匹配的 ASM 版本。 | lambdaQL 使用 ASM 9.11.1（可读取最高到 Java 28 的 class 文件）。如果你使用更新的 JDK 编译，请升级 ASM。 |
+| 在 Java 21~23 上运行时，需要与用新 JDK 编译的类匹配的 ASM 版本。 | lambdaQL 在 Java 21~23 上使用 ASM 9.11.1（可读取最高到 Java 28 的 class 文件）。如果你使用更新的 JDK 编译，请升级 ASM。在 Java 24 及以上版本上，lambdaQL 使用正在运行的 JDK 的 `java.lang.classfile` 读取，因此与 ASM 版本无关。 |
 
 更多 Java 细节见 [9. Java 说明](09-java-notes.md)。
 

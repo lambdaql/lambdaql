@@ -1,9 +1,6 @@
 <a id="1-overview"></a>
 # 1. 概述
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../ko/01-overview.md)。
-
 [手册首页](README.md) | 路线：[Java](java/README.md) | [Kotlin](kotlin/README.md) | 下一章：2. 入门（[Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md)）
 
 本页适用于两种语言。代码分别展示在 **Java** 和 **Kotlin** 两个小节中。
@@ -11,7 +8,7 @@
 <a id="what-is-lambdaql"></a>
 ## lambdaQL 是什么？
 
-lambdaQL 是一个构建在 JPA 和 Hibernate 6.6 之上、面向 Java 和 Kotlin 的查询库。
+lambdaQL 是一个构建在 JPA 和 Hibernate 7.4 之上、面向 Java 和 Kotlin 的查询库。
 
 - 用 **Lambda 表达式**编写查询。
 - lambdaQL **读取**每个 Lambda 的**字节码**。它**从不执行** Lambda。
@@ -49,7 +46,7 @@ select e0 from Order e0 join e0.customer j1
 where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
 ```
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
+**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 7.4 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
 
 **各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `overview-first`：
 
@@ -95,7 +92,7 @@ where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 | 步骤 | 内容 | 状态 |
 |---|---|---|
 | 1. 找到 Lambda 主体 | Lambda 是 `Serializable` 的。lambdaQL 通过序列化钩子获取其 `SerializedLambda`（不使用 `setAccessible`）。由此可知哪个方法包含 Lambda 主体，以及捕获了哪些值。 | 已实现 |
-| 2. 读取字节码 | lambdaQL 使用 ASM 只读取这一个方法。它读取 class 文件，不执行代码。 | 已实现 |
+| 2. 读取字节码 | lambdaQL 只读取这一个方法。在 Java 21~23 上使用 ASM，在 Java 24 及以上版本上使用 JDK 的 `java.lang.classfile`。它读取 class 文件，不执行代码。 | 已实现 |
 | 3. 重建条件 | Java 和 Kotlin 把 `&&`、`\|\|` 和 `!` 编译为跳转指令。lambdaQL 根据这些跳转重建原始的逻辑树。 | Java Lambda 已实现。Kotlin：`?.`、`!!` 和 `in` 已测试，其他 Kotlin 特有的写法（`?:`、区间、`when`）已设计。 |
 | 4. 构建 HQL | getter 和属性变成 JPA 属性路径（`o.getPrice()` 或 `it.price` → `e0.price`）。Lambda 中的常量变成字面量，捕获的值变成参数（`:p1`）。 | 已为 `where` 和 `orderBy` 实现，已在 H2、MariaDB、Oracle 上测试 |
 | 5. 执行 | lambdaQL 绑定参数，并通过 Hibernate 执行 HQL。每个 Lambda 的分析结果都会被缓存，因此字节码只读取一次。 | 已为 `toList()` 和 `toSet()`（包括 `limit` / `offset`）、`first()`、`one()`、`count()` 和 `exists()` 实现 |

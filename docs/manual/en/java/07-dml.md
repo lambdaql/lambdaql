@@ -1,9 +1,6 @@
 <a id="7-update-insert-delete-java"></a>
 # 7. Update, insert, delete (Java)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/java/07-dml.md) for the latest rules.
-
 [Java track](README.md) | [Manual home](../README.md) | Previous: [6. Select, aggregates and group by](06-select-group.md) | Next: [8. Procedures and DB functions](08-procedures-functions.md) | [Kotlin version of this page](../kotlin/07-dml.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -92,7 +89,7 @@ ExecutableUpdate<Order> u = qb.update(Order.class)
 assertEquals("update Order e0 set e0.description = 'done' where e0.status = 2", u.toHql().hql());
 ```
 
-**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 6.6.5, and it fails if Hibernate's SQL changes.
+**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 7.4, and it fails if Hibernate's SQL changes.
 
 **SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `update-value`:
 
@@ -287,10 +284,10 @@ lambdaQL writes a non-FK association path in DML as a **correlated scalar subque
 
 ```java
 .where(o -> o.getCustomer().getName().equals("Kim"))
-// → where (select s1.name from Customer s1 where s1.id = e0.customer.id) = 'Kim' and e0.customer.id is not null
+// → where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) = 'Kim' and e0.customer.id is not null
 
 o.setCustName(o.getCustomer().getName())
-// → set e0.custName = (select s1.name from Customer s1 where s1.id = e0.customer.id)
+// → set e0.custName = (select s1.name from Customer s1 where s1.id = fk(e0.customer))
 ```
 
 The reason is as follows. If lambdaQL gave the path to Hibernate directly, Hibernate would make a different join SQL for each database

@@ -1,9 +1,6 @@
 <a id="lambdaql-manual-kotlin-track"></a>
 # lambdaQL Manual: Kotlin track
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/README.md) for the latest rules.
-
 **Other languages:** English | [한국어](../../ko/kotlin/README.md) | [日本語](../../ja/kotlin/README.md) | [简体中文](../../zh/kotlin/README.md)
 
 [Manual home](../README.md) | [Java track](../java/README.md) | Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -22,7 +19,7 @@ val orders = qb.from(Order::class.java)
 //      order by e0.price desc nulls last, e0.id asc
 ```
 
-**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 6.6.5, and it fails if Hibernate's SQL changes. The test uses Java lambdas. A Kotlin lambda with the same meaning gives the same HQL, so it gets the same SQL.
+**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 7.4, and it fails if Hibernate's SQL changes. The test uses Java lambdas. A Kotlin lambda with the same meaning gives the same HQL, so it gets the same SQL.
 
 **SQL by database (Hibernate's SQL for this HQL; Kotlin gives the same HQL)** — the manual's `Order` has a nullable `price`, but the test `Order` does not, so `SqlByDatabaseTest` gives this HQL to Hibernate directly. From `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `readme-first`:
 
@@ -114,9 +111,9 @@ Details: [9. Kotlin notes](09-kotlin-notes.md).
 |---|---|
 | Kotlin | 2.x (the design was checked with kotlinc 1.7.22, 2.1.10, 2.2.21, 2.3.0 and 2.3.21) |
 | Java (JVM) | 21 |
-| Hibernate ORM | 6.6 (the design was verified with 6.6.5) |
+| Hibernate ORM | 7.4 (tested with 7.4.13 from Spring Boot 4.1.2) |
 | Databases verified in the design | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
-| Spring Boot (optional) | 3.4 (tested with 3.4.2, Java tests). Spring Boot 4 is not verified yet |
+| Spring Boot (optional) | 4.1 (tested with 4.1.2, Java tests). Spring Boot 3 is not verified in this edition |
 
 <a id="other-languages"></a>
 ## Other languages

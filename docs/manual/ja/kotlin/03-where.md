@@ -1,9 +1,6 @@
 <a id="3-conditions-where-kotlin"></a>
 # 3. 条件（`where`）（Kotlin）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/03-where.md)を参照してください。
-
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [2. はじめよう](02-getting-started.md) | 次: [4. ソートとページング](04-order-paging.md) | [このページの Java 版](../java/03-where.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -53,7 +50,7 @@ val list = qb.from(Order::class.java)
 // HQL: select e0 from Order e0 where e0.status = 1 and e0.price > 100.0
 ```
 
-**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。このテストは Java のラムダを使います。意味が同じ Kotlin のラムダは同じ HQL になるので、SQL も同じです。
+**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 7.4 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。このテストは Java のラムダを使います。意味が同じ Kotlin のラムダは同じ HQL になるので、SQL も同じです。
 
 **データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `to-hql`:
 
@@ -87,15 +84,10 @@ qb.from(Order::class.java)
 **データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `many-where`:
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
 where o1_0.status=1 and o1_0.active=true
-
--- MariaDB, Oracle
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.active=1
 ```
 
 **HQL の中の値。** ルールは、値がどこから来たかで決まります（決定 D37）。
@@ -108,7 +100,8 @@ where o1_0.status=1 and o1_0.active=1
 
 - 定数は呼び出しのたびに同じです。そのため SQL の文字列は変わらず、データベースはクエリの計画を立てるときに値を見ることができます。
 - 文字列定数の中の引用符はエスケープされます。`"O'Brien"` は `'O''Brien'` になります。この文字列はユーザーの入力ではなく、クラスにコンパイルされた定数なので、SQL インジェクションの危険はありません。
-- キャプチャした値はユーザーから来ることがあるので、**常に** バインドパラメーターです。呼び出しごとに変わるのは値だけです。
+- キャプチャした値はユーザーから来ることがあるので、バインドパラメーターです。呼び出しごとに変わるのは値だけです。
+- 例外は 1 つあります。整数カラムと比べる小数のキャプチャ値は、小数リテラル（`2.5BD`）で書きます（[3.4](#34-comparisons) の「整数カラムと小数の値」）。数値に変換した値だけを書くので、SQL インジェクションの危険はありません。
 - enum 定数は、完全なクラス名で書かれます。たとえば `e0.kind = com.example.OrderKind.GIFT` です。
 
 **`!!` はコンパイラーのためだけのものです。** `price` が `Double?` のとき、Kotlin は `it.price > 100.0` をコンパイルしません。`it.price!! > 100.0` と書いてください。lambdaQL は `!!` を無視します（決定 D23）。`price` が NULL の行は返されません。
@@ -141,13 +134,16 @@ nullable なカラムとの比較は **SQL の意味** に従います。
 **整数のカラムと小数の値**（決定 D48 B8）。整数のカラムを小数の値と比較すると、lambdaQL は書いたとおりの値で比較します。丸めや値の除外はしません。
 
 - ラムダに書いた定数はリテラルのまま残ります。`it.cnt >= 2.5` は `e0.cnt >= 2.5` になります。
-- キャプチャした値は `BigDecimal`（Hibernate の型 `BIG_DECIMAL`）でバインドします。`e0.cnt >= :p1` で、`p1` は `2.5` です。
-- そのような要素を含む IN リストは、すべての要素を `BigDecimal` でバインドします（`[2.5, 3.0]`）。
+- キャプチャした値も小数リテラルで書きます。`e0.cnt >= 2.5BD` になり、バインドパラメーターはありません。`BD` は HQL の `BigDecimal` リテラルの接尾辞です。
+- そのような要素を含む IN リストは、すべての要素を小数リテラルで書きます（`e0.cnt in (2.5BD, 3.0BD)`）。
 
-以前は値をカラムの型に切り詰めていたため、`2.5` が `2` になり、誤った行を返していました。Hibernate は整数カラムの型でバインドした小数を拒否し（`CoercionException`）、IN リストの要素は黙って切り詰めます（3 つの DB で実測）。
+キャプチャした値をバインドパラメーターで送る原則（D37）の例外です。Hibernate 7 は、整数カラムと比べるパラメーターに小数をバインドすると、`BigDecimal` 型を指定しても拒否します（`QueryArgumentException`、実測）。
+
+以前は値をカラムの型に切り詰めていたため、`2.5` が `2` になり、誤った行を返していました。Hibernate 6.6 は整数カラムの型でバインドした小数を拒否し（`CoercionException`）、IN リストの要素は黙って切り詰めます（3 つの DB で実測）。
 整数の比較に書き換える方式（`>= 3`）は採用していません。実行される SQL がラムダと違ってしまい、エンティティのマッピング（`Integer`）と DB のカラムの型（たとえば小数を持つ `DECIMAL`）が違うと誤った行を返すからです。
 
-結果は H2、MariaDB 10.11、Oracle 23.26 で正しくなります（実測）。MariaDB の `EXPLAIN` は、int、`BigDecimal`、double のどのパラメーターでもインデックスの範囲スキャン（`type=range`）を示します（実測）。Oracle の実行計画は未測定です。
+結果は H2、MariaDB 10.11、Oracle 23.26 で正しくなります（実測）。3 つの DB とも、SQL は `cnt>=2.5`、`cnt in (2.5,3.0)` のようにカラムをそのままにして小数と比べます。
+MariaDB の `EXPLAIN` はインデックスの範囲スキャン（`type=range`）を示します。Oracle はカラムに変換が付かないので、インデックスを使える形です。インデックスのヒントを与えると `INDEX RANGE SCAN` になり、3000 行のテーブルでヒントがなければ、整数リテラル（`cnt >= 99`）と同じく全件スキャンを選びます（すべて実測）。
 
 これについての Kotlin のテストはありません。Java のテスト（[`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)、リージョン `whole-number`）が確認しています。
 
@@ -380,7 +376,7 @@ where o1_0.price>?
 <a id="365-converted-attributes-convert"></a>
 ### 3.6.5 変換される属性（`@Convert`）
 
-JPA の `AttributeConverter` を持つ属性は、Kotlin の値で比べます。Hibernate 6.6 は、このような属性と比べるリテラルを変換し、バインドパラメーターも変換します（H2、MariaDB、Oracle で確認済み）。
+JPA の `AttributeConverter` を持つ属性は、Kotlin の値で比べます。Hibernate（7.4、以前の 6.6 も）は、このような属性と比べるリテラルを変換し、バインドパラメーターも変換します（H2、MariaDB、Oracle で確認済み）。
 
 テストは Java で書いています（[`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java)、リージョン `convert`）。次は設計上の例です。
 

@@ -1,9 +1,6 @@
 <a id="6-select-aggregates-and-group-by-java"></a>
 # 6. Select, aggregates and group by (Java)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/java/06-select-group.md) for the latest rules.
-
 [Java track](README.md) | [Manual home](../README.md) | Previous: [5. Subqueries](05-subquery.md) | Next: [7. Update, insert, delete](07-dml.md) | [Kotlin version of this page](../kotlin/06-select-group.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -84,7 +81,7 @@ ValueQuery<Double> q = qb.from(Order.class)
 assertEquals("select e0.price from Order e0 where e0.status = 1 order by e0.price asc", q.toHql().hql());
 ```
 
-**About the SQL blocks.** `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 6.6.5, and it fails if Hibernate's SQL changes. In this chapter the select list is the point, so it is not shortened.
+**About the SQL blocks.** `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 7.4, and it fails if Hibernate's SQL changes. In this chapter the select list is the point, so it is not shortened.
 
 **SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `value`:
 
@@ -578,7 +575,7 @@ The forms are `join(cte, (c, x) -> ...)`, `leftJoin(cte, ...)`, `join(qb.from(..
 - The row type is a record (J5). The accessor (`x.total()`) reads the column.
 - If one statement reads the same `Cte` object twice, the definition is written once, and both joins read the same name: `join t e1 on ... left join t e2 on ...`. Different `Cte` objects get their own names, as in `with t as (...), t2 as (...)` (measured on the three databases).
 - A derived row has no id, so `x == null` is an error (`LQL-3067`). Compare a column instead, as in `x.customerId() == null`.
-- Hibernate 6.6 accepts `select distinct` of an entity, inner and left joins of a derived table or CTE, and entity joins inside a subquery (measured on the three databases).
+- Hibernate 7.4 (and 6.6 before it) accepts `select distinct` of an entity, inner and left joins of a derived table or CTE, and entity joins inside a subquery (measured on the three databases).
 
 **(tested)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `join-cte`:
 
@@ -698,7 +695,7 @@ Optional<Priced> cheapestOfTop = qb.from(qb.from(Order.class)
 
 `Priced` is `record Priced(Long id, Double price)`.
 
-**About the SQL block.** [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) gives a simpler HQL of the same form to Hibernate directly and records the SQL on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5). The test fails if Hibernate's SQL changes. The block shows how each database writes a derived table.
+**About the SQL block.** [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) gives a simpler HQL of the same form to Hibernate directly and records the SQL on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 7.4). The test fails if Hibernate's SQL changes. The block shows how each database writes a derived table.
 
 **SQL by database (Hibernate's SQL for this HQL form)** — from `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql), example `06-derived`:
 
@@ -706,17 +703,17 @@ Optional<Priced> cheapestOfTop = qb.from(qb.from(Order.class)
 -- HQL: select r.customerId, r.cnt, r.total from (select o.customer.id as customerId, count(*) as cnt, sum(o.price) as total from Order o group by o.customer.id) r where r.total > 100
 
 -- H2
-select r1_0.customerId,r1_0.cnt,r1_0.total
-from (select o1_0.customer_id,count(*),sum(o1_0.price) from orders o1_0 group by o1_0.customer_id) r1_0(customerId,cnt,total)
-where r1_0.total>100
+select r1_0.c0,r1_0.c1,r1_0.c2
+from (select o1_0.customer_id,count(*),sum(o1_0.price) from orders o1_0 group by o1_0.customer_id) r1_0(c0,c1,c2)
+where r1_0.c2>100
 
 -- MariaDB, Oracle
-select r1_0.customerId,r1_0.cnt,r1_0.total
-from (select o1_0.customer_id customerId,count(*) cnt,sum(o1_0.price) total from orders o1_0 group by o1_0.customer_id) r1_0
-where r1_0.total>100
+select r1_0.c0,r1_0.c1,r1_0.c2
+from (select o1_0.customer_id c0,count(*) c1,sum(o1_0.price) c2 from orders o1_0 group by o1_0.customer_id) r1_0
+where r1_0.c2>100
 ```
 
-H2 puts the column list on the alias (`r1_0(customerId,cnt,total)`). MariaDB and Oracle put the column aliases inside the subquery.
+Hibernate 7.4 names the columns of a derived table `c0`, `c1`, `c2` and so on. H2 puts the column list on the alias (`r1_0(c0,c1,c2)`). MariaDB and Oracle put the column aliases inside the subquery.
 
 Rules:
 

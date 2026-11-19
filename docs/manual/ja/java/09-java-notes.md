@@ -1,9 +1,6 @@
 <a id="9-java-notes"></a>
 # 9. Java の注意点
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/09-java-notes.md)を参照してください。
-
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [8. プロシージャと DB 関数](08-procedures-functions.md) | 次: [10. ルールと制限](10-rules-and-limits.md) | [このページの Kotlin 版](../kotlin/09-kotlin-notes.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -235,7 +232,7 @@ public class OrderService {
 }
 ```
 
-**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。
+**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 7.4 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。
 
 **データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `this-capture`:
 
@@ -337,7 +334,7 @@ lambdaQL には **static な DSL がありません**。`Agg` の任意のイン
 |---|---|
 | コンパイラー | lambdaQL は **javac** でテストしています。**ECJ**（Eclipse のコンパイラー）でコンパイルしたラムダは保証しません。Eclipse IDE や、Eclipse JDT をベースにした他のツールは ECJ を使います。テストは Gradle か Maven（javac）で実行してください |
 | JDK のバージョン | Java 21 |
-| ASM | lambdaQL は ASM 9.11.1 でクラスファイルを読みます（Java 28 のクラスファイルまで）。より新しい JDK でコンパイルする場合は、ASM を更新してください。lambdaQL は ASM をシェーディングしていないので、自分で更新できます |
+| クラスファイルの読み込み（ASM） | Java 21〜23 では ASM 9.11.1 でクラスファイルを読みます（Java 28 のクラスファイルまで）。より新しい JDK でコンパイルする場合は、ASM を更新してください。lambdaQL は ASM をシェーディングしていないので、自分で更新できます。Java 24 以上では、実行中の JDK の `java.lang.classfile` で読むので、ASM のバージョンとは関係ありません。lambdaQL の jar は Multi-Release JAR で、JVM が実行バージョンに合うほうを選びます |
 | `-parameters` | 推奨します。lambdaQL がプロシージャの引数名をチェックできるようになります（[8.4](08-procedures-functions.md#84-warning-argument-order)） |
 | デバッグ情報 | 行番号を残してください（javac のデフォルト）。lambdaQL はソースの行番号をエラーメッセージに入れます |
 | IntelliJ の「Number objects compared using `==`」 | lambdaQL のラムダでは意図どおりです。`@SuppressWarnings("NumberEquality")` を使えます |

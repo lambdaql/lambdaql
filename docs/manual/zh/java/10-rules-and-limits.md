@@ -1,9 +1,6 @@
 <a id="10-rules-and-limits-java"></a>
 # 10. 规则与限制（Java）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/10-rules-and-limits.md)。
-
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[9. Java 说明](09-java-notes.md) | 下一章：[11. 错误与语言](../11-errors-and-languages.md) | [本页的 Kotlin 版本](../kotlin/10-rules-and-limits.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -162,7 +159,7 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 | `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | NULL：不选中（SQL 语义） |
 | `!o.getActive()`（可空 `Boolean`） | `e0.active = false` | NULL：不选中（NULL 不是 false） |
 | `x == null`、`x != null` | `is null`、`is not null` | 二值 |
-| `o.getCnt() >= 2.5`（整数列，小数值） | 按写出的值比较：常量是字面量（`e0.cnt >= 2.5`），捕获值和 IN 列表以 `BigDecimal` 绑定（D48 B8） | 保持索引范围扫描（在 MariaDB 上实测）。不再像以前那样截断值而返回错误的行 |
+| `o.getCnt() >= 2.5`（整数列，小数值） | 按写出的值比较：常量是字面量（`e0.cnt >= 2.5`），捕获值和 IN 列表也是小数字面量（`e0.cnt >= 2.5BD`、`in (2.5BD, 3.0BD)`，D48 B8） | 保持索引范围扫描（在 MariaDB 上实测）。不再像以前那样截断值而返回错误的行 |
 | 整个值对象（`@Embedded`）：`o.getAddress().equals(addr)`、`Objects.equals(o.getAddress(), addr)`、`!o.getAddress().equals(addr)` | 按列展开：`e0.address.city = :p1 and e0.address.zip = :p2`，否定为 `<> ... or ...`。`== null` 是所有列 `is null`（and），`!= null` 是 `is not null`（or） | 每列遵循 SQL 语义（D48）：NULL 列对 `=` 和 `<>` 都不匹配。捕获的对象为 `null` 时没有匹配的行（`WARN` 级别的 `LQL-4045`） |
 | 对永远不会是 NULL 的列（id、基本类型、`nullable = false`，且路径上没有关联步骤）写 `o.getId() == null` | `1=0`。与比较并列时，检查被去掉：`o.getId() != null && o.getId() == id` 得到 `e0.id = :p1`（已测试） | 该列没有 NULL。经过关联的路径（`o.getCustomer().getId()`）保留检查 |
 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR` | SQL 三值逻辑 |
@@ -212,7 +209,7 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 其他规则：
 
 - `x.compareTo(y) > 0`、`isBefore`、`isAfter` 会变成 `x > y` 等。
-- 写在 Lambda 中的常量（包括 `static final` 编译期常量）是字面量：`o.getPrice() > 100` 是 `e0.price > 100.0`，`"O'Brien"` 是 `'O''Brien'`。捕获的值和计算出的值（`new BigDecimal("1.5")`）是绑定参数（D37）。
+- 写在 Lambda 中的常量（包括 `static final` 编译期常量）是字面量：`o.getPrice() > 100` 是 `e0.price > 100.0`，`"O'Brien"` 是 `'O''Brien'`。捕获的值和计算出的值（`new BigDecimal("1.5")`）是绑定参数（D37）。例外：与整数列比较的小数捕获值是小数字面量（`2.5BD`，D48 B8）。
 - javac 有时会移动 `!` 的位置（德摩根定律、双重否定）。这不会改变结果。
   lambdaQL 保证每个条件恰好出现一次，也从不"简化"你的逻辑。
 - 你写的在 Java 中恒为 true 的条件（`x > 5 || !(x > 5)`）不会被简化。
@@ -346,7 +343,7 @@ lambdaQL 隐藏了许多差异，但有一些你必须了解。
 | 带局部变量、循环、`switch`、`try` 的块 Lambda | 单个表达式。在 Lambda 外部计算值 |
 | 写入捕获的变量 | 在 Lambda 外部计算（Java 也要求捕获的局部变量是 effectively final 的） |
 | 由 ECJ（Eclipse 编译器）编译的 Lambda | 不保证。只用 javac 测试过 |
-| 为比捆绑的 ASM 所支持的版本更新的 JDK 编译的 Lambda | 升级 ASM（lambdaQL 不对它做 shade） |
+| 在 Java 21~23 上运行时，为比捆绑的 ASM 所支持的版本更新的 JDK 编译的 Lambda | 升级 ASM（lambdaQL 不对它做 shade）。在 Java 24 及以上版本上运行时不适用（使用 `java.lang.classfile`） |
 
 <a id="conditions"></a>
 ### 条件
@@ -444,7 +441,7 @@ lambdaQL 隐藏了许多差异，但有一些你必须了解。
 | `returning` | DML 之后再查询一次 |
 | 数据库时间（`current_timestamp`） | 传入应用时间（`LocalDateTime.now()` 作为值绑定） |
 | 使用 `TABLE` id 生成器的 `insert ... select` | 使用 `values(...)`，或 IDENTITY / SEQUENCE |
-| 向 JOINED 或 TABLE_PER_CLASS 子类 `insert` | 不支持（Hibernate 6.6.5 会失败） |
+| 向 JOINED 或 TABLE_PER_CLASS 子类 `insert` | 不支持（Hibernate 6.6.5 会失败，7.4 未测） |
 
 关于 DML 还需注意：批量 DML 不经过持久化上下文。Hibernate 会先执行 flush，但
 同一会话中的托管实体之后仍保留旧值。请调用 `clear()`（或 `refresh`）。
@@ -505,9 +502,9 @@ List<Order> list = flag
 | 项目 | 版本 |
 |---|---|
 | Java | 21（javac）。不保证支持 ECJ |
-| Hibernate | 6.6（设计已用 6.6.5 检查）。使用了 HQL 扩展（例如 `function(...)` 和 `nulls first`）；不保证支持其他 JPA 提供者 |
+| Hibernate | 7.4（已用 7.4.13 测试）。使用了 HQL 扩展（例如 `function(...)` 和 `nulls first`）；不保证支持其他 JPA 提供者 |
 | 数据库 | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
-| Spring | Spring Boot 3.4.2 和 Spring Data JPA 3.4.2（Spring 模块，[12](12-spring-data-jpa.md)）。Spring Boot 4 尚未验证 |
+| Spring | Spring Boot 4.1.2 和 Spring Data JPA 4.1.2（Spring 模块，[12](12-spring-data-jpa.md)）。本版未验证 Spring Boot 3 |
 | 未测试 | PostgreSQL、SQL Server、Oracle 19c 及更早版本（例如 PL/SQL 的 `BOOLEAN` 参数） |
 
 ---

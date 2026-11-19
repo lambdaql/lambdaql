@@ -1,13 +1,10 @@
 <a id="lambdaql-user-manual-english"></a>
 # lambdaQL User Manual (English)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../ko/README.md) for the latest rules.
-
 **Other languages:** English | [한국어](../ko/README.md) | [日本語](../ja/README.md) | [简体中文](../zh/README.md)
 
 lambdaQL is a query library for Java and Kotlin.
-You write normal lambdas. lambdaQL reads the bytecode of the lambda and builds a Hibernate 6.6 HQL query.
+You write normal lambdas. lambdaQL reads the bytecode of the lambda and builds a Hibernate 7 HQL query.
 The lambda is never run.
 
 <a id="a-first-look"></a>
@@ -42,7 +39,7 @@ where e0.status = 1 and e0.price > :p1
 order by e0.price desc nulls last, e0.id asc
 ```
 
-**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 6.6.5, and it fails if Hibernate's SQL changes.
+**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 7.4, and it fails if Hibernate's SQL changes.
 
 **SQL by database (Hibernate's SQL for this HQL)** — the manual's `Order` has a nullable `Double price`, but the test `Order` does not, so `SqlByDatabaseTest` gives this HQL to Hibernate directly. From `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `readme-first`:
 
@@ -141,9 +138,9 @@ The full entity code is in Getting started: [Java](java/02-getting-started.md#ex
 |---|---|
 | Java | 21 |
 | Kotlin | 2.x |
-| Hibernate ORM | 6.6 (the design was verified with 6.6.5) |
+| Hibernate ORM | 7.4 (tested with 7.4.13 from Spring Boot 4.1.2) |
 | Databases verified | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
-| Spring Boot (optional) | 3.4 (tested with 3.4.2). Spring Boot 4 is not verified yet |
+| Spring Boot (optional) | 4.1 (tested with 4.1.2). Spring Boot 3 is not verified in this edition |
 
 <a id="folder-layout"></a>
 ## Folder layout

@@ -529,7 +529,7 @@ from orders o1_0
 where o1_0.active=false
 ```
 
-H2에는 진짜 boolean 타입이 있으므로 SQL에 `true` / `false`가 나옵니다. MariaDB와 Oracle은 boolean을 숫자로 저장하므로 Hibernate가 `1` / `0`을 씁니다.
+Hibernate 7.4는 세 DB 모두 SQL에 `true` / `false`를 씁니다. Hibernate 6.6은 MariaDB와 Oracle에서 `1` / `0`을 썼습니다.
 
 참고:
 

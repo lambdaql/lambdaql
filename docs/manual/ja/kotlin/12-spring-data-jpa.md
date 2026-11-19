@@ -1,9 +1,6 @@
 <a id="12-spring-data-jpa-kotlin"></a>
 # 12. Spring Data JPA（Kotlin）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/12-spring-data-jpa.md)を参照してください。
-
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [11. エラーと言語](../11-errors-and-languages.md) | [このページの Java 版](../java/12-spring-data-jpa.md)
 
 ---
@@ -84,9 +81,9 @@ dependencies {
 | 項目 | バージョン |
 |---|---|
 | Java（JVM） | 21 |
-| Spring Boot | 3.4 以降（3.4.2 でテスト済み）。Spring Boot 4 はまだ検証していません |
-| Spring Data JPA | 3.4 以降 |
-| Hibernate | 6.6（Spring Boot 3.4 にすでに含まれています） |
+| Spring Boot | 4.1（4.1.2 でテスト済み）。Spring Boot 3 はこの版では検証していません |
+| Spring Data JPA | 4.1（4.1.2 でテスト済み） |
+| Hibernate | 7.4（Spring Boot 4.1 にすでに含まれています） |
 | Kotlin | 2.2 以降。それより古い Kotlin については [12.9](#129-kotlin-compile-settings) を参照 |
 | `kotlin-reflect` | Kotlin のために Spring Data が必要とします |
 
@@ -541,7 +538,7 @@ kotlin {
 <a id="1210-not-implemented-yet"></a>
 ## 12.10 まだ実装されていないもの
 
-- **Spring Boot 4。** 自動構成は Spring Boot 4 のクラス名も書いていますが、テストしたのは Spring Boot 3.4.2 だけです。
+- **Spring Boot のバージョン。** この版は Spring Boot 4.1.2 でテストしています。自動構成は Spring Boot 3 のクラス名も書いていますが、Spring Boot 3 はこの版では検証していません。
 - Spring の `Sort` の **`ignoreCase()`**。
 - **Kotlin のリポジトリ** のテスト。
 

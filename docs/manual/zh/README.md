@@ -1,13 +1,10 @@
 <a id="lambdaql-user-manual-english"></a>
 # lambdaQL 用户手册（简体中文）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../ko/README.md)。
-
 **其他语言：** [English](../en/README.md) | [한국어](../ko/README.md) | [日本語](../ja/README.md) | [简体中文](../zh/README.md)
 
 lambdaQL 是一个面向 Java 和 Kotlin 的查询库。
-你只需编写普通的 Lambda 表达式。lambdaQL 读取 Lambda 的字节码，并构建 Hibernate 6.6 HQL 查询。
+你只需编写普通的 Lambda 表达式。lambdaQL 读取 Lambda 的字节码，并构建 Hibernate 7 HQL 查询。
 Lambda 永远不会被执行。
 
 <a id="a-first-look"></a>
@@ -42,7 +39,7 @@ where e0.status = 1 and e0.price > :p1
 order by e0.price desc nulls last, e0.id asc
 ```
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
+**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 7.4 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
 
 **各数据库的 SQL（Hibernate 为此 HQL 生成的 SQL）** — 手册中的 `Order` 有可为 NULL 的 `Double price`，而测试中的 `Order` 没有，所以 `SqlByDatabaseTest` 把这个 HQL 直接交给 Hibernate。来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `readme-first`：
 
@@ -141,9 +138,9 @@ fetch first ? rows only
 |---|---|
 | Java | 21 |
 | Kotlin | 2.x |
-| Hibernate ORM | 6.6（设计已用 6.6.5 验证） |
+| Hibernate ORM | 7.4（已用 Spring Boot 4.1.2 中的 7.4.13 测试） |
 | 已验证的数据库 | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
-| Spring Boot（可选） | 3.4（已用 3.4.2 测试）。Spring Boot 4 尚未验证 |
+| Spring Boot（可选） | 4.1（已用 4.1.2 测试）。本版未验证 Spring Boot 3 |
 
 <a id="folder-layout"></a>
 ## 目录结构

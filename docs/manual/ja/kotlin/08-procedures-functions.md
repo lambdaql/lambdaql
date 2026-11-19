@@ -1,9 +1,6 @@
 <a id="8-stored-procedures-and-db-functions-kotlin"></a>
 # 8. ストアドプロシージャと DB 関数（Kotlin）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/08-procedures-functions.md)を参照してください。
-
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [7. 更新、挿入、削除](07-dml.md) | 次: [9. Kotlin の注意点](09-kotlin-notes.md) | [このページの Java 版](../java/08-procedures-functions.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -193,7 +190,7 @@ MariaDB と Oracle は `SELECT *` のカラムを異なる順序で返すので�
 > **スタブ関数のパラメーターの順序は、データベースでの順序と同じでなければなりません。**
 
 lambdaQL は引数を **位置で** バインドします（ルール PR2）。
-Hibernate 6.6.5 は、名前を登録しても位置でバインドします。
+Hibernate 6.6.5 は、名前を登録しても位置でバインドします（実測、7.4 は未測定）。
 MariaDB と H2 のドライバーは名前付きパラメーターをサポートしていません。
 そのため、順序が間違っていると、**エラーなしで間違った結果** が得られることがあります。
 
@@ -389,7 +386,7 @@ qb.update(Order::class.java).set { it.price = OrderFns.discount(it.price) }.all(
 
 Java のテストは同じ形を名前 `SQ_FN_DISCOUNT` で確認しています。例: `select e0 from Order e0 where function('SQ_FN_DISCOUNT' as Double, e0.price) > 100.0`。テストは各クエリを実行し、結果の行を Java で同じ計算をした結果と比べます。
 
-**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。[`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) は同じ形の HQL（名前は `FN_DISCOUNT`）を Hibernate に直接渡し、H2 2.3、MariaDB 10.11、Oracle 23.26（Hibernate 6.6.5）で出た SQL を記録します。Hibernate の SQL が変わるとテストは失敗します。
+**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。[`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) は同じ形の HQL（名前は `FN_DISCOUNT`）を Hibernate に直接渡し、H2 2.3、MariaDB 10.11、Oracle 23.26（Hibernate 7.4）で出た SQL を記録します。Hibernate の SQL が変わるとテストは失敗します。
 
 **データベースごとの SQL（この形の HQL に対する Hibernate の SQL）** — `PlannedSqlTest` が記録しました。`expected-sql/` の [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)、例 `08-function`:
 
@@ -516,7 +513,7 @@ where FN_DISCOUNT(o1_0.price)>10
 
 | 場合 | コード | H2 | MariaDB | Oracle |
 |---|---|---|---|---|
-| ① 関数がカラムを包む: `fn(o.price) > 10`、カラムに対する Boolean の関数、`IN` や `IS NULL` の中の関数 | `LQL-5001`（WARN） | WARN | WARN（ストアド関数はインデックスに使えない） | WARN。**ただし**、`user_ind_expressions` に同じ式 `FN(COLUMN)` の関数ベースインデックスがそのテーブルにあれば出さない |
+| ① 関数がカラムを包む: `fn(o.price) > 10`、カラムに対する Boolean の関数、`IN` や `IS NULL` の中の関数 | `LQL-5001`（WARN） | WARN | WARN（ストアド関数はインデックスに使えない） | WARN。**ただし**、`user_ind_expressions` に同じ式 `FN(COLUMN)` の関数ベースインデックスがそのテーブルにあれば出さない。カラムの型が関数の引数の型と違うために Oracle が入れた数値変換（`FN(TO_NUMBER(COLUMN))` など）も同じ式とみなす |
 | ② 値の側の関数をカラムと比べる: `o.price > fn(rate)` | `LQL-5007`（WARN） | 確認しない | `information_schema.routines.is_deterministic = 'NO'`（デフォルト!）なら WARN。このとき MariaDB はインデックス全体をスキャンする | 確認しない（Oracle はどちらでも範囲スキャン） |
 
 - Oracle のインデックスとの照合では、テーブル名とカラム名を Hibernate のマッピングから取ります。カラムの引数が 1 つの関数だけを照合します。

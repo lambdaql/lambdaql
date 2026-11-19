@@ -1,9 +1,6 @@
 <a id="1-overview"></a>
 # 1. 概要
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../ko/01-overview.md)を参照してください。
-
 [マニュアルのホーム](README.md) | トラック: [Java](java/README.md) | [Kotlin](kotlin/README.md) | 次: 2. はじめよう（[Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md)）
 
 このページは両方の言語向けです。コードは **Java** と **Kotlin** の別々のセクションに分けて載せています。
@@ -11,7 +8,7 @@
 <a id="what-is-lambdaql"></a>
 ## lambdaQL とは
 
-lambdaQL は、JPA と Hibernate 6.6 の上で動く、Java と Kotlin のためのクエリライブラリです。
+lambdaQL は、JPA と Hibernate 7.4 の上で動く、Java と Kotlin のためのクエリライブラリです。
 
 - クエリは **ラムダ** で書きます。
 - lambdaQL は各ラムダの **バイトコードを読みます**。ラムダを **実行することはありません**。
@@ -49,7 +46,7 @@ select e0 from Order e0 join e0.customer j1
 where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
 ```
 
-**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。
+**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 7.4 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。
 
 **データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `overview-first`:
 
@@ -95,7 +92,7 @@ where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 | ステップ | 何が起きるか | 状況 |
 |---|---|---|
 | 1. ラムダ本体を見つける | ラムダは `Serializable` です。lambdaQL はシリアライズのフックを使って `SerializedLambda` を取得します（`setAccessible` は使いません）。これで、ラムダ本体がどのメソッドにあるか、どの値がキャプチャされているかが分かります。 | 実装済み |
-| 2. バイトコードを読む | lambdaQL は ASM でその 1 つのメソッドだけを読みます。クラスファイルを読むだけで、コードは実行しません。 | 実装済み |
+| 2. バイトコードを読む | lambdaQL はその 1 つのメソッドだけを読みます。Java 21〜23 では ASM を、Java 24 以上では JDK の `java.lang.classfile` を使います。クラスファイルを読むだけで、コードは実行しません。 | 実装済み |
 | 3. 条件を組み立て直す | Java と Kotlin は `&&`、`\|\|`、`!` をジャンプ命令にコンパイルします。lambdaQL はこのジャンプから元の論理ツリーを組み立て直します。 | Java のラムダは実装済み。Kotlin: `?.`、`!!`、`in` はテスト済み。そのほかの Kotlin だけの書き方（`?:`、範囲、`when`）は設計済み。 |
 | 4. HQL を組み立てる | getter やプロパティは JPA の属性パスになります（`o.getPrice()` や `it.price` → `e0.price`）。ラムダの中の定数はリテラルに、キャプチャした値はパラメーター（`:p1`）になります。 | `where` と `orderBy` について実装済み、H2・MariaDB・Oracle でテスト済み |
 | 5. 実行する | lambdaQL はパラメーターをバインドし、Hibernate で HQL を実行します。各ラムダの解析結果はキャッシュされるので、バイトコードを読むのは 1 回だけです。 | `toList()` と `toSet()`（`limit` / `offset` を使う場合も）、`first()`、`one()`、`count()`、`exists()` について実装済み |

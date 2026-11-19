@@ -1,9 +1,6 @@
 <a id="8-stored-procedures-and-db-functions-kotlin"></a>
 # 8. 存储过程与数据库函数（Kotlin）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/08-procedures-functions.md)。
-
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[7. 更新、插入、删除](07-dml.md) | 下一章：[9. Kotlin 说明](09-kotlin-notes.md) | [本页的 Java 版本](../java/08-procedures-functions.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -193,7 +190,7 @@ lambdaQL 从不按位置映射属性，因为 MariaDB 和 Oracle 返回 `SELECT 
 > **桩函数参数的顺序必须与数据库中的顺序相同。**
 
 lambdaQL **按位置**绑定参数（规则 PR2）。
-即使注册了名字，Hibernate 6.6.5 也按位置绑定。
+即使注册了名字，Hibernate 6.6.5 也按位置绑定（实测，7.4 未测）。
 MariaDB 和 H2 驱动不支持命名参数。
 所以如果顺序错误，你可能会**在没有任何错误的情况下得到错误的结果**。
 
@@ -386,7 +383,7 @@ qb.update(Order::class.java).set { it.price = OrderFns.discount(it.price) }.all(
 
 Java 测试用名字 `SQ_FN_DISCOUNT` 检查同样的写法，例如 `select e0 from Order e0 where function('SQ_FN_DISCOUNT' as Double, e0.price) > 100.0`。测试会执行每个查询，并把结果行与用 Java 进行的同样计算作比较。
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。[`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) 把同样形式的 HQL（函数名为 `FN_DISCOUNT`）直接交给 Hibernate，并记录在 H2 2.3、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上得到的 SQL。如果 Hibernate 的 SQL 发生变化，测试就会失败。
+**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。[`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) 把同样形式的 HQL（函数名为 `FN_DISCOUNT`）直接交给 Hibernate，并记录在 H2 2.3、MariaDB 10.11 和 Oracle 23.26（Hibernate 7.4）上得到的 SQL。如果 Hibernate 的 SQL 发生变化，测试就会失败。
 
 **各数据库的 SQL（Hibernate 对这种 HQL 形式生成的 SQL）** — 由 `PlannedSqlTest` 记录。来自 `expected-sql/` 的 [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)，示例 `08-function`：
 
@@ -512,7 +509,7 @@ where FN_DISCOUNT(o1_0.price)>10
 
 | 情况 | 错误码 | H2 | MariaDB | Oracle |
 |---|---|---|---|---|
-| ① 函数包住列：`fn(o.price) > 10`、作用于列的 Boolean 函数、`IN` 或 `IS NULL` 中的函数 | `LQL-5001`（WARN） | WARN | WARN（存储函数不能用于索引） | WARN，**除非** `user_ind_expressions` 中该表有相同表达式 `FN(COLUMN)` 的函数索引 |
+| ① 函数包住列：`fn(o.price) > 10`、作用于列的 Boolean 函数、`IN` 或 `IS NULL` 中的函数 | `LQL-5001`（WARN） | WARN | WARN（存储函数不能用于索引） | WARN，**除非** `user_ind_expressions` 中该表有相同表达式 `FN(COLUMN)` 的函数索引。由于列类型与函数参数类型不同而由 Oracle 插入的数字转换（如 `FN(TO_NUMBER(COLUMN))`）也视为相同表达式 |
 | ② 值一侧的函数与列比较：`o.price > fn(rate)` | `LQL-5007`（WARN） | 不检查 | `information_schema.routines.is_deterministic = 'NO'`（默认！）时 WARN。此时 MariaDB 会扫描整个索引 | 不检查（Oracle 两种情况都用范围扫描） |
 
 - 与 Oracle 索引比对时，表名和列名取自 Hibernate 映射。只比对只有一个列参数的函数。

@@ -1,9 +1,6 @@
 <a id="2-getting-started-kotlin"></a>
 # 2. はじめよう（Kotlin）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/02-getting-started.md)を参照してください。
-
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [1. 概要](../01-overview.md) | 次: [3. 条件](03-where.md) | [このページの Java 版](../java/02-getting-started.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -18,10 +15,10 @@
 | Kotlin | 2.x | 設計は kotlinc 1.7.22、2.1.10、2.2.21、2.3.0、2.3.21 で確認しました。 |
 | JVM | Java 21 | lambdaQL のビルドに必要です。 |
 | `-jvm-target` | 1.8、11、17、21 | 4 つとも、クエリのラムダを同じようにコンパイルします。 |
-| JPA プロバイダー | Hibernate ORM 6.6 | lambdaQL は Hibernate 6 の HQL を組み立てます。設計は 6.6.5 で検証しました。他の JPA プロバイダーはサポートしていません。 |
-| Jakarta Persistence | 3.1 | Hibernate 6.6 に含まれています。 |
+| JPA プロバイダー | Hibernate ORM 7.4 | lambdaQL は Hibernate 7 の HQL を組み立てます。7.4.13 でテストしました。他の JPA プロバイダーはサポートしていません。 |
+| Jakarta Persistence | 3.2 | Hibernate 7.4 に含まれています。 |
 | データベース | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) | この 3 つで検証しました。他のデータベースでも動くかもしれませんが、テストはしていません。 |
-| Spring Boot | 3.4 | 任意です。プロジェクトのテストは Spring Boot 3.4 を使います。 |
+| Spring Boot | 4.1 | 任意です。プロジェクトのテストは Spring Boot 4.1.2 を使います。 |
 | Kotlin ランタイム | – | lambdaQL は `kotlin-stdlib` や `kotlin-reflect` を依存関係に追加しません。 |
 
 <a id="build-from-source"></a>
@@ -33,8 +30,8 @@ cd lambdaql
 ./gradlew build
 ```
 
-- Gradle ラッパー（8.10）は **JDK 23 以下** でしか動きません。JDK 21 を使ってください。
-- リポジトリには `gradle/gradle-daemon-jvm.properties` があるので、Gradle デーモンは Java 21 を使います。
+- Gradle ラッパーは 9.9.1 です。リポジトリには `gradle/gradle-daemon-jvm.properties` があるので、Gradle デーモンは Java 21 を使います。
+- ビルドには JDK 21 と **JDK 24 以上** の JDK 1 つが必要です。JDK 24 以上は `java.lang.classfile` のリーダー（`src/main/java24`）をコンパイルし、そのリーダーでテストをもう一度実行します。デフォルトのバージョンは 25 で、`-Plql.classfile.jdk=24` のように変更できます。Gradle が JDK を見つけられない場合は、`~/.gradle/gradle.properties` の `org.gradle.java.installations.paths` にパスを書いてください。
 - IntelliJ IDEA では、**Settings > Build Tools > Gradle > Gradle JVM** を Java 21 の JDK に設定してください。
 - ビルドには 3 つのモジュールがあります。`query`（アーティファクト `lambdaql-core`）、`spring-data-jpa`（`lambdaql-spring-data-jpa`）、`spring-boot-starter`（`lambdaql-spring-boot-starter`）です。Spring のモジュールは [12. Spring Data JPA](12-spring-data-jpa.md) で説明します。
 
@@ -224,7 +221,7 @@ val orders = qb.from(Order::class.java)
 // HQL: select e0 from Order e0 where e0.status = 1 and e0.price > 100.0
 ```
 
-**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。このテストは Java のラムダを使います。意味が同じ Kotlin のラムダは同じ HQL になるので、SQL も同じです。
+**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 7.4 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。このテストは Java のラムダを使います。意味が同じ Kotlin のラムダは同じ HQL になるので、SQL も同じです。
 
 **データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `to-hql`:
 
@@ -284,15 +281,10 @@ qb.from(Order::class.java)
 **データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `start-many-where`:
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
 where o1_0.active=true and (o1_0.status=1 or o1_0.status=2)
-
--- MariaDB, Oracle
-select …
-from orders o1_0
-where o1_0.active=1 and (o1_0.status=1 or o1_0.status=2)
 ```
 
 条件を少しずつ追加するときに便利です。
@@ -380,7 +372,7 @@ val firstActive = qb.from(Order::class.java).where { it.active }.first()
 **データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `first#2`（`firstActive`）:
 
 ```sql
--- H2
+-- H2, Oracle
 select …
 from orders o1_0
 where o1_0.active=true
@@ -390,16 +382,9 @@ fetch first ? rows only
 -- MariaDB
 select …
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.id
 limit ?
-
--- Oracle
-select …
-from orders o1_0
-where o1_0.active=1
-order by o1_0.id
-fetch first ? rows only
 ```
 
 `first()` は 1 行だけを読むので、ページングしたクエリになります。lambdaQL は最後のソートキーとして `id` を追加し（[4.8](04-order-paging.md#tie-breaker-automatic-id) を参照）、Hibernate はデータベースごとにページングを書きます。H2 と Oracle では `fetch first ? rows only`、MariaDB では `limit ?` です。`?` は 1 です。
@@ -455,15 +440,10 @@ val page = active.orderBy { o, by -> by.desc(o.price) }.limit(20).toList()
 **データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `count`:
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select count(o1_0.id)
 from orders o1_0
 where o1_0.active=true
-
--- MariaDB, Oracle
-select count(o1_0.id)
-from orders o1_0
-where o1_0.active=1
 ```
 
 Hibernate は `count(e0)` を `select count(o1_0.id)` に変えます。つまり id の列を数えます。件数のクエリにはページングはありません。
@@ -526,7 +506,7 @@ val tags: List<Tag> = qb.from(Tag::class.java).toList()   // use toList() instea
 | クエリのラムダを `inline fun` の中で作らないでください。 | 拒否されます（KC2）。ヘルパーを inline でなくするか、呼び出し側からラムダを渡してください。 |
 | ラムダは 1 つの式でなければなりません（条件、ソート、選択の場合）。 | ラムダの中のループやローカルの `val`/`var` は拒否されます。 |
 | 実行されなければならないコードをラムダに入れないでください。ラムダは実行されません。 | `println(...)` のような副作用のある呼び出しは拒否されます。 |
-| 新しい JDK のバージョンには、対応する ASM のバージョンが必要です。 | lambdaQL は ASM 9.11.1 を使います（Java 28 までのクラスファイルを読めます）。 |
+| Java 21〜23 で実行する場合は、新しい JDK でコンパイルしたクラスに対応する ASM のバージョンが必要です。 | lambdaQL は Java 21〜23 では ASM 9.11.1 を使います（Java 28 までのクラスファイルを読めます）。Java 24 以上では、実行中の JDK の `java.lang.classfile` で読むので、ASM のバージョンとは関係ありません。 |
 
 Kotlin の制限はすべて [9. Kotlin の注意点](09-kotlin-notes.md#914-kotlin-limits-kc1-to-kc21) にあります。
 

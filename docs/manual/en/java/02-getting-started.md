@@ -1,9 +1,6 @@
 <a id="2-getting-started-java"></a>
 # 2. Getting started (Java)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/java/02-getting-started.md) for the latest rules.
-
 [Java track](README.md) | [Manual home](../README.md) | Previous: [1. Overview](../01-overview.md) | Next: [3. Conditions](03-where.md) | [Kotlin version of this page](../kotlin/02-getting-started.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -16,10 +13,10 @@ Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../
 | Item | Version | Notes |
 |---|---|---|
 | Java | 21 | Needed to build and to use lambdaQL. |
-| JPA provider | Hibernate ORM 6.6 | lambdaQL builds Hibernate 6 HQL. The design was verified with 6.6.5. Other JPA providers are not supported. |
-| Jakarta Persistence | 3.1 | Comes with Hibernate 6.6. |
+| JPA provider | Hibernate ORM 7.4 | lambdaQL builds Hibernate 7 HQL. It is tested with 7.4.13. Other JPA providers are not supported. |
+| Jakarta Persistence | 3.2 | Comes with Hibernate 7.4. |
 | Database | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) | These three were verified. Other databases may work, but they were not tested. |
-| Spring Boot | 3.4 | Optional. The project tests use Spring Boot 3.4. |
+| Spring Boot | 4.1 | Optional. The project tests use Spring Boot 4.1.2. |
 | Compiler | javac | Lambdas compiled by ECJ (the Eclipse compiler) are not guaranteed. See [9. Java notes](09-java-notes.md#912-compiler-and-build). |
 
 <a id="build-from-source"></a>
@@ -31,8 +28,8 @@ cd lambdaql
 ./gradlew build
 ```
 
-- The Gradle wrapper (8.10) runs only on **JDK 23 or lower**. Use JDK 21.
-- The repository has `gradle/gradle-daemon-jvm.properties`, so the Gradle daemon uses Java 21.
+- The Gradle wrapper is 9.9.1. The repository has `gradle/gradle-daemon-jvm.properties`, so the Gradle daemon uses Java 21.
+- The build needs JDK 21 and one **JDK 24 or later**. That JDK compiles the `java.lang.classfile` reader (`src/main/java24`) and runs the tests one more time with that reader. The default version is 25. You can change it, for example `-Plql.classfile.jdk=24`. If Gradle cannot find the JDK, put its path in `org.gradle.java.installations.paths` in `~/.gradle/gradle.properties`.
 - In IntelliJ IDEA, set **Settings > Build Tools > Gradle > Gradle JVM** to a Java 21 JDK.
 - The build has three modules: `query` (artifact `lambdaql-core`), `spring-data-jpa` (`lambdaql-spring-data-jpa`) and `spring-boot-starter` (`lambdaql-spring-boot-starter`). The Spring modules are explained in [12. Spring Data JPA](12-spring-data-jpa.md).
 
@@ -239,7 +236,7 @@ List<Order> orders = qb.from(Order.class)
 // HQL: select e0 from Order e0 where e0.status = 1 and e0.price > 100.0
 ```
 
-**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 6.6.5, and it fails if Hibernate's SQL changes.
+**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 7.4, and it fails if Hibernate's SQL changes.
 
 **SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `to-hql`:
 
@@ -301,15 +298,10 @@ qb.from(Order.class)
 **SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `start-many-where`:
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
 where o1_0.active=true and (o1_0.status=1 or o1_0.status=2)
-
--- MariaDB, Oracle
-select …
-from orders o1_0
-where o1_0.active=1 and (o1_0.status=1 or o1_0.status=2)
 ```
 
 This is useful when you add conditions step by step.
@@ -411,7 +403,7 @@ limit ?
 **SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `first#2` (`firstActive`):
 
 ```sql
--- H2
+-- H2, Oracle
 select …
 from orders o1_0
 where o1_0.active=true
@@ -421,16 +413,9 @@ fetch first ? rows only
 -- MariaDB
 select …
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.id
 limit ?
-
--- Oracle
-select …
-from orders o1_0
-where o1_0.active=1
-order by o1_0.id
-fetch first ? rows only
 ```
 
 `first()` reads one row, so it is a paged query. lambdaQL adds `id` as the last sort key (see [4.8](04-order-paging.md#tie-breaker-automatic-id)), and Hibernate writes the paging for each database: `fetch first ? rows only` on H2 and Oracle, `limit ?` on MariaDB. The `?` is 1.
@@ -487,15 +472,10 @@ List<Order> page = active.orderBy((o, by) -> by.desc(o.getPrice())).limit(2).toL
 **SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `count`:
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select count(o1_0.id)
 from orders o1_0
 where o1_0.active=true
-
--- MariaDB, Oracle
-select count(o1_0.id)
-from orders o1_0
-where o1_0.active=1
 ```
 
 The HQL is `select count(e0) from Order e0 where e0.active = true`. Hibernate turns `count(e0)` into `select count(o1_0.id)`, so it counts the id column. The count query has no paging.
@@ -578,7 +558,7 @@ assertEquals(2, qb.from(Tag.class).toList().size());
 | The lambda must be one expression (for conditions, sorting and select). | Loops and local variables inside the lambda are rejected. |
 | Do not put code that must run in the lambda. The lambda is never run. | Calls with side effects, like `System.out.println(...)`, are rejected. |
 | Compile with javac. | ECJ output is not guaranteed. |
-| New JDK versions need a matching ASM version. | lambdaQL uses ASM 9.11.1 (reads class files up to Java 28). If you compile with a newer JDK, update ASM. |
+| When you run on Java 21–23, classes compiled with a new JDK need a matching ASM version. | On Java 21–23, lambdaQL uses ASM 9.11.1 (reads class files up to Java 28). If you compile with a newer JDK, update ASM. On Java 24 or later, lambdaQL reads with the running JDK's `java.lang.classfile`, so the ASM version does not matter. |
 
 More Java details are in [9. Java notes](09-java-notes.md).
 

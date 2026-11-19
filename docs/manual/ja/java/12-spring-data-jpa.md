@@ -1,9 +1,6 @@
 <a id="12-spring-data-jpa-java"></a>
 # 12. Spring Data JPA（Java）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/12-spring-data-jpa.md)を参照してください。
-
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [11. エラーと言語](../11-errors-and-languages.md) | [このページの Kotlin 版](../kotlin/12-spring-data-jpa.md)
 
 ---
@@ -80,9 +77,9 @@ dependencies {
 | 項目 | バージョン |
 |---|---|
 | Java | 21 |
-| Spring Boot | 3.4 以降（3.4.2 でテスト済み）。Spring Boot 4 はまだ検証していません |
-| Spring Data JPA | 3.4 以降 |
-| Hibernate | 6.6（Spring Boot 3.4 にすでに含まれています） |
+| Spring Boot | 4.1（4.1.2 でテスト済み）。Spring Boot 3 はこの版では検証していません |
+| Spring Data JPA | 4.1（4.1.2 でテスト済み） |
+| Hibernate | 7.4（Spring Boot 4.1 にすでに含まれています） |
 
 Spring Data JPA 3.3 以前は **サポートしません**。lambdaQL は実行器を `META-INF/spring.factories` に登録しますが、Spring Data がこのファイルからリポジトリのフラグメントを読むのは 3.4 からです。
 
@@ -628,7 +625,7 @@ Kotlin で書いたリポジトリには、いくつかのコンパイラー設�
 <a id="1210-not-implemented-yet"></a>
 ## 12.10 まだ実装されていないもの
 
-- **Spring Boot 4。** 自動構成は Spring Boot 4 のクラス名も書いていますが、テストしたのは Spring Boot 3.4.2 だけです。
+- **Spring Boot のバージョン。** この版は Spring Boot 4.1.2 でテストしています。自動構成は Spring Boot 3 のクラス名も書いていますが、Spring Boot 3 はこの版では検証していません。
 - Spring の `Sort` の **`ignoreCase()`**。
 - **Kotlin のリポジトリ** はまだテストしていません。
 

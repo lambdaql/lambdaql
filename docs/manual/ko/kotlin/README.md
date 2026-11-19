@@ -113,7 +113,7 @@ fetch first ? rows only
 | Java (JVM) | 21 |
 | Hibernate ORM | 7.4 (Spring Boot 4.1.2의 7.4.13으로 테스트) |
 | 설계에서 검증한 데이터베이스 | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
-| Spring Boot(선택) | 3.4(3.4.2로 테스트, Java 테스트). Spring Boot 4는 아직 검증하지 않음 |
+| Spring Boot(선택) | 4.1(4.1.2로 테스트, Java 테스트). Spring Boot 3은 이 판에서 검증하지 않음 |
 
 <a id="other-languages"></a>
 ## 다른 언어

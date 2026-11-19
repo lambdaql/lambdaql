@@ -1,9 +1,6 @@
 <a id="10-rules-and-limits-java"></a>
 # 10. Rules and limits (Java)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/java/10-rules-and-limits.md) for the latest rules.
-
 [Java track](README.md) | [Manual home](../README.md) | Previous: [9. Java notes](09-java-notes.md) | Next: [11. Errors and languages](../11-errors-and-languages.md) | [Kotlin version of this page](../kotlin/10-rules-and-limits.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -163,7 +160,7 @@ See [8. Procedures and DB functions](08-procedures-functions.md).
 | `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | NULL: not selected (SQL meaning) |
 | `!o.getActive()` (nullable `Boolean`) | `e0.active = false` | NULL: not selected (NULL is not false) |
 | `x == null`, `x != null` | `is null`, `is not null` | 2-valued |
-| `o.getCnt() >= 2.5` (integer column, decimal value) | compares the value as written: a constant is a literal (`e0.cnt >= 2.5`), a captured value and an IN list are bound as `BigDecimal` (D48 B8) | the index range scan stays (measured on MariaDB). The value is no longer cut, which returned wrong rows before |
+| `o.getCnt() >= 2.5` (integer column, decimal value) | compares the value as written: a constant is a literal (`e0.cnt >= 2.5`), a captured value and an IN list are also decimal literals (`e0.cnt >= 2.5BD`, `in (2.5BD, 3.0BD)`, D48 B8) | the index range scan stays (measured on MariaDB). The value is no longer cut, which returned wrong rows before |
 | A whole value object (`@Embedded`): `o.getAddress().equals(addr)`, `Objects.equals(o.getAddress(), addr)`, `!o.getAddress().equals(addr)` | expanded per column: `e0.address.city = :p1 and e0.address.zip = :p2`, the negation is `<> ... or ...`. `== null` is `is null` on every column (and), `!= null` is `is not null` (or) | SQL meaning per column (D48): a NULL column matches neither `=` nor `<>`. A captured object that is `null`: no matching row (`LQL-4045` at `WARN` level) |
 | `o.getId() == null` on a column that can never be NULL (the id, a primitive, `nullable = false`, no association step on the path) | `1=0`. Next to a compare, the check is dropped: `o.getId() != null && o.getId() == id` gives `e0.id = :p1` (tested) | The column has no NULL. A path through an association (`o.getCustomer().getId()`) keeps the check |
 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL 3-valued logic |
@@ -213,7 +210,7 @@ This is the short form of the rule table in the design (section 3.6).
 Other rules:
 
 - `x.compareTo(y) > 0`, `isBefore`, `isAfter` become `x > y` and so on.
-- Constants written in the lambda (also `static final` compile-time constants) are literals: `o.getPrice() > 100` is `e0.price > 100.0`, and `"O'Brien"` is `'O''Brien'`. Captured and computed values (`new BigDecimal("1.5")`) are bind parameters (D37).
+- Constants written in the lambda (also `static final` compile-time constants) are literals: `o.getPrice() > 100` is `e0.price > 100.0`, and `"O'Brien"` is `'O''Brien'`. Captured and computed values (`new BigDecimal("1.5")`) are bind parameters (D37). Exception: a decimal captured value compared with an integer column is a decimal literal (`2.5BD`, D48 B8).
 - javac sometimes moves `!` around (De Morgan, double negation). This never changes the result.
   lambdaQL keeps each condition exactly once and never "simplifies" your logic.
 - A condition you wrote that is always true in Java (`x > 5 || !(x > 5)`) is not simplified.
@@ -347,7 +344,7 @@ lambdaQL throws a clear error for every form in this list. "Planned" means a lat
 | Block lambda with local variables, loops, `switch`, `try` | One expression. Compute values outside the lambda |
 | Writing a captured variable | Compute outside the lambda (Java also needs captured locals to be effectively final) |
 | Lambdas compiled by ECJ (Eclipse compiler) | Not guaranteed. Tested with javac only |
-| Lambdas compiled for a newer JDK than the bundled ASM knows | Update ASM (lambdaQL does not shade ASM) |
+| When running on Java 21–23, lambdas compiled for a newer JDK than the bundled ASM knows | Update ASM (lambdaQL does not shade ASM). Does not apply when running on Java 24 or later (`java.lang.classfile` is used) |
 
 <a id="conditions"></a>
 ### Conditions
@@ -445,7 +442,7 @@ lambdaQL throws a clear error for every form in this list. "Planned" means a lat
 | `returning` | Query again after the DML |
 | DB time (`current_timestamp`) | Pass app time (`LocalDateTime.now()` is bound as a value) |
 | `insert ... select` with a `TABLE` id generator | Use `values(...)`, or IDENTITY / SEQUENCE |
-| `insert` into a JOINED or TABLE_PER_CLASS subclass | Not supported (Hibernate 6.6.5 fails) |
+| `insert` into a JOINED or TABLE_PER_CLASS subclass | Not supported (Hibernate 6.6.5 fails, 7.4 not measured) |
 
 One more note for DML: bulk DML does not go through the persistence context. Hibernate flushes first, but
 managed entities in the same session keep their old values afterwards. Call `clear()` (or `refresh`).
@@ -506,9 +503,9 @@ List<Order> list = flag
 | Item | Version |
 |---|---|
 | Java | 21 (javac). ECJ is not guaranteed |
-| Hibernate | 6.6 (design checked with 6.6.5). HQL extensions are used (for example `function(...)` and `nulls first`), so other JPA providers are not guaranteed |
+| Hibernate | 7.4 (tested with 7.4.13). HQL extensions are used (for example `function(...)` and `nulls first`), so other JPA providers are not guaranteed |
 | Databases | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
-| Spring | Spring Boot 3.4.2 and Spring Data JPA 3.4.2 (the Spring module, [12](12-spring-data-jpa.md)). Spring Boot 4 is not verified yet |
+| Spring | Spring Boot 4.1.2 and Spring Data JPA 4.1.2 (the Spring module, [12](12-spring-data-jpa.md)). Spring Boot 3 is not verified in this edition |
 | Not tested | PostgreSQL, SQL Server, Oracle 19c and older (for example PL/SQL `BOOLEAN` parameters) |
 
 ---

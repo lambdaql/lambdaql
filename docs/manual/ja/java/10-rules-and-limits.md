@@ -1,9 +1,6 @@
 <a id="10-rules-and-limits-java"></a>
 # 10. ルールと制限（Java）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/10-rules-and-limits.md)を参照してください。
-
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [9. Java の注意点](09-java-notes.md) | 次: [11. エラーと言語](../11-errors-and-languages.md) | [このページの Kotlin 版](../kotlin/10-rules-and-limits.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -162,7 +159,7 @@ persistence unit ごとに `SargablePolicy.register(emf, SargableMode.STRICT)` �
 | `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | NULL: 選ばれない（SQL の意味） |
 | `!o.getActive()`（nullable な `Boolean`） | `e0.active = false` | NULL: 選ばれない（NULL は false ではない） |
 | `x == null`、`x != null` | `is null`、`is not null` | 2 値 |
-| `o.getCnt() >= 2.5`（整数カラム、小数の値） | 書いた値のまま比較する: 定数はリテラル（`e0.cnt >= 2.5`）、キャプチャ値と IN リストは `BigDecimal` でバインド（D48 B8） | インデックスの範囲スキャンを保つ（MariaDB で実測）。以前のように値を切り捨てて間違った行を返すことはない |
+| `o.getCnt() >= 2.5`（整数カラム、小数の値） | 書いた値のまま比較する: 定数はリテラル（`e0.cnt >= 2.5`）、キャプチャ値と IN リストも小数リテラル（`e0.cnt >= 2.5BD`、`in (2.5BD, 3.0BD)`、D48 B8） | インデックスの範囲スキャンを保つ（MariaDB で実測）。以前のように値を切り捨てて間違った行を返すことはない |
 | 値オブジェクト（`@Embedded`）全体: `o.getAddress().equals(addr)`、`Objects.equals(o.getAddress(), addr)`、`!o.getAddress().equals(addr)` | カラムごとに展開: `e0.address.city = :p1 and e0.address.zip = :p2`、否定は `<> ... or ...`。`== null` はすべてのカラムの `is null`（and）、`!= null` は `is not null`（or） | カラムごとに SQL の意味（D48）: NULL のカラムは `=` にも `<>` にも一致しない。キャプチャしたオブジェクトが `null` なら一致する行なし（`WARN` レベルの `LQL-4045`） |
 | NULL になれないカラム（id、プリミティブ、`nullable = false`、パスに関連のステップがない）での `o.getId() == null` | `1=0`。比較と並ぶとチェックは取り除かれる: `o.getId() != null && o.getId() == id` は `e0.id = :p1`（テスト済み） | カラムに NULL はない。関連を通るパス（`o.getCustomer().getId()`）ではチェックが残る |
 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR` | SQL の 3 値論理 |
@@ -212,7 +209,7 @@ persistence unit ごとに `SargablePolicy.register(emf, SargableMode.STRICT)` �
 その他のルール:
 
 - `x.compareTo(y) > 0`、`isBefore`、`isAfter` は `x > y`、... になります。
-- ラムダの中に書いた定数（コンパイル時の `static final` 定数も）はリテラルです: `o.getPrice() > 100` は `e0.price > 100.0`、`"O'Brien"` は `'O''Brien'` になります。キャプチャした値と計算した値（`new BigDecimal("1.5")`）はバインドパラメーターです（D37）。
+- ラムダの中に書いた定数（コンパイル時の `static final` 定数も）はリテラルです: `o.getPrice() > 100` は `e0.price > 100.0`、`"O'Brien"` は `'O''Brien'` になります。キャプチャした値と計算した値（`new BigDecimal("1.5")`）はバインドパラメーターです（D37）。例外: 整数カラムと比べる小数のキャプチャ値は小数リテラル（`2.5BD`、D48 B8）。
 - javac は `!` の位置を動かすことがあります（ド・モルガン、二重否定）。これで結果が変わることはありません。
   lambdaQL は各条件をちょうど 1 回だけ残し、ロジックを勝手に「単純化」しません。
 - Java では常に true になる条件（`x > 5 || !(x > 5)`）も単純化しません。
@@ -346,7 +343,7 @@ H2 には OUT パラメーターがないので、プロシージャの機能は
 | ローカル変数、ループ、`switch`、`try` を含むブロックラムダ | 1 つの式。値はラムダの外で計算する |
 | キャプチャした変数への書き込み | ラムダの外で計算する（Java でも、キャプチャするローカル変数は実質的に final である必要がある） |
 | ECJ（Eclipse のコンパイラー）でコンパイルしたラムダ | 保証しない。テストは javac だけ |
-| 同梱の ASM が知らない、より新しい JDK 向けにコンパイルしたラムダ | ASM を更新する（lambdaQL は ASM をシェーディングしない） |
+| Java 21〜23 で実行するとき、同梱の ASM が知らない、より新しい JDK 向けにコンパイルしたラムダ | ASM を更新する（lambdaQL は ASM をシェーディングしない）。Java 24 以上で実行する場合は該当しない（`java.lang.classfile` を使う） |
 
 <a id="conditions"></a>
 ### 条件
@@ -444,7 +441,7 @@ H2 には OUT パラメーターがないので、プロシージャの機能は
 | `returning` | DML の後にもう一度クエリを実行する |
 | DB の時刻（`current_timestamp`） | アプリの時刻を渡す（`LocalDateTime.now()` は値としてバインドされる） |
 | `TABLE` の ID ジェネレーターを使う `insert ... select` | `values(...)`、または IDENTITY / SEQUENCE を使う |
-| JOINED や TABLE_PER_CLASS のサブクラスへの `insert` | サポートしない（Hibernate 6.6.5 が失敗する） |
+| JOINED や TABLE_PER_CLASS のサブクラスへの `insert` | サポートしない（Hibernate 6.6.5 が失敗する、7.4 は未測定） |
 
 DML についての注意: 一括 DML は永続化コンテキストを通りません。Hibernate は先にフラッシュしますが、
 同じセッションの管理されたエンティティは、その後も古い値を持ったままです。`clear()`（または `refresh`）を呼んでください。
@@ -505,9 +502,9 @@ List<Order> list = flag
 | 項目 | バージョン |
 |---|---|
 | Java | 21（javac）。ECJ は保証しない |
-| Hibernate | 6.6（設計は 6.6.5 で確認）。HQL の拡張（たとえば `function(...)` や `nulls first`）を使うので、他の JPA 実装は保証しない |
+| Hibernate | 7.4（7.4.13 でテスト済み）。HQL の拡張（たとえば `function(...)` や `nulls first`）を使うので、他の JPA 実装は保証しない |
 | データベース | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
-| Spring | Spring Boot 3.4.2、Spring Data JPA 3.4.2（Spring モジュール、[12](12-spring-data-jpa.md)）。Spring Boot 4 はまだ検証していない |
+| Spring | Spring Boot 4.1.2、Spring Data JPA 4.1.2（Spring モジュール、[12](12-spring-data-jpa.md)）。Spring Boot 3 はこの版では検証していない |
 | テストしていない | PostgreSQL、SQL Server、Oracle 19c 以前（たとえば PL/SQL の `BOOLEAN` パラメーター） |
 
 ---

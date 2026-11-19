@@ -1,9 +1,6 @@
 <a id="12-spring-data-jpa-kotlin"></a>
 # 12. Spring Data JPA (Kotlin)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/12-spring-data-jpa.md) for the latest rules.
-
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [11. Errors and languages](../11-errors-and-languages.md) | [Java version of this page](../java/12-spring-data-jpa.md)
 
 ---
@@ -83,9 +80,9 @@ Requirements:
 | Item | Version |
 |---|---|
 | Java (JVM) | 21 |
-| Spring Boot | 3.4 or newer (tested with 3.4.2). Spring Boot 4 is not verified yet |
-| Spring Data JPA | 3.4 or newer |
-| Hibernate | 6.6 (Spring Boot 3.4 already brings it) |
+| Spring Boot | 4.1 (tested with 4.1.2). Spring Boot 3 is not verified in this edition |
+| Spring Data JPA | 4.1 (tested with 4.1.2) |
+| Hibernate | 7.4 (Spring Boot 4.1 already brings it) |
 | Kotlin | 2.2 or newer. For older Kotlin, see [12.9](#129-kotlin-compile-settings) |
 | `kotlin-reflect` | Required by Spring Data for Kotlin |
 
@@ -527,7 +524,7 @@ These settings were checked with a prototype: kotlinc 2.3.21, and `-jvm-default=
 <a id="1210-not-implemented-yet"></a>
 ## 12.10 Not implemented yet
 
-- **Spring Boot 4.** The auto-configuration names the Spring Boot 4 classes too, but only Spring Boot 3.4.2 is tested.
+- **Spring Boot version.** This edition is tested with Spring Boot 4.1.2. The auto-configuration names the Spring Boot 3 classes too, but Spring Boot 3 is not verified in this edition.
 - **`ignoreCase()`** in a Spring `Sort`.
 - **Kotlin repositories** are not tested yet.
 

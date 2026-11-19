@@ -1,9 +1,6 @@
 <a id="2-getting-started-kotlin"></a>
 # 2. 入门（Kotlin）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/02-getting-started.md)。
-
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[1. 概述](../01-overview.md) | 下一章：[3. 条件](03-where.md) | [本页的 Java 版本](../java/02-getting-started.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -18,10 +15,10 @@
 | Kotlin | 2.x | 设计已用 kotlinc 1.7.22、2.1.10、2.2.21、2.3.0 和 2.3.21 检查。 |
 | JVM | Java 21 | 构建 lambdaQL 需要。 |
 | `-jvm-target` | 1.8、11、17 或 21 | 这四个版本编译查询 Lambda 的方式都相同。 |
-| JPA 提供者 | Hibernate ORM 6.6 | lambdaQL 生成 Hibernate 6 HQL。设计已用 6.6.5 验证。不支持其他 JPA 提供者。 |
-| Jakarta Persistence | 3.1 | 随 Hibernate 6.6 一起提供。 |
+| JPA 提供者 | Hibernate ORM 7.4 | lambdaQL 生成 Hibernate 7 HQL。已用 7.4.13 测试。不支持其他 JPA 提供者。 |
+| Jakarta Persistence | 3.2 | 随 Hibernate 7.4 一起提供。 |
 | 数据库 | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) | 这三种已验证。其他数据库可能可用，但未经测试。 |
-| Spring Boot | 3.4 | 可选。项目的测试使用 Spring Boot 3.4。 |
+| Spring Boot | 4.1 | 可选。项目的测试使用 Spring Boot 4.1.2。 |
 | Kotlin 运行时 | – | lambdaQL 不会向你的依赖中添加 `kotlin-stdlib` 或 `kotlin-reflect`。 |
 
 <a id="build-from-source"></a>
@@ -33,8 +30,8 @@ cd lambdaql
 ./gradlew build
 ```
 
-- Gradle wrapper（8.10）只能在 **JDK 23 或更低版本**上运行。请使用 JDK 21。
-- 仓库中有 `gradle/gradle-daemon-jvm.properties`，因此 Gradle 守护进程会使用 Java 21。
+- Gradle wrapper 为 9.9.1。仓库中有 `gradle/gradle-daemon-jvm.properties`，因此 Gradle 守护进程会使用 Java 21。
+- 构建需要 JDK 21 和一个 **JDK 24 或更高版本**。JDK 24 或更高版本用于编译 `java.lang.classfile` 读取器（`src/main/java24`），并用该读取器再运行一次测试。默认版本是 25，可以像 `-Plql.classfile.jdk=24` 这样更改。如果 Gradle 找不到 JDK，请把路径写入 `~/.gradle/gradle.properties` 的 `org.gradle.java.installations.paths`。
 - 在 IntelliJ IDEA 中，把 **Settings > Build Tools > Gradle > Gradle JVM** 设置为 Java 21 JDK。
 - 构建包含三个模块：`query`（构件 `lambdaql-core`）、`spring-data-jpa`（`lambdaql-spring-data-jpa`）和 `spring-boot-starter`（`lambdaql-spring-boot-starter`）。Spring 模块的说明见 [12. Spring Data JPA](12-spring-data-jpa.md)。
 
@@ -224,7 +221,7 @@ val orders = qb.from(Order::class.java)
 // HQL: select e0 from Order e0 where e0.status = 1 and e0.price > 100.0
 ```
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。该测试使用 Java Lambda。含义相同的 Kotlin Lambda 生成相同的 HQL，因此 SQL 也相同。
+**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 7.4 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。该测试使用 Java Lambda。含义相同的 Kotlin Lambda 生成相同的 HQL，因此 SQL 也相同。
 
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `to-hql`：
 
@@ -284,15 +281,10 @@ qb.from(Order::class.java)
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `start-many-where`：
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
 where o1_0.active=true and (o1_0.status=1 or o1_0.status=2)
-
--- MariaDB, Oracle
-select …
-from orders o1_0
-where o1_0.active=1 and (o1_0.status=1 or o1_0.status=2)
 ```
 
 当你逐步添加条件时，这很有用：
@@ -380,7 +372,7 @@ val firstActive = qb.from(Order::class.java).where { it.active }.first()
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `first#2`（`firstActive`）：
 
 ```sql
--- H2
+-- H2, Oracle
 select …
 from orders o1_0
 where o1_0.active=true
@@ -390,16 +382,9 @@ fetch first ? rows only
 -- MariaDB
 select …
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.id
 limit ?
-
--- Oracle
-select …
-from orders o1_0
-where o1_0.active=1
-order by o1_0.id
-fetch first ? rows only
 ```
 
 `first()` 只读取一行，因此它是一个分页查询。lambdaQL 会把 `id` 添加为最后一个排序键（见 [4.8](04-order-paging.md#tie-breaker-automatic-id)），Hibernate 会为每个数据库写出分页 SQL：H2 和 Oracle 上是 `fetch first ? rows only`，MariaDB 上是 `limit ?`。这里的 `?` 是 1。
@@ -455,15 +440,10 @@ val page = active.orderBy { o, by -> by.desc(o.price) }.limit(20).toList()
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `count`：
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select count(o1_0.id)
 from orders o1_0
 where o1_0.active=true
-
--- MariaDB, Oracle
-select count(o1_0.id)
-from orders o1_0
-where o1_0.active=1
 ```
 
 Hibernate 把 `count(e0)` 变成 `select count(o1_0.id)`：它统计 id 列。计数查询没有分页。
@@ -526,7 +506,7 @@ val tags: List<Tag> = qb.from(Tag::class.java).toList()   // use toList() instea
 | 不要在 `inline fun` 中创建查询 Lambda。 | 会被拒绝（KC2）。把辅助函数改为非 inline，或从调用方传入 Lambda。 |
 | Lambda 必须是一个表达式（用于条件、排序和 select 时）。 | Lambda 内部的循环和局部 `val`/`var` 会被拒绝。 |
 | 不要在 Lambda 中放必须执行的代码。Lambda 永远不会被执行。 | 有副作用的调用，例如 `println(...)`，会被拒绝。 |
-| 新的 JDK 版本需要匹配的 ASM 版本。 | lambdaQL 使用 ASM 9.11.1（可读取最高到 Java 28 的 class 文件）。 |
+| 在 Java 21~23 上运行时，需要与用新 JDK 编译的类匹配的 ASM 版本。 | lambdaQL 在 Java 21~23 上使用 ASM 9.11.1（可读取最高到 Java 28 的 class 文件）。在 Java 24 及以上版本上，lambdaQL 使用正在运行的 JDK 的 `java.lang.classfile` 读取，因此与 ASM 版本无关。 |
 
 所有 Kotlin 限制见 [9. Kotlin 说明](09-kotlin-notes.md#914-kotlin-limits-kc1-to-kc21)。
 

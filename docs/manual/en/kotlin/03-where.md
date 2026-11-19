@@ -1,9 +1,6 @@
 <a id="3-conditions-where-kotlin"></a>
 # 3. Conditions (`where`) (Kotlin)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/03-where.md) for the latest rules.
-
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [2. Getting started](02-getting-started.md) | Next: [4. Sorting and paging](04-order-paging.md) | [Java version of this page](../java/03-where.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -53,7 +50,7 @@ val list = qb.from(Order::class.java)
 // HQL: select e0 from Order e0 where e0.status = 1 and e0.price > 100.0
 ```
 
-**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 6.6.5, and it fails if Hibernate's SQL changes. The test uses Java lambdas. A Kotlin lambda with the same meaning gives the same HQL, so it gets the same SQL.
+**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 7.4, and it fails if Hibernate's SQL changes. The test uses Java lambdas. A Kotlin lambda with the same meaning gives the same HQL, so it gets the same SQL.
 
 **SQL by database (from the Java test run; Kotlin gives the same HQL)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `to-hql`:
 
@@ -87,15 +84,10 @@ qb.from(Order::class.java)
 **SQL by database (from the Java test run; Kotlin gives the same HQL)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `many-where`:
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
 where o1_0.status=1 and o1_0.active=true
-
--- MariaDB, Oracle
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.active=1
 ```
 
 **Values in the HQL.** The rule depends on where the value comes from (decision D37).
@@ -108,7 +100,8 @@ where o1_0.status=1 and o1_0.active=1
 
 - A constant is the same on every call. So the SQL text does not change, and the database can see the value when it plans the query.
 - A quote in a string constant is escaped: `"O'Brien"` becomes `'O''Brien'`. There is no SQL injection risk, because the string is a constant compiled into your class, not user input.
-- A captured value can come from a user, so it is **always** a bind parameter. Only the value changes from call to call.
+- A captured value can come from a user, so it is a bind parameter. Only the value changes from call to call.
+- There is one exception. A decimal captured value that is compared with a whole-number column is written as a decimal literal (`2.5BD`) (see "Whole-number columns and decimal values" in [3.4](#34-comparisons)). Only the value converted to a number is written, so there is no SQL injection risk.
 - An enum constant is written with its full class name, for example `e0.kind = com.example.OrderKind.GIFT`.
 
 **`!!` is for the compiler.** Kotlin does not compile `it.price > 100.0` when `price` is `Double?`. Write `it.price!! > 100.0`. lambdaQL ignores `!!` (decision D23). Rows where `price` is NULL are not returned.
@@ -141,13 +134,16 @@ When you move the arithmetic to the value side, divide by a decimal, as in `it.c
 **Whole-number columns and decimal values** (decision D48 B8). When a whole-number column is compared with a decimal value, lambdaQL compares the value as written. It does not round the value or drop it.
 
 - A constant written in the lambda stays a literal. `it.cnt >= 2.5` becomes `e0.cnt >= 2.5`.
-- A captured value is bound as a `BigDecimal` (Hibernate type `BIG_DECIMAL`). The HQL is `e0.cnt >= :p1`, and `p1` is `2.5`.
-- An IN list with such an element binds all its elements as `BigDecimal` (`[2.5, 3.0]`).
+- A captured value is also written as a decimal literal. The HQL is `e0.cnt >= 2.5BD`, and there is no bind parameter. `BD` is the HQL literal suffix for `BigDecimal`.
+- An IN list with such an element writes all its elements as decimal literals (`e0.cnt in (2.5BD, 3.0BD)`).
 
-Before this change, the value was cut to the column type, so `2.5` became `2` and wrong rows were returned. Hibernate rejects a decimal bound with a whole-number column type (`CoercionException`), and it silently cuts the elements of an IN list (measured on the three databases).
+This is an exception to the rule that captured values are sent as bind parameters (D37). When a decimal is bound to a parameter compared with a whole-number column, Hibernate 7 rejects it even if the `BigDecimal` type is given (`QueryArgumentException`, measured).
+
+Before this change, the value was cut to the column type, so `2.5` became `2` and wrong rows were returned. Hibernate 6.6 rejects a decimal bound with a whole-number column type (`CoercionException`), and it silently cuts the elements of an IN list (measured on the three databases).
 Changing the comparison to a whole-number comparison (`>= 3`) was not chosen. The SQL that runs would differ from the lambda, and it gives wrong rows when the entity mapping (`Integer`) and the database column type (for example `DECIMAL` with decimals) differ.
 
-The results are correct on H2, MariaDB 10.11 and Oracle 23.26 (measured). On MariaDB, `EXPLAIN` shows an index range scan (`type=range`) for int, `BigDecimal` and double parameters (measured). The Oracle execution plan is not measured.
+The results are correct on H2, MariaDB 10.11 and Oracle 23.26 (measured). On all three databases the SQL keeps the column as it is and compares it with a decimal, like `cnt>=2.5` and `cnt in (2.5,3.0)`.
+On MariaDB, `EXPLAIN` shows an index range scan (`type=range`). On Oracle no conversion is put on the column, so the index can be used. With an index hint the plan is `INDEX RANGE SCAN`. Without a hint, on a 3000-row table Oracle chooses a full scan, the same as for a whole-number literal (`cnt >= 99`) (all measured).
 
 There is no Kotlin test for this. The Java test ([`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java), region `whole-number`) checks it.
 
@@ -380,7 +376,7 @@ There are no Kotlin tests for this yet. The same guard written in Java is tested
 <a id="365-converted-attributes-convert"></a>
 ### 3.6.5 Converted attributes (`@Convert`)
 
-An attribute with a JPA `AttributeConverter` is compared with its Kotlin value. Hibernate 6.6 converts a literal that is compared with such an attribute, and it converts bound parameters too (checked on H2, MariaDB and Oracle).
+An attribute with a JPA `AttributeConverter` is compared with its Kotlin value. Hibernate (7.4, and 6.6 before it) converts a literal that is compared with such an attribute, and it converts bound parameters too (checked on H2, MariaDB and Oracle).
 
 The test is written in Java ([`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java), region `convert`). This is a design example.
 

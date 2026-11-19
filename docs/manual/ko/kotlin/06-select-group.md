@@ -715,7 +715,7 @@ from (select o1_0.customer_id c0,count(*) c1,sum(o1_0.price) c2 from orders o1_0
 where r1_0.c2>100
 ```
 
-H2는 컬럼 목록을 별칭에 붙입니다(`r1_0(customerId,cnt,total)`). MariaDB와 Oracle은 서브쿼리 안에 컬럼 별칭을 씁니다.
+Hibernate 7.4는 파생 테이블의 컬럼에 `c0`, `c1`, `c2` 같은 이름을 붙입니다. H2는 컬럼 목록을 별칭에 붙입니다(`r1_0(c0,c1,c2)`). MariaDB와 Oracle은 서브쿼리 안에 컬럼 별칭을 씁니다.
 
 규칙:
 

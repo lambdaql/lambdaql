@@ -77,8 +77,8 @@ dependencies {
 | 항목 | 버전 |
 |---|---|
 | Java | 21 |
-| Spring Boot | 3.4 이상(3.4.2로 테스트). Spring Boot 4는 아직 검증하지 않음 |
-| Spring Data JPA | 3.4 이상 |
+| Spring Boot | 4.1(4.1.2로 테스트). Spring Boot 3은 이 판에서 검증하지 않음 |
+| Spring Data JPA | 4.1(4.1.2로 테스트) |
 | Hibernate | 7.4(Spring Boot 4.1에 포함) |
 
 Spring Data JPA 3.3 이하는 **지원하지 않습니다**. lambdaQL은 실행기를 `META-INF/spring.factories`에 등록하며, Spring Data는 3.4부터 이 파일에서 리포지토리 프래그먼트를 읽습니다.

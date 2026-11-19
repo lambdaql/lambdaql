@@ -1,9 +1,6 @@
 <a id="10-rules-and-limits-kotlin"></a>
 # 10. 规则与限制（Kotlin）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/10-rules-and-limits.md)。
-
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[9. Kotlin 说明](09-kotlin-notes.md) | 下一章：[11. 错误与语言](../11-errors-and-languages.md) | [本页的 Java 版本](../java/10-rules-and-limits.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -166,7 +163,7 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 | `it.description == it.custName`（两个实体值） | `e0.description = e0.custName` | 任一侧为 NULL：不返回，NULL 与 NULL 也一样（SQL 语义，D48） |
 | `it.description.equals(text)`（`String?`） | 与 `==` 相同 | 与 `==` 相同 |
 | `x == null`、`x != null` | `is null`、`is not null` | 二值 |
-| `it.cnt >= 2.5`（整数列，小数值） | 按写出的值比较：常量是字面量（`e0.cnt >= 2.5`），捕获值和 IN 列表以 `BigDecimal` 绑定（D48 B8） | 保持索引范围扫描（在 MariaDB 上实测）。不再像以前那样截断值而返回错误的行 |
+| `it.cnt >= 2.5`（整数列，小数值） | 按写出的值比较：常量是字面量（`e0.cnt >= 2.5`），捕获值和 IN 列表也是小数字面量（`e0.cnt >= 2.5BD`、`in (2.5BD, 3.0BD)`，D48 B8） | 保持索引范围扫描（在 MariaDB 上实测）。不再像以前那样截断值而返回错误的行 |
 | 整个值对象（`@Embedded`）：`it.address == addr`、`it.address != addr` | 按列展开：`e0.address.city = :p1 and e0.address.zip = :p2`，否定为 `<> ... or ...`。`== null` 是所有列 `is null`（and），`!= null` 是 `is not null`（or） | 每列遵循 SQL 语义（D48）：NULL 列对 `=` 和 `<>` 都不匹配。捕获的对象为 `null` 时没有匹配的行（`WARN` 级别的 `LQL-4045`） |
 | `it.id == id`（`it.id` 是 `Long?`，`id` 是捕获的 `Long`）、`it.id == null`：永远不会是 NULL 的列（id、基本类型、`nullable = false`，且路径上没有关联步骤） | `e0.id = :p1`，而不是 `not (e0.id is null or e0.id <> :p1)`；`it.id == null` 得到 `1=0`（用 Java 测试） | 该列没有 NULL。经过关联的路径（`it.customer?.id`）保留检查 |
 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR` | SQL 三值逻辑 |
@@ -232,7 +229,7 @@ Java 专用规则 R4（对实体值使用 `equals`）和 R5（Java 的 null 安�
 其他规则：
 
 - `x.compareTo(y) > 0`、`isBefore`、`isAfter` 变为 `x > y`、...
-- 写在 Lambda 中的常量（包括 `const val`）是字面量：`it.price!! > 100.0` 是 `e0.price > 100.0`，`"O'Brien"` 是 `'O''Brien'`。捕获的值和计算出的值（`BigDecimal("1.5")`）是绑定参数（D37）。
+- 写在 Lambda 中的常量（包括 `const val`）是字面量：`it.price!! > 100.0` 是 `e0.price > 100.0`，`"O'Brien"` 是 `'O''Brien'`。捕获的值和计算出的值（`BigDecimal("1.5")`）是绑定参数（D37）。例外：与整数列比较的小数捕获值是小数字面量（`2.5BD`，D48 B8）。
 - 编译器有时会移动 `!` 的位置（德摩根定律、双重否定）。这永远不会改变结果。
   lambdaQL 让每个条件恰好只出现一次，并且从不"简化"你的逻辑。
 - 你写的在 Kotlin 中恒为真的条件（`x > 5 || !(x > 5)`）不会被简化。
@@ -367,7 +364,7 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 | 条件、排序或查询列 Lambda 中的局部 `val`/`var`、循环、多条语句 | 一个表达式。在 Lambda 外部计算值 |
 | 写入捕获的变量（`n++`）（KC12） | 在 Lambda 外部计算 |
 | `@JvmField`、`internal`、`value class`、`@get:JvmName` 属性（KC15、KC16） | 公开的普通属性 |
-| 针对比内置 ASM 所知更新的 JDK 编译的 Lambda | 更新 ASM（lambdaQL 不对它做 shade） |
+| 在 Java 21~23 上运行时，针对比内置 ASM 所知更新的 JDK 编译的 Lambda | 更新 ASM（lambdaQL 不对它做 shade）。在 Java 24 及以上版本上运行时不适用（使用 `java.lang.classfile`） |
 
 <a id="conditions"></a>
 ### 条件
@@ -472,7 +469,7 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 | `returning` | 在 DML 之后再查询一次 |
 | 数据库时间（`current_timestamp`） | 传入应用程序时间（`LocalDateTime.now()` 作为值绑定） |
 | 使用 `TABLE` id 生成器的 `insert ... select` | 使用 `values { }`，或 IDENTITY / SEQUENCE |
-| 向 JOINED 或 TABLE_PER_CLASS 子类 `insert` | 不支持（Hibernate 6.6.5 会失败） |
+| 向 JOINED 或 TABLE_PER_CLASS 子类 `insert` | 不支持（Hibernate 6.6.5 会失败，7.4 未测） |
 
 DML 还需注意：批量 DML 不经过持久化上下文。Hibernate 会先刷新，但
 同一会话中的托管实体之后仍保留旧值。请调用 `clear()`（或 `refresh`）。
@@ -542,9 +539,9 @@ val list = if (flag) {
 |---|---|
 | Kotlin | 2.x（设计已用 kotlinc 1.7.22、2.1.10、2.2.21、2.3.0、2.3.21 检查过） |
 | Java（JVM） | 21 |
-| Hibernate | 6.6（设计已用 6.6.5 检查过）。使用了 HQL 扩展（例如 `function(...)` 和 `nulls first`）；不保证其他 JPA 提供者可用 |
+| Hibernate | 7.4（已用 7.4.13 测试）。使用了 HQL 扩展（例如 `function(...)` 和 `nulls first`）；不保证其他 JPA 提供者可用 |
 | 数据库 | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
-| Spring | Spring Boot 3.4.2 和 Spring Data JPA 3.4.2（Spring 模块，[12](12-spring-data-jpa.md)；仅 Java repository）。Spring Boot 4 尚未验证 |
+| Spring | Spring Boot 4.1.2 和 Spring Data JPA 4.1.2（Spring 模块，[12](12-spring-data-jpa.md)；仅 Java repository）。本版未验证 Spring Boot 3 |
 | Kotlin 逐行检查 | 目前只在 H2 上进行。计划在 MariaDB 和 Oracle 上运行 Kotlin 用例 |
 | 未测试 | 高于 2.3 的 Kotlin、Kotlin Multiplatform、PostgreSQL、SQL Server、Oracle 19c 及更早版本（例如 PL/SQL 的 `BOOLEAN` 参数） |
 

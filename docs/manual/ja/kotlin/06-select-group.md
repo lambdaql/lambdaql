@@ -1,9 +1,6 @@
 <a id="6-select-aggregates-and-group-by-kotlin"></a>
 # 6. 選択、集計、グループ化（Kotlin）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/06-select-group.md)を参照してください。
-
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [5. サブクエリ](05-subquery.md) | 次: [7. 更新、挿入、削除](07-dml.md) | [このページの Java 版](../java/06-select-group.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -94,7 +91,7 @@ val prices: List<Double?> = qb.from(Order::class.java)
 
 ここでは `price` は `Double?` なので、ソートに `nulls first` が付きます（[4.4](04-order-paging.md#44-null-ordering-is-the-same-on-every-database) を参照）。Java のテストでは `price` は `double` なので、その HQL（例 `value`）には `nulls` の部分がありません。
 
-**SQL ブロックの読み方。** `?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。この章では select リストが要点なので、省略しません。このテストは Java のラムダを使います。意味が同じ Kotlin のラムダは同じ HQL になるので、SQL も同じです。
+**SQL ブロックの読み方。** `?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 7.4 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。この章では select リストが要点なので、省略しません。このテストは Java のラムダを使います。意味が同じ Kotlin のラムダは同じ HQL になるので、SQL も同じです。
 
 **データベースごとの SQL（Java のテスト実行の結果）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `value`:
 
@@ -617,7 +614,7 @@ assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.
 - 行の型は Kotlin の data class（または Java の record）です（J5）。プロパティ（`x.total`）がカラムを読みます。
 - 同じ `Cte` オブジェクトを 1 つの文で 2 回読むと、定義は 1 回だけ書き、2 つの結合が同じ名前を読みます: `join t e1 on ... left join t e2 on ...`。異なる `Cte` オブジェクトは `with t as (...), t2 as (...)` のように別々の名前を受け取ります（3 つの DB で実測）。
 - 派生した行には id がないので、`x == null` はエラー（`LQL-3067`）です。`x.customerId == null` のようにカラムを比較してください。
-- Hibernate 6.6 は、エンティティの `select distinct`、派生テーブルと CTE の inner/left join、サブクエリの中のエンティティの結合を受け付けます（3 つの DB で実測）。
+- Hibernate 7.4（以前の 6.6 も）は、エンティティの `select distinct`、派生テーブルと CTE の inner/left join、サブクエリの中のエンティティの結合を受け付けます（3 つの DB で実測）。
 
 **(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `join-cte`:
 
@@ -699,7 +696,7 @@ val cheapestOfTop = qb.from(qb.from(Order::class.java)
     .first()
 ```
 
-**SQL ブロックの読み方。** [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) は同じ形のより単純な HQL を Hibernate に直接渡し、H2 2.3、MariaDB 10.11、Oracle 23.26（Hibernate 6.6.5）で出力された SQL を記録します。Hibernate の SQL が変わるとテストは失敗します。このブロックで、データベースごとの派生テーブルの書き方を確認できます。
+**SQL ブロックの読み方。** [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) は同じ形のより単純な HQL を Hibernate に直接渡し、H2 2.3、MariaDB 10.11、Oracle 23.26（Hibernate 7.4）で出力された SQL を記録します。Hibernate の SQL が変わるとテストは失敗します。このブロックで、データベースごとの派生テーブルの書き方を確認できます。
 
 **データベースごとの SQL（この形の HQL に対する Hibernate の SQL）** — `expected-sql/` の [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)、例 `06-derived`:
 
@@ -707,17 +704,17 @@ val cheapestOfTop = qb.from(qb.from(Order::class.java)
 -- HQL: select r.customerId, r.cnt, r.total from (select o.customer.id as customerId, count(*) as cnt, sum(o.price) as total from Order o group by o.customer.id) r where r.total > 100
 
 -- H2
-select r1_0.customerId,r1_0.cnt,r1_0.total
-from (select o1_0.customer_id,count(*),sum(o1_0.price) from orders o1_0 group by o1_0.customer_id) r1_0(customerId,cnt,total)
-where r1_0.total>100
+select r1_0.c0,r1_0.c1,r1_0.c2
+from (select o1_0.customer_id,count(*),sum(o1_0.price) from orders o1_0 group by o1_0.customer_id) r1_0(c0,c1,c2)
+where r1_0.c2>100
 
 -- MariaDB, Oracle
-select r1_0.customerId,r1_0.cnt,r1_0.total
-from (select o1_0.customer_id customerId,count(*) cnt,sum(o1_0.price) total from orders o1_0 group by o1_0.customer_id) r1_0
-where r1_0.total>100
+select r1_0.c0,r1_0.c1,r1_0.c2
+from (select o1_0.customer_id c0,count(*) c1,sum(o1_0.price) c2 from orders o1_0 group by o1_0.customer_id) r1_0
+where r1_0.c2>100
 ```
 
-H2 はカラムのリストをエイリアスに付けます（`r1_0(customerId,cnt,total)`）。MariaDB と Oracle はサブクエリの中にカラムのエイリアスを書きます。
+Hibernate 7.4 は派生テーブルのカラムに `c0`、`c1`、`c2` のような名前を付けます。H2 はカラムのリストをエイリアスに付けます（`r1_0(c0,c1,c2)`）。MariaDB と Oracle はサブクエリの中にカラムのエイリアスを書きます。
 
 ルール:
 

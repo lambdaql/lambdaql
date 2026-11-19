@@ -1,9 +1,6 @@
 <a id="9-java-notes"></a>
 # 9. Java 说明
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/09-java-notes.md)。
-
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[8. 存储过程与数据库函数](08-procedures-functions.md) | 下一章：[10. 规则与限制](10-rules-and-limits.md) | [本页的 Kotlin 版本](../kotlin/09-kotlin-notes.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -235,7 +232,7 @@ public class OrderService {
 }
 ```
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
+**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 7.4 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
 
 **各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `this-capture`：
 
@@ -337,7 +334,7 @@ lambdaQL **没有静态 DSL**。除了可选的 `Agg` 导入之外，使用 lamb
 |---|---|
 | 编译器 | lambdaQL 使用 **javac** 进行测试。不保证支持由 **ECJ**（Eclipse 编译器）编译的 Lambda。Eclipse IDE 以及其他基于 Eclipse JDT 的工具使用 ECJ。请用 Gradle 或 Maven（javac）运行测试 |
 | JDK 版本 | Java 21 |
-| ASM | lambdaQL 使用 ASM 9.11.1 读取类文件（最高支持 Java 28 类文件）。如果使用更新的 JDK 编译，请升级 ASM。lambdaQL 没有对 ASM 做 shade，因此可以自行升级 |
+| 读取类文件（ASM） | 在 Java 21~23 上，lambdaQL 使用 ASM 9.11.1 读取类文件（最高支持 Java 28 类文件）。如果使用更新的 JDK 编译，请升级 ASM。lambdaQL 没有对 ASM 做 shade，因此可以自行升级。在 Java 24 及以上版本上，lambdaQL 使用正在运行的 JDK 的 `java.lang.classfile` 读取，因此与 ASM 版本无关。lambdaQL jar 是 Multi-Release JAR，JVM 会选择与运行版本匹配的实现 |
 | `-parameters` | 推荐。它使 lambdaQL 能够检查存储过程的参数名（[8.4](08-procedures-functions.md#84-warning-argument-order)） |
 | 调试信息 | 保留行号（javac 默认）。lambdaQL 会把源代码行写进错误消息 |
 | IntelliJ 的 "Number objects compared using `==`" | 在 lambdaQL Lambda 中是有意为之。可以使用 `@SuppressWarnings("NumberEquality")` |

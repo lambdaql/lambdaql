@@ -1,9 +1,6 @@
 <a id="4-sorting-and-paging-java"></a>
 # 4. 排序与分页（Java）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/04-order-paging.md)。
-
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[3. 条件（`where`）](03-where.md) | 下一章：[5. 子查询](05-subquery.md) | [本页的 Kotlin 版本](../kotlin/04-order-paging.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -27,7 +24,7 @@ qb.from(Order.class)
 //      order by e0.price desc nulls last, j1.name asc nulls first, e0.id asc
 ```
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
+**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 7.4 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
 
 **各数据库的 SQL（Hibernate 为此 HQL 生成的 SQL）** — 手册中的 `Order` 有可为 NULL 的 `Double price`，而测试中的 `Order` 没有，所以 `SqlByDatabaseTest` 把这个 HQL 直接交给 Hibernate。来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-overview`：
 
@@ -47,7 +44,7 @@ fetch first ? rows only
 select …
 from orders o1_0
 left join customers c1_0 on c1_0.id=o1_0.customer_id
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.price desc,c1_0.name,o1_0.id
 limit ?,?
 
@@ -56,7 +53,7 @@ limit ?,?
 select …
 from orders o1_0
 left join customers c1_0 on c1_0.id=o1_0.customer_id
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.price desc nulls last,c1_0.name asc nulls first,o1_0.id
 offset ? rows
 fetch first ? rows only
@@ -86,16 +83,10 @@ assertEquals("select e0 from Order e0 where e0.active = true order by e0.price d
 **各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-basic`：
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
 where o1_0.active=true
-order by o1_0.price desc,o1_0.id
-
--- MariaDB, Oracle
-select …
-from orders o1_0
-where o1_0.active=1
 order by o1_0.price desc,o1_0.id
 ```
 
@@ -606,7 +597,7 @@ assertEquals("select e0 from Order e0 where e0.active = true order by e0.id asc"
 **各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `page-only`：
 
 ```sql
--- H2
+-- H2, Oracle
 select …
 from orders o1_0
 where o1_0.active=true
@@ -616,16 +607,9 @@ fetch first ? rows only
 -- MariaDB
 select …
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.id
 limit ?
-
--- Oracle
-select …
-from orders o1_0
-where o1_0.active=1
-order by o1_0.id
-fetch first ? rows only
 ```
 
 **第一行与总行数。**
@@ -702,22 +686,16 @@ assertEquals("select e0 from Order e0 where e0.active = true order by e0.descrip
 **各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-spec`：
 
 ```sql
--- H2
+-- H2, MariaDB
 select …
 from orders o1_0
 where o1_0.active=true
 order by o1_0.description desc,o1_0.id
 
--- MariaDB
-select …
-from orders o1_0
-where o1_0.active=1
-order by o1_0.description desc,o1_0.id
-
 -- Oracle
 select …
 from orders o1_0
-where o1_0.active=1
+where o1_0.active=true
 order by o1_0.description desc nulls last,o1_0.id
 ```
 

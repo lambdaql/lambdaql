@@ -1,9 +1,6 @@
 <a id="8-stored-procedures-and-db-functions-kotlin"></a>
 # 8. Stored procedures and DB functions (Kotlin)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/08-procedures-functions.md) for the latest rules.
-
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [7. Update, insert, delete](07-dml.md) | Next: [9. Kotlin notes](09-kotlin-notes.md) | [Java version of this page](../java/08-procedures-functions.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -193,7 +190,7 @@ If you need the number, return it as an OUT parameter.
 > **The order of the stub function parameters must be the same as the order in the database.**
 
 lambdaQL binds arguments **by position** (rule PR2).
-Hibernate 6.6.5 binds by position even when names are registered.
+Hibernate 6.6.5 binds by position even when names are registered (measured, 7.4 not measured).
 The MariaDB and H2 drivers do not support named parameters.
 So if the order is wrong, you can get a **wrong result without any error**.
 
@@ -389,7 +386,7 @@ qb.update(Order::class.java).set { it.price = OrderFns.discount(it.price) }.all(
 
 The Java test checks the same forms with the name `SQ_FN_DISCOUNT`, for example `select e0 from Order e0 where function('SQ_FN_DISCOUNT' as Double, e0.price) > 100.0`. The test runs each query and compares the result rows with the same calculation in Java.
 
-**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) gives an HQL of the same form (with the name `FN_DISCOUNT`) to Hibernate directly and records the SQL on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5). The test fails if Hibernate's SQL changes.
+**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) gives an HQL of the same form (with the name `FN_DISCOUNT`) to Hibernate directly and records the SQL on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 7.4). The test fails if Hibernate's SQL changes.
 
 **SQL by database (Hibernate's SQL for this HQL form)** — recorded by `PlannedSqlTest`. From `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql), example `08-function`:
 
@@ -516,7 +513,7 @@ The check runs once per `where` lambda, when the analysis result is cached. A co
 
 | Case | Code | H2 | MariaDB | Oracle |
 |---|---|---|---|---|
-| ① A function wraps a column: `fn(o.price) > 10`, a Boolean function on a column, a function inside `IN` or `IS NULL` | `LQL-5001` (WARN) | WARN | WARN (a stored function cannot be used in an index) | WARN. **But** no log if `user_ind_expressions` has a function-based index with the same expression `FN(COLUMN)` on that table |
+| ① A function wraps a column: `fn(o.price) > 10`, a Boolean function on a column, a function inside `IN` or `IS NULL` | `LQL-5001` (WARN) | WARN | WARN (a stored function cannot be used in an index) | WARN. **But** no log if `user_ind_expressions` has a function-based index with the same expression `FN(COLUMN)` on that table. A number conversion that Oracle adds because the column type differs from the function argument type (`FN(TO_NUMBER(COLUMN))` and so on) counts as the same expression |
 | ② A function on the value side, compared with a column: `o.price > fn(rate)` | `LQL-5007` (WARN) | not checked | WARN when `information_schema.routines.is_deterministic = 'NO'` (the default!). Then MariaDB scans the full index | not checked (Oracle uses a range scan either way) |
 
 - For the Oracle index match, lambdaQL takes the table and column names from the Hibernate mapping. Only functions with one column argument are matched.

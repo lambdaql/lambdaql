@@ -1,9 +1,6 @@
 <a id="3-conditions-where-java"></a>
 # 3. Conditions (`where`) (Java)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/java/03-where.md) for the latest rules.
-
 [Java track](README.md) | [Manual home](../README.md) | Previous: [2. Getting started](02-getting-started.md) | Next: [4. Sorting and paging](04-order-paging.md) | [Kotlin version of this page](../kotlin/03-where.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -51,7 +48,7 @@ List<Order> list = qb.from(Order.class)
 // HQL: select e0 from Order e0 where e0.status = 1 and e0.price > 100.0
 ```
 
-**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 6.6.5, and it fails if Hibernate's SQL changes.
+**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 7.4, and it fails if Hibernate's SQL changes.
 
 **SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `to-hql`:
 
@@ -118,15 +115,10 @@ assertEquals("select e0 from Order e0 where (e0.status = 1 or e0.status = 3) and
 **SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `where-many`:
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
 where (o1_0.status=1 or o1_0.status=3) and o1_0.active=true
-
--- MariaDB, Oracle
-select …
-from orders o1_0
-where (o1_0.status=1 or o1_0.status=3) and o1_0.active=1
 ```
 
 A method reference works too. `where(Order::isActive)` is the same as `where(o -> o.isActive())`.
@@ -141,7 +133,8 @@ A method reference works too. `where(Order::isActive)` is the same as `where(o -
 
 - A constant is the same on every call. So the SQL text does not change, and the database can see the value when it plans the query.
 - A quote in a string constant is escaped: `"O'Brien"` becomes `'O''Brien'`. There is no SQL injection risk, because the string is a constant compiled into your class, not user input.
-- A captured value can come from a user, so it is **always** a bind parameter. Only the value changes from call to call.
+- A captured value can come from a user, so it is a bind parameter. Only the value changes from call to call.
+- There is one exception. A decimal captured value that is compared with an integer column is written as a decimal literal (`2.5BD`) (see "An integer column and a decimal value" in [3.4](#34-comparisons)). Only the value converted to a number is written, so there is no SQL injection risk.
 
 An enum constant is written with its full class name.
 **(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `enum`:
@@ -186,29 +179,31 @@ When you move the arithmetic to the value side, divide by a decimal, like `o.get
 **An integer column and a decimal value** (decision D48 B8). When you compare an integer column with a decimal value, lambdaQL compares the value as written. It does not round the value or drop it.
 
 - A constant written in the lambda stays a literal. `o.getCnt() >= 2.5` becomes `e0.cnt >= 2.5`.
-- A captured value is bound as a `BigDecimal` (Hibernate type `BIG_DECIMAL`). The HQL is `e0.cnt >= :p1`, and `p1` is `2.5`.
-- An IN list with such an element binds all elements as `BigDecimal` (`[2.5, 3.0]`).
+- A captured value is also written as a decimal literal. The HQL is `e0.cnt >= 2.5BD`, and there is no bind parameter. `BD` is the HQL literal suffix for `BigDecimal`.
+- An IN list with such an element writes all elements as decimal literals (`e0.cnt in (2.5BD, 3.0BD)`).
 
-Before this change, the value was cut to the column type, so `2.5` became `2` and the query returned wrong rows. Hibernate rejects a decimal bound with an integer column type (`CoercionException`), and it silently cuts the elements of an IN list (measured on the three databases).
+This is an exception to the rule that captured values are sent as bind parameters (D37). When a decimal is bound to a parameter compared with an integer column, Hibernate 7 rejects it even if the `BigDecimal` type is given (`QueryArgumentException`, measured).
+
+Before this change, the value was cut to the column type, so `2.5` became `2` and the query returned wrong rows. Hibernate 6.6 rejects a decimal bound with an integer column type (`CoercionException`), and it silently cuts the elements of an IN list (measured on the three databases).
 lambdaQL does not change the comparison to an integer comparison (`>= 3`). The SQL that runs would then differ from the lambda, and it would give wrong rows when the entity mapping (`Integer`) differs from the database column type (for example, a `DECIMAL` with decimal places).
 
-The results are correct on H2, MariaDB 10.11 and Oracle 23.26 (measured). MariaDB's `EXPLAIN` shows an index range scan (`type=range`) for int, `BigDecimal` and double parameters (measured). The Oracle execution plan is not measured.
+The results are correct on H2, MariaDB 10.11 and Oracle 23.26 (measured). On all three databases the SQL keeps the column as it is and compares it with a decimal, like `cnt>=2.5` and `cnt in (2.5,3.0)`.
+MariaDB's `EXPLAIN` shows an index range scan (`type=range`). On Oracle no conversion is put on the column, so the index can be used. With an index hint the plan is `INDEX RANGE SCAN`. Without a hint, on a 3000-row table Oracle chooses a full scan, the same as for a whole-number literal (`cnt >= 99`) (all measured).
 
 **(tested)** [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java), region `whole-number`:
 
 ```java
-// cnt is a whole number; 2.5 is compared as written (it is never cut to 2)
+// cnt is a whole number; 2.5 is compared as written (it is never cut to 2): a decimal literal
 double half = 2.5;
 RenderedQuery atLeast = qb.from(Order.class).where(o -> o.getCnt() >= half).toHql();
-assertEquals("select e0 from Order e0 where e0.cnt >= :p1", atLeast.hql());
-assertEquals(Map.of("p1", new BigDecimal("2.5")), atLeast.parameters());    // bound as a decimal
+assertEquals("select e0 from Order e0 where e0.cnt >= 2.5BD", atLeast.hql());
+assertEquals(Map.of(), atLeast.parameters());                                // written as a decimal literal
 // a constant written in the lambda stays a literal
 assertEquals("select e0 from Order e0 where e0.cnt >= 2.5", qb.from(Order.class).where(o -> o.getCnt() >= 2.5).toHql().hql());
-// an IN list with such a value is bound as decimals
+// an IN list with such a value is written as decimal literals
 List<Double> values = List.of(2.5, 3.0);
 RenderedQuery in = qb.from(Order.class).where(o -> values.contains(o.getCnt().doubleValue())).toHql();
-assertEquals("select e0 from Order e0 where e0.cnt in (:p1)", in.hql());
-assertEquals(Map.of("p1", List.of(new BigDecimal("2.5"), new BigDecimal("3.0"))), in.parameters());
+assertEquals("select e0 from Order e0 where e0.cnt in (2.5BD, 3.0BD)", in.hql());
 ```
 
 **Floating point:** for `float`/`double` columns, lambdaQL does not promise the same bit-exact result as Java.
@@ -479,7 +474,7 @@ How it works:
 <a id="365-converted-attributes-convert"></a>
 ### 3.6.5 Converted attributes (`@Convert`)
 
-An attribute with a JPA `AttributeConverter` is compared with its Java value. Hibernate 6.6 converts a literal that is compared with such an attribute, and it converts bind parameters too.
+An attribute with a JPA `AttributeConverter` is compared with its Java value. Hibernate (7.4, and 6.6 before it) converts a literal that is compared with such an attribute, and it converts bind parameters too.
 
 So a condition written with Java values finds the stored rows (checked on H2, MariaDB and Oracle).
 
@@ -518,32 +513,22 @@ assertEquals("select e0 from Order e0 where e0.active = false",       // primiti
 **SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `boolean`:
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
 where o1_0.active=true
-
--- MariaDB, Oracle
-select …
-from orders o1_0
-where o1_0.active=1
 ```
 
 **SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `boolean#2`:
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
 where o1_0.active=false
-
--- MariaDB, Oracle
-select …
-from orders o1_0
-where o1_0.active=0
 ```
 
-H2 has a real boolean type, so its SQL has `true` / `false`. MariaDB and Oracle store a boolean as a number, so Hibernate writes `1` / `0`.
+Hibernate 7.4 writes `true` / `false` in the SQL on all three databases. Hibernate 6.6 wrote `1` / `0` on MariaDB and Oracle.
 
 Notes:
 

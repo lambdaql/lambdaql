@@ -1,9 +1,6 @@
 <a id="12-spring-data-jpa-java"></a>
 # 12. Spring Data JPA（Java）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/12-spring-data-jpa.md)。
-
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[11. 错误与语言](../11-errors-and-languages.md) | [本页的 Kotlin 版本](../kotlin/12-spring-data-jpa.md)
 
 ---
@@ -79,9 +76,9 @@ dependencies {
 | 项目 | 版本 |
 |---|---|
 | Java | 21 |
-| Spring Boot | 3.4 或更高版本（已用 3.4.2 测试）。Spring Boot 4 尚未验证 |
-| Spring Data JPA | 3.4 或更高版本 |
-| Hibernate | 6.6（Spring Boot 3.4 已经带入） |
+| Spring Boot | 4.1（已用 4.1.2 测试）。本版未验证 Spring Boot 3 |
+| Spring Data JPA | 4.1（已用 4.1.2 测试） |
+| Hibernate | 7.4（Spring Boot 4.1 已经带入） |
 
 **不支持** Spring Data JPA 3.3 及更早版本。lambdaQL 在 `META-INF/spring.factories` 中注册其执行器，而 Spring Data 从 3.4 起才从这个文件读取 repository fragment。
 
@@ -614,7 +611,7 @@ public QueryBuilder queryBuilder(EntityManagerFactory entityManagerFactory) {
 <a id="1210-not-implemented-yet"></a>
 ## 12.10 尚未实现
 
-- **Spring Boot 4。** 自动配置也写出了 Spring Boot 4 的类名，但只测试了 Spring Boot 3.4.2。
+- **Spring Boot 版本。** 本版使用 Spring Boot 4.1.2 测试。自动配置也写出了 Spring Boot 3 的类名，但本版未验证 Spring Boot 3。
 - Spring `Sort` 中的 **`ignoreCase()`**。
 - **Kotlin repository** 尚未测试。
 

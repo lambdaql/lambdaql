@@ -1,9 +1,6 @@
 <a id="10-rules-and-limits-kotlin"></a>
 # 10. Rules and limits (Kotlin)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/10-rules-and-limits.md) for the latest rules.
-
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [9. Kotlin notes](09-kotlin-notes.md) | Next: [11. Errors and languages](../11-errors-and-languages.md) | [Java version of this page](../java/10-rules-and-limits.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -166,7 +163,7 @@ See [8. Procedures and DB functions](08-procedures-functions.md).
 | `it.description == it.custName` (two values of the entity) | `e0.description = e0.custName` | NULL on either side: not returned, also NULL and NULL (SQL meaning, D48) |
 | `it.description.equals(text)` (`String?`) | the same as `==` | the same as `==` |
 | `x == null`, `x != null` | `is null`, `is not null` | 2-valued |
-| `it.cnt >= 2.5` (an integer column and a decimal value) | Compared with the value as written: a constant is a literal (`e0.cnt >= 2.5`), a captured value and an IN list are bound as `BigDecimal` (D48 B8) | The index range scan is kept (measured on MariaDB). The value is no longer cut, so wrong rows are no longer returned |
+| `it.cnt >= 2.5` (an integer column and a decimal value) | Compared with the value as written: a constant is a literal (`e0.cnt >= 2.5`), a captured value and an IN list are also decimal literals (`e0.cnt >= 2.5BD`, `in (2.5BD, 3.0BD)`, D48 B8) | The index range scan is kept (measured on MariaDB). The value is no longer cut, so wrong rows are no longer returned |
 | A whole value object (`@Embedded`): `it.address == addr`, `it.address != addr` | Expanded column by column: `e0.address.city = :p1 and e0.address.zip = :p2`; the negation is `<> ... or ...`. `== null` is `is null` on every column (and), `!= null` is `is not null` (or) | SQL meaning per column (D48): a NULL column matches neither `=` nor `<>`. A captured object that is `null`: no row matches (`LQL-4045` at `WARN` level) |
 | `it.id == id` (`it.id` is a `Long?`, `id` a captured `Long`), `it.id == null`: a column that can never be NULL (the id, a primitive, `nullable = false`, no association step on the path) | `e0.id = :p1` instead of `not (e0.id is null or e0.id <> :p1)`; `it.id == null` gives `1=0` (tested with Java) | The column has no NULL. A path through an association (`it.customer?.id`) keeps the check |
 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL 3-valued logic |
@@ -232,7 +229,7 @@ The Java-only rules R4 (`equals` on an entity value) and R5 (Java null-safe help
 Other rules:
 
 - `x.compareTo(y) > 0`, `isBefore`, `isAfter` become `x > y`, ...
-- Constants written in the lambda (also `const val`) are literals: `it.price!! > 100.0` is `e0.price > 100.0`, `"O'Brien"` is `'O''Brien'`. Captured and computed values (`BigDecimal("1.5")`) are bind parameters (D37).
+- Constants written in the lambda (also `const val`) are literals: `it.price!! > 100.0` is `e0.price > 100.0`, `"O'Brien"` is `'O''Brien'`. Captured and computed values (`BigDecimal("1.5")`) are bind parameters (D37). Exception: a decimal captured value compared with an integer column is a decimal literal (`2.5BD`, D48 B8).
 - The compiler sometimes moves `!` around (De Morgan, double negation). This never changes the result.
   lambdaQL keeps each condition exactly once and never "simplifies" your logic.
 - A condition you wrote that is always true in Kotlin (`x > 5 || !(x > 5)`) is not simplified.
@@ -367,7 +364,7 @@ lambdaQL throws a clear error for every form in this list. "Planned" means a lat
 | Local `val`/`var`, loops, many statements in a condition, sort or select lambda | One expression. Compute values outside the lambda |
 | Writing a captured variable (`n++`) (KC12) | Compute outside the lambda |
 | `@JvmField`, `internal`, `value class`, `@get:JvmName` properties (KC15, KC16) | A public normal property |
-| Lambdas compiled for a newer JDK than the bundled ASM knows | Update ASM (lambdaQL does not shade it) |
+| When running on Java 21–23, lambdas compiled for a newer JDK than the bundled ASM knows | Update ASM (lambdaQL does not shade it). Does not apply when running on Java 24 or later (`java.lang.classfile` is used) |
 
 <a id="conditions"></a>
 ### Conditions
@@ -472,7 +469,7 @@ lambdaQL throws a clear error for every form in this list. "Planned" means a lat
 | `returning` | Query again after the DML |
 | DB time (`current_timestamp`) | Pass app time (`LocalDateTime.now()` is bound as a value) |
 | `insert ... select` with a `TABLE` id generator | Use `values { }`, or IDENTITY / SEQUENCE |
-| `insert` into a JOINED or TABLE_PER_CLASS subclass | Not supported (Hibernate 6.6.5 fails) |
+| `insert` into a JOINED or TABLE_PER_CLASS subclass | Not supported (Hibernate 6.6.5 fails, 7.4 not measured) |
 
 One more note for DML: bulk DML does not go through the persistence context. Hibernate flushes first, but
 managed entities in the same session keep old values afterwards. Call `clear()` (or `refresh`).
@@ -542,9 +539,9 @@ val list = if (flag) {
 |---|---|
 | Kotlin | 2.x (design checked with kotlinc 1.7.22, 2.1.10, 2.2.21, 2.3.0, 2.3.21) |
 | Java (JVM) | 21 |
-| Hibernate | 6.6 (design checked with 6.6.5). HQL extensions are used (for example `function(...)` and `nulls first`), so other JPA providers are not guaranteed |
+| Hibernate | 7.4 (tested with 7.4.13). HQL extensions are used (for example `function(...)` and `nulls first`), so other JPA providers are not guaranteed |
 | Databases | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
-| Spring | Spring Boot 3.4.2 and Spring Data JPA 3.4.2 (the Spring module, [12](12-spring-data-jpa.md); Java repositories only). Spring Boot 4 is not verified yet |
+| Spring | Spring Boot 4.1.2 and Spring Data JPA 4.1.2 (the Spring module, [12](12-spring-data-jpa.md); Java repositories only). Spring Boot 3 is not verified in this edition |
 | Kotlin row-by-row checks | H2 only so far. MariaDB and Oracle runs of the Kotlin cases are planned |
 | Not tested | Kotlin later than 2.3, Kotlin Multiplatform, PostgreSQL, SQL Server, Oracle 19c and older (for example PL/SQL `BOOLEAN` parameters) |
 

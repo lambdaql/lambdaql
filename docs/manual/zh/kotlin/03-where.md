@@ -1,9 +1,6 @@
 <a id="3-conditions-where-kotlin"></a>
 # 3. 条件（`where`）（Kotlin）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/03-where.md)。
-
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[2. 入门](02-getting-started.md) | 下一章：[4. 排序与分页](04-order-paging.md) | [本页的 Java 版本](../java/03-where.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -53,7 +50,7 @@ val list = qb.from(Order::class.java)
 // HQL: select e0 from Order e0 where e0.status = 1 and e0.price > 100.0
 ```
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 6.6.5 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。该测试使用 Java Lambda。含义相同的 Kotlin Lambda 生成相同的 HQL，因此 SQL 也相同。
+**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 7.4 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。该测试使用 Java Lambda。含义相同的 Kotlin Lambda 生成相同的 HQL，因此 SQL 也相同。
 
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `to-hql`：
 
@@ -87,15 +84,10 @@ qb.from(Order::class.java)
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `many-where`：
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
 where o1_0.status=1 and o1_0.active=true
-
--- MariaDB, Oracle
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.active=1
 ```
 
 **HQL 中的值。** 规则取决于值的来源（决策 D37）。
@@ -108,7 +100,8 @@ where o1_0.status=1 and o1_0.active=1
 
 - 常量在每次调用时都相同。因此 SQL 文本不会改变，数据库在制定执行计划时也能看到这个值。
 - 字符串常量中的单引号会被转义：`"O'Brien"` 变为 `'O''Brien'`。该字符串是编译进类里的常量，而不是用户输入，因此没有 SQL 注入风险。
-- 捕获的值可能来自用户，因此它**总是**绑定参数。每次调用只有值会变化。
+- 捕获的值可能来自用户，因此它是绑定参数。每次调用只有值会变化。
+- 例外只有一个。与整数列比较的小数捕获值写成小数字面量（`2.5BD`）（参见 [3.4](#34-comparisons) 中的“整数列与小数值”）。只写入转换为数字后的值，因此没有 SQL 注入风险。
 - enum 常量会带着完整的类名写入，例如 `e0.kind = com.example.OrderKind.GIFT`。
 
 **`!!` 只是给编译器看的。** 当 `price` 是 `Double?` 时，Kotlin 无法编译 `it.price > 100.0`。请写 `it.price!! > 100.0`。lambdaQL 会忽略 `!!`（决策 D23）。`price` 为 NULL 的行不会被返回。
@@ -141,13 +134,16 @@ where o1_0.status=1 and o1_0.active=1
 **整数列与小数值**（决策 D48 B8）。把整数列与小数值比较时，lambdaQL 按写出的值比较，不做舍入，也不排除值。
 
 - 写在 Lambda 中的常量保持为字面量。`it.cnt >= 2.5` 变为 `e0.cnt >= 2.5`。
-- 捕获的值以 `BigDecimal`（Hibernate 类型 `BIG_DECIMAL`）绑定。HQL 为 `e0.cnt >= :p1`，`p1` 为 `2.5`。
-- 含有这种元素的 IN 列表会把所有元素都以 `BigDecimal` 绑定（`[2.5, 3.0]`）。
+- 捕获的值也写成小数字面量。HQL 为 `e0.cnt >= 2.5BD`，没有绑定参数。`BD` 是 HQL 中 `BigDecimal` 字面量的后缀。
+- 含有这种元素的 IN 列表会把所有元素都写成小数字面量（`e0.cnt in (2.5BD, 3.0BD)`）。
 
-以前，值会被截断为列类型，`2.5` 变成 `2`，返回错误的行。Hibernate 会拒绝以整数列类型绑定的小数（`CoercionException`），并会静默截断 IN 列表中的元素（在三种数据库上实测）。
+这是捕获值以绑定参数传递这一原则（D37）的例外。当与整数列比较的参数绑定了小数时，即使指定 `BigDecimal` 类型，Hibernate 7 也会拒绝（`QueryArgumentException`，实测）。
+
+以前，值会被截断为列类型，`2.5` 变成 `2`，返回错误的行。Hibernate 6.6 会拒绝以整数列类型绑定的小数（`CoercionException`），并会静默截断 IN 列表中的元素（在三种数据库上实测）。
 没有采用改写为整数比较（`>= 3`）的方式。那样执行的 SQL 会与 Lambda 不同；当实体映射（`Integer`）与数据库列类型（例如带小数的 `DECIMAL`）不同时，还会返回错误的行。
 
-结果在 H2、MariaDB 10.11 和 Oracle 23.26 上正确（实测）。MariaDB 的 `EXPLAIN` 对 int、`BigDecimal`、double 参数都显示索引范围扫描（`type=range`）（实测）。Oracle 的执行计划未测。
+结果在 H2、MariaDB 10.11 和 Oracle 23.26 上正确（实测）。在三种数据库上，SQL 都像 `cnt>=2.5`、`cnt in (2.5,3.0)` 这样保持列不变，直接与小数比较。
+MariaDB 的 `EXPLAIN` 显示索引范围扫描（`type=range`）。在 Oracle 上，列没有附加转换，因此是可以使用索引的形式。给出索引提示时为 `INDEX RANGE SCAN`；在 3000 行的表上不加提示时，与整数字面量（`cnt >= 99`）一样选择全表扫描（均为实测）。
 
 这一点没有 Kotlin 测试。由 Java 测试（[`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)，region `whole-number`）验证。
 
@@ -381,7 +377,7 @@ where o1_0.price>?
 <a id="365-converted-attributes-convert"></a>
 ### 3.6.5 转换的属性（`@Convert`）
 
-带有 JPA `AttributeConverter` 的属性按其 Kotlin 值比较。Hibernate 6.6 会转换与这种属性比较的字面量，也会转换绑定参数（已在 H2、MariaDB 和 Oracle 上验证）。
+带有 JPA `AttributeConverter` 的属性按其 Kotlin 值比较。Hibernate（7.4，以前的 6.6 也是）会转换与这种属性比较的字面量，也会转换绑定参数（已在 H2、MariaDB 和 Oracle 上验证）。
 
 测试用 Java 编写（[`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java)，region `convert`）。以下是设计示例。
 

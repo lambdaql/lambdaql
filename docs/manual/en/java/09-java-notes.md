@@ -1,9 +1,6 @@
 <a id="9-java-notes"></a>
 # 9. Java notes
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/java/09-java-notes.md) for the latest rules.
-
 [Java track](README.md) | [Manual home](../README.md) | Previous: [8. Procedures and DB functions](08-procedures-functions.md) | Next: [10. Rules and limits](10-rules-and-limits.md) | [Kotlin version of this page](../kotlin/09-kotlin-notes.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -235,7 +232,7 @@ public class OrderService {
 }
 ```
 
-**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 6.6.5, and it fails if Hibernate's SQL changes.
+**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 7.4, and it fails if Hibernate's SQL changes.
 
 **SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `this-capture`:
 
@@ -337,7 +334,7 @@ Static methods that use **only captured values** are fine. They run in Java each
 |---|---|
 | Compiler | lambdaQL is tested with **javac**. Lambdas compiled by **ECJ** (the Eclipse compiler) are not guaranteed. The Eclipse IDE and other tools based on Eclipse JDT use ECJ. Run your tests with Gradle or Maven (javac) |
 | JDK version | Java 21 |
-| ASM | lambdaQL reads class files with ASM 9.11.1 (up to Java 28 class files). If you compile with a newer JDK, update ASM. lambdaQL does not shade ASM, so you can update it yourself |
+| Class file reading (ASM) | On Java 21–23, lambdaQL reads class files with ASM 9.11.1 (up to Java 28 class files). If you compile with a newer JDK, update ASM. lambdaQL does not shade ASM, so you can update it yourself. On Java 24 or later, lambdaQL reads with the running JDK's `java.lang.classfile`, so the ASM version does not matter. The lambdaQL jar is a Multi-Release JAR, and the JVM picks the part that fits the running version |
 | `-parameters` | recommended. It lets lambdaQL check procedure argument names ([8.4](08-procedures-functions.md#84-warning-argument-order)) |
 | Debug information | keep line numbers (the javac default). lambdaQL puts the source line into error messages |
 | IntelliJ "Number objects compared using `==`" | intended in a lambdaQL lambda. You can use `@SuppressWarnings("NumberEquality")` |

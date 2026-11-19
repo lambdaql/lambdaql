@@ -1,9 +1,6 @@
 <a id="3-conditions-where-java"></a>
 # 3. 条件（`where`）（Java）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/03-where.md)を参照してください。
-
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [2. はじめよう](02-getting-started.md) | 次: [4. ソートとページング](04-order-paging.md) | [このページの Kotlin 版](../kotlin/03-where.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -51,7 +48,7 @@ List<Order> list = qb.from(Order.class)
 // HQL: select e0 from Order e0 where e0.status = 1 and e0.price > 100.0
 ```
 
-**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 6.6.5 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。
+**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 7.4 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。
 
 **データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `to-hql`:
 
@@ -118,15 +115,10 @@ assertEquals("select e0 from Order e0 where (e0.status = 1 or e0.status = 3) and
 **データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `where-many`:
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
 where (o1_0.status=1 or o1_0.status=3) and o1_0.active=true
-
--- MariaDB, Oracle
-select …
-from orders o1_0
-where (o1_0.status=1 or o1_0.status=3) and o1_0.active=1
 ```
 
 メソッド参照も使えます。`where(Order::isActive)` は `where(o -> o.isActive())` と同じです。
@@ -141,7 +133,8 @@ where (o1_0.status=1 or o1_0.status=3) and o1_0.active=1
 
 - 定数は呼び出しのたびに同じです。そのため SQL の文字列は変わらず、データベースはクエリの計画を立てるときに値を見ることができます。
 - 文字列定数の中の引用符はエスケープされます。`"O'Brien"` は `'O''Brien'` になります。この文字列はユーザーの入力ではなく、クラスにコンパイルされた定数なので、SQL インジェクションの危険はありません。
-- キャプチャした値はユーザーから来ることがあるので、**常に** バインドパラメーターです。呼び出しごとに変わるのは値だけです。
+- キャプチャした値はユーザーから来ることがあるので、バインドパラメーターです。呼び出しごとに変わるのは値だけです。
+- 例外は 1 つあります。整数カラムと比べる小数のキャプチャ値は、小数リテラル（`2.5BD`）で書きます（[3.4](#34-comparisons) の「整数カラムと小数の値」）。数値に変換した値だけを書くので、SQL インジェクションの危険はありません。
 
 enum 定数は、完全なクラス名で書かれます。
 **(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `enum`:
@@ -186,29 +179,31 @@ where o1_0.kind='RUSH'
 **整数カラムと小数の値**（決定 D48 B8）。整数カラムを小数の値と比べると、lambdaQL は値を書いたとおりに比べます。丸めや値の除外はしません。
 
 - ラムダに書いた定数はリテラルのままです。`o.getCnt() >= 2.5` は `e0.cnt >= 2.5` になります。
-- キャプチャした値は `BigDecimal`（Hibernate の型 `BIG_DECIMAL`）でバインドします。`e0.cnt >= :p1` で、`p1` は `2.5` です。
-- そのような要素を含む IN リストは、すべての要素を `BigDecimal` でバインドします（`[2.5, 3.0]`）。
+- キャプチャした値も小数リテラルで書きます。`e0.cnt >= 2.5BD` になり、バインドパラメーターはありません。`BD` は HQL の `BigDecimal` リテラルの接尾辞です。
+- そのような要素を含む IN リストは、すべての要素を小数リテラルで書きます（`e0.cnt in (2.5BD, 3.0BD)`）。
 
-以前は値をカラムの型に切り詰めていたので `2.5` が `2` になり、誤った行を返していました。Hibernate は整数カラムの型でバインドした小数を拒否し（`CoercionException`）、IN リストの要素は何も知らせずに切り詰めます（3 つの DB で実測）。
+キャプチャした値をバインドパラメーターで送る原則（D37）の例外です。Hibernate 7 は、整数カラムと比べるパラメーターに小数をバインドすると、`BigDecimal` 型を指定しても拒否します（`QueryArgumentException`、実測）。
+
+以前は値をカラムの型に切り詰めていたので `2.5` が `2` になり、誤った行を返していました。Hibernate 6.6 は整数カラムの型でバインドした小数を拒否し（`CoercionException`）、IN リストの要素は何も知らせずに切り詰めます（3 つの DB で実測）。
 整数の比較に書き換える方法（`>= 3`）は採用しませんでした。実行される SQL がラムダと違ってしまい、エンティティのマッピング（`Integer`）と DB のカラム型（たとえば小数を持つ `DECIMAL`）が違うと誤った行を返すからです。
 
-結果は H2、MariaDB 10.11、Oracle 23.26 で正しいです（実測）。MariaDB の `EXPLAIN` は、int、`BigDecimal`、double のどのパラメーターでもインデックスの範囲スキャン（`type=range`）を示します（実測）。Oracle の実行計画は未測定です。
+結果は H2、MariaDB 10.11、Oracle 23.26 で正しいです（実測）。3 つの DB とも、SQL は `cnt>=2.5`、`cnt in (2.5,3.0)` のようにカラムをそのままにして小数と比べます。
+MariaDB の `EXPLAIN` はインデックスの範囲スキャン（`type=range`）を示します。Oracle はカラムに変換が付かないので、インデックスを使える形です。インデックスのヒントを与えると `INDEX RANGE SCAN` になり、3000 行のテーブルでヒントがなければ、整数リテラル（`cnt >= 99`）と同じく全件スキャンを選びます（すべて実測）。
 
 **(テスト済み)** [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)、リージョン `whole-number`:
 
 ```java
-// cnt is a whole number; 2.5 is compared as written (it is never cut to 2)
+// cnt is a whole number; 2.5 is compared as written (it is never cut to 2): a decimal literal
 double half = 2.5;
 RenderedQuery atLeast = qb.from(Order.class).where(o -> o.getCnt() >= half).toHql();
-assertEquals("select e0 from Order e0 where e0.cnt >= :p1", atLeast.hql());
-assertEquals(Map.of("p1", new BigDecimal("2.5")), atLeast.parameters());    // bound as a decimal
+assertEquals("select e0 from Order e0 where e0.cnt >= 2.5BD", atLeast.hql());
+assertEquals(Map.of(), atLeast.parameters());                                // written as a decimal literal
 // a constant written in the lambda stays a literal
 assertEquals("select e0 from Order e0 where e0.cnt >= 2.5", qb.from(Order.class).where(o -> o.getCnt() >= 2.5).toHql().hql());
-// an IN list with such a value is bound as decimals
+// an IN list with such a value is written as decimal literals
 List<Double> values = List.of(2.5, 3.0);
 RenderedQuery in = qb.from(Order.class).where(o -> values.contains(o.getCnt().doubleValue())).toHql();
-assertEquals("select e0 from Order e0 where e0.cnt in (:p1)", in.hql());
-assertEquals(Map.of("p1", List.of(new BigDecimal("2.5"), new BigDecimal("3.0"))), in.parameters());
+assertEquals("select e0 from Order e0 where e0.cnt in (2.5BD, 3.0BD)", in.hql());
 ```
 
 **浮動小数点:** `float`/`double` のカラムについて、lambdaQL は Java とビット単位で同じ結果になることを約束しません。
@@ -479,7 +474,7 @@ where o1_0.price>?
 <a id="365-converted-attributes-convert"></a>
 ### 3.6.5 変換される属性（`@Convert`）
 
-JPA の `AttributeConverter` を持つ属性は、Java の値で比べます。Hibernate 6.6 は、このような属性と比べるリテラルを変換し、バインドパラメーターも変換します。
+JPA の `AttributeConverter` を持つ属性は、Java の値で比べます。Hibernate（7.4、以前の 6.6 も）は、このような属性と比べるリテラルを変換し、バインドパラメーターも変換します。
 
 そのため、条件を Java の値で書いても、保存された行を見つけられます（H2、MariaDB、Oracle で確認済み）。
 
@@ -518,32 +513,22 @@ assertEquals("select e0 from Order e0 where e0.active = false",       // primiti
 **データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `boolean`:
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
 where o1_0.active=true
-
--- MariaDB, Oracle
-select …
-from orders o1_0
-where o1_0.active=1
 ```
 
 **データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `boolean#2`:
 
 ```sql
--- H2
+-- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
 where o1_0.active=false
-
--- MariaDB, Oracle
-select …
-from orders o1_0
-where o1_0.active=0
 ```
 
-H2 には本物の boolean 型があるので、SQL は `true` / `false` になります。MariaDB と Oracle は boolean を数値で保存するので、Hibernate は `1` / `0` を書きます。
+Hibernate 7.4 は 3 つの DB すべてで SQL に `true` / `false` を書きます。Hibernate 6.6 は MariaDB と Oracle で `1` / `0` を書いていました。
 
 注意:
 

@@ -1,9 +1,6 @@
 <a id="1-overview"></a>
 # 1. Overview
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../ko/01-overview.md) for the latest rules.
-
 [Manual home](README.md) | Tracks: [Java](java/README.md) | [Kotlin](kotlin/README.md) | Next: 2. Getting started ([Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md))
 
 This page is for both languages. Code is shown in separate **Java** and **Kotlin** sections.
@@ -11,7 +8,7 @@ This page is for both languages. Code is shown in separate **Java** and **Kotlin
 <a id="what-is-lambdaql"></a>
 ## What is lambdaQL?
 
-lambdaQL is a query library for Java and Kotlin on top of JPA and Hibernate 6.6.
+lambdaQL is a query library for Java and Kotlin on top of JPA and Hibernate 7.4.
 
 - You write a query with **lambdas**.
 - lambdaQL **reads the bytecode** of each lambda. It **never runs** the lambda.
@@ -49,7 +46,7 @@ select e0 from Order e0 join e0.customer j1
 where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
 ```
 
-**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 6.6.5, and it fails if Hibernate's SQL changes.
+**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 7.4, and it fails if Hibernate's SQL changes.
 
 **SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `overview-first`:
 
@@ -95,7 +92,7 @@ But they are a **query language** written with Java or Kotlin syntax.
 | Step | What happens | Status |
 |---|---|---|
 | 1. Find the lambda body | The lambda is `Serializable`. lambdaQL gets its `SerializedLambda` through a serialization hook (no `setAccessible`). This tells lambdaQL which method holds the lambda body and which values are captured. | Implemented |
-| 2. Read the bytecode | lambdaQL reads only that one method with ASM. It reads the class file. It does not run the code. | Implemented |
+| 2. Read the bytecode | lambdaQL reads only that one method. It uses ASM on Java 21–23 and the JDK's `java.lang.classfile` on Java 24 or later. It reads the class file. It does not run the code. | Implemented |
 | 3. Rebuild the condition | Java and Kotlin compile `&&`, `\|\|` and `!` into jumps. lambdaQL rebuilds the original logic tree from these jumps. | Implemented for Java lambdas. Kotlin: `?.`, `!!` and `in` are tested; the other Kotlin-only forms (`?:`, ranges, `when`) are designed. |
 | 4. Build HQL | Getters and properties become JPA attribute paths (`o.getPrice()` or `it.price` → `e0.price`). Constants in the lambda become literals; captured values become parameters (`:p1`). | Implemented for `where` and `orderBy`, tested on H2, MariaDB, Oracle |
 | 5. Run | lambdaQL binds the parameters and runs the HQL with Hibernate. The analysis result of each lambda is cached, so the bytecode is read only once. | Implemented for `toList()` and `toSet()` (also with `limit` / `offset`), `first()`, `one()`, `count()` and `exists()` |
