@@ -297,9 +297,9 @@ lambdaQL에는 **static DSL이 없습니다**. 선택 사항인 `Agg` import를 
 |---|---|
 | `orderBy(asc(...), desc(...))` | `orderBy((o, by) -> by.asc(...).desc(...))` ([4](04-order-paging.md)) |
 | `exists(...)`, `in(...)`, `notIn(...)` | `(o, sub) -> sub.from(X.class).where(...).exists()` / `.select(...).contains(x)` ([5](05-subquery.md)) |
-| `set(path, value)` | `set(o -> o.setX(v))` 또는 `set((o, by) -> by.set(o.getX(), v))` ([7](07-dml.md)) |
+| `set(path, value)` | `set(o -> o.setX(v))` 또는 `set(o -> value(o.getX(), v))`(`Dml.value`, D49) ([7](07-dml.md)) |
 | Q 클래스, `Order_.price` | getter: `o.getPrice()` |
-| `count()`, `sum(...)`, ... | `Agg.count()`, `Agg.sum(...)`: **유일한 static 헬퍼 클래스** ([6](06-select-group.md)) |
+| `count()`, `sum(...)`, ... | `Agg.count()`, `Agg.sum(...)`: static 헬퍼 클래스는 `Agg`와 `Dml` 둘뿐 ([6](06-select-group.md)) |
 | `coalesce(a, b)` | `set` 값 안의 `Objects.requireNonNullElse(a, b)` |
 | `like(...)`, `lower(...)`, `upper(...)` | 계획 중(컬럼에 대한 문자열 함수) |
 | `currentTimestamp()` | `LocalDateTime.now()`. 애플리케이션에서 계산되어 바인딩됨 |
@@ -333,7 +333,8 @@ lambdaQL에는 **static DSL이 없습니다**. 선택 사항인 `Agg` import를 
 | `captured.length`(캡처 값의 배열) | Java에서 계산됨 |
 | 레코드 | 결과 타입(`select`)으로, 그리고 파생 테이블과 CTE의 행 타입으로(`r.total()`로 읽음) |
 | `var` | 빌더 변수에 사용하십시오. 빌더 타입 이름은 확정되지 않음 |
-| 제네릭 `by.set(o.getStatus(), "abc")` | Java에서는 컴파일됨. lambdaQL이 분석 시점에 타입을 확인함 |
+| 제네릭 `value(o.getStatus(), "abc")` | Java에서는 컴파일됨. 분석 시점의 타입 대조는 아직 구현되지 않음 |
+| 자기 `value(...)` 메서드가 있는 클래스(예: `value` 컴포넌트가 있는 레코드) 안의 `value(...)` | 정적 import가 가려짐. `Dml.value(...)`로 작성 |
 | 중첩 람다에서 같은 파라미터 이름 | Java가 허용하지 않음. `sub2`, `i`, `x`를 사용하십시오 |
 
 <a id="912-compiler-and-build"></a>

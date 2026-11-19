@@ -13,9 +13,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.lambdaql.Dml.value;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -120,15 +122,79 @@ class DmlQueryTest {
     }
 
     @Test
-    void updateWithBuilder() {
-        // @start region="update-by"
+    void updateWithValue() {
+        // @start region="update-value"
+        // entities without setters: Dml.value(column, value), the column written as a getter call
         ExecutableUpdate<Order> u = qb.update(Order.class)
-                .set((o, by) -> by.set(o.getDescription(), "done"))
+                .set(o -> value(o.getDescription(), "done"))
                 .where(o -> o.getStatus() == 2);
         assertEquals("update Order e0 set e0.description = 'done' where e0.status = 2", u.toHql().hql());
         // @end
         assertEquals(1, u.execute());
         assertEquals(1, orders().stream().filter(o -> "done".equals(o.getDescription())).count());
+    }
+
+    private void items() {
+        EntityManager em = emf.createEntityManager();
+        em.getTransaction().begin();
+        List<Order> all = em.createQuery("select o from Order o order by o.id", Order.class).getResultList();
+        double[][] lines = {{0, 10}, {0, 20}, {2, 5}};     // order index, price
+        for (double[] l : lines) {
+            Item i = new Item();
+            i.setOrder(all.get((int) l[0]));
+            i.setPrice(l[1]);
+            em.persist(i);
+        }
+        em.getTransaction().commit();
+        em.close();
+    }
+
+    @Test
+    void updateWithSubquery() {
+        items();
+        // @start region="update-sub"
+        // the second parameter starts a subquery, as in where((o, sub) -> ...) (D49)
+        ExecutableUpdate<Order> u = qb.update(Order.class)
+                .set((o, sub) -> o.setPrice(sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).sum(i -> i.getPrice())))
+                .where((o, sub) -> sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists());
+        assertEquals("update Order e0 set e0.price = (select sum(s1.price) from Item s1 where s1.order.id = e0.id)"
+                + " where exists (select 1 from Item s1 where s1.order.id = e0.id)", u.toHql().hql());
+        // sum gives NULL when there is no row; coalesce keeps a NOT NULL column valid for every row
+        ExecutableUpdate<Order> all = qb.update(Order.class)
+                .set((o, sub) -> value(o.getPrice(), Objects.requireNonNullElse(
+                        sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).sum(i -> i.getPrice()), 0.0)))
+                .all();
+        assertEquals("update Order e0 set e0.price = coalesce((select sum(s1.price) from Item s1 where s1.order.id = e0.id), 0.0)",
+                all.toHql().hql());
+        // @end
+        assertEquals(2, u.execute());
+        assertEquals(List.of(30.0, 150.0, 5.0, 120.0), orders().stream().map(Order::getPrice).toList());
+        assertEquals(4, all.execute());
+        assertEquals(List.of(30.0, 0.0, 5.0, 0.0), orders().stream().map(Order::getPrice).toList());
+        // a subquery on the target table: works on all three databases (no MariaDB 1093 for UPDATE)
+        seed();
+        assertEquals(4, qb.update(Order.class).set((o, sub) -> o.setPrice(sub.from(Order.class).avg(x -> x.getPrice()))).all().execute());
+        assertEquals(List.of(142.5, 142.5, 142.5, 142.5), orders().stream().map(Order::getPrice).toList());
+    }
+
+    @Test
+    void insertSelectWithSubquery() {
+        items();
+        // @start region="insert-select-sub"
+        // where((o, sub) -> ...) on the source, and select((a, o, sub) -> ...): the third parameter starts a subquery
+        ExecutableInsert<Archive> i = qb.insert(Archive.class).from(Order.class)
+                .where((o, sub) -> sub.from(Item.class).where(x -> x.getOrder().getId() == o.getId()).exists())
+                .select((a, o, sub) -> {
+                    a.setId(o.getId());
+                    a.setPrice(sub.from(Item.class).where(x -> x.getOrder().getId() == o.getId()).sum(x -> x.getPrice()));
+                });
+        assertEquals("insert into Archive (id, price) select e0.id, (select sum(s2.price) from Item s2 where s2.order.id = e0.id)"
+                + " from Order e0 where exists (select 1 from Item s1 where s1.order.id = e0.id)", i.toHql().get(0).hql());
+        // @end
+        assertEquals(2, i.execute());
+        List<Long> ids = orders().stream().map(Order::getId).toList();
+        assertEquals(30.0, find(Archive.class, ids.get(0)).getPrice());
+        assertEquals(5.0, find(Archive.class, ids.get(2)).getPrice());
     }
 
     @Test

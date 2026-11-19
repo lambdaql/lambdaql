@@ -40,16 +40,6 @@ public class InsertQuery<T> {
     }
 
     /**
-     * Inserts one row written with the builder.
-     *
-     * @param assign the assignment lambda
-     * @return the runnable INSERT
-     */
-    public InsertValues<T> values(AssignBy<T> assign) {
-        return InsertValues.of(entityClass, context, List.of(DmlParts.builder(context, entityClass, assign)));
-    }
-
-    /**
      * Inserts one row per list element.
      *
      * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
@@ -110,6 +100,20 @@ public class InsertQuery<T> {
         }
 
         /**
+         * Limits the source rows with a condition that may use subqueries: {@code (o, sub) -> ...} (ROADMAP D49).
+         *
+         * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+         * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert-select-sub"}
+         *
+         * @param condition the condition on the source
+         * @return this
+         */
+        public InsertFrom<T, S> where(WhereSub<S> condition) {
+            wheres.add(DmlParts.where(context, source, condition));
+            return this;
+        }
+
+        /**
          * Groups the source rows (ROADMAP M9): one key, or many keys with {@code List.of(...)}.
          * The values in {@code select} may then use {@code Agg} functions.
          *
@@ -146,6 +150,25 @@ public class InsertQuery<T> {
          * @return the runnable INSERT
          */
         public ExecutableInsert<T> select(AssignFrom<T, S> assign) {
+            return selectFrom(assign);
+        }
+
+        /**
+         * Maps a source row to a new row, with values that may use subqueries:
+         * {@code (a, o, sub) -> a.setItemCount(sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).count())}
+         * (ROADMAP D49). A subquery may read the source row {@code o}.
+         *
+         * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+         * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert-select-sub"}
+         *
+         * @param assign the mapping
+         * @return the runnable INSERT
+         */
+        public ExecutableInsert<T> select(AssignFromSub<T, S> assign) {
+            return selectFrom(assign);
+        }
+
+        private ExecutableInsert<T> selectFrom(Object assign) {
             var ref = QueryContext.read(assign);
             var items = context.analyzeSetters(ref, List.of(target, source), -1, true).stream()
                     .map(a -> new org.lambdaql.engine.ir.Assignment(a.target(),

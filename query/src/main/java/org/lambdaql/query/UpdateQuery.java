@@ -40,16 +40,16 @@ public class UpdateQuery<T> {
     }
 
     /**
-     * Adds assignments written with the builder: {@code (o, by) -> by.set(o.getStatus(), 2)}.
+     * Adds assignments whose values may use subqueries: {@code (o, sub) -> o.setTotal(sub.from(Item.class)...)}.
      *
      * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
-     * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update-by"}
+     * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update-sub"}
      *
      * @param assign the assignment lambda
      * @return the next step
      * @throws org.lambdaql.LambdaAnalysisException if the lambda breaks a rule
      */
-    public UpdateSet<T> set(AssignBy<T> assign) {
+    public UpdateSet<T> set(AssignSub<T> assign) {
         return new UpdateSet<>(entityClass, context).set(assign);
     }
 }

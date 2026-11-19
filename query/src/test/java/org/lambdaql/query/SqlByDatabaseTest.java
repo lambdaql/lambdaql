@@ -157,9 +157,9 @@ class SqlByDatabaseTest {
         ExecutableUpdate<Order> update = qb.update(Order.class)
                 .set(o -> { o.setStatus(st); o.setPrice(o.getPrice() * 2); }).where(o -> o.getStatus() == 1);
         record("update", update.toHql(), () -> List.of(update.execute()), false);
-        ExecutableUpdate<Order> updateBy = qb.update(Order.class).set((o, by) -> by.set(o.getDescription(), "done"))
+        ExecutableUpdate<Order> updateValue = qb.update(Order.class).set(o -> org.lambdaql.Dml.value(o.getDescription(), "done"))
                 .where(o -> o.getStatus() == 2);
-        record("update-by", updateBy.toHql(), () -> List.of(updateBy.execute()), false);
+        record("update-value", updateValue.toHql(), () -> List.of(updateValue.execute()), false);
         ExecutableUpdate<Order> updatePath = qb.update(Order.class).set(o -> o.setCustName("K"))
                 .where(o -> o.getCustomer().getName().equals("Kim"));
         record("update-path", updatePath.toHql(), () -> List.of(updatePath.execute()), false);

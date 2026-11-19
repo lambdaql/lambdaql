@@ -251,7 +251,7 @@ public final class Decoder implements Opcodes {
                 case POP -> {
                     Object popped = pop(stack, line);
                     // a setter that returns this (builder style), and the result is dropped
-                    // a call whose result is dropped: a setter (by.set, Kotlin setters) or a call on a lambda parameter
+                    // a call whose result is dropped: a setter (also Kotlin setters) or a call on a lambda parameter
                     // (a procedure stub call in exec), so it is checked instead of silently ignored
                     if (statements != null && popped instanceof Expr.Invoke inv
                             && (isSetterCall(inv) || inv.receiver() instanceof Expr.Param)) statements.add(inv);
@@ -632,7 +632,6 @@ public final class Decoder implements Opcodes {
 
     private static boolean isSetterCall(Expr.Invoke inv) {
         if (inv.receiver() == null) return false;
-        if (inv.method().owner().equals("org/lambdaql/query/SetBy")) return true;      // by.set(col, value), result dropped
         return inv.args().size() == 1 && inv.method().name().startsWith("set");
     }
 

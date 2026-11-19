@@ -7,7 +7,6 @@ import org.lambdaql.engine.ir.Assignment;
 import org.lambdaql.engine.load.LambdaRef;
 import org.lambdaql.engine.load.SerializedLambdaExtractor;
 import org.lambdaql.query.Assign;
-import org.lambdaql.query.AssignBy;
 import org.lambdaql.query.Order;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -18,6 +17,7 @@ import org.springframework.test.context.ActiveProfiles;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.lambdaql.Dml.value;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -40,15 +40,6 @@ class AssignmentReaderTest {
         return items.toString();
     }
 
-    private String builder(AssignBy<Order> assign) {
-        EntityModel model = new JpaEntityModel(emf.getMetamodel());
-        // @start region="read-by"
-        LambdaRef ref = SerializedLambdaExtractor.extract(assign);
-        List<Assignment> items = AssignmentReader.readBuilder(ref, List.of(Order.class), model);
-        // @end
-        return items.toString();
-    }
-
     @Test
     void setterForm() {
         String memo = "x";
@@ -61,13 +52,22 @@ class AssignmentReaderTest {
     }
 
     @Test
-    void builderForm() {
-        // constants stay literals, also when they are boxed for the generic set(V, V) (D37)
+    void valueForm() {
+        // @start region="read-value"
+        // Dml.value(column, value) for entities without setters; constants stay literals, also when they are boxed
+        // for the generic value(V, V) (D37, D49)
         assertEquals("[col0.status := 2, col0.price := 1.0]",
-                builder((o, by) -> by.set(o.getStatus(), (short) 2).set(o.getPrice(), 1.0)));
-        // the lambda returns nothing, so statements work too (and Kotlin by[o.status] = 2)
-        assertEquals("[col0.status := 2, col0.price := 1.0]",
-                builder((o, by) -> { by.set(o.getStatus(), (short) 2); by.set(o.getPrice(), 1.0); }));
+                setters(o -> { value(o.getStatus(), (short) 2); value(o.getPrice(), 1.0); }));
+        // setters and value can be mixed in one lambda
+        assertEquals("[col0.status := 2, col0.customer.id := 1]",
+                setters(o -> { o.setStatus((short) 2); value(o.getCustomer().getId(), 1); }));
+        // @end
+        // the column follows the setter rules: only the id of an association (U6), and a getter call on the target
+        LambdaQLException other = assertThrows(LambdaQLException.class, () -> setters(o -> value(o.getCustomer().getName(), "x")));
+        assertEquals("LQL-3050", other.code(), other.getMessage());
+        String name = "x";
+        LambdaQLException notColumn = assertThrows(LambdaQLException.class, () -> setters(o -> value(name, "y")));
+        assertEquals("LQL-3039", notColumn.code(), notColumn.getMessage());
     }
 
     @Test

@@ -335,7 +335,7 @@ update orders o1_0
 set status=?,price=(o1_0.price*2.0)
 where o1_0.status=1
 
--- @example update-by
+-- @example update-value
 -- HQL: update Order e0 set e0.description = 'done' where e0.status = 2
 update orders o1_0
 set description='done'

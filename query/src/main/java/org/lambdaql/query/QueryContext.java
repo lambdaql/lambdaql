@@ -329,17 +329,6 @@ public final class QueryContext {
     }
 
     /**
-     * Analyzes a builder-form assignment lambda {@code (o, by) -> by.set(...)} (cached per lambda class).
-     *
-     * @param ref   the lambda
-     * @param roots entity class of each entity parameter
-     * @return the assignments
-     */
-    List<Assignment> analyzeBuilder(LambdaRef ref, List<Class<?>> roots) {
-        return cached(ref, "assign", () -> checked(AssignmentReader.readBuilder(ref, roots, model)));
-    }
-
-    /**
      * Runs UPDATE/INSERT/DELETE statements and adds up the changed rows.
      * With an entity manager factory, one new transaction is used for all statements.
      * With a shared entity manager (Spring), the caller's transaction is required; without one this throws

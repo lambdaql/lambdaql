@@ -440,7 +440,6 @@ lambdaQL은 이 목록의 모든 형태에 대해 명확한 오류를 던집니�
 | 조건부 값(`if (c) a else b`, `when`, 값으로 쓴 토글 `!it.active`) | 계획 중(`CASE WHEN`). `where`가 다른 update 두 개를 사용 |
 | 설정할 컬럼을 고르기 위한 `set` 람다 안의 `if` | `set()`을 여러 번 호출 |
 | `set` 안의 `++`, `--`, `apply`, `with`, `also` | `it.cnt += 1`, 직접 대입 |
-| `by[o.cnt] += 1` | `by[o.cnt] = o.cnt + 1` 또는 `by.set(o.cnt, o.cnt + 1)` |
 | 대입 람다 안의 지역 `val` | 각 위치에 식을 작성 |
 | 연관의 `@Id`가 아닌 속성을 설정(`it.customer?.name = x`) | `Customer`를 직접 수정 |
 | 선택적이지 않은 컬럼(`@Id`, `nullable = false`, 기본형)에 `null` | – |

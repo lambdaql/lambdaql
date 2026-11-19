@@ -40,14 +40,14 @@ public class UpdateSet<T> {
     }
 
     /**
-     * Adds assignments written with the builder.
+     * Adds assignments whose values may use subqueries: {@code (o, sub) -> ...}.
      *
      * @param assign the assignment lambda
      * @return this
      * @throws org.lambdaql.LambdaAnalysisException if the lambda breaks a rule
      */
-    public UpdateSet<T> set(AssignBy<T> assign) {
-        sets.add(DmlParts.builder(context, entityClass, assign));
+    public UpdateSet<T> set(AssignSub<T> assign) {
+        sets.add(DmlParts.withSub(context, entityClass, assign));
         DmlParts.checkRules(sets, entityClass);
         return this;
     }

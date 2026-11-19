@@ -140,11 +140,10 @@ lambdaQL에 전달하는 Kotlin 람다 리터럴은 Java 람다와 같은 종류
 이름은 마음대로 지을 수 있습니다. 이 매뉴얼에서는 `by`와 `sub`를 사용합니다.
 
 <a id="no-static-helpers-except-agg"></a>
-### `Agg`를 제외하면 정적 헬퍼가 없음
+### `Agg`와 `Dml`을 제외하면 정적 헬퍼가 없음
 
-lambdaQL을 위한 정적 임포트는 필요 없습니다.
-유일한 정적 헬퍼 클래스는 집계(`count`, `sum`, `avg`, `min`, `max`, `countDistinct`)를 위한 `org.lambdaql.Agg`입니다.
-`Agg`의 정적 임포트는 선택 사항입니다.
+정적 헬퍼 클래스는 두 개뿐입니다. 집계(`count`, `sum`, `avg`, `min`, `max`, `countDistinct`)를 위한 `org.lambdaql.Agg`와, setter가 없는 엔티티에 값을 대입하는 `org.lambdaql.Dml`(`Dml.value(column, value)`, 결정 D49)입니다.
+두 클래스의 정적 임포트는 선택 사항입니다.
 
 #### Java
 

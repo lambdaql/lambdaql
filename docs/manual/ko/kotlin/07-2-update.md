@@ -2,7 +2,7 @@
 # 7.2 수정 (Kotlin)
 
 > [!NOTE]
-> **상태: 구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, 마일스톤 M10). 테스트는 대부분 **Java** 람다를 사용합니다. 속성 대입과 인덱스 형태 `by[column] = value`는 Kotlin 람다로도 테스트했습니다([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), **(테스트됨)** 표시). `limit`과 `executeOne()`(결정 D41)도 같습니다.
+> **상태: 구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, 마일스톤 M10). 테스트는 대부분 **Java** 람다를 사용합니다. 속성 대입, `Dml.value`, `set` 값 안의 서브쿼리는 Kotlin 람다로도 테스트했습니다([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), **(테스트됨)** 표시). `limit`과 `executeOne()`(결정 D41)도 같습니다.
 > `where` 안의 서브쿼리(`sub`)도 구현되었습니다(마일스톤 M8). 삭제 형태는 Java 람다로 테스트했습니다. [7.4](07-4-delete.md)를 참고하십시오.
 > **아직 구현되지 않음:** `set` 값 안의 `sub` 서브쿼리, 복합 키 엔티티의 `limit` / `executeOne()`.
 > Kotlin 코드는 테스트된 Java 문장을 Kotlin 문법으로 옮긴 것이고, HQL은 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)의 Java 테스트에서 가져왔습니다. HQL이 없는 예제는 설계를 따릅니다.
@@ -167,34 +167,22 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 <a id="an-aggregate-from-a-subquery"></a>
 ## 서브쿼리의 집계
 
-인자가 둘인 람다를 사용하십시오. 두 번째 인자는 컨텍스트 객체(`sub`)입니다.
+인자가 둘인 람다 `set { o, sub -> ... }`를 사용하십시오. 두 번째 인자는 서브쿼리의 시작점 `sub`입니다(결정 D49).
 여기서는 `Agg`가 필요 없습니다. 서브쿼리에는 [5. 서브쿼리](05-subquery.md)처럼 `sum`, `avg`, ...가 있습니다.
-이 형태는 **아직 구현되지 않았습니다**. 현재는 `where` 안의 서브쿼리만 동작합니다.
+
+**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `update-sub`:
 
 ```kotlin
-qb.update(Order::class.java)
-    .set { o, sub ->
-        o.total = sub.from(Item::class.java).where { i -> i.order?.id == o.id }.sum { i -> i.price }
-    }
-    .where { it.status == 1 }
-    .execute()
+// the second parameter starts a subquery, as in where { o, sub -> ... } (D49)
+val u = qb.update(Order::class.java)
+    .set { o, sub -> o.price = sub.from(Item::class.java).where { i -> i.order?.id == o.id }.sum { it.price } }
+    .where { o, sub -> sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
+assertEquals("update Order e0 set e0.price = (select sum(s1.price) from Item s1 where s1.order.id = e0.id)"
+        + " where exists (select 1 from Item s1 where s1.order.id = e0.id)", u.toHql().hql())
 ```
 
-**데이터베이스별 SQL (예정)** — 예정된 HQL을 Hibernate가 번역한 것으로, `PlannedSqlTest`가 기록했습니다. lambdaQL은 아직 이 쿼리를 만들지 않습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `07-update-sum`:
-
-```sql
--- H2, MariaDB
-update orders o1_0
-set total=(select sum(i1_0.price) from items i1_0 where i1_0.order_id=o1_0.id)
-where o1_0.status=1
-
--- Oracle
-update orders o1_0
-set o1_0.total=(select sum(i1_0.price) from items i1_0 where i1_0.order_id=o1_0.id)
-where o1_0.status=1
-```
-
-주문에 품목이 없으면 `total`은 NULL이 됩니다. SQL의 동작입니다.
+- 다른 테이블의 집계와 같은 테이블의 집계를 모두 쓸 수 있습니다(H2, MariaDB 10.11, Oracle 23.26에서 실측). `update`에서는 MariaDB도 오류 1093을 내지 않습니다.
+- 일치하는 행이 없으면 집계는 NULL입니다. NOT NULL 컬럼이면 DB 오류가 나므로 `Objects.requireNonNullElse(…, 0.0)`로 감싸 `coalesce(...)`로 만드십시오.
 
 인자가 하나인 후행 람다(`set { it... }`)와 인자가 둘인 후행 람다(`set { o, sub -> ... }`)는 서로 다른 오버로드입니다. Kotlin은 알맞은 것을 고릅니다.
 

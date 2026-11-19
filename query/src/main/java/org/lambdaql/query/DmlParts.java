@@ -26,9 +26,10 @@ final class DmlParts {
         return new HqlRenderer.AssignBound(context.analyzeSetters(ref, List.of(type), -1), ref.capturedArgs());
     }
 
-    static HqlRenderer.AssignBound builder(QueryContext context, Class<?> type, AssignBy<?> assign) {
+    /** Reads an assignment lambda {@code (o, sub) -> ...}: parameter 1 starts subqueries (D49). */
+    static HqlRenderer.AssignBound withSub(QueryContext context, Class<?> type, AssignSub<?> assign) {
         LambdaRef ref = QueryContext.read(assign);
-        return new HqlRenderer.AssignBound(context.analyzeBuilder(ref, List.of(type)), ref.capturedArgs());
+        return new HqlRenderer.AssignBound(context.analyzeSetters(ref, List.of(type), -1), ref.capturedArgs());
     }
 
     static HqlRenderer.Bound where(QueryContext context, Class<?> type, Object where) {

@@ -40,16 +40,6 @@ public class UpsertQuery<T> {
     }
 
     /**
-     * Upserts one row written with the builder.
-     *
-     * @param assign the assignment lambda
-     * @return the runnable upsert
-     */
-    public ExecutableInsert<T> values(AssignBy<T> assign) {
-        return plan(List.of(DmlParts.builder(context, entityClass, assign)));
-    }
-
-    /**
      * Upserts one row per list element (one statement per row).
      *
      * @param rows   the elements

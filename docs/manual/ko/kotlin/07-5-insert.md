@@ -3,7 +3,7 @@
 
 > [!NOTE]
 > **상태: 구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, 마일스톤 M10). `insert ... select`의 `groupBy`, `having`, `Agg`(마일스톤 M9)도 포함합니다. 테스트는 대부분 **Java** 람다를 사용합니다. `values`를 쓰는 insert는 Kotlin 람다로도 테스트했습니다([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), **(테스트됨)** 표시).
-> **아직 구현되지 않음:** `insert ... select`의 `by.set` 형태.
+> **아직 구현되지 않음:** `values { }` 안의 서브쿼리.
 > Kotlin 코드는 테스트된 Java 문장을 Kotlin 문법으로 옮긴 것이고, HQL은 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)와 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)의 Java 테스트에서 가져왔습니다. HQL이 없는 예제는 설계를 따릅니다.
 > 전체 상태는 [트랙 README](README.md)를 참고하십시오.
 
@@ -48,10 +48,10 @@ assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where
 
 람다에 적은 상수는 리터럴로 유지됩니다(결정 D37). 값에서 새 행을 읽을 수 없습니다. `it.price = it.price`는 오류입니다.
 
-`val` 속성용 `by.set` 형태도 한 행에 쓸 수 있습니다.
+`val` 속성은 `Dml.value`로 한 행에 씁니다(결정 D49, [7.3](07-dml.md#73-two-ways-to-assign-property-or-dmlvalue) 참고).
 
 ```kotlin
-qb.insert(Order::class.java).values { o, by -> by.set(o.id, id).set(o.status, 1) }.execute()
+qb.insert(Order::class.java).values { o -> value(o.id, id); value(o.status, 1) }.execute()
 ```
 
 <a id="many-rows-from-a-list"></a>
@@ -109,11 +109,20 @@ where o1_0.status=1
 
 lambdaQL은 소스 경로에 명시적인 `left join`을 사용하므로 고객이 없는 주문도 빠지지 않습니다(규칙 U10). SQL은 세 데이터베이스에서 같습니다.
 
-설계에는 컨텍스트 객체를 세 번째 인자로 받는 `by.set` 형태도 있습니다. 이 형태는 **아직 구현되지 않았습니다**.
+`val` 속성의 대상에는 `Dml.value`를 씁니다. 첫 번째 인자는 대상 `a`의 속성입니다.
 
 ```kotlin
 qb.insert(Archive::class.java).from(Order::class.java).where { it.status == 9 }
-    .select { a, o, by -> by.set(a.id, o.id).set(a.customerName, o.customer?.name) }
+    .select { a, o -> value(a.id, o.id); value(a.customerName, o.customer?.name) }
+    .execute()
+```
+
+**서브쿼리.** 소스의 `where`는 두 번째 인자로, `select`는 세 번째 인자로 서브쿼리의 시작점 `sub`를 받습니다(결정 D49). Java 테스트([`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `insert-select-sub`)가 이를 확인합니다. 다음은 설계 예제입니다.
+
+```kotlin
+qb.insert(Archive::class.java).from(Order::class.java)
+    .where { o, sub -> sub.from(Item::class.java).where { x -> x.order?.id == o.id }.exists() }
+    .select { a, o, sub -> a.id = o.id; a.price = sub.from(Item::class.java).where { x -> x.order?.id == o.id }.sum { it.price } }
     .execute()
 ```
 

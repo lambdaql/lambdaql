@@ -156,3 +156,18 @@ B6 대상 페이지: `java/03`·`kotlin/03`(임베디드 경로 절, 같음 비�
 | S9 보완 | 값 쿼리(`select(...)` 뒤)의 `first()`도 id 보조 정렬을 더함. 정렬 키 값이 같은 행이 여러 개이면 `id`가 가장 작은 행의 값 | `ProjectionTest` `pagingAndFirst`(영역 없음) |
 
 대상 페이지: `java/06-select-group.md`·`kotlin/06-select-group.md`의 값 쿼리 페이징 문단(규칙 S9 문장 다음 줄).
+
+## 대기 항목: D49 대입 표기 개정(`Dml.value`, `sub`)
+
+| 항목 | 이전 서술 | 현재 규칙 |
+|---|---|---|
+| setter 없는 엔티티의 대입 | `(o, by) -> by.set(열, 값)`, Kotlin `by[열] = 값` | 정적 함수 `Dml.value(열, 값)`, 1인자 람다. setter와 한 람다 안에서 섞을 수 있음 |
+| 대입 람다의 두 번째 인자 | `by`(대입 도구) | 서브쿼리 시작점 `sub`: `set((o, sub) -> …)` |
+| insert … select | `(a, o)`만 | `(a, o, sub)` 추가, `where((o, sub) -> …)` 추가 |
+| 오류 코드 | `LQL-3039`(by.set 대상), `LQL-3040`(by.set만) | `LQL-3039`는 `Dml.value` 대상 오류, `LQL-3040` 삭제, `LQL-3037` 문구에 `Dml.value` 추가 |
+| 이름 가림 | 서술 없음 | `value()` 메서드가 있는 클래스 안에서는 `Dml.value(…)`로 적음 |
+
+테스트 영역: `DmlQueryTest` `update-value`(이전 `update-by`)·`update-sub`·`insert-select-sub`, `AssignmentReaderTest` `read-value`(이전 `read-by`), `KotlinQueryTest` `update-value`(이전 `update-by`)·`update-sub`. SQL 정답 예제 이름 `update-by` → `update-value`.
+
+대상 페이지: `README.md`, `java/README.md`, `kotlin/README.md`, `java/07-dml.md`·`kotlin/07-dml.md`, `kotlin/07-2-update.md`(와 `java/07-2-update.md`), `java/07-5-insert.md`·`kotlin/07-5-insert.md`, `java/09-java-notes.md`·`kotlin/09-kotlin-notes.md`, `java/10-rules-and-limits.md`·`kotlin/10-rules-and-limits.md`, `11-errors-and-languages.md`(코드 표).
+

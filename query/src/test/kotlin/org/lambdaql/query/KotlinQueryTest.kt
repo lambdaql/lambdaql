@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.lambdaql.Agg
+import org.lambdaql.Dml.value
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration
 import org.springframework.boot.autoconfigure.domain.EntityScan
@@ -197,11 +198,11 @@ class KotlinQueryTest {
     }
 
     @Test
-    fun updateBy() {
-        // @start region="update-by"
-        // the builder form, Kotlin index assignment: by[column] = value
+    fun updateValue() {
+        // @start region="update-value"
+        // entities without setters (val): Dml.value(column, value)
         val u = qb.update(Order::class.java)
-            .set { o, by -> by[o.description] = "done" }
+            .set { o -> value(o.description, "done") }
             .where { it.status.toInt() == 2 }
         assertEquals("update Order e0 set e0.description = 'done' where e0.status = 2", u.toHql().hql())
         // @end
@@ -219,6 +220,24 @@ class KotlinQueryTest {
         val without = orders.filter { o -> items.none { it.first == o.id } }
         assertEquals(without.size, d.execute())
         assertEquals(ids(orders - without.toSet()), ids(reload()))
+    }
+
+    @Test
+    fun updateWithSubquery() {
+        // @start region="update-sub"
+        // the second parameter starts a subquery, as in where { o, sub -> ... } (D49)
+        val u = qb.update(Order::class.java)
+            .set { o, sub -> o.price = sub.from(Item::class.java).where { i -> i.order?.id == o.id }.sum { it.price } }
+            .where { o, sub -> sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
+        assertEquals("update Order e0 set e0.price = (select sum(s1.price) from Item s1 where s1.order.id = e0.id)"
+                + " where exists (select 1 from Item s1 where s1.order.id = e0.id)", u.toHql().hql())
+        // @end
+        val withItems = orders.filter { o -> items.any { it.first == o.id } }
+        assertEquals(withItems.size, u.execute())
+        val counts = items.groupingBy { it.first }.eachCount()
+        for (o in reload()) {
+            counts[o.id]?.let { assertEquals(it * 1.0, o.price) }      // every seeded item costs 1.0
+        }
     }
 
     @Test

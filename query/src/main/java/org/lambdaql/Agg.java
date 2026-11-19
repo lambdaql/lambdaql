@@ -4,7 +4,8 @@ import org.lambdaql.i18n.LqlMessage;
 
 /**
  * Aggregate functions for {@code select} and {@code having} lambdas (ROADMAP D27, M9).
- * The only static helper class of lambdaQL: aggregates are SQL standard functions, so the library provides them.
+ * One of the two static helper classes of lambdaQL (with {@link Dml}): aggregates are SQL standard functions, so the
+ * library provides them.
  * <p>
  * The methods are only <b>markers</b>: lambdaQL reads the calls from the lambda bytecode and never runs the lambda.
  * Calling them anywhere else throws {@link IllegalStateException}. Using them in {@code where} is an analysis error;

@@ -159,7 +159,7 @@ lambdaQL은 각 값을 생성자 인자의 타입으로 변환합니다(예: Hib
 
 집계 함수는 **`org.lambdaql.Agg`의 static 메서드**입니다.
 SQL 표준 함수이므로 lambdaQL이 제공합니다. (직접 만든 DB 함수는 [8. 프로시저와 DB 함수](08-procedures-functions.md)를 참고하십시오.)
-`Agg`는 lambdaQL의 유일한 static 헬퍼 클래스입니다.
+static 헬퍼 클래스는 `Agg`와 DML 대입용 `Dml`(결정 D49) 두 개뿐입니다.
 
 | 메서드 | SQL |
 |---|---|

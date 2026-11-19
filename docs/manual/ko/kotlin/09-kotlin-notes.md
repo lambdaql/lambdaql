@@ -6,7 +6,7 @@
 > Kotlin 지원은 확정된 설계입니다(결정 D17, D20 ~ D25, D27, D28, D31).
 > 이 장에 나오는 모든 형태의 바이트코드는 kotlinc
 > 1.7.22, 2.1.10, 2.2.21, 2.3.0, 2.3.21로 컴파일하여 확인했습니다. 많은 조건은 H2에서 행 단위로도 확인했습니다.
-> **빌드 안에서 Kotlin 람다로 테스트함**(kotlinc 2.3.21, H2, MariaDB, Oracle): `?.` 경로, `!!`, 캡처 값, 캡처 컬렉션의 `in`, 서브쿼리(`exists`, `in`, 스칼라), `limit`이 있는 정렬, 데이터 클래스·`Pair`·`Triple`을 쓰는 `select`, `listOf` 키의 `groupBy`, `having`, update의 속성 대입과 `by[column] = value`, insert, delete([`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)).
+> **빌드 안에서 Kotlin 람다로 테스트함**(kotlinc 2.3.21, H2, MariaDB, Oracle): `?.` 경로, `!!`, 캡처 값, 캡처 컬렉션의 `in`, 서브쿼리(`exists`, `in`, 스칼라), `limit`이 있는 정렬, 데이터 클래스·`Pair`·`Triple`을 쓰는 `select`, `listOf` 키의 `groupBy`, `having`, update의 속성 대입과 `Dml.value`, `set` 값 안의 서브쿼리, insert, delete([`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)).
 > **설계됨, 아직 테스트하지 않음:** 이 장의 나머지 형태(예: `?:`, 범위, `when`, 속성 참조, 문자열 템플릿). 컴파일러 버전 매트릭스(kotlinc 1.7.22 ~ 2.3.0)는 아직 빌드에 없습니다. 전체 상태는 [트랙 README](README.md)를 참고하십시오.
 
 [Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [8. 프로시저와 DB 함수](08-procedures-functions.md) | 다음: [10. 규칙과 제한](10-rules-and-limits.md) | [이 페이지의 Java 버전: 9. Java 노트](../java/09-java-notes.md)
@@ -31,7 +31,7 @@ lambdaQL은 **같은 엔진**과 같은 API로 Kotlin과 Java를 지원합니다
 - [9.9 속성 참조와 스코프 함수](#99-property-references-and-scope-functions)
 - [9.10 Kotlin 연산자](#910-kotlin-operators)
 - [9.11 결과: 데이터 클래스, `Pair`와 `Triple`](#911-results-data-classes-pair-and-triple)
-- [9.12 수정, 삽입, 삭제: 속성 대입과 `by.set`](#912-update-insert-delete-property-assignment-and-byset)
+- [9.12 수정, 삽입, 삭제: 속성 대입과 `Dml.value`](#912-update-insert-delete-property-assignment-and-dmlvalue)
 - [9.13 프로시저와 DB 함수](#913-procedures-and-db-functions)
 - [9.14 Kotlin 제한(KC1 ~ KC21)](#914-kotlin-limits-kc1-to-kc21)
 - [9.15 lambdaQL이 Kotlin 코드 실행과 다른 점](#915-where-lambdaql-differs-from-running-kotlin-code)
@@ -488,7 +488,7 @@ class OrderRepo(private val qb: QueryBuilder) {
 | 직접 만든 inline이 아닌 확장 함수나 확장 속성 | 아니요(KC11). `inline`으로 만들거나 조건을 직접 작성 |
 | `takeIf { }` | 아니요(KC6) |
 
-수정과 삽입 람다에서 `apply`, `with`, `also`는 v0.1에서 지원하지 않습니다([9.12](#912-update-insert-delete-property-assignment-and-byset) 참고).
+수정과 삽입 람다에서 `apply`, `with`, `also`는 v0.1에서 지원하지 않습니다([9.12](#912-update-insert-delete-property-assignment-and-dmlvalue) 참고).
 
 <a id="910-kotlin-operators"></a>
 ## 9.10 Kotlin 연산자
@@ -527,7 +527,6 @@ lambdaQL에는 **Kotlin 전용 연산자 API가 없습니다**(결정됨). 일�
 
 | Kotlin 형태 | 동작하는 이유 | 상태 |
 |---|---|---|
-| DML의 `by[o.status] = st` | Kotlin은 `a[i] = b`를 `a.set(i, b)`로 바꾸고, 대입 람다는 값을 반환하지 않음 | 유지(kotlinc 2.3.21 확인) |
 | `x in sub.from(...).select { ... }` | Kotlin은 `x in v`를 `v.contains(x)`로 바꿈 | 유지 |
 | `Agg.sum(x)!! + 1 > 3` | 자리표시자 값에 대한 일반 산술 | 유지 |
 | 정렬 연산자(`by + key`, `-key`) | Java 사용자에게 이상한 메서드가 추가되고 Kotlin 전용 확장이 필요함 | 거부 |
@@ -566,14 +565,14 @@ qb.from(Order::class.java).groupBy { it.customer?.id to it.status }         // P
 
 자세한 내용: [6. 조회, 집계, 그룹화](06-select-group.md).
 
-<a id="912-update-insert-delete-property-assignment-and-byset"></a>
-## 9.12 수정, 삽입, 삭제: 속성 대입과 `by.set`
+<a id="912-update-insert-delete-property-assignment-and-dmlvalue"></a>
+## 9.12 수정, 삽입, 삭제: 속성 대입과 `Dml.value`
 
 Kotlin 속성 대입은 Java와 같은 setter 호출로 컴파일되므로 규칙도 같습니다.
 
 ```kotlin
 qb.update(Order::class.java).set { it.status = st; it.price = it.price!! * 1.1 }.where { it.status == 1 }.execute()
-qb.update(Order::class.java).set { o, by -> by[o.status] = 1 }.where { it.id == id }.execute()   // val 속성용
+qb.update(Order::class.java).set { o -> value(o.status, 1) }.where { it.id == id }.execute()     // val 속성용(Dml.value)
 qb.update(Order::class.java).set { it.customer?.id = cid }.where { it.id == id }.execute()       // ?. 대입 = 일반 대입
 qb.update(Order::class.java).set { it.price = (it.price ?: 0.0) + 1 }.all().execute()            // ?: -> coalesce
 
@@ -585,12 +584,12 @@ qb.insert(Order::class.java).values(lines) { o, l -> o.id = l.id; o.price = l.pr
 
 | Kotlin 형태 | 의미 |
 |---|---|
-| `by[o.status] = 1` | `by.set(o.status, 1)`에 대한 Kotlin 인덱스 연산자. `val` 속성(setter 없음)을 가진 엔티티에 사용. kotlinc 2.3.21로 확인(빌드 안의 테스트는 아직 없음) |
-| `by[o.cnt] += 1` | 컴파일되지 않음(의도함, `by`에 `get` 없음). `by[o.cnt] = o.cnt + 1`로 작성 |
+| `value(o.status, 1)` | `import org.lambdaql.Dml.value`로 가져온 함수(D49). `val` 속성(setter 없음)을 가진 엔티티에 사용. 속성 대입과 한 람다 안에서 섞을 수 있음(테스트함) |
+| `value(o.cnt, o.cnt + 1)` | 지원 |
 | `it.cnt += 1` | 지원 |
 | `it.cnt++`, `--` | v0.1에는 없음. `it.cnt += 1`로 작성 |
 | `set` 안의 `apply { }`, `with(it) { }`, `also { }` | v0.1에는 없음. 직접 대입으로 작성 |
-| `set { }`과 `set { o, sub -> }` | 서로 다른 오버로드. Kotlin은 파라미터 개수로 고름 |
+| `set { }`과 `set { o, sub -> }` | 서로 다른 오버로드. Kotlin은 파라미터 개수로 고름. 두 번째 인자 `sub`는 서브쿼리의 시작점(D49) |
 
 자세한 내용: [7. 수정, 삽입, 삭제](07-dml.md).
 

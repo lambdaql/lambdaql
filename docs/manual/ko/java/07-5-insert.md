@@ -3,7 +3,7 @@
 
 > [!NOTE]
 > **상태: 구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, 마일스톤 M10). `insert ... select`의 `groupBy`, `having`, `Agg`(마일스톤 M9)도 포함합니다.
-> **아직 구현되지 않음:** `insert ... select`의 `by.set` 형태.
+> **아직 구현되지 않음:** `values(...)` 안의 서브쿼리.
 > **(테스트됨)** 표시가 있는 예제는 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)와 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)에서 그대로 가져온 것입니다. 나머지 예제는 설계를 따르며 아직 테스트가 없습니다.
 > 전체 상태는 [Java 트랙 README](README.md#status)를 참고하십시오.
 
@@ -38,10 +38,10 @@ values (100,9.5,'Kim')
 
 람다에 적은 상수는 리터럴로 유지됩니다(결정 D37). 값에서 새 행을 읽을 수 없습니다. `a.setPrice(a.getPrice())`는 오류입니다.
 
-한 행에도 `by.set` 형태를 쓸 수 있습니다.
+setter가 없는 엔티티는 `Dml.value`로 한 행을 삽입합니다(결정 D49, [7.3](07-dml.md#73-two-ways-to-assign-setter-or-dmlvalue) 참고).
 
 ```java
-qb.insert(Order.class).values((o, by) -> by.set(o.getId(), id).set(o.getStatus(), 1)).execute();
+qb.insert(Order.class).values(o -> { value(o.getId(), id); value(o.getStatus(), 1); }).execute();
 ```
 
 <a id="many-rows-from-a-list"></a>
@@ -104,12 +104,28 @@ where o1_0.status=1
 
 lambdaQL은 원본 경로에 명시적인 `left join`을 사용하므로 고객이 없는 주문도 빠지지 않습니다(규칙 U10). SQL은 세 데이터베이스에서 같습니다.
 
-설계에는 컨텍스트 객체를 세 번째 인자로 받는 `by.set` 형태도 있습니다. 이 형태는 **아직 구현되지 않았습니다**.
+setter가 없는 대상 엔티티에는 `Dml.value`를 씁니다. 첫 번째 인자는 대상 `a`의 getter 호출입니다.
 
 ```java
 qb.insert(Archive.class).from(Order.class).where(o -> o.getStatus() == 9)
-  .select((a, o, by) -> by.set(a.getId(), o.getId()).set(a.getCustomerName(), o.getCustomer().getName()))
+  .select((a, o) -> { value(a.getId(), o.getId()); value(a.getCustomerName(), o.getCustomer().getName()); })
   .execute();
+```
+
+**서브쿼리.** 원본의 `where`는 두 번째 인자로, `select`는 세 번째 인자로 서브쿼리의 시작점 `sub`를 받습니다(결정 D49).
+
+**(테스트됨)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `insert-select-sub`:
+
+```java
+// where((o, sub) -> ...) on the source, and select((a, o, sub) -> ...): the third parameter starts a subquery
+ExecutableInsert<Archive> i = qb.insert(Archive.class).from(Order.class)
+        .where((o, sub) -> sub.from(Item.class).where(x -> x.getOrder().getId() == o.getId()).exists())
+        .select((a, o, sub) -> {
+            a.setId(o.getId());
+            a.setPrice(sub.from(Item.class).where(x -> x.getOrder().getId() == o.getId()).sum(x -> x.getPrice()));
+        });
+assertEquals("insert into Archive (id, price) select e0.id, (select sum(s2.price) from Item s2 where s2.order.id = e0.id)"
+        + " from Order e0 where exists (select 1 from Item s1 where s1.order.id = e0.id)", i.toHql().get(0).hql());
 ```
 
 <a id="insert--select-with-aggregates"></a>

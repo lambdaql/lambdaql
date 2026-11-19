@@ -239,17 +239,14 @@ public enum LqlMessage {
     /** LQL-3036: A value in having that is not an aggregate must be a groupBy key (J3): &#123;0&#125; */
     HAVING_NOT_GROUP_KEY("LQL-3036", 1),
 
-    /** LQL-3037: An assignment lambda can only call setters (U1): &#123;0&#125; */
+    /** LQL-3037: An assignment lambda can only call setters or Dml.value(column, value) (U1): &#123;0&#125; */
     ASSIGN_ONLY_SETTERS("LQL-3037", 1),
 
     /** LQL-3038: The assignment lambda assigns nothing (U1). */
     ASSIGN_NONE("LQL-3038", 0),
 
-    /** LQL-3039: The first argument of by.set must be a property of the target entity: &#123;0&#125; */
-    BY_SET_TARGET("LQL-3039", 1),
-
-    /** LQL-3040: This assignment lambda can only use by.set(column, value): &#123;0&#125; */
-    BY_SET_ONLY("LQL-3040", 1),
+    /** LQL-3039: The first argument of Dml.value must be a property of the target entity, written as a getter call: &#123;0&#125; */
+    VALUE_TARGET("LQL-3039", 1),
 
     /** LQL-3041: The same column is assigned twice (U4): &#123;0&#125; */
     ASSIGN_TWICE("LQL-3041", 1),

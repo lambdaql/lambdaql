@@ -4,7 +4,7 @@
 > [!NOTE]
 > **상태**
 > - **구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, Hibernate 6.6.5, 마일스톤 M8-1): 조회, 수정, 삭제의 `where((o, sub) -> ...)` 안의 서브쿼리. `exists` / `not exists`, `contains`(IN), `!contains`(`NOT IN`으로 작성), 스칼라 집계(`count`, `sum`, `avg`, `min`, `max`), top-1 형태 `orderBy(...).limit(1)...first()`, 상관 서브쿼리와 중첩 서브쿼리, 캡처 값을 포함합니다.
-> - **아직 구현되지 않음:** `set` 값 안의 서브쿼리, MariaDB `lateral` 재작성. (파생 테이블과 CTE는 다른 문법으로 구현했습니다. [6. 조회, 집계, 그룹화](06-select-group.md#69-derived-table-subquery-in-from)를 참고하십시오.)
+> - **아직 구현되지 않음:** MariaDB `lateral` 재작성. (파생 테이블과 CTE는 다른 문법으로 구현했습니다. [6. 조회, 집계, 그룹화](06-select-group.md#69-derived-table-subquery-in-from)를 참고하십시오.)
 > - **(테스트됨)** 표시가 있는 예제는 테스트 코드에서 그대로 가져온 것입니다. 나머지 예제는 같은 규칙을 따르지만 테스트가 없습니다.
 
 [Java 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [4. 정렬과 페이징](04-order-paging.md) | 다음: [6. 조회, 집계, 그룹화](06-select-group.md) | [이 페이지의 Kotlin 버전](../kotlin/05-subquery.md)
@@ -354,7 +354,7 @@ Java는 중첩된 람다에서 같은 이름을 두 번 쓰는 것을 허용하�
 ## 5.11 다른 위치의 서브쿼리
 
 - **UPDATE / DELETE 안의 서브쿼리**: `where`에서 같은 `sub` 문법을 씁니다. 구현되어 테스트했습니다(영역 `dml-subquery`). [7.4 삭제(delete)](07-4-delete.md)와 [7.2 수정(update)](07-2-update.md)을 참고하십시오.
-- **`set` 값 안의 서브쿼리**(`o.setTotal(sub.from(...).sum(...))`): 아직 구현되지 않았습니다. [7.2 수정(update)](07-2-update.md)을 참고하십시오.
+- **`set` 값 안의 서브쿼리**(`o.setTotal(sub.from(...).sum(...))`): 대입 람다의 두 번째 인자 `sub`로 씁니다(결정 D49). [7.2 수정(update)](07-2-update.md#an-aggregate-from-a-subquery)을 참고하십시오.
 - **`from` 안의 서브쿼리(파생 테이블)와 CTE**: 구현됨(마일스톤 M8-2). `sub`를 쓰지 않고 값 쿼리를 `qb.from(...)`이나 `qb.with(...)`에 전달합니다. [6.9 파생 테이블](06-select-group.md#69-derived-table-subquery-in-from)과 [6.10 CTE](06-select-group.md#610-cte-with)를 참고하십시오.
 
 <a id="512-rules-summary-q1-to-q6"></a>

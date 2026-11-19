@@ -154,33 +154,29 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 <a id="an-aggregate-from-a-subquery"></a>
 ## 서브쿼리의 집계
 
-인자가 둘인 람다를 사용하십시오. 두 번째 인자는 컨텍스트 객체(`sub`)입니다.
+인자가 둘인 람다 `set((o, sub) -> ...)`를 사용하십시오. 두 번째 인자는 서브쿼리의 시작점 `sub`입니다(결정 D49).
 여기서는 `Agg`가 필요 없습니다. 서브쿼리에는 [5. 서브쿼리](05-subquery.md)처럼 `sum`, `avg`, ...가 있습니다.
-이 형태는 **아직 구현되지 않았습니다**. 현재는 `where` 안의 서브쿼리만 동작합니다.
+
+**(테스트됨)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `update-sub`:
 
 ```java
-qb.update(Order.class)
-  .set((o, sub) -> o.setTotal(
-      sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).sum(i -> i.getPrice())))
-  .where(o -> o.getStatus() == 1)
-  .execute();
+// the second parameter starts a subquery, as in where((o, sub) -> ...) (D49)
+ExecutableUpdate<Order> u = qb.update(Order.class)
+        .set((o, sub) -> o.setPrice(sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).sum(i -> i.getPrice())))
+        .where((o, sub) -> sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists());
+assertEquals("update Order e0 set e0.price = (select sum(s1.price) from Item s1 where s1.order.id = e0.id)"
+        + " where exists (select 1 from Item s1 where s1.order.id = e0.id)", u.toHql().hql());
+// sum gives NULL when there is no row; coalesce keeps a NOT NULL column valid for every row
+ExecutableUpdate<Order> all = qb.update(Order.class)
+        .set((o, sub) -> value(o.getPrice(), Objects.requireNonNullElse(
+                sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).sum(i -> i.getPrice()), 0.0)))
+        .all();
+assertEquals("update Order e0 set e0.price = coalesce((select sum(s1.price) from Item s1 where s1.order.id = e0.id), 0.0)",
+        all.toHql().hql());
 ```
 
-**데이터베이스별 SQL (예정)** — 예정된 HQL을 Hibernate가 번역한 것으로, `PlannedSqlTest`가 기록했습니다. lambdaQL은 아직 이 쿼리를 만들지 않습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `07-update-sum`:
-
-```sql
--- H2, MariaDB
-update orders o1_0
-set total=(select sum(i1_0.price) from items i1_0 where i1_0.order_id=o1_0.id)
-where o1_0.status=1
-
--- Oracle
-update orders o1_0
-set o1_0.total=(select sum(i1_0.price) from items i1_0 where i1_0.order_id=o1_0.id)
-where o1_0.status=1
-```
-
-주문에 품목이 없으면 `total`은 NULL이 됩니다. 이는 SQL의 동작입니다.
+- 다른 테이블의 집계와 같은 테이블의 집계를 모두 쓸 수 있습니다(H2, MariaDB 10.11, Oracle 23.26에서 실측). `update`에서는 MariaDB도 오류 1093을 내지 않습니다.
+- 일치하는 행이 없으면 집계는 NULL입니다. NOT NULL 컬럼이면 DB 오류가 나므로 `Objects.requireNonNullElse(…, 0.0)`로 감싸 `coalesce(...)`로 만드십시오.
 
 <a id="where-with-paths-and-subqueries"></a>
 ## 경로와 서브쿼리를 사용한 where
