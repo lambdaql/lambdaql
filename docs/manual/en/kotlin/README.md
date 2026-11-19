@@ -56,29 +56,21 @@ fetch first ? rows only
 
 ## Contents
 
-| # | Page | What you learn | Status |
-|---|---|---|---|
-| 1 | [Overview](../01-overview.md) (common) | What lambdaQL is, why, and how it works | – |
-| 2 | [Getting started](02-getting-started.md) | Requirements, Gradle setup, Kotlin entities, first query | Build from source works. `where`, `toList()` and the result functions `first()`, `one()`, `count()`, `exists()`, `toSet()`: implemented, tested on H2, MariaDB, Oracle (`where` and `toList()` also with Kotlin lambdas; the result functions with Java lambdas only) |
-| 3 | [Conditions (`where`)](03-where.md) | Operators, null rules, `?.` `?:` `!!`, ranges, `when`, captured values | Mapping getters to JPA attributes, HQL rendering and running queries (`where`, `toList()`): implemented, tested on H2, MariaDB, Oracle. `?.`, `!!`, captured values and `in`: tested with Kotlin lambdas. `?:`, ranges, `when`: designed |
-| 4 | [Sorting and paging](04-order-paging.md) | `orderBy`, `Direction`, `limit`, `offset` | Core implemented, tested on H2, MariaDB, Oracle (one Kotlin test, the rest Java tests), including `SortSpec`, join sorts `{ o, c, by -> }` and the sort policy for outside sorts (rules in code, Spring Boot properties or `@Sortable`). Property references, the join form of `SortSpec`: designed |
-| 5 | [Subqueries](05-subquery.md) | `exists()`, `x in sub...`, scalar and correlated subqueries | Implemented, tested on H2, MariaDB, Oracle (`exists`, `in` and scalar also with Kotlin lambdas). The MariaDB `lateral` rewrite: not implemented yet |
-| 6 | [Select, aggregates and group by](06-select-group.md) | `select`, data classes, `Pair`, `groupBy`, `having`, `Agg`, joins, derived tables, CTE | `select`, `groupBy`, `having`, `Agg`, `distinct()`: implemented, tested on H2, MariaDB, Oracle (data class, `Pair`, `Triple`, `groupBy` and `having` also with Kotlin lambdas). Explicit joins, derived tables and CTE: implemented (Java tests; Kotlin not tested yet) |
-| 7 | [Update, insert, delete](07-dml.md) | Property assignment, `by.set`, `values`, `all()`, `execute()`, `limit`, `executeOne()` | Implemented, tested on H2, MariaDB, Oracle, including `limit` and `executeOne()` (property assignment, `by[column] = value`, insert and delete also with Kotlin lambdas). Subqueries (`sub`) in the `where` of update and delete and aggregates in `insert ... select`: implemented. Subqueries in `set` values: designed |
-| 7.6 | [Upsert](07-6-upsert.md) | `upsert`, `onConflict { ... }.update { ... }`, `onConflict { ... }.ignore()`, row counts per database | Implemented, tested on H2, MariaDB, Oracle (Java tests; Kotlin not tested yet) |
-| 8 | [Procedures and DB functions](08-procedures-functions.md) | `@SqlProcedure`, `@SqlFunction` in a `companion object`, `qb.call`, `qb.exec` | Implemented (Java tests; Kotlin not tested yet): DB functions on H2, MariaDB, Oracle; procedures on MariaDB and Oracle, including the argument name check and the detection of Oracle package overloads. SARGable warnings for DB functions (`LQL-5001`, `LQL-5007`): implemented. Type checks of procedure parameters: not implemented yet |
-| 9 | [Kotlin notes](09-kotlin-notes.md) | What is special in Kotlin: `?.` `?:` `!!`, `==`, `in`, `when`, operators, limits KC1 to KC21 | Partly tested (`?.`, `!!`, `in`, data classes, property assignment). The other forms: designed |
-| 10 | [Rules and limits](10-rules-and-limits.md) | All rule tables in one place | Partly implemented |
-| 11 | [Errors and languages](../11-errors-and-languages.md) (common) | Error codes, exceptions, message language, logging | Implemented, unit tested. Strict mode: not implemented yet |
-| 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`, repository methods with a body, DML shortcuts (`deleteAll`, `updateOne`, ...), Spring `Sort` and `Pageable`, modules, transactions, Kotlin 2.2 / `-Xjvm-default=all` | Implemented, tested on H2, MariaDB, Oracle with Spring Boot 3.4.2, including the DML shortcuts and the update, delete, insert and upsert builders (Java tests; Kotlin repositories not tested yet) |
-
-What the words mean:
-
-| Word | Meaning |
-|---|---|
-| Implemented | The code is in the repository and has unit tests. |
-| Designed | The syntax and rules are decided. Prototypes were tested. The library does not have the code yet. |
-| Planned | The idea is known, but the details are not decided. |
+| # | Page | What you learn |
+|---|---|---|
+| 1 | [Overview](../01-overview.md) (common) | What lambdaQL is, why, and how it works |
+| 2 | [Getting started](02-getting-started.md) | Requirements, Gradle setup, Kotlin entities, first query |
+| 3 | [Conditions (`where`)](03-where.md) | Operators, null rules, `?.` `?:` `!!`, ranges, `when`, captured values |
+| 4 | [Sorting and paging](04-order-paging.md) | `orderBy`, `Direction`, `limit`, `offset` |
+| 5 | [Subqueries](05-subquery.md) | `exists()`, `x in sub...`, scalar and correlated subqueries |
+| 6 | [Select, aggregates and group by](06-select-group.md) | `select`, data classes, `Pair`, `groupBy`, `having`, `Agg`, joins, derived tables, CTE |
+| 7 | [Update, insert, delete](07-dml.md) | Property assignment, `by.set`, `values`, `all()`, `execute()`, `limit`, `executeOne()` |
+| 7.6 | [Upsert](07-6-upsert.md) | `upsert`, `onConflict { ... }.update { ... }`, `onConflict { ... }.ignore()`, row counts per database |
+| 8 | [Procedures and DB functions](08-procedures-functions.md) | `@SqlProcedure`, `@SqlFunction` in a `companion object`, `qb.call`, `qb.exec` |
+| 9 | [Kotlin notes](09-kotlin-notes.md) | What is special in Kotlin: `?.` `?:` `!!`, `==`, `in`, `when`, operators, limits KC1 to KC21 |
+| 10 | [Rules and limits](10-rules-and-limits.md) | All rule tables in one place |
+| 11 | [Errors and languages](../11-errors-and-languages.md) (common) | Error codes, exceptions, message language, logging |
+| 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`, repository methods with a body, DML shortcuts (`deleteAll`, `updateOne`, ...), Spring `Sort` and `Pageable`, modules, transactions, Kotlin 2.2 / `-Xjvm-default=all` |
 
 ## Where to start
 

@@ -113,62 +113,6 @@ fetch first ? rows only
 | 11 | 오류와 언어 (공통) | [11-errors-and-languages.md](11-errors-and-languages.md) | [11-errors-and-languages.md](11-errors-and-languages.md) |
 | 12 | Spring Data JPA: `LambdaQlExecutor<T>`, DML 단축 메서드, Spring `Sort`와 `Pageable`, 모듈, 트랜잭션, `QueryBuilder` 빈 | [Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md) |
 
-<a id="status"></a>
-## 상태
-
-| 기능 | 상태 | Java | Kotlin |
-|---|---|---|---|
-| 람다 로딩(람다 본문을 찾고 바이트코드를 읽음) | 구현됨, 단위 테스트 있음 | [01](01-overview.md#how-it-works-5-steps) | [01](01-overview.md#how-it-works-5-steps) |
-| 조건 디코딩(`&&`, `\|\|`, `!`, 비교, 캡처 값) | 구현됨, 단위 테스트 있음(Java 람다) | [03](java/03-where.md) | [03](kotlin/03-where.md) |
-| getter를 JPA 속성에 매핑, 캡처 값 계산 | 구현됨, H2·MariaDB·Oracle에서 테스트함 | [03](java/03-where.md) | [03](kotlin/03-where.md) |
-| HQL 렌더링과 쿼리 실행(`where`, `toList()`) | 구현됨, H2·MariaDB·Oracle에서 테스트함 | [03](java/03-where.md) | [03](kotlin/03-where.md) |
-| 결과 함수(`first()`, `one()`, `count()`, `exists()`, `toSet()`) | 구현됨, H2·MariaDB·Oracle에서 테스트함(Java 람다) | [02](java/02-getting-started.md#getting-the-result) | [02](kotlin/02-getting-started.md#getting-the-result) |
-| 정렬과 페이징(`orderBy`, `limit`, `offset`) | 핵심 기능 구현됨, H2·MariaDB·Oracle에서 테스트함. `SortSpec`, 조인 정렬 `(o, c, by)`, 외부 정렬의 정렬 정책(코드, Spring Boot 프로퍼티, `@Sortable` 규칙) 포함. `SortSpec`의 조인 형태: 설계됨 | [04](java/04-order-paging.md) | [04](kotlin/04-order-paging.md) |
-| 서브쿼리(`exists`, `contains`, 스칼라, 상관) | 구현됨, H2·MariaDB·Oracle에서 테스트함(Java 람다). MariaDB `lateral` 재작성: 아직 구현되지 않음 | [05](java/05-subquery.md) | [05](kotlin/05-subquery.md) |
-| 프로젝션, `groupBy`, `having`, 집계(`Agg`) | 구현됨, H2·MariaDB·Oracle에서 테스트함(Java 람다). `distinct()`와 결과 함수 포함. 집계 기준 정렬: v0.2 후보 | [06](java/06-select-group.md) | [06](kotlin/06-select-group.md) |
-| 명시적 조인(`join`, `leftJoin`, `crossJoin`, 엔티티 3개까지) | 구현됨, H2·MariaDB·Oracle에서 테스트함(Java 람다). 모든 엔티티에 대한 `where`, `orderBy`, `select`, 페이징 포함. 조인 결과의 `distinct()`, 파생 테이블·CTE의 조인: 구현됨(D51). 서브쿼리 안의 조인(엔티티 2개): 구현됨. update와 delete의 조인: 추가하지 않음 | [06](java/06-select-group.md#68-explicit-joins) | [06](kotlin/06-select-group.md#68-explicit-joins) |
-| 파생 테이블과 CTE(`qb.from(valueQuery)`, `qb.with(valueQuery)`) | 구현됨, H2·MariaDB·Oracle에서 테스트함(Java 람다). 엔티티 쿼리에 조인, 같은 CTE의 재사용: 구현됨(D51) | [06](java/06-select-group.md#69-derived-table-subquery-in-from) | [06](kotlin/06-select-group.md#69-derived-table-subquery-in-from) |
-| `update`, `insert`, `delete`, upsert | 구현됨. H2, MariaDB, Oracle에서 테스트(Java 람다). `limit`과 `executeOne()` 포함. 수정·삭제 `where` 안의 서브쿼리(`sub`)와 `insert ... select`의 집계: 구현됨. `set` 값, insert `values`, upsert 안의 서브쿼리: 구현됨 | [07](java/07-dml.md) | [07](kotlin/07-dml.md) |
-| 저장 프로시저와 DB 함수 | 구현됨. 쿼리 안의 DB 함수와 단독 호출은 H2·MariaDB·Oracle에서 테스트함. 프로시저(`call`, `exec`, OUT, INOUT, 결과 집합)는 MariaDB와 Oracle에서 테스트함(H2에는 OUT 파라미터가 없음). 인자 이름 대조(MariaDB, Oracle에서 테스트함)와 Oracle 패키지 오버로드 검출(Oracle에서 테스트함): 구현됨. DB 함수의 SARGable 경고(`LQL-5001`, `LQL-5007`): 구현됨. 프로시저 파라미터의 타입 대조: 구현됨(MariaDB, Oracle에서 테스트함) | [08](java/08-procedures-functions.md) | [08](kotlin/08-procedures-functions.md) |
-| Kotlin 형태(`?.`, `?:`, `!!`, 범위, `when`, `in`) | `?.`, `!!`, 캡처 컬렉션의 `in`, 데이터 클래스, `Pair`/`Triple`, 속성 대입: H2·MariaDB·Oracle에서 Kotlin 람다로 테스트함. `?:`, 범위, `when`, 속성 참조: 설계됨 | – | [09](kotlin/09-kotlin-notes.md) |
-| 4개 언어의 오류 코드와 메시지 | 구현됨, 단위 테스트함: `[LQL-xxxx]` 코드, `LambdaQLException`과 하위 클래스, 영어·일본어·중국어·한국어 메시지, `lambdaql.locale`. 엄격 모드: 아직 구현되지 않음 | [11](11-errors-and-languages.md) | [11](11-errors-and-languages.md) |
-| Spring Data JPA(`LambdaQlExecutor<T>`, Spring `Sort` / `Pageable`, Spring Boot 자동 구성) | 구현됨. H2, MariaDB, Oracle에서 Spring Boot 3.4.2로 테스트(Java). DML 단축 메서드(`deleteAll`, `updateOne` 등)와 수정·삭제·삽입·업서트 빌더 포함. Spring Boot 4: 아직 검증하지 않음 | [12](java/12-spring-data-jpa.md) | [12](kotlin/12-spring-data-jpa.md) |
-
-용어의 뜻:
-
-| 용어 | 뜻 |
-|---|---|
-| 구현됨 | 코드가 저장소에 있고 단위 테스트가 있습니다. |
-| 진행 중 | 일부 코드가 있지만 완성되지 않았습니다. |
-| 설계됨 | 문법과 규칙이 확정되었습니다. 프로토타입으로 테스트했습니다. 라이브러리에는 아직 코드가 없습니다. |
-| 계획됨 | 아이디어는 있지만 세부 사항은 정해지지 않았습니다. |
-
-테스트는 다음과 같습니다. `SelectQueryTest`, `SortQueryTest`, `SubqueryTest`, `ProjectionTest`, `JoinQueryTest`, `DerivedQueryTest`, `DmlQueryTest`, `FunctionTest`, `ProcedureTest`, `KotlinSelectTest`, `KotlinQueryTest`, `LqlMessagesTest`, `ExecutorTest`, `AutoConfigurationTest`는 사용자 API를 사용하고, 나머지 테스트는 내부 클래스를 확인합니다.
-
-| 테스트 | 확인하는 내용 |
-|---|---|
-| [SelectQueryTest.java](../../../query/src/test/java/org/lambdaql/query/SelectQueryTest.java) | `qb.from(...).where(...)`: H2, MariaDB, Oracle에서의 HQL, 파라미터, 행 |
-| [SortQueryTest.java](../../../query/src/test/java/org/lambdaql/query/SortQueryTest.java) | `orderBy`, `limit`, `offset`: H2, MariaDB, Oracle에서의 HQL과 행 순서 |
-| [SubqueryTest.java](../../../query/src/test/java/org/lambdaql/query/SubqueryTest.java) | `where` 안의 서브쿼리: `exists`, `contains`(IN), NOT EXISTS, 스칼라, top-1, 중첩, 서브쿼리를 쓰는 삭제. H2, MariaDB, Oracle에서의 HQL과 행 |
-| [ProjectionTest.java](../../../query/src/test/java/org/lambdaql/query/ProjectionTest.java) | `select`, 레코드, `groupBy`, `having`, `Agg`, `distinct`, 페이징, `groupBy`를 쓰는 `insert ... select`. H2, MariaDB, Oracle에서의 HQL과 값 |
-| [JoinQueryTest.java](../../../query/src/test/java/org/lambdaql/query/JoinQueryTest.java) | 엔티티 3개까지의 `join`, `leftJoin`, `crossJoin`: H2, MariaDB, Oracle에서의 조건, 정렬, `select`, 반복되는 행, `count`, 모든 엔티티에 대한 페이징 |
-| [DerivedQueryTest.java](../../../query/src/test/java/org/lambdaql/query/DerivedQueryTest.java) | 파생 테이블과 CTE(`qb.from(valueQuery)`, `qb.with(valueQuery)`): H2, MariaDB, Oracle에서의 HQL과 행, 안쪽 `limit`, 행 타입 규칙 J5 |
-| [DmlQueryTest.java](../../../query/src/test/java/org/lambdaql/query/DmlQueryTest.java) | `update`, `delete`, `insert`, upsert: H2, MariaDB, Oracle에서의 HQL과 실행 후의 행. 같은 조건의 조회 결과와 비교 |
-| [FunctionTest.java](../../../query/src/test/java/org/lambdaql/query/FunctionTest.java) | `where`, `select`, `orderBy`, update `set` 안의 `@SqlFunction` DB 함수, Boolean 함수, 등록한 함수, 규칙 검사: H2, MariaDB, Oracle |
-| [ProcedureTest.java](../../../query/src/test/java/org/lambdaql/query/ProcedureTest.java) | MariaDB와 Oracle에서 `qb.call`과 `qb.exec`로 하는 `@SqlProcedure` 호출(OUT, OUT 여러 개, INOUT, 결과 집합과 REF CURSOR)과 스텁 대조. H2, MariaDB, Oracle에서 DB 함수 단독 호출 |
-| [KotlinSelectTest.kt](../../../query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt) | `where`의 Kotlin 람다: `?.` 경로, 캡처 값, 캡처 컬렉션의 `in` |
-| [KotlinQueryTest.kt](../../../query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt) | Kotlin 람다: 정렬, 서브쿼리, 데이터 클래스·`Pair`·`Triple` 결과, `groupBy`와 `having`, update(속성 대입, `Dml.value`, `set` 값 안의 서브쿼리), insert, delete |
-| [LqlMessagesTest.java](../../../query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java) | 메시지 코드와 4개 메시지 언어: 모든 번들의 같은 키와 인자, 코드 중복 없음, 로캘 선택, 코드 범위별 예외 클래스 |
-| [ExecutorTest.java](../../../spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java) | Spring Boot 애플리케이션의 `LambdaQlExecutor<T>`: 리포지토리 메서드, Spring `Sort`와 `Pageable`, 트랜잭션 |
-| [AutoConfigurationTest.java](../../../spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java) | Spring Boot 자동 구성의 `QueryBuilder` 빈 |
-| [LoadExamplesTest.java](../../../query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java) | 람다 본문 찾기, 캡처 값 읽기, 직렬화할 수 없는 람다 거부 |
-| [ConditionDecodeTest.java](../../../query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java) | 바이트코드에서 `&&`, `\|\|`, `!`와 비교를 다시 만들기, 값 삼항 연산자 거부 |
-| [IrExamplesTest.java](../../../query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java) | 내부 조건 트리(비교 연산자, AND, OR, NOT) |
-| [NegationMinimizerTest.java](../../../query/src/test/java/org/lambdaql/engine/decode/NegationMinimizerTest.java) | 결과를 바꾸지 않고 `!`를 비교 안으로 밀어 넣기(드 모르간) |
-| [HostEvaluatorTest.java](../../../query/src/test/java/org/lambdaql/engine/sem/HostEvaluatorTest.java) | 바인딩 전에 캡처 변수로 Java에서 값 계산 |
-| [JpaEntityModelTest.java](../../../query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java) | JPA Metamodel에서 엔티티 속성 읽기(getter 매핑을 위한 초기 코드) |
-| [AssignmentReaderTest.java](../../../query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java) | 대입 람다(setter, `Dml.value`)를 컬럼과 값의 쌍으로 읽기, 규칙 위반(U1, U3, U6) 거부 |
-
 <a id="about-the-examples"></a>
 ## 예제에 대하여
 

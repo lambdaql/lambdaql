@@ -76,34 +76,6 @@ The pages marked "common" are shared by the Java and Kotlin tracks. They have sm
 | 11 | [Errors and languages](../11-errors-and-languages.md) (common) | Error codes, exceptions, message language, logging |
 | 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`, repository default methods, DML shortcuts (`deleteAll`, `updateOne`, ...), Spring `Sort` and `Pageable`, modules, transactions, `QueryBuilder` bean |
 
-## Status
-
-| Feature | Status | Chapter |
-|---|---|---|
-| Lambda loading (find the lambda body, read its bytecode) | Implemented, unit tested | [1](../01-overview.md) |
-| Condition decoding (`&&`, `\|\|`, `!`, comparisons, captured values) | Implemented, unit tested | [3](03-where.md) |
-| Mapping getters to JPA attributes | Implemented, tested on H2, MariaDB, Oracle | [3](03-where.md) |
-| HQL rendering and running queries (`where`, `toList()`) | Implemented, tested on H2, MariaDB, Oracle | [3](03-where.md) |
-| Result functions (`first()`, `one()`, `count()`, `exists()`, `toSet()`) | Implemented, tested on H2, MariaDB, Oracle | [2](02-getting-started.md#getting-the-result) |
-| Sorting and paging (`orderBy`, `limit`, `offset`) | Core implemented, tested on H2, MariaDB, Oracle, including `SortSpec`, join sorts `(o, c, by)` and the sort policy for outside sorts (rules in code, Spring Boot properties or `@Sortable`). The join form of `SortSpec`: designed | [4](04-order-paging.md) |
-| Subqueries (`exists`, `contains`, scalar, correlated) | Implemented, tested on H2, MariaDB, Oracle. The MariaDB `lateral` rewrite: not implemented yet | [5](05-subquery.md) |
-| Projection, `groupBy`, `having`, aggregates (`Agg`) | Implemented, tested on H2, MariaDB, Oracle, including `distinct()` and the result functions. Sorting by an aggregate: v0.2 candidate | [6](06-select-group.md) |
-| Explicit joins (`join`, `leftJoin`, `crossJoin`, up to three entities) | Implemented, tested on H2, MariaDB, Oracle, including `where`, `orderBy`, `select` and paging over all entities. Joins in DML and in subqueries: later | [6](06-select-group.md#68-explicit-joins) |
-| Derived tables and CTE (`qb.from(valueQuery)`, `qb.with(valueQuery)`) | Implemented, tested on H2, MariaDB, Oracle. Joins with a derived table and the same CTE twice: later | [6](06-select-group.md#69-derived-table-subquery-in-from) |
-| `update`, `insert`, `delete`, upsert | Implemented, tested on H2, MariaDB, Oracle, including `limit` and `executeOne()`. Subqueries (`sub`) in the `where` of update and delete and aggregates in `insert ... select`: implemented. Subqueries in `set` values: designed | [7](07-dml.md) |
-| Stored procedures and DB functions | Implemented: DB functions in queries and alone, tested on H2, MariaDB, Oracle; procedures (`call`, `exec`, OUT, INOUT, result sets) tested on MariaDB and Oracle (H2 has no OUT parameters). Argument name check (tested on MariaDB and Oracle) and detection of Oracle package overloads (tested on Oracle): implemented. SARGable warnings for DB functions (`LQL-5001`, `LQL-5007`): implemented. Type checks of procedure parameters: not implemented yet | [8](08-procedures-functions.md) |
-| Error codes and messages in 4 languages | Implemented, unit tested: `[LQL-xxxx]` codes, `LambdaQLException` and its subclasses, English, Japanese, Chinese and Korean messages, `lambdaql.locale`. Strict mode: not implemented yet | [11](../11-errors-and-languages.md) |
-| Spring Data JPA (`LambdaQlExecutor<T>`, Spring `Sort` / `Pageable`, Spring Boot auto-configuration) | Implemented, tested on H2, MariaDB, Oracle with Spring Boot 3.4.2, including the DML shortcuts (`deleteAll`, `updateOne`, ...) and the update, delete, insert and upsert builders. Spring Boot 4: not verified yet | [12](12-spring-data-jpa.md) |
-
-What the words mean:
-
-| Word | Meaning |
-|---|---|
-| Implemented | The code is in the repository and has unit tests. |
-| In progress | Some code exists, but it is not finished. |
-| Designed | The syntax and rules are decided. Prototypes were tested. The library does not have the code yet. |
-| Planned | The idea is known, but the details are not decided. |
-
 ## Example entities
 
 All examples use these three entities. The full code is in [Getting started](02-getting-started.md#example-entities).

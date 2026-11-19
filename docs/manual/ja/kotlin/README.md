@@ -58,29 +58,21 @@ fetch first ? rows only
 <a id="contents"></a>
 ## 目次
 
-| # | ページ | 学べること | 状況 |
-|---|---|---|---|
-| 1 | [概要](../01-overview.md)（共通） | lambdaQL とは何か、なぜ作ったか、どう動くか | – |
-| 2 | [はじめよう](02-getting-started.md) | 必要な環境、Gradle の設定、Kotlin のエンティティ、最初のクエリ | ソースからのビルドは動作します。`where`、`toList()`、結果の関数 `first()`、`one()`、`count()`、`exists()`、`toSet()`: 実装済み、H2・MariaDB・Oracle でテスト済み（`where` と `toList()` は Kotlin のラムダでも。結果の関数は Java のラムダでのみ） |
-| 3 | [条件（`where`）](03-where.md) | 演算子、null のルール、`?.` `?:` `!!`、範囲、`when`、キャプチャした値 | getter から JPA 属性へのマッピング、HQL の生成とクエリの実行（`where`、`toList()`）: 実装済み、H2・MariaDB・Oracle でテスト済み。`?.`、`!!`、キャプチャ値、`in`: Kotlin のラムダでテスト済み。`?:`、範囲、`when`: 設計済み |
-| 4 | [ソートとページング](04-order-paging.md) | `orderBy`、`Direction`、`limit`、`offset` | 中核部分は実装済み、H2・MariaDB・Oracle でテスト済み（Kotlin のテスト 1 つ、そのほかは Java のテスト）。`SortSpec`、結合のソート `{ o, c, by -> }`、外部のソートのためのソートポリシー（コード、Spring Boot のプロパティ、`@Sortable` によるルール）も含みます。プロパティ参照、`SortSpec` の結合の書き方: 設計済み |
-| 5 | [サブクエリ](05-subquery.md) | `exists()`、`x in sub...`、スカラーサブクエリと相関サブクエリ | 実装済み、H2・MariaDB・Oracle でテスト済み（`exists`、`in`、スカラーは Kotlin のラムダでも）。MariaDB の `lateral` の書き換え: まだ実装されていません |
-| 6 | [選択、集計、グループ化](06-select-group.md) | `select`、data class、`Pair`、`groupBy`、`having`、`Agg`、結合、派生テーブル、CTE | `select`、`groupBy`、`having`、`Agg`、`distinct()`: 実装済み、H2・MariaDB・Oracle でテスト済み（data class、`Pair`、`Triple`、`groupBy`、`having` は Kotlin のラムダでも）。明示的な結合、派生テーブル、CTE: 実装済み（Java のテスト。Kotlin はまだテストしていません） |
-| 7 | [更新、挿入、削除](07-dml.md) | プロパティへの代入、`by.set`、`values`、`all()`、`execute()`、`limit`、`executeOne()` | 実装済み、H2・MariaDB・Oracle でテスト済み。`limit` と `executeOne()` も含みます（プロパティへの代入、`by[column] = value`、insert、delete は Kotlin のラムダでも）。update と delete の `where` の中のサブクエリ（`sub`）と `insert ... select` の集計: 実装済み。`set` の値の中のサブクエリ: 設計済み |
-| 7.6 | [Upsert](07-6-upsert.md) | `upsert`、`onConflict { ... }.update { ... }`、`onConflict { ... }.ignore()`、データベースごとの行数 | 実装済み、H2・MariaDB・Oracle でテスト済み（Java のテスト。Kotlin はまだテストしていません） |
-| 8 | [プロシージャと DB 関数](08-procedures-functions.md) | `@SqlProcedure`、`companion object` の中の `@SqlFunction`、`qb.call`、`qb.exec` | 実装済み（Java のテスト。Kotlin はまだテストしていません）: DB 関数は H2・MariaDB・Oracle、プロシージャは MariaDB と Oracle。引数名の照合と Oracle パッケージのオーバーロードの検出も実装済み。DB 関数の SARGable 警告（`LQL-5001`、`LQL-5007`）: 実装済み。プロシージャのパラメーターの型の照合: まだ実装されていません |
-| 9 | [Kotlin の注意点](09-kotlin-notes.md) | Kotlin で特別なこと: `?.` `?:` `!!`、`==`、`in`、`when`、演算子、制限 KC1 から KC21 | 一部テスト済み（`?.`、`!!`、`in`、data class、プロパティへの代入）。そのほかの書き方: 設計済み |
-| 10 | [ルールと制限](10-rules-and-limits.md) | すべてのルール表を 1 か所に | 一部実装済み |
-| 11 | [エラーと言語](../11-errors-and-languages.md)（共通） | エラーコード、例外、メッセージの言語、ログ | 実装済み、ユニットテスト済み。厳格モード: まだ実装されていません |
-| 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`、本体を持つリポジトリのメソッド、DML の短縮メソッド（`deleteAll`、`updateOne` など）、Spring の `Sort` と `Pageable`、モジュール、トランザクション、Kotlin 2.2 / `-Xjvm-default=all` | 実装済み、Spring Boot 3.4.2 で H2・MariaDB・Oracle でテスト済み。DML の短縮メソッドと、更新、削除、挿入、upsert のビルダーも含みます（Java のテスト。Kotlin のリポジトリはまだテストしていません） |
-
-用語の意味:
-
-| 用語 | 意味 |
-|---|---|
-| 実装済み | コードがリポジトリにあり、ユニットテストがあります。 |
-| 設計済み | 構文とルールは決まっています。プロトタイプでテストしました。ライブラリにはまだコードがありません。 |
-| 予定 | アイデアはありますが、詳細は決まっていません。 |
+| # | ページ | 学べること |
+|---|---|---|
+| 1 | [概要](../01-overview.md)（共通） | lambdaQL とは何か、なぜ作ったか、どう動くか |
+| 2 | [はじめよう](02-getting-started.md) | 必要な環境、Gradle の設定、Kotlin のエンティティ、最初のクエリ |
+| 3 | [条件（`where`）](03-where.md) | 演算子、null のルール、`?.` `?:` `!!`、範囲、`when`、キャプチャした値 |
+| 4 | [ソートとページング](04-order-paging.md) | `orderBy`、`Direction`、`limit`、`offset` |
+| 5 | [サブクエリ](05-subquery.md) | `exists()`、`x in sub...`、スカラーサブクエリと相関サブクエリ |
+| 6 | [選択、集計、グループ化](06-select-group.md) | `select`、data class、`Pair`、`groupBy`、`having`、`Agg`、結合、派生テーブル、CTE |
+| 7 | [更新、挿入、削除](07-dml.md) | プロパティへの代入、`by.set`、`values`、`all()`、`execute()`、`limit`、`executeOne()` |
+| 7.6 | [Upsert](07-6-upsert.md) | `upsert`、`onConflict { ... }.update { ... }`、`onConflict { ... }.ignore()`、データベースごとの行数 |
+| 8 | [プロシージャと DB 関数](08-procedures-functions.md) | `@SqlProcedure`、`companion object` の中の `@SqlFunction`、`qb.call`、`qb.exec` |
+| 9 | [Kotlin の注意点](09-kotlin-notes.md) | Kotlin で特別なこと: `?.` `?:` `!!`、`==`、`in`、`when`、演算子、制限 KC1 から KC21 |
+| 10 | [ルールと制限](10-rules-and-limits.md) | すべてのルール表を 1 か所に |
+| 11 | [エラーと言語](../11-errors-and-languages.md)（共通） | エラーコード、例外、メッセージの言語、ログ |
+| 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`、本体を持つリポジトリのメソッド、DML の短縮メソッド（`deleteAll`、`updateOne` など）、Spring の `Sort` と `Pageable`、モジュール、トランザクション、Kotlin 2.2 / `-Xjvm-default=all` |
 
 <a id="where-to-start"></a>
 ## どこから始めるか
