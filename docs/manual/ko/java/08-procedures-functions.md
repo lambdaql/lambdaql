@@ -1,17 +1,6 @@
 <a id="8-stored-procedures-and-db-functions-java"></a>
 # 8. 저장 프로시저와 DB 함수 (Java)
 
-> [!NOTE]
-> **상태**
-> - **구현됨, 테스트함**(결정 D30, D31, 마일스톤 M11, Hibernate 6.6.5):
->   쿼리 안의 DB 함수(`@SqlFunction`)는 H2 2.3, MariaDB 10.11, Oracle 23.26에서 테스트했습니다([`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)).
->   프로시저 호출(`@SqlProcedure`, `@InOut`, `qb.call`, `qb.exec`)은 MariaDB와 Oracle에서, DB 함수 단독 호출은 세 데이터베이스 모두에서 테스트했습니다([`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)).
->   H2에는 OUT 파라미터가 없으므로 프로시저 테스트는 H2에서 실행하지 않습니다.
-> - **추가로 구현됨, 테스트함:** 데이터베이스와의 스텁 인자 **이름** 대조(규칙 PR2의 일부), Oracle 패키지 오버로드 검출.
-> - **추가로 구현됨, 테스트함:** 조건 안의 DB 함수와 컬럼 산술에 대한 SARGable 경고, 엄격 모드 `SargableMode.STRICT`(규칙 PR8, FN7, 결정 D50, [8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고).
-> - **아직 구현되지 않음:** 데이터베이스와의 파라미터 **타입** 대조(규칙 PR2의 일부), Oracle 패키지 프로시저의 오버로드 하나를 골라 호출하는 기능.
-> - **(테스트됨)** 표시가 있는 예제는 테스트 코드에서 그대로 가져온 것입니다. 다른 예제도 같은 규칙을 따르지만 테스트로 확인하지는 않았습니다. 전체 상태는 [Java 트랙 README](README.md#status)를 참고하십시오.
-
 [Java 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [7. 수정, 삽입, 삭제](07-dml.md) | 다음: [9. Java 노트](09-java-notes.md) | [이 페이지의 Kotlin 버전](../kotlin/08-procedures-functions.md)
 
 공통 페이지: [1. 개요](../01-overview.md) · [11. 오류와 언어](../11-errors-and-languages.md)
@@ -618,9 +607,6 @@ lambdaQL은 먼저 대기 중인 변경 사항을 flush합니다(PR9와 같음).
 
 <a id="89-warning-functions-on-columns-and-indexes-sargable"></a>
 ## 8.9 주의: 컬럼에 대한 함수와 인덱스(SARGable)
-
-> [!NOTE]
-> **구현됨, 테스트함**(H2, MariaDB 10.11, Oracle 23.26, 규칙 PR8, FN7). 엄격 모드(`SargableMode.STRICT`)와 컬럼 산술의 경고(`LQL-5012`, `LQL-5013`)도 구현됨(결정 D50).
 
 lambdaQL은 **인덱스를 사용할 수 있는** SQL을 만들려고 합니다([10. 규칙과 제한](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql) 참고).
 컬럼을 감싼 함수는 보통 일반 인덱스를 **사용할 수 없습니다**.

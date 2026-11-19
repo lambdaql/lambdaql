@@ -1,12 +1,6 @@
 <a id="3-conditions-where-java"></a>
 # 3. 조건(`where`) (Java)
 
-> [!NOTE]
-> **상태**
-> - **구현됨, H2·MariaDB·Oracle에서 테스트함:** `where` 조건과 `toList()`. lambdaQL이 getter를 컬럼에 매핑하고, HQL을 쓰고, 실행합니다.
-> - **함께 구현됨:** 정렬과 페이징의 핵심 기능([4. 정렬과 페이징](04-order-paging.md)), 서브쿼리([5. 서브쿼리](05-subquery.md)), `groupBy`·`having`·`Agg`를 포함한 `select`, 명시적 조인, 파생 테이블, CTE([6. 조회, 집계, 그룹화](06-select-group.md)), update/insert/delete/upsert([7. 수정, 삽입, 삭제](07-dml.md)), 프로시저와 DB 함수([8. 프로시저와 DB 함수](08-procedures-functions.md)), Spring Data JPA 모듈([12. Spring Data JPA](12-spring-data-jpa.md)).
-> - **(테스트됨)** 표시가 있는 예제는 테스트 코드에서 그대로 가져온 것입니다. 이 장의 나머지 HQL은 설계에 따른 **예정된** 출력입니다. 세부 사항(예: `e0`, `j1` 같은 별칭 이름)은 아직 조금 바뀔 수 있습니다.
-
 [Java 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [2. 시작하기](02-getting-started.md) | 다음: [4. 정렬과 페이징](04-order-paging.md) | [이 페이지의 Kotlin 버전](../kotlin/03-where.md)
 
 공통 페이지: [1. 개요](../01-overview.md) · [11. 오류와 언어](../11-errors-and-languages.md)

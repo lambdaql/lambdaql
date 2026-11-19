@@ -4,15 +4,6 @@
 > [!IMPORTANT]
 > このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/10-rules-and-limits.md)を参照してください。
 
-> [!NOTE]
-> **状況: 一部実装済み。**
-> この章には、Kotlin 向けの lambdaQL の設計のルールをまとめています。ラムダがどのように SQL になるか、NULL がどう扱われるか、
-> Kotlin と SQL がどこで違うか、データベースがどこで違うか、何がサポートされないか、です。
-> ルールは H2 2.3、MariaDB 10.11、Oracle 23ai（Hibernate 6.6.5）のプロトタイプで、Kotlin のバイトコードは kotlinc 1.7.22 から 2.3.21 で確認しました。
-> 現在動作するのは解析コア、`where`、結果の関数（`toList()`、`toSet()`、`first()`、`one()`、`count()`、`exists()`）、ソートとページングの中核部分、`SortSpec`、update/insert/delete/upsert（[7](07-dml.md)）、そして Spring Data JPA モジュール（[12](12-spring-data-jpa.md)）です（H2、MariaDB、Oracle で Java のラムダを使ってテスト済み）。
-> サブクエリ（[5](05-subquery.md)）と集計を含む `select`（[6](06-select-group.md)）のルールも実装済みで、DML の中でも使えます。明示的な結合、派生テーブル、CTE（[6](06-select-group.md)）、プロシージャと DB 関数（[8](08-procedures-functions.md)）のルールも実装済みです。カラムに対する DB 関数の警告（[10.2](#db-functions-on-a-column)）も実装済みです。ソートのルールにも、まだ実装されていないものがあります（[4.12](04-order-paging.md#412-rules-summary-s1-to-s14) を参照）。
-> 全体の状況は [トラックの README](README.md) を参照してください。
-
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [9. Kotlin の注意点](09-kotlin-notes.md) | 次: [11. エラーと言語](../11-errors-and-languages.md) | [このページの Java 版](../java/10-rules-and-limits.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)

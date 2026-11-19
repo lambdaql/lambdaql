@@ -5,14 +5,6 @@
 
 **其他语言：** [English](../../en/kotlin/README.md) | [한국어](../../ko/kotlin/README.md) | [日本語](../../ja/kotlin/README.md) | [简体中文](../../zh/kotlin/README.md)
 
-> [!IMPORTANT]
-> **状态：** lambdaQL 处于早期开发阶段。
-> 已实现**分析核心**、**带结果函数的 `where`**（`toList()`、`toSet()`、`first()`、`one()`、`count()`、`exists()`）以及**排序与分页**的核心部分（`orderBy`、`limit`、`offset`、`SortSpec`）：lambdaQL 加载 Lambda 表达式，解码它，生成 HQL 并执行它。这已在 H2、MariaDB 和 Oracle 上测试，大多使用 **Java** Lambda。
-> **Kotlin Lambda 已在构建中测试**（kotlinc 2.3.21，[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)）：`?.` 路径、`!!`、捕获值、`in`、排序、子查询、使用 data class、`Pair` 和 `Triple` 的 `select`、`groupBy` 和 `having`、update、insert 和 delete。其他 Kotlin 特有的写法（`?:`、区间、`when`、属性引用）处于**已设计**状态：它们的字节码已经编译，并用原型检查过（kotlinc 1.7.22 到 2.3.21）。
-> **子查询**、**`select`**（带 `groupBy`、`having` 和 `Agg`）、**更新、插入、删除和 upsert**（包括 `limit` 和单行保护 `executeOne()`）、**显式 join**、**派生表和 CTE**、**存储过程与数据库函数**以及**四种语言的错误码**都已实现。join、派生表、CTE、存储过程、数据库函数和 upsert 只用 Java Lambda 测试过。
-> **Spring Data JPA 模块**（`LambdaQlExecutor<T>`、Spring `Sort` 和 `Pageable`、`deleteAll { }` 和 `updateOne({ }) { }` 等 DML 快捷方法、更新、删除、插入和 upsert 构建器、Spring Boot 自动配置）已实现，并已用 Java repository 测试（Spring Boot 3.4.2）。DML 需要调用方的事务。Kotlin repository 尚未测试。
-> 目前还没有任何构件发布到 Maven Central。如果想试用，请[从源码构建](02-getting-started.md#build-from-source)。
-
 [手册首页](../README.md) | [Java 路线](../java/README.md) | 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
 
 这是 lambdaQL 手册的 **Kotlin 路线**。本路线的每个页面**只包含 Kotlin 代码**。

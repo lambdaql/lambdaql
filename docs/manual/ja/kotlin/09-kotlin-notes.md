@@ -4,14 +4,6 @@
 > [!IMPORTANT]
 > このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/09-kotlin-notes.md)を参照してください。
 
-> [!NOTE]
-> **状況: 一部実装済み。**
-> Kotlin のサポートは決定済みの設計です（決定 D17、D20 から D25、D27、D28、D31）。
-> この章のすべての書き方のバイトコードは、kotlinc
-> 1.7.22、2.1.10、2.2.21、2.3.0、2.3.21 でコンパイルして確認しました。また、多くの条件を H2 で 1 行ずつ確認しました。
-> **Kotlin のラムダでテスト済み**（ビルドの中、kotlinc 2.3.21、H2、MariaDB、Oracle）: `?.` のパス、`!!`、キャプチャ値、キャプチャしたコレクションに対する `in`、サブクエリ（`exists`、`in`、スカラー）、`limit` を使うソート、data class、`Pair`、`Triple` を使う `select`、`listOf` のキーを使う `groupBy`、`having`、update でのプロパティへの代入と `by[column] = value`、insert、delete（[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)）。
-> **設計済み、まだテストしていないもの:** このページのそのほかの書き方（たとえば `?:`、範囲、`when`、プロパティ参照、文字列テンプレート）。コンパイラーのバージョンの組み合わせ（kotlinc 1.7.22 から 2.3.0）はまだビルドに入っていません。全体の状況は [トラックの README](README.md) を参照してください。
-
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [8. プロシージャと DB 関数](08-procedures-functions.md) | 次: [10. ルールと制限](10-rules-and-limits.md) | [このページの Java 版: 9. Java の注意点](../java/09-java-notes.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -402,10 +394,6 @@ NULL の行が欲しい場合は、`it.status == null || it.status !in 1..5` と
 | カラムに対する `trim()`、`coerceAtLeast()`、`toLocalDate()` などの stdlib の呼び出し | **拒否**（KC20） | 予定（関数のマッピング） |
 | `"$a-$b" == it.description`（テンプレートの中はキャプチャ値だけ） | `:p1 = e0.description` | 設計済み: 文字列はアプリケーションで組み立てられます。現在の解析コアは文字列の連結をすべて拒否します。文字列はラムダの前に組み立ててください |
 | `"${it.description}-x"`（テンプレートの中のエンティティの値） | **拒否**（KC17） | 予定 |
-
-> [!NOTE]
-> ロードマップでは、一般的な `LIKE` のサポート（Java の `startsWith` など）は v0.2 の予定です。
-> 上の Kotlin の書き方は設計済みですが、その作業と一緒に、他の Kotlin の書き方より遅れてリリースされることがあります。
 
 **`ignoreCase = true`（D24）。** lambdaQL は `lower(col) = lower(:p)` を書きません。インデックスを使えないからです。
 起動時にそのカラムの DB メタデータを読み、DB が使える形を選びます。

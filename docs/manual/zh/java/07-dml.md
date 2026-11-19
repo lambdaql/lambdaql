@@ -3,14 +3,6 @@
 > [!IMPORTANT]
 > 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/07-dml.md)。
 
-> [!NOTE]
-> **状态**
-> - **已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（Hibernate 6.6.5，里程碑 M10，决定 D28 和 D40）：更新（setter、`by.set`、多次调用 `set()`、`@Version`）、删除、插入（一行、列表、自动生成的 id、`insert ... select`）、upsert、规则 U1、U3、U4 和 U6 的检查，以及（决定 D41）更新和删除的 `limit` 与单行保护 `executeOne()`。
-> - **同样已实现并测试：** update 和 delete 的 `where` 中的子查询（`sub`）（里程碑 M8，见 [7.4](07-4-delete.md)），以及 `insert ... select` 中的 `groupBy`、`having` 和 `Agg`（里程碑 M9，见 [7.5](07-5-insert.md)）。
-> - **尚未实现：** `set` 值中的子查询（上下文对象的 `by.from(...)`），以及复合键实体上的 `limit` / `executeOne()`。
-> - 标记为 **(已测试)** 的示例是从测试代码中复制的。其他示例遵循设计。它们还没有测试覆盖，其 HQL 在小细节上可能不同（例如 `e0` 这样的别名）。
-> - 完整状态见 [Java 路线 README](README.md#status)。
-
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[6. 查询列、聚合与分组](06-select-group.md) | 下一章：[8. 存储过程与数据库函数](08-procedures-functions.md) | [本页的 Kotlin 版本](../kotlin/07-dml.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)

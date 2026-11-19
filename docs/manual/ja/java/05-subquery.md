@@ -4,12 +4,6 @@
 > [!IMPORTANT]
 > このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/05-subquery.md)を参照してください。
 
-> [!NOTE]
-> **状況**
-> - **実装済み、テスト済み:** H2 2.3、MariaDB 10.11、Oracle 23.26（Hibernate 6.6.5、マイルストーン M8-1）。select、update、delete の `where((o, sub) -> ...)` の中のサブクエリ。`exists` / `not exists`、`contains`（IN）、`!contains`（NOT EXISTS として書かれる）、スカラーの集計（`count`、`sum`、`avg`、`min`、`max`）、top-1 の形 `orderBy(...).limit(1)...first()`、相関サブクエリと入れ子のサブクエリ、キャプチャ値を含みます。
-> - **まだ実装されていないもの:** `set` の値の中のサブクエリ、MariaDB の `lateral` の書き換え。（派生テーブルと CTE は別の構文で実装済みです。[6. 選択、集計、グループ化](06-select-group.md#69-derived-table-subquery-in-from) を参照してください。）
-> - **(テスト済み)** と書かれた例は、テストスイートからコピーしたものです。それ以外の例も同じルールに従いますが、テストではカバーされていません。
-
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [4. ソートとページング](04-order-paging.md) | 次: [6. 選択、集計、グループ化](06-select-group.md) | [このページの Kotlin 版](../kotlin/05-subquery.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)

@@ -4,12 +4,6 @@
 > [!IMPORTANT]
 > このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/09-java-notes.md)を参照してください。
 
-> [!NOTE]
-> **状況**
-> - **実装済み（解析コア）:** シリアライズ可能なラムダの読み込み、`this` をキャプチャするラムダ、メソッド参照の検出、`Serializable` でないラムダの拒否。テストは [9.13](#913-what-you-can-check-today) を参照してください。
-> - **実装済み:** キーが 1 つのソートでの getter のメソッド参照。たとえば `orderBy(Order::getPrice)`（[9.9](#99-method-references) を参照）。
-> - **設計済み、まだ実装されていないもの:** このページのそれ以外のすべて（`==` の意味、ボクシングのルール、`String` のルール、クエリでのメソッド参照など）。
-
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [8. プロシージャと DB 関数](08-procedures-functions.md) | 次: [10. ルールと制限](10-rules-and-limits.md) | [このページの Kotlin 版](../kotlin/09-kotlin-notes.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -307,10 +301,6 @@ lambdaQL には **static な DSL がありません**。`Agg` の任意のイン
 .where(o -> o.getUpdateAt().isAfter(LocalDateTime.of(2026, 1, 1, 0, 0)))   // OK: Java で計算される
 .where(o -> MyUtil.normalize(o.getDescription()) == text)                   // 拒否: エンティティを使っている
 ```
-
-> [!NOTE]
-> リポジトリには、古いプロトタイプのコード（たとえば `JpqlFunction` クラス）がまだ残っています。
-> これは新しい設計の一部ではありません。クエリでは使わないでください。
 
 <a id="911-other-java-forms"></a>
 ## 9.11 その他の Java の書き方

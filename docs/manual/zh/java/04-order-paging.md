@@ -1,13 +1,6 @@
 <a id="4-sorting-and-paging-java"></a>
 # 4. 排序与分页（Java）
 
-> [!NOTE]
-> **状态**
-> - **核心部分已实现并测试**，在 H2、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上：带有 `by.asc`、`by.desc` 和 `by.sort` 的 `orderBy((o, by) -> ...)`，一个排序键的写法 `orderBy(o -> key)` 和 `orderBy(key, Direction)`（也可以使用 `Order::getPrice` 这样的 getter 方法引用），`Direction.parse` / `reversed`，`limit` / `offset`，`orderBy` 之后的 `first()`，以及可重用排序 `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。Spring `Sort` 和 `Pageable` 可以在 Spring Data JPA 模块中使用（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。
-> - **也已实现并测试：** 在 `join`、`leftJoin` 或 `crossJoin` 之后使用的 join 写法 `(o, c, by) -> ...`（见 [6.8 显式 join](06-select-group.md#68-explicit-joins)），以及用于外部排序的排序策略（`SortRules`、`SortPolicy`、`SortMode`，见 [4.10](#sort-policy)）。
-> - **尚未实现：** `SortSpec` 的 join 写法。
-> - 标记为 **(已测试)** 的示例是从测试代码中复制的。本章中的其他 HQL 遵循相同的规则，但没有经过测试。
-
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[3. 条件](03-where.md) | 下一章：[5. 子查询](05-subquery.md) | [本页的 Kotlin 版本](../kotlin/04-order-paging.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)

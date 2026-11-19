@@ -6,13 +6,6 @@
 
 [マニュアルのホーム](README.md) | トラック: [Java](java/README.md) | [Kotlin](kotlin/README.md) | 前: 10. ルールと制限（[Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md)） | 次: 12. Spring Data JPA（[Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md)）
 
-> [!NOTE]
-> **状況:** 実装済み、テスト済みです（決定 D33）。
-> すべてのメッセージに `[LQL-xxxx]` のコードが付き、メッセージは英語、日本語、中国語（簡体字）、韓国語で用意されています。
-> 例外は `LambdaQLException` とそのサブクラスです。警告は SLF4J に出力されます。
-> **(テスト済み)** と書かれた例は、テストコード（[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)、[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)）からそのまま取ったものです。このページのそれ以外のコードは設計上の例です。
-> まだ実装されていないもの: 警告をエラーに変える厳格モード。
-
 このページは両方の言語向けです。コードは **Java** と **Kotlin** の別々のセクションに分けて載せています。
 
 <a id="error-codes"></a>

@@ -3,16 +3,6 @@
 
 **다른 언어:** [English](../en/README.md) | [한국어](../ko/README.md) | [日本語](../ja/README.md) | [简体中文](../zh/README.md)
 
-> [!IMPORTANT]
-> **상태: lambdaQL은 초기 개발 단계입니다.**
-> 현재 **분석 코어**, **결과 함수를 포함한 `where`**(`toList()`, `toSet()`, `first()`, `one()`, `count()`, `exists()`), 그리고 **정렬과 페이징**(`orderBy`, `limit`, `offset`, `SortSpec`)의 핵심 기능이 구현되어 있습니다. lambdaQL은 람다를 로드하고, 디코딩하고, HQL을 쓰고, 실행합니다. 이 부분은 H2, MariaDB, Oracle에서 테스트했습니다(Java 람다 사용).
-> **수정, 삽입, 삭제, 업서트**도 `limit`과 1행 보호 `executeOne()`을 포함해 구현되어 있습니다(H2, MariaDB, Oracle에서 Java 람다로 테스트함).
-> **Spring Data JPA 모듈**도 구현되어 있습니다. 리포지토리 실행기 `LambdaQlExecutor<T>`(Spring `Sort`, `Pageable`, `deleteAll(where)`·`updateOne(where, set)` 같은 DML 단축 메서드, 수정·삭제·삽입·업서트 빌더 포함)와 Spring Boot 자동 구성이 대상이며, Spring Boot 3.4.2에서 테스트했습니다. DML에는 호출자의 트랜잭션이 필요합니다.
-> **서브쿼리**(`where((o, sub) -> ...)`, 수정·삭제 포함)와 **`select`**(레코드와 DTO, `groupBy`, `having`, `Agg` 집계, `insert ... select` 포함)도 구현되어 있습니다(H2, MariaDB, Oracle에서 Java 람다로 테스트함).
-> **명시적 조인**(`join`, `leftJoin`, `crossJoin`), **파생 테이블과 CTE**(`qb.from(valueQuery)`, `qb.with(valueQuery)`), **저장 프로시저와 DB 함수**(`@SqlProcedure`, `@SqlFunction`, `qb.call`, `qb.exec`), **4개 언어 메시지와 오류 코드**(`[LQL-xxxx]`)도 구현되어 있습니다(Java 람다로 테스트함. 프로시저는 MariaDB와 Oracle에서 테스트함).
-> **Kotlin 람다**는 일부 형태(`?.`, `!!`, `in`, 서브쿼리, 데이터 클래스, `groupBy`, update, insert, delete)를 빌드 안에서 테스트했습니다. 나머지 Kotlin 전용 형태는 **설계** 단계입니다. 문법과 규칙은 확정되었고 프로토타입으로 확인했지만, 빌드 안의 테스트는 아직 없습니다.
-> 아직 Maven Central에 배포된 아티팩트는 없습니다. 사용해 보려면 소스에서 빌드하십시오([Java](java/02-getting-started.md#build-from-source) | [Kotlin](kotlin/02-getting-started.md#build-from-source)).
-
 lambdaQL은 Java와 Kotlin용 쿼리 라이브러리입니다.
 평소처럼 람다를 작성하면 lambdaQL이 람다의 바이트코드를 읽어 Hibernate 6.6 HQL 쿼리를 만듭니다.
 람다는 절대 실행되지 않습니다.

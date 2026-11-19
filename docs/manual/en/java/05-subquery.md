@@ -3,12 +3,6 @@
 > [!IMPORTANT]
 > This page is older than the Korean manual. See the [Korean page](../../ko/java/05-subquery.md) for the latest rules.
 
-> [!NOTE]
-> **Status**
-> - **Implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5, milestone M8-1): subqueries in `where((o, sub) -> ...)` of a select, an update and a delete. This covers `exists` / `not exists`, `contains` (IN), `!contains` (written as `NOT IN`), scalar aggregates (`count`, `sum`, `avg`, `min`, `max`), the top-1 form `orderBy(...).limit(1)...first()`, correlated and nested subqueries, and captured values.
-> - **Not implemented yet:** subqueries in the values of `set`, and the MariaDB `lateral` rewrite. (Derived tables and CTEs are implemented with another syntax, see [6. Select, aggregates and group by](06-select-group.md#69-derived-table-subquery-in-from).)
-> - Examples marked **(tested)** are copied from the test suite. The other examples follow the same rules, but they are not covered by a test.
-
 [Java track](README.md) | [Manual home](../README.md) | Previous: [4. Sorting and paging](04-order-paging.md) | Next: [6. Select, aggregates and group by](06-select-group.md) | [Kotlin version of this page](../kotlin/05-subquery.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)

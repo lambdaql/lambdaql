@@ -3,14 +3,6 @@
 > [!IMPORTANT]
 > 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/09-kotlin-notes.md)。
 
-> [!NOTE]
-> **状态：部分已实现。**
-> Kotlin 支持是已经确定的设计（决策 D17、D20 到 D25、D27、D28、D31）。
-> 本章中每种写法的字节码都已用 kotlinc
-> 1.7.22、2.1.10、2.2.21、2.3.0 和 2.3.21 编译并检查过。许多条件也已在 H2 上逐行检查。
-> **已在构建中用 Kotlin Lambda 测试**（kotlinc 2.3.21，H2、MariaDB 和 Oracle）：`?.` 路径、`!!`、捕获值、对捕获集合使用 `in`、子查询（`exists`、`in`、标量）、带 `limit` 的排序、使用 data class、`Pair` 和 `Triple` 的 `select`、`listOf` 键的 `groupBy`、`having`、update 中的属性赋值和 `by[column] = value`、insert 以及 delete（[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)）。
-> **已设计，尚未测试：** 本页的其他写法（例如 `?:`、区间、`when`、属性引用、字符串模板）。编译器版本矩阵（kotlinc 1.7.22 到 2.3.0）还没有加入构建。完整状态请参阅 [路线 README](README.md)。
-
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[8. 存储过程与数据库函数](08-procedures-functions.md) | 下一章：[10. 规则与限制](10-rules-and-limits.md) | [本页的 Java 版本：9. Java 说明](../java/09-java-notes.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -389,10 +381,6 @@ lambdaQL 不会添加保护：NULL 主体既不会被 `in` 返回，**也**不�
 | 列上的 `trim()`、`coerceAtLeast()`、`toLocalDate()` 及其他标准库调用 | **拒绝**（KC20） | 计划中（函数映射） |
 | `"$a-$b" == it.description`（模板中只有捕获值） | `:p1 = e0.description` | 已设计：字符串在应用程序中构建。目前分析核心拒绝所有字符串拼接；请在 Lambda 之前构建字符串 |
 | `"${it.description}-x"`（模板中有实体值） | **拒绝**（KC17） | 计划中 |
-
-> [!NOTE]
-> 路线图把通用的 `LIKE` 支持（Java 的 `startsWith` 等）列在 v0.2 中。
-> 上面的 Kotlin 写法已经设计好，但它们可能会与那部分工作一起发布，比其他 Kotlin 写法更晚。
 
 **`ignoreCase = true`（D24）。** lambdaQL 不会写 `lower(col) = lower(:p)`，因为那样无法使用索引。
 启动时，它会读取该列的数据库元数据，并选择数据库能够利用的写法：

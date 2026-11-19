@@ -4,13 +4,6 @@
 > [!IMPORTANT]
 > This page is older than the Korean manual. See the [Korean page](../../ko/java/07-4-delete.md) for the latest rules.
 
-> [!NOTE]
-> **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10), including `limit` and `executeOne()` (decision D41).
-> Subqueries (`sub`) in `where` are implemented and tested too (milestone M8).
-> **Not implemented yet:** `limit` / `executeOne()` on entities with a composite key.
-> Examples marked **(tested)** are copied from [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) and [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java). The other examples follow the design and are not covered by a test yet.
-> See the [Java track README](README.md#status) for the full status.
-
 [7. Update, insert, delete (Java)](07-dml.md) | [7.2 Update](07-2-update.md) | **7.4 Delete** | [7.5 Insert](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Kotlin](../kotlin/07-4-delete.md)
 
 ---

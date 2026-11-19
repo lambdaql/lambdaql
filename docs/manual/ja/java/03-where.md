@@ -4,12 +4,6 @@
 > [!IMPORTANT]
 > このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/03-where.md)を参照してください。
 
-> [!NOTE]
-> **状況**
-> - **実装済み、H2・MariaDB・Oracle でテスト済み:** `where` の条件と `toList()`。lambdaQL は getter をカラムにマッピングし、HQL を書いて実行します。
-> - **これも実装済み:** ソートとページングの中核部分（[4. ソートとページング](04-order-paging.md)）、サブクエリ（[5. サブクエリ](05-subquery.md)）、`groupBy`、`having`、`Agg` を使う `select`、明示的な結合、派生テーブルと CTE（[6. 選択、集計、グループ化](06-select-group.md)）、update/insert/delete/upsert（[7. 更新、挿入、削除](07-dml.md)）、プロシージャと DB 関数（[8. プロシージャと DB 関数](08-procedures-functions.md)）、Spring Data JPA モジュール（[12. Spring Data JPA](12-spring-data-jpa.md)）。
-> - **(テスト済み)** と書かれた例は、テストスイートからコピーしたものです。この章のそれ以外の HQL は、設計で定めた **予定の** 出力です。細かい部分（たとえば `e0`、`j1` のようなエイリアス名）はまだ変わることがあります。
-
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [2. はじめよう](02-getting-started.md) | 次: [4. ソートとページング](04-order-paging.md) | [このページの Kotlin 版](../kotlin/03-where.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)

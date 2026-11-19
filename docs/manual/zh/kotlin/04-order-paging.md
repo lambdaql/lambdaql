@@ -1,14 +1,6 @@
 <a id="4-sorting-and-paging-kotlin"></a>
 # 4. 排序与分页（Kotlin）
 
-> [!NOTE]
-> **状态**
-> - **核心部分已实现**，并在 H2、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上测试：带有 `by.asc`、`by.desc` 和 `by.sort` 的 `orderBy { o, by -> ... }`，一个排序键的写法 `orderBy { it.key }` 和 `orderBy({ it.key }, Direction)`，`Direction.parse` / `reversed`，`limit` / `offset`，`orderBy` 之后的 `first()`，以及可重用排序 `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。Spring `Sort` 和 `Pageable` 可以在 Spring Data JPA 模块中使用（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。大多数测试使用 **Java** Lambda。带 `limit` 的 Kotlin 排序也已测试（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，标记为 **(已测试)**）。
-> - **也已实现（用 Java Lambda 测试）：** 在 `join`、`leftJoin` 或 `crossJoin` 之后使用的 join 写法 `{ o, c, by -> ... }`（见 [6.8 显式 join](06-select-group.md#68-explicit-joins)），以及用于外部排序的排序策略（`SortRules`、`SortPolicy`、`SortMode`，见 [4.10](#sort-policy)）。
-> - **尚未实现：** Kotlin 属性引用（`orderBy(Order::price)`）和 `SortSpec` 的 join 写法。
-> - 该 Kotlin 语法可以编译（已用原型检查，kotlinc 2.3.21）。可空排序键、`?.` 排序键和属性引用可以编译；实体排序键不能编译。
-> - 本章中的其他 HQL 遵循库的规则，但没有用 Kotlin Lambda 测试过。
-
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[3. 条件](03-where.md) | 下一章：[5. 子查询](05-subquery.md) | [本页的 Java 版本](../java/04-order-paging.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)

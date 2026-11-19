@@ -5,13 +5,6 @@
 
 [Manual home](README.md) | Tracks: [Java](java/README.md) | [Kotlin](kotlin/README.md) | Previous: 10. Rules and limits ([Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md)) | Next: 12. Spring Data JPA ([Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md))
 
-> [!NOTE]
-> **Status:** Implemented and tested (decision D33).
-> Every message has a code `[LQL-xxxx]`, and the messages exist in English, Japanese, Chinese (Simplified) and Korean.
-> The exceptions are `LambdaQLException` and its subclasses. Warnings go to SLF4J.
-> Examples marked **(tested)** are copied from the test suite ([`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)). The other code on this page is a design example.
-> Not implemented yet: a strict mode that turns warnings into errors.
-
 This page is for both languages. Code is shown in separate **Java** and **Kotlin** sections.
 
 ## Error codes

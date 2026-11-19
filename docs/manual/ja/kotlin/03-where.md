@@ -4,14 +4,6 @@
 > [!IMPORTANT]
 > このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/03-where.md)を参照してください。
 
-> [!NOTE]
-> **状況**
-> - **実装済み、H2・MariaDB・Oracle でテスト済み:** `where` の条件と `toList()`（カラムへのマッピング、HQL の出力、クエリの実行）。ほとんどのテストは **Java** のラムダを使っています。
-> - **Kotlin のラムダでテスト済み**（[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、ビルドの中、kotlinc 2.3.21）: `?.` のパス、キャプチャ値、キャプチャしたコレクションに対する `in`。`!!` は [5. サブクエリ](05-subquery.md) の Kotlin のテストで確認しています。これらの例には **(テスト済み)** と書いてあります。
-> - **設計済み、まだテストしていないもの:** この章のそのほかの Kotlin 固有の書き方（`?:`、範囲、`when`）。そのバイトコードはコンパイルしてプロトタイプで確認しました（kotlinc 1.7.22 から 2.3.21）。また、多くの条件を H2 で 1 行ずつ確認しました。
-> - **これも実装済み:** ソートとページングの中核部分（[4. ソートとページング](04-order-paging.md)）、サブクエリ（[5. サブクエリ](05-subquery.md)）、`groupBy`、`having`、`Agg` を使う `select`、結合、派生テーブル、CTE（[6. 選択、集計、グループ化](06-select-group.md)）、update/insert/delete/upsert（[7. 更新、挿入、削除](07-dml.md)）、プロシージャと DB 関数（[8. プロシージャと DB 関数](08-procedures-functions.md)）、Spring Data JPA モジュール（[12. Spring Data JPA](12-spring-data-jpa.md)）。
-> - この章のそのほかの HQL は **予定の** 出力です。細かい部分（たとえば `e0`、`j1` のようなエイリアス名）はまだ変わることがあります。
-
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [2. はじめよう](02-getting-started.md) | 次: [4. ソートとページング](04-order-paging.md) | [このページの Java 版](../java/03-where.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)

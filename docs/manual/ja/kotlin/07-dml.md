@@ -4,15 +4,6 @@
 > [!IMPORTANT]
 > このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/07-dml.md)を参照してください。
 
-> [!NOTE]
-> **状況**
-> - **実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、Hibernate 6.6.5、マイルストーン M10、決定 D28 と D40）: 更新、削除、挿入、`insert ... select`、upsert、および（決定 D41）更新と削除の `limit` と 1 行保護 `executeOne()`。ほとんどのテストは **Java** のラムダを使っています。
-> - **Kotlin のラムダでテスト済み**（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、ビルドの中、H2、MariaDB、Oracle）: `set` の中のプロパティへの代入、インデックスの書き方 `by[column] = value`、`values` を使う `insert`、`not exists` のサブクエリを使う `delete`。これらの例には **(テスト済み)** と書いてあります。
-> - **これも実装済み、テスト済み（Java のラムダで）:** 更新と削除の `where` の中のサブクエリ（`sub`）（マイルストーン M8、[7.4](07-4-delete.md) を参照）、`insert ... select` の `groupBy`、`having`、`Agg`（マイルストーン M9、[7.5](07-5-insert.md) を参照）。
-> - **まだ実装されていません:** `set` の値の中のサブクエリ（コンテキストオブジェクトの `by.from(...)`）、複合キーのエンティティでの `limit` / `executeOne()`。
-> - この章の Kotlin コードは、テスト済みの Java の文を Kotlin の構文で書いたものです。HQL は Java のテストから取っています。HQL のない例は設計に従っています。
-> - 全体の状況は [トラックの README](README.md) を見てください。
-
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [6. 選択、集計、グループ化](06-select-group.md) | 次: [8. プロシージャと DB 関数](08-procedures-functions.md) | [このページの Java 版](../java/07-dml.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)

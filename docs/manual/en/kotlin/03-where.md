@@ -3,14 +3,6 @@
 > [!IMPORTANT]
 > This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/03-where.md) for the latest rules.
 
-> [!NOTE]
-> **Status**
-> - **Implemented and tested on H2, MariaDB and Oracle:** `where` conditions and `toList()` (mapping to columns, HQL output, running the query). Most tests use **Java** lambdas.
-> - **Tested with Kotlin lambdas** ([`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), in the build, kotlinc 2.3.21): `?.` paths, captured values, and `in` with a captured collection. `!!` is tested in the Kotlin tests of [5. Subqueries](05-subquery.md). These examples are marked **(tested)**.
-> - **Designed, not tested yet:** the other Kotlin-only forms in this chapter (`?:`, ranges, `when`). Their bytecode was compiled and checked with prototypes (kotlinc 1.7.22 to 2.3.21), and many conditions were checked row by row on H2.
-> - **Also implemented:** the core of sorting and paging ([4. Sorting and paging](04-order-paging.md)), subqueries ([5. Subqueries](05-subquery.md)), `select` with `groupBy`, `having` and `Agg`, joins, derived tables and CTEs ([6. Select, aggregates and group by](06-select-group.md)), update/insert/delete/upsert ([7. Update, insert, delete](07-dml.md)), procedures and DB functions ([8. Procedures and DB functions](08-procedures-functions.md)) and the Spring Data JPA module ([12. Spring Data JPA](12-spring-data-jpa.md)).
-> - The other HQL in this chapter is the **planned** output. Small details (for example alias names like `e0`, `j1`) can still change.
-
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [2. Getting started](02-getting-started.md) | Next: [4. Sorting and paging](04-order-paging.md) | [Java version of this page](../java/03-where.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)

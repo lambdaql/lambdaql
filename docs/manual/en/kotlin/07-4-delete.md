@@ -4,13 +4,6 @@
 > [!IMPORTANT]
 > This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/07-4-delete.md) for the latest rules.
 
-> [!NOTE]
-> **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10). Most tests use **Java** lambdas. A delete with a `not exists` subquery is tested with a Kotlin lambda too ([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), marked **(tested)**). This includes `limit` and `executeOne()` (decision D41).
-> Subqueries (`sub`) in `where` are implemented and tested with Java lambdas too (milestone M8).
-> **Not implemented yet:** `limit` / `executeOne()` on entities with a composite key.
-> The Kotlin code shows the tested Java statements in Kotlin syntax, and the HQL comes from the Java tests in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) and [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java). Examples without HQL follow the design.
-> See the [track README](README.md) for the full status.
-
 [7. Update, insert, delete (Kotlin)](07-dml.md) | [7.2 Update](07-2-update.md) | **7.4 Delete** | [7.5 Insert](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Java](../java/07-4-delete.md)
 
 ---

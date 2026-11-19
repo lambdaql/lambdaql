@@ -3,14 +3,6 @@
 
 **다른 언어:** [English](../../en/kotlin/README.md) | [한국어](../../ko/kotlin/README.md) | [日本語](../../ja/kotlin/README.md) | [简体中文](../../zh/kotlin/README.md)
 
-> [!IMPORTANT]
-> **상태:** lambdaQL은 초기 개발 단계입니다.
-> **분석 코어**, **결과 함수를 포함한 `where`**(`toList()`, `toSet()`, `first()`, `one()`, `count()`, `exists()`), 그리고 **정렬과 페이징**(`orderBy`, `limit`, `offset`, `SortSpec`)의 핵심 기능이 구현되어 있습니다. lambdaQL은 람다를 로드하고, 디코딩하고, HQL을 쓰고, 실행합니다. 이 부분은 H2, MariaDB, Oracle에서 주로 **Java** 람다로 테스트했습니다.
-> **Kotlin 람다는 빌드 안에서 테스트합니다**(kotlinc 2.3.21, [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)). 대상은 `?.` 경로, `!!`, 캡처 값, `in`, 정렬, 서브쿼리, 데이터 클래스·`Pair`·`Triple`을 쓰는 `select`, `groupBy`와 `having`, update, insert, delete입니다. 나머지 Kotlin 전용 형태(`?:`, 범위, `when`, 속성 참조)는 **설계** 단계입니다. 이 형태의 바이트코드는 프로토타입으로 컴파일하여 확인했습니다(kotlinc 1.7.22 ~ 2.3.21).
-> **서브쿼리**, **`select`**(`groupBy`, `having`, `Agg` 포함), **수정, 삽입, 삭제, 업서트**(`limit`, 1행 보호 `executeOne()` 포함), **명시적 조인**, **파생 테이블과 CTE**, **저장 프로시저와 DB 함수**, **4개 언어의 오류 코드**가 구현되어 있습니다. 조인, 파생 테이블, CTE, 프로시저, DB 함수, 업서트는 Java 람다로만 테스트했습니다.
-> **Spring Data JPA 모듈**(`LambdaQlExecutor<T>`, Spring `Sort`와 `Pageable`, `deleteAll { }`·`updateOne({ }) { }` 같은 DML 단축 메서드, 수정·삭제·삽입·업서트 빌더, Spring Boot 자동 구성)은 구현되어 Java 리포지토리로 테스트했습니다(Spring Boot 3.4.2). DML에는 호출자의 트랜잭션이 필요합니다. Kotlin 리포지토리는 아직 테스트하지 않았습니다.
-> 아직 Maven Central에 배포된 아티팩트는 없습니다. 사용해 보려면 [소스에서 빌드](02-getting-started.md#build-from-source)하십시오.
-
 [매뉴얼 홈](../README.md) | [Java 트랙](../java/README.md) | 공통 페이지: [1. 개요](../01-overview.md) · [11. 오류와 언어](../11-errors-and-languages.md)
 
 lambdaQL 매뉴얼의 **Kotlin 트랙**입니다. 이 트랙의 모든 페이지에는 **Kotlin 코드만** 있습니다.

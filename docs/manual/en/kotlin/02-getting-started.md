@@ -3,17 +3,6 @@
 > [!IMPORTANT]
 > This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/02-getting-started.md) for the latest rules.
 
-> [!NOTE]
-> **Status:** You can build lambdaQL from source and run its tests today.
-> `where` conditions and `toList()` work end to end. They are tested on H2, MariaDB and Oracle, mostly with **Java** lambdas. Kotlin lambdas are tested for `?.` paths, captured values, `in`, subqueries, `select` with data classes and `groupBy`, update, insert and delete ([`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)).
-> The result functions `first()`, `one()`, `count()`, `exists()` and `toSet()` work too (see [Getting the result](#getting-the-result); also tested with Java lambdas only).
-> The core of sorting and paging (`orderBy`, `limit`, `offset`, `SortSpec`) works too (one Kotlin sort is tested; the rest is tested with Java lambdas).
-> The Spring Data JPA module (repository executor and Spring Boot auto-configuration) works too (see [12. Spring Data JPA](12-spring-data-jpa.md); tested with Java repositories only).
-> Update, insert, delete and upsert work too (see [7. Update, insert, delete](07-dml.md); upsert is tested with Java lambdas only).
-> Subqueries and `select` (with `groupBy`, `having` and `Agg`) work too (see [5. Subqueries](05-subquery.md) and [6. Select, aggregates and group by](06-select-group.md)).
-> Explicit joins, derived tables and CTEs, stored procedures and DB functions work too (see [6](06-select-group.md#68-explicit-joins) and [8](08-procedures-functions.md); tested with Java lambdas only).
-> No artifact is published to Maven Central yet. Build from source as shown below.
-
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [1. Overview](../01-overview.md) | Next: [3. Conditions](03-where.md) | [Java version of this page](../java/02-getting-started.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)

@@ -4,13 +4,6 @@
 > [!IMPORTANT]
 > このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/05-subquery.md)を参照してください。
 
-> [!NOTE]
-> **状況**
-> - **実装済み**（マイルストーン M8-1）、H2 2.3、MariaDB 10.11、Oracle 23.26（Hibernate 6.6.5）でテスト済み: select、update、delete の `where { o, sub -> ... }` の中のサブクエリ。`exists` / `!exists`、`in`、`!in`（NOT EXISTS として書かれる）、スカラーの集計、top-1 の形、相関サブクエリと入れ子のサブクエリ、キャプチャ値を含みます。ほとんどのテストは **Java** のラムダを使います。
-> - **Kotlin のラムダでテスト済み**（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、ビルドの中、H2、MariaDB、Oracle）: `exists`、`in`、スカラーの `avg`。これらの例には **(テスト済み)** と書いてあります。そのほかの Kotlin の形（`!in`、top-1、入れ子）は、ビルドの外で kotlinc 2.3.21 でコンパイルし、Java の形と同じ HQL になることを確認しました。
-> - **まだ実装されていないもの:** `set` の値の中のサブクエリ、MariaDB の `lateral` の書き換え。（派生テーブルと CTE は別の構文で実装済みです。[6. 選択、集計、グループ化](06-select-group.md#69-derived-table-subquery-in-from) を参照してください。）
-> - そのほかの Kotlin のコードは、テスト済みの Java のクエリを Kotlin の構文で示したものです。テスト済みの Java の例は [このページの Java 版](../java/05-subquery.md) にあります。
-
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [4. ソートとページング](04-order-paging.md) | 次: [6. 選択、集計、グループ化](06-select-group.md) | [このページの Java 版](../java/05-subquery.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)

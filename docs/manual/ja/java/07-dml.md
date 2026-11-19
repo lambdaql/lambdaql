@@ -4,14 +4,6 @@
 > [!IMPORTANT]
 > このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/07-dml.md)を参照してください。
 
-> [!NOTE]
-> **状況**
-> - **実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、Hibernate 6.6.5、マイルストーン M10、決定 D28 と D40）: 更新（setter、`by.set`、複数回の `set()`、`@Version`）、削除、挿入（1 行、リスト、生成される id、`insert ... select`）、upsert、ルール U1、U3、U4、U6 の確認、および（決定 D41）更新と削除の `limit` と 1 行保護 `executeOne()`。
-> - **これも実装済み、テスト済み:** 更新と削除の `where` の中のサブクエリ（`sub`）（マイルストーン M8、[7.4](07-4-delete.md) を参照）、`insert ... select` の `groupBy`、`having`、`Agg`（マイルストーン M9、[7.5](07-5-insert.md) を参照）。
-> - **まだ実装されていません:** `set` の値の中のサブクエリ（コンテキストオブジェクトの `by.from(...)`）、複合キーのエンティティでの `limit` / `executeOne()`。
-> - **(テスト済み)** と書かれた例は、テストスイートからコピーしたものです。それ以外の例は設計に従っています。まだテストで確認しておらず、HQL の細かい部分（たとえば `e0` のようなエイリアス名）が違うことがあります。
-> - 全体の状況は [Java トラックの README](README.md#status) を参照してください。
-
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [6. 選択、集計、グループ化](06-select-group.md) | 次: [8. プロシージャと DB 関数](08-procedures-functions.md) | [このページの Kotlin 版](../kotlin/07-dml.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)

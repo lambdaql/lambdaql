@@ -1,13 +1,5 @@
 # 12. Spring Data JPA (Java)
 
-> [!NOTE]
-> **Status: the query executor and the Spring Boot auto-configuration are implemented.**
-> `LambdaQlExecutor<T>`, Spring `Sort` / `Pageable` support (also with the sort policy) and the `QueryBuilder` bean are tested on H2, MariaDB 10.11 and Oracle 23.26 with Spring Boot 3.4.2.
-> The update, delete, insert and upsert methods are tested too: the shortcuts (`deleteAll`, `deleteOne`, `updateAll`, `updateOne`, `insertOne`, `insertAll`, `upsertOne`, `upsertAll`) and the builders (`updateQuery()`, `deleteQuery()`, `insertQuery()`, `upsertQuery()`). They need the caller's transaction. lambdaQL does not add `@Transactional` (decision D41).
-> **Not verified yet:** Spring Boot 4.
-> Examples marked **(tested)** are copied from the test suite.
-> See the [Java track README](README.md#status) for the full status.
-
 [Java track](README.md) | [Manual home](../README.md) | Previous: [11. Errors and languages](../11-errors-and-languages.md) | [Kotlin version of this page](../kotlin/12-spring-data-jpa.md)
 
 ---

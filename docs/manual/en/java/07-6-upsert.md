@@ -1,11 +1,6 @@
 <a id="76-upsert"></a>
 # 7.6 Upsert (Java)
 
-> [!NOTE]
-> **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10, decision D40).
-> Examples marked **(tested)** are copied from [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java). The other examples follow the design and are not covered by a test yet.
-> See the [Java track README](README.md#status) for the full status.
-
 [7. Update, insert, delete (Java)](07-dml.md) | [7.2 Update](07-2-update.md) | [7.4 Delete](07-4-delete.md) | [7.5 Insert](07-5-insert.md) | **7.6 Upsert** | [Kotlin](../kotlin/07-6-upsert.md)
 
 ---

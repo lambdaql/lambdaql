@@ -4,13 +4,6 @@
 > [!IMPORTANT]
 > このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/07-4-delete.md)を参照してください。
 
-> [!NOTE]
-> **状況: 実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、マイルストーン M10）。`limit` と `executeOne()` も含みます（決定 D41）。
-> `where` の中のサブクエリ（`sub`）も実装済み、テスト済みです（マイルストーン M8）。
-> **まだ実装されていません:** 複合キーのエンティティでの `limit` / `executeOne()`。
-> **(テスト済み)** と書かれた例は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) と [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) からコピーしたものです。それ以外の例は設計に従っており、まだテストで確認していません。
-> 全体の状況は [Java トラックの README](README.md#status) を参照してください。
-
 [7. 更新、挿入、削除（Java）](07-dml.md) | [7.2 更新](07-2-update.md) | **7.4 削除** | [7.5 挿入](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Kotlin](../kotlin/07-4-delete.md)
 
 ---

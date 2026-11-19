@@ -5,16 +5,6 @@
 
 [手册首页](README.md) | 路线：[Java](java/README.md) | [Kotlin](kotlin/README.md) | 下一章：2. 入门（[Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md)）
 
-> [!NOTE]
-> **状态：** 分析核心（Lambda 加载和条件解码）以及带结果函数 `toList()`、`toSet()`、`first()`、`one()`、`count()` 和 `exists()` 的 `where`（HQL 生成和查询执行）已实现。它们已在 H2、MariaDB 和 Oracle 上用 Java Lambda 测试。
-> 排序与分页的核心部分（`orderBy`、`limit`、`offset`、`SortSpec`）也已实现并测试。
-> Spring Data JPA 模块（`LambdaQlExecutor<T>` 和 Spring Boot 自动配置）已实现，并已用 Spring Boot 3.4.2 测试。
-> 更新、插入、删除和 upsert 也已实现并测试，包括 `limit` 和单行保护 `executeOne()`，在 Spring Data JPA 模块中同样可用（快捷方法 `deleteAll`、`updateOne` 等）。在那里它们需要调用方的事务。
-> `where` 中的子查询和 `select`（带 `groupBy`、`having` 和 `Agg` 函数）同样已实现并测试。
-> 显式 join（`join`、`leftJoin`、`crossJoin`）、派生表和 CTE、存储过程与数据库函数，以及带四种语言消息的错误码同样已实现并测试。
-> Kotlin Lambda 已对一部分写法进行测试（`?.`、`!!`、`in`、子查询、data class、`groupBy`、update、insert 和 delete）。
-> 本页展示的 HQL 是设计所定义的输出。示例均为设计示例。
-
 本页适用于两种语言。代码分别展示在 **Java** 和 **Kotlin** 两个小节中。
 
 ## lambdaQL 是什么？

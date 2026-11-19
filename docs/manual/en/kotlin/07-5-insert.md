@@ -1,12 +1,6 @@
 <a id="75-insert"></a>
 # 7.5 Insert (Kotlin)
 
-> [!NOTE]
-> **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10), including `groupBy`, `having` and `Agg` in `insert ... select` (milestone M9). Most tests use **Java** lambdas. An insert with `values` is tested with a Kotlin lambda too ([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), marked **(tested)**).
-> **Not implemented yet:** the `by.set` form of `insert ... select`.
-> The Kotlin code shows the tested Java statements in Kotlin syntax, and the HQL comes from the Java tests in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) and [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java). Examples without HQL follow the design.
-> See the [track README](README.md) for the full status.
-
 [7. Update, insert, delete (Kotlin)](07-dml.md) | [7.2 Update](07-2-update.md) | [7.4 Delete](07-4-delete.md) | **7.5 Insert** | [7.6 Upsert](07-6-upsert.md) | [Java](../java/07-5-insert.md)
 
 ---

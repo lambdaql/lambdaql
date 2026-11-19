@@ -1,11 +1,6 @@
 <a id="76-upsert"></a>
 # 7.6 Upsert (Kotlin)
 
-> [!NOTE]
-> **Status: implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (milestone M10, decision D40). The tests use **Java** lambdas. **Kotlin lambdas for upsert are not tested yet** (update, insert and delete are, see [7. Update, insert, delete](07-dml.md)).
-> The Kotlin code shows the tested Java statements in Kotlin syntax, and the HQL comes from the Java tests in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java). Examples without HQL follow the design.
-> See the [track README](README.md) for the full status.
-
 [7. Update, insert, delete (Kotlin)](07-dml.md) | [7.2 Update](07-2-update.md) | [7.4 Delete](07-4-delete.md) | [7.5 Insert](07-5-insert.md) | **7.6 Upsert** | [Java](../java/07-6-upsert.md)
 
 ---

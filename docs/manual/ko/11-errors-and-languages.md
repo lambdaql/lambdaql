@@ -3,13 +3,6 @@
 
 [매뉴얼 홈](README.md) | 트랙: [Java](java/README.md) | [Kotlin](kotlin/README.md) | 이전: 10. 규칙과 제한 ([Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md)) | 다음: 12. Spring Data JPA ([Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md))
 
-> [!NOTE]
-> **상태:** 구현됨, 테스트함(결정 D33).
-> 모든 메시지에 `[LQL-xxxx]` 코드가 붙고, 메시지는 영어, 일본어, 중국어(간체), 한국어로 제공합니다.
-> 예외는 `LambdaQLException`과 그 하위 클래스입니다. 경고는 SLF4J로 기록합니다.
-> **(테스트됨)** 표시가 있는 예제는 테스트 코드([`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java))에서 그대로 가져온 것입니다. 이 페이지의 다른 코드는 설계 예제입니다.
-> 아직 구현되지 않음: 경고를 오류로 바꾸는 엄격 모드.
-
 이 페이지는 두 언어 모두를 위한 것입니다. 코드는 **Java**와 **Kotlin** 섹션으로 나누어 보여 줍니다.
 
 <a id="error-codes"></a>

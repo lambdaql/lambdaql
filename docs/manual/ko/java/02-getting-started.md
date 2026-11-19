@@ -1,11 +1,6 @@
 <a id="2-getting-started-java"></a>
 # 2. 시작하기 (Java)
 
-> [!NOTE]
-> **상태:** lambdaQL은 아직 Maven Central에 배포되지 않았습니다. [소스에서 빌드](#build-from-source)해서 사용하십시오.
-> 이 장에서 다루는 `where`, `toList()`, 결과 함수는 H2, MariaDB, Oracle에서 테스트했습니다.
-> 장별 구현·테스트 현황은 [Java 트랙의 상태](README.md#status)에 모아 둡니다.
-
 [Java 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [1. 개요](../01-overview.md) | 다음: [3. 조건](03-where.md) | [이 페이지의 Kotlin 버전](../kotlin/02-getting-started.md)
 
 공통 페이지: [1. 개요](../01-overview.md) · [11. 오류와 언어](../11-errors-and-languages.md)

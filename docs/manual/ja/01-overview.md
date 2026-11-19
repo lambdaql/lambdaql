@@ -6,16 +6,6 @@
 
 [マニュアルのホーム](README.md) | トラック: [Java](java/README.md) | [Kotlin](kotlin/README.md) | 次: 2. はじめよう（[Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md)）
 
-> [!NOTE]
-> **状況:** 解析コア（ラムダの読み込みと条件のデコード）と、結果の関数 `toList()`、`toSet()`、`first()`、`one()`、`count()`、`exists()` を持つ `where`（HQL の生成とクエリの実行）は実装済みです。H2、MariaDB、Oracle で Java のラムダを使ってテストしています。
-> ソートとページング（`orderBy`、`limit`、`offset`、`SortSpec`）の中核部分も実装済みで、テストしています。
-> Spring Data JPA モジュール（`LambdaQlExecutor<T>` と Spring Boot の自動構成）も実装済みで、Spring Boot 3.4.2 でテストしています。
-> 更新、挿入、削除、upsert も実装済みで、テストしています。`limit` と 1 行保護 `executeOne()` も使えます。Spring Data JPA モジュールでも使えます（短縮メソッド `deleteAll`、`updateOne` など）。そこでは呼び出し側のトランザクションが必要です。
-> `where` の中のサブクエリと `select`（`groupBy`、`having`、`Agg` 関数を含む）も実装済みで、テスト済みです。
-> 明示的な結合（`join`、`leftJoin`、`crossJoin`）、派生テーブルと CTE、ストアドプロシージャと DB 関数、4 つの言語のメッセージを持つエラーコードも実装済みで、テスト済みです。
-> Kotlin のラムダは、書き方の一部（`?.`、`!!`、`in`、サブクエリ、data class、`groupBy`、更新、挿入、削除）をテストしています。
-> このページの HQL は、設計で定めた出力です。例は設計上の例です。
-
 このページは両方の言語向けです。コードは **Java** と **Kotlin** の別々のセクションに分けて載せています。
 
 <a id="what-is-lambdaql"></a>

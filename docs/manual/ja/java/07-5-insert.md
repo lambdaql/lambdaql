@@ -1,12 +1,6 @@
 <a id="75-insert"></a>
 # 7.5 挿入（Java）
 
-> [!NOTE]
-> **状況: 実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、マイルストーン M10）。`insert ... select` の `groupBy`、`having`、`Agg`（マイルストーン M9）も含みます。
-> **まだ実装されていません:** `insert ... select` の `by.set` の書き方。
-> **(テスト済み)** と書かれた例は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) と [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) からコピーしたものです。それ以外の例は設計に従っており、まだテストで確認していません。
-> 全体の状況は [Java トラックの README](README.md#status) を参照してください。
-
 [7. 更新、挿入、削除（Java）](07-dml.md) | [7.2 更新](07-2-update.md) | [7.4 削除](07-4-delete.md) | **7.5 挿入** | [7.6 Upsert](07-6-upsert.md) | [Kotlin](../kotlin/07-5-insert.md)
 
 ---

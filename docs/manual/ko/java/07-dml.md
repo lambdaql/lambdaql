@@ -1,14 +1,6 @@
 <a id="7-update-insert-delete-java"></a>
 # 7. 수정, 삽입, 삭제 (Java)
 
-> [!NOTE]
-> **상태**
-> - **구현됨, 테스트함:** H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 6.6.5, 마일스톤 M10, 결정 D28·D40). 대상은 update(setter, `Dml.value`, 여러 번의 `set()` 호출, `@Version`, `set` 값 안의 서브쿼리), delete, insert(한 행, 리스트, 생성 id, `insert ... select`), upsert, 규칙 U1·U3·U4·U6 검사, update와 delete의 `limit`, 1행 보호 `executeOne()`(결정 D41)입니다.
-> - **함께 구현됨, 테스트함:** 수정·삭제 `where` 안의 서브쿼리(`sub`)(마일스톤 M8, [7.4](07-4-delete.md) 참고), `insert ... select`의 `groupBy`, `having`, `Agg`(마일스톤 M9, [7.5](07-5-insert.md) 참고).
-> - **아직 구현되지 않음:** 복합 키 엔티티의 `limit` / `executeOne()`.
-> - **(테스트됨)** 표시가 있는 예제는 테스트 코드에서 그대로 가져온 것입니다. 나머지 예제는 설계를 따르며 아직 테스트가 없습니다. 이 예제들의 HQL은 세부 사항(예: `e0` 같은 별칭 이름)이 다를 수 있습니다.
-> - 전체 상태는 [Java 트랙 README](README.md#status)를 참고하십시오.
-
 [Java 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [6. 조회, 집계, 그룹화](06-select-group.md) | 다음: [8. 프로시저와 DB 함수](08-procedures-functions.md) | [이 페이지의 Kotlin 버전](../kotlin/07-dml.md)
 
 공통 페이지: [1. 개요](../01-overview.md) · [11. 오류와 언어](../11-errors-and-languages.md)

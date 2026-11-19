@@ -1,13 +1,5 @@
 # 6. 查询列、聚合与分组（Kotlin）
 
-> [!NOTE]
-> **状态**
-> - **已实现**（里程碑 M9，决定 D27），并在 H2 2.3、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上测试：查询一个值、data class、`Pair` 或 `Triple` 的 `select`；带一个键或多个键（`listOf`、`a to b`、`Triple`）的 `groupBy`；`having`；`Agg` 函数；`distinct()`、`limit`、`offset`、`toList`、`toSet`、`first`、`one`；`orderBy { }.select { }`；以及规则 J3、J4 和 J7 的检查。
-> - **已用 Kotlin Lambda 测试**（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，在构建中，H2、MariaDB 和 Oracle）：data class、`Pair`、一个键的 `groupBy` 加 `having`、`listOf` 键的 `groupBy` 加 `Triple` 结果。这些示例标记为 **(已测试)**。其他 Kotlin 写法已在构建之外用 kotlinc 2.3.21 编译，生成与 Java 写法相同的 HQL。
-> - **也已实现**（决定 D44、D45、D46，用 Java Lambda 测试）：用 `join`、`leftJoin` 和 `crossJoin` 进行最多三个实体的显式 join，也支持 `select { o, c -> ... }`（6.8）；用 `qb.from(valueQuery)` 和 `qb.with(valueQuery)` 的派生表和 CTE（6.9 和 6.10，里程碑 M8-2）。
-> - **尚未实现：** 按聚合排序以及分组查询上的 `orderBy`（v0.2 候选）；DML 中和子查询内的 join；与派生表的 join；两次使用同一个 CTE。
-> - 其他 Kotlin 代码用 Kotlin 语法展示已测试的 Java 查询。已测试的 Java 示例见[本页的 Java 版本](../java/06-select-group.md)。完整状态见[路线 README](README.md)。
-
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[5. 子查询](05-subquery.md) | 下一章：[7. 更新、插入、删除](07-dml.md) | [本页的 Java 版本](../java/06-select-group.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)

@@ -1,12 +1,6 @@
 <a id="75-insert"></a>
 # 7.5 插入（Kotlin）
 
-> [!NOTE]
-> **状态：已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（里程碑 M10），包括 `insert ... select` 中的 `groupBy`、`having` 和 `Agg`（里程碑 M9）。大多数测试使用 **Java** Lambda。使用 `values` 的 insert 也已用 Kotlin Lambda 测试（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，标记为 **(已测试)**）。
-> **尚未实现：** `insert ... select` 的 `by.set` 写法。
-> Kotlin 代码用 Kotlin 语法展示已测试的 Java 语句，HQL 来自 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 和 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) 中的 Java 测试。没有 HQL 的示例遵循设计。
-> 完整状态见[路线 README](README.md)。
-
 [7. 更新、插入、删除（Kotlin）](07-dml.md) | [7.2 更新](07-2-update.md) | [7.4 删除](07-4-delete.md) | **7.5 插入** | [7.6 Upsert](07-6-upsert.md) | [Java](../java/07-5-insert.md)
 
 ---

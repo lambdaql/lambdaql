@@ -2,17 +2,6 @@
 
 **Other languages:** English | [한국어](../../ko/java/README.md) | [日本語](../../ja/java/README.md) | [简体中文](../../zh/java/README.md)
 
-> [!IMPORTANT]
-> **Status:** lambdaQL is in early development.
-> The **analysis core**, **`where` with the result functions** (`toList()`, `toSet()`, `first()`, `one()`, `count()`, `exists()`) and the core of **sorting and paging** (`orderBy`, `limit`, `offset`, `SortSpec`) are implemented: lambdaQL loads a lambda, decodes it, writes the HQL and runs it. This is tested on H2, MariaDB and Oracle.
-> **Update, insert, delete and upsert** are implemented too, with `limit` and the one-row protection `executeOne()` (tested on H2, MariaDB and Oracle).
-> The **Spring Data JPA module** is implemented too: the repository executor `LambdaQlExecutor<T>` (with Spring `Sort`, `Pageable`, the DML shortcuts such as `deleteAll(where)` and `updateOne(where, set)`, and the update, delete, insert and upsert builders) and the Spring Boot auto-configuration (tested with Spring Boot 3.4.2). DML needs the caller's transaction.
-> **Subqueries** (`where((o, sub) -> ...)`, also in update and delete) and **`select`** (records and DTOs, `groupBy`, `having`, the `Agg` aggregates, also in `insert ... select`) are implemented too (tested on H2, MariaDB and Oracle).
-> **Explicit joins** (`join`, `leftJoin`, `crossJoin`), **derived tables and CTEs** (`qb.from(valueQuery)`, `qb.with(valueQuery)`), **stored procedures and DB functions** (`@SqlProcedure`, `@SqlFunction`, `qb.call`, `qb.exec`) and **error codes with messages in four languages** (`[LQL-xxxx]`) are implemented too (tested on H2, MariaDB and Oracle; procedures on MariaDB and Oracle).
-> The **sort policy** for outside sorts (`SortRules`, `SortPolicy`, `SortMode`, `@Sortable`, the Spring Boot properties `lambdaql.sort.*`) is implemented too (tested on H2, MariaDB and Oracle).
-> The rest of this track (for example the join form of `SortSpec` and strict mode) is **designed**: the syntax and rules are decided and were checked with prototypes, but the code is not in the library yet.
-> No artifact is published to Maven Central yet. To try it, [build from source](02-getting-started.md#build-from-source).
-
 [Manual home](../README.md) | [Kotlin track](../kotlin/README.md) | Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
 
 This is the **Java track** of the lambdaQL manual. Every page in this track has **Java code only**.

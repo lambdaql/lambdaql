@@ -1,13 +1,6 @@
 <a id="74-delete"></a>
 # 7.4 삭제 (Kotlin)
 
-> [!NOTE]
-> **상태: 구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, 마일스톤 M10). 테스트는 대부분 **Java** 람다를 사용합니다. `not exists` 서브쿼리를 쓰는 delete는 Kotlin 람다로도 테스트했습니다([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), **(테스트됨)** 표시). `limit`과 `executeOne()`(결정 D41)도 같습니다.
-> `where` 안의 서브쿼리(`sub`)도 구현되어 Java 람다로 테스트했습니다(마일스톤 M8).
-> **아직 구현되지 않음:** 복합 키 엔티티의 `limit` / `executeOne()`.
-> Kotlin 코드는 테스트된 Java 문장을 Kotlin 문법으로 옮긴 것이고, HQL은 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)와 [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)의 Java 테스트에서 가져왔습니다. HQL이 없는 예제는 설계를 따릅니다.
-> 전체 상태는 [트랙 README](README.md)를 참고하십시오.
-
 [7. 수정, 삽입, 삭제 (Kotlin)](07-dml.md) | [7.2 수정](07-2-update.md) | **7.4 삭제** | [7.5 삽입](07-5-insert.md) | [7.6 업서트](07-6-upsert.md) | [Java](../java/07-4-delete.md)
 
 ---

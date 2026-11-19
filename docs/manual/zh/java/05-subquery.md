@@ -3,12 +3,6 @@
 > [!IMPORTANT]
 > 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/05-subquery.md)。
 
-> [!NOTE]
-> **状态**
-> - **已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（Hibernate 6.6.5，里程碑 M8-1）：select、update 和 delete 的 `where((o, sub) -> ...)` 中的子查询。包括 `exists` / `not exists`、`contains`（IN）、`!contains`（写成 NOT EXISTS）、标量聚合（`count`、`sum`、`avg`、`min`、`max`）、top-1 写法 `orderBy(...).limit(1)...first()`、关联子查询和嵌套子查询，以及捕获值。
-> - **尚未实现：** `set` 值中的子查询，以及 MariaDB 的 `lateral` 改写。（派生表和 CTE 已用另一种语法实现，见 [6. 查询列、聚合与分组](06-select-group.md#69-derived-table-subquery-in-from)。）
-> - 标记为 **(已测试)** 的示例是从测试代码中复制的。其他示例遵循相同的规则，但没有被测试覆盖。
-
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[4. 排序与分页](04-order-paging.md) | 下一章：[6. 查询列、聚合与分组](06-select-group.md) | [本页的 Kotlin 版本](../kotlin/05-subquery.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)

@@ -4,13 +4,6 @@
 > [!IMPORTANT]
 > 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/07-4-delete.md)。
 
-> [!NOTE]
-> **状态：已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（里程碑 M10）。大多数测试使用 **Java** Lambda。带 `not exists` 子查询的 delete 也已用 Kotlin Lambda 测试（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，标记为 **(已测试)**）。 这也包括 `limit` 和 `executeOne()`（决定 D41）。
-> `where` 中的子查询（`sub`）同样已实现，并已用 Java Lambda 测试（里程碑 M8）。
-> **尚未实现：** 复合键实体上的 `limit` / `executeOne()`。
-> Kotlin 代码用 Kotlin 语法展示已测试的 Java 语句，HQL 来自 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 和 [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) 中的 Java 测试。没有 HQL 的示例遵循设计。
-> 完整状态见[路线 README](README.md)。
-
 [7. 更新、插入、删除（Kotlin）](07-dml.md) | [7.2 更新](07-2-update.md) | **7.4 删除** | [7.5 插入](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Java](../java/07-4-delete.md)
 
 ---

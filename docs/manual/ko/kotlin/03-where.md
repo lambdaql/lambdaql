@@ -1,14 +1,6 @@
 <a id="3-conditions-where-kotlin"></a>
 # 3. 조건(`where`) (Kotlin)
 
-> [!NOTE]
-> **상태**
-> - **구현됨, H2·MariaDB·Oracle에서 테스트함:** `where` 조건과 `toList()`(컬럼 매핑, HQL 출력, 쿼리 실행). 테스트는 대부분 **Java** 람다를 사용합니다.
-> - **Kotlin 람다로 테스트함**([`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), 빌드에 포함, kotlinc 2.3.21): `?.` 경로, 캡처 값, 캡처 컬렉션의 `in`. `!!`는 [5. 서브쿼리](05-subquery.md)의 Kotlin 테스트에서 확인합니다. 이 예제에는 **(테스트됨)** 표시가 있습니다.
-> - **설계됨, 아직 테스트하지 않음:** 이 장의 나머지 Kotlin 전용 형태(`?:`, 범위, `when`). 이 형태들의 바이트코드는 프로토타입으로 컴파일하여 확인했고(kotlinc 1.7.22 ~ 2.3.21), 많은 조건을 H2에서 행 단위로 확인했습니다.
-> - **추가로 구현됨:** 정렬과 페이징의 핵심 기능([4. 정렬과 페이징](04-order-paging.md)), 서브쿼리([5. 서브쿼리](05-subquery.md)), `groupBy`·`having`·`Agg`를 포함한 `select`, 조인, 파생 테이블, CTE([6. 조회, 집계, 그룹화](06-select-group.md)), update/insert/delete/upsert([7. 수정, 삽입, 삭제](07-dml.md)), 프로시저와 DB 함수([8. 프로시저와 DB 함수](08-procedures-functions.md)), Spring Data JPA 모듈([12. Spring Data JPA](12-spring-data-jpa.md)).
-> - 이 장의 다른 HQL은 **예정된** 출력입니다. 세부 사항(예: `e0`, `j1` 같은 별칭 이름)은 아직 조금 바뀔 수 있습니다.
-
 [Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [2. 시작하기](02-getting-started.md) | 다음: [4. 정렬과 페이징](04-order-paging.md) | [이 페이지의 Java 버전](../java/03-where.md)
 
 공통 페이지: [1. 개요](../01-overview.md) · [11. 오류와 언어](../11-errors-and-languages.md)

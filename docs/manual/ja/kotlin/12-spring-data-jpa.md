@@ -1,14 +1,6 @@
 <a id="12-spring-data-jpa-kotlin"></a>
 # 12. Spring Data JPA（Kotlin）
 
-> [!NOTE]
-> **状況: クエリの実行器と Spring Boot の自動構成は実装済みです。**
-> `LambdaQlExecutor<T>`、Spring の `Sort` / `Pageable` への対応（ソートポリシーを含む）、`QueryBuilder` の Bean は、Spring Boot 3.4.2 を使って H2、MariaDB 10.11、Oracle 23.26 でテスト済みです。テストは **Java** で書かれています。**Kotlin のリポジトリはまだテストしていません。**
-> 更新、削除、挿入、upsert のメソッドも Java でテスト済みです。短縮メソッド（`deleteAll`、`deleteOne`、`updateAll`、`updateOne`、`insertOne`、`insertAll`、`upsertOne`、`upsertAll`）とビルダー（`updateQuery()`、`deleteQuery()`、`insertQuery()`、`upsertQuery()`）です。これらには呼び出し側のトランザクションが必要です。lambdaQL は `@Transactional` を付けません（決定 D41）。短縮メソッドの Kotlin の書き方は kotlinc 2.3.21 でコンパイルしました。ビルドにはまだ Kotlin のテストがありません。
-> **まだ検証していないもの:** Spring Boot 4。
-> このページの Kotlin のコードは、Java のテストと同じ呼び出しを Kotlin の構文で示したものです。テスト済みの Java のコードは [このページの Java 版](../java/12-spring-data-jpa.md) にあります。
-> 全体の状況は [Kotlin トラックの README](README.md) を参照してください。
-
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [11. エラーと言語](../11-errors-and-languages.md) | [このページの Java 版](../java/12-spring-data-jpa.md)
 
 ---

@@ -1,14 +1,6 @@
 <a id="4-sorting-and-paging-kotlin"></a>
 # 4. ソートとページング（Kotlin）
 
-> [!NOTE]
-> **状況**
-> - **中核部分は実装済み**、H2、MariaDB 10.11、Oracle 23.26（Hibernate 6.6.5）でテスト済み: `by.asc`、`by.desc`、`by.sort` を使う `orderBy { o, by -> ... }`、キーが 1 つの書き方 `orderBy { it.key }` と `orderBy({ it.key }, Direction)`、`Direction.parse` / `reversed`、`limit` / `offset`、`orderBy` の後の `first()`、再利用できるソート `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。Spring の `Sort` と `Pageable` は Spring Data JPA モジュールで使えます（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。ほとんどのテストは **Java** のラムダを使います。`limit` を使う Kotlin のソートもテストしています（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、**(テスト済み)** と表示）。
-> - **こちらも実装済み（Java のラムダでテスト済み）:** `join`、`leftJoin`、`crossJoin` の後の結合の書き方 `{ o, c, by -> ... }`（[6.8 明示的な結合](06-select-group.md#68-explicit-joins) を参照）と、外部のソートのためのソートポリシー（`SortRules`、`SortPolicy`、`SortMode`。[4.10](#sort-policy) を参照）。
-> - **まだ実装されていないもの:** Kotlin のプロパティ参照（`orderBy(Order::price)`）、`SortSpec` の結合の書き方。
-> - Kotlin の構文はコンパイルできます（プロトタイプで確認、kotlinc 2.3.21）。nullable なキー、`?.` のキー、プロパティ参照はコンパイルできます。エンティティのキーはコンパイルできません。
-> - この章のそのほかの HQL はライブラリのルールに従いますが、Kotlin のラムダではテストされていません。
-
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [3. 条件](03-where.md) | 次: [5. サブクエリ](05-subquery.md) | [このページの Java 版](../java/04-order-paging.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)

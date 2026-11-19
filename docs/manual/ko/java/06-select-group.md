@@ -1,13 +1,6 @@
 <a id="6-select-aggregates-and-group-by-java"></a>
 # 6. 조회, 집계, 그룹화 (Java)
 
-> [!NOTE]
-> **상태**
-> - **구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, Hibernate 6.6.5, 마일스톤 M9, 결정 D27): 값 하나, Java 레코드, DTO의 `select`, 키 하나나 여러 개의 `groupBy`, `having`, `Agg` 함수, `distinct()`, `limit`, `offset`, `toList`, `toSet`, `first`, `one`, `orderBy(...).select(...)`, 규칙 J3, J4, J7의 검사.
-> - **추가로 구현됨, 테스트함**(결정 D44, D45, D46): 엔티티 3개까지의 `join`, `leftJoin`, `crossJoin` 명시적 조인과 `select((o, c) -> ...)`(6.8), `qb.from(valueQuery)`와 `qb.with(valueQuery)`의 파생 테이블과 CTE(6.9, 6.10, 마일스톤 M8-2). 조인 결과의 `distinct()`와 파생 테이블·CTE의 조인(6.8, 결정 D51).
-> - **아직 구현되지 않음:** 집계 기준 정렬과 그룹 쿼리의 `orderBy`(v0.2 후보). 서브쿼리 안의 조인은 구현됨([5. 서브쿼리](05-subquery.md#joins-inside-a-subquery)). update와 delete의 조인은 추가하지 않습니다(D51).
-> - **(테스트됨)** 표시가 있는 예제는 테스트 코드에서 그대로 가져온 것입니다. 전체 상태는 [Java 트랙 README](README.md#status)를 참고하십시오.
-
 [Java 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [5. 서브쿼리](05-subquery.md) | 다음: [7. 수정, 삽입, 삭제](07-dml.md) | [이 페이지의 Kotlin 버전](../kotlin/06-select-group.md)
 
 공통 페이지: [1. 개요](../01-overview.md) · [11. 오류와 언어](../11-errors-and-languages.md)

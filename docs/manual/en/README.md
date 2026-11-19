@@ -2,16 +2,6 @@
 
 **Other languages:** English | [한국어](../ko/README.md) | [日本語](../ja/README.md) | [简体中文](../zh/README.md)
 
-> [!IMPORTANT]
-> **Status: lambdaQL is in early development.**
-> Today the **analysis core**, **`where` with the result functions** (`toList()`, `toSet()`, `first()`, `one()`, `count()`, `exists()`) and the core of **sorting and paging** (`orderBy`, `limit`, `offset`, `SortSpec`) are implemented: lambdaQL loads a lambda, decodes it, writes the HQL and runs it. This is tested on H2, MariaDB and Oracle (with Java lambdas).
-> **Update, insert, delete and upsert** are implemented too, with `limit` and the one-row protection `executeOne()` (tested on H2, MariaDB and Oracle with Java lambdas).
-> The **Spring Data JPA module** is implemented too: the repository executor `LambdaQlExecutor<T>` (with Spring `Sort`, `Pageable`, the DML shortcuts such as `deleteAll(where)` and `updateOne(where, set)`, and the update, delete, insert and upsert builders) and the Spring Boot auto-configuration (tested with Spring Boot 3.4.2). DML needs the caller's transaction.
-> **Subqueries** (`where((o, sub) -> ...)`, also in update and delete) and **`select`** (records and DTOs, `groupBy`, `having`, the `Agg` aggregates, also in `insert ... select`) are implemented too (tested on H2, MariaDB and Oracle with Java lambdas).
-> **Explicit joins** (`join`, `leftJoin`, `crossJoin`), **derived tables and CTEs** (`qb.from(valueQuery)`, `qb.with(valueQuery)`), **stored procedures and DB functions** (`@SqlProcedure`, `@SqlFunction`, `qb.call`, `qb.exec`) and **error codes with messages in four languages** (`[LQL-xxxx]`) are implemented too (tested with Java lambdas; procedures on MariaDB and Oracle).
-> **Kotlin lambdas** are tested in the build for a part of the forms (`?.`, `!!`, `in`, subqueries, data classes, `groupBy`, update, insert, delete). The other Kotlin-only forms are **designed**: the syntax and rules are decided and were checked with prototypes, but they are not tested in the build yet.
-> No artifact is published to Maven Central yet. To try it, build from source ([Java](java/02-getting-started.md#build-from-source) | [Kotlin](kotlin/02-getting-started.md#build-from-source)).
-
 lambdaQL is a query library for Java and Kotlin.
 You write normal lambdas. lambdaQL reads the bytecode of the lambda and builds a Hibernate 6.6 HQL query.
 The lambda is never run.

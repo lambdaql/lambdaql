@@ -2,17 +2,6 @@
 
 **其他语言：** [English](../../en/java/README.md) | [한국어](../../ko/java/README.md) | [日本語](../../ja/java/README.md) | [简体中文](../../zh/java/README.md)
 
-> [!IMPORTANT]
-> **状态：** lambdaQL 处于早期开发阶段。
-> 已实现**分析核心**、**带结果函数的 `where`**（`toList()`、`toSet()`、`first()`、`one()`、`count()`、`exists()`）以及**排序与分页**的核心部分（`orderBy`、`limit`、`offset`、`SortSpec`）：lambdaQL 加载 Lambda 表达式，解码它，生成 HQL 并执行它。这已在 H2、MariaDB 和 Oracle 上测试。
-> **更新、插入、删除和 upsert** 也已实现，包括 `limit` 和单行保护 `executeOne()`（已在 H2、MariaDB 和 Oracle 上测试）。
-> **Spring Data JPA 模块**也已实现：repository 执行器 `LambdaQlExecutor<T>`（支持 Spring `Sort`、`Pageable`、`deleteAll(where)` 和 `updateOne(where, set)` 等 DML 快捷方法，以及更新、删除、插入和 upsert 构建器）以及 Spring Boot 自动配置（已用 Spring Boot 3.4.2 测试）。DML 需要调用方的事务。
-> **子查询**（`where((o, sub) -> ...)`，也可用于 update 和 delete）和 **`select`**（record 和 DTO、`groupBy`、`having`、`Agg` 聚合，也可用于 `insert ... select`）同样已实现（已在 H2、MariaDB 和 Oracle 上测试）。
-> **显式 join**（`join`、`leftJoin`、`crossJoin`）、**派生表和 CTE**（`qb.from(valueQuery)`、`qb.with(valueQuery)`）、**存储过程与数据库函数**（`@SqlProcedure`、`@SqlFunction`、`qb.call`、`qb.exec`）以及**带四种语言消息的错误码**（`[LQL-xxxx]`）同样已实现（已在 H2、MariaDB 和 Oracle 上测试；存储过程在 MariaDB 和 Oracle 上测试）。
-> 用于外部排序的**排序策略**（`SortRules`、`SortPolicy`、`SortMode`、`@Sortable`、Spring Boot 属性 `lambdaql.sort.*`）也已实现（已在 H2、MariaDB、Oracle 上测试）。
-> 本路线中的其余内容（例如 `SortSpec` 的 join 写法和严格模式）处于**已设计**状态：语法和规则已经确定，并已用原型验证过，但代码还没有进入库中。
-> 目前还没有任何构件发布到 Maven Central。如果想试用，请[从源码构建](02-getting-started.md#build-from-source)。
-
 [手册首页](../README.md) | [Kotlin 路线](../kotlin/README.md) | 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
 
 这是 lambdaQL 手册的 **Java 路线**。本路线的每个页面**只包含 Java 代码**。

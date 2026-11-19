@@ -6,14 +6,6 @@
 
 **他の言語:** [English](../../en/kotlin/README.md) | [한국어](../../ko/kotlin/README.md) | [日本語](../../ja/kotlin/README.md) | [简体中文](../../zh/kotlin/README.md)
 
-> [!IMPORTANT]
-> **状況:** lambdaQL は開発の初期段階です。
-> 実装されているのは **解析コア**、**結果の関数付きの `where`**（`toList()`、`toSet()`、`first()`、`one()`、`count()`、`exists()`）、そして **ソートとページング**（`orderBy`、`limit`、`offset`、`SortSpec`）の中核部分です。lambdaQL はラムダを読み込み、それをデコードし、HQL を書いて実行します。これは H2、MariaDB、Oracle でテスト済みで、ほとんどは **Java** のラムダを使っています。
-> **Kotlin のラムダはビルドの中でテストしています**（kotlinc 2.3.21、[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)）。対象は `?.` のパス、`!!`、キャプチャ値、`in`、ソート、サブクエリ、data class・`Pair`・`Triple` を使う `select`、`groupBy` と `having`、更新、挿入、削除です。そのほかの Kotlin だけの書き方（`?:`、範囲、`when`、プロパティ参照）は **設計済み** です。そのバイトコードはコンパイルしてプロトタイプで確認しました（kotlinc 1.7.22 から 2.3.21）。
-> **サブクエリ**、**`select`**（`groupBy`、`having`、`Agg` を含む）、**更新、挿入、削除、upsert**（`limit` と 1 行保護 `executeOne()` を含む）、**明示的な結合**、**派生テーブルと CTE**、**ストアドプロシージャと DB 関数**、**4 つの言語のエラーコード** は実装済みです。結合、派生テーブル、CTE、プロシージャ、DB 関数、upsert は Java のラムダでのみテストしています。
-> **Spring Data JPA モジュール**（`LambdaQlExecutor<T>`、Spring の `Sort` と `Pageable`、`deleteAll { }` や `updateOne({ }) { }` のような DML の短縮メソッド、更新、削除、挿入、upsert のビルダー、Spring Boot の自動構成）は実装済みで、Java のリポジトリでテストしています（Spring Boot 3.4.2）。DML には呼び出し側のトランザクションが必要です。Kotlin のリポジトリはまだテストしていません。
-> 成果物（アーティファクト）はまだ Maven Central に公開していません。試すには、[ソースからビルド](02-getting-started.md#build-from-source)してください。
-
 [マニュアルのホーム](../README.md) | [Java トラック](../java/README.md) | 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
 
 これは lambdaQL マニュアルの **Kotlin トラック** です。このトラックのページには **Kotlin のコードだけ** が載っています。

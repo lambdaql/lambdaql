@@ -1,16 +1,5 @@
 # 8. Stored procedures and DB functions (Kotlin)
 
-> [!NOTE]
-> **Status**
-> - **Implemented** (decisions D30 and D31, milestone M11, Hibernate 6.6.5) and tested with **Java** lambdas:
->   DB functions in queries (`@SqlFunction`) on H2 2.3, MariaDB 10.11 and Oracle 23.26 ([`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java));
->   procedure calls (`@SqlProcedure`, `@InOut`, `qb.call`, `qb.exec`) on MariaDB and Oracle, and a DB function called alone on all three databases ([`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)).
->   lambdaQL also reads the Kotlin forms: a `companion object` function with `@JvmStatic`, and a Kotlin data class as a result. There are no Kotlin tests for this chapter yet.
-> - **Also implemented (tested with Java on MariaDB and Oracle):** the check of the stub argument **names** against the database (part of rule PR2), and the detection of Oracle package overloads.
-> - **Also implemented (tested with Java lambdas):** the SARGable warnings for DB functions in conditions (rules PR8, FN7, see [8.9](#89-warning-functions-on-columns-and-indexes-sargable)).
-> - **Not implemented yet:** the check of parameter **types** against the database (part of rule PR2), and calling one overload of an Oracle package procedure.
-> - The Kotlin code in this chapter shows the tested Java calls in Kotlin syntax. The tested Java code is in [the Java version of this page](../java/08-procedures-functions.md). See the [track README](README.md) for the full status.
-
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [7. Update, insert, delete](07-dml.md) | Next: [9. Kotlin notes](09-kotlin-notes.md) | [Java version of this page](../java/08-procedures-functions.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -466,9 +455,6 @@ lambdaQL flushes pending changes first (as in PR9), so the function sees your la
 ---
 
 ## 8.9 Warning: functions on columns and indexes (SARGable)
-
-> [!NOTE]
-> **Implemented and tested with Java lambdas** on H2, MariaDB 10.11 and Oracle 23.26 (rules PR8, FN7). Not implemented yet: strict mode (an error instead of a warning) and warnings for arithmetic on a column without a function.
 
 lambdaQL tries to make SQL that **can use an index** (see [10. Rules and limits](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql)).
 A function around a column usually **cannot** use a normal index:

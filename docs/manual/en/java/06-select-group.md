@@ -1,12 +1,5 @@
 # 6. Select, aggregates and group by (Java)
 
-> [!NOTE]
-> **Status**
-> - **Implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5, milestone M9, decision D27): `select` of one value, a Java record or a DTO; `groupBy` with one or many keys; `having`; the `Agg` functions; `distinct()`, `limit`, `offset`, `toList`, `toSet`, `first`, `one`; `orderBy(...).select(...)`; and the checks of rules J3, J4 and J7.
-> - **Also implemented and tested** (decisions D44, D45, D46): explicit joins with `join`, `leftJoin` and `crossJoin` for up to three entities, also with `select((o, c) -> ...)` (6.8); derived tables and CTEs with `qb.from(valueQuery)` and `qb.with(valueQuery)` (6.9 and 6.10, milestone M8-2).
-> - **Not implemented yet:** sorting by an aggregate and `orderBy` on a grouped query (v0.2 candidate); joins in DML and inside subqueries; joins with a derived table; using the same CTE twice.
-> - Examples marked **(tested)** are copied from the test suite. See the [Java track README](README.md#status) for the full status.
-
 [Java track](README.md) | [Manual home](../README.md) | Previous: [5. Subqueries](05-subquery.md) | Next: [7. Update, insert, delete](07-dml.md) | [Kotlin version of this page](../kotlin/06-select-group.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)

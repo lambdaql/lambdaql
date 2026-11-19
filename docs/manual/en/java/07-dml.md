@@ -3,14 +3,6 @@
 > [!IMPORTANT]
 > This page is older than the Korean manual. See the [Korean page](../../ko/java/07-dml.md) for the latest rules.
 
-> [!NOTE]
-> **Status**
-> - **Implemented and tested** on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5, milestone M10, decisions D28 and D40): update (setters, `by.set`, many `set()` calls, `@Version`), delete, insert (one row, a list, a generated id, `insert ... select`), upsert, the checks for rules U1, U3, U4 and U6, and (decision D41) `limit` for update and delete and the one-row protection `executeOne()`.
-> - **Also implemented and tested:** subqueries (`sub`) in the `where` of update and delete (milestone M8, see [7.4](07-4-delete.md)), and `groupBy`, `having` and `Agg` in `insert ... select` (milestone M9, see [7.5](07-5-insert.md)).
-> - **Not implemented yet:** subqueries in the values of `set` (the context object `by.from(...)`), and `limit` / `executeOne()` on entities with a composite key.
-> - Examples marked **(tested)** are copied from the test suite. The other examples follow the design. They are not covered by a test yet, and their HQL can differ in small details (for example alias names like `e0`).
-> - See the [Java track README](README.md#status) for the full status.
-
 [Java track](README.md) | [Manual home](../README.md) | Previous: [6. Select, aggregates and group by](06-select-group.md) | Next: [8. Procedures and DB functions](08-procedures-functions.md) | [Kotlin version of this page](../kotlin/07-dml.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)

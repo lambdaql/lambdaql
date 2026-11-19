@@ -1,14 +1,6 @@
 <a id="6-select-aggregates-and-group-by-kotlin"></a>
 # 6. 選択、集計、グループ化（Kotlin）
 
-> [!NOTE]
-> **状況**
-> - **実装済み**（マイルストーン M9、決定 D27）、H2 2.3、MariaDB 10.11、Oracle 23.26（Hibernate 6.6.5）でテスト済み: 1 つの値、data class、`Pair`、`Triple` の `select`、キーが 1 つまたは複数（`listOf`、`a to b`、`Triple`）の `groupBy`、`having`、`Agg` 関数、`distinct()`、`limit`、`offset`、`toList`、`toSet`、`first`、`one`、`orderBy { }.select { }`、ルール J3、J4、J7 のチェック。
-> - **Kotlin のラムダでテスト済み**（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、ビルドの中、H2、MariaDB、Oracle）: data class、`Pair`、キーが 1 つの `groupBy` と `having`、`listOf` のキーを使う `groupBy` と `Triple` の結果。これらの例には **(テスト済み)** と書いてあります。そのほかの Kotlin の形は、ビルドの外で kotlinc 2.3.21 でコンパイルし、Java の形と同じ HQL になることを確認しました。
-> - **こちらも実装済み**（決定 D44、D45、D46、Java のラムダでテスト済み）: エンティティ 3 つまでの `join`、`leftJoin`、`crossJoin` による明示的な結合（`select { o, c -> ... }` も含む、6.8）、`qb.from(valueQuery)` と `qb.with(valueQuery)` による派生テーブルと CTE（6.9 と 6.10、マイルストーン M8-2）。
-> - **まだ実装されていないもの:** 集約によるソートとグループ化したクエリの `orderBy`（v0.2 の候補）、DML とサブクエリの中の結合、派生テーブルとの結合、同じ CTE の 2 回の使用。
-> - そのほかの Kotlin のコードは、テスト済みの Java のクエリを Kotlin の構文で示したものです。テスト済みの Java の例は [このページの Java 版](../java/06-select-group.md) にあります。全体の状況は [トラックの README](README.md) を参照してください。
-
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [5. サブクエリ](05-subquery.md) | 次: [7. 更新、挿入、削除](07-dml.md) | [このページの Java 版](../java/06-select-group.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)

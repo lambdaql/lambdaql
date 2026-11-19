@@ -1,13 +1,5 @@
 # 12. Spring Data JPA (Kotlin)
 
-> [!NOTE]
-> **Status: the query executor and the Spring Boot auto-configuration are implemented.**
-> `LambdaQlExecutor<T>`, Spring `Sort` / `Pageable` support (also with the sort policy) and the `QueryBuilder` bean are tested on H2, MariaDB 10.11 and Oracle 23.26 with Spring Boot 3.4.2. The tests are written in **Java**. **Kotlin repositories are not tested yet.**
-> The update, delete, insert and upsert methods are tested too, in Java: the shortcuts (`deleteAll`, `deleteOne`, `updateAll`, `updateOne`, `insertOne`, `insertAll`, `upsertOne`, `upsertAll`) and the builders (`updateQuery()`, `deleteQuery()`, `insertQuery()`, `upsertQuery()`). They need the caller's transaction. lambdaQL does not add `@Transactional` (decision D41). The Kotlin forms of the shortcuts were compiled with kotlinc 2.3.21; there is no Kotlin test in the build yet.
-> **Not verified yet:** Spring Boot 4.
-> The Kotlin code on this page shows the same calls as the Java tests, in Kotlin syntax. The tested Java code is in [the Java version of this page](../java/12-spring-data-jpa.md).
-> See the [Kotlin track README](README.md) for the full status.
-
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [11. Errors and languages](../11-errors-and-languages.md) | [Java version of this page](../java/12-spring-data-jpa.md)
 
 ---

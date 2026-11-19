@@ -3,15 +3,6 @@
 > [!IMPORTANT]
 > This page is older than the Korean manual. See the [Korean page](../../ko/java/10-rules-and-limits.md) for the latest rules.
 
-> [!NOTE]
-> **Status: partly implemented.**
-> This chapter collects the rules of the lambdaQL design: how lambdas become SQL, how NULL works,
-> where Java and SQL differ, where databases differ, and what is not supported.
-> The rules were checked with prototypes on H2 2.3, MariaDB 10.11 and Oracle 23ai (Hibernate 6.6.5).
-> Today the analysis core, `where`, the result functions (`toList()`, `toSet()`, `first()`, `one()`, `count()`, `exists()`), the core of sorting and paging, `SortSpec`, update/insert/delete/upsert ([7](07-dml.md)) and the Spring Data JPA module ([12](12-spring-data-jpa.md)) work (tested on H2, MariaDB and Oracle).
-> The rules for subqueries ([5](05-subquery.md)) and `select` with aggregates ([6](06-select-group.md)) are implemented too, also in DML. The rules for explicit joins, derived tables, CTEs ([6](06-select-group.md)), procedures and DB functions ([8](08-procedures-functions.md)) are implemented too. The warnings for DB functions on a column ([10.2](#db-functions-on-a-column)) are implemented too. Some sorting rules are not implemented yet either (see [4.12](04-order-paging.md#412-rules-summary-s1-to-s14)).
-> See the [Java track README](README.md#status) for the full status.
-
 [Java track](README.md) | [Manual home](../README.md) | Previous: [9. Java notes](09-java-notes.md) | Next: [11. Errors and languages](../11-errors-and-languages.md) | [Kotlin version of this page](../kotlin/10-rules-and-limits.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)

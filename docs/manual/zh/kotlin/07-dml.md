@@ -3,15 +3,6 @@
 > [!IMPORTANT]
 > 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/07-dml.md)。
 
-> [!NOTE]
-> **状态**
-> - **已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（Hibernate 6.6.5，里程碑 M10，决定 D28 和 D40）：更新、删除、插入、`insert ... select`、upsert，以及（决定 D41）更新和删除的 `limit` 与单行保护 `executeOne()`。大多数测试使用 **Java** Lambda。
-> - **已用 Kotlin Lambda 测试**（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，在构建中，H2、MariaDB 和 Oracle）：`set` 中的属性赋值、索引写法 `by[column] = value`、使用 `values` 的 `insert`，以及带 `not exists` 子查询的 `delete`。这些示例标记为 **(已测试)**。
-> - **同样已实现并测试（使用 Java Lambda）：** update 和 delete 的 `where` 中的子查询（`sub`）（里程碑 M8，见 [7.4](07-4-delete.md)），以及 `insert ... select` 中的 `groupBy`、`having` 和 `Agg`（里程碑 M9，见 [7.5](07-5-insert.md)）。
-> - **尚未实现：** `set` 值中的子查询（上下文对象的 `by.from(...)`），以及复合键实体上的 `limit` / `executeOne()`。
-> - 本章的 Kotlin 代码用 Kotlin 语法展示已测试的 Java 语句。HQL 来自 Java 测试。没有 HQL 的示例遵循设计。
-> - 完整状态见[路线 README](README.md)。
-
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[6. 查询列、聚合与分组](06-select-group.md) | 下一章：[8. 存储过程与数据库函数](08-procedures-functions.md) | [本页的 Java 版本](../java/07-dml.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)

@@ -1,14 +1,6 @@
 <a id="4-sorting-and-paging-kotlin"></a>
 # 4. 정렬과 페이징 (Kotlin)
 
-> [!NOTE]
-> **상태**
-> - **핵심 기능 구현됨**, Hibernate 6.6.5로 H2, MariaDB 10.11, Oracle 23.26에서 테스트함: `by.asc`, `by.desc`, `by.sort`를 사용하는 `orderBy { o, by -> ... }`, 키 하나의 형태 `orderBy { it.key }`와 `orderBy({ it.key }, Direction)`, `Direction.parse` / `reversed`, `limit` / `offset`, `orderBy` 뒤의 `first()`, 그리고 재사용 정렬 `SortSpec`(`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`). Spring `Sort`와 `Pageable`은 Spring Data JPA 모듈에서 동작합니다([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)). 테스트는 대부분 **Java** 람다를 사용합니다. `limit`이 있는 Kotlin 정렬도 테스트했습니다([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), **(테스트됨)** 표시).
-> - **추가로 구현됨(Java 람다로 테스트함):** `join`, `leftJoin`, `crossJoin` 뒤의 조인 형태 `{ o, c, by -> ... }`([6.8 명시적 조인](06-select-group.md#68-explicit-joins) 참고), 외부 정렬의 정렬 정책(`SortRules`, `SortPolicy`, `SortMode`, [4.10](#sort-policy) 참고).
-> - **아직 구현되지 않음:** Kotlin 속성 참조(`orderBy(Order::price)`), `SortSpec`의 조인 형태.
-> - Kotlin 문법은 컴파일됩니다(프로토타입으로 확인, kotlinc 2.3.21). nullable 키, `?.` 키, 속성 참조는 컴파일되며, 엔티티 키는 컴파일되지 않습니다.
-> - 이 장의 다른 HQL은 라이브러리의 규칙을 따르지만, Kotlin 람다로 테스트하지는 않았습니다.
-
 [Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [3. 조건(`where`)](03-where.md) | 다음: [5. 서브쿼리](05-subquery.md) | [이 페이지의 Java 버전](../java/04-order-paging.md)
 
 공통 페이지: [1. 개요](../01-overview.md) · [11. 오류와 언어](../11-errors-and-languages.md)

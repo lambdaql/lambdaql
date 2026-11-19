@@ -3,12 +3,6 @@
 > [!IMPORTANT]
 > 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/09-java-notes.md)。
 
-> [!NOTE]
-> **状态**
-> - **已实现（分析核心）：** 加载可序列化 Lambda、捕获 `this` 的 Lambda、识别方法引用、拒绝不是 `Serializable` 的 Lambda。参见 [9.13](#913-what-you-can-check-today) 中的测试。
-> - **已实现：** 单个排序键的排序中的 getter 方法引用，例如 `orderBy(Order::getPrice)`（见 [9.9](#99-method-references)）。
-> - **已设计，尚未实现：** 本页的其他所有内容（`==` 的含义、装箱规则、`String` 规则、查询中的方法引用等）。
-
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[8. 存储过程与数据库函数](08-procedures-functions.md) | 下一章：[10. 规则与限制](10-rules-and-limits.md) | [本页的 Kotlin 版本](../kotlin/09-kotlin-notes.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -305,10 +299,6 @@ lambdaQL **没有静态 DSL**。除了可选的 `Agg` 导入之外，使用 lamb
 .where(o -> o.getUpdateAt().isAfter(LocalDateTime.of(2026, 1, 1, 0, 0)))   // 可以：在 Java 中计算
 .where(o -> MyUtil.normalize(o.getDescription()) == text)                   // 拒绝：使用了实体
 ```
-
-> [!NOTE]
-> 仓库中仍保留着旧的原型代码（例如 `JpqlFunction` 类）。
-> 它不属于新设计，请不要在查询中使用。
 
 <a id="911-other-java-forms"></a>
 ## 9.11 其他 Java 写法

@@ -1,13 +1,6 @@
 <a id="4-sorting-and-paging-java"></a>
 # 4. ソートとページング（Java）
 
-> [!NOTE]
-> **状況**
-> - **中核部分は実装済み、テスト済み**（H2、MariaDB 10.11、Oracle 23.26、Hibernate 6.6.5）: `by.asc`、`by.desc`、`by.sort` を使う `orderBy((o, by) -> ...)`、キーが 1 つの書き方 `orderBy(o -> key)` と `orderBy(key, Direction)`（`Order::getPrice` のような getter のメソッド参照も可）、`Direction.parse` / `reversed`、`limit` / `offset`、`orderBy` の後の `first()`、再利用できるソート `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。Spring の `Sort` と `Pageable` は Spring Data JPA モジュールで使えます（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。
-> - **こちらも実装済み、テスト済み:** `join`、`leftJoin`、`crossJoin` の後の結合の書き方 `(o, c, by) -> ...`（[6.8 明示的な結合](06-select-group.md#68-explicit-joins) を参照）と、外部のソートのためのソートポリシー（`SortRules`、`SortPolicy`、`SortMode`。[4.10](#sort-policy) を参照）。
-> - **まだ実装されていないもの:** `SortSpec` の結合の書き方。
-> - **(テスト済み)** と書かれた例は、テストスイートからコピーしたものです。この章のそれ以外の HQL も同じルールに従いますが、テストはされていません。
-
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [3. 条件](03-where.md) | 次: [5. サブクエリ](05-subquery.md) | [このページの Kotlin 版](../kotlin/04-order-paging.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)

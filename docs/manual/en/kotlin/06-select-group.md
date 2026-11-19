@@ -1,13 +1,5 @@
 # 6. Select, aggregates and group by (Kotlin)
 
-> [!NOTE]
-> **Status**
-> - **Implemented** (milestone M9, decision D27) and tested on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5): `select` of one value, a data class, a `Pair` or a `Triple`; `groupBy` with one key or many keys (`listOf`, `a to b`, `Triple`); `having`; the `Agg` functions; `distinct()`, `limit`, `offset`, `toList`, `toSet`, `first`, `one`; `orderBy { }.select { }`; and the checks of rules J3, J4 and J7.
-> - **Tested with Kotlin lambdas** ([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), in the build, H2, MariaDB and Oracle): a data class, a `Pair`, `groupBy` with one key and `having`, `groupBy` with `listOf` keys and a `Triple` result. These examples are marked **(tested)**. The other Kotlin forms were compiled with kotlinc 2.3.21 outside the build and give the same HQL as the Java forms.
-> - **Also implemented** (decisions D44, D45, D46, tested with Java lambdas): explicit joins with `join`, `leftJoin` and `crossJoin` for up to three entities, also with `select { o, c -> ... }` (6.8); derived tables and CTEs with `qb.from(valueQuery)` and `qb.with(valueQuery)` (6.9 and 6.10, milestone M8-2).
-> - **Not implemented yet:** sorting by an aggregate and `orderBy` on a grouped query (v0.2 candidate); joins in DML and inside subqueries; joins with a derived table; using the same CTE twice.
-> - The other Kotlin code shows the tested Java queries in Kotlin syntax. The tested Java examples are in [the Java version of this page](../java/06-select-group.md). See the [track README](README.md) for the full status.
-
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [5. Subqueries](05-subquery.md) | Next: [7. Update, insert, delete](07-dml.md) | [Java version of this page](../java/06-select-group.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)

@@ -3,17 +3,6 @@
 > [!IMPORTANT]
 > 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/02-getting-started.md)。
 
-> [!NOTE]
-> **状态：** 目前你可以从源码构建 lambdaQL 并运行它的测试。
-> `where` 条件和 `toList()` 可以端到端运行。它们已在 H2、MariaDB 和 Oracle 上测试。
-> 结果函数 `first()`、`one()`、`count()`、`exists()` 和 `toSet()` 也可以运行（见[获取结果](#getting-the-result)）。
-> 排序与分页的核心部分（`orderBy`、`limit`、`offset`、`SortSpec`）也可以运行。
-> Spring Data JPA 模块（repository 执行器和 Spring Boot 自动配置）也可以运行（见 [12. Spring Data JPA](12-spring-data-jpa.md)）。
-> 更新、插入、删除和 upsert 也可以运行（见 [7. 更新、插入、删除](07-dml.md)）。
-> 子查询和 `select`（带 `groupBy`、`having` 和 `Agg`）同样可以使用（见 [5. 子查询](05-subquery.md) 和 [6. 查询列、聚合与分组](06-select-group.md)）。
-> 显式 join、派生表和 CTE 同样可以使用（见 [6. 查询列、聚合与分组](06-select-group.md#68-explicit-joins)）。存储过程与数据库函数同样可以使用（见 [8. 存储过程与数据库函数](08-procedures-functions.md)）。
-> 目前还没有任何构件发布到 Maven Central。请按下文从源码构建。
-
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[1. 概述](../01-overview.md) | 下一章：[3. 条件](03-where.md) | [本页的 Kotlin 版本](../kotlin/02-getting-started.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)

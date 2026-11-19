@@ -1,11 +1,6 @@
 <a id="76-upsert"></a>
 # 7.6 Upsert（Kotlin）
 
-> [!NOTE]
-> **状态：已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（里程碑 M10，决定 D40）。测试使用 **Java** Lambda。**upsert 的 Kotlin Lambda 尚未测试**（update、insert 和 delete 已测试，见 [7. 更新、插入、删除](07-dml.md)）。
-> Kotlin 代码用 Kotlin 语法展示已测试的 Java 语句，HQL 来自 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中的 Java 测试。没有 HQL 的示例遵循设计。
-> 完整状态见[路线 README](README.md)。
-
 [7. 更新、插入、删除（Kotlin）](07-dml.md) | [7.2 更新](07-2-update.md) | [7.4 删除](07-4-delete.md) | [7.5 插入](07-5-insert.md) | **7.6 Upsert** | [Java](../java/07-6-upsert.md)
 
 ---

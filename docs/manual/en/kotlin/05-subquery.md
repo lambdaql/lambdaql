@@ -3,13 +3,6 @@
 > [!IMPORTANT]
 > This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/05-subquery.md) for the latest rules.
 
-> [!NOTE]
-> **Status**
-> - **Implemented** (milestone M8-1) and tested on H2 2.3, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5): subqueries in `where { o, sub -> ... }` of a select, an update and a delete. This covers `exists` / `!exists`, `in`, `!in` (written as `NOT IN`), scalar aggregates, the top-1 form, correlated and nested subqueries, and captured values. Most tests use **Java** lambdas.
-> - **Tested with Kotlin lambdas** ([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), in the build, H2, MariaDB and Oracle): `exists`, `in` and a scalar `avg`. These examples are marked **(tested)**. The other Kotlin forms (`!in`, top-1, nested) were compiled with kotlinc 2.3.21 outside the build and give the same HQL as the Java forms.
-> - **Not implemented yet:** subqueries in the values of `set`, and the MariaDB `lateral` rewrite. (Derived tables and CTEs are implemented with another syntax, see [6. Select, aggregates and group by](06-select-group.md#69-derived-table-subquery-in-from).)
-> - The other Kotlin code shows the tested Java queries in Kotlin syntax. The tested Java examples are in [the Java version of this page](../java/05-subquery.md).
-
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [4. Sorting and paging](04-order-paging.md) | Next: [6. Select, aggregates and group by](06-select-group.md) | [Java version of this page](../java/05-subquery.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)

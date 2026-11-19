@@ -1,13 +1,6 @@
 <a id="72-update"></a>
 # 7.2 更新（Kotlin）
 
-> [!NOTE]
-> **状況: 実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、マイルストーン M10）。ほとんどのテストは **Java** のラムダを使っています。プロパティへの代入とインデックスの書き方 `by[column] = value` は Kotlin のラムダでもテストしています（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、**(テスト済み)** と表示）。 `limit` と `executeOne()` も同じです（決定 D41）。
-> `where` の中のサブクエリ（`sub`）も実装済みです（マイルストーン M8）。削除の形は Java のラムダでテスト済みです。[7.4](07-4-delete.md) を参照してください。
-> **まだ実装されていません:** `set` の値の中の `sub` サブクエリ、複合キーのエンティティでの `limit` / `executeOne()`。
-> Kotlin コードはテスト済みの Java の文を Kotlin の構文で書いたもので、HQL は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) の Java のテストから取っています。HQL のない例は設計に従っています。
-> 全体の状況は [トラックの README](README.md) を見てください。
-
 [7. 更新、挿入、削除（Kotlin）](07-dml.md) | **7.2 更新** | [7.4 削除](07-4-delete.md) | [7.5 挿入](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Java](../java/07-2-update.md)
 
 ---

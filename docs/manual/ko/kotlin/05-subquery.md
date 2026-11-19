@@ -1,13 +1,6 @@
 <a id="5-subqueries-kotlin"></a>
 # 5. 서브쿼리 (Kotlin)
 
-> [!NOTE]
-> **상태**
-> - **구현됨**(마일스톤 M8-1). H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 6.6.5)에서 테스트했습니다. 대상은 조회, 수정, 삭제의 `where { o, sub -> ... }` 안의 서브쿼리입니다. `exists` / `!exists`, `in`, `!in`(`NOT IN`으로 작성), 스칼라 집계, top-1 형태, 상관 서브쿼리와 중첩 서브쿼리, 캡처 값, 서브쿼리 안의 조인(D51)을 포함합니다. 테스트는 대부분 **Java** 람다를 사용합니다.
-> - **Kotlin 람다로 테스트함**([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 빌드에 포함, H2, MariaDB, Oracle): `exists`, `in`, 스칼라 `avg`. 이 예제에는 **(테스트됨)** 표시가 있습니다. 그 밖의 Kotlin 형태(`!in`, top-1, 중첩)는 빌드 밖에서 kotlinc 2.3.21로 컴파일했고, Java 형태와 같은 HQL을 만듭니다.
-> - **아직 구현되지 않음:** MariaDB `lateral` 재작성. (파생 테이블과 CTE는 다른 문법으로 구현했습니다. [6. 조회, 집계, 그룹화](06-select-group.md#69-derived-table-subquery-in-from)를 참고하십시오.)
-> - 그 밖의 Kotlin 코드는 테스트된 Java 쿼리를 Kotlin 문법으로 옮긴 것입니다. 테스트된 Java 예제는 [이 페이지의 Java 버전](../java/05-subquery.md)에 있습니다.
-
 [Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [4. 정렬과 페이징](04-order-paging.md) | 다음: [6. 조회, 집계, 그룹화](06-select-group.md) | [이 페이지의 Java 버전](../java/05-subquery.md)
 
 공통 페이지: [1. 개요](../01-overview.md) · [11. 오류와 언어](../11-errors-and-languages.md)

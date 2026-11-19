@@ -1,13 +1,5 @@
 # 12. Spring Data JPA (Kotlin)
 
-> [!NOTE]
-> **상태: 조회 실행기와 Spring Boot 자동 구성 구현됨.**
-> `LambdaQlExecutor<T>`, Spring `Sort` / `Pageable` 지원(정렬 정책 포함), `QueryBuilder` 빈은 H2, MariaDB 10.11, Oracle 23.26에서 Spring Boot 3.4.2로 테스트했습니다. 테스트는 **Java**로 작성되어 있습니다. **Kotlin 리포지토리는 아직 테스트하지 않았습니다.**
-> 수정, 삭제, 삽입, 업서트 메서드도 Java로 테스트했습니다. 대상은 단축 메서드(`deleteAll`, `deleteOne`, `updateAll`, `updateOne`, `insertOne`, `insertAll`, `upsertOne`, `upsertAll`)와 빌더(`updateQuery()`, `deleteQuery()`, `insertQuery()`, `upsertQuery()`)입니다. 이 메서드에는 호출자의 트랜잭션이 필요합니다. lambdaQL은 `@Transactional`을 붙이지 않습니다(결정 D41). 단축 메서드의 Kotlin 형태는 kotlinc 2.3.21로 컴파일만 확인했습니다. 빌드 안에 Kotlin 테스트는 아직 없습니다.
-> **아직 검증하지 않음:** Spring Boot 4.
-> 이 페이지의 Kotlin 코드는 Java 테스트와 같은 호출을 Kotlin 문법으로 옮긴 것입니다. 테스트한 Java 코드는 [이 페이지의 Java 버전](../java/12-spring-data-jpa.md)에 있습니다.
-> 전체 상태는 [Kotlin 트랙 README](README.md)를 참고하십시오.
-
 [Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [11. 오류와 언어](../11-errors-and-languages.md) | [이 페이지의 Java 버전](../java/12-spring-data-jpa.md)
 
 ---

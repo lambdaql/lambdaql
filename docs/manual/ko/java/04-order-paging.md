@@ -1,13 +1,6 @@
 <a id="4-sorting-and-paging-java"></a>
 # 4. 정렬과 페이징 (Java)
 
-> [!NOTE]
-> **상태**
-> - **핵심 기능 구현됨, 테스트함**(Hibernate 6.6.5로 H2, MariaDB 10.11, Oracle 23.26): `by.asc`, `by.desc`, `by.sort`를 사용하는 `orderBy((o, by) -> ...)`, 키 하나의 형태 `orderBy(o -> key)`와 `orderBy(key, Direction)`(`Order::getPrice` 같은 getter 메서드 참조도 가능), `Direction.parse` / `reversed`, `limit` / `offset`, `orderBy` 뒤의 `first()`, 그리고 재사용 정렬 `SortSpec`(`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`). Spring `Sort`와 `Pageable`은 Spring Data JPA 모듈에서 동작합니다([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)).
-> - **추가로 구현됨, 테스트함:** `join`, `leftJoin`, `crossJoin` 뒤의 조인 형태 `(o, c, by) -> ...`([6.8 명시적 조인](06-select-group.md#68-explicit-joins) 참고), 외부 정렬의 정렬 정책(`SortRules`, `SortPolicy`, `SortMode`, [4.10](#sort-policy) 참고).
-> - **아직 구현되지 않음:** `SortSpec`의 조인 형태.
-> - **(테스트됨)** 표시가 있는 예제는 테스트 코드에서 그대로 가져온 것입니다. 이 장의 나머지 HQL도 같은 규칙을 따르지만 테스트하지는 않았습니다.
-
 [Java 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [3. 조건(`where`)](03-where.md) | 다음: [5. 서브쿼리](05-subquery.md) | [이 페이지의 Kotlin 버전](../kotlin/04-order-paging.md)
 
 공통 페이지: [1. 개요](../01-overview.md) · [11. 오류와 언어](../11-errors-and-languages.md)

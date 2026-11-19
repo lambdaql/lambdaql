@@ -1,11 +1,6 @@
 <a id="75-insert"></a>
 # 7.5 삽입 (Kotlin)
 
-> [!NOTE]
-> **상태: 구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, 마일스톤 M10). `insert ... select`의 `groupBy`, `having`, `Agg`(마일스톤 M9)도 포함합니다. 테스트는 대부분 **Java** 람다를 사용합니다. `values`를 쓰는 insert는 Kotlin 람다로도 테스트했습니다([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), **(테스트됨)** 표시).
-> Kotlin 코드는 테스트된 Java 문장을 Kotlin 문법으로 옮긴 것이고, HQL은 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)와 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)의 Java 테스트에서 가져왔습니다. HQL이 없는 예제는 설계를 따릅니다.
-> 전체 상태는 [트랙 README](README.md)를 참고하십시오.
-
 [7. 수정, 삽입, 삭제 (Kotlin)](07-dml.md) | [7.2 수정](07-2-update.md) | [7.4 삭제](07-4-delete.md) | **7.5 삽입** | [7.6 업서트](07-6-upsert.md) | [Java](../java/07-5-insert.md)
 
 ---

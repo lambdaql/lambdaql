@@ -1,17 +1,6 @@
 <a id="8-stored-procedures-and-db-functions-kotlin"></a>
 # 8. 저장 프로시저와 DB 함수 (Kotlin)
 
-> [!NOTE]
-> **상태**
-> - **구현됨**(결정 D30, D31, 마일스톤 M11, Hibernate 6.6.5). 테스트는 **Java** 람다로 작성했습니다.
->   쿼리 안의 DB 함수(`@SqlFunction`)는 H2 2.3, MariaDB 10.11, Oracle 23.26에서 테스트했습니다([`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)).
->   프로시저 호출(`@SqlProcedure`, `@InOut`, `qb.call`, `qb.exec`)은 MariaDB와 Oracle에서, DB 함수 단독 호출은 세 데이터베이스 모두에서 테스트했습니다([`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)).
->   lambdaQL은 Kotlin 형태(`@JvmStatic`을 붙인 `companion object` 함수, 결과로 쓰는 Kotlin data class)도 읽습니다. 이 장의 Kotlin 테스트는 아직 없습니다.
-> - **추가로 구현됨(MariaDB, Oracle에서 Java로 테스트함):** 데이터베이스와의 스텁 인자 **이름** 대조(규칙 PR2의 일부), Oracle 패키지 오버로드 검출.
-> - **추가로 구현됨(Java 람다로 테스트함):** 조건 안의 DB 함수와 컬럼 산술에 대한 SARGable 경고, 엄격 모드 `SargableMode.STRICT`(규칙 PR8, FN7, 결정 D50, [8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고).
-> - **아직 구현되지 않음:** 데이터베이스와의 파라미터 **타입** 대조(규칙 PR2의 일부), Oracle 패키지 프로시저의 오버로드 하나를 골라 호출하는 기능.
-> - 이 장의 Kotlin 코드는 테스트한 Java 호출을 Kotlin 문법으로 옮긴 것입니다. 테스트한 Java 코드는 [이 페이지의 Java 버전](../java/08-procedures-functions.md)에 있습니다. 전체 상태는 [트랙 README](README.md)를 참고하십시오.
-
 [Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [7. 수정, 삽입, 삭제](07-dml.md) | 다음: [9. Kotlin 노트](09-kotlin-notes.md) | [이 페이지의 Java 버전](../java/08-procedures-functions.md)
 
 공통 페이지: [1. 개요](../01-overview.md) · [11. 오류와 언어](../11-errors-and-languages.md)
@@ -490,9 +479,6 @@ lambdaQL은 먼저 대기 중인 변경을 플러시하므로(PR9와 같음) 함
 
 <a id="89-warning-functions-on-columns-and-indexes-sargable"></a>
 ## 8.9 주의: 컬럼에 적용한 함수와 인덱스(SARGable)
-
-> [!NOTE]
-> **구현됨, Java 람다로 테스트함**(H2, MariaDB 10.11, Oracle 23.26, 규칙 PR8, FN7). 엄격 모드(`SargableMode.STRICT`)와 컬럼 산술의 경고(`LQL-5012`, `LQL-5013`)도 구현됨(결정 D50).
 
 lambdaQL은 **인덱스를 사용할 수 있는** SQL을 만들려고 합니다([10. 규칙과 제한](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql) 참고).
 컬럼을 감싼 함수는 보통 일반 인덱스를 사용할 수 **없습니다**.

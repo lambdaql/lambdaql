@@ -1,16 +1,5 @@
 # 8. 存储过程与数据库函数（Kotlin）
 
-> [!NOTE]
-> **状态**
-> - **已实现**（决策 D30 和 D31，里程碑 M11，Hibernate 6.6.5），并用 **Java** Lambda 测试：
->   查询中的数据库函数（`@SqlFunction`），在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上测试（[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)）；
->   存储过程调用（`@SqlProcedure`、`@InOut`、`qb.call`、`qb.exec`）在 MariaDB 和 Oracle 上测试，单独调用数据库函数在全部三种数据库上测试（[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)）。
->   lambdaQL 也能读取 Kotlin 写法：带 `@JvmStatic` 的 `companion object` 函数，以及作为结果的 Kotlin data class。本章还没有 Kotlin 测试。
-> - **也已实现（已在 MariaDB 和 Oracle 上用 Java 测试）：**对照数据库检查桩函数参数的**名字**（规则 PR2 的一部分），以及 Oracle 包重载的检测。
-> - **也已实现（用 Java Lambda 测试）：** 条件中数据库函数的 SARGable 警告（规则 PR8、FN7，见 [8.9](#89-warning-functions-on-columns-and-indexes-sargable)）。
-> - **尚未实现：** 对照数据库检查参数的**类型**（规则 PR2 的一部分），以及选择并调用 Oracle 包存储过程的某个重载。
-> - 本章的 Kotlin 代码用 Kotlin 语法展示已测试的 Java 调用。已测试的 Java 代码见[本页的 Java 版本](../java/08-procedures-functions.md)。完整状态请参阅[路线 README](README.md)。
-
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[7. 更新、插入、删除](07-dml.md) | 下一章：[9. Kotlin 说明](09-kotlin-notes.md) | [本页的 Java 版本](../java/08-procedures-functions.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -479,9 +468,6 @@ lambdaQL 会先刷新待处理的变更（与 PR9 相同），所以函数能看
 
 <a id="89-warning-functions-on-columns-and-indexes-sargable"></a>
 ## 8.9 警告：列上的函数与索引（SARGable）
-
-> [!NOTE]
-> **已实现，已用 Java Lambda 测试**（H2、MariaDB 10.11、Oracle 23.26，规则 PR8、FN7）。尚未实现：严格模式（用错误代替警告），以及对不带函数的列运算的警告。
 
 lambdaQL 尽量生成**能够使用索引**的 SQL（参见 [10. 规则与限制](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql)）。
 包在列外面的函数通常**无法**使用普通索引：

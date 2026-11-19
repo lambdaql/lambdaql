@@ -1,12 +1,6 @@
 <a id="75-insert"></a>
 # 7.5 挿入（Kotlin）
 
-> [!NOTE]
-> **状況: 実装済み、テスト済み**（H2 2.3、MariaDB 10.11、Oracle 23.26、マイルストーン M10）。`insert ... select` の `groupBy`、`having`、`Agg`（マイルストーン M9）も含みます。ほとんどのテストは **Java** のラムダを使っています。`values` を使う insert は Kotlin のラムダでもテストしています（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、**(テスト済み)** と表示）。
-> **まだ実装されていません:** `insert ... select` の `by.set` の書き方。
-> Kotlin コードはテスト済みの Java の文を Kotlin の構文で書いたもので、HQL は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) と [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) の Java のテストから取っています。HQL のない例は設計に従っています。
-> 全体の状況は [トラックの README](README.md) を見てください。
-
 [7. 更新、挿入、削除（Kotlin）](07-dml.md) | [7.2 更新](07-2-update.md) | [7.4 削除](07-4-delete.md) | **7.5 挿入** | [7.6 Upsert](07-6-upsert.md) | [Java](../java/07-5-insert.md)
 
 ---

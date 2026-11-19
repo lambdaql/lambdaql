@@ -1,14 +1,6 @@
 <a id="9-kotlin-notes"></a>
 # 9. Kotlin 노트
 
-> [!NOTE]
-> **상태: 일부 구현됨.**
-> Kotlin 지원은 확정된 설계입니다(결정 D17, D20 ~ D25, D27, D28, D31).
-> 이 장에 나오는 모든 형태의 바이트코드는 kotlinc
-> 1.7.22, 2.1.10, 2.2.21, 2.3.0, 2.3.21로 컴파일하여 확인했습니다. 많은 조건은 H2에서 행 단위로도 확인했습니다.
-> **빌드 안에서 Kotlin 람다로 테스트함**(kotlinc 2.3.21, H2, MariaDB, Oracle): `?.` 경로, `!!`, 캡처 값, 캡처 컬렉션의 `in`, 서브쿼리(`exists`, `in`, 스칼라), `limit`이 있는 정렬, 데이터 클래스·`Pair`·`Triple`을 쓰는 `select`, `listOf` 키의 `groupBy`, `having`, update의 속성 대입과 `Dml.value`, `set` 값 안의 서브쿼리, insert, delete([`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)).
-> **설계됨, 아직 테스트하지 않음:** 이 장의 나머지 형태(예: `?:`, 범위, `when`, 속성 참조, 문자열 템플릿). 컴파일러 버전 매트릭스(kotlinc 1.7.22 ~ 2.3.0)는 아직 빌드에 없습니다. 전체 상태는 [트랙 README](README.md)를 참고하십시오.
-
 [Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [8. 프로시저와 DB 함수](08-procedures-functions.md) | 다음: [10. 규칙과 제한](10-rules-and-limits.md) | [이 페이지의 Java 버전: 9. Java 노트](../java/09-java-notes.md)
 
 공통 페이지: [1. 개요](../01-overview.md) · [11. 오류와 언어](../11-errors-and-languages.md)
@@ -404,10 +396,6 @@ NULL 행을 원하면 `it.status == null || it.status !in ids`라고 쓰십시�
 | 컬럼에 대한 `trim()`, `coerceAtLeast()`, `toLocalDate()` 및 다른 stdlib 호출 | **거부됨**(KC20) | 계획됨(함수 매핑) |
 | `"$a-$b" == it.description`(템플릿에 캡처 값만 사용) | `:p1 = e0.description` | 설계됨: 문자열은 애플리케이션에서 만듦. 현재 분석 코어는 모든 문자열 결합을 거부하므로 람다 전에 문자열을 만들 것 |
 | `"${it.description}-x"`(템플릿 안의 엔티티 값) | **거부됨**(KC17) | 계획됨 |
-
-> [!NOTE]
-> 로드맵에는 일반적인 `LIKE` 지원(Java `startsWith` 등)이 v0.2로 잡혀 있습니다.
-> 위의 Kotlin 형태는 설계되어 있지만, 그 작업과 함께 다른 Kotlin 형태보다 늦게 출시될 수 있습니다.
 
 **`ignoreCase = true`(D24).** lambdaQL은 인덱스를 사용할 수 없는 `lower(col) = lower(:p)`를 쓰지 않습니다.
 시작할 때 컬럼에 대한 DB 메타데이터를 읽고 DB가 사용할 수 있는 형태를 고릅니다.

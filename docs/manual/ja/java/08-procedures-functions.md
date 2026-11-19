@@ -1,17 +1,6 @@
 <a id="8-stored-procedures-and-db-functions-java"></a>
 # 8. ストアドプロシージャと DB 関数（Java）
 
-> [!NOTE]
-> **状況**
-> - **実装済み、テスト済み**（決定 D30 と D31、マイルストーン M11、Hibernate 6.6.5）:
->   クエリの中の DB 関数（`@SqlFunction`）は H2 2.3、MariaDB 10.11、Oracle 23.26 で（[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)）、
->   プロシージャの呼び出し（`@SqlProcedure`、`@InOut`、`qb.call`、`qb.exec`）は MariaDB と Oracle で、DB 関数の単独呼び出しは 3 つのデータベースすべてでテストしています（[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)）。
->   H2 には OUT パラメーターがないため、プロシージャのテストは H2 では実行しません。
-> - **こちらも実装済み、テスト済み:** スタブの引数 **名** とデータベースとの照合（ルール PR2 の一部）、Oracle パッケージのオーバーロードの検出。
-> - **こちらも実装済み、テスト済み:** 条件の中の DB 関数についての SARGable 警告（ルール PR8、FN7。[8.9](#89-warning-functions-on-columns-and-indexes-sargable) を参照）。
-> - **まだ実装されていないもの:** パラメーターの **型** のデータベースとの照合（ルール PR2 の一部）、Oracle パッケージのプロシージャのオーバーロードを 1 つ選んで呼ぶこと。
-> - **(テスト済み)** と書かれた例は、テストコードからそのまま取ったものです。それ以外の例も同じルールに従いますが、テストでは確認していません。全体の状況は [Java トラックの README](README.md#status) を参照してください。
-
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [7. 更新、挿入、削除](07-dml.md) | 次: [9. Java の注意点](09-java-notes.md) | [このページの Kotlin 版](../kotlin/08-procedures-functions.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -596,9 +585,6 @@ lambdaQL は先に保留中の変更をフラッシュするので（PR9 と同�
 
 <a id="89-warning-functions-on-columns-and-indexes-sargable"></a>
 ## 8.9 警告: カラムに対する関数とインデックス（SARGable）
-
-> [!NOTE]
-> **実装済み、テスト済み**（H2、MariaDB 10.11、Oracle 23.26、ルール PR8、FN7）。まだ実装されていないもの: 厳格モード（警告の代わりにエラー）、関数を使わないカラムの算術演算の警告。
 
 lambdaQL は **インデックスを使える** SQL を作ろうとします（[10. ルールと制限](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql) を参照）。
 カラムを関数で囲むと、通常のインデックスは普通 **使えません**。

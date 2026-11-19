@@ -3,17 +3,6 @@
 
 **他の言語:** [English](../../en/java/README.md) | [한국어](../../ko/java/README.md) | [日本語](../../ja/java/README.md) | [简体中文](../../zh/java/README.md)
 
-> [!IMPORTANT]
-> **状況:** lambdaQL は開発の初期段階です。
-> 実装されているのは **解析コア**、**結果の関数付きの `where`**（`toList()`、`toSet()`、`first()`、`one()`、`count()`、`exists()`）、そして **ソートとページング**（`orderBy`、`limit`、`offset`、`SortSpec`）の中核部分です。lambdaQL はラムダを読み込み、それをデコードし、HQL を書いて実行します。これは H2、MariaDB、Oracle でテスト済みです。
-> **更新、挿入、削除、upsert** も実装済みで、`limit` と 1 行保護 `executeOne()` も使えます（H2、MariaDB、Oracle でテスト済み）。
-> **Spring Data JPA モジュール** も実装済みです。リポジトリ用の実行器 `LambdaQlExecutor<T>`（Spring の `Sort`、`Pageable`、`deleteAll(where)` や `updateOne(where, set)` のような DML の短縮メソッド、および更新、削除、挿入、upsert のビルダーに対応）と Spring Boot の自動構成です（Spring Boot 3.4.2 でテスト済み）。DML には呼び出し側のトランザクションが必要です。
-> **サブクエリ**（`where((o, sub) -> ...)`、更新と削除でも）と **`select`**（record と DTO、`groupBy`、`having`、`Agg` の集計、`insert ... select` でも）も実装済みです（H2、MariaDB、Oracle でテスト済み）。
-> **明示的な結合**（`join`、`leftJoin`、`crossJoin`）、**派生テーブルと CTE**（`qb.from(valueQuery)`、`qb.with(valueQuery)`）、**ストアドプロシージャと DB 関数**（`@SqlProcedure`、`@SqlFunction`、`qb.call`、`qb.exec`）、**4 つの言語のメッセージを持つエラーコード**（`[LQL-xxxx]`）も実装済みです（H2、MariaDB、Oracle でテスト済み。プロシージャは MariaDB と Oracle）。
-> 外部のソートのための **ソートポリシー**（`SortRules`、`SortPolicy`、`SortMode`、`@Sortable`、Spring Boot のプロパティ `lambdaql.sort.*`）も実装済みです（H2、MariaDB、Oracle でテスト済み）。
-> このトラックのそれ以外の内容（たとえば `SortSpec` の結合の書き方と厳格モード）は **設計済み** です。構文とルールは決まっていてプロトタイプで確認しましたが、コードはまだライブラリに入っていません。
-> 成果物（アーティファクト）はまだ Maven Central に公開していません。試すには、[ソースからビルド](02-getting-started.md#build-from-source)してください。
-
 [マニュアルのホーム](../README.md) | [Kotlin トラック](../kotlin/README.md) | 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
 
 これは lambdaQL マニュアルの **Java トラック** です。このトラックのページには **Java のコードだけ** が載っています。

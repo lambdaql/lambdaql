@@ -1,14 +1,6 @@
 <a id="12-spring-data-jpa-java"></a>
 # 12. Spring Data JPA（Java）
 
-> [!NOTE]
-> **状況: クエリの実行器と Spring Boot の自動構成は実装済みです。**
-> `LambdaQlExecutor<T>`、Spring の `Sort` / `Pageable` への対応（ソートポリシーを含む）、`QueryBuilder` の Bean は、Spring Boot 3.4.2 を使って H2、MariaDB 10.11、Oracle 23.26 でテスト済みです。
-> 更新、削除、挿入、upsert のメソッドもテスト済みです。短縮メソッド（`deleteAll`、`deleteOne`、`updateAll`、`updateOne`、`insertOne`、`insertAll`、`upsertOne`、`upsertAll`）とビルダー（`updateQuery()`、`deleteQuery()`、`insertQuery()`、`upsertQuery()`）です。これらには呼び出し側のトランザクションが必要です。lambdaQL は `@Transactional` を付けません（決定 D41）。
-> **まだ検証していないもの:** Spring Boot 4。
-> **(テスト済み)** と書かれた例は、テストスイートからコピーしたものです。
-> 全体の状況は [Java トラックの README](README.md#status) を参照してください。
-
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [11. エラーと言語](../11-errors-and-languages.md) | [このページの Kotlin 版](../kotlin/12-spring-data-jpa.md)
 
 ---

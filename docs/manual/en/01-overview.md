@@ -5,16 +5,6 @@
 
 [Manual home](README.md) | Tracks: [Java](java/README.md) | [Kotlin](kotlin/README.md) | Next: 2. Getting started ([Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md))
 
-> [!NOTE]
-> **Status:** The analysis core (lambda loading and condition decoding) and `where` with the result functions `toList()`, `toSet()`, `first()`, `one()`, `count()` and `exists()` (HQL rendering and running the query) are implemented. They are tested on H2, MariaDB and Oracle with Java lambdas.
-> The core of sorting and paging (`orderBy`, `limit`, `offset`, `SortSpec`) is also implemented and tested.
-> The Spring Data JPA module (`LambdaQlExecutor<T>` and the Spring Boot auto-configuration) is implemented and tested with Spring Boot 3.4.2.
-> Update, insert, delete and upsert are implemented and tested too, with `limit` and the one-row protection `executeOne()`, also in the Spring Data JPA module (the shortcuts `deleteAll`, `updateOne` and so on). They need the caller's transaction there.
-> Subqueries in `where` and `select` (with `groupBy`, `having` and the `Agg` functions) are implemented and tested too.
-> Explicit joins (`join`, `leftJoin`, `crossJoin`), derived tables and CTEs, stored procedures and DB functions, and error codes with messages in four languages are implemented and tested too.
-> Kotlin lambdas are tested for a part of the forms (`?.`, `!!`, `in`, subqueries, data classes, `groupBy`, update, insert and delete).
-> The HQL shown on this page is the output that the design defines. The examples are design examples.
-
 This page is for both languages. Code is shown in separate **Java** and **Kotlin** sections.
 
 ## What is lambdaQL?

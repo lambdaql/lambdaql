@@ -5,14 +5,6 @@
 
 **Other languages:** English | [한국어](../../ko/kotlin/README.md) | [日本語](../../ja/kotlin/README.md) | [简体中文](../../zh/kotlin/README.md)
 
-> [!IMPORTANT]
-> **Status:** lambdaQL is in early development.
-> The **analysis core**, **`where` with the result functions** (`toList()`, `toSet()`, `first()`, `one()`, `count()`, `exists()`) and the core of **sorting and paging** (`orderBy`, `limit`, `offset`, `SortSpec`) are implemented: lambdaQL loads a lambda, decodes it, writes the HQL and runs it. This is tested on H2, MariaDB and Oracle, mostly with **Java** lambdas.
-> **Kotlin lambdas are tested in the build** (kotlinc 2.3.21, [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)) for `?.` paths, `!!`, captured values, `in`, a sort, subqueries, `select` with data classes, `Pair` and `Triple`, `groupBy` and `having`, update, insert and delete. The other Kotlin-only forms (`?:`, ranges, `when`, property references) are **designed**: their bytecode was compiled and checked with prototypes (kotlinc 1.7.22 to 2.3.21).
-> **Subqueries**, **`select`** (with `groupBy`, `having` and `Agg`), **update, insert, delete and upsert** (with `limit` and the one-row protection `executeOne()`), **explicit joins**, **derived tables and CTEs**, **stored procedures and DB functions** and **error codes in four languages** are implemented. Joins, derived tables, CTEs, procedures, DB functions and upsert are tested with Java lambdas only.
-> The **Spring Data JPA module** (`LambdaQlExecutor<T>`, Spring `Sort` and `Pageable`, the DML shortcuts such as `deleteAll { }` and `updateOne({ }) { }`, the update, delete, insert and upsert builders, the Spring Boot auto-configuration) is implemented and tested with Java repositories (Spring Boot 3.4.2). DML needs the caller's transaction. Kotlin repositories are not tested yet.
-> No artifact is published to Maven Central yet. To try it, [build from source](02-getting-started.md#build-from-source).
-
 [Manual home](../README.md) | [Java track](../java/README.md) | Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
 
 This is the **Kotlin track** of the lambdaQL manual. Every page in this track has **only Kotlin code**.

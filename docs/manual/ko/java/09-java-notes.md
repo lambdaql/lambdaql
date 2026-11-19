@@ -1,12 +1,6 @@
 <a id="9-java-notes"></a>
 # 9. Java 노트
 
-> [!NOTE]
-> **상태**
-> - **구현됨(분석 코어):** 직렬화 가능한 람다 로딩, `this`를 캡처하는 람다, 메서드 참조 감지, `Serializable`이 아닌 람다 거부. [9.13](#913-what-you-can-check-today)의 테스트를 참고하십시오.
-> - **구현됨:** 키 하나의 정렬에서 getter 메서드 참조, 예: `orderBy(Order::getPrice)`([9.9](#99-method-references) 참고).
-> - **설계됨, 아직 구현되지 않음:** 이 페이지의 나머지 전부(`==`의 의미, 박싱 규칙, `String` 규칙, 쿼리 안의 메서드 참조 등).
-
 [Java 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [8. 프로시저와 DB 함수](08-procedures-functions.md) | 다음: [10. 규칙과 제한](10-rules-and-limits.md) | [이 페이지의 Kotlin 버전](../kotlin/09-kotlin-notes.md)
 
 공통 페이지: [1. 개요](../01-overview.md) · [11. 오류와 언어](../11-errors-and-languages.md)
@@ -311,10 +305,6 @@ lambdaQL에는 **static DSL이 없습니다**. 선택 사항인 `Agg` import를 
 .where(o -> o.getUpdateAt().isAfter(LocalDateTime.of(2026, 1, 1, 0, 0)))   // OK: Java에서 계산됨
 .where(o -> MyUtil.normalize(o.getDescription()) == text)                   // 거부됨: 엔티티를 사용함
 ```
-
-> [!NOTE]
-> 저장소에는 아직 예전 프로토타입 코드(예: `JpqlFunction` 클래스)가 남아 있습니다.
-> 새 설계의 일부가 아닙니다. 쿼리에서 사용하지 마십시오.
 
 <a id="911-other-java-forms"></a>
 ## 9.11 그 밖의 Java 형태

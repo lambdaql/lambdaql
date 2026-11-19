@@ -3,13 +3,6 @@
 > [!IMPORTANT]
 > 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/05-subquery.md)。
 
-> [!NOTE]
-> **状态**
-> - **已实现**（里程碑 M8-1），并在 H2 2.3、MariaDB 10.11 和 Oracle 23.26（Hibernate 6.6.5）上测试：select、update 和 delete 的 `where { o, sub -> ... }` 中的子查询。包括 `exists` / `!exists`、`in`、`!in`（写成 NOT EXISTS）、标量聚合、top-1 写法、关联子查询和嵌套子查询，以及捕获值。大多数测试使用 **Java** Lambda。
-> - **已用 Kotlin Lambda 测试**（[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，在构建中，H2、MariaDB 和 Oracle）：`exists`、`in` 和标量 `avg`。这些示例标记为 **(已测试)**。其他 Kotlin 写法（`!in`、top-1、嵌套）已在构建之外用 kotlinc 2.3.21 编译，生成与 Java 写法相同的 HQL。
-> - **尚未实现：** `set` 值中的子查询，以及 MariaDB 的 `lateral` 改写。（派生表和 CTE 已用另一种语法实现，见 [6. 查询列、聚合与分组](06-select-group.md#69-derived-table-subquery-in-from)。）
-> - 其他 Kotlin 代码用 Kotlin 语法展示已测试的 Java 查询。已测试的 Java 示例见[本页的 Java 版本](../java/05-subquery.md)。
-
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[4. 排序与分页](04-order-paging.md) | 下一章：[6. 查询列、聚合与分组](06-select-group.md) | [本页的 Java 版本](../java/05-subquery.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)

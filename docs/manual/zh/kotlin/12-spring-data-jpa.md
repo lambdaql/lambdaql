@@ -1,13 +1,5 @@
 # 12. Spring Data JPA（Kotlin）
 
-> [!NOTE]
-> **状态：查询执行器和 Spring Boot 自动配置已实现。**
-> `LambdaQlExecutor<T>`、Spring `Sort` / `Pageable` 支持（包括排序策略）以及 `QueryBuilder` bean 已在 H2、MariaDB 10.11 和 Oracle 23.26 上用 Spring Boot 3.4.2 测试。测试是用 **Java** 编写的。**Kotlin repository 尚未测试。**
-> 更新、删除、插入和 upsert 方法也已用 Java 测试：快捷方法（`deleteAll`、`deleteOne`、`updateAll`、`updateOne`、`insertOne`、`insertAll`、`upsertOne`、`upsertAll`）和构建器（`updateQuery()`、`deleteQuery()`、`insertQuery()`、`upsertQuery()`）。它们需要调用方的事务。lambdaQL 不添加 `@Transactional`（决定 D41）。快捷方法的 Kotlin 写法已用 kotlinc 2.3.21 编译；构建中还没有 Kotlin 测试。
-> **尚未验证：** Spring Boot 4。
-> 本页的 Kotlin 代码用 Kotlin 语法展示与 Java 测试相同的调用。经过测试的 Java 代码见[本页的 Java 版本](../java/12-spring-data-jpa.md)。
-> 完整状态请参阅 [Kotlin 路线 README](README.md)。
-
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[11. 错误与语言](../11-errors-and-languages.md) | [本页的 Java 版本](../java/12-spring-data-jpa.md)
 
 ---

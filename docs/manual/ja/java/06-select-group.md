@@ -1,13 +1,6 @@
 <a id="6-select-aggregates-and-group-by-java"></a>
 # 6. 選択、集計、グループ化（Java）
 
-> [!NOTE]
-> **状況**
-> - **実装済み、テスト済み:** H2 2.3、MariaDB 10.11、Oracle 23.26（Hibernate 6.6.5、マイルストーン M9、決定 D27）。1 つの値、Java の record、DTO の `select`、キーが 1 つまたは複数の `groupBy`、`having`、`Agg` 関数、`distinct()`、`limit`、`offset`、`toList`、`toSet`、`first`、`one`、`orderBy(...).select(...)`、ルール J3、J4、J7 のチェック。
-> - **こちらも実装済み、テスト済み**（決定 D44、D45、D46）: エンティティ 3 つまでの `join`、`leftJoin`、`crossJoin` による明示的な結合（`select((o, c) -> ...)` も含む、6.8）、`qb.from(valueQuery)` と `qb.with(valueQuery)` による派生テーブルと CTE（6.9 と 6.10、マイルストーン M8-2）。
-> - **まだ実装されていないもの:** 集約によるソートとグループ化したクエリの `orderBy`（v0.2 の候補）、DML とサブクエリの中の結合、派生テーブルとの結合、同じ CTE の 2 回の使用。
-> - **(テスト済み)** と書かれた例は、テストスイートからコピーしたものです。全体の状況は [Java トラックの README](README.md#status) を参照してください。
-
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [5. サブクエリ](05-subquery.md) | 次: [7. 更新、挿入、削除](07-dml.md) | [このページの Kotlin 版](../kotlin/06-select-group.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)

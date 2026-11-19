@@ -1,13 +1,6 @@
 <a id="72-update"></a>
 # 7.2 수정(update) (Java)
 
-> [!NOTE]
-> **상태: 구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, 마일스톤 M10). `limit`과 `executeOne()`(결정 D41)도 포함합니다.
-> `where` 안의 서브쿼리(`sub`)도 구현되었습니다(마일스톤 M8). 삭제 형태는 테스트했습니다. [7.4](07-4-delete.md)를 참고하십시오.
-> **아직 구현되지 않음:** `set` 값 안의 `sub` 서브쿼리, 복합 키 엔티티의 `limit` / `executeOne()`.
-> **(테스트됨)** 표시가 있는 예제는 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)에서 그대로 가져온 것입니다. 나머지 예제는 설계를 따르며 아직 테스트가 없습니다.
-> 전체 상태는 [Java 트랙 README](README.md#status)를 참고하십시오.
-
 [7. 수정, 삽입, 삭제 (Java)](07-dml.md) | **7.2 수정(update)** | [7.4 삭제(delete)](07-4-delete.md) | [7.5 삽입(insert)](07-5-insert.md) | [7.6 업서트(upsert)](07-6-upsert.md) | [Kotlin](../kotlin/07-2-update.md)
 
 ---

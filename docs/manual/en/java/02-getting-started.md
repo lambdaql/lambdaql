@@ -3,17 +3,6 @@
 > [!IMPORTANT]
 > This page is older than the Korean manual. See the [Korean page](../../ko/java/02-getting-started.md) for the latest rules.
 
-> [!NOTE]
-> **Status:** You can build lambdaQL from source and run its tests today.
-> `where` conditions and `toList()` work end to end. They are tested on H2, MariaDB and Oracle.
-> The result functions `first()`, `one()`, `count()`, `exists()` and `toSet()` work too (see [Getting the result](#getting-the-result)).
-> The core of sorting and paging (`orderBy`, `limit`, `offset`, `SortSpec`) works too.
-> The Spring Data JPA module (repository executor and Spring Boot auto-configuration) works too (see [12. Spring Data JPA](12-spring-data-jpa.md)).
-> Update, insert, delete and upsert work too (see [7. Update, insert, delete](07-dml.md)).
-> Subqueries and `select` (with `groupBy`, `having` and `Agg`) work too (see [5. Subqueries](05-subquery.md) and [6. Select, aggregates and group by](06-select-group.md)).
-> Explicit joins, derived tables and CTEs work too (see [6. Select, aggregates and group by](06-select-group.md#68-explicit-joins)). Stored procedures and DB functions work too (see [8. Procedures and DB functions](08-procedures-functions.md)).
-> No artifact is published to Maven Central yet. Build from source as shown below.
-
 [Java track](README.md) | [Manual home](../README.md) | Previous: [1. Overview](../01-overview.md) | Next: [3. Conditions](03-where.md) | [Kotlin version of this page](../kotlin/02-getting-started.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)

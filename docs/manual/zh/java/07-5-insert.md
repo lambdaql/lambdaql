@@ -1,12 +1,6 @@
 <a id="75-insert"></a>
 # 7.5 插入（Java）
 
-> [!NOTE]
-> **状态：已实现并测试**，在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上（里程碑 M10），包括 `insert ... select` 中的 `groupBy`、`having` 和 `Agg`（里程碑 M9）。
-> **尚未实现：** `insert ... select` 的 `by.set` 写法。
-> 标记为 **(已测试)** 的示例是从 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 和 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) 中复制的。其他示例遵循设计，还没有测试覆盖。
-> 完整状态见 [Java 路线 README](README.md#status)。
-
 [7. 更新、插入、删除（Java）](07-dml.md) | [7.2 更新](07-2-update.md) | [7.4 删除](07-4-delete.md) | **7.5 插入** | [7.6 Upsert](07-6-upsert.md) | [Kotlin](../kotlin/07-5-insert.md)
 
 ---

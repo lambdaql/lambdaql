@@ -3,15 +3,6 @@
 > [!IMPORTANT]
 > 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/10-rules-and-limits.md)。
 
-> [!NOTE]
-> **状态：部分已实现。**
-> 本章汇总了 lambdaQL 针对 Kotlin 的设计规则：Lambda 如何变成 SQL、NULL 如何处理、
-> Kotlin 与 SQL 的不同之处、各数据库的不同之处，以及哪些写法不受支持。
-> 这些规则已用原型在 H2 2.3、MariaDB 10.11 和 Oracle 23ai（Hibernate 6.6.5）上检查过，Kotlin 字节码已用 kotlinc 1.7.22 到 2.3.21 检查过。
-> 目前分析核心、`where`、结果函数（`toList()`、`toSet()`、`first()`、`one()`、`count()`、`exists()`）、排序与分页的核心部分、`SortSpec`、update/insert/delete/upsert（[7](07-dml.md)）以及 Spring Data JPA 模块（[12](12-spring-data-jpa.md)）可以工作（已在 H2、MariaDB 和 Oracle 上用 Java Lambda 测试）。
-> 子查询（[5](05-subquery.md)）和带聚合的 `select`（[6](06-select-group.md)）的规则同样已实现，在 DML 中也是如此。显式 join、派生表、CTE（[6](06-select-group.md)）以及存储过程与数据库函数（[8](08-procedures-functions.md)）的规则同样已实现。列上的数据库函数的警告（[10.2](#db-functions-on-a-column)）同样已实现。一部分排序规则也尚未实现（见 [4.12](04-order-paging.md#412-rules-summary-s1-to-s14)）。
-> 完整状态请参阅 [路线 README](README.md)。
-
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[9. Kotlin 说明](09-kotlin-notes.md) | 下一章：[11. 错误与语言](../11-errors-and-languages.md) | [本页的 Java 版本](../java/10-rules-and-limits.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)

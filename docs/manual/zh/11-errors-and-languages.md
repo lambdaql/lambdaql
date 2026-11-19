@@ -5,13 +5,6 @@
 
 [手册首页](README.md) | 路线：[Java](java/README.md) | [Kotlin](kotlin/README.md) | 上一章：10. 规则与限制（[Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md)） | 下一章：12. Spring Data JPA（[Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md)）
 
-> [!NOTE]
-> **状态：** 已实现并测试（决定 D33）。
-> 每条消息都有错误码 `[LQL-xxxx]`，消息提供英文、日文、中文（简体）和韩文四种语言。
-> 异常是 `LambdaQLException` 及其子类。警告输出到 SLF4J。
-> 标记为 **(已测试)** 的示例是从测试代码（[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)、[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)）中复制的。本页的其他代码为设计示例。
-> 尚未实现：把警告变为错误的严格模式。
-
 本页适用于两种语言。代码分别展示在 **Java** 和 **Kotlin** 两个小节中。
 
 <a id="error-codes"></a>

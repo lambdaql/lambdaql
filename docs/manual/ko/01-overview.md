@@ -3,16 +3,6 @@
 
 [매뉴얼 홈](README.md) | 트랙: [Java](java/README.md) | [Kotlin](kotlin/README.md) | 다음: 2. 시작하기 ([Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md))
 
-> [!NOTE]
-> **상태:** 분석 코어(람다 로딩과 조건 디코딩)와 결과 함수 `toList()`, `toSet()`, `first()`, `one()`, `count()`, `exists()`를 포함한 `where`(HQL 렌더링과 쿼리 실행)가 구현되어 있습니다. H2, MariaDB, Oracle에서 Java 람다로 테스트했습니다.
-> 정렬과 페이징(`orderBy`, `limit`, `offset`, `SortSpec`)의 핵심 기능도 구현되어 테스트했습니다.
-> Spring Data JPA 모듈(`LambdaQlExecutor<T>`와 Spring Boot 자동 구성)도 구현되어 Spring Boot 3.4.2에서 테스트했습니다.
-> 수정, 삽입, 삭제, 업서트도 `limit`과 1행 보호 `executeOne()`을 포함해 구현되어 테스트했으며, Spring Data JPA 모듈에서도 사용할 수 있습니다(단축 메서드 `deleteAll`, `updateOne` 등). Spring Data JPA 모듈에서는 호출자의 트랜잭션이 필요합니다.
-> `where` 안의 서브쿼리와 `select`(`groupBy`, `having`, `Agg` 함수 포함)도 구현되어 테스트했습니다.
-> 명시적 조인(`join`, `leftJoin`, `crossJoin`), 파생 테이블과 CTE, 저장 프로시저와 DB 함수, 4개 언어 메시지와 오류 코드도 구현되어 테스트했습니다.
-> Kotlin 람다는 일부 형태(`?.`, `!!`, `in`, 서브쿼리, 데이터 클래스, `groupBy`, update, insert, delete)를 테스트했습니다.
-> 이 페이지의 HQL은 설계가 정의한 출력입니다. 예제는 설계 예제입니다.
-
 이 페이지는 두 언어 모두를 위한 것입니다. 코드는 **Java**와 **Kotlin** 섹션으로 나누어 보여 줍니다.
 
 <a id="what-is-lambdaql"></a>

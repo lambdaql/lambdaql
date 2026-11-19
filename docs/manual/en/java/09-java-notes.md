@@ -3,12 +3,6 @@
 > [!IMPORTANT]
 > This page is older than the Korean manual. See the [Korean page](../../ko/java/09-java-notes.md) for the latest rules.
 
-> [!NOTE]
-> **Status**
-> - **Implemented (analysis core):** loading serializable lambdas, lambdas that capture `this`, detection of method references, rejection of lambdas that are not `Serializable`. See the tests in [9.13](#913-what-you-can-check-today).
-> - **Implemented:** getter method references in a one-key sort, like `orderBy(Order::getPrice)` (see [9.9](#99-method-references)).
-> - **Designed, not implemented yet:** everything else on this page (the meaning of `==`, boxing rules, `String` rules, method references in queries, and so on).
-
 [Java track](README.md) | [Manual home](../README.md) | Previous: [8. Procedures and DB functions](08-procedures-functions.md) | Next: [10. Rules and limits](10-rules-and-limits.md) | [Kotlin version of this page](../kotlin/09-kotlin-notes.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -295,10 +289,6 @@ Static methods that use **only captured values** are fine. They run in Java each
 .where(o -> o.getUpdateAt().isAfter(LocalDateTime.of(2026, 1, 1, 0, 0)))   // OK: computed in Java
 .where(o -> MyUtil.normalize(o.getDescription()) == text)                   // rejected: uses the entity
 ```
-
-> [!NOTE]
-> The repository still has old prototype code (for example a `JpqlFunction` class).
-> It is not part of the new design. Do not use it in queries.
 
 ## 9.11 Other Java forms
 

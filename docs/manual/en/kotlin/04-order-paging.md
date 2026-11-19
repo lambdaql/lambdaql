@@ -1,13 +1,5 @@
 # 4. Sorting and paging (Kotlin)
 
-> [!NOTE]
-> **Status**
-> - **Core implemented** and tested on H2, MariaDB 10.11 and Oracle 23.26 (Hibernate 6.6.5): `orderBy { o, by -> ... }` with `by.asc`, `by.desc` and `by.sort`, the one-key forms `orderBy { it.key }` and `orderBy({ it.key }, Direction)`, `Direction.parse` / `reversed`, `limit` / `offset`, `first()` after `orderBy`, and the reusable sort `SortSpec` (`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`). Spring `Sort` and `Pageable` work in the Spring Data JPA module ([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)). Most tests use **Java** lambdas. A Kotlin sort with `limit` is tested too ([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), marked **(tested)**).
-> - **Also implemented (tested with Java lambdas):** the join form `{ o, c, by -> ... }` after `join`, `leftJoin` or `crossJoin` (see [6.8 Explicit joins](06-select-group.md#68-explicit-joins)), and the sort policy for outside sorts (`SortRules`, `SortPolicy`, `SortMode`, see [4.10](#sort-policy)).
-> - **Not implemented yet:** Kotlin property references (`orderBy(Order::price)`) and the join form of `SortSpec`.
-> - The Kotlin syntax compiles (checked with prototypes, kotlinc 2.3.21). Nullable keys, `?.` keys and property references compile; an entity key does not.
-> - The other HQL in this chapter follows the rules of the library, but it is not tested with Kotlin lambdas.
-
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [3. Conditions](03-where.md) | Next: [5. Subqueries](05-subquery.md) | [Java version of this page](../java/04-order-paging.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)

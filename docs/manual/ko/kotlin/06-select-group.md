@@ -1,14 +1,6 @@
 <a id="6-select-aggregates-and-group-by-kotlin"></a>
 # 6. 조회, 집계, 그룹화 (Kotlin)
 
-> [!NOTE]
-> **상태**
-> - **구현됨**(마일스톤 M9, 결정 D27). H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 6.6.5)에서 테스트했습니다. 대상은 값 하나, 데이터 클래스, `Pair`, `Triple`의 `select`, 키 하나나 여러 키(`listOf`, `a to b`, `Triple`)의 `groupBy`, `having`, `Agg` 함수, `distinct()`, `limit`, `offset`, `toList`, `toSet`, `first`, `one`, `orderBy { }.select { }`, 규칙 J3, J4, J7의 검사입니다. 
-> - **Kotlin 람다로 테스트함**([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 빌드에 포함, H2, MariaDB, Oracle): 데이터 클래스, `Pair`, 키 하나의 `groupBy`와 `having`, `listOf` 키의 `groupBy`와 `Triple` 결과, 조인 결과의 `distinct()`, CTE의 조인. 이 예제에는 **(테스트됨)** 표시가 있습니다. 그 밖의 Kotlin 형태는 빌드 밖에서 kotlinc 2.3.21로 컴파일했고, Java 형태와 같은 HQL을 만듭니다.
-> - **추가로 구현됨**(결정 D44, D45, D46, Java 람다로 테스트함): 엔티티 3개까지의 `join`, `leftJoin`, `crossJoin` 명시적 조인과 `select { o, c -> ... }`(6.8), `qb.from(valueQuery)`와 `qb.with(valueQuery)`의 파생 테이블과 CTE(6.9, 6.10, 마일스톤 M8-2). 조인 결과의 `distinct()`와 파생 테이블·CTE의 조인(6.8, 결정 D51).
-> - **아직 구현되지 않음:** 집계 기준 정렬과 그룹 쿼리의 `orderBy`(v0.2 후보). 서브쿼리 안의 조인은 구현됨([5. 서브쿼리](05-subquery.md#joins-inside-a-subquery)). update와 delete의 조인은 추가하지 않습니다(D51).
-> - 그 밖의 Kotlin 코드는 테스트된 Java 쿼리를 Kotlin 문법으로 옮긴 것입니다. 테스트된 Java 예제는 [이 페이지의 Java 버전](../java/06-select-group.md)에 있습니다. 전체 상태는 [트랙 README](README.md)를 참고하십시오.
-
 [Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [5. 서브쿼리](05-subquery.md) | 다음: [7. 수정, 삽입, 삭제](07-dml.md) | [이 페이지의 Java 버전](../java/06-select-group.md)
 
 공통 페이지: [1. 개요](../01-overview.md) · [11. 오류와 언어](../11-errors-and-languages.md)
