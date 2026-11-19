@@ -334,9 +334,27 @@ public sealed interface Expr permits
      * @param sorts  the order (only with a limit)
      * @param limit  the row limit, or null
      * @param type   the JVM type of the value
+     * @param joins  the entity joins inside the subquery ({@code sub.from(A).join(B, ...)}, ROADMAP D51)
      */
     record Subquery(Kind kind, int root, Class<?> entity, List<Pred> wheres, Expr select, Agg agg,
-                    List<SortItem> sorts, Integer limit, Type type) implements Expr {
+                    List<SortItem> sorts, Integer limit, Type type, List<Join> joins) implements Expr {
+        /**
+         * An entity join inside a subquery.
+         *
+         * @param root   the query root index of the joined entity
+         * @param entity the joined entity
+         * @param left   {@code true} for a left join
+         * @param on     the normalized join condition
+         */
+        public record Join(int root, Class<?> entity, boolean left, Pred on) {
+        }
+
+        /** A subquery without joins. */
+        public Subquery(Kind kind, int root, Class<?> entity, List<Pred> wheres, Expr select, Agg agg,
+                        List<SortItem> sorts, Integer limit, Type type) {
+            this(kind, root, entity, wheres, select, agg, sorts, limit, type, List.of());
+        }
+
         /** What a subquery gives. */
         public enum Kind {
             /** {@code exists (select 1 ...)}: a boolean. */
@@ -367,6 +385,7 @@ public sealed interface Expr permits
         public Subquery {
             wheres = List.copyOf(wheres);
             sorts = List.copyOf(sorts);
+            joins = List.copyOf(joins);
         }
         @Override public String toString() {
             return "sub(" + kind + (agg == Agg.NONE ? "" : " " + agg) + " " + entity.getSimpleName() + "#" + root

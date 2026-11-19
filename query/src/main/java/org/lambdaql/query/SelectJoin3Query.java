@@ -112,19 +112,40 @@ public class SelectJoin3Query<T, U, V> {
 
     SelectJoin3Query(SelectQuery<T> from, List<Class<?>> joinedBefore, List<HqlRenderer.JoinBound> boundsBefore,
             Class<?> entity, boolean left, Object condition) {
+        this(from, joinedBefore, boundsBefore, entity, left, condition, null);
+    }
+
+    SelectJoin3Query(SelectQuery<T> from, List<Class<?>> joinedBefore, List<HqlRenderer.JoinBound> boundsBefore,
+            Class<?> entity, boolean left, Object condition, HqlRenderer.JoinSource source) {
         this.joined = new ArrayList<>(joinedBefore);
         this.joined.add(entity);
         this.base = new SelectQuery<>(from.entityClass(), from.context());
         from.wheres().forEach(base::addWhere);
+        base.withDistinct(from.isDistinct());
         this.joinBounds = new ArrayList<>(boundsBefore);
         if (condition == null) {
-            this.joinBounds.add(new HqlRenderer.JoinBound(entity, false, null));          // cross join (D45)
+            this.joinBounds.add(new HqlRenderer.JoinBound(entity, false, null, source));  // cross join (D45)
         } else {
             var ref = QueryContext.read(condition);
             this.joinBounds.add(new HqlRenderer.JoinBound(entity, left,
-                    new HqlRenderer.Bound(base.context().analyzeWhere(ref, roots()), ref.capturedArgs())));
+                    new HqlRenderer.Bound(base.context().analyzeWhere(ref, roots()), ref.capturedArgs()), source));
         }
         base.withJoins(joinBounds);
+    }
+
+    /**
+     * Returns each row of the main entity once: {@code select distinct e0} (ROADMAP D44 extension). A join repeats a
+     * row once per match; {@code distinct()} removes the repeats. A sort key must then be a column of the main entity
+     * itself (J7). An {@code exists} subquery in {@code where} gives the same rows without repeats, often faster.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.JoinQueryTest" region="join-distinct"}
+     *
+     * @return this
+     */
+    public SelectJoin3Query<T, U, V> distinct() {
+        base.withDistinct(true);
+        return this;
     }
 
     private List<Class<?>> roots() {
@@ -162,8 +183,11 @@ public class SelectJoin3Query<T, U, V> {
     public OrderedJoin3Query<T, U, V> orderBy(SortBy<T, U, V> spec) {
         var ref = QueryContext.read(spec);
         var items = base.context().analyzeSortBy(ref, roots());
-        return new OrderedJoin3Query<>(base.entityClass(), base.context(), base.wheres(),
+        if (base.isDistinct()) SelectJoinQuery.distinctKeys(items);
+        OrderedJoin3Query<T, U, V> q = new OrderedJoin3Query<>(base.entityClass(), base.context(), base.wheres(),
                 List.of(new HqlRenderer.SortBound(items, ref.capturedArgs())), joinBounds, roots());
+        q.withDistinct(base.isDistinct());
+        return q;
     }
 
     /**
@@ -177,7 +201,8 @@ public class SelectJoin3Query<T, U, V> {
      * @return the value query
      */
     public <R> ValueQuery<R> select(Select<T, U, V, R> clause) {
-        return SelectJoinQuery.selectValues(base.entityClass(), base.context(), base.wheres(), List.of(), joinBounds, roots(), clause);
+        ValueQuery<R> q = SelectJoinQuery.selectValues(base.entityClass(), base.context(), base.wheres(), List.of(), joinBounds, roots(), clause);
+        return base.isDistinct() ? q.distinct() : q;
     }
 
     /**

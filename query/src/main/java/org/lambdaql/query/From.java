@@ -51,6 +51,30 @@ public interface From<X> {
     boolean exists();
 
     /**
+     * Joins another entity inside the subquery (ROADMAP D51): {@code sub.from(Order.class).join(Item.class,
+     * (o, i) -> i.getOrder().getId() == o.getId())}. The next steps take both rows.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java">SubqueryTest</a>):
+     * {@snippet class="org.lambdaql.query.SubqueryTest" region="sub-join"}
+     *
+     * @param entity    the joined entity class
+     * @param condition the join condition
+     * @param <Y>       the joined entity type
+     * @return the subquery with two rows
+     */
+    <Y> From2<X, Y> join(Class<Y> entity, SelectJoinQuery.JoinOn<X, Y> condition);
+
+    /**
+     * Left-joins another entity inside the subquery (ROADMAP D51).
+     *
+     * @param entity    the joined entity class
+     * @param condition the join condition
+     * @param <Y>       the joined entity type
+     * @return the subquery with two rows
+     */
+    <Y> From2<X, Y> leftJoin(Class<Y> entity, SelectJoinQuery.JoinOn<X, Y> condition);
+
+    /**
      * {@code (select count(*) ...)}.
      *
      * @return a placeholder

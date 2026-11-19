@@ -228,6 +228,45 @@ class SubqueryTest {
         assertEquals(0, Objects.requireNonNullElse(null, 0));
     }
 
+    @Test
+    void joinInSubquery() {
+        // @start region="sub-join"
+        // customers with an order that has an item of quantity > 10: the subquery joins Order and Item (D51)
+        SelectQuery<Customer> q = qb.from(Customer.class).where((c, sub) -> sub.from(Order.class)
+                .join(Item.class, (o, i) -> i.getOrder().getId() == o.getId())
+                .where((o, i) -> o.getCustomer().getId() == c.getId() && i.getQty() > 10)
+                .exists());
+        assertEquals("select e0 from Customer e0 where exists (select 1 from Order s1 join Item s2 on s2.order.id = s1.id"
+                + " where s1.customer.id = e0.id and s2.qty > 10)", q.toHql().hql());
+        // an aggregate over the joined rows
+        SelectQuery<Customer> total = qb.from(Customer.class).where((c, sub) -> sub.from(Order.class)
+                .join(Item.class, (o, i) -> i.getOrder().getId() == o.getId())
+                .where((o, i) -> o.getCustomer().getId() == c.getId())
+                .sum((o, i) -> i.getQty()) > 30);
+        assertEquals("select e0 from Customer e0 where (select sum(s2.qty) from Order s1 join Item s2 on s2.order.id = s1.id"
+                + " where s1.customer.id = e0.id) > 30", total.toHql().hql());
+        // @end
+        Map<Integer, Long> qtyByCustomer = new java.util.HashMap<>();
+        for (long[] i : items) {
+            Order o = orders.stream().filter(x -> x.getId() == i[0]).findFirst().orElseThrow();
+            if (o.getCustomer() != null) qtyByCustomer.merge(o.getCustomer().getId(), i[1], Long::sum);
+        }
+        List<String> big = customers.stream().filter(c -> items.stream().anyMatch(i -> i[1] > 10 && orders.stream()
+                .anyMatch(o -> o.getId() == i[0] && o.getCustomer() != null && o.getCustomer().getId() == c.getId())))
+                .map(Customer::getName).sorted().toList();
+        assertEquals(big, q.toList().stream().map(Customer::getName).sorted().toList());
+        assertEquals(customers.stream().filter(c -> qtyByCustomer.getOrDefault(c.getId(), 0L) > 30).map(Customer::getName).sorted().toList(),
+                total.toList().stream().map(Customer::getName).sorted().toList());
+        // a left join with an association path in its ON condition
+        SelectQuery<Order> in = qb.from(Order.class).where((o, sub) -> sub.from(Item.class)
+                .leftJoin(Customer.class, (i, c) -> i.getOrder().getCustomer().getId() == c.getId())
+                .where((i, c) -> c.getGrade() != null && c.getGrade() > 1)
+                .select((i, c) -> i.getOrder().getId()).contains(o.getId()));
+        assertEquals("select e0 from Order e0 where e0.id in (select s1.order.id from Item s1 left join s1.order s1j1"
+                + " left join Customer s2 on s1j1.customer.id = s2.id where s2.grade is not null and s2.grade > 1)", in.toHql().hql());
+        assertEquals(3, in.toList().size());
+    }
+
     /** Minimal Spring context: the datasource chosen by application-test.yaml and the test entities. */
     @EnableAutoConfiguration
     @EntityScan("org.lambdaql.query")

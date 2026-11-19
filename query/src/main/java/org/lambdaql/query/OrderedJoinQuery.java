@@ -42,6 +42,7 @@ public class OrderedJoinQuery<T, U> extends OrderedSelectQuery<T> {
      * @return the value query
      */
     public <R> ValueQuery<R> select(SelectJoinQuery.Select<T, U, R> clause) {
-        return SelectJoinQuery.selectValues(root, ctx, conditions, order, joinBounds, roots, clause);
+        ValueQuery<R> q = SelectJoinQuery.selectValues(root, ctx, conditions, order, joinBounds, roots, clause);
+        return isDistinct() ? q.distinct() : q;
     }
 }

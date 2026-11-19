@@ -16,6 +16,9 @@ import org.springframework.test.context.ActiveProfiles
 data class OrderRow(val id: Long?, val customerName: String?, val price: Double)
 
 /** A row of one customer group. Aggregates can be NULL, so the types are nullable (J4). */
+/** The order total of one customer: the row type of a CTE. */
+data class CustTotal(val customerId: Int?, val total: Double?)
+
 data class CustomerStat(val customerId: Int?, val count: Long, val total: Double?)
 
 /**
@@ -249,6 +252,54 @@ class KotlinQueryTest {
         assertEquals("insert into Archive (id, price) values (100L, (select sum(s1.price) from Item s1))", i.toHql()[0].hql())
         // @end
         assertEquals(1, i.execute())
+    }
+
+    @Test
+    fun joinDistinctAndCte() {
+        // @start region="join-distinct"
+        // an order with two matching items would come twice; distinct() returns it once
+        val q = qb.from(Order::class.java)
+            .join(Item::class.java) { o, i -> i.order?.id == o.id }
+            .where { _, i -> i.qty > 0 }
+            .distinct()
+        assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.id where e1.qty > 0", q.toHql().hql())
+        // @end
+        assertEquals(items.map { it.first }.distinct().sorted(), ids(q.toList()))
+        // @start region="join-cte"
+        // the total of each customer, joined to the customer row
+        val t = qb.with(qb.from(Order::class.java)
+            .where { it.customer != null }
+            .groupBy { it.customer?.id }
+            .select { CustTotal(it.customer?.id, Agg.sum(it.price)) })
+        val rows = qb.from(Customer::class.java)
+            .join(t) { c, x -> x.customerId == c.id }
+            .where { _, x -> x.total!! > 100 }
+            .select { c, x -> c.name to x.total }
+        assertEquals("with t as (select d0.customer.id as customerId, sum(d0.price) as total from Order d0"
+                + " where d0.customer is not null group by d0.customer.id) select e0.name, e1.total from Customer e0"
+                + " join t e1 on e1.customerId is not null and e1.customerId = e0.id where e1.total > 100.0", rows.toHql().hql())
+        // @end
+        val expected = orders.filter { it.customer != null }.groupBy { it.customer!!.name }
+            .mapValues { (_, os) -> os.sumOf { it.price } }.filter { it.value > 100 }.toList().sortedBy { it.first }
+        assertEquals(expected, rows.toList().map { it.first to it.second }.sortedBy { it.first })
+    }
+
+    @Test
+    fun joinInSubquery() {
+        // @start region="sub-join"
+        // customers with an order that has an item of quantity > 10: the subquery joins Order and Item (D51)
+        val q = qb.from(Customer::class.java).where { c, sub ->
+            sub.from(Order::class.java)
+                .join(Item::class.java) { o, i -> i.order?.id == o.id }
+                .where { o, i -> o.customer?.id == c.id && i.qty > 10 }
+                .exists()
+        }
+        assertEquals("select e0 from Customer e0 where exists (select 1 from Order s1 join Item s2 on s2.order.id = s1.id"
+                + " where s1.customer is not null and s1.customer.id = e0.id and s2.qty > 10)", q.toHql().hql())
+        // @end
+        val expected = orders.filter { o -> o.customer != null && items.any { it.first == o.id && it.second > 10 } }
+            .map { it.customer!!.name }.distinct().sorted()
+        assertEquals(expected, q.toList().map { it.name }.sorted())
     }
 
     @Test

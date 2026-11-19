@@ -326,6 +326,9 @@ public enum LqlMessage {
     /** LQL-3066: The condition cannot use an index, and the SARGable mode is STRICT: &#123;0&#125; */
     NON_SARGABLE("LQL-3066", 1),
 
+    /** LQL-3067: A row of a derived table or CTE has no id, so it cannot be compared with null. Compare one of its columns, for example x.customerId() == null: &#123;0&#125; */
+    DERIVED_ROW_NULL("LQL-3067", 1),
+
     /** LQL-4001: limit and the one-row protection are not supported yet for an entity with a composite key: &#123;0&#125; */
     COMPOSITE_KEY_LIMIT("LQL-4001", 1),
 

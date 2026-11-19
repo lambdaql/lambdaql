@@ -103,19 +103,40 @@ public class SelectJoinQuery<T, U> {
 
     SelectJoinQuery(SelectQuery<T> from, List<Class<?>> joinedBefore, List<HqlRenderer.JoinBound> boundsBefore,
             Class<?> entity, boolean left, Object condition) {
+        this(from, joinedBefore, boundsBefore, entity, left, condition, null);
+    }
+
+    SelectJoinQuery(SelectQuery<T> from, List<Class<?>> joinedBefore, List<HqlRenderer.JoinBound> boundsBefore,
+            Class<?> entity, boolean left, Object condition, HqlRenderer.JoinSource source) {
         this.joined = new ArrayList<>(joinedBefore);
         this.joined.add(entity);
         this.base = new SelectQuery<>(from.entityClass(), from.context());
         from.wheres().forEach(base::addWhere);
+        base.withDistinct(from.isDistinct());
         this.joinBounds = new ArrayList<>(boundsBefore);
         if (condition == null) {
-            this.joinBounds.add(new HqlRenderer.JoinBound(entity, false, null));          // cross join (D45)
+            this.joinBounds.add(new HqlRenderer.JoinBound(entity, false, null, source));  // cross join (D45)
         } else {
             var ref = QueryContext.read(condition);
             this.joinBounds.add(new HqlRenderer.JoinBound(entity, left,
-                    new HqlRenderer.Bound(base.context().analyzeWhere(ref, roots()), ref.capturedArgs())));
+                    new HqlRenderer.Bound(base.context().analyzeWhere(ref, roots()), ref.capturedArgs()), source));
         }
         base.withJoins(joinBounds);
+    }
+
+    /**
+     * Returns each row of the main entity once: {@code select distinct e0} (ROADMAP D44 extension). A join repeats a
+     * row once per match; {@code distinct()} removes the repeats. A sort key must then be a column of the main entity
+     * itself (J7). An {@code exists} subquery in {@code where} gives the same rows without repeats, often faster.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.JoinQueryTest" region="join-distinct"}
+     *
+     * @return this
+     */
+    public SelectJoinQuery<T, U> distinct() {
+        base.withDistinct(true);
+        return this;
     }
 
     private List<Class<?>> roots() {
@@ -176,6 +197,56 @@ public class SelectJoinQuery<T, U> {
     }
 
     /**
+     * Joins the rows of a CTE as the third root (ROADMAP D44 extension).
+     *
+     * @param cte       the CTE
+     * @param condition the join condition
+     * @param <V>       the row type
+     * @return the join query
+     */
+    public <V> SelectJoin3Query<T, U, V> join(Cte<V> cte, SelectJoin3Query.JoinOn<T, U, V> condition) {
+        return new SelectJoin3Query<>(base, joined, joinBounds, cte.source.rowType, false, condition, cte.source.joinSource());
+    }
+
+    /**
+     * Left-joins the rows of a CTE as the third root (ROADMAP D44 extension).
+     *
+     * @param cte       the CTE
+     * @param condition the join condition
+     * @param <V>       the row type
+     * @return the join query
+     */
+    public <V> SelectJoin3Query<T, U, V> leftJoin(Cte<V> cte, SelectJoin3Query.JoinOn<T, U, V> condition) {
+        return new SelectJoin3Query<>(base, joined, joinBounds, cte.source.rowType, true, condition, cte.source.joinSource());
+    }
+
+    /**
+     * Joins the rows of a query as a derived table, as the third root (ROADMAP D44 extension).
+     *
+     * @param rows      the inner query
+     * @param condition the join condition
+     * @param <V>       the row type
+     * @return the join query
+     */
+    public <V> SelectJoin3Query<T, U, V> join(ValueQuery<V> rows, SelectJoin3Query.JoinOn<T, U, V> condition) {
+        DerivedSource d = new DerivedSource(rows, null);
+        return new SelectJoin3Query<>(base, joined, joinBounds, d.rowType, false, condition, d.joinSource());
+    }
+
+    /**
+     * Left-joins the rows of a query as a derived table, as the third root (ROADMAP D44 extension).
+     *
+     * @param rows      the inner query
+     * @param condition the join condition
+     * @param <V>       the row type
+     * @return the join query
+     */
+    public <V> SelectJoin3Query<T, U, V> leftJoin(ValueQuery<V> rows, SelectJoin3Query.JoinOn<T, U, V> condition) {
+        DerivedSource d = new DerivedSource(rows, null);
+        return new SelectJoin3Query<>(base, joined, joinBounds, d.rowType, true, condition, d.joinSource());
+    }
+
+    /**
      * Sorts by values of all entities: {@code orderBy((o, c, by) -> by.desc(c.getName()).asc(o.getId()))} (D18).
      * Paths use a left join, so rows are not lost.
      *
@@ -188,8 +259,11 @@ public class SelectJoinQuery<T, U> {
     public OrderedJoinQuery<T, U> orderBy(SortBy<T, U> spec) {
         var ref = QueryContext.read(spec);
         var items = base.context().analyzeSortBy(ref, roots());
-        return new OrderedJoinQuery<>(base.entityClass(), base.context(), base.wheres(),
+        if (base.isDistinct()) distinctKeys(items);
+        OrderedJoinQuery<T, U> q = new OrderedJoinQuery<>(base.entityClass(), base.context(), base.wheres(),
                 List.of(new HqlRenderer.SortBound(items, ref.capturedArgs())), joinBounds, roots());
+        q.withDistinct(base.isDistinct());
+        return q;
     }
 
     /**
@@ -203,7 +277,17 @@ public class SelectJoinQuery<T, U> {
      * @return the value query
      */
     public <R> ValueQuery<R> select(Select<T, U, R> clause) {
-        return SelectJoinQuery.selectValues(base.entityClass(), base.context(), base.wheres(), List.of(), joinBounds, roots(), clause);
+        ValueQuery<R> q = SelectJoinQuery.selectValues(base.entityClass(), base.context(), base.wheres(), List.of(), joinBounds, roots(), clause);
+        return base.isDistinct() ? q.distinct() : q;
+    }
+
+    /** J7 with {@code distinct()}: a sort key must be a column of the main entity itself (it is in {@code select distinct e0}). */
+    static void distinctKeys(List<org.lambdaql.engine.ir.SortItem> items) {
+        for (org.lambdaql.engine.ir.SortItem item : items) {
+            if (!(item.key() instanceof org.lambdaql.engine.ir.Expr.Column c) || c.root() != 0 || c.association().contains(true)) {
+                throw org.lambdaql.i18n.LqlMessage.DISTINCT_SORT_NOT_SELECTED.exception(item.key());
+            }
+        }
     }
 
     static <R> ValueQuery<R> selectValues(Class<?> root, QueryContext context, List<HqlRenderer.Bound> wheres,

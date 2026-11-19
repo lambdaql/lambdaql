@@ -45,6 +45,7 @@ public final class Normalizer {
     private static final String FROM = "org/lambdaql/query/From";
     private static final String ORDERED_FROM = "org/lambdaql/query/OrderedFrom";
     private static final String VALUES = "org/lambdaql/query/Values";
+    private static final String FROM2 = "org/lambdaql/query/From2";
     private static final String BY = "org/lambdaql/query/By";
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(Normalizer.class);
 
@@ -72,9 +73,14 @@ public final class Normalizer {
 
     /** A normalizer for an inner lambda of a subquery: its parameter 0 is the subquery root. */
     private Normalizer(Normalizer outer, int root, int subParam) {
+        this(outer, List.of(root), subParam);
+    }
+
+    /** A normalizer for an inner lambda of a subquery with joins: parameter i is root {@code roots.get(i)} (D51). */
+    private Normalizer(Normalizer outer, List<Integer> roots, int subParam) {
         this.rootTypes = outer.rootTypes;
         this.paramRoot = new java.util.HashMap<>();
-        this.paramRoot.put(0, root);
+        for (int i = 0; i < roots.size(); i++) this.paramRoot.put(i, roots.get(i));
         this.subParam = subParam;
         this.model = outer.model;
         this.loader = outer.loader;
@@ -494,7 +500,7 @@ public final class Normalizer {
             return new Done(new Expr.Aggregate(fn, arg, type));
         }
         // a subquery that gives a value: exists(), count(), max/min/avg/sum(...), first()
-        if ((m.owner().equals(FROM) && List.of("exists", "count", "max", "min", "avg", "sum").contains(m.name()))
+        if (((m.owner().equals(FROM) || m.owner().equals(FROM2)) && List.of("exists", "count", "max", "min", "avg", "sum").contains(m.name()))
                 || (m.owner().equals(VALUES) && m.name().equals("first"))) {
             Expr.Subquery.Kind kind = m.name().equals("exists") ? Expr.Subquery.Kind.EXISTS : Expr.Subquery.Kind.SCALAR;
             return new Done(subquery(inv, kind));
@@ -566,6 +572,7 @@ public final class Normalizer {
     }
 
     private Expr rootId(Path p) {
+        if (model.isRow(p.type())) throw error(LqlMessage.DERIVED_ROW_NULL, p.type().getSimpleName());
         String id = model.idName(p.type()).orElseThrow(() -> error(LqlMessage.ENTITY_COMPARE, p.type().getSimpleName()));
         EntityModel.Property prop = model.property(p.type(), id)
                 .orElseThrow(() -> error(LqlMessage.PROPERTY_NOT_FOUND, p.type().getSimpleName() + "." + id));
@@ -613,6 +620,8 @@ public final class Normalizer {
 
         List<Pred> wheres = new ArrayList<>();
         List<org.lambdaql.engine.ir.SortItem> sorts = new ArrayList<>();
+        List<Integer> roots = new ArrayList<>(List.of(root));             // the subquery entity, then joined ones (D51)
+        List<Expr.Subquery.Join> joins = new ArrayList<>();
         Integer limit = null;
         Expr select = null;
         Expr.Subquery.Agg agg = Expr.Subquery.Agg.NONE;
@@ -620,15 +629,26 @@ public final class Normalizer {
             Expr.Invoke step = chain.get(i);
             String name = step.method().name();
             switch (name) {
-                case "where" -> wheres.add(innerWhere(lambdaArg(step), root));
+                case "join", "leftJoin" -> {
+                    Class<?> joined = classConstant(step.args().get(0));
+                    if (!model.isEntity(joined)) throw error(LqlMessage.SUBQUERY_NOT_ENTITY, joined.getName());
+                    int jr = rootTypes.size();
+                    rootTypes.add(joined);
+                    roots.add(jr);
+                    Expr on = step.args().get(1);
+                    while (on instanceof Expr.Convert c) on = c.operand();
+                    if (!(on instanceof Expr.Lambda l)) throw error(LqlMessage.INNER_LAMBDA_NOT_INLINE, name);
+                    joins.add(new Expr.Subquery.Join(jr, joined, name.equals("leftJoin"), innerWhere(l, roots)));
+                }
+                case "where" -> wheres.add(innerWhere(lambdaArg(step), roots));
                 case "orderBy" -> sorts.addAll(innerSort(lambdaArg(step), root));
                 case "limit" -> limit = intConstant(step.args().get(0));
-                case "select" -> select = innerValue(lambdaArg(step), root);
+                case "select" -> select = innerValue(lambdaArg(step), roots);
                 case "exists", "first", "contains" -> { }
                 case "count" -> agg = Expr.Subquery.Agg.COUNT;
                 case "max", "min", "avg", "sum" -> {
                     agg = Expr.Subquery.Agg.valueOf(name.toUpperCase(java.util.Locale.ROOT));
-                    select = innerValue(lambdaArg(step), root);
+                    select = innerValue(lambdaArg(step), roots);
                 }
                 default -> throw error(LqlMessage.SUBQUERY_UNSUPPORTED_CALL, name);
             }
@@ -652,21 +672,21 @@ public final class Normalizer {
                 default -> select.type();
             };
         };
-        return new Expr.Subquery(kind, root, entity, wheres, select, agg, sorts, limit, type);
+        return new Expr.Subquery(kind, root, entity, wheres, select, agg, sorts, limit, type, joins);
     }
 
-    private Pred innerWhere(Expr.Lambda l, int root) {
+    private Pred innerWhere(Expr.Lambda l, List<Integer> roots) {
         LambdaRef ref = innerRef(l);
         int arity = Type.getArgumentTypes(l.descriptor()).length - l.captured().size();
-        Normalizer inner = new Normalizer(this, root, arity >= 2 ? 1 : -1);
+        Normalizer inner = new Normalizer(this, roots, arity > roots.size() ? roots.size() : -1);
         Pred decoded = org.lambdaql.engine.decode.ConditionReducer.reduce(
                 org.lambdaql.engine.decode.Decoder.decodePredicate(ref, BytecodeLoader.load(ref)), ref.describe());
         return NegationMinimizer.minimize(inner.pred(substitute(decoded, outerTerms(l.captured()))));
     }
 
-    private Expr innerValue(Expr.Lambda l, int root) {
+    private Expr innerValue(Expr.Lambda l, List<Integer> roots) {
         LambdaRef ref = innerRef(l);
-        Normalizer inner = new Normalizer(this, root, -1);
+        Normalizer inner = new Normalizer(this, roots, -1);
         var node = org.lambdaql.engine.decode.Decoder.decodeValue(ref, BytecodeLoader.load(ref));
         if (!(node instanceof org.lambdaql.engine.decode.Node.Value v)) throw error(LqlMessage.CONDITION_IN_SUBQUERY_VALUE);
         return inner.done(inner.value(substitute(v.value(), outerTerms(l.captured()))));

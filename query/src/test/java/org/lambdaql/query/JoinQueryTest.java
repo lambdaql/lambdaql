@@ -4,6 +4,8 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.lambdaql.LambdaQLException;
+import org.lambdaql.Agg;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
@@ -16,6 +18,8 @@ import java.util.List;
 import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * End-to-end tests for explicit entity joins (ROADMAP D44): {@code join}, {@code leftJoin}, conditions, sorting and
@@ -159,6 +163,91 @@ class JoinQueryTest {
         assertEquals(expected.stream().sorted().toList(), ids(q.toList()), q.toHql().hql());
         assertEquals(expected.size(), q.count());
         assertEquals(0, Objects.requireNonNullElse(null, 0));
+    }
+
+    /** The order total of one customer, the row type of a CTE or derived table. */
+    record Total(Integer customerId, Double total) {
+    }
+
+    /** A customer name with a total. */
+    record NameTotal(String name, Double total) {
+    }
+
+    private ValueQuery<Total> totals() {
+        return qb.from(Order.class)
+                .where(o -> o.getCustomer() != null)
+                .groupBy(o -> o.getCustomer().getId())
+                .select(o -> new Total(o.getCustomer().getId(), Agg.sum(o.getPrice())));
+    }
+
+    @Test
+    void distinctRows() {
+        // @start region="join-distinct"
+        // an order with two matching items would come twice; distinct() returns it once
+        SelectJoinQuery<Order, Item> q = qb.from(Order.class)
+                .join(Item.class, (o, i) -> i.getOrder().getId() == o.getId())
+                .where((o, i) -> i.getQty() > 0)
+                .distinct();
+        assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.id where e1.qty > 0", q.toHql().hql());
+        // a sort key must be a column of the main entity (J7)
+        OrderedJoinQuery<Order, Item> sorted = q.orderBy((o, i, by) -> by.desc(o.getPrice()));
+        assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.id where e1.qty > 0"
+                + " order by e0.price desc", sorted.toHql().hql());
+        // @end
+        List<Long> expected = items.stream().filter(i -> i[1] > 0).map(i -> i[0]).distinct().sorted().toList();
+        assertEquals(expected, ids(q.toList()));
+        assertEquals(expected.size(), q.count());
+        assertEquals(orders.stream().filter(o -> expected.contains(o.getId()))
+                .sorted(Comparator.comparing(Order::getPrice).reversed()).map(Order::getId).toList(),
+                sorted.toList().stream().map(Order::getId).toList());
+        // paging adds only the main id: distinct rows do not repeat
+        assertTrue(sorted.limit(1).toHql().hql().endsWith("order by e0.price desc, e0.id asc"));
+        LambdaQLException j7 = assertThrows(LambdaQLException.class, () -> q.orderBy((o, i, by) -> by.desc(i.getQty())));
+        assertEquals("LQL-3046", j7.code());
+    }
+
+    @Test
+    void joinDerived() {
+        // @start region="join-cte"
+        // the total of each customer, joined to the customer row
+        Cte<Total> t = qb.with(qb.from(Order.class)
+                .where(o -> o.getCustomer() != null)
+                .groupBy(o -> o.getCustomer().getId())
+                .select(o -> new Total(o.getCustomer().getId(), Agg.sum(o.getPrice()))));
+        ValueQuery<NameTotal> rows = qb.from(Customer.class)
+                .join(t, (c, x) -> x.customerId().equals(c.getId()))
+                .where((c, x) -> x.total() > 100)
+                .select((c, x) -> new NameTotal(c.getName(), x.total()));
+        assertEquals("with t as (select d0.customer.id as customerId, sum(d0.price) as total from Order d0"
+                + " where d0.customer is not null group by d0.customer.id)"
+                + " select e0.name, e1.total from Customer e0 join t e1 on e1.customerId = e0.id where e1.total > 100.0",
+                rows.toHql().hql());
+        // @end
+        assertEquals(List.of(new NameTotal("Kim", 200.0), new NameTotal("Lee", 250.0)),
+                rows.toList().stream().sorted(Comparator.comparing(NameTotal::name)).toList());
+        // @start region="join-derived"
+        // a derived table without a name; a customer without orders has no row in it (left join)
+        SelectJoinQuery<Customer, Total> small = qb.from(Customer.class)
+                .leftJoin(totals(), (c, x) -> x.customerId().equals(c.getId()))
+                .where((c, x) -> x.customerId() == null || x.total() < 210);
+        assertEquals("select e0 from Customer e0 left join (select d0.customer.id as customerId, sum(d0.price) as total"
+                + " from Order d0 where d0.customer is not null group by d0.customer.id) e1 on e1.customerId = e0.id"
+                + " where e1.customerId is null or e1.total < 210.0", small.toHql().hql());
+        // @end
+        assertEquals(List.of("Kim", "Park"), small.toList().stream().map(Customer::getName).sorted().toList());
+        assertEquals(2, small.count());
+        // the row has no id, so x == null cannot say "no match": compare a column (LQL-3067)
+        LambdaQLException noId = assertThrows(LambdaQLException.class, () -> qb.from(Customer.class)
+                .leftJoin(totals(), (c, x) -> x.customerId().equals(c.getId())).where((c, x) -> x == null));
+        assertEquals("LQL-3067", noId.code());
+        // two CTEs in one statement get their own names
+        Cte<Total> again = qb.with(totals());
+        ValueQuery<NameTotal> twice = qb.from(Customer.class)
+                .join(t, (c, x) -> x.customerId().equals(c.getId()))
+                .join(again, (c, x, y) -> y.customerId().equals(c.getId()))
+                .select((c, x, y) -> new NameTotal(c.getName(), y.total()));
+        assertTrue(twice.toHql().hql().startsWith("with t as (") && twice.toHql().hql().contains("), t2 as ("), twice.toHql().hql());
+        assertEquals(2, twice.toList().size());
     }
 
     @Test

@@ -62,11 +62,13 @@ public final class HqlRenderer {
     /** The query root of the subquery this renderer renders, or -1. */
     private int ownRoot = -1;
     private Class<?> ownRootClass;      // the entity of ownRoot (a subquery root)
+    private Map<Integer, Class<?>> ownJoined = Map.of();   // roots joined inside a subquery (D51)
     private Class<?> mainRootClass;     // the entity (or row type) of root 0
 
     /** The entity class of a root, for reading the mapping of a path (A4). Null when it is not known. */
     private Class<?> rootClass(int root) {
         if (root == ownRoot && ownRootClass != null) return ownRootClass;
+        if (ownJoined.containsKey(root)) return ownJoined.get(root);
         if (parent != null) return parent.rootClass(root);
         if (root == 0) return mainRootClass;
         if (root >= 1 && root <= entityJoins.size()) return entityJoins.get(root - 1).entity();
@@ -150,12 +152,38 @@ public final class HqlRenderer {
      * @param left   {@code true} for {@code left join}
      * @param on     the join condition, with the captured values of its lambda; null for {@code cross join} (D45)
      */
-    public record JoinBound(Class<?> entity, boolean left, Bound on) {
+    public record JoinBound(Class<?> entity, boolean left, Bound on, JoinSource source) {
+        /**
+         * An entity join.
+         *
+         * @param entity the joined entity class
+         * @param left   {@code true} for a left join
+         * @param on     the join condition, or null for a cross join
+         */
+        public JoinBound(Class<?> entity, boolean left, Bound on) {
+            this(entity, left, on, null);
+        }
+    }
+
+    /**
+     * Writes the table of a joined derived table or CTE (ROADMAP D44 extension): {@code (select ...)}, or the name of a
+     * CTE that it adds with {@link #addCte}. Not public API.
+     */
+    @FunctionalInterface
+    public interface JoinSource {
+        /**
+         * Writes the table.
+         *
+         * @param outer the renderer of the statement
+         * @return the text after {@code join}
+         */
+        String render(HqlRenderer outer);
     }
 
     private List<JoinBound> entityJoins = List.of();
     private String source;          // a derived table "(select ...)" or a CTE name, instead of the entity name
-    private String withClause;      // "with t as (...)" before the select (CTE)
+    private final Map<String, String> ctes = new LinkedHashMap<>();   // "with t as (...), t2 as (...)" before the select
+    private boolean distinctRows;   // select distinct e0 (explicit join results)
     private List<String> aliases = List.of();
 
     /**
@@ -171,13 +199,39 @@ public final class HqlRenderer {
     /**
      * Reads from a derived table or a CTE instead of an entity (ROADMAP M8-2).
      *
-     * @param source     {@code (select ...)} for a derived table, or the CTE name
-     * @param withClause {@code with t as (...)} for a CTE, or null
+     * A CTE is added with {@link #addCte} first.
+     *
+     * @param source {@code (select ...)} for a derived table, or the CTE name
      * @return this renderer
      */
-    public HqlRenderer withSource(String source, String withClause) {
+    public HqlRenderer withSource(String source) {
         this.source = source;
-        this.withClause = withClause;
+        return this;
+    }
+
+    /**
+     * Adds a CTE to the {@code with} part of the statement.
+     *
+     * @param name the wanted name; a number is added when it is already used ({@code t}, {@code t2}, ...)
+     * @param body the query of the CTE
+     * @return the name to read the CTE by
+     */
+    public String addCte(String name, String body) {
+        String unique = name;
+        for (int i = 2; ctes.containsKey(unique); i++) unique = name + i;
+        ctes.put(unique, body);
+        return unique;
+    }
+
+    /**
+     * Makes an entity select {@code select distinct e0} and its count {@code count(distinct e0)}: the rows of the main
+     * entity without the repeats that a join gives (ROADMAP D44 extension).
+     *
+     * @param distinct {@code true} for distinct rows
+     * @return this renderer
+     */
+    public HqlRenderer withDistinct(boolean distinct) {
+        this.distinctRows = distinct;
         return this;
     }
 
@@ -193,7 +247,10 @@ public final class HqlRenderer {
     }
 
     private RenderedQuery finish(StringBuilder hql) {
-        String text = withClause == null ? hql.toString() : withClause + " " + hql;
+        if (ctes.isEmpty()) return new RenderedQuery(hql.toString(), new LinkedHashMap<>(params));
+        List<String> defs = new ArrayList<>();
+        ctes.forEach((name, body) -> defs.add(name + " as (" + body + ")"));
+        String text = "with " + String.join(", ", defs) + " " + hql;
         return new RenderedQuery(text, new LinkedHashMap<>(params));
     }
 
@@ -231,10 +288,11 @@ public final class HqlRenderer {
         pathJoins(from, mainRoot());
         for (int k = 0; k < entityJoins.size(); k++) {
             JoinBound j = entityJoins.get(k);
+            String table = j.source() != null ? j.source().render(this) : model.entityName(j.entity());
             if (ons.get(k) == null) {
-                from.append(" cross join ").append(model.entityName(j.entity())).append(' ').append(aliasOf(k + 1));
+                from.append(" cross join ").append(table).append(' ').append(aliasOf(k + 1));
             } else {
-                from.append(j.left() ? " left join " : " join ").append(model.entityName(j.entity())).append(' ')
+                from.append(j.left() ? " left join " : " join ").append(table).append(' ')
                         .append(aliasOf(k + 1)).append(" on ").append(ons.get(k));
             }
             pathJoins(from, k + 1);
@@ -344,7 +402,7 @@ public final class HqlRenderer {
      * @return the HQL and its parameters; the result is one {@code Long}
      */
     public RenderedQuery count(Class<?> root, List<Bound> wheres) {
-        return render("count(e0)", root, wheres, List.of(), false);
+        return render(distinctRows ? "count(distinct e0)" : "count(e0)", root, wheres, List.of(), false);
     }
 
     /**
@@ -377,7 +435,7 @@ public final class HqlRenderer {
      * @throws LambdaAnalysisException if a host value cannot be computed, or a run-time direction is null
      */
     public RenderedQuery select(Class<?> root, List<Bound> wheres, List<SortBound> sorts, boolean paged) {
-        return render(rootPrefix + "0", root, wheres, sorts, paged);
+        return render((distinctRows ? "distinct " : "") + rootPrefix + "0", root, wheres, sorts, paged);
     }
 
     private RenderedQuery render(String select, Class<?> root, List<Bound> wheres, List<SortBound> sorts, boolean paged) {
@@ -924,7 +982,7 @@ public final class HqlRenderer {
 
     /** The alias of a query root: {@code e0} for the main entity, {@code s1} for a subquery root. */
     private String aliasOf(int root) {
-        if (root == ownRoot) return "s" + root;
+        if (root == ownRoot || ownJoined.containsKey(root)) return "s" + root;
         if (parent != null) return parent.aliasOf(root);
         return rootPrefix + root;
     }
@@ -948,12 +1006,25 @@ public final class HqlRenderer {
      */
     private String subquery(Expr.Subquery q, String notInValue) {
         noteRead(q.entity());
+        q.joins().forEach(j -> noteRead(j.entity()));
         HqlRenderer inner = new HqlRenderer(model, evaluator, params, "s", "s" + q.root() + "j");
         inner.parent = this;
         inner.ownRoot = q.root();
         inner.ownRootClass = q.entity();
+        Map<Integer, Class<?>> joined = new LinkedHashMap<>();
+        q.joins().forEach(j -> joined.put(j.root(), j.entity()));
+        inner.ownJoined = joined;
         inner.captured = captured;
         Object[] cap = captured;
+        // the entity joins inside the subquery (D51): join Entity sN on ...
+        List<String> joinTexts = new ArrayList<>();
+        for (Expr.Subquery.Join j : q.joins()) {
+            inner.leftJoins = true;          // a path in an ON condition must not drop rows (as in fromClause)
+            List<String> on = inner.whereParts(List.of(new Bound(j.on(), cap)));
+            inner.leftJoins = false;
+            joinTexts.add((j.left() ? " left join " : " join ") + model.entityName(j.entity()) + " s" + j.root()
+                    + " on " + (on.isEmpty() ? "1=1" : String.join(" and ", on)));
+        }
         List<String> parts = inner.whereParts(q.wheres().stream().map(p -> new Bound(p, cap)).toList());
         String alias = "s" + q.root();
         String select = notInValue != null ? "1" : switch (q.kind()) {
@@ -971,7 +1042,19 @@ public final class HqlRenderer {
         boolean wrap = q.kind() == Expr.Subquery.Kind.VALUES && q.limit() != null && notInValue == null;
         StringBuilder hql = new StringBuilder("select ").append(select).append(wrap ? " as v" : "")
                 .append(" from ").append(model.entityName(q.entity())).append(' ').append(alias);
-        inner.joins.forEach((path, j) -> hql.append(j.left() ? " left join " : " join ").append(path).append(' ').append(j.alias()));
+        // path joins right after the root they start from, so an ON condition can use them (D51)
+        java.util.function.IntConsumer pathsOf = r -> inner.joins.forEach((path, j) -> {
+            if (j.root() == r) hql.append(j.left() ? " left join " : " join ").append(path).append(' ').append(j.alias());
+        });
+        pathsOf.accept(q.root());
+        for (int k = 0; k < q.joins().size(); k++) {
+            hql.append(joinTexts.get(k));
+            pathsOf.accept(q.joins().get(k).root());
+        }
+        inner.joins.forEach((path, j) -> {
+            if (j.root() != q.root() && !joined.containsKey(j.root()))
+                hql.append(j.left() ? " left join " : " join ").append(path).append(' ').append(j.alias());
+        });
         if (!parts.isEmpty()) hql.append(" where ").append(String.join(" and ", parts));
         if (!orders.isEmpty()) hql.append(" order by ").append(String.join(", ", orders));
         if (q.limit() != null) hql.append(" limit ").append(q.limit());
@@ -1002,8 +1085,9 @@ public final class HqlRenderer {
             leftJoins = false;
         }
         if (id != null && !hasId) out.add(aliasOf(mainRoot()) + "." + id + " asc");
-        if (id != null) {
-            // a join can repeat the main row, so every joined root adds its id too (D44, D45)
+        if (id != null && !distinctRows) {
+            // a join can repeat the main row, so every joined root adds its id too (D44, D45);
+            // distinct rows do not repeat, and a distinct select can only sort by its own columns
             for (int k = 0; k < entityJoins.size(); k++) {
                 String jid = model.idName(entityJoins.get(k).entity()).orElse(null);
                 String key = aliasOf(k + 1) + "." + jid + " asc";
@@ -1344,7 +1428,7 @@ public final class HqlRenderer {
     private String path(Expr.Column c) {
         String expr = aliasOf(c.root());
         List<String> names = c.path();
-        if (parent != null && c.root() != ownRoot) {
+        if (parent != null && c.root() != ownRoot && !ownJoined.containsKey(c.root())) {
             for (int i = 0; i < names.size() - 1; i++) {
                 boolean fkOnly = c.idPath() && i == names.size() - 2;
                 if (c.association().get(i) && !fkOnly) {

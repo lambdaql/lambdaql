@@ -34,9 +34,18 @@ final class DerivedSource {
 
     /** Writes the inner query into the outer renderer: {@code from (select ...) e0} or {@code with t as (...)}. */
     void apply(HqlRenderer outer) {
+        outer.withSource(table(outer));
+    }
+
+    /** The table text: {@code (select ...)}, or the name of the CTE that it adds to the statement. */
+    String table(HqlRenderer outer) {
         String q = inner.renderInner(outer.nested(), columnNames(rowType));
-        if (cteName != null) outer.withSource(cteName, "with " + cteName + " as (" + q + ")");
-        else outer.withSource("(" + q + ")", null);
+        return cteName != null ? outer.addCte(cteName, q) : "(" + q + ")";
+    }
+
+    /** The source of a join with this derived table or CTE (ROADMAP D44 extension). */
+    HqlRenderer.JoinSource joinSource() {
+        return this::table;
     }
 
     /** The select of all row columns, built into the row type. */

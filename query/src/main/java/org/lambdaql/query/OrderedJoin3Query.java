@@ -43,6 +43,7 @@ public class OrderedJoin3Query<T, U, V> extends OrderedSelectQuery<T> {
      * @return the value query
      */
     public <R> ValueQuery<R> select(SelectJoin3Query.Select<T, U, V, R> clause) {
-        return SelectJoinQuery.selectValues(root, ctx, conditions, order, joinBounds, roots, clause);
+        ValueQuery<R> q = SelectJoinQuery.selectValues(root, ctx, conditions, order, joinBounds, roots, clause);
+        return isDistinct() ? q.distinct() : q;
     }
 }

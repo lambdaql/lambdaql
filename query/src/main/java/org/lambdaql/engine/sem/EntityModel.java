@@ -92,6 +92,17 @@ public interface EntityModel {
     }
 
     /**
+     * Checks if a class is the row type of a derived table or CTE (a record or Kotlin data class registered for a
+     * query), not an entity.
+     *
+     * @param type a class
+     * @return {@code true} for a registered row type
+     */
+    default boolean isRow(Class<?> type) {
+        return false;
+    }
+
+    /**
      * Returns the name of the {@code @Id} property of an entity.
      * Used to add a tie-breaker key when a sorted query is paged (ROADMAP S9).
      *

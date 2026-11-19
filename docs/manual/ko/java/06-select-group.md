@@ -4,8 +4,8 @@
 > [!NOTE]
 > **상태**
 > - **구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, Hibernate 6.6.5, 마일스톤 M9, 결정 D27): 값 하나, Java 레코드, DTO의 `select`, 키 하나나 여러 개의 `groupBy`, `having`, `Agg` 함수, `distinct()`, `limit`, `offset`, `toList`, `toSet`, `first`, `one`, `orderBy(...).select(...)`, 규칙 J3, J4, J7의 검사.
-> - **추가로 구현됨, 테스트함**(결정 D44, D45, D46): 엔티티 3개까지의 `join`, `leftJoin`, `crossJoin` 명시적 조인과 `select((o, c) -> ...)`(6.8), `qb.from(valueQuery)`와 `qb.with(valueQuery)`의 파생 테이블과 CTE(6.9, 6.10, 마일스톤 M8-2).
-> - **아직 구현되지 않음:** 집계 기준 정렬과 그룹 쿼리의 `orderBy`(v0.2 후보), DML과 서브쿼리 안의 조인, 파생 테이블과의 조인, 같은 CTE의 중복 사용.
+> - **추가로 구현됨, 테스트함**(결정 D44, D45, D46): 엔티티 3개까지의 `join`, `leftJoin`, `crossJoin` 명시적 조인과 `select((o, c) -> ...)`(6.8), `qb.from(valueQuery)`와 `qb.with(valueQuery)`의 파생 테이블과 CTE(6.9, 6.10, 마일스톤 M8-2). 조인 결과의 `distinct()`와 파생 테이블·CTE의 조인(6.8, 결정 D51).
+> - **아직 구현되지 않음:** 집계 기준 정렬과 그룹 쿼리의 `orderBy`(v0.2 후보), 같은 CTE의 중복 사용. 서브쿼리 안의 조인은 구현됨([5. 서브쿼리](05-subquery.md#joins-inside-a-subquery)). update와 delete의 조인은 추가하지 않습니다(D51).
 > - **(테스트됨)** 표시가 있는 예제는 테스트 코드에서 그대로 가져온 것입니다. 전체 상태는 [Java 트랙 README](README.md#status)를 참고하십시오.
 
 [Java 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [5. 서브쿼리](05-subquery.md) | 다음: [7. 수정, 삽입, 삭제](07-dml.md) | [이 페이지의 Kotlin 버전](../kotlin/06-select-group.md)
@@ -510,7 +510,7 @@ assertEquals("select e0 from Order e0 join Customer e1 on e0.customer.id = e1.id
 
 > [!WARNING]
 > 조인 조건에 맞는 행이 여러 개이면 **주 엔티티의 행이 반복됩니다**. 짝 하나마다 한 번씩입니다. `toList()`와 `count()`는 반복된 행을 모두 셉니다(테스트함).
-> 주문마다 한 번만 필요하면 조인 대신 `exists()` 서브쿼리([5. 서브쿼리](05-subquery.md))를 사용하거나, 값을 select하고 `distinct()`를 적용하십시오.
+> 주문마다 한 번만 필요하면 조인 대신 `exists()` 서브쿼리([5. 서브쿼리](05-subquery.md))를 사용하거나, 조인 쿼리에 `distinct()`를 적용하십시오([조인 결과의 `distinct()`](#distinct-on-a-join) 참고).
 
 <a id="cross-join"></a>
 ### cross join
@@ -547,15 +547,84 @@ assertEquals("select e0.id, e1.name from Order e0 cross join Customer e1 order b
         pairs.limit(5).toHql().hql());
 ```
 
+<a id="distinct-on-a-join"></a>
+### 조인 결과의 `distinct()`
+
+`SelectJoinQuery.distinct()`와 `SelectJoin3Query.distinct()`는 조인 때문에 반복되는 주 엔티티의 행을 한 번만 돌려줍니다(결정 D51). HQL은 `select distinct e0`이고, `count()`는 `count(distinct e0)`입니다.
+
+- 정렬 키는 주 엔티티 자신의 컬럼이어야 합니다(J7, `LQL-3046`). 조인한 엔티티의 컬럼이나 연관 경로로 정렬하면 오류입니다.
+- 페이징하면 주 엔티티의 id만 동순위 키로 덧붙입니다. 조인한 엔티티의 id는 붙이지 않습니다.
+- `distinct()` 뒤에 `select(...)`를 쓰면 값을 `select distinct`로 조회합니다.
+- 먼저 `exists` 서브쿼리([5. 서브쿼리](05-subquery.md))를 검토하십시오. 반복 없이 같은 행을 주고, 더 빠른 경우가 많습니다.
+
+**(테스트됨)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), 영역 `join-distinct`:
+
+```java
+// an order with two matching items would come twice; distinct() returns it once
+SelectJoinQuery<Order, Item> q = qb.from(Order.class)
+        .join(Item.class, (o, i) -> i.getOrder().getId() == o.getId())
+        .where((o, i) -> i.getQty() > 0)
+        .distinct();
+assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.id where e1.qty > 0", q.toHql().hql());
+// a sort key must be a column of the main entity (J7)
+OrderedJoinQuery<Order, Item> sorted = q.orderBy((o, i, by) -> by.desc(o.getPrice()));
+assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.id where e1.qty > 0"
+        + " order by e0.price desc", sorted.toHql().hql());
+```
+
+<a id="join-a-derived-table-or-cte"></a>
+### 파생 테이블과 CTE의 조인
+
+[6.9](#69-derived-table-subquery-in-from)의 파생 테이블과 [6.10](#610-cte-with)의 CTE를 엔티티처럼 조인할 수 있습니다(결정 D51).
+형태는 `join(cte, (c, x) -> ...)`, `leftJoin(cte, ...)`, `join(qb.from(...)...select(new Row(...)), ...)`, `leftJoin(...)`이고, 두 번째나 세 번째 루트로 쓸 수 있습니다.
+
+- HQL은 `with t as (...) ... join t e1 on ...` 또는 `join (select ...) e1 on ...`입니다.
+- 행 타입은 레코드입니다(J5). 접근자(`x.total()`)가 컬럼을 읽습니다.
+- 한 문장에 CTE가 여러 개면 이름을 따로 붙입니다: `with t as (...), t2 as (...)`.
+- 파생 행에는 id가 없으므로 `x == null`은 오류(`LQL-3067`)입니다. `x.customerId() == null`처럼 컬럼을 비교하십시오.
+- Hibernate 6.6은 엔티티의 `select distinct`, 파생 테이블과 CTE의 inner/left join, 서브쿼리 안의 엔티티 조인을 받아들입니다(세 DB에서 실측).
+
+**(테스트됨)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), 영역 `join-cte`:
+
+```java
+// the total of each customer, joined to the customer row
+Cte<Total> t = qb.with(qb.from(Order.class)
+        .where(o -> o.getCustomer() != null)
+        .groupBy(o -> o.getCustomer().getId())
+        .select(o -> new Total(o.getCustomer().getId(), Agg.sum(o.getPrice()))));
+ValueQuery<NameTotal> rows = qb.from(Customer.class)
+        .join(t, (c, x) -> x.customerId().equals(c.getId()))
+        .where((c, x) -> x.total() > 100)
+        .select((c, x) -> new NameTotal(c.getName(), x.total()));
+assertEquals("with t as (select d0.customer.id as customerId, sum(d0.price) as total from Order d0"
+        + " where d0.customer is not null group by d0.customer.id)"
+        + " select e0.name, e1.total from Customer e0 join t e1 on e1.customerId = e0.id where e1.total > 100.0",
+        rows.toHql().hql());
+```
+
+**(테스트됨)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), 영역 `join-derived`:
+
+```java
+// a derived table without a name; a customer without orders has no row in it (left join)
+SelectJoinQuery<Customer, Total> small = qb.from(Customer.class)
+        .leftJoin(totals(), (c, x) -> x.customerId().equals(c.getId()))
+        .where((c, x) -> x.customerId() == null || x.total() < 210);
+assertEquals("select e0 from Customer e0 left join (select d0.customer.id as customerId, sum(d0.price) as total"
+        + " from Order d0 where d0.customer is not null group by d0.customer.id) e1 on e1.customerId = e0.id"
+        + " where e1.customerId is null or e1.total < 210.0", small.toHql().hql());
+```
+
 <a id="what-a-join-query-has"></a>
 ### 조인 쿼리의 메서드
 
 | 호출 뒤 | 메서드 |
 |---|---|
-| `join`, `leftJoin`, `crossJoin` | `where`, `join` / `leftJoin` / `crossJoin`(엔티티 3개까지), `orderBy`, `select`, `limit`, `toList`, `toSet`, `first`, `count`, `exists`, `toHql` |
+| `join`, `leftJoin`, `crossJoin` | `where`, `join` / `leftJoin` / `crossJoin`(엔티티 3개까지, 파생 테이블과 CTE 포함), `distinct`, `orderBy`, `select`, `limit`, `toList`, `toSet`, `first`, `count`, `exists`, `toHql` |
 | `orderBy((o, c, by) -> ...)` | `select`, `limit`, `offset`, `toList`, `first`, 그 밖의 정렬된 쿼리 메서드([4. 정렬과 페이징](04-order-paging.md)) |
 
-v0.1에 아직 없는 것: update, delete, insert의 조인, 서브쿼리 안의 조인, 엔티티 4개 이상, `SortSpec`의 조인 형태, 파생 테이블과의 조인.
+서브쿼리 안의 조인은 [5. 서브쿼리](05-subquery.md#joins-inside-a-subquery)를 참고하십시오(D51).
+v0.1에 아직 없는 것: insert의 조인, 엔티티 4개 이상, `SortSpec`의 조인 형태.
+update와 delete의 조인은 추가하지 않기로 했습니다(D51). 연관 경로(U9)나 `sub`(D49)를 쓰십시오.
 
 ---
 
@@ -653,7 +722,9 @@ assertEquals("LQL-3064", assertThrows(LambdaQLException.class,
         () -> qb.from(qb.from(Order.class).select(o -> o.getPrice()))).code());
 ```
 
-v0.1에 아직 없는 것: 파생 테이블끼리의 조인, 파생 테이블과 엔티티의 조인, update, delete, insert 안의 파생 테이블.
+엔티티 쿼리에 파생 테이블을 조인하는 형태는 [파생 테이블과 CTE의 조인](#join-a-derived-table-or-cte)을 참고하십시오(D51).
+
+v0.1에 아직 없는 것: 파생 테이블끼리의 조인, update, delete, insert 안의 파생 테이블.
 
 엔티티의 `@SQLRestriction`과 `@SoftDelete` 조건은 엔티티 조인의 `on`과 파생 테이블 안에도 Hibernate가 붙입니다(MariaDB 10.11, Oracle 23.26에서 실측). lambdaQL은 이 조건을 따로 처리하지 않습니다.
 
@@ -711,6 +782,7 @@ MariaDB와 Oracle은 진짜 `with`를 실행합니다. 컬럼 목록은 Hibernat
 - CTE의 컬럼 이름은 select 별칭(`as customerId`)으로 정합니다. HQL은 CTE 이름 뒤의 컬럼 목록을 받지 않으며, 컬럼 목록은 Hibernate가 SQL에 추가합니다(규칙 J6).
 - MariaDB와 Oracle은 실제 `with`를 실행합니다. H2에서는 Hibernate가 이를 파생 테이블로 펼칩니다. 결과는 같습니다(세 데이터베이스에서 테스트함).
 - 행 타입 규칙은 파생 테이블과 같습니다: 레코드(J5).
+- 엔티티 쿼리에 CTE를 조인하는 형태는 [파생 테이블과 CTE의 조인](#join-a-derived-table-or-cte)을 참고하십시오(D51).
 - v0.1에 아직 없는 것: 한 쿼리에서 같은 CTE를 두 번 사용, update, delete, insert 안의 CTE.
 
 ---
@@ -724,9 +796,9 @@ MariaDB와 Oracle은 진짜 `with`를 실행합니다. 컬럼 목록은 Hibernat
 | J2 | 생성자의 경우 lambdaQL은 컬럼만 조회하고 생성자는 Java에서 호출합니다. `select new`는 쓰지 않습니다. | 구현됨(테스트함) |
 | J3 | 집계가 있으면 `select`와 `having`(그리고 `insert ... select`의 값)에서 집계가 아닌 값은 모두 `groupBy` 키여야 합니다. 그렇지 않으면 분석 시점에 오류가 발생합니다. | 구현됨(테스트함). 오류는 `TranslationException`(`LQL-3035`, [11](../11-errors-and-languages.md) 참고) |
 | J4 | `sum`/`avg`/`min`/`max`는 행이 없거나 모든 값이 NULL이면 NULL을 줍니다. `count`는 0을 줍니다. NULL이 될 수 있는 값에는 박싱 타입을 사용하십시오. 기본형 생성자 인자에 NULL이 오면 해당 인자를 알려 주는 `IllegalStateException`이 발생합니다. | 구현됨(테스트함) |
-| J5 | 파생 테이블이나 CTE의 행 타입: **Java 레코드**(Kotlin 코드는 data class도 사용 가능). 일반 DTO 클래스는 단순 `select`에서만 허용됩니다. 그렇지 않으면 `LQL-3064`. | 구현됨(테스트함) |
+| J5 | 파생 테이블이나 CTE의 행 타입: **Java 레코드**(Kotlin 코드는 data class도 사용 가능). 일반 DTO 클래스는 단순 `select`에서만 허용됩니다. 그렇지 않으면 `LQL-3064`. 조인한 파생 테이블과 CTE의 행에도 적용합니다(D51). 파생 행은 `null`과 비교할 수 없습니다(`LQL-3067`). | 구현됨(테스트함) |
 | J6 | `qb.with(...)`로 만든 CTE는 select 별칭으로 컬럼 이름을 정합니다: `with t as (select d0.customer.id as customerId, ...) select e0.customerId ... from t e0`. HQL은 이름 뒤의 컬럼 목록을 받지 않습니다. Hibernate는 `with t (col list) as (...)`를 `SyntaxException`으로 거부합니다. 컬럼 목록은 Hibernate가 SQL에 직접 씁니다(MariaDB와 Oracle에서 `with t (customerId,cnt,total) as (...)`). H2는 CTE를 파생 테이블로 바꿉니다. 바깥 쿼리는 항상 별칭을 사용합니다(`from t e0`). | 구현됨(테스트함) |
-| J7 | `distinct()`는 `select distinct`를 렌더링합니다. 정렬과 함께 쓰면 정렬 키가 select 목록에 있어야 합니다(DB 규칙). lambdaQL은 분석 시점에 이를 검사합니다. | 구현됨(테스트함) |
+| J7 | `distinct()`는 `select distinct`를 렌더링합니다. 정렬과 함께 쓰면 정렬 키가 select 목록에 있어야 합니다(DB 규칙). lambdaQL은 분석 시점에 이를 검사합니다. 조인 결과의 `distinct()`에서는 정렬 키가 주 엔티티 자신의 컬럼이어야 합니다(D51). | 구현됨(테스트함) |
 | J8 | 조회는 정렬([4. 정렬과 페이징](04-order-paging.md)), 페이징, 서브쿼리([5. 서브쿼리](05-subquery.md))와 함께 동작합니다. 집계 기준 정렬(`by.desc(s.total())`)은 v0.2 후보입니다. | 구현됨. 집계 기준 정렬은 제외 |
 
 **(테스트됨)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), 영역 `rules`:
@@ -761,7 +833,8 @@ assertThrows(IllegalStateException.class, () -> qb.from(Order.class)
 |---|---|
 | 집계 결과나 select 별칭으로 정렬(예: `orderBy((s, by) -> by.desc(s.total()))`), 그룹 쿼리의 `orderBy` | v0.2 후보 |
 | 사용자 집계 함수와 윈도 함수 | v0.2 후보 |
-| update, delete, insert의 조인, 서브쿼리 안의 조인, 엔티티 4개 이상, 파생 테이블과의 조인 | 이후 |
+| insert의 조인, 엔티티 4개 이상, 서브쿼리 안의 엔티티 3개 이상 | 이후 |
+| update, delete의 조인 | 추가하지 않음(D51). 연관 경로(U9)나 `sub`(D49) 사용 |
 | 한 쿼리에서 같은 CTE를 두 번 사용, DML 안의 파생 테이블과 CTE | 이후 |
 
 이 장의 오류는 코드가 붙은 `TranslationException`입니다. 잘못된 그룹 키(J3)는 `LQL-3035`, `where` 안의 `Agg`는 `LQL-3005`, `distinct`에서 select하지 않은 정렬 키(J7)는 `LQL-3046`, 파생 테이블이나 CTE의 행 타입(J5)은 `LQL-3064`입니다. [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.

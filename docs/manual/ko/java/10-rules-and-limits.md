@@ -397,6 +397,7 @@ lambdaQL은 이 목록의 모든 형태에 대해 명확한 오류를 던집니�
 | 정렬 키로 쓴 엔티티(`by.desc(o.getCustomer())`) | 컬럼: `by.desc(o.getCustomer().getName())`(컴파일되지 않음) |
 | 조인 정렬 람다 안의 메서드 참조 | 람다 |
 | 정렬 이름과 방향을 함께 담은 문자열 하나(`"price,desc_nulls_last"`), 아직 구현되지 않음 | 방향은 `Direction.parse(text)`, 이름은 `SortSpec.ofPath`. 이름은 정렬 정책이 검사([4.10](04-order-paging.md#sort-policy)) |
+| 조인 결과의 `distinct()`에서 조인한 엔티티의 컬럼이나 연관 경로로 정렬(J7, `LQL-3046`) | 주 엔티티 자신의 컬럼으로 정렬하거나 `exists` 서브쿼리 사용 |
 | `limit` / `offset`과 함께 쓴 컬렉션 fetch join | 먼저 페이징한 뒤 컬렉션을 로드 |
 | Spring `Sort`의 `ignoreCase()`([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)), 아직 지원하지 않음 | `ignoreCase()` 없는 정렬 |
 | 함수 키(`lower(name)`) | 계획 중 |
@@ -433,6 +434,7 @@ lambdaQL은 이 목록의 모든 형태에 대해 명확한 오류를 던집니�
 | 필수 컬럼(`@Id`, `nullable = false`, 기본형)에 `null` 넣기 | – |
 | `@Version` 속성을 직접 쓰기 | lambdaQL이 대신 `update versioned`를 사용 |
 | 값 안의 문자열 연결 | 계획 중 |
+| update나 delete의 명시적 조인 | 추가하지 않음(D51). 연관 경로(U9)나 `sub`(D49) 사용 |
 | 명시적 조인이 있는 `insert ... select` | 계획 중. v0.1에서는 다대일 경로를 사용 |
 | 동시 삽입에서 원자적인 `onConflict(...).ignore()` | 키 중복 오류를 처리(`ignore()`는 `not exists`를 사용. [7.6](07-6-upsert.md) 참고) |
 | `insert ... select`로 하는 업서트 | `values(list, ...)`로 행마다 업서트 |

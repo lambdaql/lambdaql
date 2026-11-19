@@ -152,7 +152,8 @@ public final class AssignmentReader {
                     q.wheres().stream().map(p -> reroot(p, from, to)).toList(),
                     q.select() == null ? null : reroot(q.select(), from, to), q.agg(),
                     q.sorts().stream().map(i -> new org.lambdaql.engine.ir.SortItem(reroot(i.key(), from, to), i.kind(), i.arg())).toList(),
-                    q.limit(), q.type());
+                    q.limit(), q.type(), q.joins().stream().map(j -> new Expr.Subquery.Join(j.root(), j.entity(), j.left(),
+                            reroot(j.on(), from, to))).toList());
             default -> e;
         };
     }
@@ -336,6 +337,7 @@ public final class AssignmentReader {
                 // the outer row's columns read inside a subquery (its own roots start at q.root())
                 List<Expr.Column> inner = new ArrayList<>();
                 q.wheres().forEach(p -> collect(p, inner));
+                q.joins().forEach(j -> collect(j.on(), inner));
                 if (q.select() != null) collect(q.select(), inner);
                 for (Expr.Column c : inner) if (c.root() < q.root()) out.add(c);
             }

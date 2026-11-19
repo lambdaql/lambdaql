@@ -170,7 +170,20 @@ public class OrderedSelectQuery<T> {
         return this;
     }
 
+    private boolean distinct;
+
+    /** Makes the rows distinct ({@code select distinct e0}) for a join query. Not public API. */
+    OrderedSelectQuery<T> withDistinct(boolean distinct) {
+        this.distinct = distinct;
+        return this;
+    }
+
+    /** Whether the rows are distinct. Not public API. */
+    boolean isDistinct() {
+        return distinct;
+    }
+
     private HqlRenderer renderer() {
-        return new HqlRenderer(context.model(), entityClass.getClassLoader()).withJoins(joins);
+        return new HqlRenderer(context.model(), entityClass.getClassLoader()).withJoins(joins).withDistinct(distinct);
     }
 }

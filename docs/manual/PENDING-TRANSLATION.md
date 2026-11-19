@@ -205,3 +205,15 @@ B6 대상 페이지: `java/03`·`kotlin/03`(임베디드 경로 절, 같음 비�
 
 대상 페이지: `java/08-procedures-functions.md`·`kotlin/08-procedures-functions.md`(SARGable 절), `java/03-where.md`·`kotlin/03-where.md`(3.4 비교: "컬럼에 대한 산술과 인덱스", "정수 컬럼과 소수 값" 문단), `java/12-spring-data-jpa.md`·`kotlin/12-spring-data-jpa.md`("SARGable 모드 프로퍼티" 문단), `11-errors-and-languages.md`(3xxx 범위 `LQL-3066`, 5xxx 범위 `LQL-5013`까지, 코드 표·로그 표), `java/10-rules-and-limits.md`·`kotlin/10-rules-and-limits.md`.
 
+## 대기 항목: D51 조인 확장(distinct, 파생 테이블·CTE 조인)
+
+| 항목 | 내용 | 테스트 영역 |
+|---|---|---|
+| 조인 결과 `distinct()` | `select distinct e0`, 정렬 키는 루트 열만(J7), 페이징 보조 정렬은 루트 id만. `exists` 서브쿼리를 먼저 권장 | `JoinQueryTest` `join-distinct`, `KotlinQueryTest` `join-distinct` |
+| 파생 테이블·CTE 조인 | `join`·`leftJoin(cte, …)`, `join`·`leftJoin(qb.from(…)…select(…), …)`. CTE 여러 개는 `t`, `t2`. 파생 행의 `x == null`은 `LQL-3067` | `JoinQueryTest` `join-cte`·`join-derived`, `KotlinQueryTest` `join-cte` |
+| 서브쿼리 안 조인 | `sub.from(A).join(B, (a, b) -> …)`·`leftJoin` → `where`·`exists`·`count`·`select`·집계가 두 행을 받음. 엔티티 2개까지 | `SubqueryTest` `sub-join`, `KotlinQueryTest` `sub-join` |
+
+대상 페이지: 명시적 조인을 다루는 페이지(조인 절), 파생 테이블·CTE 페이지, `11-errors-and-languages.md`(3xxx 범위 `LQL-3067`까지), `java/10-rules-and-limits.md`·`kotlin/10-rules-and-limits.md`(J 규칙).
+
+서브쿼리 안 조인 대상 페이지: `java/05-subquery.md`·`kotlin/05-subquery.md`(새 절, 미구현 목록), `java/06-select-group.md`·`kotlin/06-select-group.md`("서브쿼리 안의 조인: 이후" 문구).
+

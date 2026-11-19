@@ -231,7 +231,7 @@ public class SelectQuery<T> {
     public OrderedSelectQuery<T> orderBy(SortBy<T> spec) {
         LambdaRef ref = QueryContext.read(spec);
         List<SortItem> items = context.analyzeSortBy(ref, List.of(entityClass));
-        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of(new HqlRenderer.SortBound(items, ref.capturedArgs()))).withJoins(joins);
+        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of(new HqlRenderer.SortBound(items, ref.capturedArgs()))).withJoins(joins).withDistinct(distinct);
     }
 
     /**
@@ -251,7 +251,7 @@ public class SelectQuery<T> {
         if (!spec.type().isAssignableFrom(entityClass)) {
             throw new IllegalArgumentException(LqlMessage.SORT_SPEC_TYPE.format(spec.type().getName(), entityClass.getName()));
         }
-        return new OrderedSelectQuery<>(entityClass, context, wheres, spec.bind(context, entityClass)).withJoins(joins);
+        return new OrderedSelectQuery<>(entityClass, context, wheres, spec.bind(context, entityClass)).withJoins(joins).withDistinct(distinct);
     }
 
     /**
@@ -286,7 +286,7 @@ public class SelectQuery<T> {
         LambdaRef ref = QueryContext.read(key);
         Expr k = context.analyzeSortKey(ref, entityClass);
         SortItem item = new SortItem(k, SortItem.Kind.SORT, new Expr.Const(direction, Type.getType(Direction.class)));
-        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of(new HqlRenderer.SortBound(List.of(item), ref.capturedArgs()))).withJoins(joins);
+        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of(new HqlRenderer.SortBound(List.of(item), ref.capturedArgs()))).withJoins(joins).withDistinct(distinct);
     }
 
     /**
@@ -301,7 +301,7 @@ public class SelectQuery<T> {
      * @throws IllegalArgumentException if {@code count} is negative
      */
     public OrderedSelectQuery<T> limit(int count) {
-        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of()).limit(count).withJoins(joins);
+        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of()).limit(count).withJoins(joins).withDistinct(distinct);
     }
 
     /**
@@ -316,7 +316,7 @@ public class SelectQuery<T> {
      * @throws IllegalArgumentException if {@code count} is negative
      */
     public OrderedSelectQuery<T> offset(int count) {
-        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of()).offset(count).withJoins(joins);
+        return new OrderedSelectQuery<>(entityClass, context, wheres, List.of()).offset(count).withJoins(joins).withDistinct(distinct);
     }
 
     /**
@@ -405,6 +405,64 @@ public class SelectQuery<T> {
     }
 
     /**
+     * Joins the rows of a CTE: {@code with t as (...) select e0 from X e0 join t e1 on ...} (ROADMAP D44 extension).
+     * The row type of the CTE is the second lambda parameter; its accessors read the CTE columns.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.JoinQueryTest" region="join-cte"}
+     *
+     * @param cte       the CTE from {@code qb.with(...)}
+     * @param condition the join condition
+     * @param <U>       the row type
+     * @return the join query
+     */
+    public <U> SelectJoinQuery<T, U> join(Cte<U> cte, SelectJoinQuery.JoinOn<T, U> condition) {
+        return new SelectJoinQuery<>(this, List.of(), List.of(), cte.source.rowType, false, condition, cte.source.joinSource());
+    }
+
+    /**
+     * Left-joins the rows of a CTE: rows of the main entity without a match stay (ROADMAP D44 extension).
+     *
+     * @param cte       the CTE from {@code qb.with(...)}
+     * @param condition the join condition
+     * @param <U>       the row type
+     * @return the join query
+     */
+    public <U> SelectJoinQuery<T, U> leftJoin(Cte<U> cte, SelectJoinQuery.JoinOn<T, U> condition) {
+        return new SelectJoinQuery<>(this, List.of(), List.of(), cte.source.rowType, true, condition, cte.source.joinSource());
+    }
+
+    /**
+     * Joins the rows of a query as a derived table: {@code join (select ...) e1 on ...} (ROADMAP D44 extension).
+     * The query must select a record or a Kotlin data class (J5); its accessors read the columns.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.JoinQueryTest" region="join-derived"}
+     *
+     * @param rows      the inner query
+     * @param condition the join condition
+     * @param <U>       the row type
+     * @return the join query
+     */
+    public <U> SelectJoinQuery<T, U> join(ValueQuery<U> rows, SelectJoinQuery.JoinOn<T, U> condition) {
+        DerivedSource d = new DerivedSource(rows, null);
+        return new SelectJoinQuery<>(this, List.of(), List.of(), d.rowType, false, condition, d.joinSource());
+    }
+
+    /**
+     * Left-joins the rows of a query as a derived table (ROADMAP D44 extension).
+     *
+     * @param rows      the inner query
+     * @param condition the join condition
+     * @param <U>       the row type
+     * @return the join query
+     */
+    public <U> SelectJoinQuery<T, U> leftJoin(ValueQuery<U> rows, SelectJoinQuery.JoinOn<T, U> condition) {
+        DerivedSource d = new DerivedSource(rows, null);
+        return new SelectJoinQuery<>(this, List.of(), List.of(), d.rowType, true, condition, d.joinSource());
+    }
+
+    /**
      * Runs the query and returns the rows as a set that keeps the row order ({@link LinkedHashSet}).
      * Entity rows never repeat (lambdaQL joins only to-one associations), so the set has the same rows as
      * {@link #toList()}.
@@ -431,8 +489,21 @@ public class SelectQuery<T> {
         return this;
     }
 
+    private boolean distinct;
+
+    /** Makes the rows distinct ({@code select distinct e0}) for a join query. Not public API. */
+    SelectQuery<T> withDistinct(boolean distinct) {
+        this.distinct = distinct;
+        return this;
+    }
+
+    /** Whether the rows are distinct. Not public API. */
+    boolean isDistinct() {
+        return distinct;
+    }
+
     private HqlRenderer renderer() {
-        return new HqlRenderer(context.model(), entityClass.getClassLoader()).withJoins(joins);
+        return new HqlRenderer(context.model(), entityClass.getClassLoader()).withJoins(joins).withDistinct(distinct);
     }
 
     /** Adds a condition that was analyzed with all join roots. Not public API. */

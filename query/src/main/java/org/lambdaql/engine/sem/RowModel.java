@@ -40,6 +40,11 @@ public final class RowModel implements EntityModel {
     }
 
     @Override
+    public boolean isRow(Class<?> type) {
+        return rows.contains(type);
+    }
+
+    @Override
     public boolean isEntity(Class<?> type) {
         return rows.contains(type) || jpa.isEntity(type);
     }

@@ -3,7 +3,7 @@
 
 > [!NOTE]
 > **상태**
-> - **구현됨**(마일스톤 M8-1). H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 6.6.5)에서 테스트했습니다. 대상은 조회, 수정, 삭제의 `where { o, sub -> ... }` 안의 서브쿼리입니다. `exists` / `!exists`, `in`, `!in`(`NOT IN`으로 작성), 스칼라 집계, top-1 형태, 상관 서브쿼리와 중첩 서브쿼리, 캡처 값을 포함합니다. 테스트는 대부분 **Java** 람다를 사용합니다.
+> - **구현됨**(마일스톤 M8-1). H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 6.6.5)에서 테스트했습니다. 대상은 조회, 수정, 삭제의 `where { o, sub -> ... }` 안의 서브쿼리입니다. `exists` / `!exists`, `in`, `!in`(`NOT IN`으로 작성), 스칼라 집계, top-1 형태, 상관 서브쿼리와 중첩 서브쿼리, 캡처 값, 서브쿼리 안의 조인(D51)을 포함합니다. 테스트는 대부분 **Java** 람다를 사용합니다.
 > - **Kotlin 람다로 테스트함**([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 빌드에 포함, H2, MariaDB, Oracle): `exists`, `in`, 스칼라 `avg`. 이 예제에는 **(테스트됨)** 표시가 있습니다. 그 밖의 Kotlin 형태(`!in`, top-1, 중첩)는 빌드 밖에서 kotlinc 2.3.21로 컴파일했고, Java 형태와 같은 HQL을 만듭니다.
 > - **아직 구현되지 않음:** MariaDB `lateral` 재작성. (파생 테이블과 CTE는 다른 문법으로 구현했습니다. [6. 조회, 집계, 그룹화](06-select-group.md#69-derived-table-subquery-in-from)를 참고하십시오.)
 > - 그 밖의 Kotlin 코드는 테스트된 Java 쿼리를 Kotlin 문법으로 옮긴 것입니다. 테스트된 Java 예제는 [이 페이지의 Java 버전](../java/05-subquery.md)에 있습니다.
@@ -38,6 +38,7 @@ lambdaQL은 인자의 개수로 두 형태를 구분합니다. Kotlin은 알맞�
 | `y !in sub.from(...)...select { ... }` | 조건 | `y not in (select x.v from X x where ...)` |
 | `sub.from(X::class.java).avg { x -> v }`(`sum`, `min`, `max`, `count()`도) | 값 | `(select avg(x.v) from X x)` |
 | `sub.from(X::class.java)...orderBy { ... }.limit(1).select { x -> v }.first()` | 값 | top-1 서브쿼리 |
+| `sub.from(A::class.java).join(B::class.java) { a, b -> ... }.where { a, b -> ... }.exists()` | 조건 | `exists (select 1 from A a join B b on ... where ...)`([서브쿼리 안의 조인](#joins-inside-a-subquery)) |
 
 > [!NOTE]
 > 반환 값(`Boolean`, `Double`, ...)은 코드가 컴파일되도록 하는 자리 표시자일 뿐입니다.
@@ -373,6 +374,33 @@ where exists(select 1 from orders o1_0 where o1_0.customer_id=c1_0.id and exists
 // it.items.size > 0 대신(거부됨):
 .where { o, sub -> sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
 ```
+
+<a id="joins-inside-a-subquery"></a>
+### 서브쿼리 안의 조인
+
+서브쿼리 안에서도 엔티티 두 개를 조인할 수 있습니다(결정 D51). 형태는 `sub.from(A::class.java).join(B::class.java) { a, b -> ... }`와 `leftJoin(...) { ... }`이고, 결과는 `From2<A, B>`입니다.
+`From2`의 모든 람다는 두 행을 받습니다: `where { a, b -> ... }`, `exists()`, `count()`, `select { a, b -> v }` 뒤의 `contains(x)`나 `first()`, `max`, `min`, `avg`, `sum { a, b -> v }`.
+
+- HQL은 `exists (select 1 from Order s1 join Item s2 on s2.order.id = s1.id where ...)`처럼 됩니다.
+- ON 조건 안의 연관 경로는 `left join`이 됩니다. 경로 조인은 그 경로가 시작하는 루트 바로 뒤에 둡니다.
+- 서브쿼리 안의 엔티티는 두 개까지입니다. 조인 형태에서는 `orderBy`와 `limit`을 쓸 수 없습니다.
+- `exists`, 조인한 행의 `sum`, `left join`과 ON 안의 연관 경로를 쓴 `in`을 세 DB에서 실측했습니다.
+
+**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `sub-join`:
+
+```kotlin
+// customers with an order that has an item of quantity > 10: the subquery joins Order and Item (D51)
+val q = qb.from(Customer::class.java).where { c, sub ->
+    sub.from(Order::class.java)
+        .join(Item::class.java) { o, i -> i.order?.id == o.id }
+        .where { o, i -> o.customer?.id == c.id && i.qty > 10 }
+        .exists()
+}
+assertEquals("select e0 from Customer e0 where exists (select 1 from Order s1 join Item s2 on s2.order.id = s1.id"
+        + " where s1.customer is not null and s1.customer.id = e0.id and s2.qty > 10)", q.toHql().hql())
+```
+
+Kotlin의 `o.customer?.id == c.id`는 `s1.customer is not null and ...`을 더합니다(위 영역 참고). 집계 형태는 Java 테스트([`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java), 영역 `sub-join`)가 확인합니다.
 
 <a id="511-subqueries-in-other-places"></a>
 ## 5.11 다른 곳의 서브쿼리

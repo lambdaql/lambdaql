@@ -3,7 +3,7 @@
 
 > [!NOTE]
 > **상태**
-> - **구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, Hibernate 6.6.5, 마일스톤 M8-1): 조회, 수정, 삭제의 `where((o, sub) -> ...)` 안의 서브쿼리. `exists` / `not exists`, `contains`(IN), `!contains`(`NOT IN`으로 작성), 스칼라 집계(`count`, `sum`, `avg`, `min`, `max`), top-1 형태 `orderBy(...).limit(1)...first()`, 상관 서브쿼리와 중첩 서브쿼리, 캡처 값을 포함합니다.
+> - **구현됨, 테스트함**(H2 2.3, MariaDB 10.11, Oracle 23.26, Hibernate 6.6.5, 마일스톤 M8-1): 조회, 수정, 삭제의 `where((o, sub) -> ...)` 안의 서브쿼리. `exists` / `not exists`, `contains`(IN), `!contains`(`NOT IN`으로 작성), 스칼라 집계(`count`, `sum`, `avg`, `min`, `max`), top-1 형태 `orderBy(...).limit(1)...first()`, 상관 서브쿼리와 중첩 서브쿼리, 캡처 값, 서브쿼리 안의 조인(D51)을 포함합니다.
 > - **아직 구현되지 않음:** MariaDB `lateral` 재작성. (파생 테이블과 CTE는 다른 문법으로 구현했습니다. [6. 조회, 집계, 그룹화](06-select-group.md#69-derived-table-subquery-in-from)를 참고하십시오.)
 > - **(테스트됨)** 표시가 있는 예제는 테스트 코드에서 그대로 가져온 것입니다. 나머지 예제는 같은 규칙을 따르지만 테스트가 없습니다.
 
@@ -37,6 +37,7 @@ lambdaQL은 인자의 개수로 두 형태를 구분합니다.
 | `!... .contains(y)` | 조건 | `y not in (select x.v from X x where ...)` |
 | `sub.from(X.class).avg(x -> v)`(`sum`, `min`, `max`, `count()`도) | 값 | `(select avg(x.v) from X x)` |
 | `sub.from(X.class)...orderBy(...).limit(1).select(x -> v).first()` | 값 | top-1 서브쿼리 |
+| `sub.from(A.class).join(B.class, (a, b) -> ...).where((a, b) -> ...).exists()` | 조건 | `exists (select 1 from A a join B b on ... where ...)`([서브쿼리 안의 조인](#joins-inside-a-subquery)) |
 
 > [!NOTE]
 > 반환 값(`boolean`, `Double`, ...)은 코드가 컴파일되도록 하는 자리 표시자일 뿐입니다.
@@ -348,6 +349,36 @@ Java는 중첩된 람다에서 같은 이름을 두 번 쓰는 것을 허용하�
 ```java
 // o.getItems().size() > 0 (거부됨) 대신:
 .where((o, sub) -> sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists())
+```
+
+<a id="joins-inside-a-subquery"></a>
+### 서브쿼리 안의 조인
+
+서브쿼리 안에서도 엔티티 두 개를 조인할 수 있습니다(결정 D51). 형태는 `sub.from(A.class).join(B.class, (a, b) -> ...)`와 `leftJoin(...)`이고, 결과는 `From2<A, B>`입니다.
+`From2`의 모든 람다는 두 행을 받습니다: `where((a, b) -> ...)`, `exists()`, `count()`, `select((a, b) -> v)` 뒤의 `contains(x)`나 `first()`, `max`, `min`, `avg`, `sum((a, b) -> v)`.
+
+- HQL은 `exists (select 1 from Order s1 join Item s2 on s2.order.id = s1.id where ...)`처럼 됩니다.
+- ON 조건 안의 연관 경로는 `left join`이 됩니다. 경로 조인은 그 경로가 시작하는 루트 바로 뒤에 둡니다.
+- 서브쿼리 안의 엔티티는 두 개까지입니다. 조인 형태에서는 `orderBy`와 `limit`을 쓸 수 없습니다.
+- `exists`, 조인한 행의 `sum`, `left join`과 ON 안의 연관 경로를 쓴 `in`을 세 DB에서 실측했습니다.
+
+**(테스트됨)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java), 영역 `sub-join`:
+
+```java
+// customers with an order that has an item of quantity > 10: the subquery joins Order and Item (D51)
+SelectQuery<Customer> q = qb.from(Customer.class).where((c, sub) -> sub.from(Order.class)
+        .join(Item.class, (o, i) -> i.getOrder().getId() == o.getId())
+        .where((o, i) -> o.getCustomer().getId() == c.getId() && i.getQty() > 10)
+        .exists());
+assertEquals("select e0 from Customer e0 where exists (select 1 from Order s1 join Item s2 on s2.order.id = s1.id"
+        + " where s1.customer.id = e0.id and s2.qty > 10)", q.toHql().hql());
+// an aggregate over the joined rows
+SelectQuery<Customer> total = qb.from(Customer.class).where((c, sub) -> sub.from(Order.class)
+        .join(Item.class, (o, i) -> i.getOrder().getId() == o.getId())
+        .where((o, i) -> o.getCustomer().getId() == c.getId())
+        .sum((o, i) -> i.getQty()) > 30);
+assertEquals("select e0 from Customer e0 where (select sum(s2.qty) from Order s1 join Item s2 on s2.order.id = s1.id"
+        + " where s1.customer.id = e0.id) > 30", total.toHql().hql());
 ```
 
 <a id="511-subqueries-in-other-places"></a>
