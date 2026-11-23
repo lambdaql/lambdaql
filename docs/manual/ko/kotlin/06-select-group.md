@@ -45,32 +45,25 @@
 | `Customer` | `id`, `name`, `grade` |
 | `Item` | `order`, `price`, `qty` |
 
-그리고 다음 결과 타입을 사용합니다.
+예제는 [`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)에서 가져온 것입니다. 이 테스트는 Java 테스트 엔티티(`price`는 기본형 `double`, `status`는 `short`, `Customer.id`는 `int`)와 다음 결과 타입을 사용합니다.
+테스트는 결과 행을 Kotlin으로 계산한 결과와 비교합니다.
+
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `result-types`:
 
 ```kotlin
 data class OrderView(val id: Long?, val customerName: String?, val price: Double?)
-data class Stat(val customerId: Long?, val count: Long, val total: Double?)
-data class KeyCount(val customerId: Long?, val status: Int?, val count: Long)
+data class Stat(val customerId: Int?, val count: Long, val total: Double?)
+data class KeyCount(val customerId: Int?, val status: Short?, val count: Long)
 data class Total(val count: Long, val average: Double?)
 ```
+
+Kotlin은 타입을 엄격히 검사하므로 생성자 파라미터 타입은 엔티티 속성의 타입에 맞춥니다(`Customer.id`는 `Int?`, `status`는 `Short?`).
 
 > [!TIP]
 > 결과에는 nullable 타입(`Double?`, `String?`)을 사용하십시오.
 > 컬럼이나 `sum` 같은 집계는 NULL일 수 있습니다(규칙 J4). non-null `Double`이나 `Long` 파라미터는 JVM 기본형이고, non-null `String` 파라미터도 NULL을 받지 않습니다.
 > 이런 파라미터에 NULL이 들어가면 lambdaQL은 `IllegalStateException`을 던집니다. 기본형이면 메시지에 해당 인자와 래퍼 타입을 쓰라는 안내가 들어 있습니다.
 > `count`는 절대 NULL을 내지 않으므로 `count: Long`은 괜찮습니다.
-
-예제는 [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)에서 가져온 것입니다. 이 테스트는 Java 테스트 엔티티(`price`는 기본형 `double`, `status`는 `short`, `Customer.id`는 `int`)와 다음 결과 타입을 사용합니다.
-
-```kotlin
-/** A row of one order (Kotlin data class). */
-data class OrderRow(val id: Long?, val customerName: String?, val price: Double)
-
-/** A row of one customer group. Aggregates can be NULL, so the types are nullable (J4). */
-data class CustomerStat(val customerId: Int?, val count: Long, val total: Double?)
-```
-
-더 많은 쿼리를 Java로 작성한 테스트가 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)에 있습니다(H2, MariaDB, Oracle). 그 예제는 [이 페이지의 Java 버전](../java/06-select-group.md)을 참고하십시오.
 
 ---
 
@@ -80,20 +73,22 @@ data class CustomerStat(val customerId: Int?, val count: Long, val total: Double
 `select`는 람다 하나를 받습니다. 람다는 값 하나를 반환합니다. 결과는 그 값의 `ValueQuery`입니다.
 `select`는 `where` 뒤와 `orderBy` 뒤에서 호출할 수 있습니다. 정렬, `limit`, `offset`은 그대로 유지됩니다.
 
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `value`:
+
 ```kotlin
-val prices: List<Double?> = qb.from(Order::class.java)
-    .where { it.status == 1 }
+val q = qb.from(Order::class.java)
+    .where { it.status.toInt() == 1 }
     .orderBy { o, by -> by.asc(o.price) }
     .select { it.price }
-    .toList()
-// HQL: select e0.price from Order e0 where e0.status = 1 order by e0.price asc nulls first
+assertEquals("select e0.price from Order e0 where e0.status = 1 order by e0.price asc", q.toHql().hql())
+val prices: List<Double> = q.toList()
 ```
 
-여기서 `price`는 `Double?`이므로 정렬에 `nulls first`가 붙습니다([4.4](04-order-paging.md#44-null-ordering-is-the-same-on-every-database) 참고). Java 테스트에서는 `price`가 `double`이므로 그 HQL(예제 `value`)에는 `nulls` 부분이 없습니다.
+`price`는 NULL이 될 수 없으므로 정렬에 `nulls` 부분이 없습니다. NULL이 될 수 있는 컬럼이면 `nulls first`가 붙습니다([4.4](04-order-paging.md#44-null-ordering-is-the-same-on-every-database) 참고).
 
 **SQL 블록 읽는 법.** `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다. 이 장에서는 select 목록이 핵심이므로 줄여 쓰지 않습니다. 이 테스트는 Java 람다를 사용합니다. 의미가 같은 Kotlin 람다는 같은 HQL을 만들므로 SQL도 같습니다.
 
-**데이터베이스별 SQL (Java 테스트 실행 결과)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `value`:
+**데이터베이스별 SQL (`SqlByDatabaseTest` 실행 결과, 같은 HQL)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `value`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -106,24 +101,35 @@ order by o1_0.price
 연관 경로는 `where`에서와 마찬가지로 컬럼입니다(규칙 R24). `select`에서는 lambdaQL이 `left join`을 추가하므로 고객이 없는 주문도 빠지지 않습니다(`where`에서는 같은 경로가 기본적으로 inner join입니다).
 `optional = false`로 매핑한 필수 연관은 행을 잃지 않으므로 `select`에서도 inner join입니다([4.5](04-order-paging.md#45-what-a-sort-key-can-be) 참고).
 
-```kotlin
-.select { it.customer?.name }
-// HQL: select j1.name from Order e0 left join e0.customer j1
-```
-
-`it.customer!!.name`도 같은 HQL을 만듭니다. [6.3](#63-select-a-data-class-pair-or-triple)의 데이터 클래스 예제에서 이 `left join`을 볼 수 있습니다.
-경로가 연관 엔티티의 `@Id`로 끝나면 조인이 없습니다.
-`it.customer?.id`는 외래 키 컬럼 `customer_id`를 읽습니다.
-
-그 밖의 값 형태(Kotlin 전용 형태, 설계됨. [9. Kotlin 노트](09-kotlin-notes.md) 참고):
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `value-path`:
 
 ```kotlin
-.select { it.description ?: "" }              // coalesce(e0.description, '')
-.select { it.customer?.name ?: "none" }       // coalesce(j1.name, 'none') + left join
-.select { (it.price ?: 0.0) * 2 }             // coalesce(e0.price, 0.0) * 2
+// a path in select is a left join: the order without a customer stays (its value is null)
+val names = qb.from(Order::class.java).select { it.customer?.name }
+assertEquals("select j1.name from Order e0 left join e0.customer j1", names.toHql().hql())
+// !! gives the same query
+assertEquals(names.toHql().hql(), qb.from(Order::class.java).select { it.customer!!.name }.toHql().hql())
+// a path that ends with the @Id reads the foreign key column: no join
+assertEquals("select e0.customer.id from Order e0", qb.from(Order::class.java).select { it.customer?.id }.toHql().hql())
 ```
 
-boolean 엘비스(`select { it.flag ?: false }`)와 값 `if`/`when`은 거부됩니다(제한 KC21, KC6).
+`it.customer!!.name`도 같은 HQL을 만듭니다. [6.3](#63-select-a-data-class-pair-or-triple)의 데이터 클래스 예제에서도 이 `left join`을 볼 수 있습니다.
+경로가 연관 엔티티의 `@Id`로 끝나면 조인이 없습니다. `it.customer?.id`는 외래 키 컬럼 `customer_id`를 읽습니다.
+
+**엘비스 연산자.** boolean이 아닌 컬럼의 `?:`는 `coalesce`가 됩니다. `?.` 경로 뒤의 `?:`(`it.customer?.name ?: "none"`)는 조건으로 읽혀 `LQL-2022`로 거부됩니다.
+
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `value-elvis`:
+
+```kotlin
+// ?: on a column that is not a boolean: coalesce
+val q = qb.from(Order::class.java).select { it.description ?: "" }
+assertEquals("select coalesce(e0.description, '') from Order e0", q.toHql().hql())
+// ?: after a ?. path is rejected (LQL-2022)
+val afterPath = assertThrows(LambdaQLException::class.java) {
+    qb.from(Order::class.java).select { it.customer?.name ?: "none" }.toHql()
+}
+assertEquals("LQL-2022", afterPath.code())
+```
 
 ---
 
@@ -132,37 +138,20 @@ boolean 엘비스(`select { it.flag ?: false }`)와 값 `if`/`when`은 거부됩
 
 람다 안에서 생성자를 호출하십시오. 생성자의 각 인자는 값 식입니다.
 
-```kotlin
-// 데이터 클래스
-val list: List<OrderView> = qb.from(Order::class.java)
-    .select { OrderView(it.id, it.customer?.name, it.price) }
-    .toList()
-// HQL: select e0.id, j1.name, e0.price from Order e0 left join e0.customer j1
-
-// Pair(Triple도 가능)
-val pairs: List<Pair<String?, Double?>> = qb.from(Order::class.java)
-    .select { it.customer?.name to it.price }
-    .toList()
-// HQL: select j1.name, e0.price from Order e0 left join e0.customer j1
-```
-
-[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `data-class`:
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `data-class`:
 
 ```kotlin
-val q = qb.from(Order::class.java).select { OrderRow(it.id, it.customer?.name, it.price) }
-assertEquals("select e0.id, j1.name, e0.price from Order e0 left join e0.customer j1", q.toHql().hql())
+// only the columns are selected; lambdaQL calls the constructor
+val views = qb.from(Order::class.java).select { OrderView(it.id, it.customer?.name, it.price) }
+assertEquals("select e0.id, j1.name, e0.price from Order e0 left join e0.customer j1", views.toHql().hql())
+// Pair (a to b) and Triple
+val pairs = qb.from(Order::class.java).select { it.customer?.name to it.price }
+assertEquals("select j1.name, e0.price from Order e0 left join e0.customer j1", pairs.toHql().hql())
+val triples = qb.from(Order::class.java).select { Triple(it.id, it.status, it.isActive) }
+assertEquals("select e0.id, e0.status, e0.active from Order e0", triples.toHql().hql())
 ```
 
-[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `pair`:
-
-```kotlin
-val q = qb.from(Order::class.java).where { it.status.toInt() == 1 }.select { it.customer?.name to it.price }
-assertEquals("select j1.name, e0.price from Order e0 left join e0.customer j1 where e0.status = 1", q.toHql().hql())
-```
-
-테스트 엔티티의 `status`는 `short`이므로 테스트는 `it.status.toInt() == 1`로 비교합니다. lambdaQL은 이 변환을 무시합니다.
-
-**데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `record`(데이터 클래스 예제):
+**데이터베이스별 SQL (`SqlByDatabaseTest` 실행 결과, 같은 HQL)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `record`(데이터 클래스 예제):
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -173,8 +162,7 @@ left join customers c1_0 on c1_0.id=o1_0.customer_id
 
 lambdaQL은 `select new com.acme.OrderView(...)`를 쓰지 **않습니다**(규칙 J2).
 컬럼을 조회하고 생성자는 lambdaQL이 직접 호출합니다. 데이터 클래스, `Pair`, `Triple` 모두 같습니다.
-그래서 긴 클래스 이름이나 중첩 클래스 이름 때문에 생기는 문제를 피할 수 있습니다.
-lambdaQL은 각 값을 생성자 파라미터의 타입으로 변환합니다(예: Hibernate의 `Integer`를 `Long?` 파라미터로).
+그래서 긴 클래스 이름이나 중첩 클래스 이름 때문에 생기는 문제를 피할 수 있습니다. 위 영역의 `OrderView`도 테스트 클래스 안에 중첩된 데이터 클래스입니다.
 
 반환할 수 있는 것:
 
@@ -215,13 +203,14 @@ Kotlin에서 보이는 타입:
 
 import는 선택 사항입니다. 함수 하나를 import할 수 있습니다.
 
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `agg-import`:
+
 ```kotlin
 import org.lambdaql.Agg.sum
-
-.having { sum(it.price) > 200 }
 ```
 
-이는 `xs.sum()`이나 `xs.count()` 같은 Kotlin 표준 라이브러리 확장과 충돌하지 않습니다(컴파일러로 확인함).
+그러면 `having { sum(it.price) > 200 }`처럼 쓸 수 있습니다([6.6](#66-having) 참고).
+이는 `xs.sum()` 같은 Kotlin 표준 라이브러리 확장과 충돌하지 않습니다. 테스트 파일이 두 `sum`을 함께 사용합니다.
 
 중요한 점:
 
@@ -233,16 +222,18 @@ import org.lambdaql.Agg.sum
 <a id="aggregate-over-all-rows-no-group-by"></a>
 ### 모든 행에 대한 집계(group by 없음)
 
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `total`:
+
 ```kotlin
-val t: Total? = qb.from(Order::class.java)
-    .where { it.status == 1 }
+// aggregates without groupBy: always one row
+val q = qb.from(Order::class.java)
+    .where { it.status.toInt() == 1 }
     .select { Total(Agg.count(), Agg.avg(it.price)) }
-    .one()
-    .orElse(null)
-// HQL: select count(*), avg(e0.price) from Order e0 where e0.status = 1
+assertEquals("select count(*), avg(e0.price) from Order e0 where e0.status = 1", q.toHql().hql())
+val t: Total? = q.one().orElse(null)
 ```
 
-**데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `total`:
+**데이터베이스별 SQL (`SqlByDatabaseTest` 실행 결과, 같은 HQL)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `total`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -274,12 +265,14 @@ where o1_0.status=1
 <a id="one-key"></a>
 ### 키 하나
 
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `group-one`:
+
 ```kotlin
-val stats: List<Stat> = qb.from(Order::class.java)
+// the key ends with the @Id: no join. The orders without a customer are one group with the key NULL
+val q = qb.from(Order::class.java)
     .groupBy { it.customer?.id }
     .select { Stat(it.customer?.id, Agg.count(), Agg.sum(it.price)) }
-    .toList()
-// HQL: select e0.customer.id, count(*), sum(e0.price) from Order e0 group by e0.customer.id
+assertEquals("select e0.customer.id, count(*), sum(e0.price) from Order e0 group by e0.customer.id", q.toHql().hql())
 ```
 
 키가 `@Id`로 끝나므로 조인이 없습니다. 고객이 없는 주문은 키가 NULL인 그룹 하나가 됩니다.
@@ -290,31 +283,29 @@ val stats: List<Stat> = qb.from(Order::class.java)
 
 `listOf(...)`로 키 리스트를 반환하거나, `Pair`(`a to b`)나 `Triple`을 사용하십시오.
 
-```kotlin
-val counts: List<KeyCount> = qb.from(Order::class.java)
-    .where { it.customer != null }
-    .groupBy { listOf(it.customer?.id, it.status) }
-    .select { KeyCount(it.customer?.id, it.status, Agg.count()) }
-    .toList()
-// HQL: select e0.customer.id, e0.status, count(*) from Order e0 where e0.customer is not null
-//      group by e0.customer.id, e0.status
-
-.groupBy { it.customer?.id to it.status }                     // Pair: 같은 결과
-.groupBy { Triple(it.customer?.id, it.status, it.active) }    // 키 세 개
-```
-
-[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `group-many`(결과는 `Triple`):
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `group-many`:
 
 ```kotlin
 val q = qb.from(Order::class.java)
     .where { it.customer != null }
     .groupBy { listOf(it.customer?.id, it.status) }
-    .select { Triple(it.customer?.id, it.status, Agg.count()) }
+    .select { KeyCount(it.customer?.id, it.status, Agg.count()) }
 assertEquals("select e0.customer.id, e0.status, count(*) from Order e0 where e0.customer is not null"
     + " group by e0.customer.id, e0.status", q.toHql().hql())
+// a Pair (a to b) gives the same keys; a Triple gives three
+val pair = qb.from(Order::class.java)
+    .where { it.customer != null }
+    .groupBy { it.customer?.id to it.status }
+    .select { KeyCount(it.customer?.id, it.status, Agg.count()) }
+assertEquals(q.toHql().hql(), pair.toHql().hql())
+val three = qb.from(Order::class.java)
+    .groupBy { Triple(it.customer?.id, it.status, it.isActive) }
+    .select { Triple(it.customer?.id, it.status, Agg.count()) }
+assertEquals("select e0.customer.id, e0.status, count(*) from Order e0 group by e0.customer.id, e0.status, e0.active",
+    three.toHql().hql())
 ```
 
-**데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `group-many`:
+**데이터베이스별 SQL (`SqlByDatabaseTest` 실행 결과, 첫 번째 HQL)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `group-many`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -339,15 +330,19 @@ group by o1_0.customer_id,o1_0.status
 
 쿼리에 집계가 있으면 `select`와 `having`에서 집계가 **아닌** 값은 모두 `groupBy` 키여야 합니다. 이는 SQL 규칙입니다. lambdaQL은 분석 시점에 이를 검사합니다.
 
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `group-key-error`:
+
 ```kotlin
-// 오류: it.status는 그룹 키가 아님
-qb.from(Order::class.java)
-    .groupBy { it.customer?.id }
-    .select { KeyCount(it.customer?.id, it.status, Agg.count()) }
-// → TranslationException(LQL-3035)
+// J3: status is not a group key
+val e = assertThrows(LambdaQLException::class.java) {
+    qb.from(Order::class.java)
+        .groupBy { it.customer?.id }
+        .select { KeyCount(it.customer?.id, it.status, Agg.count()) }
+}
+assertEquals("LQL-3035", e.code())
 ```
 
-같은 검사를 Java로 테스트했습니다(영역 `rules`, [6.11](#611-rules-j1-to-j8) 참고).
+오류는 `select`를 호출할 때 발생합니다. 그 밖의 규칙 검사는 [6.11](#611-rules-j1-to-j8)을 참고하십시오.
 
 ---
 
@@ -357,28 +352,20 @@ qb.from(Order::class.java)
 `having`은 그룹에 대한 조건입니다. `where`와 같은 람다 규칙([3. 조건(`where`)](03-where.md))을 사용하며, `Agg`를 사용할 수 있습니다.
 `having`은 여러 번 호출할 수 있습니다. 조건은 `AND`로 연결됩니다.
 
-```kotlin
-val big: List<Stat> = qb.from(Order::class.java)
-    .groupBy { it.customer?.id }
-    .having { Agg.sum(it.price) > 200 }
-    .select { Stat(it.customer?.id, Agg.count(), Agg.sum(it.price)) }
-    .toList()
-// HQL: select e0.customer.id, count(*), sum(e0.price) from Order e0 group by e0.customer.id
-//      having sum(e0.price) > 200.0
-```
-
-[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `group-by`:
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `having`:
 
 ```kotlin
+// sum is imported (import org.lambdaql.Agg.sum); having can be called more than once (AND)
 val q = qb.from(Order::class.java)
     .groupBy { it.customer?.id }
-    .having { Agg.sum(it.price) > 200 }
-    .select { CustomerStat(it.customer?.id, Agg.count(), Agg.sum(it.price)) }
+    .having { sum(it.price) > 200 }
+    .having { Agg.count() >= 2 }
+    .select { Stat(it.customer?.id, Agg.count(), sum(it.price)) }
 assertEquals("select e0.customer.id, count(*), sum(e0.price) from Order e0 group by e0.customer.id"
-    + " having sum(e0.price) > 200.0", q.toHql().hql())
+    + " having sum(e0.price) > 200.0 and count(*) >= 2L", q.toHql().hql())
 ```
 
-**데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `group-by`:
+**데이터베이스별 SQL (`SqlByDatabaseTest` 실행 결과, 첫 번째 `having`만 있는 HQL)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `group-by`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -388,7 +375,7 @@ group by o1_0.customer_id
 having sum(o1_0.price)>200.0
 ```
 
-`Agg.sum`은 Java 메서드이므로 결과가 플랫폼 타입입니다. 그래서 `Agg.sum(it.price) > 200`은 `!!` 없이 컴파일됩니다. `!!`를 붙여도 lambdaQL은 이를 무시합니다(결정 D23).
+`Agg.sum`은 Java 메서드이므로 결과가 플랫폼 타입입니다. 그래서 `sum(it.price) > 200`은 `!!` 없이 컴파일됩니다. `!!`를 붙여도 lambdaQL은 이를 무시합니다(결정 D23).
 
 ---
 
@@ -407,16 +394,19 @@ having sum(o1_0.price)>200.0
 | `one()` | 유일한 값(Java `Optional`). 행이 2개 이상이면 `NonUniqueResultException` |
 | `toHql()` | 쿼리를 실행하지 않고 HQL과 파라미터를 반환 |
 
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `distinct`:
+
 ```kotlin
 val q = qb.from(Order::class.java)
     .orderBy { o, by -> by.desc(o.price) }
     .select { it.price }
     .distinct()
-// HQL: select distinct e0.price from Order e0 order by e0.price desc nulls last
-val prices = q.toSet()      // always select distinct
+assertEquals("select distinct e0.price from Order e0 order by e0.price desc", q.toHql().hql())
+// toSet() always uses select distinct
+val prices = q.toSet()
 ```
 
-**데이터베이스별 SQL (Java 테스트 실행 결과)** — Java 테스트의 `price`는 `double`이므로 그 HQL에는 `nulls` 부분이 없습니다. `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `distinct`:
+**데이터베이스별 SQL (`SqlByDatabaseTest` 실행 결과, 같은 HQL)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `distinct`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -425,7 +415,7 @@ from orders o1_0
 order by o1_0.price desc
 ```
 
-- `distinct()`를 쓰면 모든 정렬 키가 select 값이어야 합니다(규칙 J7). 그렇지 않으면 lambdaQL은 분석 시점에 `TranslationException`(`LQL-3046`)을 던집니다.
+- `distinct()`를 쓰면 모든 정렬 키가 select 값이어야 합니다(규칙 J7). 그렇지 않으면 lambdaQL은 분석 시점에 `TranslationException`(`LQL-3046`)을 던집니다([6.11](#611-rules-j1-to-j8)의 영역 `rules` 참고).
 - 값 쿼리의 `toSet()`은 항상 `select distinct`를 사용합니다. 여기서는 값의 반복이 정상이므로 크기 검사를 하지 않습니다(엔티티의 `toSet()`과 다름, [2. 시작하기](02-getting-started.md#toset) 참고).
 - `@Lob` 컬럼을 `distinct`나 `groupBy` 키로 쓰면 Oracle은 거부합니다(ORA-22848, ORA-22849). H2와 MariaDB는 실행합니다. lambdaQL은 쿼리를 바꾸지 않고 `LQL-5010`을 `DEBUG` 수준으로 기록합니다([4.5](04-order-paging.md#45-what-a-sort-key-can-be) 참고).
 
@@ -434,16 +424,18 @@ order by o1_0.price desc
 `first()`도 한 행만 읽으므로 같은 보조 정렬을 더합니다. 정렬 키 값이 같은 행이 여러 개이면 매번 `id`가 가장 작은 행의 값을 반환합니다.
 그룹 쿼리와 `distinct` 쿼리에는 더하지 않습니다. 이 쿼리들의 select 목록에는 `id`가 없기 때문입니다.
 
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `value-page`:
+
 ```kotlin
+// paging adds the id as the last key (S9), so the pages do not overlap
 val page = qb.from(Order::class.java)
     .orderBy { o, by -> by.desc(o.price) }
     .select { it.price }
     .limit(2).offset(1)
-    .toList()
-// HQL: select e0.price from Order e0 order by e0.price desc nulls last, e0.id asc
+assertEquals("select e0.price from Order e0 order by e0.price desc, e0.id asc", page.toHql().hql())
 ```
 
-**데이터베이스별 SQL (Java 테스트 실행 결과)** — Java 테스트의 `price`는 `double`이므로 그 HQL에는 `nulls` 부분이 없습니다. `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `value-page`:
+**데이터베이스별 SQL (`SqlByDatabaseTest` 실행 결과, 같은 HQL)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `value-page`:
 
 ```sql
 -- H2, Oracle
@@ -478,16 +470,19 @@ limit ?,?
 `where { o, c -> ... }`, `orderBy { o, c, by -> ... }`(`by`는 마지막, 규칙 S12), `select { o, c -> ... }`입니다.
 조인한 엔티티의 별칭은 `e1`, `e2`입니다.
 
-조인은 [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)에서 **Java** 람다로 테스트했습니다(H2, MariaDB, Oracle). 조인 결과의 `distinct()`와 CTE의 조인은 Kotlin 람다로도 테스트했습니다([`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `join-distinct`, `join-cte`).
-그 밖의 아래 Kotlin 코드는 테스트한 Java 쿼리를 Kotlin 문법으로 옮긴 것이고, HQL은 Java 테스트의 결과입니다. 테스트 코드는 [이 페이지의 Java 버전](../java/06-select-group.md#68-explicit-joins)을 참고하십시오.
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `join`:
 
 ```kotlin
 val q = qb.from(Order::class.java)
     .join(Customer::class.java) { o, c -> o.customer?.id == c.id }
-    .where { o, c -> c.grade != null && c.grade!! >= 5 }
-// HQL: select e0 from Order e0 join Customer e1 on e0.customer.id = e1.id
-//      where e1.grade is not null and e1.grade >= 5
+    .where { _, c -> c.grade != null && c.grade >= 5 }
+assertEquals("select e0 from Order e0 join Customer e1 on e0.customer is not null and e0.customer.id = e1.id"
+    + " where e1.grade is not null and e1.grade >= 5", q.toHql().hql())
+// without select, the result is the main entity
+val result: List<Order> = q.toList()
 ```
+
+Kotlin의 `o.customer?.id == c.id`는 NULL이 될 수 있는 값의 비교이므로 lambdaQL이 `e0.customer is not null and`를 덧붙입니다. 결과 행은 같습니다.
 
 **결과는 주 엔티티입니다.** `select`가 없으면 `toList()`는 `List<Order>`를 반환합니다.
 조인한 엔티티는 조건, 정렬, `select`에만 사용합니다.
@@ -496,13 +491,15 @@ val q = qb.from(Order::class.java)
 <a id="left-join-and-null"></a>
 ### left join과 NULL
 
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `left-join-null`:
+
 ```kotlin
-// 고객이 없는 주문에는 c가 없음: c == null로 그런 행을 찾음
+// c is missing for an order without a customer: c == null finds those rows
 val q = qb.from(Order::class.java)
     .leftJoin(Customer::class.java) { o, c -> o.customer?.id == c.id }
-    .where { o, c -> c == null || c.name == "Kim" }
-// HQL: select e0 from Order e0 left join Customer e1 on e0.customer.id = e1.id
-//      where e1.id is null or e1.name = 'Kim'
+    .where { _, c -> c == null || c.name == "Kim" }
+assertEquals("select e0 from Order e0 left join Customer e1 on e0.customer is not null and e0.customer.id = e1.id"
+    + " where e1.id is null or e1.name = 'Kim'", q.toHql().hql())
 ```
 
 - `c == null`은 "짝이 없음"을 뜻합니다. lambdaQL은 이를 `e1.id is null`(조인한 엔티티의 `@Id`)로 씁니다.
@@ -513,21 +510,29 @@ val q = qb.from(Order::class.java)
 <a id="sort-and-select"></a>
 ### 정렬과 select
 
+예제의 `Row`는 다음 데이터 클래스입니다.
+
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `row-type`:
+
 ```kotlin
-val q = qb.from(Order::class.java)
+data class Row(val orderId: Long?, val customerName: String?)
+```
+
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `join-sort-select`:
+
+```kotlin
+val sorted = qb.from(Order::class.java)
     .leftJoin(Customer::class.java) { o, c -> o.customer?.id == c.id }
     .orderBy { o, c, by -> by.asc(c.name).asc(o.id) }
-// HQL: select e0 from Order e0 left join Customer e1 on e0.customer.id = e1.id
-//      order by e1.name asc nulls first, e0.id asc
-
-data class Row(val orderId: Long?, val customerName: String?)
-
+assertEquals("select e0 from Order e0 left join Customer e1 on e0.customer is not null and e0.customer.id = e1.id"
+    + " order by e1.name asc nulls first, e0.id asc", sorted.toHql().hql())
+// the order without a customer has customerName = null
 val rows = qb.from(Order::class.java)
     .leftJoin(Customer::class.java) { o, c -> o.customer?.id == c.id }
-    .orderBy { o, c, by -> by.asc(o.id) }
+    .orderBy { o, _, by -> by.asc(o.id) }
     .select { o, c -> Row(o.id, c.name) }
-// HQL: select e0.id, e1.name from Order e0 left join Customer e1 on e0.customer.id = e1.id
-//      order by e0.id asc
+assertEquals("select e0.id, e1.name from Order e0 left join Customer e1 on e0.customer is not null and e0.customer.id = e1.id"
+    + " order by e0.id asc", rows.toHql().hql())
 ```
 
 고객이 없는 주문은 `customerName`이 `null`입니다.
@@ -538,14 +543,16 @@ val rows = qb.from(Order::class.java)
 
 엔티티는 3개까지 조인할 수 있습니다. 세 번째 조인 람다는 세 엔티티를 모두 받습니다: `{ o, c, i -> ... }`.
 
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `join-three`:
+
 ```kotlin
-// 수량이 10을 넘는 품목이 있는 고객의 주문. 조건에 맞는 품목마다 주문이 한 번씩 반복됨
+// orders of a customer with an item of quantity > 10; an order repeats once per matching item
 val q = qb.from(Order::class.java)
     .join(Customer::class.java) { o, c -> o.customer?.id == c.id }
-    .join(Item::class.java) { o, c, i -> i.order?.id == o.id }
-    .where { o, c, i -> i.qty > 10 }
-// HQL: select e0 from Order e0 join Customer e1 on e0.customer.id = e1.id
-//      join Item e2 on e2.order.id = e0.id where e2.qty > 10
+    .join(Item::class.java) { o, _, i -> i.order?.id == o.id }
+    .where { _, _, i -> i.qty > 10 }
+assertEquals("select e0 from Order e0 join Customer e1 on e0.customer is not null and e0.customer.id = e1.id"
+    + " join Item e2 on e2.order.id = e0.id where e2.qty > 10", q.toHql().hql())
 ```
 
 > [!WARNING]
@@ -557,12 +564,15 @@ val q = qb.from(Order::class.java)
 
 `crossJoin`에는 조인 조건이 없습니다. 함수 이름으로 모든 행의 조합을 원한다는 의도를 나타냅니다. 조건은 `where`에 작성하십시오.
 
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `cross-join`:
+
 ```kotlin
-// 모든 행의 조합. 조건은 where에 작성
+// every pair of rows; the conditions go in where
 val q = qb.from(Order::class.java)
     .crossJoin(Customer::class.java)
-    .where { o, c -> c.grade != null && o.price!! > 100 }
-// HQL: select e0 from Order e0 cross join Customer e1 where e1.grade is not null and e0.price > 100.0
+    .where { o, c -> c.grade != null && o.price > 100 }
+assertEquals("select e0 from Order e0 cross join Customer e1 where e1.grade is not null and e0.price > 100.0",
+    q.toHql().hql())
 ```
 
 lambdaQL에는 `from(Order::class.java, Customer::class.java)`(콤마 조인)가 없습니다. 조건을 빠뜨리면 실수로 모든 조합을 얻고, 어느 엔티티가 결과인지도 불분명하기 때문입니다(결정 D45). 그런 조회에는 `crossJoin`을 사용하십시오.
@@ -572,17 +582,19 @@ lambdaQL에는 `from(Order::class.java, Customer::class.java)`(콤마 조인)가
 
 페이징하면 lambdaQL은 **모든** 엔티티의 id를 마지막 정렬 키로 덧붙입니다. 그래서 페이지가 겹치지 않습니다(규칙 S9).
 
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `join-paging`:
+
 ```kotlin
-// 페이징하면 모든 엔티티의 id를 정렬에 덧붙이므로 페이지가 겹치지 않음(S9)
+// with paging, the id of every entity is added to the order, so the pages do not overlap (S9)
 val pairs = qb.from(Order::class.java)
     .crossJoin(Customer::class.java)
-    .orderBy { o, c, by -> by.desc(o.price) }
+    .orderBy { o, _, by -> by.desc(o.price) }
     .select { o, c -> Row(o.id, c.name) }
-    .limit(5)
-// HQL: select e0.id, e1.name from Order e0 cross join Customer e1 order by e0.price desc, e0.id asc, e1.id asc
+assertEquals("select e0.id, e1.name from Order e0 cross join Customer e1 order by e0.price desc, e0.id asc, e1.id asc",
+    pairs.limit(5).toHql().hql())
 ```
 
-이 HQL은 `price`가 기본형 `double`인 Java 테스트의 결과입니다. 이 매뉴얼의 nullable `price: Double?`이면 정렬 키에 `nulls last`가 붙습니다([4.4](04-order-paging.md#44-null-ordering-is-the-same-on-every-database) 참고).
+테스트는 페이지를 차례로 읽어 모든 조합이 한 번씩, 정렬 순서대로 나오는지 확인합니다.
 
 <a id="distinct-on-a-join"></a>
 ### 조인 결과의 `distinct()`
@@ -634,9 +646,40 @@ assertEquals("with t as (select d0.customer.id as customerId, sum(d0.price) as t
         + " join t e1 on e1.customerId is not null and e1.customerId = e0.id where e1.total > 100.0", rows.toHql().hql())
 ```
 
-`x.customerId`가 nullable `Int?`이면 `x.customerId == c.id`는 `e1.customerId is not null and e1.customerId = e0.id`가 됩니다(위 영역 참고). 이름 없는 파생 테이블의 조인은 Java 테스트([`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), 영역 `join-derived`)가 확인합니다.
+`x.customerId`가 nullable `Int?`이면 `x.customerId == c.id`는 `e1.customerId is not null and e1.customerId = e0.id`가 됩니다(위 영역 참고).
 
-같은 CTE를 두 번 읽는 형태는 Java 테스트([`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), 영역 `cte-reuse`)가 확인합니다.
+이름 없는 파생 테이블의 조인(`CustomerTotal`은 [6.9](#69-derived-table-subquery-in-from)의 행 타입):
+
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `join-derived`:
+
+```kotlin
+// a derived table without a name; a customer without orders has no row in it (left join)
+val small = qb.from(Customer::class.java)
+    .leftJoin(qb.from(Order::class.java)
+        .where { it.customer != null }
+        .groupBy { it.customer?.id }
+        .select { CustomerTotal(it.customer?.id, Agg.count(), Agg.sum(it.price)) }) { c, x -> x.customerId == c.id }
+    .where { _, x -> x.customerId == null || x.total!! < 210 }
+assertEquals("select e0 from Customer e0 left join (select d0.customer.id as customerId, count(*) as cnt,"
+    + " sum(d0.price) as total from Order d0 where d0.customer is not null group by d0.customer.id) e1"
+    + " on e1.customerId is not null and e1.customerId = e0.id where e1.customerId is null or e1.total < 210.0", small.toHql().hql())
+```
+
+같은 CTE를 두 번 읽는 형태:
+
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `cte-reuse`:
+
+```kotlin
+// the same CTE read twice is written once
+val reused = qb.from(Customer::class.java)
+    .join(t) { c, x -> x.customerId == c.id }
+    .leftJoin(t) { c, _, y -> y.customerId == c.id && y.total!! > 210 }
+    .select { c, _, y -> c.name to y.total }
+assertEquals("with t as (select d0.customer.id as customerId, count(*) as cnt, sum(d0.price) as total from Order d0"
+    + " where d0.customer is not null group by d0.customer.id)"
+    + " select e0.name, e2.total from Customer e0 join t e1 on e1.customerId is not null and e1.customerId = e0.id"
+    + " left join t e2 on e2.customerId is not null and e2.customerId = e0.id and e2.total > 210.0", reused.toHql().hql())
+```
 
 <a id="what-a-join-query-has"></a>
 ### 조인 쿼리의 함수
@@ -647,7 +690,7 @@ assertEquals("with t as (select d0.customer.id as customerId, sum(d0.price) as t
 | `orderBy { o, c, by -> ... }` | `select`, `limit`, `offset`, `toList`, `first`, 그 밖의 정렬된 쿼리 함수([4. 정렬과 페이징](04-order-paging.md)) |
 
 서브쿼리 안의 조인은 [5. 서브쿼리](05-subquery.md#joins-inside-a-subquery)를 참고하십시오(D51).
-v0.1에 아직 없는 것: insert의 조인, 엔티티 4개 이상, `SortSpec`의 조인 형태.
+지원하지 않는 것: insert의 조인, 엔티티 4개 이상, `SortSpec`의 조인 형태.
 update와 delete의 조인은 추가하지 않기로 했습니다(D51). 연관 경로(U9)나 `sub`(D49)를 쓰십시오.
 
 ---
@@ -659,22 +702,29 @@ update와 delete의 조인은 추가하지 않기로 했습니다(D51). 연관 �
 그 행이 바깥 쿼리의 테이블이 됩니다(결정 D46).
 결과는 `DerivedQuery<R>`이며, `R`은 행 타입입니다.
 
-파생 테이블은 [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)에서 **Java** 람다로 테스트했습니다(H2, MariaDB, Oracle). Kotlin 테스트는 아직 없습니다.
-아래 Kotlin 코드는 테스트한 Java 쿼리를 Kotlin 문법으로 옮긴 것입니다. 테스트 코드는 [이 페이지의 Java 버전](../java/06-select-group.md#69-derived-table-subquery-in-from)을 참고하십시오.
+이 절과 [6.10](#610-cte-with)의 행 타입:
+
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `derived-types`:
 
 ```kotlin
-data class CustomerTotal(val customerId: Long?, val cnt: Long, val total: Double?)
+/** A row of a derived table or CTE: the properties name the columns (J5). */
+data class CustomerTotal(val customerId: Int?, val cnt: Long, val total: Double?)
+data class Priced(val id: Long?, val price: Double?)
+```
 
-// 그룹 쿼리의 행이 바깥 쿼리의 테이블이 됨. r.total은 컬럼 "total"을 읽음
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `derived`:
+
+```kotlin
+// the rows of a group query are the table of the outer query; r.total reads the column "total"
 val q = qb.from(qb.from(Order::class.java)
         .where { it.customer != null }
         .groupBy { it.customer?.id }
         .select { CustomerTotal(it.customer?.id, Agg.count(), Agg.sum(it.price)) })
     .where { r -> r.total!! > 100 }
     .orderBy { r, by -> by.desc(r.total) }
-// HQL: select e0.customerId, e0.cnt, e0.total from (select d0.customer.id as customerId, count(*) as cnt,
-//      sum(d0.price) as total from Order d0 where d0.customer is not null group by d0.customer.id) e0
-//      where e0.total > 100.0 order by e0.total desc nulls last
+assertEquals("select e0.customerId, e0.cnt, e0.total from (select d0.customer.id as customerId, count(*) as cnt,"
+    + " sum(d0.price) as total from Order d0 where d0.customer is not null group by d0.customer.id) e0"
+    + " where e0.total > 100.0 order by e0.total desc nulls last", q.toHql().hql())
 ```
 
 - 안쪽 쿼리의 별칭은 `d0`(조인은 `dj1`, ...), 바깥 쿼리의 별칭은 `e0`입니다.
@@ -685,10 +735,10 @@ val q = qb.from(qb.from(Order::class.java)
 행의 값 하나를 select할 수도 있습니다(`.select { r -> r.customerId }`). 안쪽과 바깥의 캡처 값은 순서대로 바인딩합니다.
 안쪽 쿼리의 `limit`과 `offset`은 안쪽 쿼리에 남습니다(HQL `limit`, `offset`). 그래서 상위 행을 다시 정렬할 수 있습니다.
 
-```kotlin
-data class Priced(val id: Long?, val price: Double?)
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `derived-limit`:
 
-// 가장 비싼 주문 3개 중 가장 싼 주문
+```kotlin
+// the three most expensive orders, then the cheapest of them
 val cheapestOfTop = qb.from(qb.from(Order::class.java)
         .orderBy { o, by -> by.desc(o.price) }
         .limit(3)
@@ -723,9 +773,17 @@ Hibernate 7.4는 파생 테이블의 컬럼에 `c0`, `c1`, `c2` 같은 이름을
   lambdaQL은 데이터 클래스 속성에서 주 생성자의 순서대로 컬럼 이름을 가져옵니다.
 - 일반 클래스, `Pair`, `Triple`, 값 하나는 여기서 사용할 수 없습니다. lambdaQL이 컬럼 이름을 정할 수 없기 때문입니다. 이 경우 `TranslationException`(`LQL-3064`)이 발생합니다.
 
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `derived-row-type`:
+
+```kotlin
+// J5: a single value (or a Pair, or a class that is not a data class) has no column names
+val e = assertThrows(LambdaQLException::class.java) { qb.from(qb.from(Order::class.java).select { it.price }) }
+assertEquals("LQL-3064", e.code())
+```
+
 엔티티 쿼리에 파생 테이블을 조인하는 형태는 [파생 테이블과 CTE의 조인](#join-a-derived-table-or-cte)을 참고하십시오(D51).
 
-v0.1에 아직 없는 것: 파생 테이블끼리의 조인, update, delete, insert 안의 파생 테이블.
+지원하지 않는 것: 파생 테이블끼리의 조인, update, delete, insert 안의 파생 테이블.
 
 엔티티의 `@SQLRestriction`과 `@SoftDelete` 조건은 엔티티 조인의 `on`과 파생 테이블 안에도 Hibernate가 붙입니다(MariaDB 10.11, Oracle 23.26에서 실측). lambdaQL은 이 조건을 따로 처리하지 않습니다.
 
@@ -737,17 +795,18 @@ v0.1에 아직 없는 것: 파생 테이블끼리의 조인, update, delete, ins
 `qb.with(valueQuery)`로 `Cte<R>` 타입의 핸들을 만드십시오. 그런 다음 `qb.from(handle)`로 읽습니다.
 안쪽 쿼리는 파생 테이블(6.9)과 같습니다.
 
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `cte`:
+
 ```kotlin
 val perCustomer = qb.from(Order::class.java)
     .where { it.customer != null }
     .groupBy { it.customer?.id }
     .select { CustomerTotal(it.customer?.id, Agg.count(), Agg.sum(it.price)) }
-
 val t: Cte<CustomerTotal> = qb.with(perCustomer)
-val rows = qb.from(t).where { r -> r.cnt >= 2 }.toList()
-// HQL: with t as (select d0.customer.id as customerId, count(*) as cnt, sum(d0.price) as total
-//      from Order d0 where d0.customer is not null group by d0.customer.id)
-//      select e0.customerId, e0.cnt, e0.total from t e0 where e0.cnt >= 2L
+val q = qb.from(t).where { r -> r.cnt >= 2 }
+assertEquals("with t as (select d0.customer.id as customerId, count(*) as cnt, sum(d0.price) as total"
+    + " from Order d0 where d0.customer is not null group by d0.customer.id)"
+    + " select e0.customerId, e0.cnt, e0.total from t e0 where e0.cnt >= 2L", q.toHql().hql())
 ```
 
 **데이터베이스별 SQL(이 형태의 HQL에 대한 Hibernate SQL)** — `PlannedSqlTest`가 기록했습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `06-cte`:
@@ -777,7 +836,7 @@ MariaDB와 Oracle은 진짜 `with`를 실행합니다. 컬럼 목록은 Hibernat
 - 행 타입 규칙은 파생 테이블과 같습니다: 데이터 클래스나 record(J5).
 - 엔티티 쿼리에 CTE를 조인하는 형태는 [파생 테이블과 CTE의 조인](#join-a-derived-table-or-cte)을 참고하십시오(D51).
 - 같은 CTE를 한 쿼리에서 두 번 읽을 수 있습니다. 정의는 한 번만 씁니다([파생 테이블과 CTE의 조인](#join-a-derived-table-or-cte) 참고).
-- v0.1에 아직 없는 것: update, delete, insert 안의 CTE.
+- 지원하지 않는 것: update, delete, insert 안의 CTE.
 
 ---
 
@@ -793,22 +852,41 @@ MariaDB와 Oracle은 진짜 `with`를 실행합니다. 컬럼 목록은 Hibernat
 | J5 | 파생 테이블이나 CTE의 행 타입: **Kotlin 데이터 클래스나 Java record만**. 일반 클래스는 단순 `select`에서만 허용됩니다. 그렇지 않으면 `LQL-3064`. 조인한 파생 테이블과 CTE의 행에도 적용합니다(D51). 파생 행은 `null`과 비교할 수 없습니다(`LQL-3067`). | 구현됨 |
 | J6 | `qb.with(...)`로 만든 CTE는 select 별칭으로 컬럼 이름을 정합니다: `with t as (select d0.customer.id as customerId, ...) select e0.customerId ... from t e0`. HQL은 이름 뒤의 컬럼 목록을 받지 않습니다. Hibernate는 `with t (col list) as (...)`를 `SyntaxException`으로 거부합니다. 컬럼 목록은 Hibernate가 SQL에 직접 씁니다(MariaDB와 Oracle에서 `with t (customerId,cnt,total) as (...)`). H2는 CTE를 파생 테이블로 바꿉니다. 바깥 쿼리는 항상 별칭을 사용합니다(`from t e0`). | 구현됨 |
 | J7 | `distinct()`는 `select distinct`를 출력합니다. 정렬과 함께 쓰면 정렬 키가 select 목록에 있어야 합니다(DB 규칙). lambdaQL은 분석 시점에 이를 검사합니다. 조인 결과의 `distinct()`에서는 정렬 키가 주 엔티티 자신의 컬럼이어야 합니다(D51). | 구현됨 |
-| J8 | 조회는 정렬([4. 정렬과 페이징](04-order-paging.md)), 페이징, 서브쿼리([5. 서브쿼리](05-subquery.md))와 함께 동작합니다. 집계 기준 정렬(`by.desc(s.total)`)은 v0.2 후보입니다. | 구현됨. 집계 기준 정렬은 제외 |
+| J8 | 조회는 정렬([4. 정렬과 페이징](04-order-paging.md)), 페이징, 서브쿼리([5. 서브쿼리](05-subquery.md))와 함께 동작합니다. 그룹 쿼리의 집계 결과로 정렬하는 기능(`by.desc(s.total)`)은 없습니다. | 구현됨 |
 
-[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)의 Java 테스트 영역 `rules`가 J3, `where` 안의 `Agg`, J7, J4를 확인합니다. [이 페이지의 Java 버전](../java/06-select-group.md#611-rules-j1-to-j8)을 참고하십시오.
+J3은 [6.5](#every-non-aggregate-value-must-be-a-key-rule-j3)의 영역 `group-key-error`가 확인합니다. `where` 안의 `Agg`, J7, J4:
+
+[`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt), 영역 `rules`:
+
+```kotlin
+// aggregates belong in having, not in where
+val where = assertThrows(LambdaQLException::class.java) { qb.from(Order::class.java).where { Agg.count() > 1 } }
+assertEquals("LQL-3005", where.code())
+// J7: with distinct, the sort key must be selected
+val j7 = assertThrows(LambdaQLException::class.java) {
+    qb.from(Order::class.java).orderBy { o, by -> by.asc(o.id) }.select { it.price }.distinct().toHql()
+}
+assertEquals("LQL-3046", j7.code())
+// J4: sum over no rows is NULL; the non-null parameter of StrictTotal(val total: Double) cannot take it
+assertThrows(IllegalStateException::class.java) {
+    qb.from(Order::class.java).where { it.status.toInt() == 9 }.select { StrictTotal(Agg.sum(it.price)) }.toList()
+}
+```
 
 ---
 
 <a id="612-not-in-v01"></a>
 ## 6.12 v0.1에 없는 것
 
-| 항목 | 상태 |
+이 장의 기능에는 다음이 없습니다.
+
+| 항목 | 비고 |
 |---|---|
-| 집계 결과나 select 별칭으로 정렬(예: `orderBy { s, by -> by.desc(s.total) }`), 그룹 쿼리의 `orderBy` | v0.2 후보 |
-| 사용자 집계 함수와 윈도 함수 | v0.2 후보 |
-| insert의 조인, 엔티티 4개 이상, 서브쿼리 안의 엔티티 3개 이상 | 이후 |
-| update, delete의 조인 | 추가하지 않음(D51). 연관 경로(U9)나 `sub`(D49) 사용 |
-| DML 안의 파생 테이블과 CTE | 이후 |
+| 집계 결과나 select 별칭으로 정렬(예: `orderBy { s, by -> by.desc(s.total) }`), 그룹 쿼리의 `orderBy` | |
+| 사용자 집계 함수와 윈도 함수 | |
+| insert의 조인, 엔티티 4개 이상, 서브쿼리 안의 엔티티 3개 이상 | |
+| update, delete의 조인 | 추가하지 않기로 함(D51). 연관 경로(U9)나 `sub`(D49) 사용 |
+| DML 안의 파생 테이블과 CTE | |
 
 이 장의 오류는 코드가 붙은 `TranslationException`입니다. 잘못된 그룹 키(J3)는 `LQL-3035`, `where` 안의 `Agg`는 `LQL-3005`, `distinct`에서 select하지 않은 정렬 키(J7)는 `LQL-3046`, 파생 테이블이나 CTE의 행 타입(J5)은 `LQL-3064`입니다. [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
 
