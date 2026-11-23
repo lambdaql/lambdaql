@@ -1,12 +1,9 @@
 <a id="lambdaql-manual-kotlin-track"></a>
 # lambdaQL Manual: Kotlin track
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/README.md) for the latest rules.
-
 **Other languages:** English | [한국어](../../ko/kotlin/README.md) | [日本語](../../ja/kotlin/README.md) | [简体中文](../../zh/kotlin/README.md)
 
-[Manual home](../README.md) | [Java track](../java/README.md) | Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
+[Manual home](../README.md) | [Java track](../java/README.md) | Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md) · [13. Spring Boot 3 and 4](../13-spring-boot-versions.md)
 
 This is the **Kotlin track** of the lambdaQL manual. Every page in this track has **only Kotlin code**.
 If you write your queries in Java, read the [Java track](../java/README.md). Both tracks have the same chapter numbers and file names (only chapter 9 is different), so you can switch at any time.
@@ -73,6 +70,7 @@ fetch first ? rows only
 | 10 | [Rules and limits](10-rules-and-limits.md) | All rule tables in one place |
 | 11 | [Errors and languages](../11-errors-and-languages.md) (common) | Error codes, exceptions, message language, logging |
 | 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`, repository methods with a body, DML shortcuts (`deleteAll`, `updateOne`, ...), Spring `Sort` and `Pageable`, modules, transactions, Kotlin 2.2 / `-Xjvm-default=all` |
+| 13 | [Spring Boot 3 and 4](../13-spring-boot-versions.md) (common) | Version table, artifacts (common jars and the `-boot3` and `-boot4` starters), SQL differences between Hibernate 6.6 and 7.4, what is verified |
 
 <a id="where-to-start"></a>
 ## Where to start
@@ -102,7 +100,7 @@ Most properties are nullable `var` properties, because a database column can be 
 | Kotlin | In a lambdaQL lambda |
 |---|---|
 | `it.price!! > 100.0` | `!!` is ignored. It is only there so that the code compiles. There is no `NullPointerException`, because the lambda never runs. |
-| `it.customer?.name == "Kim"` | `it.customer?.name` names a column of the joined customer. In `where` it is an inner `join` by default: orders without a customer are not returned. A null guard (`it.customer == null \|\| ...`) does not change this (D48). To keep these orders, use `leftJoin`. `it.customer!!.name` means the same column. |
+| `it.customer?.name == "Kim"` | `it.customer?.name` names a column of the joined customer. This condition cannot match an order without a customer, so it is an inner `join`, and orders without a customer are not returned. `?.` becomes a `left join` when an order without a customer can make the condition true (`it.status == 1 \|\| ...`, `it.customer?.name == null`) (D54). `it.customer!!.name` is the same column, but it is always an inner join. |
 | `it.status == 1` with `status: Int?` | `e0.status = 1`. A NULL `status` does not match (SQL meaning). lambdaQL ignores the null checks that the Kotlin compiler adds. Only the null checks **you write** count. |
 
 Details: [9. Kotlin notes](09-kotlin-notes.md).
@@ -114,9 +112,9 @@ Details: [9. Kotlin notes](09-kotlin-notes.md).
 |---|---|
 | Kotlin | 2.x (the design was checked with kotlinc 1.7.22, 2.1.10, 2.2.21, 2.3.0 and 2.3.21) |
 | Java (JVM) | 21 |
-| Hibernate ORM | 7.4 (tested with 7.4.13 from Spring Boot 4.1.2) |
+| Hibernate ORM | 6.6 or 7.4 (tested with 6.6.53 and 7.4.13) |
 | Databases verified in the design | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
-| Spring Boot (optional) | 4.1 (tested with 4.1.2, Java tests). Spring Boot 3 is not verified in this edition |
+| Spring Boot (optional) | 3.5 or 4.1 (tested with 3.5.16 and 4.1.2, Java tests). See [13. Spring Boot 3 and 4](../13-spring-boot-versions.md) |
 
 <a id="other-languages"></a>
 ## Other languages

@@ -1,9 +1,6 @@
 <a id="lambdaql-user-manual-english"></a>
 # lambdaQL 用户手册（简体中文）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../ko/README.md)。
-
 **其他语言：** [English](../en/README.md) | [한국어](../ko/README.md) | [日本語](../ja/README.md) | [简体中文](../zh/README.md)
 
 lambdaQL 是一个面向 Java 和 Kotlin 的查询库。
@@ -96,6 +93,7 @@ fetch first ? rows only
 |---|---|
 | [1. 概述](01-overview.md) | lambdaQL 是什么、为什么需要它、它如何工作、设计原则 |
 | [11. 错误与语言](11-errors-and-languages.md) | 错误码、异常、消息语言、日志 |
+| [13. Spring Boot 3 与 4](13-spring-boot-versions.md) | 版本表、构件、Hibernate 6.6 与 7.4 的 SQL 差异、验证范围 |
 
 <a id="table-of-contents"></a>
 ## 目录
@@ -115,6 +113,7 @@ fetch first ? rows only
 | 10 | 规则与限制：完整的规则表 | [Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md) |
 | 11 | 错误与语言（公共） | [11-errors-and-languages.md](11-errors-and-languages.md) | [11-errors-and-languages.md](11-errors-and-languages.md) |
 | 12 | Spring Data JPA：`LambdaQlExecutor<T>`、DML 快捷方法、Spring `Sort` 和 `Pageable`、模块、事务、`QueryBuilder` bean | [Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md) |
+| 13 | Spring Boot 3 与 4（公共）：版本、构件、Hibernate 6.6 与 7.4 的 SQL 差异 | [13-spring-boot-versions.md](13-spring-boot-versions.md) | [13-spring-boot-versions.md](13-spring-boot-versions.md) |
 
 <a id="about-the-examples"></a>
 ## 关于示例
@@ -141,9 +140,9 @@ fetch first ? rows only
 |---|---|
 | Java | 21 |
 | Kotlin | 2.x |
-| Hibernate ORM | 7.4（已用 Spring Boot 4.1.2 中的 7.4.13 测试） |
-| 已验证的数据库 | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
-| Spring Boot（可选） | 4.1（已用 4.1.2 测试）。本版未验证 Spring Boot 3 |
+| Hibernate ORM | 6.6 或 7.4（已用 6.6.53、7.4.13 测试） |
+| 已验证的数据库 | H2 2.3、MariaDB 10.11、MySQL 8.4、PostgreSQL 17、Oracle 23.26 (23ai) |
+| Spring Boot（可选） | 3.5 或 4.1（已用 3.5.16、4.1.2 测试）。见 [13. Spring Boot 3 与 4](13-spring-boot-versions.md) |
 
 <a id="folder-layout"></a>
 ## 目录结构

@@ -1,9 +1,6 @@
 <a id="11-errors-and-languages"></a>
 # 11. エラーと言語
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../ko/11-errors-and-languages.md)を参照してください。
-
 [マニュアルのホーム](README.md) | トラック: [Java](java/README.md) | [Kotlin](kotlin/README.md) | 前: 10. ルールと制限（[Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md)） | 次: 12. Spring Data JPA（[Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md)）
 
 このページは両方の言語向けです。コードは **Java** と **Kotlin** の別々のセクションに分けて載せています。
@@ -31,7 +28,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-2xxx` | バイトコードのデコード | `LQL-2001`〜`LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | 意味の解釈と Java で計算する値 | `LQL-3001`〜`LQL-3067` | `TranslationException`（`LQL-3066` はサブクラスの `NonSargableException`） |
 | `LQL-4xxx` | 生成、バインド、実行 | `LQL-4001`〜`LQL-4045`、`LQL-4999`（内部エラー） | `LambdaQLException` そのもの、または JDK/JPA の標準例外（[例外](#exceptions) を参照）。`LQL-4045` は `WARN` ログ（同じ基本型へのアンボクシングだけがある比較は `DEBUG`） |
-| `LQL-5xxx` | 警告（ログに出力） | `LQL-5001`〜`LQL-5013` | –（ログ 1 行。レベルは `WARN`。`LQL-5004`〜`LQL-5006`、`LQL-5008` と、デフォルトのソートモードの `LQL-5003` は `INFO`、`LQL-5009`〜`LQL-5011`、`LQL-5013` は `DEBUG`） |
+| `LQL-5xxx` | 警告（ログに出力） | `LQL-5001`〜`LQL-5014` | –（ログ 1 行。レベルは `WARN`。`LQL-5004`〜`LQL-5006`、`LQL-5008` と、デフォルトのソートモードの `LQL-5003` は `INFO`、`LQL-5009`〜`LQL-5011`、`LQL-5013` は `DEBUG`） |
 
 実際のコードの例:
 
@@ -55,19 +52,20 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-4043` | `LambdaQLException` | {0} のスタブ引数は、データベースの引数と名前が同じで順序だけが違います。スタブ: {1}、データベース: {2} |
 | `LQL-4044` | `LambdaQLException` | Oracle パッケージにこの名前のプロシージャが複数あります（オーバーロード）。どれを呼ぶか区別できません: {0} |
 | `LQL-4045` | –（実行時の `WARN` ログ。同じ基本型へのアンボクシングを経た比較は `DEBUG`） | {0} でキャプチャした値が null です。SQL では = NULL と <> NULL はどの行にも合いません。ラムダで x == null を使うか、クエリの前に値を確認してください。 |
-| `LQL-5001` | –（`WARN` ログ） | 関数 {0} が列 {1} に適用されているため、列の通常のインデックスを使えず、全件スキャンになることがあります。列を値と比較する形に変えるか、（Oracle）関数ベースのインデックスを作ってください: {2} |
+| `LQL-5001` | –（`WARN` ログ） | 関数 {0} が列 {1} に適用されているため、列の通常のインデックスを使えず、全件スキャンになることがあります。列を値と比較する形に変えるか、（Oracle、PostgreSQL）同じ式の関数ベースのインデックスを作ってください: {2} |
 | `LQL-5002` | –（`WARN` ログ） | limit のないサブクエリのソートは結果に影響しないため削除しました（Q4）: {0} |
 | `LQL-5003` | –（`INFO` または `WARN` ログ） | 外部からのソートが {0} のソート規則にありません: {1}。今は実行しますが、SortMode.STRICT では拒否されます。 |
 | `LQL-5004` | –（`INFO` ログ） | クラスファイルにスタブ引数の名前がないため、{0} の引数の順序を確認しません。-parameters（Kotlin: -java-parameters）でコンパイルするか、@DbParam を使ってください。 |
 | `LQL-5005` | –（`INFO` ログ） | データベースのメタデータから {0} の引数を読めませんでした（{1}）。スタブは照合せず、IN・INOUT はスタブの順、その後に OUT 引数が来るとみなします。 |
 | `LQL-5006` | –（`INFO` ログ） | {0} のオーバーロードを確認できませんでした（{1}）。確認せずに呼び出します。 |
-| `LQL-5007` | –（`WARN` ログ） | MariaDB の関数 {0} は NOT DETERMINISTIC のため行ごとに計算され、比較する列のインデックスが範囲検索に使われません。決定的な関数なら DETERMINISTIC と宣言してください: {1} |
+| `LQL-5007` | –（`WARN` ログ） | 関数 {0} は NOT DETERMINISTIC（MariaDB、MySQL）または VOLATILE（PostgreSQL）のため行ごとに計算され、比較する列のインデックスが使われません。結果が引数だけで決まるなら DETERMINISTIC（MariaDB、MySQL）または STABLE・IMMUTABLE（PostgreSQL）と宣言してください: {1} |
 | `LQL-5008` | –（`INFO` ログ） | {0} のインデックス・関数のメタデータを読めませんでした（{1}）。メタデータなしで SARGable の確認を続けます。 |
 | `LQL-5009` | –（`DEBUG` ログ） | SQL の意味: {0} では値が NULL の行は条件に合いません（Java の null の扱いとは異なります）。含めるには `x == null \|\| ...` のように null の確認を書いてください。 |
 | `LQL-5010` | –（`DEBUG` ログ） | 列 {0} は @Lob の列です。一部のデータベース（例: Oracle）は LOB を {1} に使えません。 |
 | `LQL-5011` | –（`DEBUG` ログ） | 列挙型の列 {0} は文字列として保存されている（@Enumerated(STRING)）ため、データベースは宣言順ではなく名前順でソートします。 |
 | `LQL-5012` | –（`WARN` ログ） | 列 {0} に演算をかけると条件がインデックスを使えません。同じ意味のまま値の側に移してください。小数で割り（o.getQty() * 2 > n の代わりに o.getQty() > n / 2.0。n / 2 は整数除算）、負の数を掛けた場合は比較の向きを逆にしてください: {1} |
 | `LQL-5013` | –（`DEBUG` ログ） | 条件が列 {0} を計算するため、その列のインデックスを使えません: {1} |
+| `LQL-5014` | –（`WARN` ログ） | Kotlin: 関連 {0} をある箇所では ?. で、別の箇所では !! か印なしで読んでいるため inner join になり、関連のない行は除かれます。その行を残すにはすべて ?. で、そうでなければすべて !! で書いてください: {1} |
 
 `{0}` と `{1}` は引数です。たとえば式やプロシージャ名が入ります。
 一覧はメッセージファイルにあります（[翻訳者向け](#for-translators) を参照）。
@@ -407,19 +405,20 @@ lambdaQL は **SLF4J API** を通してログを出します。
 | コード | いつ |
 |---|---|
 | `LQL-4045` | `=`・`<>`（`==`、`!=`、`equals`、`Objects.equals`）でキャプチャした値が `null` のため、合う行がないとき（SQL の意味、決定 D48）。実行するときにだけ分かる。`WARN` レベルで出る。大小比較のように同じ基本型へのアンボクシング（`min.doubleValue()`）を経た場合は `DEBUG` レベル。NULL を探すには `x == null`（3.6 を参照: [Java](java/03-where.md#36-null-rules) \| [Kotlin](kotlin/03-where.md#36-null-rules)） |
-| `LQL-5001` | 条件で DB 関数がカラムを包んでいるとき（`OrderFns.discount(o.getPrice()) > 10`、カラムに対する Boolean の関数、`IN` や `IS NULL` の中の関数）。通常のインデックスを使えない。`where` のラムダごとに 1 回、`WARN` レベルで出る。Oracle で同じ式の関数ベースのインデックスがあれば出ない（[8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) を参照） |
+| `LQL-5001` | 条件で DB 関数がカラムを包んでいるとき（`OrderFns.discount(o.getPrice()) > 10`、カラムに対する Boolean の関数、`IN` や `IS NULL` の中の関数）。通常のインデックスを使えない。`where` のラムダごとに 1 回、`WARN` レベルで出る。Oracle や PostgreSQL で同じ式の関数ベース（式）インデックスがあれば出ない（[8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) を参照） |
 | `LQL-5002` | サブクエリに `orderBy` があって `limit` がないため、lambdaQL がソートを取り除くとき（ソートは結果に影響しない、ルール Q4） |
 | `LQL-5003` | 外部のソート（Spring の `Sort`、`SortSpec.ofPath`）がソートのルールにない名前を使い、モードが `SortMode.INFO`（デフォルト、`INFO` レベルで出る）か `SortMode.WARN`（`WARN` レベルで出る）のとき。ソートは実行される。エンティティと名前ごとに 1 回出る（[4.10 ソートポリシー](java/04-order-paging.md#sort-policy) を参照） |
 | `LQL-5004` | クラスファイルにプロシージャのスタブの引数名がなく（`-parameters`、Kotlin の `-java-parameters` なしでコンパイルし、`@DbParam` もない）、隣り合う 2 つの引数の型が同じとき。プロシージャごとに 1 回、`INFO` レベルで出る（[8.4](java/08-procedures-functions.md#84-warning-argument-order) を参照） |
 | `LQL-5005` | プロシージャのメタデータを読めないとき（たとえばディクショナリビューや `information_schema` の権限がなく、取得が失敗する）。スタブは照合せず、引数の並びはスタブから取る。プロシージャごとに 1 回、`INFO` レベルで出る（[8.4](java/08-procedures-functions.md#when-the-metadata-cannot-be-read) を参照） |
 | `LQL-5006` | Oracle のオーバーロードの取得（`all_arguments`）だけが失敗したとき。オーバーロードのチェックなしで呼び出す。`INFO` レベルで出る |
-| `LQL-5007` | MariaDB のみ: 値の側の `NOT DETERMINISTIC` な DB 関数をカラムと比べるとき（`o.getPrice() > OrderFns.nondet(base)`）。インデックスが範囲検索に使われない。`WARN` レベルで出る |
+| `LQL-5007` | 値の側の DB 関数が MariaDB・MySQL で `NOT DETERMINISTIC`、PostgreSQL で `VOLATILE` のとき、その値をカラムと比べると（`o.getPrice() > OrderFns.nondet(base)`）。関数を行ごとに計算するため、比較するカラムのインデックスが使われない（3 つの DB の実行計画で確認）。`WARN` レベルで出る |
 | `LQL-5008` | SARGable の確認のためのインデックスや関数のメタデータを読めないとき（たとえば権限がない）。`INFO` レベルで出る。`LQL-5001` はそのまま出し、`LQL-5007` は確認しない |
 | `LQL-5009` | 条件がエンティティの値を SQL の意味で比べるため（決定 D48）、Java や Kotlin なら合う NULL の行が外れることがあるとき: エンティティの値どうしの `==`/`equals`、値との `!=`、NULL になりうる `Boolean` の `!`、関連のパスの null ガード（パスは INNER JOIN のまま）、サブクエリの `NOT IN`。条件の文ごとに 1 回、`DEBUG` レベルで出る（3.6.3 を参照: [Java](java/03-where.md#363-write-your-null-checks-yourself) \| [Kotlin](kotlin/03-where.md#363-write-your-null-checks-yourself)） |
 | `LQL-5010` | `@Lob` カラムを `order by`、`distinct`、`group by` に使うとき。H2 と MariaDB は実行するが、Oracle は拒否する（ORA-22848、ORA-22849）。`=` の比較は 3 つのデータベースすべてで動く。lambdaQL はクエリを変えない。カラムと使い方ごとに 1 回、`DEBUG` レベルで出る（[4.5](java/04-order-paging.md#45-what-a-sort-key-can-be) を参照） |
 | `LQL-5011` | `@Enumerated(EnumType.STRING)` の enum カラムでソートするとき。データベースは名前順、Java・Kotlin は宣言順でソートするので、順序が異なることがある。lambdaQL はクエリを変えない。カラムごとに 1 回、`DEBUG` レベルで出る。`ORDINAL` では出ない（[4.5](java/04-order-paging.md#45-what-a-sort-key-can-be) を参照） |
 | `LQL-5012` | カラム 1 つと値だけの演算（`+ - * /`）が条件のカラム側にあるとき（`o.getCnt() * 2 > n`）。値の側に移せる。`WARN` レベルで出る。`SargableMode.STRICT` ではエラー `LQL-3066`（決定 D50、[8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) を参照） |
 | `LQL-5013` | カラムどうしの演算や `%` が条件にあるとき（`o.getPrice() * o.getCnt() > n`）。移せないので `DEBUG` レベルでだけ出る。`STRICT` でも許可 |
+| `LQL-5014` | Kotlin のみ: `where` で同じ関連の段階を、ある箇所では `?.` で、別の箇所では `!!` か印なしでたどるとき（`it.customer?.name == "Kim" \|\| it.customer!!.grade!! > 3`）。その段階は内部結合になり、関連のない行が除かれる。条件ごとに 1 回、`WARN` レベルで出る（決定 D54、[3.10](kotlin/03-where.md#310-association-paths) を参照） |
 
 ```
 WARN  [LQL-5002] limit のないサブクエリのソートは結果に影響しないため削除しました（Q4）: ...
@@ -436,7 +435,7 @@ WARN  [LQL-5002] limit のないサブクエリのソートは結果に影響し
 - SARGable（決定 D50）: `SargableMode.STRICT` では、`LQL-5001`、`LQL-5007`、`LQL-5012` の場合に `NonSargableException`（`LQL-3066`）が発生します。
 
 > [!NOTE]
-> `lambdaql-core` は Spring に依存しません。ログの依存関係は `slf4j-api` 1 つだけなので、ログの実装は利用者が選びます。Spring モジュール（`lambdaql-spring-data-jpa`、`lambdaql-spring-boot-starter`）は Spring Data JPA を持ち込み、スターターはさらに `spring-boot-starter-data-jpa` と Logback も持ち込みます。
+> `lambdaql-core` は Spring に依存しません。ログの依存関係は `slf4j-api` 1 つだけなので、ログの実装は利用者が選びます。`lambdaql-spring-data-jpa` はプロジェクトの Spring Data JPA をそのまま使います。スターター（`lambdaql-spring-boot-starter-boot3`・`-boot4`）は `spring-boot-starter-data-jpa` と Logback も持ち込みます。
 
 <a id="summary"></a>
 ## まとめ

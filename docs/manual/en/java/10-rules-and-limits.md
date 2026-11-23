@@ -1,9 +1,6 @@
 <a id="10-rules-and-limits-java"></a>
 # 10. Rules and limits (Java)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/java/10-rules-and-limits.md) for the latest rules.
-
 [Java track](README.md) | [Manual home](../README.md) | Previous: [9. Java notes](09-java-notes.md) | Next: [11. Errors and languages](../11-errors-and-languages.md) | [Kotlin version of this page](../kotlin/10-rules-and-limits.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -506,9 +503,9 @@ List<Order> list = flag
 | Item | Version |
 |---|---|
 | Java | 21 (javac). ECJ is not guaranteed |
-| Hibernate | 7.4 (tested with 7.4.13). HQL extensions are used (for example `function(...)` and `nulls first`), so other JPA providers are not guaranteed |
+| Hibernate | 6.6 or 7.4 (tested with 6.6.53 and 7.4.13). HQL extensions are used (for example `function(...)` and `nulls first`), so other JPA providers are not guaranteed |
 | Databases | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
-| Spring | Spring Boot 4.1.2 and Spring Data JPA 4.1.2 (the Spring module, [12](12-spring-data-jpa.md)). Spring Boot 3 is not verified in this edition |
+| Spring | Spring Boot 3.5.16 (Spring Data JPA 3.5.13) and 4.1.2 (Spring Data JPA 4.1.2) (the Spring modules, [12](12-spring-data-jpa.md), [13](../13-spring-boot-versions.md)) |
 | Not tested | PostgreSQL, SQL Server, Oracle 19c and older (for example PL/SQL `BOOLEAN` parameters) |
 
 ---

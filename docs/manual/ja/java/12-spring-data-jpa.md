@@ -1,10 +1,7 @@
 <a id="12-spring-data-jpa-java"></a>
 # 12. Spring Data JPA（Java）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/12-spring-data-jpa.md)を参照してください。
-
-[Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [11. エラーと言語](../11-errors-and-languages.md) | [このページの Kotlin 版](../kotlin/12-spring-data-jpa.md)
+[Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [11. エラーと言語](../11-errors-and-languages.md) | 次: [13. Spring Boot 3 と 4](../13-spring-boot-versions.md) | [このページの Kotlin 版](../kotlin/12-spring-data-jpa.md)
 
 ---
 
@@ -26,17 +23,17 @@ Spring Data JPA では、リポジトリのインターフェースを書きま�
 <a id="122-modules"></a>
 ## 12.2 モジュール
 
-lambdaQL には 3 つの成果物（アーティファクト）があります。コアは Spring に依存しないので、素の JPA でも使えます。
+コアは Spring に依存しないので、素の JPA でも使えます。`lambdaql-core` と `lambdaql-spring-data-jpa` は Spring Boot 3・4 共通で、スターターだけが Spring Boot のバージョンごとに別にあります（名前の末尾 `-boot3`、`-boot4`、[13. Spring Boot 3 と 4](../13-spring-boot-versions.md)）。
 
 | 成果物 | 内容 | 必要になるとき |
 |---|---|---|
-| `lambdaql-core` | エンジンと `QueryBuilder`。Spring には依存しません | 常に。ほかの 2 つの成果物がこれを持ち込みます |
-| `lambdaql-spring-data-jpa` | `LambdaQlExecutor<T>`、その Spring Data への登録、Spring Boot の自動構成（`QueryBuilder` の Bean） | Spring Boot なしで Spring Data JPA を使うとき |
-| `lambdaql-spring-boot-starter` | コードはありません。`lambdaql-spring-data-jpa` と `spring-boot-starter-data-jpa` を持ち込みます | Spring Boot を使うとき |
+| `lambdaql-core` | エンジンと `QueryBuilder`。Spring には依存しません。Spring Boot 3・4 共通 | 常に。下の成果物がこれを持ち込みます |
+| `lambdaql-spring-data-jpa` | `LambdaQlExecutor<T>`、その Spring Data への登録、Spring Boot の自動構成（`QueryBuilder` の Bean）。Spring Data JPA 3.5・4.1 共通。Spring Data JPA はプロジェクトのものを使います | Spring Boot なしで Spring Data JPA を使うとき |
+| `lambdaql-spring-boot-starter-boot4`、`lambdaql-spring-boot-starter-boot3` | コードはありません。`lambdaql-spring-data-jpa` と、その Boot バージョンの `spring-boot-starter-data-jpa` を持ち込みます | Spring Boot を使うとき（プロジェクトの Boot バージョンに合わせる） |
 
 成果物は **まだ Maven Central に公開していません**。先にソースからビルドし、ローカルの Maven リポジトリに公開してください（[2. はじめよう](02-getting-started.md#build-from-source) を参照）。バージョンは `1.0.0` です。
 
-Spring Boot を使う場合、Gradle（Groovy DSL）:
+Spring Boot 4 を使う場合の Gradle（Groovy DSL）。Spring Boot 3 なら名前の末尾を `-boot3` に変えてください:
 
 ```groovy
 repositories {
@@ -45,7 +42,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.lambdaql:lambdaql-spring-boot-starter:1.0.0'
+    implementation 'org.lambdaql:lambdaql-spring-boot-starter-boot4:1.0.0'
 }
 ```
 
@@ -54,12 +51,12 @@ Maven:
 ```xml
 <dependency>
   <groupId>org.lambdaql</groupId>
-  <artifactId>lambdaql-spring-boot-starter</artifactId>
+  <artifactId>lambdaql-spring-boot-starter-boot4</artifactId>
   <version>1.0.0</version>
 </dependency>
 ```
 
-Spring Boot を使わない場合は、自分の Spring Data JPA の構成（Hibernate と JDBC ドライバー）に `lambdaql-spring-data-jpa` を追加します。これは `lambdaql-core` と Spring Data JPA を持ち込みます。
+Spring Boot を使わない場合は、自分の Spring Data JPA の構成（Spring Data JPA、Hibernate、JDBC ドライバー）に `lambdaql-spring-data-jpa` を追加します。これは `lambdaql-core` を持ち込み、Spring Data JPA はプロジェクトにあるもの（3.5 または 4.1）を使います。
 
 ```groovy
 dependencies {
@@ -80,9 +77,9 @@ dependencies {
 | 項目 | バージョン |
 |---|---|
 | Java | 21 |
-| Spring Boot | 4.1（4.1.2 でテスト済み）。Spring Boot 3 はこの版では検証していません |
-| Spring Data JPA | 4.1（4.1.2 でテスト済み） |
-| Hibernate | 7.4（Spring Boot 4.1 にすでに含まれています） |
+| Spring Boot | 3.5 または 4.1（3.5.16、4.1.2 でテスト済み） |
+| Spring Data JPA | 3.5 または 4.1（3.5.13、4.1.2 でテスト済み） |
+| Hibernate | 6.6 または 7.4（Spring Boot にすでに含まれています） |
 
 Spring Data JPA 3.3 以前は **サポートしません**。lambdaQL は実行器を `META-INF/spring.factories` に登録しますが、Spring Data がこのファイルからリポジトリのフラグメントを読むのは 3.4 からです。
 
@@ -387,7 +384,7 @@ lambdaQL は、各 `Sort.Order` を `SortSpec.ofPath` で 1 つのソートキ�
 
 | Spring | lambdaQL での扱い |
 |---|---|
-| プロパティ名（`"grade"`、`"team.name"`） | Spring Data 自身のリポジトリと同じく、Spring Data の `PropertyPath` でチェックします。知らない名前なら `PropertyReferenceException` になります。パスは、エンティティではなく基本型の値で終わる必要があります。`team.name` のような to-one のパスは `left join` を使うので、チームのない行も残ります。その後、ソートポリシーが名前をチェックします（[下](#sort-policy-with-spring) を参照） |
+| プロパティ名（`"grade"`、`"team.name"`） | Spring Data 自身のリポジトリと同じく、Spring Data の `PropertyPath` でチェックします。知らない名前なら `PropertyReferenceException` になります（パッケージ: Spring Data 3 は `org.springframework.data.mapping`、4 は `org.springframework.data.core`）。パスは、エンティティではなく基本型の値で終わる必要があります。`team.name` のような to-one のパスは `left join` を使うので、チームのない行も残ります。その後、ソートポリシーが名前をチェックします（[下](#sort-policy-with-spring) を参照） |
 | ソートポリシーのエイリアス（`"level"`） | `PropertyPath` のチェックをせず、そのまま渡します。ソートポリシーがパスに変えます |
 | `NullHandling.NATIVE`（デフォルト）での `ASC` / `DESC` | lambdaQL の NULL のルールです。昇順では NULL が先頭、降順では NULL が末尾です。順序はどのデータベースでも同じです（[4.4](04-order-paging.md#44-null-ordering-is-the-same-on-every-database) を参照） |
 | `NullHandling.NULLS_FIRST` / `NULLS_LAST` | 書いたとおりに使います（`ASC_NULLS_FIRST`、`DESC_NULLS_LAST` など） |
@@ -402,8 +399,9 @@ Spring Data JPA 自身のリポジトリは、`NATIVE` の NULL の位置をデ�
 List<Member> rows = repository.findAll(m -> m.isActive(),
         Sort.by(Sort.Order.desc("grade"), Sort.Order.asc("team.name"), Sort.Order.asc("id")));
 // a property that does not exist: the same error as Spring Data's own repositories
-assertThrows(PropertyReferenceException.class,
+RuntimeException unknown = assertThrows(RuntimeException.class,
         () -> repository.findAll(m -> m.isActive(), Sort.by("nickname")));
+assertEquals("PropertyReferenceException", unknown.getClass().getSimpleName());
 ```
 
 `findAll(where, pageable)` でのページング:
@@ -628,10 +626,10 @@ Kotlin で書いたリポジトリには、いくつかのコンパイラー設�
 <a id="1210-not-implemented-yet"></a>
 ## 12.10 まだ実装されていないもの
 
-- **Spring Boot のバージョン。** この版は Spring Boot 4.1.2 でテストしています。自動構成は Spring Boot 3 のクラス名も書いていますが、Spring Boot 3 はこの版では検証していません。
+- **Spring Boot のバージョン。** Spring Boot 3.5.16 と 4.1.2 でテストしています。同じテストを両方のバージョンで実行します（[13. Spring Boot 3 と 4](../13-spring-boot-versions.md)）。
 - Spring の `Sort` の **`ignoreCase()`**。
 - **Kotlin のリポジトリ** はまだテストしていません。
 
 ---
 
-[Java トラック](README.md) | 前: [11. エラーと言語](../11-errors-and-languages.md) | [このページの Kotlin 版](../kotlin/12-spring-data-jpa.md)
+[Java トラック](README.md) | 前: [11. エラーと言語](../11-errors-and-languages.md) | 次: [13. Spring Boot 3 と 4](../13-spring-boot-versions.md) | [このページの Kotlin 版](../kotlin/12-spring-data-jpa.md)

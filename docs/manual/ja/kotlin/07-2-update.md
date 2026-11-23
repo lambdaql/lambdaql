@@ -1,9 +1,6 @@
 <a id="72-update"></a>
 # 7.2 更新（Kotlin）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/07-2-update.md)を参照してください。
-
 [7. 更新、挿入、削除（Kotlin）](07-dml.md) | **7.2 更新** | [7.4 削除](07-4-delete.md) | [7.5 挿入](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Java](../java/07-2-update.md)
 
 ---
@@ -168,6 +165,39 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 
 注文に顧客がない場合、`custName` は NULL になります。
 `where` では lambdaQL が `e0.customer.id is not null` を加えます。そのため、更新の対象行は `qb.from(Order::class.java).where { 同じラムダ }` の結果と同じです（決定 D36）。Java のテストでこれを確認しています。
+
+**`?.` と `||`。** 選択で `?.` でたどった段階が `left join` になる条件なら（決定 D54、[3.10](03-where.md#310-association-paths) を参照）、DML は `e0.customer.id is not null` を加えません。
+そのため、顧客のない注文も選択とまったく同じように更新の対象になります。上の例のように `?.` だけがあり、顧客のない行が条件を真にできない場合は、確認をそのまま残します。
+
+**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `update-safe-call`:
+
+```kotlin
+// UPDATE: the left join of ?. drops the "customer exists" check, so the order without a customer is changed too
+val u = qb.update(Order::class.java)
+    .set { it.status = st }
+    .where { it.status.toInt() == 1 || it.customer?.name == "Kim" }
+assertEquals("update Order e0 set e0.status = :p1"
+    + " where e0.status = 1 or (select s1.name from Customer s1 where s1.id = fk(e0.customer)) = 'Kim'", u.toHql().hql())
+```
+
+**データベースごとの SQL（Kotlin のリージョンの HQL をそのまま実行した結果）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `update-safe-call`:
+
+```sql
+-- H2
+update orders o1_0
+set status=?
+where o1_0.status=1 or (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)='Kim'
+
+-- MariaDB
+update orders
+set status=?
+where status=1 or (select c1_0.name from customers c1_0 where c1_0.id=orders.customer_id)='Kim'
+
+-- Oracle
+update orders o1_0
+set o1_0.status=?
+where o1_0.status=1 or (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)='Kim'
+```
 
 <a id="an-aggregate-from-a-subquery"></a>
 ## サブクエリの集約

@@ -1,9 +1,6 @@
 <a id="2-getting-started-java"></a>
 # 2. はじめよう（Java）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/02-getting-started.md)を参照してください。
-
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [1. 概要](../01-overview.md) | 次: [3. 条件](03-where.md) | [このページの Kotlin 版](../kotlin/02-getting-started.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -16,10 +13,10 @@
 | 項目 | バージョン | 注意 |
 |---|---|---|
 | Java | 21 | lambdaQL のビルドと利用に必要です。 |
-| JPA プロバイダー | Hibernate ORM 7.4 | lambdaQL は Hibernate 7 の HQL を組み立てます。7.4.13 でテストしました。他の JPA プロバイダーはサポートしていません。 |
-| Jakarta Persistence | 3.2 | Hibernate 7.4 に含まれています。 |
-| データベース | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) | この 3 つで検証しました。他のデータベースでも動くかもしれませんが、テストはしていません。 |
-| Spring Boot | 4.1 | 任意です。プロジェクトのテストは Spring Boot 4.1.2 を使います。 |
+| JPA プロバイダー | Hibernate ORM 6.6 または 7.4 | lambdaQL は Hibernate の HQL を組み立てます。6.6.53（Spring Boot 3.5.16）と 7.4.13（Spring Boot 4.1.2）でテストしました。他の JPA プロバイダーはサポートしていません。[13. Spring Boot 3 と 4](../13-spring-boot-versions.md) を参照してください。 |
+| Jakarta Persistence | 3.1 または 3.2 | Hibernate 6.6 は 3.1、7.4 は 3.2 を使います。 |
+| データベース | H2 2.3、MariaDB 10.11、MySQL 8.4、PostgreSQL 17、Oracle 23.26 (23ai) | この 5 つで検証しました。マニュアルのデータベースごとの SQL は H2、MariaDB、Oracle のものです。他のデータベースでも動くかもしれませんが、テストはしていません。 |
+| Spring Boot | 3.5 または 4.1 | 任意です。プロジェクトのテストは Spring Boot 3.5.16 と 4.1.2 を使います。 |
 | コンパイラー | javac | ECJ（Eclipse のコンパイラー）でコンパイルしたラムダは保証しません。[9. Java の注意点](09-java-notes.md#912-compiler-and-build) を参照してください。 |
 
 <a id="build-from-source"></a>
@@ -34,7 +31,7 @@ cd lambdaql
 - Gradle ラッパーは 9.9.1 です。リポジトリには `gradle/gradle-daemon-jvm.properties` があるので、Gradle デーモンは Java 21 を使います。
 - ビルドには JDK 21 と **JDK 24 以上** の JDK 1 つが必要です。JDK 24 以上は `java.lang.classfile` のリーダー（`src/main/java24`）をコンパイルし、そのリーダーでテストをもう一度実行します。デフォルトのバージョンは 25 で、`-Plql.classfile.jdk=24` のように変更できます。Gradle が JDK を見つけられない場合は、`~/.gradle/gradle.properties` の `org.gradle.java.installations.paths` にパスを書いてください。
 - IntelliJ IDEA では、**Settings > Build Tools > Gradle > Gradle JVM** を Java 21 の JDK に設定してください。
-- ビルドには 3 つのモジュールがあります。`query`（アーティファクト `lambdaql-core`）、`spring-data-jpa`（`lambdaql-spring-data-jpa`）、`spring-boot-starter`（`lambdaql-spring-boot-starter`）です。Spring のモジュールは [12. Spring Data JPA](12-spring-data-jpa.md) で説明します。
+- ビルドの主なモジュールは `query`（アーティファクト `lambdaql-core`）、`spring-data-jpa`（`lambdaql-spring-data-jpa`）、`spring-boot-starter-boot3`・`spring-boot-starter-boot4`（`lambdaql-spring-boot-starter-boot3`・`-boot4`）です。`lambdaql-core` と `lambdaql-spring-data-jpa` は Spring Boot 3・4 共通の jar で、スターターだけが Boot のバージョンごとに分かれます（[13. Spring Boot 3 と 4](../13-spring-boot-versions.md)）。Spring のモジュールは [12. Spring Data JPA](12-spring-data-jpa.md) で説明します。
 
 ユニットテストを実行します。
 
@@ -88,7 +85,7 @@ Maven:
 </dependency>
 ```
 
-Spring Data JPA や Spring Boot を使う場合は、代わりに `lambdaql-spring-boot-starter` か `lambdaql-spring-data-jpa` を使ってください。どちらも `lambdaql-core` を持ち込みます（[12.2](12-spring-data-jpa.md#122-modules) を参照）。
+Spring Boot を使う場合は Boot のバージョンに合った `lambdaql-spring-boot-starter-boot4`（`-boot3`）を、Spring Boot なしで Spring Data JPA だけを使う場合は `lambdaql-spring-data-jpa` を、代わりに使ってください。どちらも `lambdaql-core` を持ち込みます（[12.2](12-spring-data-jpa.md#122-modules) を参照）。
 
 > [!WARNING]
 > バージョン `1.0.0` はリポジトリの `gradle.properties` で定義した値で、最初のリリースまでに変わることがあります。
@@ -190,7 +187,7 @@ QueryBuilder qb = new QueryBuilder(emf);
 <a id="with-spring-boot"></a>
 ### Spring Boot で
 
-`lambdaql-spring-boot-starter` を使うと、Spring Boot が `QueryBuilder` の Bean を作ります（[12.8](12-spring-data-jpa.md#128-the-querybuilder-bean) を参照）。
+`lambdaql-spring-boot-starter-boot4`（`-boot3`）を使うと、Spring Boot が `QueryBuilder` の Bean を作ります（[12.8](12-spring-data-jpa.md#128-the-querybuilder-bean) を参照）。
 スターターを使わない場合は、Bean を自分で作ります。自動構成と同じように、Spring の共有 `EntityManager` を使ってください。
 
 ```java

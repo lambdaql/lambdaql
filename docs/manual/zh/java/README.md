@@ -1,12 +1,9 @@
 <a id="lambdaql-manual-java-track"></a>
 # lambdaQL 手册：Java 路线
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/README.md)。
-
 **其他语言：** [English](../../en/java/README.md) | [한국어](../../ko/java/README.md) | [日本語](../../ja/java/README.md) | [简体中文](../../zh/java/README.md)
 
-[手册首页](../README.md) | [Kotlin 路线](../kotlin/README.md) | 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
+[手册首页](../README.md) | [Kotlin 路线](../kotlin/README.md) | 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md) · [13. Spring Boot 3 与 4](../13-spring-boot-versions.md)
 
 这是 lambdaQL 手册的 **Java 路线**。本路线的每个页面**只包含 Java 代码**。
 如果你用 Kotlin 编写查询，请阅读 [Kotlin 路线](../kotlin/README.md)。它的章节和编号与本路线相同。
@@ -80,6 +77,7 @@ fetch first ? rows only
 | 10 | [规则与限制](10-rules-and-limits.md) | 所有规则表、Java 与 SQL 的差异、数据库差异、不支持的内容 |
 | 11 | [错误与语言](../11-errors-and-languages.md)（公共） | 错误码、异常、消息语言、日志 |
 | 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`、仓库默认方法、DML 快捷方法（`deleteAll`、`updateOne` 等）、Spring `Sort` 和 `Pageable`、模块、事务、`QueryBuilder` bean |
+| 13 | [Spring Boot 3 与 4](../13-spring-boot-versions.md)（公共） | 版本表、构件（公共 jar 与 `-boot3`、`-boot4` starter）、Hibernate 6.6 与 7.4 的 SQL 差异、验证范围 |
 
 <a id="example-entities"></a>
 ## 示例实体
@@ -99,9 +97,9 @@ fetch first ? rows only
 |---|---|
 | Java | 21 |
 | 编译器 | javac（不保证支持 Eclipse 编译器 ECJ） |
-| Hibernate ORM | 7.4（已用 Spring Boot 4.1.2 中的 7.4.13 测试） |
-| 已验证的数据库 | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
-| Spring Boot（可选） | 4.1（已用 4.1.2 测试）。本版未验证 Spring Boot 3 |
+| Hibernate ORM | 6.6 或 7.4（已用 6.6.53、7.4.13 测试） |
+| 已验证的数据库 | H2 2.3、MariaDB 10.11、MySQL 8.4、PostgreSQL 17、Oracle 23.26 (23ai) |
+| Spring Boot（可选） | 3.5 或 4.1（已用 3.5.16、4.1.2 测试）。见 [13. Spring Boot 3 与 4](../13-spring-boot-versions.md) |
 
 <a id="help-and-contributions"></a>
 ## 帮助与贡献

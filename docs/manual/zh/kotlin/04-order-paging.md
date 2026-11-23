@@ -1,9 +1,6 @@
 <a id="4-sorting-and-paging-kotlin"></a>
 # 4. 排序与分页（Kotlin）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/04-order-paging.md)。
-
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[3. 条件（`where`）](03-where.md) | 下一章：[5. 子查询](05-subquery.md) | [本页的 Java 版本](../java/04-order-paging.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -275,7 +272,7 @@ qb.from(Order::class.java).orderBy { o, by -> by.asc(o.kind) }
 ```
 
 别名与 `where` 共享。如果 `where` 已经 join 了同一条路径，排序就会使用那个 join。
-这个 join 是 inner join。`where` 中的路径总是使用 inner join，因此没有客户的订单已经被排除（决策 D36、D48，见 [3.10](03-where.md#310-association-paths)）。
+如果 `where` 以 inner join 使用这条路径，没有客户的订单已经被排除（决策 D36、D48）。如果路径用 `?.` 经过并成为 `left join`（决策 D54），排序也会使用那个 `left join`（见 [3.10](03-where.md#310-association-paths)）。
 
 <a id="46-rules-for-the-lambda-body"></a>
 ## 4.6 Lambda 主体的规则

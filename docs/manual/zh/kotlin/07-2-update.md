@@ -1,9 +1,6 @@
 <a id="72-update"></a>
 # 7.2 更新（Kotlin）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/07-2-update.md)。
-
 [7. 更新、插入、删除（Kotlin）](07-dml.md) | **7.2 更新** | [7.4 删除](07-4-delete.md) | [7.5 插入](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Java](../java/07-2-update.md)
 
 ---
@@ -168,6 +165,39 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 
 如果订单没有客户，`custName` 会变成 NULL。
 在 `where` 中，lambdaQL 会加上 `e0.customer.id is not null`，因此更新修改的行与 `qb.from(Order::class.java).where { 同一个 Lambda }` 返回的行相同（决策 D36）。Java 测试会检查这一点。
+
+**`?.` 与 `||`。** 如果条件中用 `?.` 经过的步骤在查询中成为 `left join`（决策 D54，见 [3.10](03-where.md#310-association-paths)），DML 不会添加 `e0.customer.id is not null`。
+因此没有客户的订单也会与查询完全一样成为更新对象。像上面的示例那样，只有 `?.` 而没有客户的行无法使条件为真时，检查会保留。
+
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `update-safe-call`：
+
+```kotlin
+// UPDATE: the left join of ?. drops the "customer exists" check, so the order without a customer is changed too
+val u = qb.update(Order::class.java)
+    .set { it.status = st }
+    .where { it.status.toInt() == 1 || it.customer?.name == "Kim" }
+assertEquals("update Order e0 set e0.status = :p1"
+    + " where e0.status = 1 or (select s1.name from Customer s1 where s1.id = fk(e0.customer)) = 'Kim'", u.toHql().hql())
+```
+
+**各数据库的 SQL（直接执行 Kotlin region 中 HQL 的结果）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `update-safe-call`：
+
+```sql
+-- H2
+update orders o1_0
+set status=?
+where o1_0.status=1 or (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)='Kim'
+
+-- MariaDB
+update orders
+set status=?
+where status=1 or (select c1_0.name from customers c1_0 where c1_0.id=orders.customer_id)='Kim'
+
+-- Oracle
+update orders o1_0
+set o1_0.status=?
+where o1_0.status=1 or (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)='Kim'
+```
 
 <a id="an-aggregate-from-a-subquery"></a>
 ## 来自子查询的聚合

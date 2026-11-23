@@ -1,9 +1,6 @@
 <a id="4-sorting-and-paging-kotlin"></a>
 # 4. ソートとページング（Kotlin）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/04-order-paging.md)を参照してください。
-
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [3. 条件（`where`）](03-where.md) | 次: [5. サブクエリ](05-subquery.md) | [このページの Java 版](../java/04-order-paging.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -275,7 +272,7 @@ qb.from(Order::class.java).orderBy { o, by -> by.asc(o.kind) }
 ```
 
 エイリアスは `where` と共有されます。同じパスを `where` がすでに結合していれば、ソートはその結合を使います。
-この結合は inner join です。`where` のパスは常に inner join なので、顧客のない注文はすでに除かれています（決定 D36、D48、[3.10](03-where.md#310-association-paths) を参照）。
+`where` がこのパスを inner join で書いたなら、顧客のない注文はすでに除かれています（決定 D36、D48）。`?.` でたどって `left join` になったパスなら（決定 D54）、ソートもその `left join` を使います（[3.10](03-where.md#310-association-paths) を参照）。
 
 <a id="46-rules-for-the-lambda-body"></a>
 ## 4.6 ラムダ本体のルール

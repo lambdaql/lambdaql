@@ -1,9 +1,6 @@
 <a id="9-kotlin-notes"></a>
 # 9. Kotlin notes
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/09-kotlin-notes.md) for the latest rules.
-
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [8. Procedures and DB functions](08-procedures-functions.md) | Next: [10. Rules and limits](10-rules-and-limits.md) | [Java version of this page: 9. Java notes](../java/09-java-notes.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -35,7 +32,7 @@ How to read the examples:
 
 - The comment under an example shows the HQL that lambdaQL makes, when the design states it.
 - Constants written in the lambda (numbers, strings, booleans, `null`, enum constants, `const val`) are written into the HQL as literals. Captured and computed values are always bind parameters (`:p1`, `:p2`, ...) (D37).
-- `e0` is the alias of the root entity, and `j1` is the alias of the join that lambdaQL adds for an association path. In `where` it is always an inner `join` (D48); when the path is used only in `orderBy` or `select`, it is a `left join` (D36). A subquery root is `s1`, `s2`, ... (see [5. Subqueries](05-subquery.md)). Examples of planned features (derived tables, CTEs, procedures) still use the planned aliases `o` and `c1`.
+- `e0` is the alias of the root entity, and `j1` is the alias of the join that lambdaQL adds for an association path. In `where` it is an inner `join` by default (D48), and a step reached with `?.` is a `left join` when needed (D54); when the path is used only in `orderBy` or `select`, it is a `left join` (D36). A subquery root is `s1`, `s2`, ... (see [5. Subqueries](05-subquery.md)). Examples of planned features (derived tables, CTEs, procedures) still use the planned aliases `o` and `c1`.
 - Entities are the ones from [2. Getting started](02-getting-started.md#example-entities). Some examples use two extra properties on `Order`: `var flag: Boolean? = null` and `var kind: OrderKind? = null` (with `enum class OrderKind { NORMAL, EXPRESS, GIFT }`).
 
 ---
@@ -107,13 +104,14 @@ A boolean property `active` has the getter `getActive()`. lambdaQL maps it to `a
 ## 9.3 Only your null checks count
 
 lambdaQL **never runs your lambda**. It reads the bytecode and writes HQL.
-So some Kotlin rules work differently. These four decisions are the base:
+So some Kotlin rules work differently. These five decisions are the base:
 
 | Decision | Rule |
 |---|---|
-| D20, D36 | A path like `it.customer?.name` is **a column**, not a call chain. In `where`, a to-one association is an inner join by default: an order without a customer is not returned. To find those orders, write `it.customer == null`. A null guard like `it.customer == null \|\| ...` does not change the inner join (D48). To keep those orders, use `leftJoin`. |
+| D20, D36 | A path like `it.customer?.name` is **a column**, not a call chain. In `where`, a to-one association is an inner join by default. To find only orders without a customer, write `it.customer == null`. |
+| D54 | In `where`, an association step reached with `?.` is a `left join` when an order without a customer can make the condition true (`it.status == 1 \|\| it.customer?.name == "Kim"`, `it.customer?.name == null`, a null guard written with `?.`). A step reached with `!!` is always an inner join. If the same step is written both ways, it is an inner join and lambdaQL logs `LQL-5014` at `WARN` level. |
 | D22 | lambdaQL uses **only the null handling you wrote**: `== null`, `!= null`, `?.`, `?:`. The null checks that the Kotlin compiler adds by itself are ignored. Any other NULL follows SQL: the condition is UNKNOWN and the row is not returned. |
-| D23 | `!!` is ignored. It is only there so that the code compiles. `it.customer!!.name` and `it.customer?.name` are the same column. |
+| D23 | `!!` does not change the value. `it.customer!!.name` and `it.customer?.name` are the same column. But in `where`, `!!` on an association step is read as "the association is always there", so it is an inner join (D54). |
 | D12 | `==` between objects (and `===`) means **value equality**, not object identity. |
 
 How can lambdaQL tell "your" null checks from the compiler's? The bytecode is different:
@@ -205,8 +203,8 @@ The rules are the same. `j.id == 1L` is `e0.id = 1`, and `j.customer.name` is th
 
 | Kotlin | Meaning in lambdaQL | Example HQL |
 |---|---|---|
-| `it.customer?.name` | The column `customer.name`. In `where` it is an inner join by default, so an order without a customer is not returned | `j1.name` + `join e0.customer j1` |
-| `it.customer!!.name` | The same as `?.`. `!!` is ignored (D23) | `j1.name` + `join e0.customer j1` |
+| `it.customer?.name` | The column `customer.name`. In `where`, a `left join` when an order without a customer can make the condition true, otherwise an inner join (D54) | `j1.name` + `join e0.customer j1` or `left join e0.customer j1` |
+| `it.customer!!.name` | The same column. In `where`, always an inner join (D23, D54) | `j1.name` + `join e0.customer j1` |
 | `it.customer?.id` | Path ends with the target `@Id`: the FK column, no join | `e0.customer.id` |
 | `it.customer == null` | Only orders without a customer | `e0.customer is null` (FK column, no join) |
 | `it.customer != null` | Only orders that have a customer | `e0.customer is not null` (FK column, no join) |
@@ -249,18 +247,22 @@ where o1_0.customer_id=5
 ```
 
 A path is **a column**, not a call chain (D20). In `where`, lambdaQL uses an inner join by default (D36).
-So an order without a customer is not returned, and you do not need `it.customer != null &&` before the path.
+So you do not need `it.customer != null &&` before the path.
 
-**`?.` does not bring back orders without a customer.** In Kotlin, `it.customer?.name == null` is `true` when there is no customer.
-In lambdaQL it returns only orders whose customer has no name. A null guard does not change this, because the path is an inner join (D48).
+**A condition written with `?.` keeps orders without a customer, as in Kotlin.** In Kotlin, `it.customer?.name == null` is `true` when there is no customer.
+lambdaQL writes this condition with a `left join`, so it also returns orders without a customer (D54). Written with `!!`, it is an inner join, so it returns only orders whose customer has no name.
 
 ```kotlin
 .where { it.customer == null }
 // select e0 from Order e0 where e0.customer is null      (FK column, no join)
 
-.where { it.customer == null || it.customer?.name == null }
+.where { it.customer?.name == null }
+// orders without a customer, and orders whose customer has no name
+// select e0 from Order e0 left join e0.customer j1 where j1.name is null
+
+.where { it.customer!!.name == null }
 // only orders whose customer has no name: the inner join leaves out orders without a customer
-// select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name is null
+// select e0 from Order e0 join e0.customer j1 where j1.name is null
 ```
 
 **SQL by database (from the Java test run; Kotlin gives the same HQL)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `no-association`:
@@ -683,9 +685,9 @@ These differences are part of the design. They are not bugs.
 
 | Kotlin code | lambdaQL (SQL) |
 |---|---|
-| `!!` throws NPE | `!!` is ignored. NULL follows SQL rules |
+| `!!` throws NPE | `!!` on a value is ignored. NULL follows SQL rules. In `where`, `!!` on an association step is an inner join, so rows without the association are left out (D54) |
 | `it.status != 1` with `status == null` is `true` | The hidden null check is ignored: `e0.status <> 1` is UNKNOWN for NULL, so the row is not returned. Write `it.status == null \|\| ...` to include it |
-| `it.customer?.name == null` is `true` when there is no customer | In `where` the path is an inner join by default, so an order without a customer is not returned. To include it, use `leftJoin` with `c == null \|\| c.name == null`, or run a second query with `it.customer == null` |
+| `it.customer?.name == null` is `true` when there is no customer | The same: a step reached with `?.` becomes a `left join`, so orders without a customer are returned too (D54). `it.customer!!.name == null` is an inner join, so they are not returned |
 | A `when` or range with a NULL subject goes to `else`, and `!in` is `true` | The row is not returned, also under `NOT` |
 | `===` is object identity | Value equality |
 | `BigDecimal` `==` compares scale (`1.0 != 1.00`) | Value equality |

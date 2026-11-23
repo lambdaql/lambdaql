@@ -1,9 +1,6 @@
 <a id="1-overview"></a>
 # 1. Overview
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../ko/01-overview.md) for the latest rules.
-
 [Manual home](README.md) | Tracks: [Java](java/README.md) | [Kotlin](kotlin/README.md) | Next: 2. Getting started ([Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md))
 
 This page is for both languages. Code is shown in separate **Java** and **Kotlin** sections.
@@ -42,16 +39,25 @@ val orders = qb.from(Order::class.java)
 ```
 
 <a id="hql-the-same-for-both"></a>
-### HQL (the same for both)
+### HQL
+
+Java:
 
 ```
 select e0 from Order e0 join e0.customer j1
 where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
 ```
 
+Kotlin (an association reached with `?.` becomes a `left join` when needed, decision D54):
+
+```
+select e0 from Order e0 left join e0.customer j1
+where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
+```
+
 **About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 7.4, and it fails if Hibernate's SQL changes.
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `overview-first`:
+**SQL by database (Java example, tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `overview-first`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -63,9 +69,9 @@ where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 
 Two `where` calls are joined with `AND`.
 The constant `"Kim"` is a literal; the captured `minPrice` is a bind parameter (`:p1`).
-A path like `o.getCustomer().getName()` in `where` is an inner `join` by default. Orders without a customer are not returned.
-This example is the same. In Java, an order with status 1 would match even without a customer, but lambdaQL uses the SQL meaning (decision D48).
-To keep such orders, use `leftJoin`.
+A path like `o.getCustomer().getName()` in `where` is an inner `join` by default. The Java example does not return orders without a customer.
+In Java, an order with status 1 would match even without a customer, but lambdaQL uses the SQL meaning (decision D48). To keep such orders, use `leftJoin`.
+The Kotlin example writes "the customer may be missing" with `?.`, so it becomes a `left join` and also returns orders with status 1 and no customer (decision D54). With `!!` it is an inner join, the same as Java.
 
 The lambdas look like normal Java or Kotlin code.
 But they are a **query language** written with Java or Kotlin syntax.
@@ -178,7 +184,7 @@ lambdaQL follows its own documented rules, not the run-time rules of Java or Kot
 |---|---|---|
 | `it.id == id` (`id: Long?`, a nullable variable) | value equality: `e0.id = :p1` | Kotlin `==` already means "same value". A captured `null` is bound as NULL and matches no row (`LQL-4045` at `WARN`). |
 | `it.description == it.custName`, `it.description != text` | `e0.description = e0.custName`, `e0.description <> :p1` (SQL meaning) | Two values of the entity, or `!=` against a value: a row whose value is NULL does not match. To keep such rows, write `it.description == null \|\| ...`. |
-| `it.customer?.name` or `it.customer!!.name` | the `name` column of the joined customer (in `where`: inner `join` by default) | A path names a column. `?.` and `!!` do not change the column. `!!` is only there so the lambda compiles. In `where`, orders without a customer are not returned; to find them, write `it.customer == null`. A null guard (`it.customer == null \|\| ...`) does not change this (SQL meaning, D48). To keep these orders, use `leftJoin`. |
+| `it.customer?.name` or `it.customer!!.name` | the `name` column of the joined customer. In `where`, `!!` is an inner `join` and `?.` is a `left join` when needed | A path names a column. `?.` and `!!` do not change the column; they only choose the join type in `where` (D54). `!!` means "the association is always there", so orders without a customer are not returned. `?.` means "the association may be missing", so when an order without a customer can make the condition true (`it.status == 1 \|\| ...`, `it.customer?.name == null`), it is kept with a `left join`. To find only orders without a customer, write `it.customer == null`. |
 | `it.price!! > 100.0` when `price` is NULL | the row does not match (SQL meaning) | Kotlin would throw `NullPointerException` at `!!`. lambdaQL ignores `!!`, and SQL returns UNKNOWN. |
 | `it.description == null` | `e0.description is null` | You wrote the null check, so lambdaQL uses it. |
 

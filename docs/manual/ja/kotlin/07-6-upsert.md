@@ -1,9 +1,6 @@
 <a id="76-upsert"></a>
 # 7.6 Upsert（Kotlin）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/07-6-upsert.md)を参照してください。
-
 [7. 更新、挿入、削除（Kotlin）](07-dml.md) | [7.2 更新](07-2-update.md) | [7.4 削除](07-4-delete.md) | [7.5 挿入](07-5-insert.md) | **7.6 Upsert** | [Java](../java/07-6-upsert.md)
 
 ---
@@ -26,7 +23,7 @@ lambdaQL には 3 つの書き方があります。
 val inserted = qb.upsert(Archive::class.java).values { it.id = 100L; it.price = 1.0 }.execute()
 val again = qb.upsert(Archive::class.java).values { it.id = 100L; it.price = 2.0 }
 // HQL: insert into Archive e0 (id, price) values (100L, 2.0) on conflict(id) do update set price = excluded.price
-val updated = again.execute()                 // MariaDB counts an updated row as 2, H2 and Oracle as 1
+val updated = again.execute()                 // MariaDB and MySQL count an updated row as 2, the others as 1
 ```
 
 **SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 7.4 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。このテストは Java のラムダを使います。意味が同じ Kotlin のラムダは同じ HQL になるので、SQL も同じです。

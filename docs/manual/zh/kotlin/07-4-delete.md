@@ -1,9 +1,6 @@
 <a id="74-delete"></a>
 # 7.4 删除（Kotlin）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/07-4-delete.md)。
-
 [7. 更新、插入、删除（Kotlin）](07-dml.md) | [7.2 更新](07-2-update.md) | **7.4 删除** | [7.5 插入](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Java](../java/07-4-delete.md)
 
 ---
@@ -14,8 +11,8 @@ val d = qb.delete(Order::class.java).where { it.status == 3 }
 // HQL: delete from Order e0 where e0.status = 3
 val deleted = d.execute()
 
-// a path: the same rows as qb.from(Order::class.java).where { same lambda } - orders without a customer stay
-val byName = qb.delete(Order::class.java).where { it.customer?.name == null }
+// a path: the same rows as qb.from(Order::class.java).where { same lambda } - with !! orders without a customer stay
+val byName = qb.delete(Order::class.java).where { it.customer!!.name == null }
 // HQL: delete from Order e0 where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) is null and e0.customer.id is not null
 ```
 
@@ -59,9 +56,11 @@ assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where
 测试先插入一行 `Archive`，然后删除没有商品的订单，并把剩下的行与用 Kotlin 进行的同样过滤作比较。
 更多用 Java 写的语句在 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中测试（H2、MariaDB 和 Oracle）。这些示例见[本页的 Java 版本](../java/07-4-delete.md)。
 
-第二条语句删除的行与 `qb.from(Order::class.java).where { it.customer?.name == null }` 返回的**行相同**：客户没有名字的订单。Java 测试会把删除的行与这个查询进行比较。
-**没有**客户的订单不会被删除（规则 U9，决策 D36）。写 null 守卫（`it.customer == null || ...`）也一样，因为在查询中这条路径也是 inner join（决策 D48）。
-要删除没有客户的订单，请用 `it.customer == null` 条件再执行一次删除语句。
+第二条语句删除的行与 `qb.from(Order::class.java).where { it.customer!!.name == null }` 返回的**行相同**：客户没有名字的订单。Java 测试用 Java 写出相同的条件，并把删除的行与查询结果进行比较。
+**没有**客户的订单不会被删除（规则 U9，决策 D36），因为 `!!` 声明关联一定存在。
+
+如果写成 `?.`（`it.customer?.name == null`），则与查询一样相当于 `left join`，不会添加 `e0.customer.id is not null`（决策 D54）。因此没有客户的订单也会被删除。
+同样方式的 UPDATE 示例见 [7.2](07-2-update.md) 中的 region `update-safe-call`。只删除没有客户的订单时，请写 `it.customer == null`。
 
 删除所有行时需要 `all()`（规则 U5）。
 

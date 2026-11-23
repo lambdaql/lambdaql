@@ -1,9 +1,6 @@
 <a id="2-getting-started-kotlin"></a>
 # 2. Getting started (Kotlin)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/02-getting-started.md) for the latest rules.
-
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [1. Overview](../01-overview.md) | Next: [3. Conditions](03-where.md) | [Java version of this page](../java/02-getting-started.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -18,10 +15,10 @@ Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../
 | Kotlin | 2.x | The design was checked with kotlinc 1.7.22, 2.1.10, 2.2.21, 2.3.0 and 2.3.21. |
 | JVM | Java 21 | Needed to build lambdaQL. |
 | `-jvm-target` | 1.8, 11, 17 or 21 | All four compile query lambdas the same way. |
-| JPA provider | Hibernate ORM 7.4 | lambdaQL builds Hibernate 7 HQL. It is tested with 7.4.13. Other JPA providers are not supported. |
-| Jakarta Persistence | 3.2 | Comes with Hibernate 7.4. |
-| Database | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) | These three were verified. Other databases may work, but they were not tested. |
-| Spring Boot | 4.1 | Optional. The project tests use Spring Boot 4.1.2. |
+| JPA provider | Hibernate ORM 6.6 or 7.4 | lambdaQL builds Hibernate HQL. It is tested with 6.6.53 (Spring Boot 3.5.16) and 7.4.13 (Spring Boot 4.1.2). Other JPA providers are not supported. See [13. Spring Boot 3 and 4](../13-spring-boot-versions.md). |
+| Jakarta Persistence | 3.1 or 3.2 | Hibernate 6.6 uses 3.1, and 7.4 uses 3.2. |
+| Database | H2 2.3, MariaDB 10.11, MySQL 8.4, PostgreSQL 17, Oracle 23.26 (23ai) | These five were verified. The SQL by database in this manual is from H2, MariaDB and Oracle. Other databases may work, but they were not tested. |
+| Spring Boot | 3.5 or 4.1 | Optional. The project tests use Spring Boot 3.5.16 and 4.1.2. |
 | Kotlin runtime | – | lambdaQL does not add `kotlin-stdlib` or `kotlin-reflect` to your dependencies. |
 
 <a id="build-from-source"></a>
@@ -36,7 +33,7 @@ cd lambdaql
 - The Gradle wrapper is 9.9.1. The repository has `gradle/gradle-daemon-jvm.properties`, so the Gradle daemon uses Java 21.
 - The build needs JDK 21 and one **JDK 24 or later**. That JDK compiles the `java.lang.classfile` reader (`src/main/java24`) and runs the tests one more time with that reader. The default version is 25. You can change it, for example `-Plql.classfile.jdk=24`. If Gradle cannot find the JDK, put its path in `org.gradle.java.installations.paths` in `~/.gradle/gradle.properties`.
 - In IntelliJ IDEA, set **Settings > Build Tools > Gradle > Gradle JVM** to a Java 21 JDK.
-- The build has three modules: `query` (artifact `lambdaql-core`), `spring-data-jpa` (`lambdaql-spring-data-jpa`) and `spring-boot-starter` (`lambdaql-spring-boot-starter`). The Spring modules are explained in [12. Spring Data JPA](12-spring-data-jpa.md).
+- The main modules of the build are `query` (artifact `lambdaql-core`), `spring-data-jpa` (`lambdaql-spring-data-jpa`), and `spring-boot-starter-boot3` and `spring-boot-starter-boot4` (`lambdaql-spring-boot-starter-boot3` and `-boot4`). `lambdaql-core` and `lambdaql-spring-data-jpa` are one jar each for both Spring Boot 3 and 4; only the starter is split by Boot version ([13. Spring Boot 3 and 4](../13-spring-boot-versions.md)). The Spring modules are explained in [12. Spring Data JPA](12-spring-data-jpa.md).
 
 Run the unit tests:
 
@@ -78,7 +75,7 @@ Maven:
 </dependency>
 ```
 
-With Spring Data JPA or Spring Boot, add `lambdaql-spring-boot-starter` or `lambdaql-spring-data-jpa` instead. Both bring `lambdaql-core` with them (see [12.2](12-spring-data-jpa.md#122-modules)).
+With Spring Boot, add `lambdaql-spring-boot-starter-boot4` (`-boot3`) for your Boot version instead. With Spring Data JPA but without Spring Boot, add `lambdaql-spring-data-jpa` instead. Both bring `lambdaql-core` with them (see [12.2](12-spring-data-jpa.md#122-modules)).
 
 > [!WARNING]
 > The version `1.0.0` comes from `gradle.properties` of the repository. It can change before the first release.
@@ -183,7 +180,7 @@ val qb = QueryBuilder(emf)
 <a id="with-spring-boot"></a>
 ### With Spring Boot
 
-With `lambdaql-spring-boot-starter`, Spring Boot makes the `QueryBuilder` bean for you (see [12.8](12-spring-data-jpa.md#128-the-querybuilder-bean)).
+With `lambdaql-spring-boot-starter-boot4` (`-boot3`), Spring Boot makes the `QueryBuilder` bean for you (see [12.8](12-spring-data-jpa.md#128-the-querybuilder-bean)).
 Without the starter, make the bean yourself. Use Spring's shared `EntityManager`, as the auto-configuration does.
 
 ```kotlin
@@ -304,7 +301,7 @@ val orders = query.toList()
 ### Paths to other entities
 
 A path like `it.customer?.name` names a column of the joined entity.
-In `where`, lambdaQL adds an inner `join` by default. Orders without a customer are **not** in the result.
+In `where`, lambdaQL adds an inner `join` by default. When an order without a customer cannot make the condition true, as in the example below, orders without a customer are **not** in the result.
 
 ```kotlin
 qb.from(Order::class.java)
@@ -324,11 +321,10 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.name=?
 ```
 
-`it.customer!!.name` gives the same HQL. Use the form you like.
-To find orders without a customer, compare the association: `it.customer == null` gives `e0.customer is null` (no join).
-`it.customer?.name == null` does **not** include them.
-A null guard (`it.customer == null || ...`) does not keep orders without a customer either, because the path is an inner join (decision D48).
-To keep such orders, use `leftJoin` ([6.8](06-select-group.md#68-explicit-joins)). See [3.10](03-where.md#310-association-paths).
+`it.customer!!.name` gives the same HQL in this example.
+The two forms differ by condition (decision D54). `!!` means "the association is always there", so it is always an inner join.
+`?.` means "the association may be missing", so it is a `left join` when an order without a customer can make the condition true. For example, `it.status == 1 || it.customer?.name == name` and `it.customer?.name == null` also return orders without a customer.
+To find only orders without a customer, compare the association: `it.customer == null` gives `e0.customer is null` (no join). See [3.10](03-where.md#310-association-paths).
 
 <a id="getting-the-result"></a>
 ## Getting the result

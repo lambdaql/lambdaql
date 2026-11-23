@@ -1,9 +1,6 @@
 <a id="9-kotlin-notes"></a>
 # 9. Kotlin 说明
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/09-kotlin-notes.md)。
-
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[8. 存储过程与数据库函数](08-procedures-functions.md) | 下一章：[10. 规则与限制](10-rules-and-limits.md) | [本页的 Java 版本：9. Java 说明](../java/09-java-notes.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -35,7 +32,7 @@ lambdaQL 用**同一个引擎**和同一套 API 支持 Kotlin 和 Java。
 
 - 示例下方的注释给出 lambdaQL 生成的 HQL（当设计中有明确说明时）。
 - 直接写在 Lambda 中的常量（数字、字符串、布尔值、`null`、enum 常量、`const val`）作为字面量写入 HQL。捕获的值和计算出的值始终是绑定参数（`:p1`、`:p2`、...）（D37）。
-- `e0` 是根实体的别名，`j1` 是 lambdaQL 为关联路径添加的 join 的别名。在 `where` 中始终是内连接 `join`（D48），路径只在 `orderBy` 或 `select` 中使用时是 `left join`（D36）。子查询的根是 `s1`、`s2` 等（见 [5. 子查询](05-subquery.md)）。计划中功能（派生表、CTE、存储过程）的示例仍使用计划中的别名 `o` 和 `c1`。
+- `e0` 是根实体的别名，`j1` 是 lambdaQL 为关联路径添加的 join 的别名。在 `where` 中默认是内连接 `join`（D48），用 `?.` 经过的步骤在需要时为 `left join`（D54），路径只在 `orderBy` 或 `select` 中使用时是 `left join`（D36）。子查询的根是 `s1`、`s2` 等（见 [5. 子查询](05-subquery.md)）。计划中功能（派生表、CTE、存储过程）的示例仍使用计划中的别名 `o` 和 `c1`。
 - 实体来自 [2. 入门](02-getting-started.md#example-entities)。有些示例在 `Order` 上使用了两个额外属性：`var flag: Boolean? = null` 和 `var kind: OrderKind? = null`（其中 `enum class OrderKind { NORMAL, EXPRESS, GIFT }`）。
 
 ---
@@ -107,13 +104,14 @@ lambdaQL 把 getter 映射到 JPA 属性（规则 R10）。
 ## 9.3 只有自己写的 null 检查才算数
 
 lambdaQL **从不运行 Lambda**。它读取字节码并写出 HQL。
-因此有些 Kotlin 规则的作用方式不同。以下四个决策是基础。
+因此有些 Kotlin 规则的作用方式不同。以下五个决策是基础。
 
 | 决策 | 规则 |
 |---|---|
-| D20、D36 | 像 `it.customer?.name` 这样的路径是**一个列**，而不是调用链。在 `where` 中，对一关联默认是内连接。没有 customer 的订单不会被返回。要查找这些订单，请写 `it.customer == null`。即使写了 `it.customer == null \|\| ...` 这样的 null 保护，内连接也不会改变（D48）。要保留这些订单，请使用 `leftJoin`。 |
+| D20、D36 | 像 `it.customer?.name` 这样的路径是**一个列**，而不是调用链。在 `where` 中，对一关联默认是内连接。只查找没有 customer 的订单时，请写 `it.customer == null`。 |
+| D54 | 在 `where` 中，用 `?.` 经过的关联步骤在没有 customer 的订单可能使条件为真时为 `left join`（`it.status == 1 \|\| it.customer?.name == "Kim"`、`it.customer?.name == null`、用 `?.` 写的 null 保护）。用 `!!` 经过的步骤总是内连接。同一步骤混用时为内连接，并记录 `WARN` 级别的 `LQL-5014`。 |
 | D22 | lambdaQL **只使用自己写的 null 处理**：`== null`、`!= null`、`?.`、`?:`。Kotlin 编译器自己添加的 null 检查会被忽略。其他 NULL 遵循 SQL：条件为 UNKNOWN，该行不会被返回。 |
-| D23 | `!!` 会被忽略。它只是为了让代码能够编译。`it.customer!!.name` 和 `it.customer?.name` 是同一个列。 |
+| D23 | `!!` 不改变值。`it.customer!!.name` 和 `it.customer?.name` 是同一个列。但在 `where` 中，关联步骤上的 `!!` 被视为“关联一定存在”，因此是内连接（D54）。 |
 | D12 | 对象之间的 `==`（以及 `===`）表示**值相等**，而不是对象同一性。 |
 
 lambdaQL 如何区分“自己写的” null 检查和编译器的 null 检查？字节码不同。
@@ -205,8 +203,8 @@ SQL 的 `=` 只比较值。**lambdaQL 使用值相等。**
 
 | Kotlin | 在 lambdaQL 中的含义 | HQL 示例 |
 |---|---|---|
-| `it.customer?.name` | 列 `customer.name`。在 `where` 中默认是内连接，因此没有 customer 的订单不会被返回 | `j1.name` + `join e0.customer j1` |
-| `it.customer!!.name` | 与 `?.` 相同。`!!` 被忽略（D23） | `j1.name` + `join e0.customer j1` |
+| `it.customer?.name` | 列 `customer.name`。在 `where` 中，没有 customer 的订单可能使条件为真时为 `left join`，否则为内连接（D54） | `j1.name` + `join e0.customer j1` 或 `left join e0.customer j1` |
+| `it.customer!!.name` | 同一个列。在 `where` 中总是内连接（D23、D54） | `j1.name` + `join e0.customer j1` |
 | `it.customer?.id` | 路径以目标的 `@Id` 结尾：外键列，不需要 join | `e0.customer.id` |
 | `it.customer == null` | 只取没有 customer 的订单 | `e0.customer is null`（外键列，不需要 join） |
 | `it.customer != null` | 只取有 customer 的订单 | `e0.customer is not null`（外键列，不需要 join） |
@@ -249,18 +247,22 @@ where o1_0.customer_id=5
 ```
 
 路径是**一个列**，而不是调用链（D20）。在 `where` 中，lambdaQL 默认使用内连接（D36）。
-因此没有 customer 的订单不会被返回，也不需要在路径前面写 `it.customer != null &&`。
+因此不需要在路径前面写 `it.customer != null &&`。
 
-**`?.` 不会把没有 customer 的订单带回来。** 在 Kotlin 中，没有 customer 时 `it.customer?.name == null` 为 `true`。
-在 lambdaQL 中，它只返回 customer 没有名字的订单。路径是内连接，因此即使写了 null 保护也一样（D48）。
+**用 `?.` 写的条件会像 Kotlin 一样保留没有 customer 的订单。** 在 Kotlin 中，没有 customer 时 `it.customer?.name == null` 为 `true`。
+lambdaQL 把这个条件写成 `left join`，因此也会返回没有 customer 的订单（D54）。写成 `!!` 则是内连接，只返回 customer 没有名字的订单。
 
 ```kotlin
 .where { it.customer == null }
 // select e0 from Order e0 where e0.customer is null      （外键列，不需要 join）
 
-.where { it.customer == null || it.customer?.name == null }
+.where { it.customer?.name == null }
+// 没有 customer 的订单和 customer 没有名字的订单
+// select e0 from Order e0 left join e0.customer j1 where j1.name is null
+
+.where { it.customer!!.name == null }
 // 只返回 customer 没有名字的订单：内连接排除了没有 customer 的订单
-// select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name is null
+// select e0 from Order e0 join e0.customer j1 where j1.name is null
 ```
 
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `no-association`：
@@ -683,9 +685,9 @@ KC1 到 KC5 在加载 Lambda 时就会被发现。在这些情况下 lambdaQL �
 
 | Kotlin 代码 | lambdaQL（SQL） |
 |---|---|
-| `!!` 抛出 NPE | `!!` 被忽略。NULL 遵循 SQL 规则 |
+| `!!` 抛出 NPE | 值上的 `!!` 被忽略。NULL 遵循 SQL 规则。在 `where` 中，关联步骤上的 `!!` 是内连接，因此没有关联的行会被排除（D54） |
 | `status == null` 时 `it.status != 1` 为 `true` | 隐藏的 null 检查被忽略：对于 NULL，`e0.status <> 1` 为 UNKNOWN，所以该行不会被返回。要包含它，请写 `it.status == null \|\| ...` |
-| 没有 customer 时 `it.customer?.name == null` 为 `true` | 在 `where` 中该路径默认是内连接，所以没有 customer 的订单不会被返回。要包含它们，请使用 `leftJoin` 并写 `c == null \|\| c.name == null`，或者用 `it.customer == null` 再执行一次查询 |
+| 没有 customer 时 `it.customer?.name == null` 为 `true` | 相同：用 `?.` 经过的步骤成为 `left join`，没有 customer 的订单也会被返回（D54）。`it.customer!!.name == null` 是内连接，因此不会返回 |
 | 主体为 NULL 的 `when` 或区间会进入 `else`，`!in` 为 `true` | 该行不会被返回，在 `NOT` 之下也一样 |
 | `===` 是对象同一性 | 值相等 |
 | `BigDecimal` 的 `==` 比较标度（`1.0 != 1.00`） | 值相等 |

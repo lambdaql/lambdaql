@@ -24,35 +24,16 @@
 이전 대기 항목(D48~D51 등)은 모두 반영되어 지웠습니다. 내용은 git 기록에 있습니다.
 앞으로 한국어 원본이 바뀌면 이 문서에 다시 항목을 적습니다.
 
-## 대기 항목
+## D54·D55 반영(2026-11-23, `feature/unified-boot`)
 
-아래 페이지의 번역본(en, ja, zh)에는 맨 위에 낡음 안내를 두었습니다.
-코드 블록 안의 주석은 언어마다 번역되어 있으므로, 한국어 블록을 통째로 복사하지 말고 바뀐 줄만 옮깁니다.
+다음 변경을 한국어 원본과 영어, 일본어, 중국어에 함께 반영했습니다. 남은 대기 항목은 없습니다.
 
-### 1. D54: Kotlin `?.`·`!!`에 따른 where 조인 구분(2026-11-19)
+1. D54: Kotlin `?.`·`!!`에 따른 where 조인 구분(개요, Kotlin 02·03·04·07·09·10·README, 11장 `LQL-5014`)
+2. PostgreSQL·MySQL 반영으로 바뀐 `LQL-5001`·`LQL-5007` 메시지와 설명, upsert 주석
+3. D55: Spring Boot 3·4 동시 지원(새 공통 페이지 13장, 02·10·11·12장과 README의 버전·아티팩트·데이터베이스 표기)
 
-- `01-overview.md`: 첫 예제의 "HQL (두 언어 모두 동일)" 절을 Java HQL과 Kotlin HQL(`left join`)로 나눔(앵커 `hql-the-same-for-both`는 유지). 아래 설명 문단과 "lambdaQL이 정한 의미" Kotlin 표의 `it.customer?.name` 행. Java 표는 그대로
-- `kotlin/03-where.md` 3.10: `?.`와 `!!`의 조인 구분 표, 영역 `safe-call-and`·`safe-call-or`·`safe-call-null`·`not-null-assert`·`mixed-warn`과 SQL 블록(`safe-call-or`, `safe-call-null`), null 가드 설명과 HQL, 경로 안 섞임 규칙. 예전의 "`?.`를 써도 고객 없는 주문은 돌아오지 않습니다" 경고와 "`\|\|`의 다른 부분도 inner join" 문장은 지움
-- `kotlin/07-2-update.md`: 영역 `update-safe-call`과 SQL 블록, 설명 문단
-- `kotlin/07-4-delete.md`: 예제를 `it.customer!!.name == null`로 바꾸고 `?.`로 쓰면 고객 없는 주문도 삭제된다는 문단
-- `kotlin/07-dml.md`: DML 가드 설명 문단, U9 표 행
-- `kotlin/02-getting-started.md`(다른 엔티티로 가는 경로), `kotlin/04-order-paging.md`(정렬이 where 조인을 쓰는 문장), `kotlin/09-kotlin-notes.md`(예제 읽는 법, D20·D36·D54·D23 표, 요약 표, `?.` 설명과 예제, Kotlin과의 차이 표 두 행), `kotlin/10-rules-and-limits.md`(1번 원칙, 경로 표 네 행, R24), `kotlin/README.md`(`it.customer?.name == "Kim"` 행)
-- `11-errors-and-languages.md`: 5xxx 범위(`LQL-5014`까지), 메시지 표에 `LQL-5014`, 설명 표에 `LQL-5014`
-
-### 3. D55: Spring Boot 3·4 동시 지원(2026-11-23)
-
-- 새 페이지 `13-spring-boot-versions.md`(공통): 번역본에 같은 파일을 새로 만듦. 매뉴얼 홈(`README.md`)의 공통 페이지 표와 목차, `java/README.md`·`kotlin/README.md`의 공통 페이지 줄과 목차에 13장 행 추가
-- 아티팩트 구성: `lambdaql-core`와 `lambdaql-spring-data-jpa`는 Boot 3·4 공통 jar 하나, 스타터만 `lambdaql-spring-boot-starter-boot3`·`-boot4`. `lambdaql-spring-data-jpa`는 Spring Data JPA를 가져오지 않음(프로젝트의 것을 씀)
-- `java/02-getting-started.md`, `kotlin/02-getting-started.md`: 요구 사항 표(Hibernate 6.6 또는 7.4, Jakarta Persistence 3.1 또는 3.2, 데이터베이스 다섯 개, Spring Boot 3.5 또는 4.1), 빌드 모듈 문장, 의존성 문장, `QueryBuilder` 빈 문장의 아티팩트 이름
-- `java/12-spring-data-jpa.md`, `kotlin/12-spring-data-jpa.md`: 탐색 줄(다음: 13장), 아티팩트 표와 설명, Gradle·Maven 예제의 아티팩트 이름, 요구 사항 표, `spring.factories` 문장, "Spring Boot 버전" 항목, `PropertyReferenceException` 패키지 설명. Java는 영역 `find-all-spring-sort`의 코드 블록(예외를 단순 이름으로 확인)
-- `java/10-rules-and-limits.md`, `kotlin/10-rules-and-limits.md`: 환경 표의 Hibernate·Spring 행
-- `README.md`, `java/README.md`, `kotlin/README.md`: Hibernate ORM·데이터베이스·Spring Boot 행
-- `11-errors-and-languages.md`: 로깅 안내의 Spring 모듈 이름
-
-### 2. PostgreSQL·MySQL 반영으로 바뀐 메시지와 설명(2026-11-19)
-
-- `11-errors-and-languages.md`: 메시지 표의 `LQL-5001`(PostgreSQL 함수 기반 인덱스), `LQL-5007`(MySQL `NOT DETERMINISTIC`, PostgreSQL `VOLATILE`), 설명 표의 `LQL-5001`·`LQL-5007`
-- `java/07-6-upsert.md`, `kotlin/07-6-upsert.md`: 영역 `upsert`의 주석 한 줄(`MariaDB and MySQL count an updated row as 2, the others as 1`)
+코드 블록은 `.claude/tools/docs/sync_code_blocks.py <기준 커밋> <언어>`로 먼저 맞췄습니다. 한글이 없는 블록은 그대로 복사하고, 한글 주석이 있는 블록은 바뀐 줄만 옮깁니다.
+Kotlin 09장의 "네 가지 결정"은 표에 D54가 더해져 네 언어 모두 "다섯 가지"로 고쳤습니다.
 
 ## Boot 4 브랜치 반영(2026-11-19, `feature/boot4`)
 

@@ -1,12 +1,9 @@
 <a id="lambdaql-manual-kotlin-track"></a>
 # lambdaQL マニュアル: Kotlin トラック
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/README.md)を参照してください。
-
 **他の言語:** [English](../../en/kotlin/README.md) | [한국어](../../ko/kotlin/README.md) | [日本語](../../ja/kotlin/README.md) | [简体中文](../../zh/kotlin/README.md)
 
-[マニュアルのホーム](../README.md) | [Java トラック](../java/README.md) | 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
+[マニュアルのホーム](../README.md) | [Java トラック](../java/README.md) | 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md) · [13. Spring Boot 3 と 4](../13-spring-boot-versions.md)
 
 これは lambdaQL マニュアルの **Kotlin トラック** です。このトラックのページには **Kotlin のコードだけ** が載っています。
 クエリを Java で書く場合は、[Java トラック](../java/README.md) を読んでください。どちらのトラックも章番号とファイル名が同じなので（違うのは 9 章だけ）、いつでも切り替えられます。
@@ -73,6 +70,7 @@ fetch first ? rows only
 | 10 | [ルールと制限](10-rules-and-limits.md) | すべてのルール表を 1 か所に |
 | 11 | [エラーと言語](../11-errors-and-languages.md)（共通） | エラーコード、例外、メッセージの言語、ログ |
 | 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`、本体を持つリポジトリのメソッド、DML の短縮メソッド（`deleteAll`、`updateOne` など）、Spring の `Sort` と `Pageable`、モジュール、トランザクション、Kotlin 2.2 / `-Xjvm-default=all` |
+| 13 | [Spring Boot 3 と 4](../13-spring-boot-versions.md)（共通） | バージョン表、アーティファクト（共通の jar と `-boot3`・`-boot4` のスターター）、Hibernate 6.6 と 7.4 の SQL の違い、検証の範囲 |
 
 <a id="where-to-start"></a>
 ## どこから始めるか
@@ -102,7 +100,7 @@ fetch first ? rows only
 | Kotlin | lambdaQL のラムダの中では |
 |---|---|
 | `it.price!! > 100.0` | `!!` は無視されます。コードをコンパイルするためだけにあります。ラムダは実行されないので、`NullPointerException` は起きません。 |
-| `it.customer?.name == "Kim"` | `it.customer?.name` は結合した customer のカラムを指定します。`where` の中ではデフォルトで内部結合の `join` なので、customer のない注文は返されません。null ガード（`it.customer == null \|\| ...`）を書いても同じです（D48）。このような注文も残すには `leftJoin` を使ってください。`it.customer!!.name` も同じカラムを意味します。 |
+| `it.customer?.name == "Kim"` | `it.customer?.name` は結合した customer のカラムを指定します。この条件は customer のない注文と一致しえないので内部結合の `join` になり、customer のない注文は返されません。`?.` は、customer のない注文が条件を真にできるとき（`it.status == 1 \|\| ...`、`it.customer?.name == null`）に `left join` になります（D54）。`it.customer!!.name` も同じカラムですが、常に内部結合です。 |
 | `status: Int?` のときの `it.status == 1` | `e0.status = 1`。`status` が NULL の行は一致しません（SQL の意味）。lambdaQL は Kotlin コンパイラーが追加する null チェックを無視します。意味を持つのは **自分で書いた** null チェックだけです。 |
 
 詳細: [9. Kotlin の注意点](09-kotlin-notes.md)。
@@ -114,9 +112,9 @@ fetch first ? rows only
 |---|---|
 | Kotlin | 2.x（設計は kotlinc 1.7.22、2.1.10、2.2.21、2.3.0、2.3.21 で確認） |
 | Java（JVM） | 21 |
-| Hibernate ORM | 7.4（Spring Boot 4.1.2 の 7.4.13 でテスト済み） |
+| Hibernate ORM | 6.6 または 7.4（6.6.53、7.4.13 でテスト済み） |
 | 設計で検証したデータベース | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
-| Spring Boot（任意） | 4.1（4.1.2 でテスト済み、Java のテスト）。Spring Boot 3 はこの版では検証していません |
+| Spring Boot（任意） | 3.5 または 4.1（3.5.16、4.1.2 でテスト済み、Java のテスト）。[13. Spring Boot 3 と 4](../13-spring-boot-versions.md) を参照 |
 
 <a id="other-languages"></a>
 ## 他の言語

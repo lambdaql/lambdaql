@@ -1,9 +1,6 @@
 <a id="4-sorting-and-paging-kotlin"></a>
 # 4. Sorting and paging (Kotlin)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/04-order-paging.md) for the latest rules.
-
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [3. Conditions (`where`)](03-where.md) | Next: [5. Subqueries](05-subquery.md) | [Java version of this page](../java/04-order-paging.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -275,7 +272,7 @@ qb.from(Order::class.java).orderBy { o, by -> by.asc(o.kind) }
 ```
 
 The alias is shared with `where`. If `where` already joined the same path, the sort uses that join.
-This join is an inner join. A path in `where` is always an inner join, so the orders without a customer are already removed (decisions D36, D48, see [3.10](03-where.md#310-association-paths)).
+If `where` used this path as an inner join, the orders without a customer are already removed (decisions D36, D48). If the path was reached with `?.` and became a `left join` (decision D54), the sort uses that `left join` too (see [3.10](03-where.md#310-association-paths)).
 
 <a id="46-rules-for-the-lambda-body"></a>
 ## 4.6 Rules for the lambda body

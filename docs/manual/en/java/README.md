@@ -1,12 +1,9 @@
 <a id="lambdaql-manual-java-track"></a>
 # lambdaQL Manual: Java track
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/java/README.md) for the latest rules.
-
 **Other languages:** English | [한국어](../../ko/java/README.md) | [日本語](../../ja/java/README.md) | [简体中文](../../zh/java/README.md)
 
-[Manual home](../README.md) | [Kotlin track](../kotlin/README.md) | Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
+[Manual home](../README.md) | [Kotlin track](../kotlin/README.md) | Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md) · [13. Spring Boot 3 and 4](../13-spring-boot-versions.md)
 
 This is the **Java track** of the lambdaQL manual. Every page in this track has **Java code only**.
 If you write your queries in Kotlin, read the [Kotlin track](../kotlin/README.md). It has the same chapters with the same numbers.
@@ -80,6 +77,7 @@ The pages marked "common" are shared by the Java and Kotlin tracks. They have sm
 | 10 | [Rules and limits](10-rules-and-limits.md) | All rule tables, Java and SQL differences, database differences, what is not supported |
 | 11 | [Errors and languages](../11-errors-and-languages.md) (common) | Error codes, exceptions, message language, logging |
 | 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`, repository default methods, DML shortcuts (`deleteAll`, `updateOne`, ...), Spring `Sort` and `Pageable`, modules, transactions, `QueryBuilder` bean |
+| 13 | [Spring Boot 3 and 4](../13-spring-boot-versions.md) (common) | Version table, artifacts (common jars and the `-boot3` and `-boot4` starters), SQL differences between Hibernate 6.6 and 7.4, what is verified |
 
 <a id="example-entities"></a>
 ## Example entities
@@ -99,9 +97,9 @@ All examples use these three entities. The full code is in [Getting started](02-
 |---|---|
 | Java | 21 |
 | Compiler | javac (ECJ, the Eclipse compiler, is not guaranteed) |
-| Hibernate ORM | 7.4 (tested with 7.4.13 from Spring Boot 4.1.2) |
-| Databases verified | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
-| Spring Boot (optional) | 4.1 (tested with 4.1.2). Spring Boot 3 is not verified in this edition |
+| Hibernate ORM | 6.6 or 7.4 (tested with 6.6.53 and 7.4.13) |
+| Databases verified | H2 2.3, MariaDB 10.11, MySQL 8.4, PostgreSQL 17, Oracle 23.26 (23ai) |
+| Spring Boot (optional) | 3.5 or 4.1 (tested with 3.5.16 and 4.1.2). See [13. Spring Boot 3 and 4](../13-spring-boot-versions.md) |
 
 <a id="help-and-contributions"></a>
 ## Help and contributions

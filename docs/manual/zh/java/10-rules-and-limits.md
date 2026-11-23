@@ -1,9 +1,6 @@
 <a id="10-rules-and-limits-java"></a>
 # 10. 规则与限制（Java）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/10-rules-and-limits.md)。
-
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[9. Java 说明](09-java-notes.md) | 下一章：[11. 错误与语言](../11-errors-and-languages.md) | [本页的 Kotlin 版本](../kotlin/10-rules-and-limits.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -505,9 +502,9 @@ List<Order> list = flag
 | 项目 | 版本 |
 |---|---|
 | Java | 21（javac）。不保证支持 ECJ |
-| Hibernate | 7.4（已用 7.4.13 测试）。使用了 HQL 扩展（例如 `function(...)` 和 `nulls first`）；不保证支持其他 JPA 提供者 |
+| Hibernate | 6.6 或 7.4（已用 6.6.53、7.4.13 测试）。使用了 HQL 扩展（例如 `function(...)` 和 `nulls first`）；不保证支持其他 JPA 提供者 |
 | 数据库 | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
-| Spring | Spring Boot 4.1.2 和 Spring Data JPA 4.1.2（Spring 模块，[12](12-spring-data-jpa.md)）。本版未验证 Spring Boot 3 |
+| Spring | Spring Boot 3.5.16（Spring Data JPA 3.5.13）和 4.1.2（Spring Data JPA 4.1.2）（Spring 模块，[12](12-spring-data-jpa.md)、[13](../13-spring-boot-versions.md)） |
 | 未测试 | PostgreSQL、SQL Server、Oracle 19c 及更早版本（例如 PL/SQL 的 `BOOLEAN` 参数） |
 
 ---

@@ -1,9 +1,6 @@
 <a id="lambdaql-user-manual-english"></a>
 # lambdaQL User Manual (English)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../ko/README.md) for the latest rules.
-
 **Other languages:** English | [한국어](../ko/README.md) | [日本語](../ja/README.md) | [简体中文](../zh/README.md)
 
 lambdaQL is a query library for Java and Kotlin.
@@ -96,6 +93,7 @@ These pages are for both languages. They show code in separate Java and Kotlin s
 |---|---|
 | [1. Overview](01-overview.md) | What lambdaQL is, why it exists, how it works, design principles |
 | [11. Errors and languages](11-errors-and-languages.md) | Error codes, exceptions, message language, logging |
+| [13. Spring Boot 3 and 4](13-spring-boot-versions.md) | Version table, artifacts, SQL differences between Hibernate 6.6 and 7.4, what is verified |
 
 <a id="table-of-contents"></a>
 ## Table of contents
@@ -115,6 +113,7 @@ These pages are for both languages. They show code in separate Java and Kotlin s
 | 10 | Rules and limits: the full rule tables | [Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md) |
 | 11 | Errors and languages (common) | [11-errors-and-languages.md](11-errors-and-languages.md) | [11-errors-and-languages.md](11-errors-and-languages.md) |
 | 12 | Spring Data JPA: `LambdaQlExecutor<T>`, DML shortcuts, Spring `Sort` and `Pageable`, modules, transactions, `QueryBuilder` bean | [Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md) |
+| 13 | Spring Boot 3 and 4 (common): versions, artifacts, SQL differences between Hibernate 6.6 and 7.4 | [13-spring-boot-versions.md](13-spring-boot-versions.md) | [13-spring-boot-versions.md](13-spring-boot-versions.md) |
 
 <a id="about-the-examples"></a>
 ## About the examples
@@ -141,9 +140,9 @@ The full entity code is in Getting started: [Java](java/02-getting-started.md#ex
 |---|---|
 | Java | 21 |
 | Kotlin | 2.x |
-| Hibernate ORM | 7.4 (tested with 7.4.13 from Spring Boot 4.1.2) |
-| Databases verified | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
-| Spring Boot (optional) | 4.1 (tested with 4.1.2). Spring Boot 3 is not verified in this edition |
+| Hibernate ORM | 6.6 or 7.4 (tested with 6.6.53 and 7.4.13) |
+| Databases verified | H2 2.3, MariaDB 10.11, MySQL 8.4, PostgreSQL 17, Oracle 23.26 (23ai) |
+| Spring Boot (optional) | 3.5 or 4.1 (tested with 3.5.16 and 4.1.2). See [13. Spring Boot 3 and 4](13-spring-boot-versions.md) |
 
 <a id="folder-layout"></a>
 ## Folder layout

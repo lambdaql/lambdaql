@@ -1,12 +1,9 @@
 <a id="lambdaql-manual-kotlin-track"></a>
 # lambdaQL 手册：Kotlin 路线
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/README.md)。
-
 **其他语言：** [English](../../en/kotlin/README.md) | [한국어](../../ko/kotlin/README.md) | [日本語](../../ja/kotlin/README.md) | [简体中文](../../zh/kotlin/README.md)
 
-[手册首页](../README.md) | [Java 路线](../java/README.md) | 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
+[手册首页](../README.md) | [Java 路线](../java/README.md) | 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md) · [13. Spring Boot 3 与 4](../13-spring-boot-versions.md)
 
 这是 lambdaQL 手册的 **Kotlin 路线**。本路线的每个页面**只包含 Kotlin 代码**。
 如果你用 Java 编写查询，请阅读 [Java 路线](../java/README.md)。两条路线的章节编号和文件名相同（只有第 9 章不同），你可以随时切换。
@@ -73,6 +70,7 @@ fetch first ? rows only
 | 10 | [规则与限制](10-rules-and-limits.md) | 所有规则表集中在一处 |
 | 11 | [错误与语言](../11-errors-and-languages.md)（公共） | 错误码、异常、消息语言、日志 |
 | 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`、带方法体的仓库方法、DML 快捷方法（`deleteAll`、`updateOne` 等）、Spring `Sort` 和 `Pageable`、模块、事务、Kotlin 2.2 / `-Xjvm-default=all` |
+| 13 | [Spring Boot 3 与 4](../13-spring-boot-versions.md)（公共） | 版本表、构件（公共 jar 与 `-boot3`、`-boot4` starter）、Hibernate 6.6 与 7.4 的 SQL 差异、验证范围 |
 
 <a id="where-to-start"></a>
 ## 从哪里开始
@@ -102,7 +100,7 @@ fetch first ? rows only
 | Kotlin | 在 lambdaQL Lambda 中 |
 |---|---|
 | `it.price!! > 100.0` | `!!` 会被忽略。它只是为了让代码能够编译。不会出现 `NullPointerException`，因为 Lambda 从不执行。 |
-| `it.customer?.name == "Kim"` | `it.customer?.name` 指代关联客户的一个列。在 `where` 中它默认是内连接 `join`，因此没有客户的订单不会被返回。写了 null 守卫（`it.customer == null \|\| ...`）也是如此（D48）。要保留这些订单，请使用 `leftJoin`。`it.customer!!.name` 也表示同一个列。 |
+| `it.customer?.name == "Kim"` | `it.customer?.name` 指代关联客户的一个列。这个条件不可能与没有客户的订单匹配，因此是内连接 `join`，没有客户的订单不会被返回。当没有客户的订单可能使条件为真时（`it.status == 1 \|\| ...`、`it.customer?.name == null`），`?.` 会成为 `left join`（D54）。`it.customer!!.name` 也表示同一个列，但总是内连接。 |
 | `status: Int?` 时的 `it.status == 1` | `e0.status = 1`。`status` 为 NULL 的行不匹配（SQL 语义）。lambdaQL 忽略 Kotlin 编译器添加的 null 检查。只有**你写的** null 检查才算数。 |
 
 详情：[9. Kotlin 说明](09-kotlin-notes.md)。
@@ -114,9 +112,9 @@ fetch first ? rows only
 |---|---|
 | Kotlin | 2.x（设计已用 kotlinc 1.7.22、2.1.10、2.2.21、2.3.0 和 2.3.21 检查） |
 | Java（JVM） | 21 |
-| Hibernate ORM | 7.4（已用 Spring Boot 4.1.2 中的 7.4.13 测试） |
+| Hibernate ORM | 6.6 或 7.4（已用 6.6.53、7.4.13 测试） |
 | 设计中已验证的数据库 | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
-| Spring Boot（可选） | 4.1（已用 4.1.2 测试，Java 测试）。本版未验证 Spring Boot 3 |
+| Spring Boot（可选） | 3.5 或 4.1（已用 3.5.16、4.1.2 测试，Java 测试）。见 [13. Spring Boot 3 与 4](../13-spring-boot-versions.md) |
 
 <a id="other-languages"></a>
 ## 其他语言

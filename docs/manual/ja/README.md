@@ -1,9 +1,6 @@
 <a id="lambdaql-user-manual-english"></a>
 # lambdaQL ユーザーマニュアル（日本語）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../ko/README.md)を参照してください。
-
 **他の言語:** [English](../en/README.md) | [한국어](../ko/README.md) | [日本語](../ja/README.md) | [简体中文](../zh/README.md)
 
 lambdaQL は Java と Kotlin のためのクエリライブラリです。
@@ -96,6 +93,7 @@ fetch first ? rows only
 |---|---|
 | [1. 概要](01-overview.md) | lambdaQL とは何か、なぜ作ったか、どう動くか、設計方針 |
 | [11. エラーと言語](11-errors-and-languages.md) | エラーコード、例外、メッセージの言語、ログ |
+| [13. Spring Boot 3 と 4](13-spring-boot-versions.md) | バージョン表、アーティファクト、Hibernate 6.6 と 7.4 の SQL の違い、検証の範囲 |
 
 <a id="table-of-contents"></a>
 ## 目次
@@ -115,6 +113,7 @@ fetch first ? rows only
 | 10 | ルールと制限: ルール表の全体 | [Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md) |
 | 11 | エラーと言語（共通） | [11-errors-and-languages.md](11-errors-and-languages.md) | [11-errors-and-languages.md](11-errors-and-languages.md) |
 | 12 | Spring Data JPA: `LambdaQlExecutor<T>`、DML の短縮メソッド、Spring の `Sort` と `Pageable`、モジュール、トランザクション、`QueryBuilder` の Bean | [Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md) |
+| 13 | Spring Boot 3 と 4（共通）: バージョン、アーティファクト、Hibernate 6.6 と 7.4 の SQL の違い | [13-spring-boot-versions.md](13-spring-boot-versions.md) | [13-spring-boot-versions.md](13-spring-boot-versions.md) |
 
 <a id="about-the-examples"></a>
 ## 例について
@@ -141,9 +140,9 @@ fetch first ? rows only
 |---|---|
 | Java | 21 |
 | Kotlin | 2.x |
-| Hibernate ORM | 7.4（Spring Boot 4.1.2 の 7.4.13 でテスト済み） |
-| 検証したデータベース | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
-| Spring Boot（任意） | 4.1（4.1.2 でテスト済み）。Spring Boot 3 はこの版では検証していません |
+| Hibernate ORM | 6.6 または 7.4（6.6.53、7.4.13 でテスト済み） |
+| 検証したデータベース | H2 2.3、MariaDB 10.11、MySQL 8.4、PostgreSQL 17、Oracle 23.26 (23ai) |
+| Spring Boot（任意） | 3.5 または 4.1（3.5.16、4.1.2 でテスト済み）。[13. Spring Boot 3 と 4](13-spring-boot-versions.md) を参照 |
 
 <a id="folder-layout"></a>
 ## フォルダー構成

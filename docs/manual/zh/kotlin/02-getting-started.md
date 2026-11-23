@@ -1,9 +1,6 @@
 <a id="2-getting-started-kotlin"></a>
 # 2. 入门（Kotlin）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/02-getting-started.md)。
-
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[1. 概述](../01-overview.md) | 下一章：[3. 条件](03-where.md) | [本页的 Java 版本](../java/02-getting-started.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -18,10 +15,10 @@
 | Kotlin | 2.x | 设计已用 kotlinc 1.7.22、2.1.10、2.2.21、2.3.0 和 2.3.21 检查。 |
 | JVM | Java 21 | 构建 lambdaQL 需要。 |
 | `-jvm-target` | 1.8、11、17 或 21 | 这四个版本编译查询 Lambda 的方式都相同。 |
-| JPA 提供者 | Hibernate ORM 7.4 | lambdaQL 生成 Hibernate 7 HQL。已用 7.4.13 测试。不支持其他 JPA 提供者。 |
-| Jakarta Persistence | 3.2 | 随 Hibernate 7.4 一起提供。 |
-| 数据库 | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) | 这三种已验证。其他数据库可能可用，但未经测试。 |
-| Spring Boot | 4.1 | 可选。项目的测试使用 Spring Boot 4.1.2。 |
+| JPA 提供者 | Hibernate ORM 6.6 或 7.4 | lambdaQL 生成 Hibernate HQL。已用 6.6.53（Spring Boot 3.5.16）和 7.4.13（Spring Boot 4.1.2）测试。不支持其他 JPA 提供者。请参阅 [13. Spring Boot 3 与 4](../13-spring-boot-versions.md)。 |
+| Jakarta Persistence | 3.1 或 3.2 | Hibernate 6.6 使用 3.1，7.4 使用 3.2。 |
+| 数据库 | H2 2.3、MariaDB 10.11、MySQL 8.4、PostgreSQL 17、Oracle 23.26 (23ai) | 这五种已验证。手册中各数据库的 SQL 来自 H2、MariaDB 和 Oracle。其他数据库可能可用，但未经测试。 |
+| Spring Boot | 3.5 或 4.1 | 可选。项目的测试使用 Spring Boot 3.5.16 和 4.1.2。 |
 | Kotlin 运行时 | – | lambdaQL 不会向你的依赖中添加 `kotlin-stdlib` 或 `kotlin-reflect`。 |
 
 <a id="build-from-source"></a>
@@ -36,7 +33,7 @@ cd lambdaql
 - Gradle wrapper 为 9.9.1。仓库中有 `gradle/gradle-daemon-jvm.properties`，因此 Gradle 守护进程会使用 Java 21。
 - 构建需要 JDK 21 和一个 **JDK 24 或更高版本**。JDK 24 或更高版本用于编译 `java.lang.classfile` 读取器（`src/main/java24`），并用该读取器再运行一次测试。默认版本是 25，可以像 `-Plql.classfile.jdk=24` 这样更改。如果 Gradle 找不到 JDK，请把路径写入 `~/.gradle/gradle.properties` 的 `org.gradle.java.installations.paths`。
 - 在 IntelliJ IDEA 中，把 **Settings > Build Tools > Gradle > Gradle JVM** 设置为 Java 21 JDK。
-- 构建包含三个模块：`query`（构件 `lambdaql-core`）、`spring-data-jpa`（`lambdaql-spring-data-jpa`）和 `spring-boot-starter`（`lambdaql-spring-boot-starter`）。Spring 模块的说明见 [12. Spring Data JPA](12-spring-data-jpa.md)。
+- 构建的主要模块是 `query`（构件 `lambdaql-core`）、`spring-data-jpa`（`lambdaql-spring-data-jpa`）和 `spring-boot-starter-boot3`、`spring-boot-starter-boot4`（`lambdaql-spring-boot-starter-boot3`、`-boot4`）。`lambdaql-core` 和 `lambdaql-spring-data-jpa` 是 Spring Boot 3 与 4 共用的 jar，只有 starter 按 Boot 版本分开（[13. Spring Boot 3 与 4](../13-spring-boot-versions.md)）。Spring 模块的说明见 [12. Spring Data JPA](12-spring-data-jpa.md)。
 
 运行单元测试：
 
@@ -78,7 +75,7 @@ Maven：
 </dependency>
 ```
 
-使用 Spring Data JPA 或 Spring Boot 时，请改用 `lambdaql-spring-boot-starter` 或 `lambdaql-spring-data-jpa`。它们会带入 `lambdaql-core`（见 [12.2](12-spring-data-jpa.md#122-modules)）。
+使用 Spring Boot 时，请改用与 Boot 版本对应的 `lambdaql-spring-boot-starter-boot4`（`-boot3`）；不使用 Spring Boot 而只使用 Spring Data JPA 时，请改用 `lambdaql-spring-data-jpa`。它们会带入 `lambdaql-core`（见 [12.2](12-spring-data-jpa.md#122-modules)）。
 
 > [!WARNING]
 > 版本 `1.0.0` 是仓库的 `gradle.properties` 中定义的值，在首次发布前可能改变。
@@ -183,7 +180,7 @@ val qb = QueryBuilder(emf)
 <a id="with-spring-boot"></a>
 ### 使用 Spring Boot
 
-使用 `lambdaql-spring-boot-starter` 时，Spring Boot 会为你创建 `QueryBuilder` bean（见 [12.8](12-spring-data-jpa.md#128-the-querybuilder-bean)）。
+使用 `lambdaql-spring-boot-starter-boot4`（`-boot3`）时，Spring Boot 会为你创建 `QueryBuilder` bean（见 [12.8](12-spring-data-jpa.md#128-the-querybuilder-bean)）。
 不使用它时，请自己创建这个 bean。像自动配置那样，使用 Spring 的共享 `EntityManager`。
 
 ```kotlin
@@ -304,7 +301,7 @@ val orders = query.toList()
 ### 指向其他实体的路径
 
 像 `it.customer?.name` 这样的路径指代关联实体的一个列。
-在 `where` 中，lambdaQL 默认会添加内连接 `join`。没有客户的订单**不在**结果中。
+在 `where` 中，lambdaQL 默认会添加内连接 `join`。像下面的示例这样，如果没有客户的订单无法使条件为真，那么没有客户的订单**不在**结果中。
 
 ```kotlin
 qb.from(Order::class.java)
@@ -324,11 +321,10 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.name=?
 ```
 
-`it.customer!!.name` 生成相同的 HQL。使用你喜欢的写法即可。
-要查找没有客户的订单，请比较关联本身：`it.customer == null` 生成 `e0.customer is null`（不需要 join）。
-`it.customer?.name == null` **不会**包含它们。
-即使使用 null 守卫（`it.customer == null || ...`），没有客户的订单也不会保留，因为路径是内连接（决策 D48）。
-要保留这些订单，请使用 `leftJoin`（[6.8](06-select-group.md#68-explicit-joins)）。见 [3.10](03-where.md#310-association-paths)。
+在这个示例中，`it.customer!!.name` 也生成相同的 HQL。
+两种写法会因条件而不同（决策 D54）。`!!` 表示“关联一定存在”，因此总是内连接。
+`?.` 表示“关联可能不存在”，因此当没有客户的订单可能使条件为真时，为 `left join`。例如 `it.status == 1 || it.customer?.name == name` 和 `it.customer?.name == null` 也会返回没有客户的订单。
+只查找没有客户的订单时，请比较关联本身：`it.customer == null` 生成 `e0.customer is null`（不需要 join）。见 [3.10](03-where.md#310-association-paths)。
 
 <a id="getting-the-result"></a>
 ## 获取结果

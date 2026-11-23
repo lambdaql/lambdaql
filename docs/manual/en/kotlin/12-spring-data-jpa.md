@@ -1,10 +1,7 @@
 <a id="12-spring-data-jpa-kotlin"></a>
 # 12. Spring Data JPA (Kotlin)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/12-spring-data-jpa.md) for the latest rules.
-
-[Kotlin track](README.md) | [Manual home](../README.md) | Previous: [11. Errors and languages](../11-errors-and-languages.md) | [Java version of this page](../java/12-spring-data-jpa.md)
+[Kotlin track](README.md) | [Manual home](../README.md) | Previous: [11. Errors and languages](../11-errors-and-languages.md) | Next: [13. Spring Boot 3 and 4](../13-spring-boot-versions.md) | [Java version of this page](../java/12-spring-data-jpa.md)
 
 ---
 
@@ -25,17 +22,17 @@ You do not write a `...RepositoryImpl` class for these methods.
 <a id="122-modules"></a>
 ## 12.2 Modules
 
-lambdaQL has three artifacts. The core has no Spring dependency, so you can use it with plain JPA too.
+The core has no Spring dependency, so you can use it with plain JPA too. `lambdaql-core` and `lambdaql-spring-data-jpa` are the same for Spring Boot 3 and 4; only the starter has one artifact per Spring Boot version (the name ends with `-boot3` or `-boot4`, [13. Spring Boot 3 and 4](../13-spring-boot-versions.md)).
 
 | Artifact | What it has | You need it when |
 |---|---|---|
-| `lambdaql-core` | The engine and `QueryBuilder`. No Spring dependency | Always. The other two artifacts bring it |
-| `lambdaql-spring-data-jpa` | `LambdaQlExecutor<T>`, its Spring Data registration, the Spring Boot auto-configuration (`QueryBuilder` bean) | You use Spring Data JPA without Spring Boot |
-| `lambdaql-spring-boot-starter` | No code. It brings `lambdaql-spring-data-jpa` and `spring-boot-starter-data-jpa` | You use Spring Boot |
+| `lambdaql-core` | The engine and `QueryBuilder`. No Spring dependency. The same for Spring Boot 3 and 4 | Always. The artifacts below bring it |
+| `lambdaql-spring-data-jpa` | `LambdaQlExecutor<T>`, its Spring Data registration, the Spring Boot auto-configuration (`QueryBuilder` bean). The same for Spring Data JPA 3.5 and 4.1. It uses the Spring Data JPA of your project | You use Spring Data JPA without Spring Boot |
+| `lambdaql-spring-boot-starter-boot4`, `lambdaql-spring-boot-starter-boot3` | No code. It brings `lambdaql-spring-data-jpa` and the `spring-boot-starter-data-jpa` of that Boot version | You use Spring Boot (pick the one for your Boot version) |
 
 The artifacts are **not published to Maven Central yet**. Build them from source and publish them to your local Maven repository first (see [2. Getting started](02-getting-started.md#build-from-source)). The version is `1.0.0`.
 
-With Spring Boot, Gradle (Kotlin DSL):
+With Spring Boot 4, Gradle (Kotlin DSL). For Spring Boot 3, change the end of the name to `-boot3`:
 
 ```kotlin
 repositories {
@@ -44,7 +41,7 @@ repositories {
 }
 
 dependencies {
-    implementation("org.lambdaql:lambdaql-spring-boot-starter:1.0.0")
+    implementation("org.lambdaql:lambdaql-spring-boot-starter-boot4:1.0.0")
     implementation("org.jetbrains.kotlin:kotlin-reflect")           // Spring Data needs it for Kotlin
 }
 ```
@@ -54,14 +51,14 @@ Maven:
 ```xml
 <dependency>
   <groupId>org.lambdaql</groupId>
-  <artifactId>lambdaql-spring-boot-starter</artifactId>
+  <artifactId>lambdaql-spring-boot-starter-boot4</artifactId>
   <version>1.0.0</version>
 </dependency>
 ```
 
 With Maven, add `kotlin-reflect` too (see [12.9](#129-kotlin-compile-settings)).
 
-Without Spring Boot, add `lambdaql-spring-data-jpa` next to your own Spring Data JPA setup (Hibernate and a JDBC driver). It brings `lambdaql-core` and Spring Data JPA.
+Without Spring Boot, add `lambdaql-spring-data-jpa` next to your own Spring Data JPA setup (Spring Data JPA, Hibernate and a JDBC driver). It brings `lambdaql-core`, and it uses the Spring Data JPA that your project has (3.5 or 4.1).
 
 ```kotlin
 dependencies {
@@ -83,9 +80,9 @@ Requirements:
 | Item | Version |
 |---|---|
 | Java (JVM) | 21 |
-| Spring Boot | 4.1 (tested with 4.1.2). Spring Boot 3 is not verified in this edition |
-| Spring Data JPA | 4.1 (tested with 4.1.2) |
-| Hibernate | 7.4 (Spring Boot 4.1 already brings it) |
+| Spring Boot | 3.5 or 4.1 (tested with 3.5.16 and 4.1.2) |
+| Spring Data JPA | 3.5 or 4.1 (tested with 3.5.13 and 4.1.2) |
+| Hibernate | 6.6 or 7.4 (Spring Boot already brings it) |
 | Kotlin | 2.2 or newer. For older Kotlin, see [12.9](#129-kotlin-compile-settings) |
 | `kotlin-reflect` | Required by Spring Data for Kotlin |
 
@@ -298,7 +295,7 @@ lambdaQL turns each `Sort.Order` into one sort key with `SortSpec.ofPath` (see [
 
 | Spring | In lambdaQL |
 |---|---|
-| A property name (`"grade"`, `"team.name"`) | Checked with Spring Data `PropertyPath`, the same as in Spring Data's own repositories. An unknown name gives `PropertyReferenceException`. The path must end at a basic value, not at an entity. A to-one path such as `team.name` uses a `left join`, so rows without a team are kept. Then the sort policy checks the name (see [below](#sort-policy-with-spring)) |
+| A property name (`"grade"`, `"team.name"`) | Checked with Spring Data `PropertyPath`, the same as in Spring Data's own repositories. An unknown name gives `PropertyReferenceException` (package: `org.springframework.data.mapping` in Spring Data 3, `org.springframework.data.core` in 4). The path must end at a basic value, not at an entity. A to-one path such as `team.name` uses a `left join`, so rows without a team are kept. Then the sort policy checks the name (see [below](#sort-policy-with-spring)) |
 | An alias of the sort policy (`"level"`) | Passed on as it is, without the `PropertyPath` check. The sort policy turns it into its path |
 | `ASC` / `DESC` with `NullHandling.NATIVE` (the default) | The lambdaQL NULL rule: NULLs first for ascending, NULLs last for descending. The order is the same on every database (see [4.4](04-order-paging.md#44-null-ordering-is-the-same-on-every-database)) |
 | `NullHandling.NULLS_FIRST` / `NULLS_LAST` | Used as written (`ASC_NULLS_FIRST`, `DESC_NULLS_LAST` and so on) |
@@ -527,10 +524,10 @@ These settings were checked with a prototype: kotlinc 2.3.21, and `-jvm-default=
 <a id="1210-not-implemented-yet"></a>
 ## 12.10 Not implemented yet
 
-- **Spring Boot version.** This edition is tested with Spring Boot 4.1.2. The auto-configuration names the Spring Boot 3 classes too, but Spring Boot 3 is not verified in this edition.
+- **Spring Boot version.** Tested with Spring Boot 3.5.16 and 4.1.2. The same tests run on both versions ([13. Spring Boot 3 and 4](../13-spring-boot-versions.md)).
 - **`ignoreCase()`** in a Spring `Sort`.
 - **Kotlin repositories** are not tested yet.
 
 ---
 
-[Kotlin track](README.md) | Previous: [11. Errors and languages](../11-errors-and-languages.md) | [Java version of this page](../java/12-spring-data-jpa.md)
+[Kotlin track](README.md) | Previous: [11. Errors and languages](../11-errors-and-languages.md) | Next: [13. Spring Boot 3 and 4](../13-spring-boot-versions.md) | [Java version of this page](../java/12-spring-data-jpa.md)

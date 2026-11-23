@@ -1,9 +1,6 @@
 <a id="10-rules-and-limits-java"></a>
 # 10. ルールと制限（Java）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/10-rules-and-limits.md)を参照してください。
-
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [9. Java の注意点](09-java-notes.md) | 次: [11. エラーと言語](../11-errors-and-languages.md) | [このページの Kotlin 版](../kotlin/10-rules-and-limits.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -505,9 +502,9 @@ List<Order> list = flag
 | 項目 | バージョン |
 |---|---|
 | Java | 21（javac）。ECJ は保証しない |
-| Hibernate | 7.4（7.4.13 でテスト済み）。HQL の拡張（たとえば `function(...)` や `nulls first`）を使うので、他の JPA 実装は保証しない |
+| Hibernate | 6.6 または 7.4（6.6.53、7.4.13 でテスト済み）。HQL の拡張（たとえば `function(...)` や `nulls first`）を使うので、他の JPA 実装は保証しない |
 | データベース | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
-| Spring | Spring Boot 4.1.2、Spring Data JPA 4.1.2（Spring モジュール、[12](12-spring-data-jpa.md)）。Spring Boot 3 はこの版では検証していない |
+| Spring | Spring Boot 3.5.16（Spring Data JPA 3.5.13）と 4.1.2（Spring Data JPA 4.1.2）（Spring モジュール、[12](12-spring-data-jpa.md)、[13](../13-spring-boot-versions.md)） |
 | テストしていない | PostgreSQL、SQL Server、Oracle 19c 以前（たとえば PL/SQL の `BOOLEAN` パラメーター） |
 
 ---

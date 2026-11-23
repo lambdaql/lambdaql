@@ -1,9 +1,6 @@
 <a id="9-kotlin-notes"></a>
 # 9. Kotlin の注意点
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/09-kotlin-notes.md)を参照してください。
-
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [8. プロシージャと DB 関数](08-procedures-functions.md) | 次: [10. ルールと制限](10-rules-and-limits.md) | [このページの Java 版: 9. Java の注意点](../java/09-java-notes.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -35,7 +32,7 @@ lambdaQL は Kotlin と Java を **同じエンジン**、同じ API でサポ�
 
 - 例の下のコメントは、設計で決まっている場合に、lambdaQL が作る HQL を示します。
 - ラムダの中に書いた定数（数値、文字列、真偽値、`null`、enum 定数、`const val`）は、リテラルとして HQL に書き込まれます。キャプチャした値と計算した値は常にバインドパラメーター（`:p1`、`:p2`、...）になります（D37）。
-- `e0` はルートエンティティのエイリアス、`j1` は関連のパスのために lambdaQL が追加する結合のエイリアスです。`where` の中では常に内部結合の `join`（D48）、パスを `orderBy` か `select` だけで使うときは `left join` です（D36）。サブクエリのルートは `s1`、`s2`、... です（[5. サブクエリ](05-subquery.md) を参照）。予定の機能（派生テーブル、CTE、プロシージャ）の例は、まだ予定のエイリアス `o` と `c1` を使います。
+- `e0` はルートエンティティのエイリアス、`j1` は関連のパスのために lambdaQL が追加する結合のエイリアスです。`where` の中ではデフォルトで内部結合の `join`（D48）で、`?.` でたどった段階は必要なときに `left join`（D54）、パスを `orderBy` か `select` だけで使うときは `left join` です（D36）。サブクエリのルートは `s1`、`s2`、... です（[5. サブクエリ](05-subquery.md) を参照）。予定の機能（派生テーブル、CTE、プロシージャ）の例は、まだ予定のエイリアス `o` と `c1` を使います。
 - エンティティは [2. はじめよう](02-getting-started.md#example-entities) のものです。一部の例では `Order` に 2 つのプロパティを追加して使います: `var flag: Boolean? = null` と `var kind: OrderKind? = null`（`enum class OrderKind { NORMAL, EXPRESS, GIFT }`）。
 
 ---
@@ -107,13 +104,14 @@ lambdaQL は getter を JPA 属性にマッピングします（ルール R10）
 ## 9.3 意味を持つのは自分で書いた null チェックだけ
 
 lambdaQL は **ラムダを実行しません**。バイトコードを読んで HQL を書きます。
-そのため、Kotlin のいくつかのルールは違う動きになります。基本となるのは次の 4 つの決定です。
+そのため、Kotlin のいくつかのルールは違う動きになります。基本となるのは次の 5 つの決定です。
 
 | 決定 | ルール |
 |---|---|
-| D20、D36 | `it.customer?.name` のようなパスは、呼び出しの連鎖ではなく **カラム** です。`where` の中では、to-one の関連はデフォルトで内部結合です。customer のない注文は返されません。それらの注文を探すには `it.customer == null` と書きます。`it.customer == null \|\| ...` のような null ガードを書いても、内部結合は変わりません（D48）。それらの注文を残すには `leftJoin` を使ってください。 |
+| D20、D36 | `it.customer?.name` のようなパスは、呼び出しの連鎖ではなく **カラム** です。`where` の中では、to-one の関連はデフォルトで内部結合です。customer のない注文だけを探すには `it.customer == null` と書きます。 |
+| D54 | `where` の中で `?.` でたどった関連の段階は、customer のない注文が条件を真にできるなら `left join` です（`it.status == 1 \|\| it.customer?.name == "Kim"`、`it.customer?.name == null`、`?.` で書いた null ガード）。`!!` でたどった段階は常に内部結合です。同じ段階を混ぜて書くと内部結合になり、`WARN` レベルの `LQL-5014` を出します。 |
 | D22 | lambdaQL は **自分で書いた null の扱いだけ** を使います: `== null`、`!= null`、`?.`、`?:`。Kotlin コンパイラーが自分で追加する null チェックは無視します。それ以外の NULL は SQL に従います。条件は UNKNOWN になり、その行は返されません。 |
-| D23 | `!!` は無視されます。コードをコンパイルするためだけにあります。`it.customer!!.name` と `it.customer?.name` は同じカラムです。 |
+| D23 | `!!` は値を変えません。`it.customer!!.name` と `it.customer?.name` は同じカラムです。ただし `where` の中の関連の段階の `!!` は「関連が必ずある」とみなし、内部結合です（D54）。 |
 | D12 | オブジェクト同士の `==`（と `===`）は、オブジェクトの同一性ではなく **値の等価** を意味します。 |
 
 lambdaQL は「自分で書いた」null チェックとコンパイラーのものをどう見分けるのでしょうか。バイトコードが違います。
@@ -205,8 +203,8 @@ SQL の `=` は値だけを比較します。**lambdaQL は値の等価を使い
 
 | Kotlin | lambdaQL での意味 | HQL の例 |
 |---|---|---|
-| `it.customer?.name` | カラム `customer.name`。`where` の中ではデフォルトで内部結合なので、customer のない注文は返されません | `j1.name` + `join e0.customer j1` |
-| `it.customer!!.name` | `?.` と同じ。`!!` は無視されます（D23） | `j1.name` + `join e0.customer j1` |
+| `it.customer?.name` | カラム `customer.name`。`where` の中では、customer のない注文が条件を真にできるなら `left join`、そうでなければ内部結合（D54） | `j1.name` + `join e0.customer j1` または `left join e0.customer j1` |
+| `it.customer!!.name` | 同じカラム。`where` の中では常に内部結合（D23、D54） | `j1.name` + `join e0.customer j1` |
 | `it.customer?.id` | パスが対象の `@Id` で終わる: FK のカラムで、join なし | `e0.customer.id` |
 | `it.customer == null` | customer のない注文だけ | `e0.customer is null`（FK のカラム、join なし） |
 | `it.customer != null` | customer がある注文だけ | `e0.customer is not null`（FK のカラム、join なし） |
@@ -249,18 +247,22 @@ where o1_0.customer_id=5
 ```
 
 パスは呼び出しの連鎖ではなく **カラム** です（D20）。`where` の中では、lambdaQL はデフォルトで内部結合を使います（D36）。
-そのため customer のない注文は返されず、パスの前に `it.customer != null &&` を書く必要はありません。
+そのため、パスの前に `it.customer != null &&` を書く必要はありません。
 
-**`?.` を使っても customer のない注文は戻りません。** Kotlin では、customer がないとき `it.customer?.name == null` は `true` です。
-lambdaQL では、customer に名前がない注文だけを返します。パスは内部結合なので、null ガードを書いても同じです（D48）。
+**`?.` で書いた条件は、Kotlin と同じように customer のない注文を残します。** Kotlin では、customer がないとき `it.customer?.name == null` は `true` です。
+lambdaQL はこの条件を `left join` で書き、customer のない注文も返します（D54）。`!!` で書くと内部結合なので、customer に名前がない注文だけを返します。
 
 ```kotlin
 .where { it.customer == null }
 // select e0 from Order e0 where e0.customer is null      （FK のカラム、join なし）
 
-.where { it.customer == null || it.customer?.name == null }
-// customer に名前がない注文だけ: 内部結合が customer のない注文を除く
-// select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name is null
+.where { it.customer?.name == null }
+// customer のない注文と、名前のない customer の注文
+// select e0 from Order e0 left join e0.customer j1 where j1.name is null
+
+.where { it.customer!!.name == null }
+// 名前のない customer の注文だけ: 内部結合が customer のない注文を除く
+// select e0 from Order e0 join e0.customer j1 where j1.name is null
 ```
 
 **データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `no-association`:
@@ -683,9 +685,9 @@ KC1 から KC5 は、ラムダを読み込むときに見つかります。こ�
 
 | Kotlin のコード | lambdaQL（SQL） |
 |---|---|
-| `!!` は NPE を投げる | `!!` は無視されます。NULL は SQL のルールに従います |
+| `!!` は NPE を投げる | 値の `!!` は無視されます。NULL は SQL のルールに従います。`where` の中の関連の段階の `!!` は内部結合なので、関連のない行は除かれます（D54） |
 | `status == null` のとき `it.status != 1` は `true` | 隠れた null チェックは無視されます: NULL に対して `e0.status <> 1` は UNKNOWN なので、その行は返されません。含めるには `it.status == null \|\| ...` と書いてください |
-| customer がないとき `it.customer?.name == null` は `true` | `where` の中ではパスはデフォルトで内部結合なので、customer のない注文は返されません。含めるには `leftJoin` と `c == null \|\| c.name == null` を使うか、`it.customer == null` でクエリをもう一度実行してください |
+| customer がないとき `it.customer?.name == null` は `true` | 同じ: `?.` でたどった段階は `left join` になり、customer のない注文も返されます（D54）。`it.customer!!.name == null` は内部結合なので返されません |
 | 対象が NULL の `when` や範囲は `else` に進み、`!in` は `true` | その行は返されません。`NOT` の下でも同じです |
 | `===` はオブジェクトの同一性 | 値の等価 |
 | `BigDecimal` の `==` はスケールを比較する（`1.0 != 1.00`） | 値の等価 |

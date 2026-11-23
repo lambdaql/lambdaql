@@ -1,12 +1,9 @@
 <a id="lambdaql-manual-java-track"></a>
 # lambdaQL マニュアル: Java トラック
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/README.md)を参照してください。
-
 **他の言語:** [English](../../en/java/README.md) | [한국어](../../ko/java/README.md) | [日本語](../../ja/java/README.md) | [简体中文](../../zh/java/README.md)
 
-[マニュアルのホーム](../README.md) | [Kotlin トラック](../kotlin/README.md) | 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
+[マニュアルのホーム](../README.md) | [Kotlin トラック](../kotlin/README.md) | 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md) · [13. Spring Boot 3 と 4](../13-spring-boot-versions.md)
 
 これは lambdaQL マニュアルの **Java トラック** です。このトラックのページには **Java のコードだけ** が載っています。
 クエリを Kotlin で書く場合は、[Kotlin トラック](../kotlin/README.md) を読んでください。同じ番号の同じ章があります。
@@ -80,6 +77,7 @@ fetch first ? rows only
 | 10 | [ルールと制限](10-rules-and-limits.md) | すべてのルール表、Java と SQL の違い、データベースごとの違い、サポートしないもの |
 | 11 | [エラーと言語](../11-errors-and-languages.md)（共通） | エラーコード、例外、メッセージの言語、ログ |
 | 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`、リポジトリの default メソッド、DML の短縮メソッド（`deleteAll`、`updateOne` など）、Spring の `Sort` と `Pageable`、モジュール、トランザクション、`QueryBuilder` の Bean |
+| 13 | [Spring Boot 3 と 4](../13-spring-boot-versions.md)（共通） | バージョン表、アーティファクト（共通の jar と `-boot3`・`-boot4` のスターター）、Hibernate 6.6 と 7.4 の SQL の違い、検証の範囲 |
 
 <a id="example-entities"></a>
 ## 例で使うエンティティ
@@ -99,9 +97,9 @@ fetch first ? rows only
 |---|---|
 | Java | 21 |
 | コンパイラー | javac（Eclipse のコンパイラーである ECJ は保証しません） |
-| Hibernate ORM | 7.4（Spring Boot 4.1.2 の 7.4.13 でテスト済み） |
-| 検証したデータベース | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
-| Spring Boot（任意） | 4.1（4.1.2 でテスト済み）。Spring Boot 3 はこの版では検証していません |
+| Hibernate ORM | 6.6 または 7.4（6.6.53、7.4.13 でテスト済み） |
+| 検証したデータベース | H2 2.3、MariaDB 10.11、MySQL 8.4、PostgreSQL 17、Oracle 23.26 (23ai) |
+| Spring Boot（任意） | 3.5 または 4.1（3.5.16、4.1.2 でテスト済み）。[13. Spring Boot 3 と 4](../13-spring-boot-versions.md) を参照 |
 
 <a id="help-and-contributions"></a>
 ## ヘルプと貢献

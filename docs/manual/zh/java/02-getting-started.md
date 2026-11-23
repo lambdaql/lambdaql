@@ -1,9 +1,6 @@
 <a id="2-getting-started-java"></a>
 # 2. 入门（Java）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/02-getting-started.md)。
-
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[1. 概述](../01-overview.md) | 下一章：[3. 条件](03-where.md) | [本页的 Kotlin 版本](../kotlin/02-getting-started.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -16,10 +13,10 @@
 | 项目 | 版本 | 说明 |
 |---|---|---|
 | Java | 21 | 构建和使用 lambdaQL 都需要。 |
-| JPA 提供者 | Hibernate ORM 7.4 | lambdaQL 生成 Hibernate 7 HQL。已用 7.4.13 测试。不支持其他 JPA 提供者。 |
-| Jakarta Persistence | 3.2 | 随 Hibernate 7.4 一起提供。 |
-| 数据库 | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) | 这三种已验证。其他数据库可能可用，但未经测试。 |
-| Spring Boot | 4.1 | 可选。项目的测试使用 Spring Boot 4.1.2。 |
+| JPA 提供者 | Hibernate ORM 6.6 或 7.4 | lambdaQL 生成 Hibernate HQL。已用 6.6.53（Spring Boot 3.5.16）和 7.4.13（Spring Boot 4.1.2）测试。不支持其他 JPA 提供者。请参阅 [13. Spring Boot 3 与 4](../13-spring-boot-versions.md)。 |
+| Jakarta Persistence | 3.1 或 3.2 | Hibernate 6.6 使用 3.1，7.4 使用 3.2。 |
+| 数据库 | H2 2.3、MariaDB 10.11、MySQL 8.4、PostgreSQL 17、Oracle 23.26 (23ai) | 这五种已验证。手册中各数据库的 SQL 来自 H2、MariaDB 和 Oracle。其他数据库可能可用，但未经测试。 |
+| Spring Boot | 3.5 或 4.1 | 可选。项目的测试使用 Spring Boot 3.5.16 和 4.1.2。 |
 | 编译器 | javac | 不保证支持由 ECJ（Eclipse 编译器）编译的 Lambda。见 [9. Java 说明](09-java-notes.md#912-compiler-and-build)。 |
 
 <a id="build-from-source"></a>
@@ -34,7 +31,7 @@ cd lambdaql
 - Gradle wrapper 为 9.9.1。仓库中有 `gradle/gradle-daemon-jvm.properties`，因此 Gradle 守护进程会使用 Java 21。
 - 构建需要 JDK 21 和一个 **JDK 24 或更高版本**。JDK 24 或更高版本用于编译 `java.lang.classfile` 读取器（`src/main/java24`），并用该读取器再运行一次测试。默认版本是 25，可以像 `-Plql.classfile.jdk=24` 这样更改。如果 Gradle 找不到 JDK，请把路径写入 `~/.gradle/gradle.properties` 的 `org.gradle.java.installations.paths`。
 - 在 IntelliJ IDEA 中，把 **Settings > Build Tools > Gradle > Gradle JVM** 设置为 Java 21 JDK。
-- 构建包含三个模块：`query`（构件 `lambdaql-core`）、`spring-data-jpa`（`lambdaql-spring-data-jpa`）和 `spring-boot-starter`（`lambdaql-spring-boot-starter`）。Spring 模块的说明见 [12. Spring Data JPA](12-spring-data-jpa.md)。
+- 构建的主要模块是 `query`（构件 `lambdaql-core`）、`spring-data-jpa`（`lambdaql-spring-data-jpa`）和 `spring-boot-starter-boot3`、`spring-boot-starter-boot4`（`lambdaql-spring-boot-starter-boot3`、`-boot4`）。`lambdaql-core` 和 `lambdaql-spring-data-jpa` 是 Spring Boot 3 与 4 共用的 jar，只有 starter 按 Boot 版本分开（[13. Spring Boot 3 与 4](../13-spring-boot-versions.md)）。Spring 模块的说明见 [12. Spring Data JPA](12-spring-data-jpa.md)。
 
 运行单元测试：
 
@@ -88,7 +85,7 @@ Maven：
 </dependency>
 ```
 
-使用 Spring Data JPA 或 Spring Boot 时，请改用 `lambdaql-spring-boot-starter` 或 `lambdaql-spring-data-jpa`。它们会带入 `lambdaql-core`（见 [12.2](12-spring-data-jpa.md#122-modules)）。
+使用 Spring Boot 时，请改用与 Boot 版本对应的 `lambdaql-spring-boot-starter-boot4`（`-boot3`）；不使用 Spring Boot 而只使用 Spring Data JPA 时，请改用 `lambdaql-spring-data-jpa`。它们会带入 `lambdaql-core`（见 [12.2](12-spring-data-jpa.md#122-modules)）。
 
 > [!WARNING]
 > 版本 `1.0.0` 是仓库的 `gradle.properties` 中定义的值，在首次发布前可能改变。
@@ -190,7 +187,7 @@ QueryBuilder qb = new QueryBuilder(emf);
 <a id="with-spring-boot"></a>
 ### 使用 Spring Boot
 
-使用 `lambdaql-spring-boot-starter` 时，Spring Boot 会为你创建 `QueryBuilder` bean（见 [12.8](12-spring-data-jpa.md#128-the-querybuilder-bean)）。
+使用 `lambdaql-spring-boot-starter-boot4`（`-boot3`）时，Spring Boot 会为你创建 `QueryBuilder` bean（见 [12.8](12-spring-data-jpa.md#128-the-querybuilder-bean)）。
 不使用它时，请自己创建这个 bean。像自动配置那样，使用 Spring 的共享 `EntityManager`。
 
 ```java

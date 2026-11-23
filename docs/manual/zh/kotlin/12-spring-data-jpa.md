@@ -1,10 +1,7 @@
 <a id="12-spring-data-jpa-kotlin"></a>
 # 12. Spring Data JPA（Kotlin）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/12-spring-data-jpa.md)。
-
-[Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[11. 错误与语言](../11-errors-and-languages.md) | [本页的 Java 版本](../java/12-spring-data-jpa.md)
+[Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[11. 错误与语言](../11-errors-and-languages.md) | 下一章：[13. Spring Boot 3 与 4](../13-spring-boot-versions.md) | [本页的 Java 版本](../java/12-spring-data-jpa.md)
 
 ---
 
@@ -25,17 +22,17 @@
 <a id="122-modules"></a>
 ## 12.2 模块
 
-lambdaQL 有三个构件。核心不依赖 Spring，因此也可以和普通 JPA 一起使用。
+核心不依赖 Spring，因此也可以和普通 JPA 一起使用。`lambdaql-core` 和 `lambdaql-spring-data-jpa` 是 Spring Boot 3 与 4 共用的，只有 starter 按 Spring Boot 版本分开提供（名称以 `-boot3`、`-boot4` 结尾，见 [13. Spring Boot 3 与 4](../13-spring-boot-versions.md)）。
 
 | 构件 | 包含内容 | 何时需要 |
 |---|---|---|
-| `lambdaql-core` | 引擎和 `QueryBuilder`。不依赖 Spring | 始终需要。另外两个构件会带入它 |
-| `lambdaql-spring-data-jpa` | `LambdaQlExecutor<T>`、它在 Spring Data 中的注册、Spring Boot 自动配置（`QueryBuilder` bean） | 不使用 Spring Boot 而使用 Spring Data JPA 时 |
-| `lambdaql-spring-boot-starter` | 没有代码。它带入 `lambdaql-spring-data-jpa` 和 `spring-boot-starter-data-jpa` | 使用 Spring Boot 时 |
+| `lambdaql-core` | 引擎和 `QueryBuilder`。不依赖 Spring。Spring Boot 3 与 4 共用 | 始终需要。下面的构件会带入它 |
+| `lambdaql-spring-data-jpa` | `LambdaQlExecutor<T>`、它在 Spring Data 中的注册、Spring Boot 自动配置（`QueryBuilder` bean）。Spring Data JPA 3.5 与 4.1 共用。使用项目中的 Spring Data JPA | 不使用 Spring Boot 而使用 Spring Data JPA 时 |
+| `lambdaql-spring-boot-starter-boot4`、`lambdaql-spring-boot-starter-boot3` | 没有代码。它带入 `lambdaql-spring-data-jpa` 和对应 Boot 版本的 `spring-boot-starter-data-jpa` | 使用 Spring Boot 时（与项目的 Boot 版本对应） |
 
 这些构件**尚未发布到 Maven Central**。请先从源码构建，并发布到本地 Maven 仓库（见 [2. 入门](02-getting-started.md#build-from-source)）。版本是 `1.0.0`。
 
-使用 Spring Boot 时，Gradle（Kotlin DSL）：
+使用 Spring Boot 4 时，Gradle（Kotlin DSL）。如果是 Spring Boot 3，请把名称结尾改为 `-boot3`：
 
 ```kotlin
 repositories {
@@ -44,7 +41,7 @@ repositories {
 }
 
 dependencies {
-    implementation("org.lambdaql:lambdaql-spring-boot-starter:1.0.0")
+    implementation("org.lambdaql:lambdaql-spring-boot-starter-boot4:1.0.0")
     implementation("org.jetbrains.kotlin:kotlin-reflect")           // Spring Data needs it for Kotlin
 }
 ```
@@ -54,14 +51,14 @@ Maven：
 ```xml
 <dependency>
   <groupId>org.lambdaql</groupId>
-  <artifactId>lambdaql-spring-boot-starter</artifactId>
+  <artifactId>lambdaql-spring-boot-starter-boot4</artifactId>
   <version>1.0.0</version>
 </dependency>
 ```
 
 使用 Maven 时，也请添加 `kotlin-reflect`（见 [12.9](#129-kotlin-compile-settings)）。
 
-不使用 Spring Boot 时，在你自己的 Spring Data JPA 配置（Hibernate 和 JDBC 驱动）之外添加 `lambdaql-spring-data-jpa`。它会带入 `lambdaql-core` 和 Spring Data JPA。
+不使用 Spring Boot 时，在你自己的 Spring Data JPA 配置（Spring Data JPA、Hibernate 和 JDBC 驱动）之外添加 `lambdaql-spring-data-jpa`。它会带入 `lambdaql-core`，Spring Data JPA 则使用项目中已有的版本（3.5 或 4.1）。
 
 ```kotlin
 dependencies {
@@ -83,9 +80,9 @@ dependencies {
 | 项目 | 版本 |
 |---|---|
 | Java（JVM） | 21 |
-| Spring Boot | 4.1（已用 4.1.2 测试）。本版未验证 Spring Boot 3 |
-| Spring Data JPA | 4.1（已用 4.1.2 测试） |
-| Hibernate | 7.4（Spring Boot 4.1 已经带入） |
+| Spring Boot | 3.5 或 4.1（已用 3.5.16、4.1.2 测试） |
+| Spring Data JPA | 3.5 或 4.1（已用 3.5.13、4.1.2 测试） |
+| Hibernate | 6.6 或 7.4（Spring Boot 已经带入） |
 | Kotlin | 2.2 或更高版本。较旧的 Kotlin 见 [12.9](#129-kotlin-compile-settings) |
 | `kotlin-reflect` | Spring Data 在 Kotlin 中需要它 |
 
@@ -298,7 +295,7 @@ lambdaQL 用 `SortSpec.ofPath` 把每个 `Sort.Order` 转换为一个排序键�
 
 | Spring | 在 lambdaQL 中 |
 |---|---|
-| 属性名（`"grade"`、`"team.name"`） | 用 Spring Data 的 `PropertyPath` 检查，与 Spring Data 自身的 repository 相同。未知的名称会抛出 `PropertyReferenceException`。路径必须以基本值结尾，而不是以实体结尾。`team.name` 这样的 to-one 路径使用 `left join`，因此没有 team 的行也会保留。之后由排序策略检查名称（见[下文](#sort-policy-with-spring)） |
+| 属性名（`"grade"`、`"team.name"`） | 用 Spring Data 的 `PropertyPath` 检查，与 Spring Data 自身的 repository 相同。未知的名称会抛出 `PropertyReferenceException`（包：Spring Data 3 为 `org.springframework.data.mapping`，4 为 `org.springframework.data.core`）。路径必须以基本值结尾，而不是以实体结尾。`team.name` 这样的 to-one 路径使用 `left join`，因此没有 team 的行也会保留。之后由排序策略检查名称（见[下文](#sort-policy-with-spring)） |
 | 排序策略的别名（`"level"`） | 不做 `PropertyPath` 检查，按原样传递。由排序策略变为其路径 |
 | 带 `NullHandling.NATIVE`（默认值）的 `ASC` / `DESC` | lambdaQL 的 NULL 规则：升序时 NULL 在前，降序时 NULL 在后。在每个数据库上顺序都相同（见 [4.4](04-order-paging.md#44-null-ordering-is-the-same-on-every-database)） |
 | `NullHandling.NULLS_FIRST` / `NULLS_LAST` | 按写法使用（`ASC_NULLS_FIRST`、`DESC_NULLS_LAST` 等） |
@@ -527,10 +524,10 @@ kotlin {
 <a id="1210-not-implemented-yet"></a>
 ## 12.10 尚未实现
 
-- **Spring Boot 版本。** 本版使用 Spring Boot 4.1.2 测试。自动配置也写出了 Spring Boot 3 的类名，但本版未验证 Spring Boot 3。
+- **Spring Boot 版本。** 使用 Spring Boot 3.5.16 和 4.1.2 测试。同一套测试在两个版本上运行（[13. Spring Boot 3 与 4](../13-spring-boot-versions.md)）。
 - Spring `Sort` 中的 **`ignoreCase()`**。
 - **Kotlin repository** 尚未测试。
 
 ---
 
-[Kotlin 路线](README.md) | 上一章：[11. 错误与语言](../11-errors-and-languages.md) | [本页的 Java 版本](../java/12-spring-data-jpa.md)
+[Kotlin 路线](README.md) | 上一章：[11. 错误与语言](../11-errors-and-languages.md) | 下一章：[13. Spring Boot 3 与 4](../13-spring-boot-versions.md) | [本页的 Java 版本](../java/12-spring-data-jpa.md)

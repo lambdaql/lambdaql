@@ -1,9 +1,6 @@
 <a id="1-overview"></a>
 # 1. 概述
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../ko/01-overview.md)。
-
 [手册首页](README.md) | 路线：[Java](java/README.md) | [Kotlin](kotlin/README.md) | 下一章：2. 入门（[Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md)）
 
 本页适用于两种语言。代码分别展示在 **Java** 和 **Kotlin** 两个小节中。
@@ -42,16 +39,25 @@ val orders = qb.from(Order::class.java)
 ```
 
 <a id="hql-the-same-for-both"></a>
-### HQL（两种语言相同）
+### HQL
+
+Java：
 
 ```
 select e0 from Order e0 join e0.customer j1
 where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
 ```
 
+Kotlin（用 `?.` 经过的关联在需要时为 `left join`，决策 D54）：
+
+```
+select e0 from Order e0 left join e0.customer j1
+where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
+```
+
 **关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 7.4 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `overview-first`：
+**各数据库的 SQL（Java 示例，已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `overview-first`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -63,9 +69,9 @@ where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 
 两次 `where` 调用以 `AND` 连接。
 常量 `"Kim"` 是字面量，捕获的 `minPrice` 是绑定参数（`:p1`）。
-`where` 中像 `o.getCustomer().getName()` 这样的路径默认是内连接 `join`。没有客户的订单不会被返回。
-本示例也是如此。在 Java 中，状态为 1 的订单即使没有客户也满足条件，但 lambdaQL 采用 SQL 语义（决策 D48）。
-要保留这样的订单，请使用 `leftJoin`。
+`where` 中像 `o.getCustomer().getName()` 这样的路径默认是内连接 `join`。Java 示例不会返回没有客户的订单。
+在 Java 中，状态为 1 的订单即使没有客户也满足条件，但 lambdaQL 采用 SQL 语义（决策 D48）。要保留这样的订单，请使用 `leftJoin`。
+Kotlin 示例用 `?.` 写明了“客户可能不存在”，因此成为 `left join`，状态为 1 且没有客户的订单也会被返回（决策 D54）。写成 `!!` 则与 Java 相同，为内连接。
 
 这些 Lambda 看起来像普通的 Java 或 Kotlin 代码。
 但它们其实是用 Java 或 Kotlin 语法编写的**查询语言**。
@@ -178,7 +184,7 @@ lambdaQL 遵循自身有文档说明的规则，而不是 Java 或 Kotlin 的运
 |---|---|---|
 | `it.id == id`（`id: Long?`，可空变量） | 值相等：`e0.id = :p1` | Kotlin 的 `==` 本来就表示“值相同”。捕获的值 `null` 绑定为 NULL，不匹配任何行（`WARN` 级别 `LQL-4045`）。 |
 | `it.description == it.custName`、`it.description != text` | `e0.description = e0.custName`、`e0.description <> :p1`（SQL 语义） | 比较两个实体值，或用 `!=` 与一个值比较时，值为 NULL 的行不匹配。要保留这些行，请写 `it.description == null \|\| ...`。 |
-| `it.customer?.name` 或 `it.customer!!.name` | 关联客户的 `name` 列（在 `where` 中默认是内连接 `join`） | 路径指代一个列。`?.` 和 `!!` 不改变列。`!!` 只是为了让 Lambda 能够编译。在 `where` 中，没有客户的订单不会被返回。要查找这些订单，请写 `it.customer == null`。写了 null 守卫（`it.customer == null \|\| ...`）也是如此（SQL 语义，D48）。要保留这些订单，请使用 `leftJoin`。 |
+| `it.customer?.name` 或 `it.customer!!.name` | 关联客户的 `name` 列。在 `where` 中 `!!` 是内连接 `join`，`?.` 在需要时为 `left join` | 路径指代一个列。`?.` 和 `!!` 不改变列，只决定 `where` 中的连接类型（D54）。`!!` 表示“关联一定存在”，因此没有客户的订单不会被返回。`?.` 表示“关联可能不存在”，因此当没有客户的订单可能使条件为真时（`it.status == 1 \|\| ...`、`it.customer?.name == null`），会以 `left join` 保留这些订单。只查找没有客户的订单时，请写 `it.customer == null`。 |
 | `price` 为 NULL 时的 `it.price!! > 100.0` | 该行不匹配（SQL 语义） | Kotlin 会在 `!!` 处抛出 `NullPointerException`。lambdaQL 忽略 `!!`，SQL 返回 UNKNOWN。 |
 | `it.description == null` | `e0.description is null` | null 检查是直接写出的，所以 lambdaQL 使用它。 |
 

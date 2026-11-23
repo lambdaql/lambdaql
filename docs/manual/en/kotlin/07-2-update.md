@@ -1,9 +1,6 @@
 <a id="72-update"></a>
 # 7.2 Update (Kotlin)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/07-2-update.md) for the latest rules.
-
 [7. Update, insert, delete (Kotlin)](07-dml.md) | **7.2 Update** | [7.4 Delete](07-4-delete.md) | [7.5 Insert](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Java](../java/07-2-update.md)
 
 ---
@@ -168,6 +165,39 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 
 If an order has no customer, `custName` becomes NULL.
 In `where`, lambdaQL adds `e0.customer.id is not null`. So the update changes the same rows as `qb.from(Order::class.java).where { same lambda }` returns (decision D36). The Java test checks this.
+
+**`?.` and `||`.** When a step reached with `?.` becomes a `left join` in the select (decision D54, see [3.10](03-where.md#310-association-paths)), DML does not add `e0.customer.id is not null`.
+So orders without a customer are changed too, exactly as the select returns them. When there is only `?.` and a row without a customer cannot make the condition true, as in the example above, the check stays.
+
+**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `update-safe-call`:
+
+```kotlin
+// UPDATE: the left join of ?. drops the "customer exists" check, so the order without a customer is changed too
+val u = qb.update(Order::class.java)
+    .set { it.status = st }
+    .where { it.status.toInt() == 1 || it.customer?.name == "Kim" }
+assertEquals("update Order e0 set e0.status = :p1"
+    + " where e0.status = 1 or (select s1.name from Customer s1 where s1.id = fk(e0.customer)) = 'Kim'", u.toHql().hql())
+```
+
+**SQL by database (the HQL of the Kotlin region, run as it is)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `update-safe-call`:
+
+```sql
+-- H2
+update orders o1_0
+set status=?
+where o1_0.status=1 or (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)='Kim'
+
+-- MariaDB
+update orders
+set status=?
+where status=1 or (select c1_0.name from customers c1_0 where c1_0.id=orders.customer_id)='Kim'
+
+-- Oracle
+update orders o1_0
+set o1_0.status=?
+where o1_0.status=1 or (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)='Kim'
+```
 
 <a id="an-aggregate-from-a-subquery"></a>
 ## An aggregate from a subquery

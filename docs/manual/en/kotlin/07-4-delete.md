@@ -1,9 +1,6 @@
 <a id="74-delete"></a>
 # 7.4 Delete (Kotlin)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/07-4-delete.md) for the latest rules.
-
 [7. Update, insert, delete (Kotlin)](07-dml.md) | [7.2 Update](07-2-update.md) | **7.4 Delete** | [7.5 Insert](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Java](../java/07-4-delete.md)
 
 ---
@@ -14,8 +11,8 @@ val d = qb.delete(Order::class.java).where { it.status == 3 }
 // HQL: delete from Order e0 where e0.status = 3
 val deleted = d.execute()
 
-// a path: the same rows as qb.from(Order::class.java).where { same lambda } - orders without a customer stay
-val byName = qb.delete(Order::class.java).where { it.customer?.name == null }
+// a path: the same rows as qb.from(Order::class.java).where { same lambda } - with !! orders without a customer stay
+val byName = qb.delete(Order::class.java).where { it.customer!!.name == null }
 // HQL: delete from Order e0 where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) is null and e0.customer.id is not null
 ```
 
@@ -59,9 +56,11 @@ assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where
 The test first inserts one `Archive` row. Then it deletes the orders without items and compares the rows left with the result of the same condition in Kotlin.
 More statements written in Java are tested in [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/07-4-delete.md) for those examples.
 
-The second statement deletes **the same rows** that `qb.from(Order::class.java).where { it.customer?.name == null }` returns: orders whose customer has no name. The Java test compares the deleted rows with this select.
-Orders **without** a customer are not deleted (rule U9, decision D36). A null guard (`it.customer == null || ...`) does not change this, because the path is an inner join in the select too (decision D48).
-To delete orders without a customer, run one more delete with the condition `it.customer == null`.
+The second statement deletes **the same rows** that `qb.from(Order::class.java).where { it.customer!!.name == null }` returns: orders whose customer has no name. The Java test writes the same condition in Java and compares the deleted rows with the select result.
+Orders **without** a customer are not deleted (rule U9, decision D36), because `!!` says the association is always there.
+
+If you write it with `?.` (`it.customer?.name == null`), it means the same as a `left join`, as in a select, so lambdaQL does not add `e0.customer.id is not null` (decision D54). Then orders without a customer are deleted too.
+For an UPDATE example of the same kind, see the region `update-safe-call` in [7.2](07-2-update.md). To delete only orders without a customer, write `it.customer == null`.
 
 To delete all rows, `all()` is required (rule U5).
 

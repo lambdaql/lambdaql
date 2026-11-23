@@ -1,9 +1,6 @@
 <a id="10-rules-and-limits-kotlin"></a>
 # 10. 规则与限制（Kotlin）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/10-rules-and-limits.md)。
-
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[9. Kotlin 说明](09-kotlin-notes.md) | 下一章：[11. 错误与语言](../11-errors-and-languages.md) | [本页的 Java 版本](../java/10-rules-and-limits.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -40,9 +37,9 @@ lambdaQL **从不运行你的 Lambda**。它读取字节码并写出 HQL。
 Lambda 是用 Kotlin 语法写成的查询。因此：
 
 1. 像 `it.customer?.name` 这样的路径**指的是一个列**，而不是一串调用。
-   lambdaQL 不会检查 customer 是否为 null（D20）。在 `where` 中，该路径默认是内连接，因此没有 customer 的订单不会被返回（D36）。
-   写了 null 保护（`... == null || ...`）也一样：该路径仍是内连接（D48）。要保留没有 customer 的订单，请使用 `leftJoin`。
-   要查找这些订单，请比较关联本身：`it.customer == null`。`it.customer?.name == null` 不会返回它们。
+   lambdaQL 不会检查 customer 是否为 null（D20）。在 `where` 中，用 `!!` 或不加标记经过的关联是内连接，因此没有 customer 的订单不会被返回（D36）。
+   用 `?.` 经过的关联，在没有 customer 的订单可能使条件为真时为 `left join`（D54）。因此 `it.status == 1 || it.customer?.name == "Kim"`、`it.customer?.name == null` 以及用 `?.` 写的 null 保护会像 Kotlin 一样保留没有 customer 的订单。
+   只查找没有 customer 的订单时，请比较关联本身：`it.customer == null`。
 2. NULL **只在你写出的地方**处理（`== null`、`!= null`、`?.`、`?:`）（D22）。
    Kotlin 编译器添加的 null 检查会被忽略。其他 NULL 遵循 SQL 规则：条件为 UNKNOWN，该行不会被返回。
 3. `!!` 被忽略（D23）。Kotlin 的内存规则（对象同一性、装箱）不适用。`==` 和 `===` 表示**值相等**（D12、R17）。
@@ -172,8 +169,10 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR` | SQL 三值逻辑 |
 | `it.flag == true` / `it.flag != true` | `e0.flag = true` / `e0.flag <> true` | NULL：不返回（SQL 语义，D48） |
 | `it.flag ?: false`（条件） | `(e0.flag is not null and e0.flag = true)` | NULL 视为 false |
-| `where` 中的 `it.customer?.name`、`it.customer!!.name` | `j1.name` + `join e0.customer j1`（默认是内连接） | 没有 customer：该订单不会被返回，`it.customer?.name == null` 也是如此 |
-| `it.customer == null \|\| it.customer?.name == p` | `e0.customer is null or j1.name = :p1` + `join e0.customer j1` | 没有 customer：**不**返回（内连接，D48；`DEBUG` 级别的 `LQL-5009`）。要保留，请使用 `leftJoin` |
+| `where` 中的 `it.customer!!.name`（或不加标记的路径） | `j1.name` + `join e0.customer j1` | 没有 customer：该订单不会被返回 |
+| `where` 中的 `it.customer?.name` | `j1.name` + 没有 customer 的订单可能使条件为真时为 `left join e0.customer j1`，否则为 `join`（D54） | `it.customer?.name == "Kim"`：不返回（`join`）。`it.status == 1 \|\| it.customer?.name == "Kim"`、`it.customer?.name == null`：返回（`left join`） |
+| `it.customer == null \|\| it.customer?.name == p` | `e0.customer is null or j1.name = :p1` + `left join e0.customer j1` | 没有 customer：返回（D54）。写成 `!!` 则为 `join`，不返回（D48，`DEBUG` 级别的 `LQL-5009`） |
+| 同一关联步骤混用 `?.` 和 `!!`（或不加标记） | `join` | 没有 customer：不返回。`WARN` 级别的 `LQL-5014`（D54） |
 | 只在 `orderBy` 或 `select` 中使用的同一路径 | `j1.name` + `left join e0.customer j1`。必需关联（`optional = false`）为 `join` | 没有 customer：该列为 NULL |
 | `it.customer == null`、`it.customer != null` | `e0.customer is null`、`e0.customer is not null`（外键列，不需要 join） | 没有 customer 的订单 / 有 customer 的订单 |
 | `it.customer?.id` | `e0.customer.id`（外键列，不需要 join） | 没有 customer：NULL |
@@ -225,7 +224,7 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 | R21 | Kotlin 字符串函数（`startsWith`、`endsWith`、`contains`、`equals(ignoreCase)`、`lowercase`、`length`、`isNullOrEmpty`） | `like ... escape '\'`、D24 的忽略大小写路径、`lower`、`length`、`(x is null or x = :p)` |
 | R22 | Kotlin 宿主值（捕获的 `var`、private 属性、`companion` 中的值） | 每次执行时读取。写入它们会被拒绝 |
 | R23 | 属性引用 `Order::price` | 与 getter 相同。在 `orderBy`（`orderBy(Order::price)`）中**尚未实现**：请使用 `orderBy { it.price }` |
-| R24 | 关联路径（`it.customer?.name`、`it.customer!!.name`、Java 实体的 `it.customer.name`） | 一个列。对一关联：where、order by、select 共用的别名。在 `where` 中始终是内连接（D48；要保留没有关联的行，请使用 `leftJoin`），只在 order by 或 select 中使用时是 `left join`（必需关联 `optional = false` 为内连接，A4）。嵌入类型：同一张表。以目标 `@Id` 结尾，或关联本身与 `null` 比较：外键列，不需要 join。集合：报错 |
+| R24 | 关联路径（`it.customer?.name`、`it.customer!!.name`、Java 实体的 `it.customer.name`） | 一个列。对一关联：where、order by、select 共用的别名。在 `where` 中，`!!` 和不加标记的路径是内连接（D48），用 `?.` 经过的步骤在没有关联的行可能使条件为真时为 `left join`（D54；同一步骤混用时为内连接并记录 `LQL-5014`），只在 order by 或 select 中使用时是 `left join`（必需关联 `optional = false` 为内连接，A4）。嵌入类型：同一张表。以目标 `@Id` 结尾，或关联本身与 `null` 比较：外键列，不需要 join。集合：报错 |
 
 Java 专用规则 R4（对实体值使用 `equals`）和 R5（Java 的 null 安全辅助方法）在 [Java 路线](../java/10-rules-and-limits.md) 中。在 Kotlin 中，`==` 具有与 R5 相同的含义。
 
@@ -542,9 +541,9 @@ val list = if (flag) {
 |---|---|
 | Kotlin | 2.x（设计已用 kotlinc 1.7.22、2.1.10、2.2.21、2.3.0、2.3.21 检查过） |
 | Java（JVM） | 21 |
-| Hibernate | 7.4（已用 7.4.13 测试）。使用了 HQL 扩展（例如 `function(...)` 和 `nulls first`）；不保证其他 JPA 提供者可用 |
+| Hibernate | 6.6 或 7.4（已用 6.6.53、7.4.13 测试）。使用了 HQL 扩展（例如 `function(...)` 和 `nulls first`）；不保证其他 JPA 提供者可用 |
 | 数据库 | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
-| Spring | Spring Boot 4.1.2 和 Spring Data JPA 4.1.2（Spring 模块，[12](12-spring-data-jpa.md)；仅 Java repository）。本版未验证 Spring Boot 3 |
+| Spring | Spring Boot 3.5.16（Spring Data JPA 3.5.13）和 4.1.2（Spring Data JPA 4.1.2）（Spring 模块，[12](12-spring-data-jpa.md)、[13](../13-spring-boot-versions.md)；仅 Java repository） |
 | Kotlin 逐行检查 | 目前只在 H2 上进行。计划在 MariaDB 和 Oracle 上运行 Kotlin 用例 |
 | 未测试 | 高于 2.3 的 Kotlin、Kotlin Multiplatform、PostgreSQL、SQL Server、Oracle 19c 及更早版本（例如 PL/SQL 的 `BOOLEAN` 参数） |
 

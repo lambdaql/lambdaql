@@ -1,9 +1,6 @@
 <a id="76-upsert"></a>
 # 7.6 Upsert (Kotlin)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/07-6-upsert.md) for the latest rules.
-
 [7. Update, insert, delete (Kotlin)](07-dml.md) | [7.2 Update](07-2-update.md) | [7.4 Delete](07-4-delete.md) | [7.5 Insert](07-5-insert.md) | **7.6 Upsert** | [Java](../java/07-6-upsert.md)
 
 ---
@@ -26,7 +23,7 @@ lambdaQL has three forms.
 val inserted = qb.upsert(Archive::class.java).values { it.id = 100L; it.price = 1.0 }.execute()
 val again = qb.upsert(Archive::class.java).values { it.id = 100L; it.price = 2.0 }
 // HQL: insert into Archive e0 (id, price) values (100L, 2.0) on conflict(id) do update set price = excluded.price
-val updated = again.execute()                 // MariaDB counts an updated row as 2, H2 and Oracle as 1
+val updated = again.execute()                 // MariaDB and MySQL count an updated row as 2, the others as 1
 ```
 
 **About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 7.4, and it fails if Hibernate's SQL changes. The test uses Java lambdas. A Kotlin lambda with the same meaning gives the same HQL, so it gets the same SQL.

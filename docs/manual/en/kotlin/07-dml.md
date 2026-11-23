@@ -1,9 +1,6 @@
 <a id="7-update-insert-delete-kotlin"></a>
 # 7. Update, insert, delete (Kotlin)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/07-dml.md) for the latest rules.
-
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [6. Select, aggregates and group by](06-select-group.md) | Next: [8. Procedures and DB functions](08-procedures-functions.md) | [Java version of this page](../java/07-dml.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -275,7 +272,8 @@ lambdaQL writes the subqueries itself. The statement then reads only its own tab
 
 A select uses an inner join for a path in `where` (decision D36). So in DML, lambdaQL adds `e0.customer.id is not null` for such a path.
 As a result, `update` and `delete` target **exactly the rows** that `qb.from(X::class.java).where { same lambda }` returns (tested with Java: the deleted rows are compared with the select result).
-This is the same with a null guard such as `it.customer == null || ...`. The select also uses an inner join for this path (decision D48), so the check stays.
+This is the same with a null guard written with `!!` or without a mark (`it.customer == null || it.customer!!.name == ...`). The select also uses an inner join for this path (decision D48), so the check stays.
+When a step reached with `?.` becomes a `left join` in the select (`it.status == 1 || it.customer?.name == "Kim"`, decision D54), lambdaQL does not add this check. DML still targets the same rows as the select (the region `update-safe-call` in [7.2](07-2-update.md)).
 
 A path that ends with the `@Id` (`it.customer?.id`) is the FK column. There is no subquery and no join.
 
@@ -373,7 +371,7 @@ The lambdaQL checks of U11, U12 and U15 are not implemented yet.
 | U6 | Assigning `null` to a non-optional column (`@Id`, `nullable=false`, primitive) is an error. Assigning a collection, or a property of an associated entity that is not its `@Id`, is also an error. |
 | U7 | Each use of a captured value gets its own parameter. (In a test, a STRING column and an ORDINAL column shared one enum parameter, and a wrong value was stored without an error.) |
 | U8 | `LocalDateTime.now()` is evaluated in the application and bound. The database time (`current_timestamp`) is not supported. |
-| U9 | In DML, a non-FK association path becomes a correlated scalar subquery, both in `where` and on the right side of SET. In `where`, a path that a select would inner join (D36) also gets `customer.id is not null`. DML targets the same rows as select. |
+| U9 | In DML, a non-FK association path becomes a correlated scalar subquery, both in `where` and on the right side of SET. In `where`, a path that a select would inner join (D36) also gets `customer.id is not null`. A step reached with `?.` that becomes a `left join` in the select does not get it (D54). DML targets the same rows as select. |
 | U10 | In `insert ... select`, source paths become an explicit `left join`. |
 | U11 | `it.customer = entity` binds the `@Id` of the entity. If the id is null, binding fails. |
 | U12 | IDENTITY and SEQUENCE ids can be left out. A TABLE generator works only with `values`, not with `insert ... select`. Without a generator, the id is required. Other non-optional properties are also required. |

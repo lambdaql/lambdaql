@@ -1,9 +1,6 @@
 <a id="10-rules-and-limits-kotlin"></a>
 # 10. ルールと制限（Kotlin）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/10-rules-and-limits.md)を参照してください。
-
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [9. Kotlin の注意点](09-kotlin-notes.md) | 次: [11. エラーと言語](../11-errors-and-languages.md) | [このページの Java 版](../java/10-rules-and-limits.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -40,9 +37,9 @@ lambdaQL は **ラムダを決して実行しません**。バイトコードを
 ラムダは、Kotlin の構文で書いたクエリです。したがって、次のようになります。
 
 1. `it.customer?.name` のようなパスは **カラムを指します**。呼び出しの連鎖ではありません。
-   lambdaQL は customer が null かどうかを確認しません（D20）。`where` の中ではパスはデフォルトで内部結合なので、customer のない注文は返されません（D36）。
-   null ガード（`... == null || ...`）を書いても同じです。パスは内部結合のまま残ります（D48）。customer のない注文を残すには `leftJoin` を使ってください。
-   それらの注文を探すには、関連そのものを比較します: `it.customer == null`。`it.customer?.name == null` ではそれらは返されません。
+   lambdaQL は customer が null かどうかを確認しません（D20）。`where` の中で `!!` か印なしでたどった関連は内部結合なので、customer のない注文は返されません（D36）。
+   `?.` でたどった関連は、customer のない注文が条件を真にできるなら `left join` です（D54）。そのため `it.status == 1 || it.customer?.name == "Kim"`、`it.customer?.name == null`、`?.` で書いた null ガードは、Kotlin と同じように customer のない注文を残します。
+   customer のない注文だけを探すには、関連そのものを比較します: `it.customer == null`。
 2. NULL は **書いた場所でだけ** 扱われます（`== null`、`!= null`、`?.`、`?:`）（D22）。
    Kotlin のコンパイラーが追加する null チェックは無視されます。それ以外の NULL は SQL のルールに従います。条件は UNKNOWN になり、その行は返されません。
 3. `!!` は無視されます（D23）。Kotlin のメモリのルール（オブジェクトの同一性、ボクシング）は当てはまりません。`==` と `===` は **値の等価** を意味します（D12、R17）。
@@ -172,8 +169,10 @@ persistence unit ごとに `SargablePolicy.register(emf, SargableMode.STRICT)` �
 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR` | SQL の 3 値論理 |
 | `it.flag == true` / `it.flag != true` | `e0.flag = true` / `e0.flag <> true` | NULL: 返されない（SQL の意味、D48） |
 | `it.flag ?: false`（条件） | `(e0.flag is not null and e0.flag = true)` | NULL は false として扱う |
-| `where` の中の `it.customer?.name`、`it.customer!!.name` | `j1.name` + `join e0.customer j1`（デフォルトで内部結合） | customer がない: 注文は返されない。`it.customer?.name == null` でも同じ |
-| `it.customer == null \|\| it.customer?.name == p` | `e0.customer is null or j1.name = :p1` + `join e0.customer j1` | customer がない: 返され **ない**（内部結合、D48。`DEBUG` レベルの `LQL-5009`）。残すには `leftJoin` を使う |
+| `where` の中の `it.customer!!.name`（または印なしのパス） | `j1.name` + `join e0.customer j1` | customer がない: 注文は返されない |
+| `where` の中の `it.customer?.name` | `j1.name` + customer のない注文が条件を真にできるなら `left join e0.customer j1`、そうでなければ `join`（D54） | `it.customer?.name == "Kim"`: 返されない（`join`）。`it.status == 1 \|\| it.customer?.name == "Kim"`、`it.customer?.name == null`: 返される（`left join`） |
+| `it.customer == null \|\| it.customer?.name == p` | `e0.customer is null or j1.name = :p1` + `left join e0.customer j1` | customer がない: 返される（D54）。`!!` で書くと `join` なので返されない（D48、`DEBUG` レベルの `LQL-5009`） |
+| 同じ関連の段階を `?.` と `!!`（または印なし）で混ぜて書く | `join` | customer がない: 返されない。`WARN` レベルの `LQL-5014`（D54） |
 | 同じパスを `orderBy` か `select` だけで使う | `j1.name` + `left join e0.customer j1`。必須の関連（`optional = false`）は `join` | customer がない: カラムは NULL |
 | `it.customer == null`、`it.customer != null` | `e0.customer is null`、`e0.customer is not null`（FK カラム、結合なし） | customer のない注文 / customer がある注文 |
 | `it.customer?.id` | `e0.customer.id`（FK カラム、結合なし） | customer がない: NULL |
@@ -225,7 +224,7 @@ persistence unit ごとに `SargablePolicy.register(emf, SargableMode.STRICT)` �
 | R21 | Kotlin の文字列関数（`startsWith`、`endsWith`、`contains`、`equals(ignoreCase)`、`lowercase`、`length`、`isNullOrEmpty`） | `like ... escape '\'`、D24 の大文字小文字を区別しない経路、`lower`、`length`、`(x is null or x = :p)` |
 | R22 | Kotlin のホストの値（キャプチャした `var`、private プロパティ、`companion` の値） | 実行のたびに読む。書き込みは拒否される |
 | R23 | プロパティ参照 `Order::price` | getter と同じ。`orderBy`（`orderBy(Order::price)`）では **まだ実装されていません**。`orderBy { it.price }` を使ってください |
-| R24 | 関連のパス（`it.customer?.name`、`it.customer!!.name`、Java のエンティティの `it.customer.name`） | カラム。to-one の関連: where、order by、select で共有するエイリアス。`where` では常に内部結合（D48。関連のない行を残すには `leftJoin` を使う）、order by か select だけで使うなら `left join`（必須の関連 `optional = false` は内部結合、A4）。Embedded: 同じテーブル。対象の `@Id` で終わる、または関連を `null` と比較する: FK カラム、結合なし。コレクション: エラー |
+| R24 | 関連のパス（`it.customer?.name`、`it.customer!!.name`、Java のエンティティの `it.customer.name`） | カラム。to-one の関連: where、order by、select で共有するエイリアス。`where` では `!!` と印なしのパスは内部結合（D48）、`?.` でたどった段階は関連のない行が条件を真にできるなら `left join`（D54。同じ段階を混ぜて書くと内部結合と `LQL-5014`）、order by か select だけで使うなら `left join`（必須の関連 `optional = false` は内部結合、A4）。Embedded: 同じテーブル。対象の `@Id` で終わる、または関連を `null` と比較する: FK カラム、結合なし。コレクション: エラー |
 
 Java だけのルール R4（エンティティの値に対する `equals`）と R5（Java の null-safe なヘルパー）は [Java トラック](../java/10-rules-and-limits.md) にあります。Kotlin では、`==` が R5 と同じ意味になります。
 
@@ -542,9 +541,9 @@ val list = if (flag) {
 |---|---|
 | Kotlin | 2.x（設計は kotlinc 1.7.22、2.1.10、2.2.21、2.3.0、2.3.21 で確認） |
 | Java（JVM） | 21 |
-| Hibernate | 7.4（7.4.13 でテスト済み）。HQL の拡張（たとえば `function(...)` や `nulls first`）を使うので、他の JPA 実装は保証しない |
+| Hibernate | 6.6 または 7.4（6.6.53、7.4.13 でテスト済み）。HQL の拡張（たとえば `function(...)` や `nulls first`）を使うので、他の JPA 実装は保証しない |
 | データベース | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
-| Spring | Spring Boot 4.1.2、Spring Data JPA 4.1.2（Spring モジュール、[12](12-spring-data-jpa.md)。Java のリポジトリのみ）。Spring Boot 3 はこの版では検証していない |
+| Spring | Spring Boot 3.5.16（Spring Data JPA 3.5.13）と 4.1.2（Spring Data JPA 4.1.2）（Spring モジュール、[12](12-spring-data-jpa.md)、[13](../13-spring-boot-versions.md)。Java のリポジトリのみ） |
 | Kotlin の 1 行ずつの確認 | 今のところ H2 だけ。Kotlin のケースを MariaDB と Oracle で実行することは予定 |
 | テストしていないもの | 2.3 より新しい Kotlin、Kotlin Multiplatform、PostgreSQL、SQL Server、Oracle 19c 以前（たとえば PL/SQL の `BOOLEAN` パラメーター） |
 

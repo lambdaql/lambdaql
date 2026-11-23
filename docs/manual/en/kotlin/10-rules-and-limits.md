@@ -1,9 +1,6 @@
 <a id="10-rules-and-limits-kotlin"></a>
 # 10. Rules and limits (Kotlin)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/10-rules-and-limits.md) for the latest rules.
-
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [9. Kotlin notes](09-kotlin-notes.md) | Next: [11. Errors and languages](../11-errors-and-languages.md) | [Java version of this page](../java/10-rules-and-limits.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -40,9 +37,9 @@ lambdaQL **never runs your lambda**. It reads the bytecode and writes HQL.
 A lambda is a query written with Kotlin syntax. So:
 
 1. A path like `it.customer?.name` **names a column**. It is not a chain of calls.
-   lambdaQL does not check if the customer is null (D20). In `where`, the path is an inner join by default, so an order without a customer is not returned (D36).
-   A null guard (`... == null || ...`) does not change this. The path stays an inner join (D48). To keep orders without a customer, use `leftJoin`.
-   To find those orders, compare the association itself: `it.customer == null`. `it.customer?.name == null` does not return them.
+   lambdaQL does not check if the customer is null (D20). In `where`, an association reached with `!!` or without a mark is an inner join, so an order without a customer is not returned (D36).
+   An association reached with `?.` is a `left join` when an order without a customer can make the condition true (D54). So `it.status == 1 || it.customer?.name == "Kim"`, `it.customer?.name == null` and a null guard written with `?.` keep orders without a customer, as in Kotlin.
+   To find only orders without a customer, compare the association itself: `it.customer == null`.
 2. NULL is handled **only where you wrote it** (`== null`, `!= null`, `?.`, `?:`) (D22).
    The null checks that the Kotlin compiler adds are ignored. Other NULLs follow SQL rules: the condition is UNKNOWN and the row is not returned.
 3. `!!` is ignored (D23). Kotlin memory rules (object identity, boxing) do not apply. `==` and `===` mean **value equality** (D12, R17).
@@ -172,8 +169,10 @@ See [8. Procedures and DB functions](08-procedures-functions.md).
 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL 3-valued logic |
 | `it.flag == true` / `it.flag != true` | `e0.flag = true` / `e0.flag <> true` | NULL: not returned (SQL meaning, D48) |
 | `it.flag ?: false` (condition) | `(e0.flag is not null and e0.flag = true)` | NULL counts as false |
-| `it.customer?.name`, `it.customer!!.name` in `where` | `j1.name` + `join e0.customer j1` (inner join by default) | no customer: the order is not returned, also for `it.customer?.name == null` |
-| `it.customer == null \|\| it.customer?.name == p` | `e0.customer is null or j1.name = :p1` + `join e0.customer j1` | no customer: **not** returned (inner join, D48; `LQL-5009` at `DEBUG` level). To keep them, use `leftJoin` |
+| `it.customer!!.name` (or a path without a mark) in `where` | `j1.name` + `join e0.customer j1` | no customer: the order is not returned |
+| `it.customer?.name` in `where` | `j1.name` + `left join e0.customer j1` when an order without a customer can make the condition true, otherwise `join` (D54) | `it.customer?.name == "Kim"`: not returned (`join`). `it.status == 1 \|\| it.customer?.name == "Kim"`, `it.customer?.name == null`: returned (`left join`) |
+| `it.customer == null \|\| it.customer?.name == p` | `e0.customer is null or j1.name = :p1` + `left join e0.customer j1` | no customer: returned (D54). Written with `!!`, it is a `join`, so not returned (D48, `LQL-5009` at `DEBUG` level) |
+| the same association step written with both `?.` and `!!` (or no mark) | `join` | no customer: not returned. `LQL-5014` at `WARN` level (D54) |
 | the same path only in `orderBy` or `select` | `j1.name` + `left join e0.customer j1`. A required association (`optional = false`) is a `join` | no customer: the column is NULL |
 | `it.customer == null`, `it.customer != null` | `e0.customer is null`, `e0.customer is not null` (FK column, no join) | orders without a customer / with a customer |
 | `it.customer?.id` | `e0.customer.id` (FK column, no join) | no customer: NULL |
@@ -225,7 +224,7 @@ This is the short form of the rule table in the design (section 3.6 and KOTLIN.m
 | R21 | Kotlin string functions (`startsWith`, `endsWith`, `contains`, `equals(ignoreCase)`, `lowercase`, `length`, `isNullOrEmpty`) | `like ... escape '\'`, D24 ignore-case paths, `lower`, `length`, `(x is null or x = :p)` |
 | R22 | Kotlin host values (captured `var`, private properties, `companion` values) | Read on every run. Writing them is rejected |
 | R23 | Property references `Order::price` | The same as the getter. **Not implemented yet** in `orderBy` (`orderBy(Order::price)`): use `orderBy { it.price }` |
-| R24 | Association path (`it.customer?.name`, `it.customer!!.name`, Java entity `it.customer.name`) | A column. To-one association: an alias shared by where, order by and select. In `where` it is always an inner join (D48; to keep rows without the association, use `leftJoin`). Used only in order by or select, it is a `left join` (a required association with `optional = false` is an inner join, A4). Embedded: same table. Ends with the target `@Id`, or the association compared with `null`: FK column, no join. Collection: error |
+| R24 | Association path (`it.customer?.name`, `it.customer!!.name`, Java entity `it.customer.name`) | A column. To-one association: an alias shared by where, order by and select. In `where`, `!!` and a path without a mark are an inner join (D48); a step reached with `?.` is a `left join` when a row without the association can make the condition true (D54; the same step written both ways is an inner join with `LQL-5014`). Used only in order by or select, it is a `left join` (a required association with `optional = false` is an inner join, A4). Embedded: same table. Ends with the target `@Id`, or the association compared with `null`: FK column, no join. Collection: error |
 
 The Java-only rules R4 (`equals` on an entity value) and R5 (Java null-safe helpers) are in the [Java track](../java/10-rules-and-limits.md). In Kotlin, `==` has the same meaning as R5.
 
@@ -542,9 +541,9 @@ val list = if (flag) {
 |---|---|
 | Kotlin | 2.x (design checked with kotlinc 1.7.22, 2.1.10, 2.2.21, 2.3.0, 2.3.21) |
 | Java (JVM) | 21 |
-| Hibernate | 7.4 (tested with 7.4.13). HQL extensions are used (for example `function(...)` and `nulls first`), so other JPA providers are not guaranteed |
+| Hibernate | 6.6 or 7.4 (tested with 6.6.53 and 7.4.13). HQL extensions are used (for example `function(...)` and `nulls first`), so other JPA providers are not guaranteed |
 | Databases | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
-| Spring | Spring Boot 4.1.2 and Spring Data JPA 4.1.2 (the Spring module, [12](12-spring-data-jpa.md); Java repositories only). Spring Boot 3 is not verified in this edition |
+| Spring | Spring Boot 3.5.16 (Spring Data JPA 3.5.13) and 4.1.2 (Spring Data JPA 4.1.2) (the Spring modules, [12](12-spring-data-jpa.md), [13](../13-spring-boot-versions.md); Java repositories only) |
 | Kotlin row-by-row checks | H2 only so far. MariaDB and Oracle runs of the Kotlin cases are planned |
 | Not tested | Kotlin later than 2.3, Kotlin Multiplatform, PostgreSQL, SQL Server, Oracle 19c and older (for example PL/SQL `BOOLEAN` parameters) |
 

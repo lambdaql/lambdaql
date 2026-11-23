@@ -1,9 +1,6 @@
 <a id="7-update-insert-delete-kotlin"></a>
 # 7. 更新、插入、删除（Kotlin）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/07-dml.md)。
-
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[6. 查询列、聚合与分组](06-select-group.md) | 下一章：[8. 存储过程与数据库函数](08-procedures-functions.md) | [本页的 Java 版本](../java/07-dml.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -275,7 +272,8 @@ lambdaQL 自己编写子查询。这样语句只读取自己的表，因此不�
 
 查询对 `where` 中的路径使用 inner join（决策 D36）。因此在 DML 中，lambdaQL 会为这样的路径加上 `e0.customer.id is not null`。
 这样 `update` 和 `delete` 处理的**正好是** `qb.from(X::class.java).where { 同一个 Lambda }` 返回的那些行（已用 Java 测试：把删除的行与查询结果进行比较）。
-有 `it.customer == null || ...` 这样的 null 守卫时也一样。查询对这条路径同样使用 inner join（决策 D48），因此检查会保留。
+有用 `!!` 或不加标记写的 null 守卫（`it.customer == null || it.customer!!.name == ...`）时也一样。查询对这条路径同样使用 inner join（决策 D48），因此检查会保留。
+如果条件使用 `?.` 经过的步骤在查询中成为 `left join`（`it.status == 1 || it.customer?.name == "Kim"`，决策 D54），则不添加这个检查。此时 DML 处理的也是与查询相同的行（[7.2](07-2-update.md) 中的 region `update-safe-call`）。
 
 以 `@Id` 结尾的路径（`it.customer?.id`）是外键列。没有子查询，也没有 join。
 
@@ -373,7 +371,7 @@ U11、U12、U15 的 lambdaQL 检查尚未实现。
 | U6 | 给不可为空的列（`@Id`、`nullable=false`、基本类型）赋 `null` 是错误。给集合或关联实体的非 `@Id` 属性赋值也是错误。 |
 | U7 | 捕获值的每次使用都会得到自己的参数。（在测试中，让 STRING 列和 ORDINAL 列共享一个枚举参数时，没有报错，但存入了错误的值。） |
 | U8 | `LocalDateTime.now()` 在应用程序中求值并绑定。不支持数据库时间（`current_timestamp`）。 |
-| U9 | DML 中非外键的关联路径在 `where` 中和 SET 的右侧都会变成关联标量子查询。在 `where` 中，查询会做 inner join 的路径（D36）还会加上 `customer.id is not null`。DML 处理的行与查询相同。 |
+| U9 | DML 中非外键的关联路径在 `where` 中和 SET 的右侧都会变成关联标量子查询。在 `where` 中，查询会做 inner join 的路径（D36）还会加上 `customer.id is not null`。用 `?.` 经过并在查询中成为 `left join` 的步骤则不添加（D54）。DML 处理的行与查询相同。 |
 | U10 | 在 `insert ... select` 中，源路径会变成显式的 `left join`。 |
 | U11 | `it.customer = entity` 绑定该实体的 `@Id`。如果 id 为 null，绑定会失败。 |
 | U12 | IDENTITY 和 SEQUENCE 的 id 可以省略。TABLE 生成器只能用于 `values`，不能用于 `insert ... select`。没有生成器时，id 是必需的。其他不可为空的属性也是必需的。 |

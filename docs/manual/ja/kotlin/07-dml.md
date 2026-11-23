@@ -1,9 +1,6 @@
 <a id="7-update-insert-delete-kotlin"></a>
 # 7. 更新、挿入、削除（Kotlin）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/07-dml.md)を参照してください。
-
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [6. 選択、集計、グループ化](06-select-group.md) | 次: [8. プロシージャと DB 関数](08-procedures-functions.md) | [このページの Java 版](../java/07-dml.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -275,7 +272,8 @@ lambdaQL はサブクエリを自分で書きます。そうすると文は自�
 
 選択では、`where` の中のパスに内部結合を使います（決定 D36）。そのため DML では、lambdaQL はそのようなパスに `e0.customer.id is not null` を加えます。
 その結果、`update` と `delete` は `qb.from(X::class.java).where { 同じラムダ }` が返す **まったく同じ行** だけを対象にします（Java でテスト済み: 削除した行を選択の結果と比べています）。
-`it.customer == null || ...` のような null ガードがあっても同じです。選択でもこのパスに内部結合を使うので（決定 D48）、確認は残ります。
+`!!` か印なしで書いた null ガード（`it.customer == null || it.customer!!.name == ...`）があっても同じです。選択でもこのパスに内部結合を使うので（決定 D48）、確認は残ります。
+`?.` でたどった段階が選択で `left join` になる条件なら（`it.status == 1 || it.customer?.name == "Kim"`、決定 D54）、この確認を加えません。このときも DML は選択と同じ行を対象にします（[7.2](07-2-update.md) のリージョン `update-safe-call`）。
 
 `@Id` で終わるパス（`it.customer?.id`）は FK カラムです。サブクエリも結合も使いません。
 
@@ -373,7 +371,7 @@ U11、U12、U15 の lambdaQL による確認はまだ実装されていません
 | U6 | 省略できないカラム（`@Id`、`nullable=false`、プリミティブ）に `null` を代入するとエラーです。コレクション、または関連エンティティの `@Id` 以外のプロパティに代入してもエラーです。 |
 | U7 | キャプチャ値は、使うたびに別のパラメーターになります。（テストでは、STRING カラムと ORDINAL カラムが 1 つの enum パラメーターを共有すると、エラーなしで間違った値が保存されました。） |
 | U8 | `LocalDateTime.now()` はアプリケーションで計算してバインドします。データベースの時刻（`current_timestamp`）はサポートしません。 |
-| U9 | DML の中の FK でない関連のパスは、`where` でも SET の右辺でも相関スカラーサブクエリになります。`where` では、選択なら内部結合するパス（D36）に `customer.id is not null` を加えます。DML は選択と同じ行を対象にします。 |
+| U9 | DML の中の FK でない関連のパスは、`where` でも SET の右辺でも相関スカラーサブクエリになります。`where` では、選択なら内部結合するパス（D36）に `customer.id is not null` を加えます。`?.` でたどって選択で `left join` になる段階には加えません（D54）。DML は選択と同じ行を対象にします。 |
 | U10 | `insert ... select` では、ソースのパスは明示的な `left join` になります。 |
 | U11 | `it.customer = entity` はエンティティの `@Id` をバインドします。id が null の場合、バインドは失敗します。 |
 | U12 | IDENTITY と SEQUENCE の id は省略できます。TABLE ジェネレーターは `values` でだけ動作し、`insert ... select` では動作しません。ジェネレーターがなければ id は必須です。その他の省略できないプロパティも必須です。 |

@@ -1,9 +1,6 @@
 <a id="3-conditions-where-kotlin"></a>
 # 3. 条件（`where`）（Kotlin）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/03-where.md)を参照してください。
-
 [Kotlin トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [2. はじめよう](02-getting-started.md) | 次: [4. ソートとページング](04-order-paging.md) | [このページの Java 版](../java/03-where.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
@@ -515,8 +512,18 @@ assertEquals("select e0 from Order e0 where e0.address.city is null and e0.addre
 ```
 
 `it.customer?.name`、`it.customer!!.name`、そして（Java のエンティティなら）`it.customer.name` は、すべて **同じカラム** `j1.name` を意味します。
+ただし `where` の中では、関連の段階をどうたどったかによって結合の種類が変わります（決定 D54）。
 
-`where` の中では、関連のパスはデフォルトで **inner join** です（決定 D36）。
+| `where` で関連の段階をたどった方法 | 結合 | 顧客のない注文 |
+|---|---|---|
+| `!!`、または印なし（non-null 型 `customer: Customer`、Java のエンティティのプラットフォーム型） | inner `join` | 結果に入らない |
+| `?.` | 顧客のない注文が条件全体を真にできるなら `left join`、そうでなければ inner `join` | Kotlin で条件が真なら結果に残る |
+
+`?.` は「関連がないかもしれない」とソースに書く構文です。`!!` は「関連が必ずある」という宣言とみなします。
+値の比較はどちらの場合も SQL の意味に従います（決定 D48）。たとえば `it.customer?.name != "Kim"` は顧客のない注文に一致しません。
+
+**inner join で足りる場合。** `where` の中では、関連のパスはデフォルトで inner join です（決定 D36）。
+`?.` でたどった段階でも、顧客のない注文が条件を真にできなければ inner join で書きます。結果は同じです。
 
 ```kotlin
 qb.from(Order::class.java)
@@ -546,17 +553,70 @@ where c1_0.name=?
 - **顧客のない注文** は結果に入りません。結合する顧客の行がないからです。
 - lambdaQL は null チェックを代わりに追加しません。パスの前に `it.customer != null &&` を書く必要はありません。
 
-**null ガードでは顧客のない注文は残りません。** `where` のパスは常に inner join です（SQL の意味、決定 D48）。
-そのため、`it.customer == null || ...` は顧客のない注文に一致しません。その注文には結合する顧客の行がないからです。このような条件について、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します。
-顧客のない注文を残すには、明示的な `leftJoin`（決定 D44、[6.8](06-select-group.md#68-explicit-joins) を参照）を使い、`c == null || ...` と書いてください。
+**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `safe-call-and`:
+
+```kotlin
+// a row without a customer can never match: lambdaQL keeps the inner join (the same rows)
+val q = qb.from(Order::class.java).where { it.customer?.name == "Kim" && it.price > 100.0 }
+assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' and e0.price > 100.0", q.toHql().hql())
+```
+
+**`?.` と `||`。** 顧客のない注文が条件を真にできるなら、`?.` でたどった段階は `left join` です。
+status が 1 で顧客のない注文も結果に残ります。Kotlin で同じ条件を実行した結果と同じです。
+
+**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `safe-call-or`:
+
+```kotlin
+// ?. says the customer may be missing: an order without a customer stays when the rest of the OR is true
+val q = qb.from(Order::class.java).where { it.status.toInt() == 1 || it.customer?.name == "Kim" }
+assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", q.toHql().hql())
+```
+
+**データベースごとの SQL（Kotlin のリージョンの HQL をそのまま実行した結果）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `safe-call-or`:
+
+```sql
+-- H2, MariaDB, Oracle (same)
+select …
+from orders o1_0
+left join customers c1_0 on c1_0.id=o1_0.customer_id
+where o1_0.status=1 or c1_0.name='Kim'
+```
+
+**`?.` と `== null`。** `it.customer?.name == null` は、Kotlin と同じように、顧客のない注文と名前のない顧客の注文の両方を探します。
+
+**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `safe-call-null`:
+
+```kotlin
+// "no customer, or a customer without a name": a left join, as in Kotlin
+val q = qb.from(Order::class.java).where { it.customer?.name == null }
+assertEquals("select e0 from Order e0 left join e0.customer j1 where j1.name is null", q.toHql().hql())
+```
+
+**データベースごとの SQL（Kotlin のリージョンの HQL をそのまま実行した結果）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `safe-call-null`:
+
+```sql
+-- H2, MariaDB, Oracle (same)
+select …
+from orders o1_0
+left join customers c1_0 on c1_0.id=o1_0.customer_id
+where c1_0.name is null
+```
+
+**null ガード。** `?.` で書いた null ガードも `left join` になり、顧客のない注文が残ります。
+`!!` で書くと inner join なので残りません。この場合、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します。
 
 ```kotlin
 .where { it.customer == null || it.customer?.name == name }
+// HQL: select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1
+
+.where { it.customer == null || it.customer!!.name == name }
 // HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name = :p1
 
 .where { it.customer != null && it.customer?.name == name }
 // HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is not null and j1.name = :p1
 ```
+
+下の SQL は、同じ条件を Java で書いたテストの結果です。Kotlin では、`!!` で書いた 2 番目の形と `&&` で書いた 3 番目の形がこの SQL を作ります。
 
 **データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `null-guard`:
 
@@ -580,8 +640,31 @@ where c1_0.id is not null and c1_0.name=?
 
 Hibernate は `e0.customer is null` を `c1_0.id is null` と書きます。inner join の後では、この条件は真になりません。
 
-- `||` のほかの部分も同じです。`it.status == 1 || it.customer?.name == name` も inner join を使うので、status が 1 でも顧客のない注文は返されません（Kotlin なら返されます）。
-- これについての Kotlin のテストはまだありません。同じ条件を Java で書いたものはテスト済みです。[このページの Java 版](../java/03-where.md#310-association-paths) を参照してください。
+**`!!`: 関連が必ずあるという宣言。** `!!` でたどった段階は常に inner join です。
+Kotlin では `||` が `!!` に届く前に終わる行（status 1、顧客なし）が残りますが、lambdaQL はその行を除きます。そのような行を残すには `?.` を使ってください。
+
+**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `not-null-assert`:
+
+```kotlin
+// !! says the customer is always there: an inner join, so orders without a customer are left out
+// (Kotlin itself would keep the status 1 order without a customer, because || stops before the !!)
+val q = qb.from(Order::class.java).where { it.status.toInt() == 1 || it.customer!!.name == "Kim" }
+assertEquals("select e0 from Order e0 join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", q.toHql().hql())
+```
+
+**`?.` と `!!` を混ぜた場合。** 条件全体（同じクエリのすべての `where`）で、同じ関連の段階をある箇所では `?.` で、別の箇所では `!!` か印なしでたどると、inner join になります。
+lambdaQL は `LQL-5014` を `WARN` レベルでログに出します（条件ごとに 1 回）。顧客のない注文を残すには、すべて `?.` で書いてください。
+
+**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `mixed-warn`:
+
+```kotlin
+// the same association with ?. in one place and !! in another: an inner join, and WARN LQL-5014
+val q = qb.from(Order::class.java).where { it.customer?.name == "Kim" || it.customer!!.grade!! > 3 }
+assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' or j1.grade > 3", q.toHql().hql())
+```
+
+- 1 つのパスの中で後ろの段階が `!!` なら、前の段階も inner join です。たとえば `Item` の `it.order?.customer!!.name` は `join e0.order j1 join j1.customer j2` です。Kotlin でも注文がなければ `NullPointerException` になるパスなので、`LQL-5014` は出しません。
+- 2 つの段階をどちらも `?.` でたどると（`it.order?.customer?.name`）、必要なときに両方の段階が `left join` になります。
 
 顧客の **ない** 注文を探すには、関連そのものを比較してください。結合せずに外部キーのカラムをチェックします。
 
@@ -599,16 +682,12 @@ from orders o1_0
 where o1_0.customer_id is null
 ```
 
-> [!WARNING]
-> **`?.` を使っても顧客のない注文は返りません。** Kotlin では、顧客がないとき `it.customer?.name == null` は `true` です。
-> lambdaQL ではここでパスが inner join なので、`it.customer?.name == null` は顧客に名前がない注文だけを返します。
-> 顧客のない注文も含めるには、明示的な `leftJoin` と `c == null || c.name == null` を使うか（[6.8](06-select-group.md#68-explicit-joins) を参照）、`it.customer == null` でクエリをもう一度実行してください。
-
 その他の事項:
 
 - 同じパスには 1 つのエイリアスが付きます。このエイリアスは `where`、`orderBy`、`select` で共有されます。
 - `it.customer?.id == 5L` は外部キーのカラム `e0.customer.id` を使います。結合は不要です。
-- `orderBy` か `select` **だけ** で使うパスは `left join` なので、そこでは行が失われません（ルール S8、J1）。同じパスを `where` でも使うと、`orderBy` と `select` は `where` の結合、つまり inner join を使います。
+- `orderBy` か `select` **だけ** で使うパスは `left join` なので、そこでは行が失われません（ルール S8、J1）。`!!` があっても同じです。同じパスを `where` でも使うと、`orderBy` と `select` は `where` の結合を使います。
+- `?.` による結合の区別は、取得、`count`、サブクエリ、結合クエリの `where` に適用します。明示的な結合の `on` の中のパスは従来どおり `left join` です。必須の関連（`optional = false`）は常に inner join です。
 - 2 つのエンティティの比較（`it.customer == c`）は **予定** です（KC13）。今は id を比較してください: `it.customer?.id == c.id`（ここで `c` はキャプチャしたオブジェクトです）。
 
 <a id="311-captured-values"></a>

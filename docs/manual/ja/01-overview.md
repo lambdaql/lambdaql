@@ -1,9 +1,6 @@
 <a id="1-overview"></a>
 # 1. 概要
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../ko/01-overview.md)を参照してください。
-
 [マニュアルのホーム](README.md) | トラック: [Java](java/README.md) | [Kotlin](kotlin/README.md) | 次: 2. はじめよう（[Java](java/02-getting-started.md) | [Kotlin](kotlin/02-getting-started.md)）
 
 このページは両方の言語向けです。コードは **Java** と **Kotlin** の別々のセクションに分けて載せています。
@@ -42,16 +39,25 @@ val orders = qb.from(Order::class.java)
 ```
 
 <a id="hql-the-same-for-both"></a>
-### HQL（どちらも同じ）
+### HQL
+
+Java:
 
 ```
 select e0 from Order e0 join e0.customer j1
 where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
 ```
 
+Kotlin（`?.` でたどった関連は必要なときに `left join`、決定 D54）:
+
+```
+select e0 from Order e0 left join e0.customer j1
+where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
+```
+
 **SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 7.4 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `overview-first`:
+**データベースごとの SQL（Java の例、テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `overview-first`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -63,9 +69,9 @@ where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 
 2 つの `where` 呼び出しは `AND` でつながります。
 定数 `"Kim"` はリテラルになり、キャプチャした `minPrice` はバインドパラメーター（`:p1`）になります。
-`where` の中の `o.getCustomer().getName()` のようなパスは、デフォルトで内部結合の `join` になります。customer のない注文は返されません。
-この例も同じです。Java なら status が 1 の注文は customer がなくても条件に合いますが、lambdaQL は SQL の意味を使います（決定 D48）。
-このような注文も残すには `leftJoin` を使ってください。
+`where` の中の `o.getCustomer().getName()` のようなパスは、デフォルトで内部結合の `join` になります。Java の例は customer のない注文を返しません。
+Java なら status が 1 の注文は customer がなくても条件に合いますが、lambdaQL は SQL の意味を使います（決定 D48）。このような注文も残すには `leftJoin` を使ってください。
+Kotlin の例は `?.` で「customer がないかもしれない」と書いているので `left join` になり、status が 1 で customer のない注文も返します（決定 D54）。`!!` で書くと Java と同じ内部結合です。
 
 ラムダは普通の Java や Kotlin のコードに見えます。
 しかし実際は、Java や Kotlin の構文で書く **クエリ言語** です。
@@ -178,7 +184,7 @@ lambdaQL は Java や Kotlin の実行時のルールではなく、ドキュメ
 |---|---|---|
 | `it.id == id`（`id: Long?`、nullable な変数） | 値の等価比較: `e0.id = :p1` | Kotlin の `==` はもともと「同じ値」を意味します。キャプチャした値の `null` は NULL としてバインドされ、どの行にも一致しません（`WARN` レベルの `LQL-4045`）。 |
 | `it.description == it.custName`、`it.description != text` | `e0.description = e0.custName`、`e0.description <> :p1`（SQL の意味） | エンティティの値どうし、または値との `!=` では、値が NULL の行は一致しません。そのような行を残すには `it.description == null \|\| ...` と書きます。 |
-| `it.customer?.name` または `it.customer!!.name` | 結合した customer の `name` カラム（`where` の中ではデフォルトで内部結合の `join`） | パスはカラムを指定します。`?.` や `!!` でカラムは変わりません。`!!` はラムダをコンパイルするためだけにあります。`where` の中では、customer のない注文は返されません。それらを探すには `it.customer == null` と書きます。null ガード（`it.customer == null \|\| ...`）を書いても同じです（SQL の意味、D48）。このような注文も残すには `leftJoin` を使ってください。 |
+| `it.customer?.name` または `it.customer!!.name` | 結合した customer の `name` カラム。`where` の中では `!!` は内部結合の `join`、`?.` は必要なときに `left join` | パスはカラムを指定します。`?.` や `!!` はカラムを変えず、`where` の結合の種類だけを決めます（D54）。`!!` は「関連が必ずある」という意味なので、customer のない注文は返されません。`?.` は「関連がないかもしれない」という意味なので、customer のない注文が条件を真にできるとき（`it.status == 1 \|\| ...`、`it.customer?.name == null`）は `left join` で残します。customer のない注文だけを探すには `it.customer == null` と書きます。 |
 | `price` が NULL のときの `it.price!! > 100.0` | その行は一致しない（SQL の意味） | Kotlin なら `!!` で `NullPointerException` を投げます。lambdaQL は `!!` を無視し、SQL は UNKNOWN を返します。 |
 | `it.description == null` | `e0.description is null` | null チェックを書いたので、lambdaQL はそれを使います。 |
 

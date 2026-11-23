@@ -1,9 +1,6 @@
 <a id="3-conditions-where-kotlin"></a>
 # 3. Conditions (`where`) (Kotlin)
 
-> [!IMPORTANT]
-> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/03-where.md) for the latest rules.
-
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [2. Getting started](02-getting-started.md) | Next: [4. Sorting and paging](04-order-paging.md) | [Java version of this page](../java/03-where.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)
@@ -515,8 +512,18 @@ assertEquals("select e0 from Order e0 where e0.address.city is null and e0.addre
 ```
 
 `it.customer?.name`, `it.customer!!.name` and (for a Java entity) `it.customer.name` all mean the **same column** `j1.name`.
+But in `where`, the join type depends on how the association step is reached (decision D54).
 
-In `where`, an association path is an **inner join** by default (decision D36).
+| How the association step is reached in `where` | Join | Orders without a customer |
+|---|---|---|
+| `!!`, or no mark (a non-null type `customer: Customer`, the platform type of a Java entity) | inner `join` | not in the result |
+| `?.` | `left join` when an order without a customer can make the whole condition true, otherwise inner `join` | kept in the result when the condition is true in Kotlin |
+
+`?.` is the syntax that writes "the association may be missing" in the source. `!!` is read as a statement that "the association is always there".
+A comparison of values follows the SQL meaning in both cases (decision D48). For example, `it.customer?.name != "Kim"` does not match an order without a customer.
+
+**When an inner join is enough.** In `where`, an association path is an inner join by default (decision D36).
+Even for a step reached with `?.`, lambdaQL writes an inner join when an order without a customer cannot make the condition true. The result is the same.
 
 ```kotlin
 qb.from(Order::class.java)
@@ -546,17 +553,70 @@ where c1_0.name=?
 - An order **without a customer** is not in the result. There is no customer row to join.
 - lambdaQL does not add a null check for you. You do not need `it.customer != null &&` before the path.
 
-**A null guard does not keep orders without a customer.** A path in `where` is always an inner join (SQL meaning, decision D48).
-So `it.customer == null || ...` does not match an order without a customer, because that order has no customer row to join. lambdaQL logs `LQL-5009` at `DEBUG` level for such a condition.
-To keep orders without a customer, use an explicit `leftJoin` (decision D44, see [6.8](06-select-group.md#68-explicit-joins)) and write `c == null || ...`.
+**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `safe-call-and`:
+
+```kotlin
+// a row without a customer can never match: lambdaQL keeps the inner join (the same rows)
+val q = qb.from(Order::class.java).where { it.customer?.name == "Kim" && it.price > 100.0 }
+assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' and e0.price > 100.0", q.toHql().hql())
+```
+
+**`?.` and `||`.** When an order without a customer can make the condition true, a step reached with `?.` is a `left join`.
+An order with status 1 and no customer is also in the result. This is the same as the result of the same condition run in Kotlin.
+
+**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `safe-call-or`:
+
+```kotlin
+// ?. says the customer may be missing: an order without a customer stays when the rest of the OR is true
+val q = qb.from(Order::class.java).where { it.status.toInt() == 1 || it.customer?.name == "Kim" }
+assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", q.toHql().hql())
+```
+
+**SQL by database (the HQL of the Kotlin region, run as it is)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `safe-call-or`:
+
+```sql
+-- H2, MariaDB, Oracle (same)
+select …
+from orders o1_0
+left join customers c1_0 on c1_0.id=o1_0.customer_id
+where o1_0.status=1 or c1_0.name='Kim'
+```
+
+**`?.` and `== null`.** `it.customer?.name == null` finds both orders without a customer and orders whose customer has no name, as in Kotlin.
+
+**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `safe-call-null`:
+
+```kotlin
+// "no customer, or a customer without a name": a left join, as in Kotlin
+val q = qb.from(Order::class.java).where { it.customer?.name == null }
+assertEquals("select e0 from Order e0 left join e0.customer j1 where j1.name is null", q.toHql().hql())
+```
+
+**SQL by database (the HQL of the Kotlin region, run as it is)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `safe-call-null`:
+
+```sql
+-- H2, MariaDB, Oracle (same)
+select …
+from orders o1_0
+left join customers c1_0 on c1_0.id=o1_0.customer_id
+where c1_0.name is null
+```
+
+**Null guard.** A null guard written with `?.` also becomes a `left join`, so orders without a customer stay.
+Written with `!!`, it is an inner join, so they do not stay. In this case lambdaQL logs `LQL-5009` at `DEBUG` level.
 
 ```kotlin
 .where { it.customer == null || it.customer?.name == name }
+// HQL: select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1
+
+.where { it.customer == null || it.customer!!.name == name }
 // HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name = :p1
 
 .where { it.customer != null && it.customer?.name == name }
 // HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is not null and j1.name = :p1
 ```
+
+The SQL below is from the test that writes the same conditions in Java. In Kotlin, the second form (with `!!`) and the third form (with `&&`) give this SQL.
 
 **SQL by database (from the Java test run; Kotlin gives the same HQL)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `null-guard`:
 
@@ -580,8 +640,31 @@ where c1_0.id is not null and c1_0.name=?
 
 Hibernate writes `c1_0.id is null` for `e0.customer is null`. After the inner join this condition is never true.
 
-- The same holds for other parts of an `||`. `it.status == 1 || it.customer?.name == name` also uses an inner join, so an order with status 1 but without a customer is not returned (Kotlin would return it).
-- There are no Kotlin tests for this yet. The same conditions written in Java are tested. See [the Java version of this page](../java/03-where.md#310-association-paths).
+**`!!`: the association is always there.** A step reached with `!!` is always an inner join.
+In Kotlin, a row where `||` stops before it reaches the `!!` (status 1, no customer) stays, but lambdaQL leaves that row out. To keep such rows, use `?.`.
+
+**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `not-null-assert`:
+
+```kotlin
+// !! says the customer is always there: an inner join, so orders without a customer are left out
+// (Kotlin itself would keep the status 1 order without a customer, because || stops before the !!)
+val q = qb.from(Order::class.java).where { it.status.toInt() == 1 || it.customer!!.name == "Kim" }
+assertEquals("select e0 from Order e0 join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", q.toHql().hql())
+```
+
+**Mixing `?.` and `!!`.** If, in the whole condition (all `where` calls of the same query), the same association step is reached with `?.` in one place and with `!!` or without a mark in another, it is an inner join.
+lambdaQL logs `LQL-5014` at `WARN` level (once per condition). To keep orders without a customer, write `?.` everywhere.
+
+**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `mixed-warn`:
+
+```kotlin
+// the same association with ?. in one place and !! in another: an inner join, and WARN LQL-5014
+val q = qb.from(Order::class.java).where { it.customer?.name == "Kim" || it.customer!!.grade!! > 3 }
+assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' or j1.grade > 3", q.toHql().hql())
+```
+
+- Inside one path, if a later step is `!!`, the earlier steps are inner joins too. For example, `it.order?.customer!!.name` on `Item` is `join e0.order j1 join j1.customer j2`. In Kotlin too this path throws `NullPointerException` when there is no order, so lambdaQL does not log `LQL-5014`.
+- If both steps are reached with `?.` (`it.order?.customer?.name`), both steps are a `left join` when needed.
 
 To find orders **without** a customer, compare the association itself. This checks the foreign key column, with no join.
 
@@ -599,16 +682,12 @@ from orders o1_0
 where o1_0.customer_id is null
 ```
 
-> [!WARNING]
-> **`?.` does not bring back orders without a customer.** In Kotlin, `it.customer?.name == null` is `true` when there is no customer.
-> In lambdaQL, the path is an inner join here, so `it.customer?.name == null` returns only orders whose customer has no name.
-> To include orders without a customer too, use an explicit `leftJoin` with `c == null || c.name == null` (see [6.8](06-select-group.md#68-explicit-joins)), or run a second query with `it.customer == null`.
-
 More facts:
 
 - The same path gets one alias. It is shared by `where`, `orderBy` and `select`.
 - `it.customer?.id == 5L` uses the foreign key column `e0.customer.id`. No join is needed.
-- A path that is used **only** in `orderBy` or `select` is a `left join`, so no rows are lost there (rules S8 and J1). If `where` uses the same path too, `orderBy` and `select` use the `where` join, which is an inner join.
+- A path that is used **only** in `orderBy` or `select` is a `left join`, so no rows are lost there (rules S8 and J1). This is the same with `!!`. If `where` uses the same path too, `orderBy` and `select` use the `where` join.
+- The join choice by `?.` applies to `where` in selects, `count`, subqueries and join queries. A path inside the `on` of an explicit join is a `left join` as before. A required association (`optional = false`) is always an inner join.
 - Comparing two entities (`it.customer == c`) is **planned** (KC13). For now compare ids: `it.customer?.id == c.id` (here `c` is a captured object).
 
 <a id="311-captured-values"></a>

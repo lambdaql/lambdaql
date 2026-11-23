@@ -1,9 +1,6 @@
 <a id="74-delete"></a>
 # 7.4 削除（Kotlin）
 
-> [!IMPORTANT]
-> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/kotlin/07-4-delete.md)を参照してください。
-
 [7. 更新、挿入、削除（Kotlin）](07-dml.md) | [7.2 更新](07-2-update.md) | **7.4 削除** | [7.5 挿入](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Java](../java/07-4-delete.md)
 
 ---
@@ -14,8 +11,8 @@ val d = qb.delete(Order::class.java).where { it.status == 3 }
 // HQL: delete from Order e0 where e0.status = 3
 val deleted = d.execute()
 
-// a path: the same rows as qb.from(Order::class.java).where { same lambda } - orders without a customer stay
-val byName = qb.delete(Order::class.java).where { it.customer?.name == null }
+// a path: the same rows as qb.from(Order::class.java).where { same lambda } - with !! orders without a customer stay
+val byName = qb.delete(Order::class.java).where { it.customer!!.name == null }
 // HQL: delete from Order e0 where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) is null and e0.customer.id is not null
 ```
 
@@ -59,9 +56,11 @@ assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where
 テストはまず `Archive` の行を 1 つ挿入し、品目のない注文を削除した後、残った行を Kotlin で同じ条件を適用した結果と比べます。
 Java で書いたほかの文は [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) でテストしています（H2、MariaDB、Oracle）。それらの例は [このページの Java 版](../java/07-4-delete.md) を参照してください。
 
-2 つ目の文は、`qb.from(Order::class.java).where { it.customer?.name == null }` が返すのと **同じ行**、つまり顧客に名前がない注文を削除します。Java のテストでは、削除した行をこの選択の結果と比べています。
-顧客の **いない** 注文は削除されません（ルール U9、決定 D36）。null ガード（`it.customer == null || ...`）を書いても同じです。選択でもこのパスは inner join だからです（決定 D48）。
-顧客のいない注文を削除するには、`it.customer == null` の条件で削除文をもう一度実行してください。
+2 つ目の文は、`qb.from(Order::class.java).where { it.customer!!.name == null }` が返すのと **同じ行**、つまり顧客に名前がない注文を削除します。Java のテストでは、同じ条件を Java で書き、削除した行を選択の結果と比べています。
+顧客の **いない** 注文は削除されません（ルール U9、決定 D36）。`!!` は関連が必ずあるという宣言だからです。
+
+`?.` で書くと（`it.customer?.name == null`）、選択と同じく `left join` と同じ意味になり、`e0.customer.id is not null` を加えません（決定 D54）。そのため、顧客のいない注文も削除されます。
+同じ方式の UPDATE の例は [7.2](07-2-update.md) のリージョン `update-safe-call` を参照してください。顧客のいない注文だけを削除するには、`it.customer == null` と書いてください。
 
 すべての行を削除するには `all()` が必要です（ルール U5）。
 

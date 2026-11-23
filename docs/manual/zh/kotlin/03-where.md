@@ -1,9 +1,6 @@
 <a id="3-conditions-where-kotlin"></a>
 # 3. 条件（`where`）（Kotlin）
 
-> [!IMPORTANT]
-> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/kotlin/03-where.md)。
-
 [Kotlin 路线](README.md) | [手册首页](../README.md) | 上一章：[2. 入门](02-getting-started.md) | 下一章：[4. 排序与分页](04-order-paging.md) | [本页的 Java 版本](../java/03-where.md)
 
 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)
@@ -516,8 +513,18 @@ assertEquals("select e0 from Order e0 where e0.address.city is null and e0.addre
 ```
 
 `it.customer?.name`、`it.customer!!.name` 以及（对于 Java 实体）`it.customer.name` 都表示**同一个列** `j1.name`。
+不过在 `where` 中，连接类型取决于以何种方式经过关联步骤（决策 D54）。
 
-在 `where` 中，关联路径默认是**内连接（inner join）**（决策 D36）。
+| 在 `where` 中经过关联步骤的方式 | 连接 | 没有客户的订单 |
+|---|---|---|
+| `!!`，或不加标记（非空类型 `customer: Customer`、Java 实体的平台类型） | 内连接 `join` | 不在结果中 |
+| `?.` | 没有客户的订单可能使整个条件为真时为 `left join`，否则为内连接 `join` | 在 Kotlin 中条件为真时保留在结果中 |
+
+`?.` 是在源码中写明“关联可能不存在”的语法。`!!` 被视为“关联一定存在”的声明。
+无论哪种情况，值的比较都遵循 SQL 语义（决策 D48）。例如 `it.customer?.name != "Kim"` 不匹配没有客户的订单。
+
+**内连接已经足够的情况。** 在 `where` 中，关联路径默认是内连接（决策 D36）。
+即使是用 `?.` 经过的步骤，如果没有客户的订单无法使条件为真，也写成内连接。结果相同。
 
 ```kotlin
 qb.from(Order::class.java)
@@ -547,17 +554,70 @@ where c1_0.name=?
 - **没有客户的**订单不在结果中。因为没有可以连接的客户行。
 - lambdaQL 不会替你添加 null 检查。不需要在路径前面写 `it.customer != null &&`。
 
-**null 守卫不会保留没有客户的订单。** `where` 中的路径总是内连接（SQL 语义，决策 D48）。
-因此 `it.customer == null || ...` 不匹配没有客户的订单，因为这些订单没有可以连接的客户行。对于这种条件，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`。
-要保留没有客户的订单，请使用显式的 `leftJoin`（决策 D44，见 [6.8](06-select-group.md#68-explicit-joins)），并写 `c == null || ...`。
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `safe-call-and`：
+
+```kotlin
+// a row without a customer can never match: lambdaQL keeps the inner join (the same rows)
+val q = qb.from(Order::class.java).where { it.customer?.name == "Kim" && it.price > 100.0 }
+assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' and e0.price > 100.0", q.toHql().hql())
+```
+
+**`?.` 与 `||`。** 如果没有客户的订单可能使条件为真，用 `?.` 经过的步骤就是 `left join`。
+状态为 1 且没有客户的订单也保留在结果中。这与在 Kotlin 中执行同一条件的结果相同。
+
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `safe-call-or`：
+
+```kotlin
+// ?. says the customer may be missing: an order without a customer stays when the rest of the OR is true
+val q = qb.from(Order::class.java).where { it.status.toInt() == 1 || it.customer?.name == "Kim" }
+assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", q.toHql().hql())
+```
+
+**各数据库的 SQL（直接执行 Kotlin region 中 HQL 的结果）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `safe-call-or`：
+
+```sql
+-- H2, MariaDB, Oracle (same)
+select …
+from orders o1_0
+left join customers c1_0 on c1_0.id=o1_0.customer_id
+where o1_0.status=1 or c1_0.name='Kim'
+```
+
+**`?.` 与 `== null`。** `it.customer?.name == null` 与 Kotlin 一样，既查找没有客户的订单，也查找客户没有名字的订单。
+
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `safe-call-null`：
+
+```kotlin
+// "no customer, or a customer without a name": a left join, as in Kotlin
+val q = qb.from(Order::class.java).where { it.customer?.name == null }
+assertEquals("select e0 from Order e0 left join e0.customer j1 where j1.name is null", q.toHql().hql())
+```
+
+**各数据库的 SQL（直接执行 Kotlin region 中 HQL 的结果）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `safe-call-null`：
+
+```sql
+-- H2, MariaDB, Oracle (same)
+select …
+from orders o1_0
+left join customers c1_0 on c1_0.id=o1_0.customer_id
+where c1_0.name is null
+```
+
+**null 守卫。** 用 `?.` 写的 null 守卫也会成为 `left join`，没有客户的订单会被保留。
+写成 `!!` 则是内连接，不会保留。此时 lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`。
 
 ```kotlin
 .where { it.customer == null || it.customer?.name == name }
+// HQL: select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1
+
+.where { it.customer == null || it.customer!!.name == name }
 // HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name = :p1
 
 .where { it.customer != null && it.customer?.name == name }
 // HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is not null and j1.name = :p1
 ```
+
+下面的 SQL 是用 Java 写出同一条件的测试结果。在 Kotlin 中，用 `!!` 写的第二种形式和用 `&&` 写的第三种形式会生成这个 SQL。
 
 **各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `null-guard`：
 
@@ -581,8 +641,31 @@ where c1_0.id is not null and c1_0.name=?
 
 Hibernate 把 `e0.customer is null` 写成 `c1_0.id is null`。在内连接之后，这个条件永远不为真。
 
-- `||` 的其他部分也一样。`it.status == 1 || it.customer?.name == name` 同样使用内连接，因此状态为 1 但没有客户的订单不会被返回（Kotlin 会返回）。
-- 这一点目前还没有 Kotlin 测试。用 Java 写的同样的条件已经测试过。见[本页的 Java 版本](../java/03-where.md#310-association-paths)。
+**`!!`：关联一定存在的声明。** 用 `!!` 经过的步骤总是内连接。
+在 Kotlin 中，`||` 在到达 `!!` 之前就结束的行（状态为 1、没有客户）会保留，但 lambdaQL 会排除这样的行。要保留这样的行，请使用 `?.`。
+
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `not-null-assert`：
+
+```kotlin
+// !! says the customer is always there: an inner join, so orders without a customer are left out
+// (Kotlin itself would keep the status 1 order without a customer, because || stops before the !!)
+val q = qb.from(Order::class.java).where { it.status.toInt() == 1 || it.customer!!.name == "Kim" }
+assertEquals("select e0 from Order e0 join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", q.toHql().hql())
+```
+
+**混用 `?.` 和 `!!` 的情况。** 在整个条件（同一查询的所有 `where`）中，如果同一关联步骤在一处用 `?.` 经过，在另一处用 `!!` 或不加标记经过，则为内连接。
+lambdaQL 以 `WARN` 级别记录 `LQL-5014`（每个条件一次）。要保留没有客户的订单，请全部写成 `?.`。
+
+**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `mixed-warn`：
+
+```kotlin
+// the same association with ?. in one place and !! in another: an inner join, and WARN LQL-5014
+val q = qb.from(Order::class.java).where { it.customer?.name == "Kim" || it.customer!!.grade!! > 3 }
+assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' or j1.grade > 3", q.toHql().hql())
+```
+
+- 在一条路径中，如果后面的步骤是 `!!`，前面的步骤也是内连接。例如 `Item` 的 `it.order?.customer!!.name` 是 `join e0.order j1 join j1.customer j2`。这条路径在 Kotlin 中没有订单时也会抛出 `NullPointerException`，因此不记录 `LQL-5014`。
+- 两个步骤都用 `?.` 经过时（`it.order?.customer?.name`），需要时两个步骤都是 `left join`。
 
 要查找**没有**客户的订单，请比较关联本身。这会检查外键列，不需要 join。
 
@@ -600,16 +683,12 @@ from orders o1_0
 where o1_0.customer_id is null
 ```
 
-> [!WARNING]
-> **使用 `?.` 也不会带回没有客户的订单。** 在 Kotlin 中，没有客户时 `it.customer?.name == null` 为 `true`。
-> 在 lambdaQL 中，该路径在这里是内连接，因此 `it.customer?.name == null` 只返回客户没有名字的订单。
-> 要同时包含没有客户的订单，请使用显式的 `leftJoin` 和 `c == null || c.name == null`（见 [6.8](06-select-group.md#68-explicit-joins)），或者用 `it.customer == null` 再执行一次查询。
-
 补充说明：
 
 - 同一条路径只得到一个别名。`where`、`orderBy` 和 `select` 共享这个别名。
 - `it.customer?.id == 5L` 使用外键列 `e0.customer.id`。不需要 join。
-- **只**在 `orderBy` 或 `select` 中使用的路径是 `left join`，因此那里不会丢失行（规则 S8、J1）。如果 `where` 也使用同一条路径，`orderBy` 和 `select` 会使用 `where` 的 join，即内连接。
+- **只**在 `orderBy` 或 `select` 中使用的路径是 `left join`，因此那里不会丢失行（规则 S8、J1）。有 `!!` 时也一样。如果 `where` 也使用同一条路径，`orderBy` 和 `select` 会使用 `where` 的 join。
+- 按 `?.` 区分连接类型的规则适用于查询、`count`、子查询和连接查询的 `where`。显式连接的 `on` 中的路径仍像现在一样是 `left join`。必需关联（`optional = false`）总是内连接。
 - 比较两个实体（`it.customer == c`）在**计划中**（KC13）。目前请比较 id：`it.customer?.id == c.id`（这里 `c` 是一个捕获的对象）。
 
 <a id="311-captured-values"></a>
