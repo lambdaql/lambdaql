@@ -18,24 +18,33 @@ lambdaQL은 JPA와 Hibernate 7.4 위에서 동작하는 Java와 Kotlin용 쿼리
 
 ### Java
 
+[`ManualSharedTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java), 영역 `overview-first`:
+
 ```java
 long minPrice = 100;
 
-List<Order> orders = qb.from(Order.class)
-    .where(o -> o.getStatus() == 1 || o.getCustomer().getName().equals("Kim"))
-    .where(o -> o.getPrice() > minPrice)
-    .toList();
+SelectQuery<Order> q = qb.from(Order.class)
+        .where(o -> o.getStatus() == 1 || o.getCustomer().getName().equals("Kim"))
+        .where(o -> o.getPrice() > minPrice);
+assertEquals("select e0 from Order e0 join e0.customer j1"
+        + " where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1", q.toHql().hql());
+List<Order> rows = q.toList();
 ```
 
 ### Kotlin
 
+[`ManualKotlinSharedTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSharedTest.kt), 영역 `overview-first`:
+
 ```kotlin
 val minPrice = 100.0
 
-val orders = qb.from(Order::class.java)
-    .where { it.status == 1 || it.customer?.name == "Kim" }
-    .where { it.price!! > minPrice }
-    .toList()
+val q = qb.from(Order::class.java)
+    .where { it.status.toInt() == 1 || it.customer?.name == "Kim" }
+    .where { it.price > minPrice }
+// ?. says the customer may be missing: a left join (D54)
+assertEquals("select e0 from Order e0 left join e0.customer j1"
+    + " where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1", q.toHql().hql())
+val rows = q.toList()
 ```
 
 <a id="hql-the-same-for-both"></a>
@@ -102,8 +111,8 @@ Kotlin 예제는 `?.`로 "고객이 없을 수 있음"을 적었으므로 `left 
 |---|---|---|
 | 1. 람다 본문 찾기 | 람다는 `Serializable`입니다. lambdaQL은 직렬화 훅을 통해 `SerializedLambda`를 얻습니다(`setAccessible` 없음). 이를 통해 어떤 메서드가 람다 본문을 담고 있는지, 어떤 값이 캡처되었는지 알 수 있습니다. | 구현됨 |
 | 2. 바이트코드 읽기 | lambdaQL은 그 메서드 하나만 읽습니다. Java 21~23에서는 ASM을, Java 24 이상에서는 JDK의 `java.lang.classfile`을 씁니다. 클래스 파일을 읽을 뿐 코드를 실행하지 않습니다. | 구현됨 |
-| 3. 조건 다시 만들기 | Java와 Kotlin은 `&&`, `\|\|`, `!`를 점프로 컴파일합니다. lambdaQL은 이 점프로부터 원래의 논리 트리를 다시 만듭니다. | Java 람다는 구현됨. Kotlin은 `?.`, `!!`, `in`을 테스트함. 나머지 Kotlin 전용 형태(`?:`, 범위, `when`)는 설계됨. |
-| 4. HQL 만들기 | getter와 속성은 JPA 속성 경로가 됩니다(`o.getPrice()` 또는 `it.price` → `e0.price`). 람다 안의 상수는 리터럴이 되고, 캡처 값은 파라미터(`:p1`)가 됩니다. | `where`와 `orderBy`에 대해 구현됨, H2·MariaDB·Oracle에서 테스트함 |
+| 3. 조건 다시 만들기 | Java와 Kotlin은 `&&`, `\|\|`, `!`를 점프로 컴파일합니다. lambdaQL은 이 점프로부터 원래의 논리 트리를 다시 만듭니다. | 구현됨. Kotlin 전용 형태 중 `?.`, `!!`, `?:`(`coalesce`), 컬렉션의 `in`, 범위의 `in`(`a..b`)을 테스트함 |
+| 4. HQL 만들기 | getter와 속성은 JPA 속성 경로가 됩니다(`o.getPrice()` 또는 `it.price` → `e0.price`). 람다 안의 상수는 리터럴이 되고, 캡처 값은 파라미터(`:p1`)가 됩니다. | 구현됨 |
 | 5. 실행 | lambdaQL은 파라미터를 바인딩하고 Hibernate로 HQL을 실행합니다. 각 람다의 분석 결과는 캐시되므로 바이트코드는 한 번만 읽습니다. | `toList()`와 `toSet()`(`limit` / `offset` 포함), `first()`, `one()`, `count()`, `exists()`에 대해 구현됨 |
 
 람다 하나를 읽는 데는 몇 마이크로초가 걸립니다. 캐시 덕분에 lambdaQL은 람다의 바이트코드를 한 번만 읽습니다.
@@ -121,18 +130,28 @@ lambdaQL에 전달하는 Kotlin 람다 리터럴은 Java 람다와 같은 종류
 
 #### Java
 
+[`ManualSharedTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java), 영역 `one-lambda-per-clause`:
+
 ```java
-.where(o -> o.getStatus() == 1 && o.isActive())                 // 조건 람다 하나
-.orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId()))     // 모든 키를 위한 정렬 람다 하나
-.select(o -> new OrderView(o.getId(), o.getPrice()))           // 조회 람다 하나
+ValueQuery<OrderView> q = qb.from(Order.class)
+        .where(o -> o.getStatus() == 1 && o.isActive())                 // one condition lambda
+        .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId()))     // one sort lambda for all keys
+        .select(o -> new OrderView(o.getId(), o.getPrice()));          // one select lambda
+assertEquals("select e0.id, e0.price from Order e0 where e0.status = 1 and e0.active = true"
+        + " order by e0.price desc, e0.id asc", q.toHql().hql());
 ```
 
 #### Kotlin
 
+[`ManualKotlinSharedTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSharedTest.kt), 영역 `one-lambda-per-clause`:
+
 ```kotlin
-.where { it.status == 1 && it.active }                          // 조건 람다 하나
-.orderBy { o, by -> by.desc(o.price).asc(o.id) }                // 모든 키를 위한 정렬 람다 하나
-.select { OrderView(it.id, it.price) }                          // 조회 람다 하나
+val q = qb.from(Order::class.java)
+    .where { it.status.toInt() == 1 && it.isActive }               // one condition lambda
+    .orderBy { o, by -> by.desc(o.price).asc(o.id) }               // one sort lambda for all keys
+    .select { OrderView(it.id, it.price) }                         // one select lambda
+assertEquals("select e0.id, e0.price from Order e0 where e0.status = 1 and e0.active = true"
+    + " order by e0.price desc, e0.id asc", q.toHql().hql())
 ```
 
 정렬 빌더 `by`나 서브쿼리 팩토리 `sub` 같은 헬퍼는 **람다 인자**입니다.
@@ -146,14 +165,28 @@ lambdaQL에 전달하는 Kotlin 람다 리터럴은 Java 람다와 같은 종류
 
 #### Java
 
+[`ManualSharedTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java), 영역 `agg`:
+
 ```java
-.having(o -> Agg.sum(o.getPrice()) > 1000)
+ValueQuery<CustomerTotal> q = qb.from(Order.class)
+        .groupBy(o -> o.getCustomer().getId())
+        .having(o -> Agg.sum(o.getPrice()) > 1000)
+        .select(o -> new CustomerTotal(o.getCustomer().getId(), Agg.count(), Agg.sum(o.getPrice())));
+assertEquals("select e0.customer.id, count(*), sum(e0.price) from Order e0 group by e0.customer.id"
+        + " having sum(e0.price) > 1000.0", q.toHql().hql());
 ```
 
 #### Kotlin
 
+[`ManualKotlinSharedTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSharedTest.kt), 영역 `agg`:
+
 ```kotlin
-.having { Agg.sum(it.price)!! > 1000 }
+val q = qb.from(Order::class.java)
+    .groupBy { it.customer?.id }
+    .having { Agg.sum(it.price) > 1000 }
+    .select { CustomerTotal(it.customer?.id, Agg.count(), Agg.sum(it.price)) }
+assertEquals("select e0.customer.id, count(*), sum(e0.price) from Order e0 group by e0.customer.id"
+    + " having sum(e0.price) > 1000.0", q.toHql().hql())
 ```
 
 직접 만든 데이터베이스 함수도 정적 메서드이지만, 선언은 직접 합니다
@@ -213,8 +246,6 @@ lambdaQL은 인덱스를 사용할 수 있는("SARGable") SQL을 만듭니다.
 
 | 작성한 코드 | lambdaQL이 만들지 **않는** 것 | lambdaQL이 만드는 것 |
 |---|---|---|
-| `(it.description ?: "") == "x"` | `coalesce(e0.description, '') = 'x'` | `e0.description = 'x'` |
-| `it.description.isNullOrEmpty()` | `(e0.description is null or length(e0.description) = 0)` | `(e0.description is null or e0.description = :p1)` |
 | `it.id == id`(`it.id`는 `Long?`) | `not (e0.id is null or e0.id <> :p1)` | `e0.id = :p1`(id는 NULL이 될 수 없음) |
 
 <a id="java-and-kotlin"></a>

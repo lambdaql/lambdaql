@@ -128,31 +128,38 @@ assertEquals("[LQL-2004] Loops are not supported in a lambda. Build the list out
 ```
 
 이 테스트는 예외를 직접 만듭니다. 실제 코드에서는 lambdaQL이 람다를 읽을 때 예외를 만듭니다.
-처리 방법은 다음과 같습니다(설계 예제).
+다음 예제는 값 삼항 연산자(Kotlin은 값 `if`)를 쓴 조건을 잡아 영어 메시지를 기록용 문자열로 만듭니다. 이 조건은 `where`를 호출할 때 `LQL-2021`(`UnsupportedLambdaShapeException`)로 실패합니다.
 
 ### Java
 
+[`ManualSharedTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java), 영역 `catch`:
+
 ```java
+String logged;
 try {
-    List<Order> orders = qb.from(Order.class)
-        .where(o -> o.getStatus() == (flag ? 1 : 2))   // 값 삼항 연산자: 지원하지 않음
-        .toList();
+    qb.from(Order.class)
+            .where(o -> o.getStatus() == (flag ? 1 : 2))   // a value ternary: not supported
+            .toList();
+    logged = null;
 } catch (LambdaQLException e) {
-    log.error("lambdaQL error {}: {}", e.code(), e.getMessage(Locale.ROOT));
-    throw e;
+    // for example log.error("lambdaQL error {}: {}", e.code(), e.getMessage(Locale.ROOT))
+    logged = "lambdaQL error " + e.code() + ": " + e.getMessage(Locale.ROOT);
 }
 ```
 
 ### Kotlin
 
+[`ManualKotlinErrorsTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinErrorsTest.kt), 영역 `catch`:
+
 ```kotlin
-try {
+val logged = try {
     qb.from(Order::class.java)
-        .where { it.status == if (flag) 1 else 2 }      // 값 if: 지원하지 않음
+        .where { it.status.toInt() == if (flag) 1 else 2 }   // a value if: not supported
         .toList()
+    null
 } catch (e: LambdaQLException) {
-    log.error("lambdaQL error {}: {}", e.code(), e.getMessage(Locale.ROOT))
-    throw e
+    // for example log.error("lambdaQL error {}: {}", e.code(), e.getMessage(Locale.ROOT))
+    "lambdaQL error ${e.code()}: ${e.getMessage(Locale.ROOT)}"
 }
 ```
 
@@ -171,18 +178,26 @@ try {
 
 #### Java
 
+[`ManualSharedTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java), 영역 `check-code`:
+
 ```java
-var e = assertThrows(LambdaQLException.class, () -> query.toList());
-assertEquals("LQL-2004", e.code());     // 좋음
-// assertEquals("Loops are ...", e.getMessage());   // 이렇게 하지 마십시오
+var e = assertThrows(LambdaQLException.class,
+        () -> qb.from(Order.class).where(o -> o.getStatus() == (flag ? 1 : 2)));
+assertEquals("LQL-2021", e.code());                 // good
+assertInstanceOf(UnsupportedLambdaShapeException.class, e);
+// assertEquals("Could not ...", e.getMessage());   // do not do this
 ```
 
 #### Kotlin
 
+[`ManualKotlinErrorsTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinErrorsTest.kt), 영역 `check-code`:
+
 ```kotlin
-val e = assertThrows<LambdaQLException> { query.toList() }   // org.junit.jupiter.api.assertThrows
-assertEquals("LQL-2004", e.code())      // 좋음
-// assertEquals("Loops are ...", e.message)          // 이렇게 하지 마십시오
+// org.junit.jupiter.api.assertThrows
+val e = assertThrows<LambdaQLException> { qb.from(Order::class.java).where { it.status.toInt() == if (flag) 1 else 2 } }
+assertEquals("LQL-2021", e.code())                           // good
+assertInstanceOf(UnsupportedLambdaShapeException::class.java, e)
+// assertEquals("Could not ...", e.message)                 // do not do this
 ```
 
 <a id="when-errors-happen"></a>
@@ -202,17 +217,7 @@ lambdaQL은 실패한 결과도 캐시하므로, 잘못된 람다는 다음번�
 <a id="compile-time-examples"></a>
 ### 컴파일 시점의 예
 
-#### Java
-
-```java
-.orderBy((o, by) -> by.desc(o.getCustomer()))   // 컴파일 오류: 엔티티는 정렬 키가 아님
-```
-
-#### Kotlin
-
-```kotlin
-.orderBy { o, by -> by.desc(o.customer) }        // 컴파일 오류: 엔티티는 정렬 키가 아님
-```
+엔티티는 정렬 키가 아니므로 Java의 `.orderBy((o, by) -> by.desc(o.getCustomer()))`와 Kotlin의 `.orderBy { o, by -> by.desc(o.customer) }`는 컴파일되지 않습니다.
 
 <a id="analysis-time-errors-that-only-kotlin-has"></a>
 ### Kotlin에만 있는 분석 시점 오류
@@ -270,7 +275,7 @@ NULL을 찾으려면 `o.getDescription() == null`이라고 씁니다.
 
 #### Java
 
-[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `rules`(앞부분):
+[`ManualSharedTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java), 영역 `db-only`:
 
 ```java
 // the body never runs in Java
@@ -281,10 +286,11 @@ assertEquals("LQL-4034", assertThrows(DbOnlyException.class, () -> OrderFns.disc
 
 #### Kotlin
 
+[`ManualKotlinErrorsTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinErrorsTest.kt), 영역 `db-only`:
+
 ```kotlin
-interface OrderFns { companion object {
-    @JvmStatic @SqlFunction("FN_DISCOUNT") fun discount(price: Double?): Double? = throw DbOnlyException()
-} }
+// the body never runs in Kotlin
+assertEquals("LQL-4034", assertThrows<DbOnlyException> { OrderFns.discount(1.0) }.code())
 ```
 
 <a id="message-language"></a>
@@ -335,24 +341,28 @@ assertEquals(Locale.ROOT, LqlMessages.bundleLocale(Locale.FRENCH));
 
 `LqlMessages.LOCALE_PROPERTY`는 이름 `"lambdaql.locale"`입니다. `LqlMessages.bundleLocale(locale)`은 로캘이 사용하는 메시지 파일을 알려 줍니다.
 
-애플리케이션에서는 다음과 같이 씁니다(설계 예제).
+애플리케이션에서는 다음과 같이 씁니다.
 
 #### Java
 
+[`ManualSharedTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java), 영역 `set-locale`:
+
 ```java
-// 애플리케이션 시작 시
-LqlMessages.setLocale(Locale.JAPANESE);   // 일본어 메시지
-LqlMessages.setLocale(null);              // 원래대로: 시스템 속성, 그다음 JVM 기본값
-Locale current = LqlMessages.locale();    // lambdaQL이 현재 사용하는 로캘
+// at application start
+LqlMessages.setLocale(Locale.JAPANESE);   // Japanese messages
+Locale current = LqlMessages.locale();    // the locale lambdaQL uses now
+LqlMessages.setLocale(null);              // back to the default: the system property, then the JVM default
 ```
 
 #### Kotlin
 
+[`ManualKotlinErrorsTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinErrorsTest.kt), 영역 `set-locale`:
+
 ```kotlin
-// 애플리케이션 시작 시
-LqlMessages.setLocale(Locale.JAPANESE)    // 일본어 메시지
-LqlMessages.setLocale(null)               // 원래대로: 시스템 속성, 그다음 JVM 기본값
-val current: Locale = LqlMessages.locale() // lambdaQL이 현재 사용하는 로캘
+// at application start
+LqlMessages.setLocale(Locale.JAPANESE)       // Japanese messages
+val current: Locale = LqlMessages.locale()   // the locale lambdaQL uses now
+LqlMessages.setLocale(null)                  // back to the default: the system property, then the JVM default
 ```
 
 참고:

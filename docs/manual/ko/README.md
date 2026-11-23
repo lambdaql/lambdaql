@@ -12,23 +12,29 @@ lambdaQL은 Java와 Kotlin용 쿼리 라이브러리입니다.
 
 ### Java
 
+[`ManualSharedTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java), 영역 `readme-first`:
+
 ```java
 List<Order> orders = qb.from(Order.class)
-    .where(o -> o.getStatus() == 1 && o.getPrice() > minPrice)
-    .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId()))
-    .limit(20)
-    .toList();
+        .where(o -> o.getStatus() == 1 && o.getPrice() > minPrice)
+        .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId()))
+        .limit(20)
+        .toList();
 ```
 
 ### Kotlin
 
+[`ManualKotlinSharedTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSharedTest.kt), 영역 `readme-first`:
+
 ```kotlin
 val orders = qb.from(Order::class.java)
-    .where { it.status == 1 && it.price!! > minPrice }
+    .where { it.status.toInt() == 1 && it.price > minPrice }
     .orderBy { o, by -> by.desc(o.price).asc(o.id) }
     .limit(20)
     .toList()
 ```
+
+`status`는 `short` 컬럼이므로 Kotlin에서는 `it.status.toInt() == 1`로 비교합니다.
 
 <a id="hql-the-same-for-both"></a>
 ### HQL (두 언어 모두 동일)
@@ -36,12 +42,12 @@ val orders = qb.from(Order::class.java)
 ```
 select e0 from Order e0
 where e0.status = 1 and e0.price > :p1
-order by e0.price desc nulls last, e0.id asc
+order by e0.price desc, e0.id asc
 ```
 
 **SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다.
 
-**데이터베이스별 SQL (이 HQL에 대한 Hibernate의 SQL)** — 매뉴얼의 `Order`에는 NULL이 될 수 있는 `Double price`가 있지만 테스트의 `Order`에는 없으므로, `SqlByDatabaseTest`가 이 HQL을 Hibernate에 직접 넘깁니다. `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `readme-first`:
+**데이터베이스별 SQL (이 HQL에 대한 Hibernate의 SQL)** — `SqlByDatabaseTest`가 같은 형태의 HQL(`order by e0.price desc nulls last, e0.id asc`)을 Hibernate에 직접 넘겨 기록했습니다. 테스트의 `price`는 NULL이 될 수 없는 `double`이므로 lambdaQL은 `nulls last`를 붙이지 않습니다. `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `readme-first`:
 
 ```sql
 -- H2

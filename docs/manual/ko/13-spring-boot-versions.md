@@ -42,7 +42,7 @@ dependencies {
 
 Spring Boot 3, Gradle(Kotlin DSL):
 
-```kotlin
+```gradle-kts
 dependencies {
     implementation("org.lambdaql:lambdaql-spring-boot-starter-boot3:1.0.0")
 }
