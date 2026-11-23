@@ -8,46 +8,19 @@
 lambdaQL 매뉴얼의 **Kotlin 트랙**입니다. 이 트랙의 모든 페이지에는 **Kotlin 코드만** 있습니다.
 쿼리를 Java로 작성한다면 [Java 트랙](../java/README.md)을 읽으십시오. 두 트랙의 장 번호와 파일 이름은 같으므로(9장만 다름) 언제든지 전환할 수 있습니다.
 
+[`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt), 영역 `readme`:
+
 ```kotlin
-val orders = qb.from(Order::class.java)
-    .where { it.status == 1 && it.price!! > minPrice }
+val q = qb.from(Order::class.java)
+    .where { it.status.toInt() == 1 && it.price > minPrice }
     .orderBy { o, by -> by.desc(o.price).asc(o.id) }
     .limit(20)
-    .toList()
-// HQL: select e0 from Order e0
-//      where e0.status = 1 and e0.price > :p1
-//      order by e0.price desc nulls last, e0.id asc
+assertEquals("select e0 from Order e0 where e0.status = 1 and e0.price > :p1"
+    + " order by e0.price desc, e0.id asc", q.toHql().hql())
+val orders: List<Order> = q.toList()
 ```
 
-**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다. 이 테스트는 Java 람다를 사용합니다. 의미가 같은 Kotlin 람다는 같은 HQL을 만들므로 SQL도 같습니다.
-
-**데이터베이스별 SQL (이 HQL에 대한 Hibernate의 SQL, Kotlin도 같은 HQL을 만듦)** — 매뉴얼의 `Order`에는 NULL이 될 수 있는 `price`가 있지만 테스트의 `Order`에는 없으므로, `SqlByDatabaseTest`가 이 HQL을 Hibernate에 직접 넘깁니다. `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `readme-first`:
-
-```sql
--- H2
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.price>?
-order by o1_0.price desc,o1_0.id
-fetch first ? rows only
-
--- MariaDB
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.price>?
-order by o1_0.price desc,o1_0.id
-limit ?
-
--- Oracle
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.price>?
-order by o1_0.price desc nulls last,o1_0.id
-fetch first ? rows only
-```
+**SQL 블록 읽는 법.** 다른 페이지의 SQL 블록에서 `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다. 이 테스트는 Java 람다를 사용합니다. SQL 블록은 바로 앞 Kotlin 예제와 같은 HQL을 실행한 결과입니다.
 
 > [!NOTE]
 > **예제에 대하여.** 예제 코드는 모두 Kotlin 테스트 코드의 한 구간을 그대로 옮긴 것입니다. 코드 위에 테스트 파일과 구간 이름(영역 `name`)을 적습니다. 테스트는 lambdaQL이 만든 HQL과 반환한 행을 확인합니다.
@@ -58,7 +31,7 @@ fetch first ? rows only
 | # | 페이지 | 배우는 내용 |
 |---|---|---|
 | 1 | [개요](../01-overview.md) (공통) | lambdaQL이 무엇인지, 왜 필요한지, 어떻게 동작하는지 |
-| 2 | [시작하기](02-getting-started.md) | 요구 사항, Gradle 설정, Kotlin 엔티티, 첫 쿼리 |
+| 2 | [시작하기](02-getting-started.md) | 요구 사항, Gradle 설정, 예제 엔티티, 첫 쿼리, 결과 함수 |
 | 3 | [조건(`where`)](03-where.md) | 연산자, null 규칙, `?.` `?:` `!!`, 범위, `when`, 캡처 값 |
 | 4 | [정렬과 페이징](04-order-paging.md) | `orderBy`, `Direction`, `limit`, `offset` |
 | 5 | [서브쿼리](05-subquery.md) | `exists()`, `x in sub...`, 스칼라 서브쿼리와 상관 서브쿼리, 서브쿼리 안의 조인 |
@@ -83,16 +56,16 @@ fetch first ? rows only
 <a id="example-entities"></a>
 ## 예제 엔티티
 
-이 트랙의 모든 페이지는 다음 Kotlin 엔티티를 사용합니다. 전체 코드는 [2. 시작하기](02-getting-started.md#example-entities)에 있습니다.
+이 트랙의 예제는 lambdaQL 저장소의 테스트 엔티티(Java 클래스, `query/src/test/java/org/lambdaql/query/`)를 사용합니다. 자세한 내용은 [2. 시작하기](02-getting-started.md#example-entities)에 있습니다.
 
-| 엔티티 | 속성 |
+| 엔티티 | 주요 속성(Java 타입) |
 |---|---|
-| `Order` | `id: Long?`, `price: Double?`, `status: Int?`, `active: Boolean`, `description: String?`, `customer: Customer?`, `updateAt: LocalDateTime?`, `items: MutableList<Item>` |
-| `Customer` | `id: Long?`, `name: String?`, `grade: Int?` |
-| `Item` | `id: Long?`, `order: Order?`, `price: Double?`, `qty: Int` |
+| `Order` | `Long id`, `double price`, `short status`, `boolean active`(Kotlin에서 `isActive`), `String description`, `Integer cnt`, `String custName`, `LocalDateTime updateAt`, `Customer customer`, `Address address` |
+| `Customer` | `int id`, `String name`, `Integer grade` |
+| `Item` | `Long id`, `Order order`, `Double price`, `int qty` |
 
-데이터베이스 컬럼은 NULL일 수 있으므로 대부분의 속성은 nullable `var` 속성입니다.
-`active`와 `qty`는 Kotlin `Boolean`과 `Int`입니다. 이들은 JVM 기본형이므로 절대 NULL이 될 수 없습니다.
+`price`, `status`, `active`, `qty`는 Java 기본형이므로 절대 NULL이 될 수 없습니다.
+참조 타입 속성은 NULL일 수 있으며, Kotlin에서는 플랫폼 타입으로 보입니다.
 
 <a id="three-things-to-know-first"></a>
 ## 먼저 알아 둘 세 가지
@@ -101,7 +74,7 @@ fetch first ? rows only
 |---|---|
 | `it.price!! > 100.0` | `!!`는 무시됩니다. 코드가 컴파일되도록 있을 뿐입니다. 람다는 실행되지 않으므로 `NullPointerException`은 없습니다. |
 | `it.customer?.name == "Kim"` | `it.customer?.name`은 조인한 고객의 컬럼을 가리킵니다. 이 조건은 고객이 없는 주문과 맞을 수 없으므로 inner `join`이고, 고객이 없는 주문은 반환되지 않습니다. `?.`는 고객이 없는 주문이 조건을 참으로 만들 수 있을 때(`it.status == 1 \|\| ...`, `it.customer?.name == null`) `left join`이 됩니다(D54). `it.customer!!.name`도 같은 컬럼이지만 항상 inner join입니다. |
-| `status: Int?`일 때 `it.status == 1` | `e0.status = 1`. `status`가 NULL이면 일치하지 않습니다(SQL 의미). lambdaQL은 Kotlin 컴파일러가 추가하는 null 검사를 무시합니다. **직접 작성한** null 검사만 의미가 있습니다. |
+| `n: Int?`일 때 `it.cnt == n` | `e0.cnt = :p1`. `cnt`가 NULL인 행은 일치하지 않습니다(SQL 의미). NULL 행을 찾으려면 `it.cnt == null`처럼 null 검사를 **직접 작성**하십시오. |
 
 자세한 내용: [9. Kotlin 노트](09-kotlin-notes.md).
 
