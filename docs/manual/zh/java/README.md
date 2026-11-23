@@ -1,6 +1,9 @@
 <a id="lambdaql-manual-java-track"></a>
 # lambdaQL 手册：Java 路线
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/README.md)。
+
 **其他语言：** [English](../../en/java/README.md) | [한국어](../../ko/java/README.md) | [日本語](../../ja/java/README.md) | [简体中文](../../zh/java/README.md)
 
 [手册首页](../README.md) | [Kotlin 路线](../kotlin/README.md) | 公共页面：[1. 概述](../01-overview.md) · [11. 错误与语言](../11-errors-and-languages.md)

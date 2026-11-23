@@ -1,7 +1,7 @@
 <a id="12-spring-data-jpa-kotlin"></a>
 # 12. Spring Data JPA (Kotlin)
 
-[Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [11. 오류와 언어](../11-errors-and-languages.md) | [이 페이지의 Java 버전](../java/12-spring-data-jpa.md)
+[Kotlin 트랙](README.md) | [매뉴얼 홈](../README.md) | 이전: [11. 오류와 언어](../11-errors-and-languages.md) | 다음: [13. Spring Boot 3과 4](../13-spring-boot-versions.md) | [이 페이지의 Java 버전](../java/12-spring-data-jpa.md)
 
 ---
 
@@ -23,17 +23,17 @@ Spring Data JPA에서는 리포지토리 인터페이스를 작성합니다. lam
 <a id="122-modules"></a>
 ## 12.2 모듈
 
-lambdaQL의 아티팩트는 세 개입니다. 코어는 Spring에 의존하지 않으므로 일반 JPA에서도 사용할 수 있습니다.
+코어는 Spring에 의존하지 않으므로 일반 JPA에서도 사용할 수 있습니다. Spring 모듈은 Spring Boot 버전마다 따로 있습니다(이름 끝 `-boot3`, `-boot4`, [13. Spring Boot 3과 4](../13-spring-boot-versions.md)).
 
 | 아티팩트 | 포함 내용 | 필요한 경우 |
 |---|---|---|
-| `lambdaql-core` | 엔진과 `QueryBuilder`. Spring 의존성 없음 | 항상. 나머지 두 아티팩트가 함께 가져옴 |
-| `lambdaql-spring-data-jpa` | `LambdaQlExecutor<T>`, Spring Data 등록, Spring Boot 자동 구성(`QueryBuilder` 빈) | Spring Boot 없이 Spring Data JPA를 사용할 때 |
-| `lambdaql-spring-boot-starter` | 코드 없음. `lambdaql-spring-data-jpa`와 `spring-boot-starter-data-jpa`를 가져옴 | Spring Boot를 사용할 때 |
+| `lambdaql-core` | 엔진과 `QueryBuilder`. Spring 의존성 없음. Spring Boot 3·4 공통 | 항상. 아래 아티팩트가 함께 가져옴 |
+| `lambdaql-spring-data-jpa-boot4`, `lambdaql-spring-data-jpa-boot3` | `LambdaQlExecutor<T>`, Spring Data 등록, Spring Boot 자동 구성(`QueryBuilder` 빈) | Spring Boot 없이 Spring Data JPA를 사용할 때(Spring Data 4는 `-boot4`, 3은 `-boot3`) |
+| `lambdaql-spring-boot-starter-boot4`, `lambdaql-spring-boot-starter-boot3` | 코드 없음. 같은 Boot 버전의 `lambdaql-spring-data-jpa-*`와 `spring-boot-starter-data-jpa`를 가져옴 | Spring Boot를 사용할 때 |
 
 아티팩트는 **아직 Maven Central에 배포되지 않았습니다**. 먼저 소스에서 빌드하여 로컬 Maven 저장소에 배포하십시오([2. 시작하기](02-getting-started.md#build-from-source) 참고). 버전은 `1.0.0`입니다.
 
-Spring Boot에서 사용할 때의 Gradle(Kotlin DSL):
+Spring Boot 4에서 사용할 때의 Gradle(Kotlin DSL). Spring Boot 3이면 이름 끝을 `-boot3`으로 바꾸십시오:
 
 ```kotlin
 repositories {
@@ -42,7 +42,7 @@ repositories {
 }
 
 dependencies {
-    implementation("org.lambdaql:lambdaql-spring-boot-starter:1.0.0")
+    implementation("org.lambdaql:lambdaql-spring-boot-starter-boot4:1.0.0")
     implementation("org.jetbrains.kotlin:kotlin-reflect")           // Spring Data needs it for Kotlin
 }
 ```
@@ -52,18 +52,18 @@ Maven:
 ```xml
 <dependency>
   <groupId>org.lambdaql</groupId>
-  <artifactId>lambdaql-spring-boot-starter</artifactId>
+  <artifactId>lambdaql-spring-boot-starter-boot4</artifactId>
   <version>1.0.0</version>
 </dependency>
 ```
 
 Maven에서도 `kotlin-reflect`를 추가하십시오([12.9](#129-kotlin-compile-settings) 참고).
 
-Spring Boot 없이 사용할 때는 기존 Spring Data JPA 구성(Hibernate, JDBC 드라이버)에 `lambdaql-spring-data-jpa`를 추가하십시오. 이 아티팩트는 `lambdaql-core`와 Spring Data JPA를 함께 가져옵니다.
+Spring Boot 없이 사용할 때는 기존 Spring Data JPA 구성(Hibernate, JDBC 드라이버)에 Spring Data 버전에 맞는 `lambdaql-spring-data-jpa-boot4`(Spring Data 4) 또는 `-boot3`(Spring Data 3)을 추가하십시오. 이 아티팩트는 `lambdaql-core`와 Spring Data JPA를 함께 가져옵니다.
 
 ```kotlin
 dependencies {
-    implementation("org.lambdaql:lambdaql-spring-data-jpa:1.0.0")
+    implementation("org.lambdaql:lambdaql-spring-data-jpa-boot4:1.0.0")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
 }
 ```
@@ -71,7 +71,7 @@ dependencies {
 ```xml
 <dependency>
   <groupId>org.lambdaql</groupId>
-  <artifactId>lambdaql-spring-data-jpa</artifactId>
+  <artifactId>lambdaql-spring-data-jpa-boot4</artifactId>
   <version>1.0.0</version>
 </dependency>
 ```
@@ -81,9 +81,9 @@ dependencies {
 | 항목 | 버전 |
 |---|---|
 | Java(JVM) | 21 |
-| Spring Boot | 4.1(4.1.2로 테스트). Spring Boot 3은 이 판에서 검증하지 않음 |
-| Spring Data JPA | 4.1(4.1.2로 테스트) |
-| Hibernate | 7.4(Spring Boot 4.1에 포함) |
+| Spring Boot | 3.5 또는 4.1(3.5.16, 4.1.2로 테스트) |
+| Spring Data JPA | 3.5 또는 4.1(3.5.13, 4.1.2로 테스트) |
+| Hibernate | 6.6 또는 7.4(Spring Boot에 포함) |
 | Kotlin | 2.2 이상. 이전 버전은 [12.9](#129-kotlin-compile-settings) 참고 |
 | `kotlin-reflect` | Spring Data의 Kotlin 지원에 필요 |
 
@@ -132,7 +132,7 @@ interface MemberRepository : JpaRepository<Member, Long>, LambdaQlExecutor<Membe
 동작 방식:
 
 - **본문이 있는 인터페이스 메서드는 Spring Data가 직접 실행합니다.** Spring Data는 이 메서드에서 쿼리를 만들지 않고 본문을 호출합니다. lambdaQL은 이 동작을 변경하지 않습니다. Kotlin 2.2 미만은 [12.9](#129-kotlin-compile-settings)을 참고하십시오.
-- **`LambdaQlExecutor<T>`는 Spring Data 리포지토리 프래그먼트입니다.** 구현 클래스는 `lambdaql-spring-data-jpa`의 `META-INF/spring.factories`에 등록되어 있습니다. Spring Data는 이 파일을 읽고, `LambdaQlExecutor<T>`를 상속하는 모든 리포지토리에 구현을 추가합니다.
+- **`LambdaQlExecutor<T>`는 Spring Data 리포지토리 프래그먼트입니다.** 구현 클래스는 `lambdaql-spring-data-jpa-boot3`·`-boot4`의 `META-INF/spring.factories`에 등록되어 있습니다. Spring Data는 이 파일을 읽고, `LambdaQlExecutor<T>`를 상속하는 모든 리포지토리에 구현을 추가합니다.
 - **실행기 객체 하나를 모든 리포지토리가 공유합니다.** 호출마다 해당 리포지토리의 엔티티를 사용합니다. 예를 들어 `TeamRepository`에서 `teams.count { ... }`는 `Team` 행의 수를 반환합니다(Java로 테스트함, [`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)).
 
 규칙:
@@ -301,7 +301,7 @@ lambdaQL은 각 `Sort.Order`를 `SortSpec.ofPath`로 정렬 키 하나로 변환
 
 | Spring | lambdaQL의 처리 |
 |---|---|
-| 속성 이름(`"grade"`, `"team.name"`) | Spring Data 리포지토리와 같이 Spring Data `PropertyPath`로 검증. 없는 이름이면 `PropertyReferenceException`. 경로의 끝은 엔티티가 아닌 기본 값이어야 함. `team.name` 같은 to-one 경로는 `left join`을 사용하므로 팀이 없는 행도 결과에 포함됨. 이어서 정렬 정책이 이름을 검사함([아래](#sort-policy-with-spring) 참고) |
+| 속성 이름(`"grade"`, `"team.name"`) | Spring Data 리포지토리와 같이 Spring Data `PropertyPath`로 검증. 없는 이름이면 `PropertyReferenceException`(패키지: Spring Data 3은 `org.springframework.data.mapping`, 4는 `org.springframework.data.core`). 경로의 끝은 엔티티가 아닌 기본 값이어야 함. `team.name` 같은 to-one 경로는 `left join`을 사용하므로 팀이 없는 행도 결과에 포함됨. 이어서 정렬 정책이 이름을 검사함([아래](#sort-policy-with-spring) 참고) |
 | 정렬 정책의 별칭(`"level"`) | `PropertyPath` 검사 없이 그대로 전달. 정렬 정책이 경로로 바꿈 |
 | `NullHandling.NATIVE`(기본값)의 `ASC` / `DESC` | lambdaQL NULL 규칙 적용. 오름차순은 NULL 먼저, 내림차순은 NULL 나중. 모든 데이터베이스에서 같은 순서([4.4](04-order-paging.md#44-null-ordering-is-the-same-on-every-database) 참고) |
 | `NullHandling.NULLS_FIRST` / `NULLS_LAST` | 지정한 그대로 사용(`ASC_NULLS_FIRST`, `DESC_NULLS_LAST` 등) |
@@ -538,10 +538,10 @@ kotlin {
 <a id="1210-not-implemented-yet"></a>
 ## 12.10 미구현 기능
 
-- **Spring Boot 버전.** 이 판은 Spring Boot 4.1.2로 테스트합니다. 자동 구성에는 Spring Boot 3의 클래스 이름도 지정되어 있지만, Spring Boot 3은 이 판에서 검증하지 않습니다.
+- **Spring Boot 버전.** Spring Boot 3.5.16과 4.1.2로 테스트합니다. 같은 테스트를 두 버전에서 실행합니다([13. Spring Boot 3과 4](../13-spring-boot-versions.md)).
 - Spring `Sort`의 **`ignoreCase()`**.
 - **Kotlin 리포지토리** 테스트.
 
 ---
 
-[Kotlin 트랙](README.md) | 이전: [11. 오류와 언어](../11-errors-and-languages.md) | [이 페이지의 Java 버전](../java/12-spring-data-jpa.md)
+[Kotlin 트랙](README.md) | 이전: [11. 오류와 언어](../11-errors-and-languages.md) | 다음: [13. Spring Boot 3과 4](../13-spring-boot-versions.md) | [이 페이지의 Java 버전](../java/12-spring-data-jpa.md)

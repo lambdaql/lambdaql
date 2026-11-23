@@ -1,10 +1,10 @@
 # DEVNOTE — lambdaQL 개발 인계 노트
 
-> 최종 갱신: 2026-11-19 · 브랜치 `feature/boot4`
+> 최종 갱신: 2026-11-23 · 브랜치 `feature/unified-boot`(`feature/boot4`에서 갈라짐)
 >
 > 이 문서는 작업을 이어받는 개발자와 에이전트를 위한 요약이다. 근거와 상세는 다음 문서에 있다.
 >
-> - [`docs/design/ROADMAP.md`](docs/design/ROADMAP.md): 결정 사항(D1~D54), 마일스톤, 규칙 표(U, J, S, Q, PR, FN 등), 세 DB 실측 기록
+> - [`docs/design/ROADMAP.md`](docs/design/ROADMAP.md): 결정 사항(D1~D55), 마일스톤, 규칙 표(U, J, S, Q, PR, FN 등), 세 DB 실측 기록
 > - [`docs/design/KOTLIN.md`](docs/design/KOTLIN.md): Kotlin 지원 설계(바이트코드 패턴, 제약 KC1~KC21)
 > - [`docs/manual/ko`](docs/manual/ko): 사용자 매뉴얼. 한국어가 원본이고 `en`·`ja`·`zh`는 번역이다.
 > - [`docs/manual/PENDING-TRANSLATION.md`](docs/manual/PENDING-TRANSLATION.md): 번역본에 아직 옮기지 않은 변경 목록
@@ -35,9 +35,13 @@ qb.from(Order.class)
 
 | 모듈 | 아티팩트 | 내용 |
 |---|---|---|
-| `query` | `lambdaql-core` | 분석 엔진과 `QueryBuilder`. Spring 의존 없음 |
-| `spring-data-jpa` | `lambdaql-spring-data-jpa` | 리포지토리 실행기 `LambdaQlExecutor<T>`, Spring Boot 자동 구성 |
-| `spring-boot-starter` | `lambdaql-spring-boot-starter` | 의존성 묶음 |
+| `query` | `lambdaql-core` | 분석 엔진과 `QueryBuilder`. Spring 의존 없음. Spring Boot 3·4 공통 jar 하나. 테스트는 Boot 4.1.2(Hibernate 7.4) |
+| `query-test-boot3` | (배포 안 함) | `query/src/test`를 Boot 3.5.16(Hibernate 6.6)으로 실행. Hibernate 6용 SQL 정답은 이 모듈의 `src/test/resources/expected-sql` |
+| `spring-data-jpa-boot3`·`-boot4` | `lambdaql-spring-data-jpa-boot3`·`-boot4` | 리포지토리 실행기 `LambdaQlExecutor<T>`, Spring Boot 자동 구성. 공유 소스는 `spring-data-jpa/`(Gradle 프로젝트 아님), 모듈마다 `SpringDataPaths` 한 클래스 |
+| `spring-boot-starter-boot3`·`-boot4` | `lambdaql-spring-boot-starter-boot3`·`-boot4` | 의존성 묶음 |
+| `benchmark` | (배포 안 함) | JDBC·JPQL·Criteria API·lambdaQL 비교(JMH) |
+
+Boot BOM은 모듈의 `gradle.properties`의 `lql.springBoot`로 고른다(루트 기본 4.1.2, `-boot3` 모듈 3.5.16, 결정 D55). IntelliJ는 공유 소스 폴더(`query/src/test`, `spring-data-jpa/src`)를 두 모듈이 함께 쓰므로 "Duplicate content roots" 경고를 낼 수 있다(빌드는 정상).
 
 구현된 범위(세부는 9절):
 
@@ -50,7 +54,7 @@ qb.from(Order.class)
 - Spring Data JPA 모듈(M12): `main`은 Spring Boot 3.4.2, `feature/boot4`는 Spring Boot 4.1.2로 테스트
 - 클래스 파일 읽기(`feature/boot4`, D52): Java 21~23은 ASM, Java 24 이상은 `java.lang.classfile`(Multi-Release JAR)
 
-테스트: 세 DB(H2 2.3.230, MariaDB 10.11.18, Oracle Free 23.26.3)에서 모듈 전체 통과(2026-11-19 실측). `main` 241개. `feature/boot4`는 다섯 DB(H2·MariaDB·Oracle·PostgreSQL·MySQL)에서 `test`(JDK 21, ASM) 250개와 `testClassFile`(JDK 25, ClassFile) 250개(D54 구현 뒤). 건너뜀은 DB별 H2 16·MariaDB 10·Oracle 9. Kotlin 람다 테스트는 `query/src/test/kotlin`에 별도 소스 세트로 있다.
+테스트: 세 DB(H2 2.3.230, MariaDB 10.11.18, Oracle Free 23.26.3)에서 모듈 전체 통과(2026-11-19 실측). `main` 241개. `feature/unified-boot`는 다섯 DB(H2·MariaDB·Oracle·PostgreSQL·MySQL)에서 Boot 라인마다 250개, 두 라인 합계 `test`(JDK 21, ASM) 500개와 `testClassFile`(JDK 25, ClassFile) 500개(2026-11-23). 건너뜀은 DB별 H2 16·MariaDB 10·Oracle 9. Kotlin 람다 테스트는 `query/src/test/kotlin`에 별도 소스 세트로 있다.
 
 아직 Maven Central에 배포하지 않았다. 버전 `1.0.0`은 `gradle.properties`의 값이며 첫 릴리스 전에 바뀔 수 있다.
 
@@ -221,6 +225,14 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 - 이 브랜치의 매뉴얼은 Boot 4판(Hibernate 7.4) 기준이다. 요구 사항, 빌드 안내, DB별 SQL 블록(155개)을 Boot 4 정답 파일에 맞췄다.
 - DB별 SQL 블록은 로컬 도구로 정답 파일에서 다시 만든다(`.claude/tools/docs/sync_sql.py check|diff|write`. 분기 전 커밋 `3e671bc`의 정답 파일로 만든 결과가 당시 매뉴얼과 155개 모두 일치해 형식 규칙을 확인함). 테스트 구간 사본 대조는 `.claude/tools/docs/check_regions.py`.
 - 7.4에서 실측하지 않은 Hibernate 동작 설명(프로시저 이름 바인딩, JOINED 하위 클래스 insert)은 "6.6.5 실측, 7.4 미측정"으로 둔다.
+
+### 10.5 Spring Boot 3·4 단일 브랜치(D55, 2026-11-23)
+
+- 근거: `feature/boot4` 코드를 Boot 3.4.2(Hibernate 6.6.5)로 돌리자 import 두 종류만 바꿔 244개 통과, Hibernate 6.6의 SQL은 분기 전 정답과 같음(HQL 주석의 `fk()` 표기 3곳만 다름).
+- 공유 테스트를 버전 중립으로: `@EntityScan` → `@AutoConfigurationPackage(basePackages = …)`, `PropertyReferenceException`은 단순 이름으로 확인.
+- Boot 3 + MySQL에서만 나던 실패(UPDATE SET의 자기 테이블 서브쿼리, MySQL 1093)를 U22로 해결: UPDATE에서 대상 테이블을 읽는 비상관 서브쿼리는 HQL에서 파생 테이블로 감쌈. Hibernate 7은 MySQL에서 스스로 감싸지만 6.6은 그러지 않음(실측). 상관 서브쿼리는 미해결.
+- 매뉴얼: 본문은 공통, DB별 SQL은 Hibernate 7.4 기준. Boot 버전 내용은 새 공통 페이지 13장(`13-spring-boot-versions.md`): 버전 표, 아티팩트, Hibernate 6.6과 7.4의 SQL 차이(예제 129개 중 H2 3·PostgreSQL 3·Oracle 16·MariaDB 28·MySQL 28개), 검증 범위.
+- 명령: `./gradlew -q test -Dlql.db=…`가 두 라인과 두 리더를 모두 돈다. Hibernate 6용 정답 갱신은 `-Dlql.sql.update=true`(같은 명령, `query-test-boot3`의 파일도 다시 씀).
 
 ---
 

@@ -1,6 +1,22 @@
-plugins {
-	id 'java-library'
-	id 'maven-publish'
+// lambdaql-spring-data-jpa for one Spring Boot line (ROADMAP D55), applied by spring-data-jpa-boot3 and
+// spring-data-jpa-boot4. The code and the tests are shared in the folder spring-data-jpa/ (not a Gradle project);
+// each module adds only the few classes that differ between the Spring Data versions (src/main/java of the module)
+// and chooses its Spring Boot BOM with lql.springBoot in its gradle.properties.
+
+apply plugin: 'java-library'
+apply plugin: 'maven-publish'
+
+def shared = rootProject.file('spring-data-jpa/src')
+
+sourceSets {
+	main {
+		java.srcDirs = [file('src/main/java'), new File(shared, 'main/java')]
+		resources.srcDirs = [new File(shared, 'main/resources')]
+	}
+	test {
+		java.srcDirs = [new File(shared, 'test/java')]
+		resources.srcDirs = [new File(shared, 'test/resources')]
+	}
 }
 
 dependencies {
@@ -23,7 +39,7 @@ dependencies {
 
 test {
 	useJUnitPlatform()
-	// -Dlql.db=mariadb|oracle makes application-test.yaml import src/test/resources/lql-db-<name>.yaml
+	// -Dlql.db=mariadb|oracle|postgresql|mysql makes application-test.yaml import src/test/resources/lql-db-<name>.yaml
 	systemProperty 'lql.db', System.getProperty('lql.db', 'h2')
 	testLogging {
 		events "passed", "skipped", "failed"
@@ -36,5 +52,5 @@ apply from: rootProject.file('gradle/classfile-test.gradle')
 
 javadoc {
 	// Javadoc examples come from the test code ({@snippet ... region="..."})
-	options.addStringOption('-snippet-path', file('src/test/java').absolutePath)
+	options.addStringOption('-snippet-path', new File(shared, 'test/java').absolutePath)
 }

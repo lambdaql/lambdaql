@@ -45,7 +45,9 @@ subprojects { subproject ->
 
     dependencyManagement {
         imports {
-            mavenBom("org.springframework.boot:spring-boot-dependencies:4.1.2")
+            // the Spring Boot line of the module: lql.springBoot in its gradle.properties (default in the root
+            // gradle.properties). Modules for Boot 3 end with -boot3 and set 3.x (ROADMAP D55)
+            mavenBom("org.springframework.boot:spring-boot-dependencies:${subproject.findProperty('lql.springBoot')}")
         }
     }
 

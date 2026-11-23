@@ -502,9 +502,9 @@ List<Order> list = flag
 | 항목 | 버전 |
 |---|---|
 | Java | 21 (javac). ECJ는 보장하지 않음 |
-| Hibernate | 7.4 (7.4.13으로 테스트). HQL 확장(예: `function(...)`, `nulls first`)을 사용하므로 다른 JPA 구현체는 보장하지 않음 |
+| Hibernate | 6.6 또는 7.4 (6.6.53, 7.4.13으로 테스트). HQL 확장(예: `function(...)`, `nulls first`)을 사용하므로 다른 JPA 구현체는 보장하지 않음 |
 | 데이터베이스 | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
-| Spring | Spring Boot 4.1.2, Spring Data JPA 4.1.2(Spring 모듈, [12](12-spring-data-jpa.md)). Spring Boot 3은 이 판에서 검증하지 않음 |
+| Spring | Spring Boot 3.5.16(Spring Data JPA 3.5.13)과 4.1.2(Spring Data JPA 4.1.2)(Spring 모듈, [12](12-spring-data-jpa.md), [13](../13-spring-boot-versions.md)) |
 | 테스트하지 않음 | PostgreSQL, SQL Server, Oracle 19c 이하(예: PL/SQL `BOOLEAN` 파라미터) |
 
 ---

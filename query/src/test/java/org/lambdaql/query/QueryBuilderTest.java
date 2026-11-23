@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.lambdaql.LambdaQLException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.persistence.autoconfigure.EntityScan;
+import org.springframework.boot.autoconfigure.AutoConfigurationPackage;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
@@ -294,7 +294,7 @@ class QueryBuilderTest {
     @Configuration
     @EnableAutoConfiguration
     @EnableJpaRepositories(basePackages = {"org.lambdaql"}) // JPA 스캔
-    @EntityScan("org.lambdaql")
+    @AutoConfigurationPackage(basePackages = "org.lambdaql")
     public static class TestContext {
     }
 }

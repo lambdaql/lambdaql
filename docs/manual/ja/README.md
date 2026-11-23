@@ -1,6 +1,9 @@
 <a id="lambdaql-user-manual-english"></a>
 # lambdaQL ユーザーマニュアル（日本語）
 
+> [!IMPORTANT]
+> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../ko/README.md)を参照してください。
+
 **他の言語:** [English](../en/README.md) | [한국어](../ko/README.md) | [日本語](../ja/README.md) | [简体中文](../zh/README.md)
 
 lambdaQL は Java と Kotlin のためのクエリライブラリです。

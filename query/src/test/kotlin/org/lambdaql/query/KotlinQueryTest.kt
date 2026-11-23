@@ -8,7 +8,7 @@ import org.lambdaql.Agg
 import org.lambdaql.Dml.value
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration
-import org.springframework.boot.persistence.autoconfigure.EntityScan
+import org.springframework.boot.autoconfigure.AutoConfigurationPackage
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
 
@@ -419,6 +419,6 @@ class KotlinQueryTest {
 
     /** Minimal Spring context: the datasource chosen by application-test.yaml and the test entities. */
     @EnableAutoConfiguration
-    @EntityScan("org.lambdaql.query")
+    @AutoConfigurationPackage(basePackages = ["org.lambdaql.query"])
     class Context
 }

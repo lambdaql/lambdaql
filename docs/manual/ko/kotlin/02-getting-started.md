@@ -15,10 +15,10 @@
 | Kotlin | 2.x | 설계는 kotlinc 1.7.22, 2.1.10, 2.2.21, 2.3.0, 2.3.21로 확인했습니다. |
 | JVM | Java 21 | lambdaQL을 빌드하는 데 필요합니다. |
 | `-jvm-target` | 1.8, 11, 17 또는 21 | 네 가지 모두 쿼리 람다를 같은 방식으로 컴파일합니다. |
-| JPA 구현체 | Hibernate ORM 7.4 | lambdaQL은 Hibernate 7 HQL을 만듭니다. 7.4.13으로 테스트했습니다. 다른 JPA 구현체는 지원하지 않습니다. |
-| Jakarta Persistence | 3.2 | Hibernate 7.4에 포함되어 있습니다. |
-| 데이터베이스 | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) | 이 세 가지를 검증했습니다. 다른 데이터베이스도 동작할 수 있지만 테스트하지 않았습니다. |
-| Spring Boot | 4.1 | 선택 사항입니다. 프로젝트 테스트는 Spring Boot 4.1.2를 사용합니다. |
+| JPA 구현체 | Hibernate ORM 6.6 또는 7.4 | lambdaQL은 Hibernate HQL을 만듭니다. 6.6.53(Spring Boot 3.5.16)과 7.4.13(Spring Boot 4.1.2)으로 테스트했습니다. 다른 JPA 구현체는 지원하지 않습니다. [13. Spring Boot 3과 4](../13-spring-boot-versions.md)를 참고하십시오. |
+| Jakarta Persistence | 3.1 또는 3.2 | Hibernate 6.6은 3.1, 7.4는 3.2를 씁니다. |
+| 데이터베이스 | H2 2.3, MariaDB 10.11, MySQL 8.4, PostgreSQL 17, Oracle 23.26 (23ai) | 이 다섯 가지를 검증했습니다. 매뉴얼의 DB별 SQL은 H2, MariaDB, Oracle의 것입니다. 다른 데이터베이스도 동작할 수 있지만 테스트하지 않았습니다. |
+| Spring Boot | 3.5 또는 4.1 | 선택 사항입니다. 프로젝트 테스트는 Spring Boot 3.5.16과 4.1.2를 사용합니다. |
 | Kotlin 런타임 | – | lambdaQL은 의존성에 `kotlin-stdlib`나 `kotlin-reflect`를 추가하지 않습니다. |
 
 <a id="build-from-source"></a>
@@ -33,7 +33,7 @@ cd lambdaql
 - Gradle 래퍼는 9.9.1입니다. 저장소에 `gradle/gradle-daemon-jvm.properties`가 있으므로 Gradle 데몬은 Java 21을 사용합니다.
 - 빌드에는 JDK 21과 **JDK 24 이상** 하나가 필요합니다. JDK 24 이상은 `java.lang.classfile` 리더(`src/main/java24`)를 컴파일하고 그 리더로 테스트를 한 번 더 돌립니다. 기본 버전은 25이며 `-Plql.classfile.jdk=24`처럼 바꿀 수 있습니다. Gradle이 JDK를 찾지 못하면 `~/.gradle/gradle.properties`의 `org.gradle.java.installations.paths`에 경로를 적으십시오.
 - IntelliJ IDEA에서는 **Settings > Build Tools > Gradle > Gradle JVM**을 Java 21 JDK로 설정하십시오.
-- 빌드는 세 모듈로 구성됩니다. `query`(아티팩트 `lambdaql-core`), `spring-data-jpa`(`lambdaql-spring-data-jpa`), `spring-boot-starter`(`lambdaql-spring-boot-starter`)입니다. Spring 모듈은 [12. Spring Data JPA](12-spring-data-jpa.md)에서 설명합니다.
+- 빌드의 주요 모듈은 `query`(아티팩트 `lambdaql-core`), `spring-data-jpa-boot3`·`spring-data-jpa-boot4`(`lambdaql-spring-data-jpa-boot3`·`-boot4`), `spring-boot-starter-boot3`·`spring-boot-starter-boot4`(`lambdaql-spring-boot-starter-boot3`·`-boot4`)입니다. `lambdaql-core`는 Spring Boot 버전과 무관한 jar 하나이고, Spring 모듈만 Boot 버전별로 나뉩니다([13. Spring Boot 3과 4](../13-spring-boot-versions.md)). Spring 모듈은 [12. Spring Data JPA](12-spring-data-jpa.md)에서 설명합니다.
 
 단위 테스트를 실행합니다.
 
@@ -75,7 +75,7 @@ Maven:
 </dependency>
 ```
 
-Spring Data JPA나 Spring Boot를 사용하면 `lambdaql-spring-boot-starter` 또는 `lambdaql-spring-data-jpa`를 대신 추가하십시오. 두 아티팩트는 `lambdaql-core`를 함께 가져옵니다([12.2](12-spring-data-jpa.md#122-modules) 참고).
+Spring Data JPA나 Spring Boot를 사용하면 Boot 버전에 맞는 `lambdaql-spring-boot-starter-boot4`(`-boot3`) 또는 `lambdaql-spring-data-jpa-boot4`(`-boot3`)를 대신 추가하십시오. 이 아티팩트들은 `lambdaql-core`를 함께 가져옵니다([12.2](12-spring-data-jpa.md#122-modules) 참고).
 
 > [!WARNING]
 > 버전 `1.0.0`은 저장소의 `gradle.properties`에 정의된 값이며, 첫 릴리스 전에 바뀔 수 있습니다.
@@ -180,7 +180,7 @@ val qb = QueryBuilder(emf)
 <a id="with-spring-boot"></a>
 ### Spring Boot에서
 
-`lambdaql-spring-boot-starter`를 사용하면 Spring Boot가 `QueryBuilder` 빈을 만듭니다([12.8](12-spring-data-jpa.md#128-the-querybuilder-bean) 참고).
+`lambdaql-spring-boot-starter-boot4`(`-boot3`)를 사용하면 Spring Boot가 `QueryBuilder` 빈을 만듭니다([12.8](12-spring-data-jpa.md#128-the-querybuilder-bean) 참고).
 스타터 없이 사용하면 빈을 직접 만드십시오. 자동 구성과 마찬가지로 Spring의 공유 `EntityManager`를 사용합니다.
 
 ```kotlin

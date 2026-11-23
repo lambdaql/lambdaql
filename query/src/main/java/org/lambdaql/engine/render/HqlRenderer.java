@@ -63,6 +63,10 @@ public final class HqlRenderer {
     private int ownRoot = -1;
     private Class<?> ownRootClass;      // the entity of ownRoot (a subquery root)
     private Map<Integer, Class<?>> ownJoined = Map.of();   // roots joined inside a subquery (D51)
+    /** A subquery renderer that read a column of an outer root (a correlated subquery). */
+    private boolean correlated;
+    /** The target entity while rendering an UPDATE (U22), else null. */
+    private Class<?> updateRoot;
     private Class<?> mainRootClass;     // the entity (or row type) of root 0
 
     /** The entity class of a root, for reading the mapping of a path (A4). Null when it is not known. */
@@ -573,6 +577,7 @@ public final class HqlRenderer {
      */
     public RenderedQuery update(Class<?> root, List<AssignBound> sets, List<Bound> wheres, DmlScope scope) {
         dmlRoot = root;
+        updateRoot = root;
         List<String> parts = new ArrayList<>();
         for (AssignBound b : sets) {
             captured = b.captured();
@@ -650,6 +655,27 @@ public final class HqlRenderer {
     private boolean readsTarget(Class<?> root) {
         for (Class<?> c : subqueryReads) {
             if (c != null && (c.isAssignableFrom(root) || root.isAssignableFrom(c))) return true;
+        }
+        return false;
+    }
+
+    /**
+     * U22: tells whether the subquery reads the target entity of the UPDATE being rendered (or an entity of the same
+     * hierarchy), in its own FROM or its joins.
+     *
+     * @param q the subquery
+     * @return {@code true} when the statement is an UPDATE and the subquery reads its target
+     */
+    private boolean readsUpdateTarget(Expr.Subquery q) {
+        HqlRenderer top = this;
+        while (top.parent != null) top = top.parent;
+        Class<?> target = top.updateRoot;
+        if (target == null) return false;
+        List<Class<?>> read = new ArrayList<>();
+        read.add(q.entity());
+        q.joins().forEach(j -> read.add(j.entity()));
+        for (Class<?> c : read) {
+            if (c != null && (c.isAssignableFrom(target) || target.isAssignableFrom(c))) return true;
         }
         return false;
     }
@@ -1068,7 +1094,12 @@ public final class HqlRenderer {
         if (notInValue != null) parts.add(inner.value(q.select(), null) + " = " + notInValue);
         List<String> orders = q.limit() == null ? List.of()
                 : inner.orderBy(q.entity(), q.sorts().isEmpty() ? List.of() : List.of(new SortBound(q.sorts(), cap)), true);
-        boolean wrap = q.kind() == Expr.Subquery.Kind.VALUES && q.limit() != null && notInValue == null;
+        // U22: in an UPDATE, a subquery that reads the target table and does not use the outer row is read through a
+        // derived table, (select tN.v from (select ... as v ...) tN). MySQL rejects reading the target table of an
+        // UPDATE in a subquery (error 1093); Hibernate 7 adds such a derived table on MySQL itself, Hibernate 6.6 does
+        // not (measured on MySQL 8.4). The rows are the same on every database.
+        boolean selfUpdate = notInValue == null && !inner.correlated && readsUpdateTarget(q);
+        boolean wrap = (q.kind() == Expr.Subquery.Kind.VALUES && q.limit() != null && notInValue == null) || selfUpdate;
         StringBuilder hql = new StringBuilder("select ").append(select).append(wrap ? " as v" : "")
                 .append(" from ").append(model.entityName(q.entity())).append(' ').append(alias);
         // path joins right after the root they start from, so an ON condition can use them (D51)
@@ -1485,6 +1516,10 @@ public final class HqlRenderer {
         String expr = aliasOf(c.root());
         List<String> names = c.path();
         if (parent != null && c.root() != ownRoot && !ownJoined.containsKey(c.root())) {
+            // a column of an outer root: this subquery and the ones between it and that root are correlated
+            for (HqlRenderer r = this; r.parent != null && r.ownRoot != c.root() && !r.ownJoined.containsKey(c.root()); r = r.parent) {
+                r.correlated = true;
+            }
             for (int i = 0; i < names.size() - 1; i++) {
                 boolean fkOnly = c.idPath() && i == names.size() - 2;
                 if (c.association().get(i) && !fkOnly) {

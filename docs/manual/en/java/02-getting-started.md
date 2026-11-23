@@ -1,6 +1,9 @@
 <a id="2-getting-started-java"></a>
 # 2. Getting started (Java)
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/java/02-getting-started.md) for the latest rules.
+
 [Java track](README.md) | [Manual home](../README.md) | Previous: [1. Overview](../01-overview.md) | Next: [3. Conditions](03-where.md) | [Kotlin version of this page](../kotlin/02-getting-started.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)

@@ -541,9 +541,9 @@ val list = if (flag) {
 |---|---|
 | Kotlin | 2.x (설계는 kotlinc 1.7.22, 2.1.10, 2.2.21, 2.3.0, 2.3.21로 확인) |
 | Java (JVM) | 21 |
-| Hibernate | 7.4 (7.4.13으로 테스트). HQL 확장(예: `function(...)`, `nulls first`)을 사용하므로 다른 JPA 구현체는 보장하지 않음 |
+| Hibernate | 6.6 또는 7.4 (6.6.53, 7.4.13으로 테스트). HQL 확장(예: `function(...)`, `nulls first`)을 사용하므로 다른 JPA 구현체는 보장하지 않음 |
 | 데이터베이스 | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
-| Spring | Spring Boot 4.1.2, Spring Data JPA 4.1.2(Spring 모듈, [12](12-spring-data-jpa.md); Java 리포지토리만). Spring Boot 3은 이 판에서 검증하지 않음 |
+| Spring | Spring Boot 3.5.16(Spring Data JPA 3.5.13)과 4.1.2(Spring Data JPA 4.1.2)(Spring 모듈, [12](12-spring-data-jpa.md), [13](../13-spring-boot-versions.md); Java 리포지토리만) |
 | Kotlin 행 단위 확인 | 지금까지는 H2만. Kotlin 사례의 MariaDB와 Oracle 실행은 계획 중 |
 | 테스트하지 않음 | 2.3보다 새로운 Kotlin, Kotlin Multiplatform, PostgreSQL, SQL Server, Oracle 19c 이하(예: PL/SQL `BOOLEAN` 파라미터) |
 

@@ -39,6 +39,15 @@
 - `kotlin/02-getting-started.md`(다른 엔티티로 가는 경로), `kotlin/04-order-paging.md`(정렬이 where 조인을 쓰는 문장), `kotlin/09-kotlin-notes.md`(예제 읽는 법, D20·D36·D54·D23 표, 요약 표, `?.` 설명과 예제, Kotlin과의 차이 표 두 행), `kotlin/10-rules-and-limits.md`(1번 원칙, 경로 표 네 행, R24), `kotlin/README.md`(`it.customer?.name == "Kim"` 행)
 - `11-errors-and-languages.md`: 5xxx 범위(`LQL-5014`까지), 메시지 표에 `LQL-5014`, 설명 표에 `LQL-5014`
 
+### 3. D55: Spring Boot 3·4 동시 지원(2026-11-23)
+
+- 새 페이지 `13-spring-boot-versions.md`(공통): 번역본에 같은 파일을 새로 만듦. 매뉴얼 홈(`README.md`)의 공통 페이지 표와 목차, `java/README.md`·`kotlin/README.md`의 공통 페이지 줄과 목차에 13장 행 추가
+- `java/02-getting-started.md`, `kotlin/02-getting-started.md`: 요구 사항 표(Hibernate 6.6 또는 7.4, Jakarta Persistence 3.1 또는 3.2, 데이터베이스 다섯 개, Spring Boot 3.5 또는 4.1), 빌드 모듈 문장, 의존성 문장, `QueryBuilder` 빈 문장의 아티팩트 이름(`-boot3`·`-boot4`)
+- `java/12-spring-data-jpa.md`, `kotlin/12-spring-data-jpa.md`: 탐색 줄(다음: 13장), 아티팩트 표와 설명, Gradle·Maven 예제의 아티팩트 이름, 요구 사항 표, `spring.factories` 문장, "Spring Boot 버전" 항목, `PropertyReferenceException` 패키지 설명. Java는 영역 `find-all-spring-sort`의 코드 블록(예외를 단순 이름으로 확인)
+- `java/10-rules-and-limits.md`, `kotlin/10-rules-and-limits.md`: 환경 표의 Hibernate·Spring 행
+- `README.md`, `java/README.md`, `kotlin/README.md`: Hibernate ORM·데이터베이스·Spring Boot 행
+- `11-errors-and-languages.md`: 로깅 안내의 Spring 모듈 이름
+
 ### 2. PostgreSQL·MySQL 반영으로 바뀐 메시지와 설명(2026-11-19)
 
 - `11-errors-and-languages.md`: 메시지 표의 `LQL-5001`(PostgreSQL 함수 기반 인덱스), `LQL-5007`(MySQL `NOT DETERMINISTIC`, PostgreSQL `VOLATILE`), 설명 표의 `LQL-5001`·`LQL-5007`

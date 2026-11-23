@@ -15,7 +15,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -121,8 +120,9 @@ class ExecutorTest {
         List<Member> rows = repository.findAll(m -> m.isActive(),
                 Sort.by(Sort.Order.desc("grade"), Sort.Order.asc("team.name"), Sort.Order.asc("id")));
         // a property that does not exist: the same error as Spring Data's own repositories
-        assertThrows(PropertyReferenceException.class,
+        RuntimeException unknown = assertThrows(RuntimeException.class,
                 () -> repository.findAll(m -> m.isActive(), Sort.by("nickname")));
+        assertEquals("PropertyReferenceException", unknown.getClass().getSimpleName());
         // @end
         assertEquals(all.stream().filter(Member::isActive).sorted(GRADE_DESC_NULLS_LAST.thenComparing(BY_ID))
                 .map(Member::getId).toList(), ids(rows));

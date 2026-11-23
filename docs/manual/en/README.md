@@ -1,6 +1,9 @@
 <a id="lambdaql-user-manual-english"></a>
 # lambdaQL User Manual (English)
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../ko/README.md) for the latest rules.
+
 **Other languages:** English | [한국어](../ko/README.md) | [日本語](../ja/README.md) | [简体中文](../zh/README.md)
 
 lambdaQL is a query library for Java and Kotlin.

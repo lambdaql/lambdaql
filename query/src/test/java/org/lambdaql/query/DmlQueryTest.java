@@ -8,7 +8,7 @@ import org.lambdaql.LambdaQLException;
 import org.lambdaql.engine.render.RenderedQuery;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.persistence.autoconfigure.EntityScan;
+import org.springframework.boot.autoconfigure.AutoConfigurationPackage;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -177,9 +177,12 @@ class DmlQueryTest {
         assertEquals(List.of(30.0, 150.0, 5.0, 120.0), orders().stream().map(Order::getPrice).toList());
         assertEquals(4, all.execute());
         assertEquals(List.of(30.0, 0.0, 5.0, 0.0), orders().stream().map(Order::getPrice).toList());
-        // a subquery on the target table: works on all three databases (no MariaDB 1093 for UPDATE)
+        // a subquery on the target table that does not use the outer row is read through a derived table (U22):
+        // MySQL rejects reading the target table of an UPDATE (1093), and Hibernate 6.6 does not add the derived table
         seed();
-        assertEquals(4, qb.update(Order.class).set((o, sub) -> o.setPrice(sub.from(Order.class).avg(x -> x.getPrice()))).all().execute());
+        ExecutableUpdate<Order> avg = qb.update(Order.class).set((o, sub) -> o.setPrice(sub.from(Order.class).avg(x -> x.getPrice()))).all();
+        assertEquals("update Order e0 set e0.price = (select t1.v from (select avg(s1.price) as v from Order s1) t1)", avg.toHql().hql());
+        assertEquals(4, avg.execute());
         assertEquals(List.of(142.5, 142.5, 142.5, 142.5), orders().stream().map(Order::getPrice).toList());
     }
 
@@ -539,7 +542,7 @@ class DmlQueryTest {
 
     /** Minimal Spring context: the datasource chosen by application-test.yaml and the test entities. */
     @EnableAutoConfiguration
-    @EntityScan("org.lambdaql.query")
+    @AutoConfigurationPackage(basePackages = "org.lambdaql.query")
     static class Context {
     }
 }

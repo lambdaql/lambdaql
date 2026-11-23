@@ -6,7 +6,7 @@ import org.lambdaql.query.Customer;
 import org.lambdaql.query.Order;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.persistence.autoconfigure.EntityScan;
+import org.springframework.boot.autoconfigure.AutoConfigurationPackage;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -62,7 +62,7 @@ class JpaEntityModelTest {
 
     /** Minimal Spring context: H2 from application-test.yaml and the test entities. */
     @EnableAutoConfiguration
-    @EntityScan("org.lambdaql.query")
+    @AutoConfigurationPackage(basePackages = "org.lambdaql.query")
     static class Context {
     }
 }

@@ -93,6 +93,7 @@ fetch first ? rows only
 |---|---|
 | [1. 개요](01-overview.md) | lambdaQL이 무엇인지, 왜 만들었는지, 어떻게 동작하는지, 설계 원칙 |
 | [11. 오류와 언어](11-errors-and-languages.md) | 오류 코드, 예외, 메시지 언어, 로깅 |
+| [13. Spring Boot 3과 4](13-spring-boot-versions.md) | 버전 표, 아티팩트, Hibernate 6.6과 7.4의 SQL 차이, 검증 범위 |
 
 <a id="table-of-contents"></a>
 ## 목차
@@ -112,6 +113,7 @@ fetch first ? rows only
 | 10 | 규칙과 제한: 전체 규칙 표 | [Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md) |
 | 11 | 오류와 언어 (공통) | [11-errors-and-languages.md](11-errors-and-languages.md) | [11-errors-and-languages.md](11-errors-and-languages.md) |
 | 12 | Spring Data JPA: `LambdaQlExecutor<T>`, DML 단축 메서드, Spring `Sort`와 `Pageable`, 모듈, 트랜잭션, `QueryBuilder` 빈 | [Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md) |
+| 13 | Spring Boot 3과 4 (공통): 버전, 아티팩트, Hibernate 6.6과 7.4의 SQL 차이 | [13-spring-boot-versions.md](13-spring-boot-versions.md) | [13-spring-boot-versions.md](13-spring-boot-versions.md) |
 
 <a id="about-the-examples"></a>
 ## 예제에 대하여
@@ -138,9 +140,9 @@ fetch first ? rows only
 |---|---|
 | Java | 21 |
 | Kotlin | 2.x |
-| Hibernate ORM | 7.4 (Spring Boot 4.1.2의 7.4.13으로 테스트) |
-| 검증한 데이터베이스 | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
-| Spring Boot(선택) | 4.1(4.1.2로 테스트). Spring Boot 3은 이 판에서 검증하지 않음 |
+| Hibernate ORM | 6.6 또는 7.4 (6.6.53, 7.4.13으로 테스트) |
+| 검증한 데이터베이스 | H2 2.3, MariaDB 10.11, MySQL 8.4, PostgreSQL 17, Oracle 23.26 (23ai) |
+| Spring Boot(선택) | 3.5 또는 4.1(3.5.16, 4.1.2로 테스트). [13. Spring Boot 3과 4](13-spring-boot-versions.md) 참고 |
 
 <a id="folder-layout"></a>
 ## 폴더 구성

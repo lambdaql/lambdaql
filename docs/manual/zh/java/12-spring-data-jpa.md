@@ -1,6 +1,9 @@
 <a id="12-spring-data-jpa-java"></a>
 # 12. Spring Data JPA（Java）
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../../ko/java/12-spring-data-jpa.md)。
+
 [Java 路线](README.md) | [手册首页](../README.md) | 上一章：[11. 错误与语言](../11-errors-and-languages.md) | [本页的 Kotlin 版本](../kotlin/12-spring-data-jpa.md)
 
 ---

@@ -435,7 +435,7 @@ WARN  [LQL-5002] limit 없는 서브쿼리 정렬은 결과에 영향이 없어 
 - SARGable(결정 D50): `SargableMode.STRICT`에서는 `LQL-5001`, `LQL-5007`, `LQL-5012`의 경우에 `NonSargableException`(`LQL-3066`)이 발생합니다.
 
 > [!NOTE]
-> `lambdaql-core`는 Spring에 의존하지 않습니다. 로깅 의존성은 `slf4j-api` 하나이므로 로깅 구현체는 사용자가 선택합니다. Spring 모듈(`lambdaql-spring-data-jpa`, `lambdaql-spring-boot-starter`)은 Spring Data JPA를 가져오고, 스타터는 `spring-boot-starter-data-jpa`와 Logback도 함께 가져옵니다.
+> `lambdaql-core`는 Spring에 의존하지 않습니다. 로깅 의존성은 `slf4j-api` 하나이므로 로깅 구현체는 사용자가 선택합니다. Spring 모듈(`lambdaql-spring-data-jpa-boot3`·`-boot4`, `lambdaql-spring-boot-starter-boot3`·`-boot4`)은 Spring Data JPA를 가져오고, 스타터는 `spring-boot-starter-data-jpa`와 Logback도 함께 가져옵니다.
 
 <a id="summary"></a>
 ## 요약

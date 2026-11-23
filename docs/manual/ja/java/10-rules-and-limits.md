@@ -1,6 +1,9 @@
 <a id="10-rules-and-limits-java"></a>
 # 10. ルールと制限（Java）
 
+> [!IMPORTANT]
+> このページは韓国語版のマニュアルより古い内容です。最新のルールは[韓国語のページ](../../ko/java/10-rules-and-limits.md)を参照してください。
+
 [Java トラック](README.md) | [マニュアルのホーム](../README.md) | 前: [9. Java の注意点](09-java-notes.md) | 次: [11. エラーと言語](../11-errors-and-languages.md) | [このページの Kotlin 版](../kotlin/10-rules-and-limits.md)
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)

@@ -4,12 +4,11 @@ import org.lambdaql.i18n.LqlMessage;
 import org.lambdaql.query.Direction;
 import org.lambdaql.query.SortSpec;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.core.PropertyPath;
 
 /**
  * Turns a Spring {@link Sort} into a lambdaQL {@link SortSpec}.
  * <ul>
- *   <li>Each property is checked with Spring Data's {@link PropertyPath}, so an unknown name gives
+ *   <li>Each property is checked with Spring Data's {@code PropertyPath} ({@link SpringDataPaths}), so an unknown name gives
  *       {@code PropertyReferenceException}, the same as Spring Data's own repositories.
  *       Then lambdaQL checks again that the path ends at a basic value ({@link SortSpec#ofPath}).</li>
  *   <li>{@code NullHandling.NATIVE} becomes the lambdaQL default ({@link Direction#ASC} / {@link Direction#DESC},
@@ -33,7 +32,7 @@ public final class SpringSorts {
      * @param <T>  the entity type
      * @return the same order as a spec
      * @throws IllegalArgumentException                                     if the sort has no order
-     * @throws org.springframework.data.core.PropertyReferenceException if a property does not exist
+     * @throws RuntimeException Spring Data's {@code PropertyReferenceException} if a property does not exist
      * @throws UnsupportedOperationException                                if an order uses {@code ignoreCase}
      */
     public static <T> SortSpec<T> toSpec(Class<T> type, Sort sort) {
@@ -50,7 +49,7 @@ public final class SpringSorts {
      * @param <T>    the entity type
      * @return the same order as a spec
      * @throws IllegalArgumentException                                     if the sort has no order
-     * @throws org.springframework.data.core.PropertyReferenceException if a property that is not an alias does not exist
+     * @throws RuntimeException Spring Data's {@code PropertyReferenceException} if a property that is not an alias does not exist
      * @throws UnsupportedOperationException                                if an order uses {@code ignoreCase}
      */
     public static <T> SortSpec<T> toSpec(Class<T> type, org.lambdaql.query.SortPolicy policy, Sort sort) {
@@ -60,7 +59,7 @@ public final class SpringSorts {
                 throw new UnsupportedOperationException(LqlMessage.IGNORE_CASE_NOT_SUPPORTED.format(order.getProperty()));
             }
             String name = order.getProperty();
-            String path = policy != null && policy.isAlias(type, name) ? name : PropertyPath.from(name, type).toDotPath();
+            String path = policy != null && policy.isAlias(type, name) ? name : SpringDataPaths.dotPath(name, type);
             SortSpec<T> part = SortSpec.ofPath(type, path, direction(order));
             spec = spec == null ? part : spec.then(part);
         }

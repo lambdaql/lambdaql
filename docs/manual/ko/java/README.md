@@ -3,7 +3,7 @@
 
 **다른 언어:** [English](../../en/java/README.md) | [한국어](../../ko/java/README.md) | [日本語](../../ja/java/README.md) | [简体中文](../../zh/java/README.md)
 
-[매뉴얼 홈](../README.md) | [Kotlin 트랙](../kotlin/README.md) | 공통 페이지: [1. 개요](../01-overview.md) · [11. 오류와 언어](../11-errors-and-languages.md)
+[매뉴얼 홈](../README.md) | [Kotlin 트랙](../kotlin/README.md) | 공통 페이지: [1. 개요](../01-overview.md) · [11. 오류와 언어](../11-errors-and-languages.md) · [13. Spring Boot 3과 4](../13-spring-boot-versions.md)
 
 lambdaQL 매뉴얼의 **Java 트랙**입니다. 이 트랙의 모든 페이지에는 **Java 코드만** 있습니다.
 쿼리를 Kotlin으로 작성한다면 [Kotlin 트랙](../kotlin/README.md)을 읽으십시오. 같은 번호의 같은 장으로 구성되어 있습니다.
@@ -77,6 +77,7 @@ fetch first ? rows only
 | 10 | [규칙과 제한](10-rules-and-limits.md) | 전체 규칙 표, Java와 SQL의 차이, 데이터베이스별 차이, 지원하지 않는 것 |
 | 11 | [오류와 언어](../11-errors-and-languages.md) (공통) | 오류 코드, 예외, 메시지 언어, 로깅 |
 | 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`, 리포지토리 default 메서드, DML 단축 메서드(`deleteAll`, `updateOne` 등), Spring `Sort`와 `Pageable`, 모듈, 트랜잭션, `QueryBuilder` 빈 |
+| 13 | [Spring Boot 3과 4](../13-spring-boot-versions.md) (공통) | 버전 표, 아티팩트(`-boot3`, `-boot4`), Hibernate 6.6과 7.4의 SQL 차이, 검증 범위 |
 
 <a id="example-entities"></a>
 ## 예제 엔티티
@@ -96,9 +97,9 @@ fetch first ? rows only
 |---|---|
 | Java | 21 |
 | 컴파일러 | javac (Eclipse 컴파일러인 ECJ는 보장하지 않음) |
-| Hibernate ORM | 7.4 (Spring Boot 4.1.2의 7.4.13으로 테스트) |
-| 검증한 데이터베이스 | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
-| Spring Boot(선택) | 4.1(4.1.2로 테스트). Spring Boot 3은 이 판에서 검증하지 않음 |
+| Hibernate ORM | 6.6 또는 7.4 (6.6.53, 7.4.13으로 테스트) |
+| 검증한 데이터베이스 | H2 2.3, MariaDB 10.11, MySQL 8.4, PostgreSQL 17, Oracle 23.26 (23ai) |
+| Spring Boot(선택) | 3.5 또는 4.1(3.5.16, 4.1.2로 테스트). [13. Spring Boot 3과 4](../13-spring-boot-versions.md) 참고 |
 
 <a id="help-and-contributions"></a>
 ## 도움말과 기여
