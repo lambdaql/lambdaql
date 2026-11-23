@@ -91,12 +91,12 @@ Spring Data JPA 3.3 이하는 **지원하지 않습니다**. lambdaQL은 실행�
 
 이 장의 예제는 테스트 엔티티 `Member`(`id`, `name`, `active`, `grade`, `team`)와 `Team`(`id`, `name`)을 사용합니다. `grade`는 `Integer`이므로 NULL일 수 있습니다.
 
-[`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java), 영역 `repository`:
+[`ManualMemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualMemberRepository.java), 영역 `repository`:
 
 ```java
 /** No Impl class: Spring Data finds the LambdaQlExecutor implementation by itself. */
-public interface MemberRepository extends JpaRepository<Member, Long>, LambdaQlExecutor<Member>,
-        JpaSpecificationExecutor<Member>, MemberRepositoryCustom {
+public interface ManualMemberRepository extends JpaRepository<Member, Long>, LambdaQlExecutor<Member>,
+        JpaSpecificationExecutor<Member> {
 
     /** @return the active members */
     default List<Member> activeMembers() {
@@ -148,8 +148,8 @@ public interface MemberRepository extends JpaRepository<Member, Long>, LambdaQlE
 
 마지막 세 메서드는 수정, 삭제, 삽입 문장을 실행합니다. 이 메서드에는 트랜잭션이 필요합니다([12.6](#126-transactions-and-exceptions) 참고).
 
-이 리포지토리는 `JpaSpecificationExecutor<Member>`와 직접 작성한 프래그먼트 `MemberRepositoryCustom`도 상속합니다.
-둘 다 lambdaQL에는 필요하지 않으며, 함께 사용할 때의 동작을 확인하기 위한 구성입니다([12.7](#127-other-fragments-and-jpaspecificationexecutor) 참고).
+이 리포지토리는 `JpaSpecificationExecutor<Member>`도 상속합니다. lambdaQL에는 필요하지 않으며, 함께 사용할 때의 동작을 보여 주기 위한 구성입니다.
+테스트의 다른 리포지토리 [`MemberRepository`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)는 같은 메서드에 직접 작성한 프래그먼트 `MemberRepositoryCustom`까지 상속합니다([12.7](#127-other-fragments-and-jpaspecificationexecutor) 참고).
 
 동작 방식:
 
@@ -388,7 +388,7 @@ lambdaQL은 각 `Sort.Order`를 `SortSpec.ofPath`로 정렬 키 하나로 변환
 | 정렬 정책의 별칭(`"level"`) | `PropertyPath` 검사 없이 그대로 전달. 정렬 정책이 경로로 바꿈 |
 | `NullHandling.NATIVE`(기본값)의 `ASC` / `DESC` | lambdaQL NULL 규칙 적용. 오름차순은 NULL 먼저, 내림차순은 NULL 나중. 모든 데이터베이스에서 같은 순서([4.4](04-order-paging.md#44-null-ordering-is-the-same-on-every-database) 참고) |
 | `NullHandling.NULLS_FIRST` / `NULLS_LAST` | 지정한 그대로 사용(`ASC_NULLS_FIRST`, `DESC_NULLS_LAST` 등) |
-| `ignoreCase()` | 아직 지원하지 않음. `UnsupportedOperationException` 발생 |
+| `ignoreCase()` | 지원하지 않음. `UnsupportedOperationException` 발생 |
 | `Sort.unsorted()` | `order by` 없음 |
 
 Spring Data JPA 자체 리포지토리는 `NATIVE`의 NULL 위치를 데이터베이스에 맡기므로 데이터베이스마다 순서가 다를 수 있습니다. lambdaQL은 자체 규칙을 적용합니다.
@@ -477,15 +477,21 @@ assertThrows(SortNotAllowedException.class, () -> repository.findAll(m -> m.isAc
 이 테스트는 자동 구성의 정책 등록도 확인합니다.
 
 **`SortPolicy` 빈.** 컴파일러가 검사하는 규칙을 쓰려면 `SortPolicy` 빈을 정의하십시오. 같은 자동 구성 단계가 이 빈을 등록합니다.
-다음 빈은 설계 예제입니다. 아래 테스트는 같은 정책을 직접 등록합니다.
+다음 설정 클래스는 테스트 안의 `static` 클래스입니다. 이 빈을 넣은 컨텍스트에서 테스트는 `Sort.Order.desc("level")`이 `grade`로 정렬되고 `Sort.by("grade")`가 `SortNotAllowedException`으로 거부되는지 확인합니다. 그다음 예제는 같은 정책을 직접 등록합니다.
+
+[`ManualJavaSpringTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualJavaSpringTest.java), 영역 `sort-policy-bean`:
 
 ```java
-@Bean
-public SortPolicy sortPolicy() {
-    return SortPolicy.of(SortMode.STRICT,
-            SortRules.of(Member.class)
-                    .allow(m -> m.getName())
-                    .alias("level", m -> m.getGrade()));
+@Configuration
+static class SortConfig {
+
+    @Bean
+    public SortPolicy sortPolicy() {
+        return SortPolicy.of(SortMode.STRICT,
+                SortRules.of(Member.class)
+                        .allow(m -> m.getName())
+                        .alias("level", m -> m.getGrade()));
+    }
 }
 ```
 
@@ -509,21 +515,8 @@ try {
 - 별칭도 속성도 아닌 이름이면 정책 검사 전에 `PropertyReferenceException`이 발생합니다.
 - `STRICT` 모드에서 규칙에 없는 속성을 지정하면 `SortNotAllowedException`(`LQL-4040`)이 발생합니다. Spring은 이 예외를 변환하지 않습니다([12.6](#126-transactions-and-exceptions) 참고).
 
-**HTTP 400 응답.** lambdaQL은 웹 의존성이 없으므로 HTTP 상태를 정하지 않습니다. 웹 애플리케이션은 보통 `SortNotAllowedException`에 400 Bad Request로 응답합니다.
-다음 핸들러는 예시입니다(테스트하지 않음).
+**HTTP 400 응답.** lambdaQL은 웹 의존성이 없으므로 HTTP 상태를 정하지 않습니다. 웹 애플리케이션은 보통 `@ExceptionHandler(SortNotAllowedException.class)`에서 400 Bad Request로 응답하고, 오류 코드는 `e.code()`(`"LQL-4040"`)로 읽습니다.
 
-```java
-@RestControllerAdvice
-public class SortErrorHandler {
-
-    @ExceptionHandler(SortNotAllowedException.class)
-    public ProblemDetail sortNotAllowed(SortNotAllowedException e) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
-        problem.setProperty("code", e.code());      // "LQL-4040"
-        return problem;
-    }
-}
-```
 
 메시지에는 엔티티 클래스와 정렬 이름이 들어 있습니다. 클라이언트에 엔티티 이름을 노출하지 않으려면 `e.code()`만 보내십시오.
 
@@ -540,9 +533,18 @@ public class SortErrorHandler {
 | 경우 | 동작 |
 |---|---|
 | `@Transactional` 안의 조회 | lambdaQL은 같은 트랜잭션에서 실행되며, 아직 flush되지 않은 변경 사항도 조회합니다. 롤백 후에는 lambdaQL에서도 그 변경 사항이 조회되지 않습니다 |
-| 트랜잭션 밖의 조회 | Spring이 호출마다 새 `EntityManager`를 사용하고 호출이 끝나면 닫으므로, 반환된 엔티티는 준영속(detached) 상태입니다. Spring의 일반 동작이며 lambdaQL에서는 테스트하지 않았습니다 |
+| 트랜잭션 밖의 조회 | Spring이 호출마다 새 `EntityManager`를 사용하고 호출이 끝나면 닫으므로, 반환된 엔티티는 준영속(detached) 상태입니다(아래 `detached` 예제) |
 | `@Transactional` 또는 `TransactionTemplate` 안의 수정, 삭제, 삽입, 업서트 | 그 트랜잭션에서 실행되고, 트랜잭션과 함께 롤백됩니다 |
 | 트랜잭션 밖의 수정, 삭제, 삽입, 업서트 | SQL을 보내기 전에 실패합니다. 아무것도 변경하지 않습니다(다음 표 참고) |
+
+[`ManualJavaSpringTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualJavaSpringTest.java), 영역 `detached`:
+
+```java
+// outside a transaction each call uses a new EntityManager: the returned entity is detached
+Member kim = repository.findOne(m -> m.getName().equals("Kim")).orElseThrow();
+boolean managed = new TransactionTemplate(txManager).execute(s -> entityManager.contains(kim));
+assertFalse(managed);
+```
 
 DML을 자체 트랜잭션에서 실행하는 빌더는 `new QueryBuilder(entityManagerFactory)` 하나뿐입니다([7.8](07-dml.md#transactions) 참고). Spring 애플리케이션에서는 이 빌더를 사용하지 마십시오([12.8](#128-the-querybuilder-bean) 참고).
 
@@ -571,13 +573,15 @@ DML을 자체 트랜잭션에서 실행하는 빌더는 `new QueryBuilder(entity
 | `JpaSpecificationExecutor<T>` | 동작 | lambdaQL 람다는 인자가 하나, `Specification` 람다는 인자가 셋이므로 Java가 항상 올바른 `findAll`을 선택 |
 | `JpaRepository` 메서드(`findAll()`, `count()`, `save(...)`) | 동작 | 인자 타입이 다름 |
 
-다음 호출은 `ExecutorTest`의 테스트 메서드 `worksWithOtherFragments`에서 가져왔습니다.
+다음 예제의 `repository`는 `MemberRepository`입니다.
+
+[`ManualJavaSpringTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualJavaSpringTest.java), 영역 `fragments`:
 
 ```java
-repository.countByHand();                                                  // hand-written fragment
-repository.findAll((root, query, cb) -> cb.isTrue(root.get("active")));    // Specification: three arguments
-repository.findAll(m -> m.isActive());                                     // lambdaQL Where: one argument
-repository.count();                                                        // Spring Data's own count()
+long byHand = repository.countByHand();                                               // hand-written fragment
+List<Member> bySpec = repository.findAll((root, query, cb) -> cb.isTrue(root.get("active")));   // Specification: three arguments
+List<Member> byLambda = repository.findAll(m -> m.isActive());                        // lambdaQL Where: one argument
+long total = repository.count();                                                      // Spring Data's own count()
 ```
 
 <a id="128-the-querybuilder-bean"></a>
@@ -603,11 +607,16 @@ long seen = tx.execute(status -> {
 
 Spring Boot 없이 사용하거나 `EntityManagerFactory` 빈이 둘 이상이면 빈을 직접 만드십시오. 자동 구성과 마찬가지로 공유 `EntityManager`를 사용합니다.
 
+[`ManualJavaStartTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java), 영역 `config`:
+
 ```java
-@Bean
-public QueryBuilder queryBuilder(EntityManagerFactory entityManagerFactory) {
-    // the same as the auto-configuration: a shared, transaction-bound EntityManager
-    return new QueryBuilder(SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory));
+@Configuration
+public static class LambdaQlConfig {
+
+    @Bean
+    public QueryBuilder queryBuilder(EntityManagerFactory entityManagerFactory) {
+        return new QueryBuilder(SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory));
+    }
 }
 ```
 
@@ -615,7 +624,7 @@ public QueryBuilder queryBuilder(EntityManagerFactory entityManagerFactory) {
 Spring 애플리케이션에서는 `new QueryBuilder(entityManagerFactory)`를 사용하지 마십시오. 이 빌더는 쿼리마다 자체 `EntityManager`를 열며, 이 `EntityManager`는 Spring 트랜잭션에 참여하지 않습니다.
 
 **`@DataJpaTest` 테스트.** `@DataJpaTest` 슬라이스 테스트는 일부 자동 구성만 로드합니다. 리포지토리 메서드는 동작하지만 `QueryBuilder` 빈은 생성되지 않습니다.
-테스트에 이 빈이 필요하면 테스트 클래스에 `@ImportAutoConfiguration(LambdaQlAutoConfiguration.class)`를 추가하십시오(아직 테스트하지 않음).
+테스트에 이 빈이 필요하면 `@SpringBootTest`처럼 자동 구성 전체를 로드하는 테스트를 쓰십시오.
 
 <a id="129-kotlin-repositories"></a>
 ## 12.9 Kotlin 리포지토리
@@ -624,11 +633,9 @@ Kotlin으로 작성한 리포지토리에는 컴파일러 설정이 필요합니
 자세한 내용은 [이 페이지의 Kotlin 버전](../kotlin/12-spring-data-jpa.md#129-kotlin-compile-settings)을 참고하십시오.
 
 <a id="1210-not-implemented-yet"></a>
-## 12.10 미구현 기능
+## 12.10 지원하지 않는 것
 
-- **Spring Boot 버전.** Spring Boot 3.5.16과 4.1.2로 테스트합니다. 같은 테스트를 두 버전에서 실행합니다([13. Spring Boot 3과 4](../13-spring-boot-versions.md)).
-- Spring `Sort`의 **`ignoreCase()`**.
-- **Kotlin 리포지토리** 테스트.
+- Spring `Sort`의 **`ignoreCase()`**. 호출하면 `UnsupportedOperationException`이 발생합니다([12.6](#126-transactions-and-exceptions) 참고).
 
 ---
 

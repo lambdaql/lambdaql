@@ -45,51 +45,71 @@ Oracle은 `set`에 별칭을 씁니다(`set o1_0.status=?`). H2와 MariaDB는 �
 <a id="values-null-date-boolean"></a>
 ## 값: null, 날짜, boolean
 
+[`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java), 영역 `update-values`:
+
 ```java
-qb.update(Order.class)
-  .set(o -> { o.setDescription(null); o.setUpdateAt(now); o.setActive(true); })
-  .where(o -> o.getId() == id)
-  .execute();
+ExecutableUpdate<Order> u = qb.update(Order.class)
+        .set(o -> { o.setDescription(null); o.setUpdateAt(now); o.setKind(Order.Kind.RUSH); o.setActive(false); })
+        .where(o -> o.getId() == id);
+assertEquals("update Order e0 set e0.description = null, e0.updateAt = :p1,"
+        + " e0.kind = org.lambdaql.query.Order$Kind.RUSH, e0.active = false where e0.id = :p2", u.toHql().hql());
+int changed = u.execute();
 ```
 
-enum 값도 같은 방식으로 동작합니다. 같은 값을 두 번 사용하더라도 각 캡처 값은 **자기 파라미터**를 받습니다(규칙 U7).
+`null`, 람다에 적은 enum 상수와 boolean 상수는 리터럴이고, 캡처 값(`now`, `id`)은 바인드 파라미터입니다. 같은 값을 두 번 사용하더라도 각 캡처 값은 **자기 파라미터**를 받습니다(규칙 U7).
 
 <a id="add-to-a-value-default-for-null"></a>
 ## 값에 더하기, NULL의 기본값
 
-```java
-qb.update(Order.class).set(o -> o.setCnt(o.getCnt() + 1)).where(o -> o.getStatus() == 1).execute();
+[`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java), 영역 `update-add`:
 
-qb.update(Order.class)
-  .set(o -> o.setPrice(Objects.requireNonNullElse(o.getPrice(), 0.0) + 1))
-  .all()
-  .execute();
-// → set o.price = coalesce(o.price, 0.0) + 1
+```java
+ExecutableUpdate<Order> plusOne = qb.update(Order.class)
+        .set(o -> o.setCnt(o.getCnt() + 1))
+        .where(o -> o.getStatus() == 1);
+assertEquals("update Order e0 set e0.cnt = (e0.cnt + 1) where e0.status = 1", plusOne.toHql().hql());
+// a default for NULL: Objects.requireNonNullElse becomes coalesce
+ExecutableUpdate<Order> orZero = qb.update(Order.class)
+        .set(o -> o.setTotal(Objects.requireNonNullElse(o.getTotal(), 0.0) + 1))
+        .all();
+assertEquals("update Order e0 set e0.total = (coalesce(e0.total, 0.0) + 1.0)", orZero.toHql().hql());
 ```
+
+`cnt`가 NULL인 행에서 `cnt + 1`은 NULL로 남습니다(SQL 의미). NULL을 다른 값으로 바꾸려면 `Objects.requireNonNullElse`를 쓰십시오.
 
 <a id="embedded-fields"></a>
 ## 임베디드 필드
 
-```java
-qb.update(Order.class).set(o -> o.getAddress().setCity(city)).where(o -> o.getId() == id).execute();
-// → set o.address.city = :p1
+[`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java), 영역 `update-embedded`:
 
-qb.update(Order.class).set(o -> o.setAddress(addr)).where(o -> o.getId() == id).execute();
-// → sets all columns of the embedded value (city, zip)
+```java
+ExecutableUpdate<Order> oneColumn = qb.update(Order.class)
+        .set(o -> o.getAddress().setCity(city)).where(o -> o.getId() == id);
+assertEquals("update Order e0 set e0.address.city = :p1 where e0.id = :p2", oneColumn.toHql().hql());
+// the whole value: every column of the embedded value (city, zip)
+ExecutableUpdate<Order> whole = qb.update(Order.class)
+        .set(o -> o.setAddress(addr)).where(o -> o.getId() == id);
+assertEquals("update Order e0 set e0.address = :p1 where e0.id = :p2", whole.toHql().hql());
 ```
+
+값 객체 전체를 할당하면 HQL은 `e0.address = :p1` 하나이고, Hibernate가 임베디드 값의 모든 컬럼(`city`, `zip`)을 SQL의 SET 목록에 씁니다.
 
 <a id="change-an-association-foreign-key"></a>
 ## 연관 변경(외래 키)
 
+[`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java), 영역 `update-fk`:
+
 ```java
-qb.update(Order.class).set(o -> o.getCustomer().setId(cid)).where(o -> o.getId() == id).execute();
-// → set o.customer.id = :p1      (the FK column)
-
-qb.update(Order.class).set(o -> o.setCustomer(null)).where(o -> o.getId() == id).execute();
-// → set o.customer = null
-
-qb.update(Order.class).set(o -> o.setCustomer(customer)).where(o -> o.getId() == id).execute();
-// → binds the @Id of the captured customer (rule U11)
+ExecutableUpdate<Order> byId = qb.update(Order.class)
+        .set(o -> o.getCustomer().setId(cid)).where(o -> o.getId() == id);
+assertEquals("update Order e0 set e0.customer.id = :p1 where e0.id = :p2", byId.toHql().hql());
+ExecutableUpdate<Order> none = qb.update(Order.class)
+        .set(o -> o.setCustomer(null)).where(o -> o.getId() == id);
+assertEquals("update Order e0 set e0.customer = null where e0.id = :p1", none.toHql().hql());
+// a captured entity: its @Id is bound (rule U11)
+ExecutableUpdate<Order> entity = qb.update(Order.class)
+        .set(o -> o.setCustomer(customer)).where(o -> o.getId() == other);
+assertEquals("update Order e0 set e0.customer = :p1 where e0.id = :p2", entity.toHql().hql());
 ```
 
 연관 엔티티에서는 `@Id`(FK)만 설정할 수 있습니다.
@@ -185,18 +205,25 @@ assertEquals("update Order e0 set e0.price = coalesce((select sum(s1.price) from
 
 `where`는 조회 쿼리와 같습니다.
 
-```java
-qb.update(Order.class).set(o -> o.setStatus(0)).where(o -> o.getCustomer().getGrade() > 3).execute();
+[`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java), 영역 `update-where`:
 
-qb.update(Order.class).set(o -> o.setStatus(9))
-  .where((o, sub) -> !sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists())
-  .execute();
+```java
+// a path in the condition: a scalar subquery (U9)
+ExecutableUpdate<Order> byGrade = qb.update(Order.class)
+        .set(o -> o.setStatus((short) 0))
+        .where(o -> o.getCustomer().getGrade() > 3);
+assertEquals("update Order e0 set e0.status = 0 where (select s1.grade from Customer s1 where s1.id = fk(e0.customer)) > 3"
+        + " and e0.customer.id is not null", byGrade.toHql().hql());
+// a subquery with sub
+ExecutableUpdate<Order> noItems = qb.update(Order.class)
+        .set(o -> o.setStatus((short) 9))
+        .where((o, sub) -> !sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists());
+assertEquals("update Order e0 set e0.status = 9 where not exists (select 1 from Item s1 where s1.order.id = e0.id)",
+        noItems.toHql().hql());
 ```
 
-두 예제 모두 현재 동작합니다.
-첫 번째 예제에서는 위의 테스트된 예제처럼 경로가 스칼라 서브쿼리가 됩니다.
-두 번째 예제는 [5. 서브쿼리](05-subquery.md)처럼 `sub`를 사용합니다. HQL은 `update Order e0 set e0.status = 9 where not exists (select 1 from Item s1 where s1.order.id = e0.id)`입니다.
-같은 `where`를 쓰는 삭제는 테스트했습니다(영역 `dml-subquery`, [7.4](07-4-delete.md) 참고). 수정 형태에는 아직 별도 테스트가 없습니다.
+첫 번째 문장에서는 경로가 스칼라 서브쿼리가 되고, 고객이 있는 주문만 대상이 됩니다(규칙 U9).
+두 번째 문장은 [5. 서브쿼리](05-subquery.md)처럼 `sub`를 사용합니다.
 
 **데이터베이스별 SQL (이 HQL에 대한 Hibernate의 SQL)** — [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)가 같은 문장을 Hibernate에 직접 넘겨 기록했습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `07-update-not-exists`:
 
@@ -246,13 +273,19 @@ where v1_0.id=1
 
 Hibernate는 SET 목록에 `version=(v1_0.version+1)`을 더합니다. 버전을 낙관적 잠금으로 사용하려면 `where`에 버전을 넣고 결과를 확인하십시오.
 
+[`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java), 영역 `update-version`:
+
 ```java
-int n = qb.update(VOrder.class)
-    .set(o -> o.setStatus(8))
-    .where(o -> o.getId() == id && o.getVersion() == v)
-    .execute();
+// put the version in the condition and check the result
+ExecutableUpdate<VOrder> u = qb.update(VOrder.class)
+        .set(o -> o.setStatus(8))
+        .where(o -> o.getId() == id && o.getVersion() == v);
+assertEquals("update versioned VOrder e0 set e0.status = 8 where e0.id = :p1 and e0.version = :p2", u.toHql().hql());
+int n = u.execute();
 if (n == 0) throw new OptimisticLockException();   // checking the result is your job
 ```
+
+테스트는 같은 문장을 한 번 더 실행해 0을 받는지 확인합니다. 첫 실행에서 버전이 올라갔으므로 이전 버전과 일치하는 행이 없습니다.
 
 `@Version` 필드에 직접 값을 할당하지 마십시오(규칙 U15).
 
@@ -287,9 +320,13 @@ assertThrows(LambdaQLException.class,
 
 `where`가 없는 update는 `all()`을 명시해야 합니다. `where`나 `all()`이 없으면 코드가 **컴파일되지 않습니다**(규칙 U5).
 
+[`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java), 영역 `update-all`:
+
 ```java
-qb.update(Order.class).set(o -> o.setStatus(0)).all().execute();       // OK
-qb.update(Order.class).set(o -> o.setStatus(0)).execute();             // compile error: no execute()
+// without where, all() is required; without both, there is no execute() (a compile error)
+ExecutableUpdate<Order> u = qb.update(Order.class).set(o -> o.setStatus((short) 0)).all();
+assertEquals("update Order e0 set e0.status = 0", u.toHql().hql());
+int changed = u.execute();
 ```
 
 update에는 트랜잭션이 필요합니다([7.8](07-dml.md#transactions) 참고).
@@ -342,14 +379,21 @@ where o1_0.id in (select t1_0.c0 from (select o2_0.id c0 from orders o2_0 join c
 
 id가 2개이면 아무것도 변경하지 않고 `NonUniqueResultException`을 던집니다. id가 1개이면 `id = :p and (조건)`으로 그 행을 수정합니다. 절차는 delete와 같습니다([7.4](07-4-delete.md#delete-exactly-one-row-executeone) 참고).
 
+[`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java), 영역 `update-one`:
+
 ```java
 int one = qb.update(Order.class)
         .set(o -> o.setDescription("checked"))
         .where(o -> o.getId() == id)
-        .executeOne();                             // 0 or 1; 2 or more rows: NonUniqueResultException
+        .executeOne();                             // 0 or 1
+// two or more rows match: nothing changes
+assertThrows(NonUniqueResultException.class, () -> qb.update(Order.class)
+        .set(o -> o.setDescription("checked"))
+        .where(o -> o.getStatus() == 1)
+        .executeOne());
 ```
 
-영역 `execute-one`이 속한 테스트 메서드(`DmlQueryTest`의 `executeOneProtects`)는 update의 `executeOne()`도 검사합니다. 2행 이상이 조건에 맞으면 아무것도 변경하지 않습니다.
+테스트는 두 번째 호출 뒤에 `checked`인 행이 하나뿐인지 확인합니다. 2행 이상이 조건에 맞으면 아무것도 변경하지 않습니다.
 
 Spring 리포지토리에서는 `updateOne(where, set)`이 같은 동작을 합니다([12.4](12-spring-data-jpa.md#one-row-protection-deleteone-and-updateone) 참고).
 

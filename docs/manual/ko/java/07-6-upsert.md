@@ -145,13 +145,17 @@ Hibernate 자체의 `on conflict ... do nothing`은 H2와 Oracle에서 일반 in
 <a id="many-rows"></a>
 ## 여러 행
 
-`qb.upsert(X.class).values(list, (a, l) -> ...)`와 `values(list, ...)` 뒤의 `onConflict(...)`는 **행마다 문장 하나**를 실행합니다. `execute()`는 합계를 반환합니다. 이 형태는 아직 테스트가 없습니다(미측정).
+`qb.upsert(X.class).values(list, (a, l) -> ...)`와 `values(list, ...)` 뒤의 `onConflict(...)`는 **행마다 문장 하나**를 실행합니다. `execute()`는 합계를 반환합니다. 테스트는 같은 키로 한 번 더 실행해 행이 늘지 않고 값만 바뀌는지 확인합니다.
 리스트 형태도 `values(list, (a, l, sub) -> ...)`처럼 세 번째 인자로 서브쿼리를 받습니다([7.5](07-5-insert.md#many-rows-from-a-list) 참고).
 
+[`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java), 영역 `upsert-list`:
+
 ```java
+// one statement per row; execute() returns the sum
+List<Line> lines = List.of(new Line(501, 1.0), new Line(502, 2.0));
 int n = qb.upsert(Archive.class)
-    .values(lines, (a, l) -> { a.setId(l.id()); a.setPrice(l.price()); })
-    .execute();
+        .values(lines, (a, l) -> { a.setId(l.id()); a.setPrice(l.price()); })
+        .execute();
 ```
 
 <a id="rules"></a>

@@ -32,10 +32,15 @@ values (100,9.5,'Kim')
 
 람다에 적은 상수는 리터럴로 유지됩니다(결정 D37). 값에서 새 행을 읽을 수 없습니다. `a.setPrice(a.getPrice())`는 오류입니다.
 
-setter가 없는 엔티티는 `Dml.value`로 한 행을 삽입합니다(결정 D49, [7.3](07-dml.md#73-two-ways-to-assign-setter-or-dmlvalue) 참고).
+setter가 없는 엔티티는 `Dml.value`로 한 행을 삽입합니다(결정 D49, [7.3](07-dml.md#73-two-ways-to-assign-setter-or-dmlvalue) 참고). 예제의 `Archive`에는 setter가 있지만, 같은 형태를 setter 없는 엔티티에도 씁니다.
+
+[`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java), 영역 `insert-value`:
 
 ```java
-qb.insert(Order.class).values(o -> { value(o.getId(), id); value(o.getStatus(), 1); }).execute();
+ExecutableInsert<Archive> i = qb.insert(Archive.class)
+        .values(a -> { value(a.getId(), id); value(a.getPrice(), 1.0); });
+assertEquals("insert into Archive (id, price) values (:p1, 1.0)", i.toHql().get(0).hql());
+int inserted = i.execute();
 ```
 
 <a id="a-subquery-in-a-value"></a>
@@ -146,10 +151,14 @@ lambdaQL은 원본 경로에 명시적인 `left join`을 사용하므로 고객�
 
 setter가 없는 대상 엔티티에는 `Dml.value`를 씁니다. 첫 번째 인자는 대상 `a`의 getter 호출입니다.
 
+[`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java), 영역 `insert-select-value`:
+
 ```java
-qb.insert(Archive.class).from(Order.class).where(o -> o.getStatus() == 9)
-  .select((a, o) -> { value(a.getId(), o.getId()); value(a.getCustomerName(), o.getCustomer().getName()); })
-  .execute();
+ExecutableInsert<Archive> i = qb.insert(Archive.class).from(Order.class).where(o -> o.getStatus() == 1)
+        .select((a, o) -> { value(a.getId(), o.getId()); value(a.getCustomerName(), o.getCustomer().getName()); });
+assertEquals("insert into Archive (id, customerName) select e0.id, j1.name"
+        + " from Order e0 left join e0.customer j1 where e0.status = 1", i.toHql().get(0).hql());
+int inserted = i.execute();
 ```
 
 **서브쿼리.** 원본의 `where`는 두 번째 인자로, `select`는 세 번째 인자로 서브쿼리의 시작점 `sub`를 받습니다(결정 D49).

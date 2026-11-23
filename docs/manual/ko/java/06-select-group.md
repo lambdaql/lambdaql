@@ -30,7 +30,7 @@
 - [6.9 파생 테이블(FROM 안의 서브쿼리)](#69-derived-table-subquery-in-from)
 - [6.10 CTE(`with`)](#610-cte-with)
 - [6.11 규칙 J1~J8](#611-rules-j1-to-j8)
-- [6.12 v0.1에 없는 것](#612-not-in-v01)
+- [6.12 지원하지 않는 것](#612-not-in-v01)
 
 ---
 
@@ -45,18 +45,18 @@
 | `Customer` | `id`, `name`, `grade` |
 | `Item` | `order`, `price`, `qty` |
 
-예제는 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)에서 그대로 가져온 것입니다.
+예제는 주로 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)에서 그대로 가져온 것입니다.
 이 테스트는 HQL을 확인하고, 쿼리를 실행하고, 같은 계산을 Java로 한 결과와 값을 비교합니다. H2, MariaDB, Oracle에서 통과합니다.
-테스트는 [3.3](03-where.md#33-basic-form)의 테스트 엔티티를 사용합니다. `price`는 `double`, `status`는 `short`, `Customer.id`는 `int`입니다. 테스트 데이터에는 고객이 없는 주문이 하나 있습니다.
+`price`는 `double`, `status`는 `short`, `Customer.id`는 `int`입니다. 테스트 데이터에는 고객이 없는 주문이 하나 있습니다.
 
 테스트는 다음 결과 타입을 사용합니다.
 
-```java
-record OrderView(Long id, String customerName, double price) {}
-record Stat(Integer customerId, long count, Double total) {}
-record KeyCount(Integer customerId, short status, long count) {}
-record Total(long count, Double average) {}
-```
+- `record OrderView(Long id, String customerName, double price)`
+- `record Stat(Integer customerId, long count, Double total)`
+- `record KeyCount(Integer customerId, short status, long count)`
+- `record Total(long count, Double average)`
+
+[`ManualJavaSelectTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSelectTest.java)의 예제는 같은 이름의 `Stat`, `Total` 레코드를 자기 클래스 안에 선언해 사용합니다.
 
 > [!TIP]
 > NULL이 될 수 있는 값에는 박싱 타입(`Double`, `Long`, `Integer`)을 사용하십시오.
@@ -96,12 +96,15 @@ order by o1_0.price
 연관 경로는 `where`에서와 마찬가지로 컬럼입니다(규칙 R24). `select`에서는 lambdaQL이 `left join`을 추가하므로 고객이 없는 주문도 빠지지 않습니다(`where`에서는 같은 경로가 기본적으로 inner join입니다).
 `optional = false`로 매핑한 필수 연관은 행을 잃지 않으므로 `select`에서도 inner join입니다([4.5](04-order-paging.md#45-what-a-sort-key-can-be) 참고).
 
+[`ManualJavaSelectTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSelectTest.java), 영역 `select-path`:
+
 ```java
-.select(o -> o.getCustomer().getName())
-// HQL: select j1.name from Order e0 left join e0.customer j1
+ValueQuery<String> names = qb.from(Order.class).select(o -> o.getCustomer().getName());
+// a path used only in select is a left join: the order without a customer gives null
+assertEquals("select j1.name from Order e0 left join e0.customer j1", names.toHql().hql());
 ```
 
-[6.3](#63-select-a-record-or-dto)의 레코드 예제가 이 `left join`을 테스트합니다.
+[6.3](#63-select-a-record-or-dto)의 레코드 예제도 이 `left join`을 사용합니다.
 경로가 연관 엔티티의 `@Id`로 끝나면 조인이 없습니다.
 `o.getCustomer().getId()`는 외래 키 컬럼 `customer_id`를 읽습니다.
 
@@ -166,20 +169,23 @@ static 헬퍼 클래스는 `Agg`와 DML 대입용 `Dml`(결정 D49) 두 개뿐�
 
 Java 타입:
 
-```java
-long count();
-<N extends Number> N sum(N x);
-Double avg(Number x);
-<R extends Comparable<?>> R min(R x);   // max도 같음
-```
+- `Agg.count()`: `long`
+- `Agg.sum(x)`: `<N extends Number> N`(인자와 같은 타입)
+- `Agg.avg(x)`: `Double`
+- `Agg.min(x)`, `Agg.max(x)`: `<R extends Comparable<?>> R`(인자와 같은 타입)
 
 static import는 선택 사항입니다. 다음 두 줄은 같습니다.
 
-```java
-.select(o -> new Total(Agg.count(), Agg.avg(o.getPrice())))
+[`ManualJavaSelectTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSelectTest.java), 영역 `agg-static-import`:
 
-import static org.lambdaql.Agg.*;
-.select(o -> new Total(count(), avg(o.getPrice())))
+```java
+// the same query: Agg.count() or, with "import static org.lambdaql.Agg.*", count()
+ValueQuery<Total> withClass = qb.from(Order.class)
+        .select(o -> new Total(Agg.count(), Agg.avg(o.getPrice())));
+ValueQuery<Total> withImport = qb.from(Order.class)
+        .select(o -> new Total(count(), avg(o.getPrice())));
+assertEquals("select count(*), avg(e0.price) from Order e0", withClass.toHql().hql());
+assertEquals(withClass.toHql().hql(), withImport.toHql().hql());
 ```
 
 중요한 점:
@@ -235,12 +241,15 @@ NULL이 기본형 생성자 인자(`double`, `long`)에 들어가면 lambdaQL은
 <a id="one-key"></a>
 ### 키 하나
 
+[`ManualJavaSelectTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSelectTest.java), 영역 `group-one`:
+
 ```java
-List<Stat> stats = qb.from(Order.class)
-    .groupBy(o -> o.getCustomer().getId())
-    .select(o -> new Stat(o.getCustomer().getId(), Agg.count(), Agg.sum(o.getPrice())))
-    .toList();
-// HQL: select e0.customer.id, count(*), sum(e0.price) from Order e0 group by e0.customer.id
+ValueQuery<Stat> q = qb.from(Order.class)
+        .groupBy(o -> o.getCustomer().getId())
+        .select(o -> new Stat(o.getCustomer().getId(), Agg.count(), Agg.sum(o.getPrice())));
+assertEquals("select e0.customer.id, count(*), sum(e0.price) from Order e0 group by e0.customer.id",
+        q.toHql().hql());
+List<Stat> stats = q.toList();
 ```
 
 키가 `@Id`로 끝나므로 조인이 없습니다. 고객이 없는 주문은 키가 NULL인 그룹 하나가 됩니다.
@@ -287,13 +296,7 @@ group by o1_0.customer_id,o1_0.status
 
 쿼리에 집계가 있으면 `select`와 `having`에서 집계가 **아닌** 값은 모두 `groupBy` 키여야 합니다. 이는 SQL 규칙입니다. lambdaQL은 분석 시점에 이를 검사합니다.
 
-```java
-// 오류: o.getStatus()는 그룹 키가 아님
-qb.from(Order.class)
-  .groupBy(o -> o.getCustomer().getId())
-  .select(o -> new KeyCount(o.getCustomer().getId(), o.getStatus(), Agg.count()));
-// → TranslationException(LQL-3035)
-```
+예를 들어 `groupBy(o -> o.getCustomer().getId())` 뒤에 그룹 키가 아닌 `o.getStatus()`를 `select`에 쓰면 `TranslationException`(`LQL-3035`)이 발생합니다.
 
 테스트된 예제는 [6.11](#611-rules-j1-to-j8)에 있습니다.
 
@@ -375,15 +378,17 @@ order by o1_0.price desc
 `first()`도 한 행만 읽으므로 같은 보조 정렬을 더합니다. 정렬 키 값이 같은 행이 여러 개이면 매번 `id`가 가장 작은 행의 값을 반환합니다.
 그룹 쿼리와 `distinct` 쿼리에는 더하지 않습니다. 이 쿼리들의 select 목록에는 `id`가 없기 때문입니다.
 
+[`ManualJavaSelectTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSelectTest.java), 영역 `value-page`:
+
 ```java
 ValueQuery<Double> paged = qb.from(Order.class)
         .orderBy((o, by) -> by.desc(o.getPrice()))
         .select(o -> o.getPrice())
         .limit(2).offset(1);
-// HQL: select e0.price from Order e0 order by e0.price desc, e0.id asc
+// paging adds the id as the last sort key
+assertEquals("select e0.price from Order e0 order by e0.price desc, e0.id asc", paged.toHql().hql());
+List<Double> page = paged.toList();
 ```
-
-[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)의 테스트 메서드 `pagingAndFirst`가 이 HQL, `first()`, 페이지를 확인합니다.
 
 **데이터베이스별 SQL** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `value-page`:
 
@@ -631,7 +636,7 @@ assertEquals("with t as (select d0.customer.id as customerId, sum(d0.price) as t
 | `orderBy((o, c, by) -> ...)` | `select`, `limit`, `offset`, `toList`, `first`, 그 밖의 정렬된 쿼리 메서드([4. 정렬과 페이징](04-order-paging.md)) |
 
 서브쿼리 안의 조인은 [5. 서브쿼리](05-subquery.md#joins-inside-a-subquery)를 참고하십시오(D51).
-v0.1에 아직 없는 것: insert의 조인, 엔티티 4개 이상, `SortSpec`의 조인 형태.
+지원하지 않는 것: insert의 조인, 엔티티 4개 이상, `SortSpec`의 조인 형태.
 update와 delete의 조인은 추가하지 않기로 했습니다(D51). 연관 경로(U9)나 `sub`(D49)를 쓰십시오.
 
 ---
@@ -732,7 +737,7 @@ assertEquals("LQL-3064", assertThrows(LambdaQLException.class,
 
 엔티티 쿼리에 파생 테이블을 조인하는 형태는 [파생 테이블과 CTE의 조인](#join-a-derived-table-or-cte)을 참고하십시오(D51).
 
-v0.1에 아직 없는 것: 파생 테이블끼리의 조인, update, delete, insert 안의 파생 테이블.
+지원하지 않는 것: 파생 테이블끼리의 조인, update, delete, insert 안의 파생 테이블.
 
 엔티티의 `@SQLRestriction`과 `@SoftDelete` 조건은 엔티티 조인의 `on`과 파생 테이블 안에도 Hibernate가 붙입니다(MariaDB 10.11, Oracle 23.26에서 실측). lambdaQL은 이 조건을 따로 처리하지 않습니다.
 
@@ -754,16 +759,7 @@ assertEquals("with t as (select d0.customer.id as customerId, count(*) as cnt, s
         + " select e0.customerId, e0.cnt, e0.total from t e0 where e0.cnt >= 2L", q.toHql().hql());
 ```
 
-`perCustomer()`는 테스트의 헬퍼 메서드입니다. [6.9](#69-derived-table-subquery-in-from)의 안쪽 쿼리와 같은 값 쿼리를 반환합니다.
-
-```java
-private ValueQuery<Stat> perCustomer() {
-    return qb.from(Order.class)
-            .where(o -> o.getCustomer() != null)
-            .groupBy(o -> o.getCustomer().getId())
-            .select(o -> new Stat(o.getCustomer().getId(), Agg.count(), Agg.sum(o.getPrice())));
-}
-```
+`perCustomer()`는 테스트의 헬퍼 메서드입니다. [6.9](#69-derived-table-subquery-in-from)의 안쪽 쿼리(고객이 있는 주문을 고객 id로 묶어 `Stat`을 만드는 그룹 쿼리)와 같은 값 쿼리를 반환합니다.
 
 **데이터베이스별 SQL(이 형태의 HQL에 대한 Hibernate SQL)** — `PlannedSqlTest`가 기록했습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `06-cte`:
 
@@ -792,7 +788,7 @@ MariaDB와 Oracle은 진짜 `with`를 실행합니다. 컬럼 목록은 Hibernat
 - 행 타입 규칙은 파생 테이블과 같습니다: 레코드(J5).
 - 엔티티 쿼리에 CTE를 조인하는 형태는 [파생 테이블과 CTE의 조인](#join-a-derived-table-or-cte)을 참고하십시오(D51).
 - 같은 CTE를 한 쿼리에서 두 번 읽을 수 있습니다. 정의는 한 번만 씁니다([파생 테이블과 CTE의 조인](#join-a-derived-table-or-cte) 참고).
-- v0.1에 아직 없는 것: update, delete, insert 안의 CTE.
+- update, delete, insert 안의 CTE는 지원하지 않습니다.
 
 ---
 
@@ -808,7 +804,7 @@ MariaDB와 Oracle은 진짜 `with`를 실행합니다. 컬럼 목록은 Hibernat
 | J5 | 파생 테이블이나 CTE의 행 타입: **Java 레코드**(Kotlin 코드는 data class도 사용 가능). 일반 DTO 클래스는 단순 `select`에서만 허용됩니다. 그렇지 않으면 `LQL-3064`. 조인한 파생 테이블과 CTE의 행에도 적용합니다(D51). 파생 행은 `null`과 비교할 수 없습니다(`LQL-3067`). | 구현됨 |
 | J6 | `qb.with(...)`로 만든 CTE는 select 별칭으로 컬럼 이름을 정합니다: `with t as (select d0.customer.id as customerId, ...) select e0.customerId ... from t e0`. HQL은 이름 뒤의 컬럼 목록을 받지 않습니다. Hibernate는 `with t (col list) as (...)`를 `SyntaxException`으로 거부합니다. 컬럼 목록은 Hibernate가 SQL에 직접 씁니다(MariaDB와 Oracle에서 `with t (customerId,cnt,total) as (...)`). H2는 CTE를 파생 테이블로 바꿉니다. 바깥 쿼리는 항상 별칭을 사용합니다(`from t e0`). | 구현됨 |
 | J7 | `distinct()`는 `select distinct`를 렌더링합니다. 정렬과 함께 쓰면 정렬 키가 select 목록에 있어야 합니다(DB 규칙). lambdaQL은 분석 시점에 이를 검사합니다. 조인 결과의 `distinct()`에서는 정렬 키가 주 엔티티 자신의 컬럼이어야 합니다(D51). | 구현됨 |
-| J8 | 조회는 정렬([4. 정렬과 페이징](04-order-paging.md)), 페이징, 서브쿼리([5. 서브쿼리](05-subquery.md))와 함께 동작합니다. 집계 기준 정렬(`by.desc(s.total())`)은 v0.2 후보입니다. | 구현됨. 집계 기준 정렬은 제외 |
+| J8 | 조회는 정렬([4. 정렬과 페이징](04-order-paging.md)), 페이징, 서브쿼리([5. 서브쿼리](05-subquery.md))와 함께 동작합니다. 집계 기준 정렬(`by.desc(s.total())`)은 지원하지 않습니다. | 구현됨. 집계 기준 정렬은 제외 |
 
 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), 영역 `rules`:
 
@@ -836,15 +832,15 @@ assertThrows(IllegalStateException.class, () -> qb.from(Order.class)
 ---
 
 <a id="612-not-in-v01"></a>
-## 6.12 v0.1에 없는 것
+## 6.12 지원하지 않는 것
 
 | 항목 | 상태 |
 |---|---|
-| 집계 결과나 select 별칭으로 정렬(예: `orderBy((s, by) -> by.desc(s.total()))`), 그룹 쿼리의 `orderBy` | v0.2 후보 |
-| 사용자 집계 함수와 윈도 함수 | v0.2 후보 |
-| insert의 조인, 엔티티 4개 이상, 서브쿼리 안의 엔티티 3개 이상 | 이후 |
+| 집계 결과나 select 별칭으로 정렬(예: `orderBy((s, by) -> by.desc(s.total()))`), 그룹 쿼리의 `orderBy` | 지원하지 않음 |
+| 사용자 집계 함수와 윈도 함수 | 지원하지 않음 |
+| insert의 조인, 엔티티 4개 이상, 서브쿼리 안의 엔티티 3개 이상 | 지원하지 않음 |
 | update, delete의 조인 | 추가하지 않음(D51). 연관 경로(U9)나 `sub`(D49) 사용 |
-| DML 안의 파생 테이블과 CTE | 이후 |
+| DML 안의 파생 테이블과 CTE | 지원하지 않음 |
 
 이 장의 오류는 코드가 붙은 `TranslationException`입니다. 잘못된 그룹 키(J3)는 `LQL-3035`, `where` 안의 `Agg`는 `LQL-3005`, `distinct`에서 select하지 않은 정렬 키(J7)는 `LQL-3046`, 파생 테이블이나 CTE의 행 타입(J5)은 `LQL-3064`입니다. [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
 
