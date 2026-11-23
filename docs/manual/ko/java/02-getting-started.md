@@ -115,63 +115,34 @@ Maven(`maven-compiler-plugin`):
 <a id="example-entities"></a>
 ## 예제 엔티티
 
-Java 트랙의 모든 예제는 다음 엔티티를 사용합니다.
+Java 트랙의 예제는 테스트 엔티티를 사용합니다. 전체 코드는 [`Order.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/Order.java), [`Customer.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/Customer.java), [`Item.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/Item.java)에 있습니다.
 
-```java
-@Entity
-@Table(name = "orders")
-public class Order {
-    @Id @GeneratedValue
-    private Long id;
-    private Double price;
-    private Integer status;
-    private boolean active;              // getter: isActive()
-    private String description;
-    @ManyToOne(fetch = FetchType.LAZY)
-    private Customer customer;
-    private LocalDateTime updateAt;
-    @OneToMany(mappedBy = "order")
-    private List<Item> items;
+| 엔티티 | 테이블 | 주요 속성 |
+|---|---|---|
+| `Order` | `orders` | `id`(`Long`, 자동 생성), `price`(`double`), `status`(`short`), `active`(`boolean`, getter `isActive()`), `description`(`String`), `kind`(enum `Order.Kind`: `NORMAL`, `RUSH`), `updateAt`(`LocalDateTime`), `customer`(`@ManyToOne` `Customer`), `total`(`Double`), `cnt`(`Integer`), `custName`(`String`), `address`(`@Embedded` `Address`: `city`, `zip`) |
+| `Customer` | `customers` | `id`(`int`), `name`(`String`), `grade`(`Integer`), `orders`(`@OneToMany` `Order`) |
+| `Item` | `items` | `id`(`Long`, 자동 생성), `order`(`@ManyToOne` `Order`), `price`(`Double`), `qty`(`int`) |
 
-    // getter와 setter
-}
-
-@Entity
-public class Customer {
-    @Id @GeneratedValue
-    private Long id;
-    private String name;
-    private Integer grade;
-
-    // getter와 setter
-}
-
-@Entity
-public class Item {
-    @Id @GeneratedValue
-    private Long id;
-    @ManyToOne(fetch = FetchType.LAZY)
-    private Order order;
-    private Double price;
-    private int qty;
-
-    // getter와 setter
-}
-```
+`Order`에는 `Item` 컬렉션이 없습니다. 주문의 항목은 `Item.order`로 찾습니다([5. 서브쿼리](05-subquery.md) 참고).
 
 엔티티 규칙:
 
 - lambdaQL은 **getter**(`o.getPrice()`, `o.isActive()`)를 읽습니다. JPA Metamodel로 getter를 JPA 속성에 매핑합니다. 필드를 직접 읽지 않습니다.
 - 생성 코드가 필요 없습니다(Q-클래스도, 정적 메타모델도 없음).
-- 대부분의 필드는 박싱 타입(`Long`, `Double`, `Integer`)입니다. 이는 `==`에 영향을 줍니다. [9. Java 노트](09-java-notes.md#92-boxing-and-unboxing)를 참고하십시오.
+- 기본형 필드(`double price`, `short status`)는 NULL이 될 수 없고, 박싱 타입 필드(`Double total`, `Integer cnt`)는 NULL이 될 수 있습니다. 이는 `==`와 NULL 처리에 영향을 줍니다. [9. Java 노트](09-java-notes.md#92-boxing-and-unboxing)를 참고하십시오.
 
 <a id="create-a-querybuilder"></a>
 ## QueryBuilder 만들기
 
 `QueryBuilder`는 진입점입니다. JPA `EntityManagerFactory` 또는 `EntityManager`가 필요합니다.
 
+[`ManualJavaStartTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java), 영역 `create`:
+
 ```java
-QueryBuilder qb = new QueryBuilder(entityManagerFactory);
+// one builder for the whole application; each query opens and closes its own EntityManager
+QueryBuilder qb = new QueryBuilder(emf);
+// or on an EntityManager that you manage: the queries run on it (and in its transaction)
+QueryBuilder qbOnEm = new QueryBuilder(em);
 ```
 
 `QueryBuilder`는 하나만 만들어 재사용하십시오. 쿼리마다 새로 만들지 마십시오.
@@ -179,20 +150,20 @@ QueryBuilder qb = new QueryBuilder(entityManagerFactory);
 <a id="with-plain-jpa"></a>
 ### 일반 JPA에서
 
-```java
-EntityManagerFactory emf = Persistence.createEntityManagerFactory("my-unit");
-QueryBuilder qb = new QueryBuilder(emf);
-```
+`Persistence.createEntityManagerFactory("my-unit")`로 만든 `EntityManagerFactory`를 위 예제처럼 `new QueryBuilder(emf)`에 넘깁니다.
 
 <a id="with-spring-boot"></a>
 ### Spring Boot에서
 
 `lambdaql-spring-boot-starter-boot4`(`-boot3`)를 사용하면 Spring Boot가 `QueryBuilder` 빈을 만듭니다([12.8](12-spring-data-jpa.md#128-the-querybuilder-bean) 참고).
 스타터 없이 사용하면 빈을 직접 만드십시오. 자동 구성과 마찬가지로 Spring의 공유 `EntityManager`를 사용합니다.
+테스트에서는 설정 클래스와 서비스 클래스를 테스트 클래스 안의 `static` 클래스로 선언했습니다. 애플리케이션에서는 보통 최상위 클래스로 둡니다.
+
+[`ManualJavaStartTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java), 영역 `config`:
 
 ```java
 @Configuration
-public class LambdaQlConfig {
+public static class LambdaQlConfig {
 
     @Bean
     public QueryBuilder queryBuilder(EntityManagerFactory entityManagerFactory) {
@@ -203,9 +174,11 @@ public class LambdaQlConfig {
 
 그다음 필요한 곳에 `QueryBuilder`를 주입합니다.
 
+[`ManualJavaStartTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java), 영역 `service`:
+
 ```java
 @Service
-public class OrderService {
+public static class OrderService {
 
     private final QueryBuilder qb;
 
@@ -229,11 +202,13 @@ public class OrderService {
 <a id="your-first-query"></a>
 ## 첫 쿼리
 
+[`ManualJavaStartTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java), 영역 `first-query`:
+
 ```java
-List<Order> orders = qb.from(Order.class)
-    .where(o -> o.getStatus() == 1 && o.getPrice() > 100)
-    .toList();
-// HQL: select e0 from Order e0 where e0.status = 1 and e0.price > 100.0
+SelectQuery<Order> query = qb.from(Order.class)
+        .where(o -> o.getStatus() == 1 && o.getPrice() > 100);
+assertEquals("select e0 from Order e0 where e0.status = 1 and e0.price > 100.0", query.toHql().hql());
+List<Order> orders = query.toList();
 ```
 
 **SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다.
@@ -249,12 +224,13 @@ where o1_0.status=1 and o1_0.price>100.0
 
 - `qb.from(Order.class)`는 `Order`에 대한 쿼리를 시작합니다.
 - `where(...)`는 조건 람다 하나를 받습니다.
+- `toHql()`은 쿼리를 실행하지 않고 HQL과 파라미터를 돌려줍니다. 예제의 `assertEquals`는 테스트가 확인하는 HQL입니다.
 - `toList()`는 쿼리를 실행하고 `List<Order>`를 반환합니다.
 - `toList()`는 모든 행을 반환합니다. 다른 결과 함수(`first()`, `one()`, `count()`, `exists()`, `toSet()`)는 [결과 가져오기](#getting-the-result)에 있습니다.
 
 왜 `1`과 `100.0`은 바인드 파라미터가 아니라 HQL에 그대로 쓰일까요?
 둘 다 **람다에 직접 쓴 상수**이기 때문입니다. lambdaQL은 상수(숫자, 문자열, boolean, `null`, enum 상수)를 HQL에 리터럴로 씁니다.
-`price`는 `Double`이므로 javac는 `100`을 소수 `100.0`으로 컴파일합니다.
+`price`는 `double`이므로 javac는 `100`을 소수 `100.0`으로 컴파일합니다.
 람다 밖에서 온 값은 다릅니다. 항상 바인드 파라미터가 됩니다(다음 절과 [3.3](03-where.md#33-basic-form) 참고).
 
 <a id="use-values-from-outside-the-lambda"></a>
@@ -263,13 +239,15 @@ where o1_0.status=1 and o1_0.price>100.0
 람다는 지역 변수, 필드, 메서드 파라미터를 사용할 수 있습니다. 이를 **캡처 값**이라고 합니다.
 lambdaQL은 캡처 값을 바인드 파라미터로 바꿉니다. 쿼리가 실행될 때마다 새 값을 읽습니다.
 
+[`ManualJavaStartTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java), 영역 `captured`:
+
 ```java
-public List<Order> expensive(int status, double minPrice) {
-    return qb.from(Order.class)
-             .where(o -> o.getStatus() == status && o.getPrice() >= minPrice)
-             .toList();
-    // HQL: select e0 from Order e0 where e0.status = :p1 and e0.price >= :p2
-}
+int status = 1;
+double minPrice = 100;
+SelectQuery<Order> query = qb.from(Order.class)
+        .where(o -> o.getStatus() == status && o.getPrice() >= minPrice);
+assertEquals("select e0 from Order e0 where e0.status = :p1 and e0.price >= :p2", query.toHql().hql());
+List<Order> orders = query.toList();
 ```
 
 **데이터베이스별 SQL** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `start-captured`:
@@ -286,13 +264,14 @@ where o1_0.status=? and o1_0.price>=?
 
 `where`는 여러 번 호출할 수 있습니다. lambdaQL은 조건들을 `AND`로 결합합니다.
 
+[`ManualJavaStartTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java), 영역 `many-where`:
+
 ```java
-qb.from(Order.class)
-  .where(o -> o.isActive())
-  .where(o -> o.getStatus() == 1 || o.getStatus() == 2)
-  .toList();
-// HQL: select e0 from Order e0
-//      where e0.active = true and (e0.status = 1 or e0.status = 2)
+SelectQuery<Order> query = qb.from(Order.class)
+        .where(o -> o.isActive())
+        .where(o -> o.getStatus() == 1 || o.getStatus() == 2);
+assertEquals("select e0 from Order e0 where e0.active = true and (e0.status = 1 or e0.status = 2)",
+        query.toHql().hql());
 ```
 
 **데이터베이스별 SQL** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `start-many-where`:
@@ -306,15 +285,19 @@ where o1_0.active=true and (o1_0.status=1 or o1_0.status=2)
 
 조건을 단계별로 추가할 때 유용합니다.
 
+[`ManualJavaStartTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java), 영역 `step-by-step`:
+
 ```java
-var query = qb.from(Order.class).where(o -> o.isActive());
+Double minPrice = input;                         // for example from a search form; may be null
+SelectQuery<Order> query = qb.from(Order.class).where(o -> o.isActive());
 if (minPrice != null) {
     query = query.where(o -> o.getPrice() >= minPrice);
 }
+assertEquals("select e0 from Order e0 where e0.active = true and e0.price >= :p1", query.toHql().hql());
 List<Order> orders = query.toList();
 ```
 
-빌더 변수에는 `var`를 사용하십시오. 빌더 타입의 이름은 아직 확정되지 않았습니다.
+빌더 변수의 타입은 `SelectQuery<Order>`입니다(`var`도 사용할 수 있음). `where`는 같은 쿼리 객체에 조건을 더하고 그 객체를 반환합니다.
 
 <a id="paths-to-other-entities"></a>
 ### 다른 엔티티로 가는 경로
@@ -322,11 +305,12 @@ List<Order> orders = query.toList();
 `o.getCustomer().getName()` 같은 경로는 조인한 엔티티의 컬럼을 가리킵니다.
 `where`에서 lambdaQL은 기본적으로 inner `join`을 추가합니다. 고객이 없는 주문은 결과에 **없습니다**.
 
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), 영역 `inner-join`:
+
 ```java
-qb.from(Order.class)
-  .where(o -> o.getCustomer().getName().equals(name))
-  .toList();
-// HQL: select e0 from Order e0 join e0.customer j1 where j1.name = :p1
+String name = "Kim";
+RenderedQuery q = qb.from(Order.class).where(o -> o.getCustomer().getName().equals(name)).toHql();
+assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = :p1", q.hql());
 ```
 
 **데이터베이스별 SQL** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `inner-join`:
@@ -554,7 +538,7 @@ assertEquals(2, qb.from(Tag.class).toList().size());
 
 | 규칙 | 예 |
 |---|---|
-| 람다나 메서드 참조를 사용하십시오. 익명 클래스는 거부됩니다. | `where(o -> o.isActive())`, `where(Order::isActive)` |
+| 람다를 사용하십시오. 익명 클래스는 거부되고, 메서드 참조는 정렬 키에만 쓸 수 있습니다. | `where(o -> o.isActive())`, `orderBy(Order::getPrice)` |
 | 람다는 식 하나여야 합니다(조건, 정렬, 조회). | 람다 안의 반복문과 지역 변수는 거부됩니다. |
 | 반드시 실행되어야 하는 코드를 람다에 넣지 마십시오. 람다는 실행되지 않습니다. | `System.out.println(...)`처럼 부수 효과가 있는 호출은 거부됩니다. |
 | javac로 컴파일하십시오. | ECJ 출력은 보장하지 않습니다. |

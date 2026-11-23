@@ -12,46 +12,21 @@ lambdaQL은 Java와 Kotlin용 쿼리 라이브러리입니다.
 평소처럼 람다를 작성하면 lambdaQL이 람다의 바이트코드를 읽어 Hibernate 7 HQL 쿼리를 만듭니다.
 람다는 절대 실행되지 않습니다.
 
+[`ManualJavaStartTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java), 영역 `readme`:
+
 ```java
-List<Order> orders = qb.from(Order.class)
-    .where(o -> o.getStatus() == 1 && o.getPrice() > minPrice)
-    .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId()))
-    .limit(20)
-    .toList();
-// HQL: select e0 from Order e0
-//      where e0.status = 1 and e0.price > :p1
-//      order by e0.price desc nulls last, e0.id asc
+double minPrice = 100;
+OrderedSelectQuery<Order> query = qb.from(Order.class)
+        .where(o -> o.getStatus() == 1 && o.getPrice() > minPrice)
+        .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId()))
+        .limit(20);
+assertEquals("select e0 from Order e0 where e0.status = 1 and e0.price > :p1"
+        + " order by e0.price desc, e0.id asc", query.toHql().hql());
+List<Order> orders = query.toList();
 ```
 
-**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다.
-
-**데이터베이스별 SQL (이 HQL에 대한 Hibernate의 SQL)** — 매뉴얼의 `Order`에는 NULL이 될 수 있는 `Double price`가 있지만 테스트의 `Order`에는 없으므로, `SqlByDatabaseTest`가 이 HQL을 Hibernate에 직접 넘깁니다. `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `readme-first`:
-
-```sql
--- H2
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.price>?
-order by o1_0.price desc,o1_0.id
-fetch first ? rows only
-
--- MariaDB
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.price>?
-order by o1_0.price desc,o1_0.id
-limit ?
-
--- Oracle
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.price>?
-order by o1_0.price desc nulls last,o1_0.id
-fetch first ? rows only
-```
+`toHql()`은 쿼리를 실행하지 않고 HQL을 돌려줍니다. 예제의 `assertEquals`는 테스트가 확인하는 HQL입니다.
+`price`와 `id`는 NULL이 될 수 없는 컬럼이므로 정렬에 `nulls` 부분이 없습니다.
 
 > [!NOTE]
 > **예제에 대하여.**
@@ -82,13 +57,13 @@ fetch first ? rows only
 <a id="example-entities"></a>
 ## 예제 엔티티
 
-모든 예제는 다음 세 엔티티를 사용합니다. 전체 코드는 [시작하기](02-getting-started.md#example-entities)에 있습니다.
+예제는 주로 다음 세 테스트 엔티티를 사용합니다. 속성의 타입과 원본 파일은 [시작하기](02-getting-started.md#example-entities)에 있습니다.
 
 | 엔티티 | 필드 |
 |---|---|
-| `Order` | `id`, `price`, `status`, `active`, `description`, `customer`(`Customer`로), `updateAt`, `items`(여러 `Item`으로) |
-| `Customer` | `id`, `name`, `grade` |
-| `Item` | `order`(`Order`로), `price`, `qty` |
+| `Order` | `id`, `price`, `status`, `active`, `description`, `kind`, `customer`(`Customer`로), `updateAt`, `total`, `cnt`, `custName`, `address` |
+| `Customer` | `id`, `name`, `grade`, `orders`(여러 `Order`로) |
+| `Item` | `id`, `order`(`Order`로), `price`, `qty` |
 
 <a id="supported-environment"></a>
 ## 지원 환경

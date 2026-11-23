@@ -39,7 +39,7 @@ lambdaQL은 Java 직렬화(`SerializedLambda`)를 통해 람다의 본문을 찾
 | 전달하는 것 | 결과 |
 |---|---|
 | 호출에 직접 작성한 람다: `where(o -> o.isActive())` | OK. `where`의 파라미터 타입은 `Serializable` 함수형 인터페이스 |
-| 메서드 참조: `where(Order::isActive)` | OK([9.9](#99-method-references) 참고) |
+| 조건의 메서드 참조: `where(Order::isActive)` | **거부됨**(`LQL-1009`). 람다를 사용하십시오([9.9](#99-method-references) 참고) |
 | lambdaQL 파라미터 타입의 변수에 담아 둔 람다 | OK |
 | `java.util.function.Predicate`(`Serializable`이 아님) | **거부됨**(`LambdaAnalysisException`) |
 | 익명 클래스: `new Where<Order>() { ... }` | **거부됨** |
@@ -48,17 +48,20 @@ lambdaQL은 Java 직렬화(`SerializedLambda`)를 통해 람다의 본문을 찾
 
 - 캡처 값(그리고 캡처한 `this`)은 `Serializable`일 필요가 **없습니다**. lambdaQL은 그 값을 읽을 뿐 직렬화하지 않습니다.
 - 서브쿼리의 안쪽 람다(`sub.from(Item.class).where(i -> ...)`)는 그 자체로 `Serializable`일 필요가 없습니다. lambdaQL은 바깥 람다의 바이트코드에서 그것을 찾습니다.
-- lambdaQL 함수형 인터페이스의 이름은 아직 확정되지 않았습니다. 가능하면 람다를 직접 전달하십시오.
 
 <a id="92-boxing-and-unboxing"></a>
 ## 9.2 박싱과 언박싱
 
-예제 엔티티는 박싱 타입을 사용합니다: `Long id`, `Double price`, `Integer status`.
+테스트 엔티티 `Order`에는 박싱 타입 속성(`Long id`, `Integer cnt`, `Double total`)과 기본형 속성(`double price`, `short status`)이 함께 있습니다.
 박싱된 값을 기본형과 비교하면 javac는 **언박싱** 호출(`intValue()`, `doubleValue()`)을 추가합니다.
 
+[`ManualJavaNotesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaNotesTest.java), 영역 `unboxing`:
+
 ```java
-.where(o -> o.getStatus() == 1)     // javac: o.getStatus().intValue() == 1
-// HQL: e0.status = 1
+// cnt is an Integer column: javac writes o.getCnt().intValue() == 1; lambdaQL keeps only the meaning
+SelectQuery<Order> q = qb.from(Order.class).where(o -> o.getCnt() == 1);
+assertEquals("select e0 from Order e0 where e0.cnt = 1", q.toHql().hql());
+// a NULL cnt: no NullPointerException, the row is simply not returned (the SQL meaning)
 ```
 
 lambdaQL은 박싱과 언박싱 호출(`valueOf`, `intValue`, `doubleValue`, ...)을 **무시합니다**. 의미만 유지합니다.
@@ -67,9 +70,9 @@ NULL에 대해 이것이 뜻하는 바:
 
 | Java 형태 | Java에서(실행한다면) | lambdaQL에서 |
 |---|---|---|
-| `o.getStatus() == 1`, status가 NULL | NullPointerException | SQL 의미: UNKNOWN, 행이 반환되지 않음(규칙 R1) |
-| `o.getPrice() > 100`, price가 NULL | NullPointerException | 행이 반환되지 않음(R1) |
-| `!o.getActive()`(`Boolean`), active가 NULL | NullPointerException | 행이 반환되지 않음 |
+| `o.getCnt() == 1`, cnt가 NULL | NullPointerException | SQL 의미: UNKNOWN, 행이 반환되지 않음(규칙 R1) |
+| `o.getTotal() > 100`, total이 NULL | NullPointerException | 행이 반환되지 않음(R1) |
+| `!c.getVip()`(`Boolean`, 테스트 엔티티 `Coded`), vip가 NULL | NullPointerException | 행이 반환되지 않음([3.6.3](03-where.md#363-write-your-null-checks-yourself)의 `sql-meaning` 예제) |
 | `o.getPrice() > p`, 캡처한 `Double p`가 `null` | NullPointerException | `e0.price > :p1`에 NULL 바인딩, 일치하는 행 없음(`DEBUG` 수준 `LQL-4045`) |
 | `i.getQty() == q`, `qty`는 `int`, 캡처한 `Integer q`가 `null` | NullPointerException | `i.qty = :p1`에 NULL 바인딩, 일치하는 행 없음(`DEBUG` 수준 `LQL-4045`) |
 | `o.getStatus() > p.intValue()`, 캡처한 `Double p`가 `null` | NullPointerException | 쿼리가 실행될 때 **예외**(`LQL-4012`) |
@@ -79,9 +82,15 @@ NULL에 대해 이것이 뜻하는 바:
 
 NULL 행을 원한다면 검사를 직접 작성하십시오.
 
+[`ManualJavaWhereTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java), 영역 `null-check`:
+
 ```java
-.where(o -> o.getStatus() == null || o.getStatus() != 1)
-// HQL: e0.status is null or e0.status <> 1
+// only rows where cnt is not NULL and not 1
+SelectQuery<Order> notOne = qb.from(Order.class).where(o -> o.getCnt() != 1);
+assertEquals("select e0 from Order e0 where e0.cnt <> 1", notOne.toHql().hql());
+// rows where cnt is NULL too
+SelectQuery<Order> notOneOrNull = qb.from(Order.class).where(o -> o.getCnt() == null || o.getCnt() != 1);
+assertEquals("select e0 from Order e0 where e0.cnt is null or e0.cnt <> 1", notOneOrNull.toHql().hql());
 ```
 
 <a id="93-equality-of-boxed-values"></a>
@@ -96,8 +105,8 @@ lambdaQL에서 두 객체 사이의 `==`는 **값 비교**입니다(결정 D12).
 
 | 왼쪽 | 오른쪽 | javac가 만드는 것 | lambdaQL 규칙 | HQL |
 |---|---|---|---|---|
-| `Integer` 컬럼 | `int` 상수나 변수 | 언박싱, 숫자 비교 | R1, SQL 의미 | `e0.status = 1` |
-| `Integer` 컬럼 | `Integer` 변수 | 객체 비교 | R2 | `e0.status = :p1` |
+| `Integer` 컬럼 | `int` 상수나 변수 | 언박싱, 숫자 비교 | R1, SQL 의미 | `e0.cnt = 1` |
+| `Integer` 컬럼 | `Integer` 변수 | 객체 비교 | R2 | `e0.cnt = :p1` |
 | `Long` `@Id` 컬럼 | `Long` 변수 | 객체 비교 | R2, 하지만 한쪽은 절대 NULL이 아님 | `e0.id = :p1` |
 | `Long` 컬럼 | `long` 변수 | 언박싱 | R1 | `e0.id = :p1` |
 | `String` | `String` | 객체 비교 | R2 | `e0.description = :p1` |
@@ -107,28 +116,37 @@ lambdaQL에서 두 객체 사이의 `==`는 **값 비교**입니다(결정 D12).
 | `Boolean` 컬럼 | `true` | 언박싱 | R1 | `e0.active = true` |
 | 값 객체(`@Embedded`) | 같은 타입의 캡처 값 객체 | `equals` / 객체 비교 | 컬럼마다 펼침(B6) | `e0.address.city = :p1 and e0.address.zip = :p2`([3.10](03-where.md#310-association-paths) 참고) |
 | 무엇이든 | `null` | null 검사 | R3 | `x is null` |
-| 엔티티 | 엔티티(`o.getCustomer() == c`) | 객체 비교 | **v0.1에는 없음** | –(대신 id를 비교) |
+| 엔티티 | 엔티티(`o.getCustomer() == c`) | 객체 비교 | **거부됨**(`LQL-3011`) | –(대신 id를 비교) |
 
 캡처 값과 비교할 때:
 
 | 컬럼 | 캡처 값 | HQL | 결과 |
 |---|---|---|---|
-| 3 | 3 | `e0.status = :p1` | true |
-| NULL | `null` | `e0.status = :p1` | **false**: `= NULL`은 참이 되지 않음(`WARN` 수준 `LQL-4045`) |
-| NULL | 3 | `e0.status = :p1` | false |
-| 3 | `null` | `e0.status = :p1` | false |
+| 3 | 3 | `e0.cnt = :p1` | true |
+| NULL | `null` | `e0.cnt = :p1` | **false**: `= NULL`은 참이 되지 않음(`WARN` 수준 `LQL-4045`) |
+| NULL | 3 | `e0.cnt = :p1` | false |
+| 3 | `null` | `e0.cnt = :p1` | false |
+
+[`ManualJavaWhereTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java), 영역 `boxed-equals`:
 
 ```java
-Integer wanted = request.getStatus();        // null일 수 있음
-qb.from(Order.class).where(o -> o.getStatus() == wanted).toList();
-// wanted = 3    -> status가 3인 행
-// wanted = null -> 일치하는 행 없음(LQL-4045). NULL을 찾으려면 o.getStatus() == null
+// cnt is an Integer column; Integer == Integer compares values, not objects
+Integer wanted = 3;
+SelectQuery<Order> three = qb.from(Order.class).where(o -> o.getCnt() == wanted);
+assertEquals("select e0 from Order e0 where e0.cnt = :p1", three.toHql().hql());
+// a captured null is bound as NULL: "= NULL" matches no row (WARN LQL-4045)
+Integer none = null;
+SelectQuery<Order> noRow = qb.from(Order.class).where(o -> o.getCnt() == none);
+assertEquals("select e0 from Order e0 where e0.cnt = :p1", noRow.toHql().hql());
+// to find NULL, write the null check
+SelectQuery<Order> nullCnt = qb.from(Order.class).where(o -> o.getCnt() == null);
+assertEquals("select e0 from Order e0 where e0.cnt is null", nullCnt.toHql().hql());
 ```
 
 컬럼을 함수로 감싸지 않으므로 데이터베이스는 인덱스를 사용할 수 있습니다.
 
 객체 사이의 `!=`는 `<>`가 됩니다. 값이 NULL인 행은 `<>`에 일치하지 않습니다(SQL 의미, D48). Java라면 이 행을 반환합니다.
-이런 행을 유지하려면 `o.getStatus() == null || o.getStatus() != wanted`라고 쓰십시오.
+이런 행을 유지하려면 `o.getCnt() == null || o.getCnt() != wanted`라고 쓰십시오.
 
 엔티티 값 두 개(`o.getDescription() == o.getCustName()`)는 `=`와 `<>`가 됩니다. 어느 한쪽이 NULL이면 일치하지 않으며, NULL과 NULL도 마찬가지입니다.
 결과가 Java와 다를 수 있으면 lambdaQL은 `LQL-5009`를 `DEBUG` 수준으로 기록합니다([3.6.3](03-where.md#363-write-your-null-checks-yourself) 참고).
@@ -152,12 +170,15 @@ qb.from(Order.class).where(o -> o.getStatus() == wanted).toList();
 - `==`, `equals`, `Objects.equals`는 NULL에 대해 같게 동작합니다. 컬럼이 NULL이거나 `p`가 `null`이면 일치하는 행이 없습니다. NULL 행을 원하면 `o.getDescription() == null`을 직접 쓰십시오.
 - 비교는 Java가 아니라 **데이터베이스 콜레이션**을 따릅니다. MariaDB `_ci` 콜레이션은 대소문자와 끝의 공백을 무시합니다. Oracle은 `''`를 NULL로 저장합니다.
 - 람다에 직접 쓴 문자열 상수는 HQL 리터럴이 되고, 작은따옴표는 escape됩니다(`'O''Brien'`). 캡처한 문자열은 항상 바인드 파라미터입니다([3.3](03-where.md#33-basic-form) 참고).
-- 컬럼에 대한 문자열 메서드(`startsWith`, `contains`, `trim`, `toUpperCase`)는 계획 중이며 v0.1에는 없습니다.
-- 문자열 `+`는 v0.1에서 거부됩니다. 캡처 값만 있어도 마찬가지입니다(javac는 `+`를 `invokedynamic`으로 컴파일함). 문자열은 람다 전에 만드십시오.
+- 컬럼에 대한 문자열 메서드(`startsWith`, `contains`, `trim`, `toUpperCase`)는 지원하지 않습니다(`LQL-3008`).
+- 람다 안의 문자열 `+`는 거부됩니다(`LQL-2007`). 캡처 값만 있어도 마찬가지입니다(javac는 `+`를 `invokedynamic`으로 컴파일함). 문자열은 람다 전에 만드십시오.
+
+[`ManualJavaNotesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaNotesTest.java), 영역 `string-outside`:
 
 ```java
-String code = "A" + suffix;                                  // 밖: 일반 Java
-qb.from(Order.class).where(o -> o.getDescription() == code).toList();
+String code = "A" + suffix;                                  // outside: plain Java
+SelectQuery<Order> q = qb.from(Order.class).where(o -> o.getDescription() == code);
+assertEquals("select e0 from Order e0 where e0.description = :p1", q.toHql().hql());
 ```
 
 <a id="95-null-safe-helpers"></a>
@@ -167,20 +188,26 @@ qb.from(Order.class).where(o -> o.getDescription() == code).toList();
 
 | Java | HQL | 참고 |
 |---|---|---|
-| `Objects.equals(o.getStatus(), s)` | `e0.status = :p1` | `s`가 `null`이면 일치하는 행 없음(`LQL-4045`) |
-| `!Objects.equals(o.getStatus(), 1)` | `e0.status <> 1` | NULL 행이 **반환되지 않음**(SQL 의미. Java라면 반환) |
+| `Objects.equals(o.getCnt(), s)` | `e0.cnt = :p1` | `s`가 `null`이면 일치하는 행 없음(`LQL-4045`) |
+| `!Objects.equals(o.getCnt(), 1)` | `e0.cnt <> 1` | NULL 행이 **반환되지 않음**(SQL 의미. Java라면 반환) |
 | `Objects.equals(o.getDescription(), o.getCustomer().getName())` | `e0.description = j1.name` + `join e0.customer j1` | 두 컬럼: 어느 한쪽이 NULL이면 불일치 |
-| `Boolean.TRUE.equals(o.getActive())` | `e0.active = :p1` | |
-| `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | NULL 행이 **반환되지 않음**(SQL 의미) |
+| `Boolean.TRUE.equals(c.getVip())` | `e0.vip = :p1` | |
+| `!Boolean.TRUE.equals(c.getVip())` | `e0.vip <> :p1` | NULL 행이 **반환되지 않음**(SQL 의미) |
 | `"x".equals(o.getDescription())` | `e0.description = 'x'` | 상수 수신 객체: NULL이 될 수 없으므로 단순한 `=` |
-| `set` 값 안의 `Objects.requireNonNullElse(o.getPrice(), 0.0)` | `coalesce(o.price, 0.0)` | [7. 수정, 삽입, 삭제](07-dml.md) 참고 |
+| `set` 값 안의 `Objects.requireNonNullElse(o.getTotal(), 0.0)` | `coalesce(e0.total, 0.0)` | [7. 수정, 삽입, 삭제](07-dml.md) 참고 |
 
 `!=`와 비교:
 
+[`ManualJavaNotesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaNotesTest.java), 영역 `not-equals`:
+
 ```java
-.where(o -> o.getStatus() != 1)                 // e0.status <> 1           (NULL 행은 반환되지 않음)
-.where(o -> !Objects.equals(o.getStatus(), 1))  // e0.status <> 1           (NULL 행은 역시 반환되지 않음)
-.where(o -> o.getStatus() == null || !Objects.equals(o.getStatus(), 1))   // NULL 행이 반환됨
+SelectQuery<Order> notOne = qb.from(Order.class).where(o -> o.getCnt() != 1);
+assertEquals("select e0 from Order e0 where e0.cnt <> 1", notOne.toHql().hql());              // no NULL rows
+SelectQuery<Order> notEquals = qb.from(Order.class).where(o -> !Objects.equals(o.getCnt(), 1));
+assertEquals("select e0 from Order e0 where e0.cnt <> 1", notEquals.toHql().hql());           // no NULL rows either
+SelectQuery<Order> withNull = qb.from(Order.class)
+        .where(o -> o.getCnt() == null || !Objects.equals(o.getCnt(), 1));
+assertEquals("select e0 from Order e0 where e0.cnt is null or e0.cnt <> 1", withNull.toHql().hql());  // NULL rows too
 ```
 
 <a id="96-small-types-char-short-byte-and-boolean"></a>
@@ -192,7 +219,7 @@ lambdaQL은 이를 알고 있습니다.
 - `long`, `int`, `short`, `byte`, `char`, `float`, `double` 값의 비교를 지원합니다(규칙 R1).
 - 상수는 컬럼의 타입으로 변환됩니다. 예를 들어 `int` 상수 `10`은 `short` 컬럼에 대해 `short` 값이 됩니다.
 - `boolean` getter는 단독으로 조건이 됩니다: `o.isActive()`는 `e0.active = true`가 됩니다.
-- `o.isActive() == (o.getStatus() > s)`(두 boolean 식)를 지원합니다. `AND`/`OR`가 됩니다([3.7](03-where.md#37-boolean-columns) 참고).
+- boolean 컬럼과 조건의 비교 `o.isActive() == (o.getStatus() > s)`는 거부됩니다(`LQL-2021`). `&&`와 `||`로 나누어 쓰십시오([3.7](03-where.md#37-boolean-columns) 참고).
 - 기본형 속성(`boolean active`, `int qty`)은 `@Id`나 `nullable = false` 컬럼처럼 "절대 NULL이 아님"으로 취급합니다. 그래서 lambdaQL은 이 속성에 대한 null 검사를 생략할 수 있고, `o.getId() == null`은 `1=0`이 됩니다([3.6.2](03-where.md#362--on-objects-compares-values)).
 
 <a id="97-float-double-and-bigdecimal"></a>
@@ -212,9 +239,11 @@ lambdaQL은 이를 알고 있습니다.
 
 인스턴스 메서드 안의 람다가 필드를 사용하면, javac는 람다 본문을 **인스턴스 메서드**로 만들고 `this`를 캡처합니다.
 
+[`ManualJavaNotesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaNotesTest.java), 영역 `this-capture`:
+
 ```java
 @Service
-public class OrderService {
+public static class OrderService {
 
     private final QueryBuilder qb;
     private int defaultStatus = 1;
@@ -225,9 +254,8 @@ public class OrderService {
 
     public List<Order> defaults() {
         return qb.from(Order.class)
-                 .where(o -> o.getStatus() == defaultStatus)   // this.defaultStatus를 뜻함
+                 .where(o -> o.getStatus() == defaultStatus)   // means this.defaultStatus
                  .toList();
-        // HQL: select e0 from Order e0 where e0.status = :p1
     }
 }
 ```
@@ -245,7 +273,7 @@ where o1_0.status=?
 
 lambdaQL이 하는 일:
 
-- 첫 번째 캡처 값이 `this`라는 것을 압니다. (이 부분은 구현되어 있고 테스트되었습니다.)
+- 첫 번째 캡처 값이 `this`라는 것을 압니다.
 - `this.defaultStatus`는 엔티티를 사용하지 않으므로 Java에서 계산되어 파라미터로 바인딩됩니다.
 - 필드는 **쿼리가 실행될 때마다** 읽습니다. 분석 결과는 객체마다가 아니라 람다마다 캐시됩니다.
 - 클래스가 `Serializable`일 필요는 없습니다.
@@ -253,9 +281,14 @@ lambdaQL이 하는 일:
 
 지역 변수는 다릅니다. Java는 람다가 만들어질 때 그 값을 복사합니다. Java는 지역 변수가 사실상 final이어야 한다고 요구합니다.
 
+[`ManualJavaNotesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaNotesTest.java), 영역 `local-copy`:
+
 ```java
-int st = defaultStatus;                                   // 지금 복사됨
-qb.from(Order.class).where(o -> o.getStatus() == st).toList();
+int st = defaultStatus;                                   // copied now
+SelectQuery<Order> q = qb.from(Order.class).where(o -> o.getStatus() == st);
+// the same HQL as the lambda that reads the field
+assertEquals("select e0 from Order e0 where e0.status = :p1", q.toHql().hql());
+assertEquals(q.toHql().hql(), qb.from(Order.class).where(o -> o.getStatus() == defaultStatus).toHql().hql());
 ```
 
 두 형태 모두 같은 HQL을 만듭니다.
@@ -265,12 +298,23 @@ qb.from(Order.class).where(o -> o.getStatus() == st).toList();
 
 | 메서드 참조 | 같은 의미 | 상태 |
 |---|---|---|
-| `where(Order::isActive)` | `where(o -> o.isActive())` | 설계됨(감지는 구현됨) |
+| `where(Order::isActive)` | `where(o -> o.isActive())` | **거부됨**(`LQL-1009`). 람다를 사용하십시오 |
 | `orderBy(Order::getPrice)` | `orderBy(o -> o.getPrice())` | 구현됨 |
 | `by` 정렬 형태 `orderBy((o, by) -> ...)`의 메서드 참조 | – | **허용 안 됨**. 람다를 사용하십시오(규칙 S13) |
 | 조인 정렬 람다 안의 메서드 참조 | – | **허용 안 됨**. 람다를 사용하십시오(규칙 S13) |
 
-lambdaQL은 메서드 참조를 로드할 때 그것을 감지합니다. 참조된 메서드의 본문은 읽지 않습니다. `o.isActive()` 호출을 직접 만듭니다.
+lambdaQL은 메서드 참조를 로드할 때 그것을 감지합니다. 참조된 메서드의 본문은 읽지 않습니다. 정렬 키에서는 `o.getPrice()` 호출을 직접 만들고, 조건에서는 거부합니다.
+
+[`ManualJavaNotesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaNotesTest.java), 영역 `method-ref`:
+
+```java
+// a method reference as a sort key: the same as o -> o.getPrice()
+assertEquals("select e0 from Order e0 order by e0.price asc",
+        qb.from(Order.class).orderBy(Order::getPrice).toHql().hql());
+// a method reference as a condition is rejected: write a lambda
+assertEquals("LQL-1009", assertThrows(LambdaQLException.class,
+        () -> qb.from(Order.class).where(Order::isActive)).code());
+```
 
 어떤 메서드 참조는 컴파일되지만 의미가 잘못됩니다. lambdaQL은 이를 분석 시점에 거부합니다(규칙 S13).
 
@@ -295,15 +339,22 @@ lambdaQL에는 **static DSL이 없습니다**. 선택 사항인 `Agg` import를 
 | Q 클래스, `Order_.price` | getter: `o.getPrice()` |
 | `count()`, `sum(...)`, ... | `Agg.count()`, `Agg.sum(...)`: static 헬퍼 클래스는 `Agg`와 `Dml` 둘뿐 ([6](06-select-group.md)) |
 | `coalesce(a, b)` | `set` 값 안의 `Objects.requireNonNullElse(a, b)` |
-| `like(...)`, `lower(...)`, `upper(...)` | 계획 중(컬럼에 대한 문자열 함수) |
+| `like(...)`, `lower(...)`, `upper(...)` | 지원하지 않음(컬럼에 대한 문자열 함수) |
 | `currentTimestamp()` | `LocalDateTime.now()`. 애플리케이션에서 계산되어 바인딩됨 |
 | 엔티티 값에 대한 직접 만든 static 유틸리티 메서드 | **거부됨**. 단, `@SqlFunction`을 붙인 DB 함수는 예외 ([8](08-procedures-functions.md)) |
 
 **캡처 값만** 사용하는 static 메서드는 괜찮습니다. 쿼리가 실행될 때마다 Java에서 실행됩니다.
 
+[`ManualJavaNotesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaNotesTest.java), 영역 `static-helper`:
+
 ```java
-.where(o -> o.getUpdateAt().isAfter(LocalDateTime.of(2026, 1, 1, 0, 0)))   // OK: Java에서 계산됨
-.where(o -> MyUtil.normalize(o.getDescription()) == text)                   // 거부됨: 엔티티를 사용함
+// a static method on captured values only: computed in Java when the query runs
+SelectQuery<Order> q = qb.from(Order.class)
+        .where(o -> o.getUpdateAt().compareTo(LocalDateTime.of(2026, 1, 1, 0, 0)) > 0);
+assertEquals("select e0 from Order e0 where e0.updateAt > :p1", q.toHql().hql());
+// your own static method on an entity value: rejected
+assertEquals("LQL-3008", assertThrows(LambdaQLException.class,
+        () -> qb.from(Order.class).where(o -> normalize(o.getDescription()) == text)).code());
 ```
 
 <a id="911-other-java-forms"></a>
@@ -319,10 +370,10 @@ lambdaQL에는 **static DSL이 없습니다**. 선택 사항인 `Agg` import를 
 | boolean에 대한 `&`, `\|`, `^` | 거부됨. `&&`, `\|\|`를 사용하십시오 |
 | 스트림, 중첩 람다(`sub` 서브쿼리 제외) | 거부됨 |
 | 람다 안의 `List.of(...)` | 거부됨. `groupBy` 키로 쓰는 경우는 예외 |
-| `compareTo(...) < 0`, `isBefore`, `isAfter` | `<`, `>`가 됨 |
+| `compareTo(...) < 0` | `<`, `>`가 됨. `LocalDateTime`의 `isBefore`, `isAfter`는 거부됨(`LQL-3008`) |
 | `captured.length`(캡처 값의 배열) | Java에서 계산됨 |
 | 레코드 | 결과 타입(`select`)으로, 그리고 파생 테이블과 CTE의 행 타입으로(`r.total()`로 읽음) |
-| `var` | 빌더 변수에 사용하십시오. 빌더 타입 이름은 확정되지 않음 |
+| `var` | 빌더 변수에 사용할 수 있음. 타입은 `SelectQuery<T>`, `OrderedSelectQuery<T>`, `ValueQuery<R>` 등 |
 | 제네릭 `value(o.getStatus(), "abc")` | Java에서는 컴파일됨. 분석 시점에 컬럼 타입과 대조해 `LQL-3065` 오류 |
 | 자기 `value(...)` 메서드가 있는 클래스(예: `value` 컴포넌트가 있는 레코드) 안의 `value(...)` | 정적 import가 가려짐. `Dml.value(...)`로 작성 |
 | 중첩 람다에서 같은 파라미터 이름 | Java가 허용하지 않음. `sub2`, `i`, `x`를 사용하십시오 |

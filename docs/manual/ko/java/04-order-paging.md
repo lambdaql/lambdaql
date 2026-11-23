@@ -13,51 +13,19 @@
 정렬은 **람다 하나**로 작성합니다. 람다는 엔티티와, 마지막 인자로 정렬 빌더 `by`를 받습니다.
 `by.asc(...)`와 `by.desc(...)`로 키와 방향을 추가합니다.
 
+[`ManualJavaSortTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSortTest.java), 영역 `sort-overview`:
+
 ```java
-qb.from(Order.class)
-  .where(o -> o.isActive())
-  .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getCustomer().getName()).asc(o.getId()))
-  .limit(20).offset(40)
-  .toList();
-// HQL: select e0 from Order e0 left join e0.customer j1
-//      where e0.active = true
-//      order by e0.price desc nulls last, j1.name asc nulls first, e0.id asc
+OrderedSelectQuery<Order> page = qb.from(Order.class)
+        .where(o -> o.isActive())
+        .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getCustomer().getName()).asc(o.getId()))
+        .limit(2).offset(2);
+assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.active = true"
+        + " order by e0.price desc, j1.name asc nulls first, e0.id asc", page.toHql().hql());
+List<Order> rows = page.toList();
 ```
 
 **SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다.
-
-**데이터베이스별 SQL (이 HQL에 대한 Hibernate의 SQL)** — 매뉴얼의 `Order`에는 NULL이 될 수 있는 `Double price`가 있지만 테스트의 `Order`에는 없으므로, `SqlByDatabaseTest`가 이 HQL을 Hibernate에 직접 넘깁니다. `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `sort-overview`:
-
-```sql
--- H2
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
-where o1_0.active=true
-order by o1_0.price desc,c1_0.name,o1_0.id
-offset ? rows
-fetch first ? rows only
-
--- MariaDB
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
-where o1_0.active=true
-order by o1_0.price desc,c1_0.name,o1_0.id
-limit ?,?
-
--- Oracle
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-left join customers c1_0 on c1_0.id=o1_0.customer_id
-where o1_0.active=true
-order by o1_0.price desc nulls last,c1_0.name asc nulls first,o1_0.id
-offset ? rows
-fetch first ? rows only
-```
 
 - `by`라는 이름은 이 매뉴얼의 관례일 뿐입니다. 어떤 이름이든 사용할 수 있습니다.
 - static import가 필요 없습니다. `by`는 람다 인자입니다.
@@ -66,8 +34,7 @@ fetch first ? rows only
 
 예제는 [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)에서 그대로 가져온 것입니다.
 이 테스트는 HQL을 확인하고, 쿼리를 실행하고, 같은 정렬을 Java로 적용한 결과와 행 순서를 비교합니다. H2, MariaDB, Oracle에서 통과합니다.
-테스트는 [3.3](03-where.md#33-basic-form)의 테스트 엔티티를 사용합니다. `price`는 `double`, `status`는 `short`입니다. 이 키들은 NULL이 될 수 없으므로 HQL에 `nulls` 부분이 없습니다.
-나머지 예제에서 `price`는 NULL이 될 수 있는 `Double`이므로([3.2](03-where.md#32-example-entities) 참고) `nulls first`나 `nulls last`가 붙습니다([4.4](#44-null-ordering-is-the-same-on-every-database) 참고).
+`price`(`double`), `status`(`short`), `id`는 NULL이 될 수 없으므로 HQL에 `nulls` 부분이 없습니다. NULL이 될 수 있는 키(`description`, `updateAt`, 고객 `name`)에는 `nulls first`나 `nulls last`가 붙습니다([4.4](#44-null-ordering-is-the-same-on-every-database) 참고).
 
 [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), 영역 `sort-basic`:
 
@@ -137,6 +104,7 @@ from orders o1_0
 order by o1_0.price desc
 ```
 
+<a id="43-direction"></a>
 ## 4.3 `Direction`
 
 `Direction`에는 값이 여섯 개 있습니다.
@@ -237,14 +205,22 @@ SQL에서 NULL 정책을 볼 수 있습니다. H2와 MariaDB는 자신의 기본
 
 **방향이 변수에서 올 때는** 캡처한 `Direction`과 함께 `by.sort(key, direction)`을 사용하십시오.
 
-```java
-.orderBy((o, by) -> by.desc(o.getDescription(), false).asc(o.getId()))   // nulls last
+[`ManualJavaSortTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSortTest.java), 영역 `sort-direction`:
 
-Direction dir = request.isNewestFirst() ? Direction.DESC : Direction.ASC;
-.orderBy((o, by) -> by.sort(o.getUpdateAt(), dir).asc(o.getId()))   // dir은 호출할 때마다 읽음
+```java
+// the second argument: false = NULL last
+OrderedSelectQuery<Order> nullsLast = qb.from(Order.class)
+        .orderBy((o, by) -> by.desc(o.getDescription(), false).asc(o.getId()));
+assertEquals("select e0 from Order e0 order by e0.description desc nulls last, e0.id asc",
+        nullsLast.toHql().hql());
+// a direction from a variable: the ternary runs outside the lambda
+Direction dir = newestFirst ? Direction.DESC : Direction.ASC;
+OrderedSelectQuery<Order> newest = qb.from(Order.class)
+        .orderBy((o, by) -> by.sort(o.getUpdateAt(), dir).asc(o.getId()));   // dir is read on every call
+assertEquals("select e0 from Order e0 order by e0.updateAt desc nulls last, e0.id asc", newest.toHql().hql());
 ```
 
-여기서 삼항 연산자 `request.isNewestFirst() ? ... : ...`는 괜찮습니다. 람다 **밖에서** 실행되기 때문입니다.
+여기서 삼항 연산자 `newestFirst ? ... : ...`는 괜찮습니다. 람다 **밖에서** 실행되기 때문입니다.
 
 [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), 영역 `sort-dynamic`:
 
@@ -342,14 +318,29 @@ MariaDB에는 `NULLS` 구문이 없으므로, 기본값이 아닌 위치는 Hibe
 | to-one 경로: `o.getCustomer().getName()` | 허용 | `left join`(필수 연관은 inner join), 아래 참고 |
 | `@Lob` 컬럼 | 허용 | Oracle은 거부함. `DEBUG` 수준 `LQL-5010`, 아래 참고 |
 | `@Enumerated(EnumType.STRING)` enum 컬럼 | 허용 | 이름 순으로 정렬됨(선언 순서가 아님). `DEBUG` 수준 `LQL-5011`, 아래 참고 |
-| 산술: `o.getPrice() * 2`, `+`, `-` | 허용 | 아직 테스트하지 않음 |
-| 확대 변환(`int`에서 `long`으로) | 허용 | 아직 테스트하지 않음 |
+| 산술: `o.getPrice() * 2`, `+`, `-` | 허용 | 아래 예제 참고 |
+| 확대 변환(`short`에서 `long`으로 등) | 허용 | 변환 없이 컬럼으로 정렬. 아래 예제 참고 |
 | 엔티티: `by.desc(o.getCustomer())` | **컴파일 오류** | 엔티티는 `Comparable`이 아님 |
 | 엔티티를 쓰지 않는 값: `by.asc(1)`, 캡처한 값 | **거부됨** | [4.6](#46-rules-for-the-lambda-body) 참고 |
-| 컬럼에 대한 함수: `lower(name)` | 계획됨 | |
+| 컬럼에 대한 함수: `lower(name)` | 지원하지 않음 | |
 
 키는 `Comparable`이어야 합니다. 박싱 타입(`Double`, `Integer`, `Long`), `String`, `java.time` 타입은 `Comparable`이므로 동작합니다. Java 컴파일러는 엔티티 키를 거부합니다.
 엔티티 클래스가 `Comparable`을 구현하더라도 lambdaQL은 람다를 읽을 때 그것을 키로 쓰지 못하게 거부합니다.
+
+산술 키는 식 그대로 정렬합니다. 확대 변환(`(long) o.getStatus()`)은 HQL에서 사라지고 컬럼으로 정렬합니다.
+
+[`ManualJavaSortTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSortTest.java), 영역 `sort-arith`:
+
+```java
+// arithmetic on columns
+OrderedSelectQuery<Order> doubled = qb.from(Order.class)
+        .orderBy((o, by) -> by.desc(o.getPrice() * 2).asc(o.getId()));
+assertEquals("select e0 from Order e0 order by (e0.price * 2.0) desc, e0.id asc", doubled.toHql().hql());
+// a widening conversion (short to long)
+OrderedSelectQuery<Order> widened = qb.from(Order.class)
+        .orderBy((o, by) -> by.asc((long) o.getStatus()).asc(o.getId()));
+assertEquals("select e0 from Order e0 order by e0.status asc, e0.id asc", widened.toHql().hql());
+```
 
 **연관 경로는 `left join`을 사용합니다.** HQL의 단순 경로 `order by o.customer.name`은 세 데이터베이스 모두에서 inner join이 됩니다. 고객이 없는 주문은 사라집니다.
 lambdaQL은 대신 `left join`을 추가합니다. 고객이 없는 주문도 결과에 남습니다. 그런 주문의 `j1.name`은 NULL이므로 `asc`에서 처음에 옵니다.
@@ -460,28 +451,24 @@ order by c1_0.name desc nulls last,o1_0.price desc
 
 본문은 **`by` 호출의 단순한 체인**이어야 합니다.
 
+[`ManualJavaSortTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSortTest.java), 영역 `sort-body`:
+
 ```java
-// 허용
-.orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId()))
-
-// 거부됨: 조건에 따른 키
-.orderBy((o, by) -> flag ? by.desc(o.getPrice()) : by.asc(o.getId()))
-
-// 거부됨: 반복문, if, 지역 변수
+// allowed: a simple chain of by calls
+assertEquals("select e0 from Order e0 order by e0.price desc, e0.id asc",
+        qb.from(Order.class).orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId())).toHql().hql());
+// rejected: a key chosen by a condition
+LambdaQLException choice = assertThrows(LambdaQLException.class,
+        () -> qb.from(Order.class).orderBy((o, by) -> flag ? by.desc(o.getPrice()) : by.asc(o.getId())));
+assertEquals("LQL-2023", choice.code());
+// rejected: a key without the entity
+LambdaQLException constant = assertThrows(LambdaQLException.class,
+        () -> qb.from(Order.class).orderBy((o, by) -> by.asc(1)));
+assertEquals("LQL-3031", constant.code());
 ```
 
 lambdaQL은 `orderBy`를 호출할 때 이를 확인하고 `LambdaQLException`을 던집니다(예: 조건은 `LQL-2023`, 엔티티를 쓰지 않는 키는 `LQL-3031`).
 모든 키는 엔티티를 사용해야 합니다. 상수나 캡처한 값만으로 된 키는 거부됩니다.
-
-[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), 영역 `sort-rejected`:
-
-```java
-// a condition inside the sort lambda (rule S4)
-assertThrows(LambdaQLException.class, () -> qb.from(Order.class)
-        .orderBy((o, by) -> o.isActive() ? by.asc(o.getPrice()) : by.desc(o.getPrice())));
-// a key without the entity
-assertThrows(LambdaQLException.class, () -> qb.from(Order.class).orderBy((o, by) -> by.asc(1)));
-```
 
 실행 시점에 방향을 바꿔야 한다면 변수로 전달하십시오: `by.sort(key, dir)`. 키 자체를 바꿔야 한다면 일반 Java 코드의 두 분기에서 쿼리를 따로 만드십시오.
 
@@ -503,46 +490,20 @@ assertThrows(LambdaQLException.class, () -> qb.from(Order.class).orderBy((o, by)
 <a id="48-paging"></a>
 ## 4.8 페이징
 
+[`ManualJavaSortTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSortTest.java), 영역 `page`:
+
 ```java
-qb.from(Order.class)
-  .where(o -> o.getStatus() == 1)
-  .orderBy((o, by) -> by.desc(o.getPrice()))
-  .limit(20)      // 페이지 크기
-  .offset(40)     // 40행 건너뜀(3페이지)
-  .toList();
-// HQL: select e0 from Order e0 where e0.status = 1 order by e0.price desc nulls last, e0.id asc
-// limit과 offset은 Hibernate에 전달됨(setMaxResults / setFirstResult)
+OrderedSelectQuery<Order> page = qb.from(Order.class)
+        .where(o -> o.getStatus() == 1)
+        .orderBy((o, by) -> by.desc(o.getPrice()))
+        .limit(2)       // page size
+        .offset(2);     // skip 2 rows (page 2)
+assertEquals("select e0 from Order e0 where e0.status = 1 order by e0.price desc, e0.id asc",
+        page.toHql().hql());
+List<Order> rows = page.toList();
 ```
 
-**데이터베이스별 SQL (이 HQL에 대한 Hibernate의 SQL)** — 매뉴얼의 `Order`에는 NULL이 될 수 있는 `Double price`가 있지만 테스트의 `Order`에는 없으므로, `SqlByDatabaseTest`가 이 HQL을 Hibernate에 직접 넘깁니다. `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `page-design`:
-
-```sql
--- H2
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1
-order by o1_0.price desc,o1_0.id
-offset ? rows
-fetch first ? rows only
-
--- MariaDB
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1
-order by o1_0.price desc,o1_0.id
-limit ?,?
-
--- Oracle
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1
-order by o1_0.price desc nulls last,o1_0.id
-offset ? rows
-fetch first ? rows only
-```
+`limit`과 `offset`은 HQL에 쓰지 않고 Hibernate에 전달합니다(`setMaxResults` / `setFirstResult`). 정렬 키에 id가 없으므로 lambdaQL이 `e0.id asc`를 추가했습니다([다음 절](#tie-breaker-automatic-id) 참고).
 
 [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), 영역 `sort-page`:
 
@@ -634,7 +595,6 @@ limit ?
   NULL이 될 수 있는 유일 컬럼은 해당하지 않습니다. NULL은 여러 행에 있을 수 있기 때문입니다.
 - `limit`과 `offset`이 없으면 아무것도 추가하지 않습니다.
 - 명시적 조인(`join`, `leftJoin`, `crossJoin`)이 있으면 조인한 모든 엔티티의 id도 조인 순서대로 추가합니다([6.8](06-select-group.md#68-explicit-joins) 참고).
-- 아직 구현되지 않음: 컬렉션 fetch join과 `limit`/`offset`을 함께 사용하면 거부합니다.
 
 [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java), 영역 `unique-key`(`OrderLine.code`는 `@Column(unique = true, nullable = false)`):
 
@@ -661,13 +621,6 @@ assertEquals("select e0 from OrderLine e0 join e0.order j1 order by j1.price asc
 `SortSpec.of(Order.class, (o, by) -> ...)`로 만듭니다. 람다는 `orderBy((o, by) -> ...)`의 람다와 같으므로 같은 규칙이 적용됩니다([4.6](#46-rules-for-the-lambda-body) 참고).
 그다음 `orderBy(spec)`에 넘깁니다.
 
-```java
-public static final SortSpec<Order> NEWEST =
-        SortSpec.of(Order.class, (o, by) -> by.desc(o.getUpdateAt()).asc(o.getId()));
-
-qb.from(Order.class).where(o -> o.isActive()).orderBy(NEWEST).limit(20).toList();
-// HQL: select e0 from Order e0 where e0.active = true order by e0.updateAt desc nulls last, e0.id asc
-```
 
 - `SortSpec`은 바꿀 수 없습니다. `then()`과 `reversed()`는 새 spec을 반환합니다. 그래서 spec 하나를 여러 쿼리와 스레드가 안전하게 함께 쓸 수 있습니다. 예를 들어 `static final` 필드로 두어도 됩니다.
 - lambdaQL은 spec이 `orderBy`에서 쓰일 때 람다를 검사합니다. 각 람다는 한 번만 분석됩니다.
@@ -799,7 +752,18 @@ assertThrows(IllegalArgumentException.class,
 | `alias("newest", o -> o.getUpdateAt())` | `newest`. 정렬 기준은 `updateAt`입니다. 이때 경로 `updateAt` 자체는 외부 이름이 **아니므로** 클라이언트에 속성 이름이 드러나지 않습니다 |
 
 규칙은 엔티티의 열이어야 합니다.
-그 밖의 키는 규칙을 처음 사용할 때 `LQL-4041`로 거부합니다(아직 테스트하지 않음).
+그 밖의 키는 규칙을 처음 사용할 때 `LQL-4041`로 거부합니다.
+
+[`ManualJavaSortTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSortTest.java), 영역 `rule-not-column`:
+
+```java
+// a rule that is not a column of the entity is rejected when the rules are first used
+SortPolicy.register(emf, SortPolicy.of(SortMode.STRICT,
+        SortRules.of(Order.class).allow(o -> o.getPrice() * 2)));
+LambdaQLException e = assertThrows(LambdaQLException.class,
+        () -> qb.from(Order.class).orderBy(SortSpec.ofPath(Order.class, "price", Direction.ASC)).toHql());
+assertEquals("LQL-4041", e.code());
+```
 
 | `SortMode` | 규칙이 허용하지 않는 이름의 처리 |
 |---|---|
@@ -821,13 +785,20 @@ assertThrows(IllegalArgumentException.class,
 
 Spring Boot에서는 `register`를 호출하는 대신 `SortPolicy` 빈을 정의하십시오([12.5](12-spring-data-jpa.md#sort-policy-with-spring) 참고).
 
-[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), 영역 `rules`와 `strict`:
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), 영역 `rules`:
 
 ```java
 SortRules<Order> orderRules = SortRules.of(Order.class)
         .allow(o -> o.getPrice())                        // the name "price"
         .allow(o -> o.getCustomer().getName())           // an association path: allowed only when listed
         .alias("newest", o -> o.getUpdateAt());          // the outside name "newest" sorts by updateAt
+```
+
+규칙을 정책에 담아 persistence unit에 등록합니다.
+
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), 영역 `strict`:
+
+```java
 SortPolicy.register(emf, SortPolicy.of(SortMode.STRICT, orderRules));
 ```
 
@@ -911,16 +882,10 @@ assertThrows(SortNotAllowedException.class, () -> hql("description", Direction.A
 - `SortNotAllowedException`은 `LambdaQLException`입니다([11. 오류와 언어](../11-errors-and-languages.md#exceptions) 참고).
   lambdaQL은 웹 의존성이 없습니다. HTTP 400 응답 예시는 [12.5](12-spring-data-jpa.md#sort-policy-with-spring)를 참고하십시오.
 
-**아직 구현되지 않음:**
-
-- 이름과 방향을 함께 담은 문자열 하나(`"price,desc_nulls_last"`, 규칙 S11).
-  방향은 `Direction.parse`([4.3](#43-direction) 참고), 이름은 `SortSpec.ofPath`로 읽으십시오.
-- **계획됨:** `SortSpec`의 조인 형태, 키셋 페이징. (조인의 람다 형태 `(o, c, by) -> ...`는 구현됨, [6.8](06-select-group.md#68-explicit-joins) 참고.)
+외부 문자열의 이름과 방향은 따로 읽으십시오. 방향은 `Direction.parse`([4.3](#43-direction) 참고), 이름은 `SortSpec.ofPath`로 읽습니다.
 
 <a id="411-sorting-inside-subqueries"></a>
 ## 4.11 서브쿼리 안의 정렬
-
-**구현됨**(마일스톤 M8-1, [5. 서브쿼리](05-subquery.md)의 서브쿼리와 함께). MariaDB `lateral` 재작성은 아직 구현되지 않았습니다.
 
 서브쿼리 안의 정렬은 `limit`과 함께 사용할 때(top-1 또는 top-N)만 유지됩니다.
 `limit`이 없으면 결과에 영향을 주지 않으므로 lambdaQL은 정렬을 제거하고 경고를 로그에 남깁니다.
@@ -936,15 +901,15 @@ assertThrows(SortNotAllowedException.class, () -> hql("description", Direction.A
 | S3 | 방향은 `asc` / `desc`나 `sort(key, Direction)`으로 정합니다. `asc(key)`/`desc(key)`(`ASC`/`DESC`)는 NULL 정책을 사용하고, `asc(key, nullsFirst)`, `desc(key, nullsFirst)`, `*_NULLS_*`는 쓴 그대로 사용합니다 | 구현됨 |
 | S4 | 본문은 `by` 호출의 단순한 체인뿐입니다. `if`, 삼항 연산자, 반복문은 안 됩니다 | 구현됨 |
 | S5 | `orderBy`는 쿼리당 한 번입니다. `orderBy` 뒤에 `where`는 안 됩니다. `limit` 뒤에 `orderBy`는 안 됩니다(컴파일 오류) | 구현됨 |
-| S6 | `SortSpec`(`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`)으로 재사용합니다. 외부 문자열은 persistence unit의 정렬 정책(`SortRules`, `SortPolicy`, `SortMode`, [4.10](#sort-policy) 참고)이 검사합니다 | `SortSpec`과 정렬 정책은 구현됨. `SortSpec`의 조인 형태는 아직 구현되지 않음 |
+| S6 | `SortSpec`(`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`)으로 재사용합니다. 외부 문자열은 persistence unit의 정렬 정책(`SortRules`, `SortPolicy`, `SortMode`, [4.10](#sort-policy) 참고)이 검사합니다 | 구현됨 |
 | S7 | 키: 컬럼, to-one 경로, `+ - *`, 확대 변환. 값 분기는 안 됩니다 | 구현됨 |
 | S8 | `orderBy`에만 쓰인 연관 경로는 `left join`을 사용하므로 연관이 없는 행도 유지됩니다. 필수 연관(`optional = false`)은 행을 잃지 않으므로 inner join입니다(A4). 같은 경로를 `where`에서 쓰면 정렬은 `where`의 조인을 사용합니다 | 구현됨 |
-| S9 | 페이징을 사용할 때 키에 id가 없으면 루트 `@Id asc`를 추가합니다. 키에 유일하고 NULL이 될 수 없는 컬럼(`unique = true`이고 `nullable = false`, `@NaturalId`)이 있으면 추가하지 않습니다(A5). 컬렉션 fetch join + 페이징은 거부됩니다 | 루트 id와 명시적으로 조인한 엔티티의 id는 구현됨. fetch join 검사는 아직 구현되지 않음 |
+| S9 | 페이징을 사용할 때 키에 id가 없으면 루트 `@Id asc`를 추가합니다. 키에 유일하고 NULL이 될 수 없는 컬럼(`unique = true`이고 `nullable = false`, `@NaturalId`)이 있으면 추가하지 않습니다(A5) | 구현됨(루트 id와 명시적으로 조인한 엔티티의 id) |
 | S10 | 분석 결과는 람다별로 캐시됩니다. 캡처한 `Direction`은 호출할 때마다 읽습니다 | 구현됨 |
-| S11 | Spring `Sort.Order`는 `Direction`에 1:1로 대응합니다(Spring 모듈, [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) 참고). 속성 이름은 정렬 정책의 검사를 거치고, 별칭은 그대로 전달합니다 | Spring `Sort`는 구현됨(`ignoreCase`는 아직 지원하지 않음). 정렬 정책과 함께 써도 동작함. `"price,desc_nulls_last"` 같은 문자열 하나의 해석은 아직 구현되지 않음 |
+| S11 | Spring `Sort.Order`는 `Direction`에 1:1로 대응합니다(Spring 모듈, [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) 참고). 속성 이름은 정렬 정책의 검사를 거치고, 별칭은 그대로 전달합니다 | Spring `Sort`는 구현됨(`ignoreCase`는 지원하지 않음). 정렬 정책과 함께 써도 동작함 |
 | S12 | 조인 쿼리도 같은 형태를 사용합니다: `(o, c, by)`, `(o, c, i, by)` | 구현됨([6.8](06-select-group.md#68-explicit-joins) 참고) |
 | S13 | 메서드 참조는 키 하나의 짧은 형태에서만 사용합니다. 컴파일은 되지만 의미가 틀린 메서드 참조는 거부됩니다([9. Java 노트](09-java-notes.md#99-method-references) 참고) | 구현됨(getter 참조) |
-| S14 | 서브쿼리 정렬: `limit`이 있으면 유지, 없으면 경고와 함께 제거. 데이터베이스별 차이는 lambdaQL이 처리합니다(5장 참고) | 구현됨. MariaDB `lateral` 재작성은 아직 구현되지 않음 |
+| S14 | 서브쿼리 정렬: `limit`이 있으면 유지, 없으면 경고와 함께 제거. 데이터베이스별 차이는 lambdaQL이 처리합니다(5장 참고) | 구현됨 |
 
 ---
 

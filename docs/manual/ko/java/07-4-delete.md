@@ -50,17 +50,25 @@ MariaDB는 `delete o1_0 from orders o1_0`로 씁니다. H2와 Oracle은 `delete 
 고객이 **없는** 주문은 삭제되지 않습니다(규칙 U9, 결정 D36). null 가드(`o.getCustomer() == null || ...`)를 써도 마찬가지입니다. 조회에서도 이 경로는 inner join이기 때문입니다(결정 D48).
 고객이 없는 주문을 삭제하려면 `o.getCustomer() == null` 조건으로 삭제 문장을 한 번 더 실행하십시오.
 
-모든 행을 삭제할 때는 `all()`이 필요합니다(규칙 U5).
+모든 행을 삭제할 때는 `all()`이 필요합니다(규칙 U5). `where`도 `all()`도 없으면 `execute()`가 없으므로 컴파일되지 않습니다.
+
+[`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java), 영역 `delete-all`:
 
 ```java
-qb.delete(Order.class).all().execute();     // delete all rows
-qb.delete(Order.class).execute();           // compile error: no execute()
+ExecutableDelete<Order> d = qb.delete(Order.class).all();
+assertEquals("delete from Order e0", d.toHql().hql());
+int deleted = d.execute();
 ```
 
 id 목록으로 삭제(캡처한 컬렉션, 결정 D29):
 
+[`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java), 영역 `delete-in`:
+
 ```java
-qb.delete(Item.class).where(i -> ids.contains(i.getId())).execute();
+List<Long> ids = all;                               // ids read before, for example from a request
+ExecutableDelete<Item> d = qb.delete(Item.class).where(i -> ids.contains(i.getId()));
+assertEquals("delete from Item e0 where e0.id in (:p1)", d.toHql().hql());
+int deleted = d.execute();
 ```
 
 `where` 안의 서브쿼리는 [5. 서브쿼리](05-subquery.md)처럼 두 번째 람다 인자 `sub`를 사용합니다.
@@ -191,7 +199,7 @@ assertThrows(jakarta.persistence.NonUniqueResultException.class,
 ```
 
 - `executeOne()`을 `orderBy`나 `limit`과 함께 쓰면 오류(`IllegalStateException`)입니다.
-- `limit`과 `executeOne()`은 아직 복합 키 엔티티를 지원하지 않습니다.
+- `limit`과 `executeOne()`은 복합 키 엔티티를 지원하지 않습니다.
 - Spring 리포지토리에서는 `deleteOne(where)`가 같은 동작을 하며, `IncorrectResultSizeDataAccessException`을 던집니다([12.4](12-spring-data-jpa.md#one-row-protection-deleteone-and-updateone) 참고).
 
 ---

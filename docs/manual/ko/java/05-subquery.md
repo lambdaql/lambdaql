@@ -13,11 +13,7 @@
 `where` 람다는 **두 번째 인자**로 서브쿼리 팩토리를 받을 수 있습니다. 이 매뉴얼에서는 이를 `sub`라고 부릅니다(어떤 이름이든 사용할 수 있습니다).
 그 안에서 일반 쿼리와 **같은 람다 문법**으로 서브쿼리를 작성합니다.
 
-```java
-.where(o -> ...)              // 서브쿼리 없음: 인자 하나
-.where((o, sub) -> ...)       // 서브쿼리 있음: 인자 둘
-```
-
+서브쿼리가 없으면 `.where(o -> ...)`처럼 인자가 하나이고, 서브쿼리가 있으면 `.where((o, sub) -> ...)`처럼 인자가 둘입니다.
 lambdaQL은 인자의 개수로 두 형태를 구분합니다.
 서브쿼리는 `&&`, `||`, `!`와 자유롭게 섞을 수 있습니다. static import가 필요 없습니다.
 
@@ -157,13 +153,7 @@ where o1_0.status not in (select c2_0.grade from customers c2_0)
 <a id="56-correlated-subqueries"></a>
 ## 5.6 상관 서브쿼리
 
-안쪽 람다가 바깥 엔티티를 사용하면 서브쿼리는 **상관** 서브쿼리가 됩니다. 특별한 문법이 필요 없습니다. 바깥 변수를 그냥 사용하십시오.
-
-```java
-.where((o, sub) -> sub.from(Item.class)
-                      .where(i -> i.getOrder().getId() == o.getId())   // o는 바깥에서 옴
-                      .exists())
-```
+안쪽 람다가 바깥 엔티티를 사용하면 서브쿼리는 **상관** 서브쿼리가 됩니다. 특별한 문법이 필요 없습니다. 바깥 변수를 그냥 사용하십시오(아래 예제의 `o`).
 
 lambdaQL이 안쪽 람다의 캡처 값을 읽는 방법:
 
@@ -172,17 +162,18 @@ lambdaQL이 안쪽 람다의 캡처 값을 읽는 방법:
 | 바깥 엔티티(`o`) | 바깥 별칭에 대한 참조(`e0.id`) |
 | 그 밖의 값(지역 변수, 필드, ...) | [3.11](03-where.md#311-captured-values)과 같은 바인드 파라미터 |
 
+[`ManualJavaSubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSubqueryTest.java), 영역 `correlated`:
+
 ```java
 int minQty = 10;
-.where((o, sub) -> sub.from(Item.class)
-                      .where(i -> i.getOrder().getId() == o.getId() && i.getQty() > minQty)
-                      .exists())
-// HQL: select e0 from Order e0
-//      where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > :p1)
-// 파라미터: {p1=10}
+SelectQuery<Order> q = qb.from(Order.class)
+        .where((o, sub) -> sub.from(Item.class)
+                .where(i -> i.getOrder().getId() == o.getId() && i.getQty() > minQty)   // o comes from outside
+                .exists());
+assertEquals("select e0 from Order e0"
+        + " where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > :p1)", q.toHql().hql());
+assertEquals(Map.of("p1", 10), q.toHql().parameters());
 ```
-
-[`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)의 테스트 메서드 `capturedValueInside`가 이 HQL, 파라미터, 행을 확인합니다.
 
 **데이터베이스별 SQL (이 HQL에 대한 Hibernate의 SQL)** — [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)가 같은 HQL을 Hibernate에 직접 넘겨 기록했습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `05-correlated-param`:
 
@@ -324,7 +315,6 @@ Java는 중첩된 람다에서 같은 이름을 두 번 쓰는 것을 허용하�
 | `limit`이 있는 `orderBy`(top-1, top-N) | `id` 동순위 처리와 함께 유지 |
 | `limit`이 없는 `orderBy` | **제거**하고 경고를 로그에 남김(결과에 영향이 없음. Oracle에서는 구문 오류 ORA-00907까지 발생) |
 | `limit`이 있는 서브쿼리에 대한 `contains`(MariaDB는 `IN (... limit n)`을 지원하지 않음, 오류 1235) | 모든 데이터베이스에서 파생 테이블로 감쌈: `in (select t1.v from (select s1.id as v ... limit n) t1)` |
-| MariaDB: `lateral`(MariaDB에서 결과가 틀림) | `row_number() over (partition by ... order by ...)`로 재작성: **아직 구현되지 않음** |
 
 [4. 정렬과 페이징](04-order-paging.md)의 NULL 정책과 자동 `id` 동순위 처리도 서브쿼리 안에 적용됩니다.
 
@@ -337,12 +327,23 @@ Java는 중첩된 람다에서 같은 이름을 두 번 쓰는 것을 허용하�
 - 서브쿼리 자신의 엔티티에 대한 연관 경로는 바깥 `where`와 같은 조인 규칙을 따릅니다. 항상 inner `join`입니다(결정 D48).
 - `@Id`로 끝나는 경로는 외래 키 컬럼입니다(조인 없음).
 - **바깥 엔티티**는 자신의 컬럼과 외래 키 id(`o.getId()`, `o.getCustomer().getId()`)만 사용할 수 있습니다. 조인이 필요한 바깥 엔티티의 경로(`o.getCustomer().getName()`)는 분석 시점에 오류가 됩니다. 대신 외래 키 id를 비교하십시오.
-- 컬렉션 경로(`o.getItems()`)는 거부됩니다. 컬렉션에 대해 물으려면 서브쿼리를 사용하십시오.
+- 컬렉션 경로(`c.getOrders()`)는 거부됩니다(`LQL-3010`). 컬렉션에 대해 물으려면 서브쿼리를 사용하십시오.
 - 엔티티의 `@SQLRestriction`과 `@SoftDelete` 조건은 서브쿼리(`exists`, `in`) 안에도 Hibernate가 붙입니다(MariaDB 10.11, Oracle 23.26에서 실측). lambdaQL은 이 조건을 따로 처리하지 않습니다.
 
+다음 예제는 "주문이 있는 고객"을 `Customer.orders` 컬렉션 대신 서브쿼리로 찾습니다.
+
+[`ManualJavaSubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSubqueryTest.java), 영역 `collection-path`:
+
 ```java
-// o.getItems().size() > 0 (거부됨) 대신:
-.where((o, sub) -> sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists())
+// a collection path is rejected
+LambdaQLException e = assertThrows(LambdaQLException.class,
+        () -> qb.from(Customer.class).where(c -> c.getOrders().size() > 0));
+assertEquals("LQL-3010", e.code());
+// ask with a subquery instead
+SelectQuery<Customer> withOrders = qb.from(Customer.class)
+        .where((c, sub) -> sub.from(Order.class).where(o -> o.getCustomer().getId() == c.getId()).exists());
+assertEquals("select e0 from Customer e0"
+        + " where exists (select 1 from Order s1 where s1.customer.id = e0.id)", withOrders.toHql().hql());
 ```
 
 <a id="joins-inside-a-subquery"></a>
@@ -390,7 +391,7 @@ assertEquals("select e0 from Customer e0 where (select sum(s2.qty) from Order s1
 | Q1 | 서브쿼리 안의 조건, 경로, NULL 규칙은 바깥과 같습니다. 조건 안의 연관 경로도 같은 조인 규칙(기본은 inner `join`)을 따릅니다. 조인이 필요한 바깥 엔티티의 경로는 오류이고, 외래 키 id는 허용됩니다 |
 | Q2 | **NOT IN은 SQL 의미를 유지합니다**(D48): `!values.contains(x)`는 `x not in (select c.sel from C c where <condition>)`이 됩니다. 서브쿼리에 NULL이 있으면 행이 반환되지 않습니다(`DEBUG` 수준 `LQL-5009`). NULL을 건너뛰려면 서브쿼리에 `c.sel != null`을 추가합니다 |
 | Q3 | 스칼라 서브쿼리는 한 행을 주어야 합니다: 집계(`max`, `min`, `avg`, `sum`, `count`)나 `orderBy(...).limit(1)...first()`. 그 밖의 `first()`는 오류입니다 |
-| Q4 | 서브쿼리 정렬: `limit`이 있으면 유지, 없으면 경고와 함께 제거. `IN (... limit)`은 파생 테이블로 감쌉니다. `row_number()`를 쓰는 MariaDB `lateral` 재작성은 아직 구현되지 않았습니다 |
+| Q4 | 서브쿼리 정렬: `limit`이 있으면 유지, 없으면 경고와 함께 제거. `IN (... limit)`은 파생 테이블로 감쌉니다 |
 | Q5 | 상관 조건에서 `==`는 `=`로, `!=`는 `<>`로 씁니다(SQL 의미, D48). 어느 한쪽이 NULL이면 일치하지 않습니다. 인덱스 사용을 유지합니다 |
 | Q6 | 서브쿼리의 `where`는 자신의 `sub` 인자를 받을 수 있습니다: `where((i, sub2) -> ...)`. 모든 단계에서 같은 규칙이 적용됩니다 |
 

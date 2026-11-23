@@ -40,7 +40,7 @@ lambdaQL에는 진입점이 다섯 개 있습니다.
 - [7.7 DML에 대한 Java 노트](#77-java-notes-for-dml)
 - [7.8 중요한 규칙](#78-important-rules)
 - [7.9 전체 규칙 U1~U21(요약)](#79-all-rules-u1-to-u21-summary)
-- [7.10 v0.1에 없는 것](#710-not-in-v01)
+- [7.10 지원하지 않는 것](#710-not-in-v01)
 
 ---
 
@@ -109,16 +109,20 @@ Oracle은 `set`에 별칭을 씁니다(`set o1_0.status=?`). H2와 MariaDB는 �
 
 이 장의 모든 setter 예제는 `value`로도 작성할 수 있습니다. 문장 하나에 `value` 호출 하나를 씁니다.
 
+[`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java), 영역 `value-forms`:
+
 ```java
-import static org.lambdaql.Dml.value;
-
-qb.update(Order.class)
-  .set(o -> { value(o.getStatus(), st); value(o.getPrice(), o.getPrice() * 1.1); })
-  .where(o -> o.getStatus() == 1)
-  .execute();
-
-qb.update(Order.class).set(o -> value(o.getAddress().getCity(), city)).where(o -> o.getId() == id).execute(); // embedded
-qb.update(Order.class).set(o -> value(o.getCustomer().getId(), cid)).where(o -> o.getId() == id).execute();  // FK
+ExecutableUpdate<Order> u = qb.update(Order.class)
+        .set(o -> { value(o.getStatus(), st); value(o.getPrice(), o.getPrice() * 1.1); })
+        .where(o -> o.getStatus() == 1);
+assertEquals("update Order e0 set e0.status = :p1, e0.price = (e0.price * 1.1) where e0.status = 1", u.toHql().hql());
+// an embedded column and a foreign key
+ExecutableUpdate<Order> embedded = qb.update(Order.class)
+        .set(o -> value(o.getAddress().getCity(), city)).where(o -> o.getId() == id);
+assertEquals("update Order e0 set e0.address.city = :p1 where e0.id = :p2", embedded.toHql().hql());
+ExecutableUpdate<Order> fk = qb.update(Order.class)
+        .set(o -> value(o.getCustomer().getId(), cid)).where(o -> o.getId() == id);
+assertEquals("update Order e0 set e0.customer.id = :p1 where e0.id = :p2", fk.toHql().hql());
 ```
 
 `value`의 규칙(규칙 U20):
@@ -212,8 +216,8 @@ assertEquals("update Order e0 set e0.price = coalesce((select sum(s1.price) from
 | `Objects.requireNonNullElse(a, b)` | `coalesce(a, b)`(규칙 U2) |
 | `o.setCnt(o.getCnt() + 1)` | 지원. javac가 값을 언박싱하고 박싱하지만 lambdaQL은 이를 무시함 |
 | `o.setStatus((short) 1)` | `short`나 `byte` 필드에 javac가 요구하는 캐스트. 상수는 리터럴로 유지됨 |
-| `o.setActive(!o.isActive())`(토글) | **v0.1에 없음**(조건에 따른 값). `where`가 다른 update 두 개를 사용 |
-| `o.setDescription(o.getDescription() + "_x")` | **v0.1에 없음**(문자열 연결) |
+| `o.setActive(!o.isActive())`(토글) | **지원하지 않음**(조건에 따른 값). `where`가 다른 update 두 개를 사용 |
+| `o.setDescription(o.getDescription() + "_x")` | **지원하지 않음**(문자열 연결) |
 | 값으로 쓴 `LocalDateTime.now()` | 애플리케이션에서 계산해 바인딩(규칙 U8) |
 | `UpdateSet<Order> u = qb.update(...).set(...)`(또는 `var`) | update를 단계별로 구성([PATCH](07-2-update.md#many-set-calls-patch) 참고) |
 
@@ -227,9 +231,18 @@ assertEquals("update Order e0 set e0.price = coalesce((select sum(s1.price) from
 
 SQL에서 SET 오른쪽의 모든 컬럼은 수정 **이전**의 값을 뜻합니다. lambdaQL은 이 규칙을 따릅니다.
 
+[`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java), 영역 `old-value`:
+
 ```java
-.set(o -> { o.setPrice(o.getPrice() * 2); o.setTotal(o.getPrice()); })
-// error: price is assigned first, then read again
+// price is assigned first and read again: rejected (MariaDB would read the new value)
+LambdaQLException e = assertThrows(LambdaQLException.class,
+        () -> qb.update(Order.class).set(o -> { o.setPrice(o.getPrice() * 2); o.setTotal(o.getPrice()); }));
+assertEquals("LQL-3042", e.code());
+// read first, assign later: allowed, total gets the old price
+ExecutableUpdate<Order> u = qb.update(Order.class)
+        .set(o -> { o.setTotal(o.getPrice()); o.setPrice(0.0); })
+        .where(o -> o.getStatus() == 3);
+assertEquals("update Order e0 set e0.total = e0.price, e0.price = 0.0 where e0.status = 3", u.toHql().hql());
 ```
 
 **같은 문장에서 컬럼에 할당한 뒤 나중에 그 컬럼을 읽으면** lambdaQL은 `set(...)`을 호출하는 시점에 `TranslationException`(`LQL-3042`)을 던집니다(규칙 U3).
@@ -280,14 +293,20 @@ assertThrows(LambdaQLException.class, () -> AssignmentReader.checkRules(
 <a id="association-paths-same-rows-as-select"></a>
 ### 연관 경로: 조회와 같은 행
 
-lambdaQL은 DML에서 FK가 아닌 연관 경로를 **상관 스칼라 서브쿼리**로 씁니다. `where`와 SET 오른쪽 모두 같습니다(규칙 U9). 아래 줄은 [7.2](07-2-update.md#a-value-from-another-table)의 테스트된 예제에서 가져왔습니다.
+lambdaQL은 DML에서 FK가 아닌 연관 경로를 **상관 스칼라 서브쿼리**로 씁니다. `where`와 SET 오른쪽 모두 같습니다(규칙 U9). 아래 예제는 `where`와 SET 오른쪽의 경로를 보여 줍니다.
+
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `update-path`:
 
 ```java
-.where(o -> o.getCustomer().getName().equals("Kim"))
-// → where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) = 'Kim' and e0.customer.id is not null
-
-o.setCustName(o.getCustomer().getName())
-// → set e0.custName = (select s1.name from Customer s1 where s1.id = fk(e0.customer))
+// a path in the condition: a subquery, plus "customer exists" (the same rows as the select, D36, U9)
+ExecutableUpdate<Order> u = qb.update(Order.class)
+        .set(o -> o.setCustName("K"))
+        .where(o -> o.getCustomer().getName().equals("Kim"));
+assertEquals("update Order e0 set e0.custName = 'K' where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) = 'Kim'"
+        + " and e0.customer.id is not null", u.toHql().hql());
+// a path in a value: a subquery; NULL when there is no customer
+ExecutableUpdate<Order> copy = qb.update(Order.class).set(o -> o.setCustName(o.getCustomer().getName())).all();
+assertEquals("update Order e0 set e0.custName = (select s1.name from Customer s1 where s1.id = fk(e0.customer))", copy.toHql().hql());
 ```
 
 이렇게 하는 이유는 다음과 같습니다. lambdaQL이 경로를 Hibernate에 그대로 넘기면 Hibernate는 데이터베이스마다 다른 조인 SQL을 만듭니다
@@ -322,8 +341,17 @@ Oracle에는 바인드 값 65,535개라는 엄격한 한도가 있습니다(ORA-
 
 `where(...)` 또는 `all()` 뒤에 `orderBy(...).limit(n)`을 붙이면 update나 delete가 최대 `n`개 행만 변경합니다. 대상은 `qb.from(X.class).where(same).orderBy(same)`의 앞쪽 `n`개 행입니다.
 
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `delete-limit`:
+
 ```java
-qb.delete(Order.class).where(o -> o.getStatus() == 1).orderBy((o, by) -> by.asc(o.getPrice())).limit(100).execute();
+// the first rows of qb.from(Order.class).where(same).orderBy(same); the id is the last sort key
+ExecutableDelete<Order> d = qb.delete(Order.class)
+        .where(o -> o.getStatus() == 1)
+        .orderBy((o, by) -> by.asc(o.getPrice()))
+        .limit(1);
+assertEquals("delete from Order e0 where e0.id in (select t.id from (select x0.id as id from Order x0"
+        + " where x0.status = 1 order by x0.price asc, x0.id asc limit 1) t)", d.toHql().hql());
+int deleted = d.execute();
 ```
 
 | 항목 | 규칙 |
@@ -383,7 +411,7 @@ lambdaQL은 이 조건을 따로 처리하지 않습니다.
 ## 7.9 전체 규칙 U1~U21(요약)
 
 lambdaQL이 람다를 읽을 때 검사하는 규칙: U1, U3, U4, U6. 컴파일러가 검사하는 규칙: U5.
-U11, U12, U15에 대한 lambdaQL의 검사는 아직 구현되지 않았습니다.
+lambdaQL은 U11, U12, U15를 따로 검사하지 않습니다.
 
 | # | 규칙 |
 |---|---|
@@ -414,16 +442,16 @@ U11, U12, U15에 대한 lambdaQL의 검사는 아직 구현되지 않았습니�
 ---
 
 <a id="710-not-in-v01"></a>
-## 7.10 v0.1에 없는 것
+## 7.10 지원하지 않는 것
 
-| 항목 | 계획 | 지금 할 수 있는 일 |
-|---|---|---|
-| 조건에 따른 값(`c ? a : b`, 값으로 쓴 `!o.isActive()`) | v0.2(CASE WHEN) | – |
-| 할당을 고르는 람다 안의 `if` | v0.2 | `set()`을 여러 번 호출(U14) |
-| 문자열 연결(`o.getDescription() + "_x"`) | v0.2 | – |
-| `insert ... select`의 명시적 조인 | v0.2 | many-to-one 경로 사용 |
-| `returning` | 거부됨 | – |
-| 데이터베이스 시간(`current_timestamp`) | 거부됨 | 애플리케이션 시간을 바인딩(U8) |
+| 항목 | 대신 할 수 있는 일 |
+|---|---|
+| 조건에 따른 값(`c ? a : b`, 값으로 쓴 `!o.isActive()`) | – |
+| 할당을 고르는 람다 안의 `if` | `set()`을 여러 번 호출(U14) |
+| 문자열 연결(`o.getDescription() + "_x"`) | – |
+| `insert ... select`의 명시적 조인 | many-to-one 경로 사용 |
+| `returning` | – |
+| 데이터베이스 시간(`current_timestamp`) | 애플리케이션 시간을 바인딩(U8) |
 
 규칙을 어기면 코드 `[LQL-xxxx]`가 붙은 `LambdaQLException`이 발생합니다. 대부분의 규칙은 `TranslationException`, 대입 람다 안의 조건이나 지역 변수는 `UnsupportedLambdaShapeException`입니다. [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
 모든 규칙을 한곳에서 보려면: [10. 규칙과 제한](10-rules-and-limits.md).
