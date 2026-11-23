@@ -14,3 +14,5 @@ rootProject.name = 'lambdaql'
 include 'query'
 include 'spring-data-jpa'
 include 'spring-boot-starter'
+// benchmark           -> not published: JDBC, JPQL, Criteria API and lambdaQL on the same queries (JMH)
+include 'benchmark'

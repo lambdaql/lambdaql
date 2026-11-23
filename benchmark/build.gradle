@@ -1,0 +1,51 @@
+plugins {
+	id 'java'
+}
+
+// Benchmarks that compare plain JDBC, JPA (JPQL and the Criteria API) and lambdaQL on the same queries.
+// Not published. Run:
+//   ./gradlew :benchmark:jmh                       H2 in memory
+//   ./gradlew :benchmark:jmh -Dlql.db=postgresql   the local PostgreSQL (LQL_DB_PASSWORD, tables SQ_bench_*)
+//   ./gradlew :benchmark:jmh -Pjmh.include=Select  only the benchmarks whose name matches
+// Results: build/jmh/results-<db>.json (JMH JSON) and the console.
+
+dependencies {
+	implementation project(':query')
+	implementation 'org.hibernate.orm:hibernate-core'
+	implementation 'jakarta.persistence:jakarta.persistence-api'
+	implementation 'com.zaxxer:HikariCP'
+	implementation 'org.openjdk.jmh:jmh-core:1.37'
+	annotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess:1.37'
+	runtimeOnly 'com.h2database:h2:2.3.230'
+	runtimeOnly 'org.postgresql:postgresql'
+	runtimeOnly 'org.mariadb.jdbc:mariadb-java-client:3.5.6'
+	runtimeOnly 'com.mysql:mysql-connector-j'
+	runtimeOnly 'com.oracle.database.jdbc:ojdbc11:23.26.0.0.0'
+	runtimeOnly 'org.slf4j:slf4j-nop'
+}
+
+// checks that the four ways give the same rows before anything is measured
+tasks.register('benchCheck', JavaExec) {
+	description = 'Runs every benchmark query once and compares the results of the four ways.'
+	group = 'benchmark'
+	classpath = sourceSets.main.runtimeClasspath
+	mainClass = 'org.lambdaql.bench.SameResults'
+	systemProperty 'lql.db', System.getProperty('lql.db', 'h2')
+	systemProperty 'org.jboss.logging.provider', 'slf4j'
+}
+
+tasks.register('jmh', JavaExec) {
+	description = 'Runs the JMH benchmarks (JDBC, JPQL, Criteria API, lambdaQL).'
+	group = 'benchmark'
+	dependsOn tasks.classes
+	classpath = sourceSets.main.runtimeClasspath
+	mainClass = 'org.openjdk.jmh.Main'
+	def db = System.getProperty('lql.db', 'h2')
+	systemProperty 'lql.db', db
+	def out = layout.buildDirectory.file("jmh/results-${db}.json").get().asFile
+	doFirst { out.parentFile.mkdirs() }
+	def include = findProperty('jmh.include') ?: '.*'
+	// extra JMH options, for example -Pjmh.args="-wi 0 -i 1 -f 1" for a quick check
+	def extra = (findProperty('jmh.args') ?: '').toString().split(' ').findAll { it }
+	args = [include, '-rf', 'json', '-rff', out.absolutePath, '-jvmArgsAppend', "-Dlql.db=${db} -Dorg.jboss.logging.provider=slf4j"] + extra
+}
