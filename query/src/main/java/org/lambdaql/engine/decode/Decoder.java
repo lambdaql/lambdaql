@@ -459,6 +459,8 @@ public final class Decoder implements Opcodes {
         if (op == IFNULL) {
             int a = nextReal(target);
             int b = a >= 0 ? nextReal(a + 1) : -1;
+            Integer elvis = primitiveElvis(jumpAt, target, a, b, stack, locals);
+            if (elvis != null) return elvis;
             if (a >= 0 && b >= 0 && insns[a].getOpcode() == POP && insns[b].getOpcode() == ACONST_NULL) {
                 markSafeCall(stack);
                 return jumpAt + 1; // keep x on the stack and go on with the non-null path
@@ -471,17 +473,86 @@ public final class Decoder implements Opcodes {
         int a = nextReal(jumpAt + 1);
         int b = a >= 0 ? nextReal(a + 1) : -1;
         if (a < 0 || b < 0 || insns[a].getOpcode() != POP) return null;
+        if (insns[b].getOpcode() == GOTO && isUnboxing(nextReal(target))) {
+            return target; // the null check Kotlin adds before unboxing: ignored, SQL meaning (D22)
+        }
         if (insns[b].getOpcode() == ACONST_NULL) {
             markSafeCall(stack);
             return target; // safe call: go to the non-null path (L)
         }
-        // elvis: one instruction pushes the default value and then L comes right away
-        if (target <= b || !onlyLabelsBetween(b + 1, target)) return null;
+        // elvis: one instruction pushes the default value (boxed by valueOf for a wrapper type) and then L comes
+        int last = b;
+        int box = nextReal(b + 1);
+        if (box >= 0 && box < target && isBoxing(box)) last = box;
+        if (target <= last || !onlyLabelsBetween(last + 1, target)) return null;
         Expr dflt = simplePush(insns[b], locals);
         if (dflt == null) return null;
         Expr x = popExpr(stack, -1);
         stack.add(new Expr.Coalesce(x, dflt, x.type()));
         return target;
+    }
+
+    /**
+     * Handles a Kotlin elvis with a primitive default: {@code dup; ifnull L; unbox; goto M; L: pop; <push>; M:}.
+     * The value becomes {@code coalesce(x, default)} with the primitive type, as for an object elvis.
+     *
+     * <p>Example (Kotlin): {@code (it.total ?: 0.0) > 3} reads as {@code coalesce(e0.total, 0.0) > 3.0}.
+     *
+     * @param jumpAt index of the {@code IFNULL} jump
+     * @param target index of the jump target {@code L}
+     * @param a      index of the first instruction at {@code L} (expected {@code POP})
+     * @param b      index of the instruction after it (expected one simple push)
+     * @param stack  current stack (its top is the checked value)
+     * @param locals current local variables
+     * @return the index of {@code M}, or {@code null} if this is not the pattern
+     */
+    private Integer primitiveElvis(int jumpAt, int target, int a, int b, List<Object> stack, List<Expr> locals) {
+        if (a < 0 || b < 0 || insns[a].getOpcode() != POP) return null;
+        int unbox = nextReal(jumpAt + 1);
+        if (!isUnboxing(unbox)) return null;
+        int jump = nextReal(unbox + 1);
+        if (jump < 0 || insns[jump].getOpcode() != GOTO) return null;
+        int end = labelIndex.get(((JumpInsnNode) insns[jump]).label);
+        if (end <= b || !onlyLabelsBetween(b + 1, end)) return null;
+        Expr dflt = simplePush(insns[b], locals);
+        if (dflt == null) return null;
+        Type prim = Type.getReturnType(((MethodInsnNode) insns[unbox]).desc);
+        // a Boolean elvis in a condition ("it.vip ?: false") keeps the plain null branches: "vip is not null and
+        // vip = true" can use an index, coalesce(vip, false) cannot
+        if (prim.getSort() == Type.BOOLEAN) return null;
+        Expr x = popExpr(stack, -1);
+        stack.add(new Expr.Coalesce(x, dflt, prim));
+        return end;
+    }
+
+    /**
+     * Tells whether an instruction unboxes a wrapper ({@code Integer.intValue()}, {@code Double.doubleValue()}, ...).
+     *
+     * <p>Example: Kotlin compiles {@code it.cnt == 1} ({@code cnt} is a nullable {@code Integer}) to a null check,
+     * then {@code Integer.intValue()}.
+     *
+     * @param k instruction index, or a negative number
+     * @return {@code true} for an unboxing call
+     */
+    private boolean isUnboxing(int k) {
+        if (k < 0 || !(insns[k] instanceof MethodInsnNode m) || m.getOpcode() != INVOKEVIRTUAL) return false;
+        return m.owner.startsWith("java/lang/") && m.name.endsWith("Value") && m.desc.startsWith("()")
+                && Type.getReturnType(m.desc).getSort() <= Type.DOUBLE;
+    }
+
+    /**
+     * Tells whether an instruction boxes a primitive ({@code Double.valueOf(double)}, {@code Integer.valueOf(int)}, ...).
+     *
+     * <p>Example: Kotlin compiles {@code it.total ?: 0.0} ({@code total} is a nullable {@code Double}) to
+     * {@code dconst_0; Double.valueOf} for the default value.
+     *
+     * @param k instruction index
+     * @return {@code true} for a boxing call
+     */
+    private boolean isBoxing(int k) {
+        return insns[k] instanceof MethodInsnNode m && m.getOpcode() == INVOKESTATIC && m.name.equals("valueOf")
+                && m.owner.startsWith("java/lang/") && Type.getArgumentTypes(m.desc).length == 1
+                && Type.getArgumentTypes(m.desc)[0].getSort() <= Type.DOUBLE;
     }
 
     /**
@@ -534,6 +605,9 @@ public final class Decoder implements Opcodes {
         int op = n.getOpcode();
         if (op == LDC) return ldc(((LdcInsnNode) n).cst, -1);
         if (op >= ICONST_M1 && op <= ICONST_5) return new Expr.Const(op - ICONST_0, Type.INT_TYPE);
+        if (op == LCONST_0 || op == LCONST_1) return new Expr.Const((long) (op - LCONST_0), Type.LONG_TYPE);
+        if (op >= FCONST_0 && op <= FCONST_2) return new Expr.Const((float) (op - FCONST_0), Type.FLOAT_TYPE);
+        if (op == DCONST_0 || op == DCONST_1) return new Expr.Const((double) (op - DCONST_0), Type.DOUBLE_TYPE);
         if (op == BIPUSH || op == SIPUSH) return new Expr.Const(((IntInsnNode) n).operand, Type.INT_TYPE);
         if (op == ALOAD) {
             int v = ((VarInsnNode) n).var;

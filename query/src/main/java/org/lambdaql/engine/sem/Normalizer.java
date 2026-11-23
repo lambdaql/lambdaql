@@ -195,6 +195,7 @@ public final class Normalizer {
                 .orElseThrow(() -> n.error(LqlMessage.PROPERTY_NOT_FOUND, p.type().getSimpleName() + "." + setter));
         List<String> names = new ArrayList<>(p.names());
         names.add(prop.name());
+        if (prop.version()) throw n.error(LqlMessage.VERSION_ASSIGN, String.join(".", names));
         List<Boolean> assoc = new ArrayList<>(p.assoc());
         if (p.kind().equals("ASSOCIATION")) {
             if (!prop.id()) {

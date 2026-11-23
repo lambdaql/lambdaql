@@ -153,7 +153,7 @@ assertEquals("update Order e0 set e0.price = (select sum(s1.price) from Item s1 
 ```
 
 - 다른 테이블의 집계와 같은 테이블의 집계를 모두 `set` 값으로 쓸 수 있습니다(H2, MariaDB 10.11, Oracle 23.26에서 실측). `update`에서는 MariaDB도 오류 1093을 내지 않습니다.
-- 일치하는 행이 없으면 `sum` 등은 NULL을 돌려줍니다. NOT NULL 컬럼이면 DB 오류가 나므로 `Objects.requireNonNullElse(…, 0.0)`로 감싸십시오. `coalesce(...)`가 됩니다([7.2](07-2-update.md#an-aggregate-from-a-subquery)의 영역 `update-sub-coalesce`).
+- 일치하는 행이 없으면 `sum` 등은 NULL을 돌려줍니다. NOT NULL 컬럼이면 DB 오류가 나므로 `?: 0.0`을 붙이십시오. `coalesce(...)`가 됩니다([7.2](07-2-update.md#an-aggregate-from-a-subquery)의 영역 `update-sub-coalesce`).
 - insert의 `values { a, sub -> ... }`와 upsert(`onConflict { ... }.update { a, sub -> ... }`)에서도 같은 방식으로 서브쿼리를 씁니다([7.5](07-5-insert.md#a-subquery-in-a-value) 참고). 리스트 형태는 `values(list) { a, l, sub -> ... }`처럼 세 번째 인자가 `sub`입니다.
 
 ---
@@ -361,8 +361,8 @@ lambdaQL은 이 조건을 따로 처리하지 않습니다.
 <a id="79-all-rules-u1-to-u21-summary"></a>
 ## 7.9 모든 규칙 U1 ~ U21(요약)
 
-lambdaQL이 람다를 읽을 때 검사하는 규칙: U1, U3, U4, U6. 컴파일러가 검사하는 규칙: U5.
-U11, U12, U15는 lambdaQL이 검사하지 않습니다. 예를 들어 `@Version` 속성에 대입해도 오류가 나지 않습니다.
+lambdaQL이 람다를 읽을 때 검사하는 규칙: U1, U3, U4, U6, U15. 컴파일러가 검사하는 규칙: U5.
+lambdaQL은 `@Version` 속성에 대입하면 거부합니다(U15, `LQL-3068`). U11과 U12는 검사하지 않습니다.
 
 | # | 규칙 |
 |---|---|
@@ -380,7 +380,7 @@ U11, U12, U15는 lambdaQL이 검사하지 않습니다. 예를 들어 `@Version`
 | U12 | IDENTITY와 SEQUENCE id는 생략할 수 있습니다. TABLE 생성기는 `values`에서만 동작하고 `insert ... select`에서는 동작하지 않습니다. 생성기가 없으면 id가 필요합니다. 그 밖의 선택적이지 않은 속성도 필요합니다. |
 | U13 | 여러 행은 문장당 값 500개 이하로 나눕니다. 결과는 합산합니다. 모든 문장은 한 트랜잭션에서 실행됩니다. |
 | U14 | `set` 람다 하나로 여러 컬럼에 대입할 수 있고, `set()`은 여러 번 호출할 수 있습니다. 모두 호출 순서대로 SET 목록 하나로 합쳐집니다. 속성 대입과 `Dml.value`는 한 람다 안에서도 섞을 수 있습니다(D49). |
-| U15 | `@Version` 엔티티는 `update versioned`를 사용합니다. 버전에 직접 대입하지 마십시오. `execute() == 0` 확인은 사용자가 할 일입니다. |
+| U15 | `@Version` 엔티티는 `update versioned`를 사용합니다. 버전에 직접 대입하면 `LQL-3068`입니다. `execute() == 0` 확인은 사용자가 할 일입니다. |
 | U16 | 벌크 DML은 영속성 컨텍스트를 건너뜁니다. 실행 전 flush, 실행 후 오래된 엔티티, cascade 없음. |
 | U17 | DELETE의 서브쿼리가 대상 엔티티(또는 같은 상속 계층)를 읽으면 lambdaQL은 대상 id를 파생 테이블로 먼저 읽습니다: `d0.id in (select t.id from (select e0.id as id from … where <condition>) t)`. 그렇지 않으면 MariaDB 오류 1093이 납니다. 상관 서브쿼리에도 동작하며, `update`와 복합 id 엔티티는 감싸지 않습니다([7.4](07-4-delete.md#delete-with-a-subquery-on-the-same-table) 참고). |
 | U18 | 상속: SINGLE_TABLE은 완전히 지원합니다. JOINED와 TABLE_PER_CLASS의 update/delete는 임시 테이블을 사용합니다. 그 하위 클래스에 대한 insert는 거부됩니다. |

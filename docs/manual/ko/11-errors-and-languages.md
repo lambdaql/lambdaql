@@ -26,7 +26,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 |---|---|---|---|
 | `LQL-1xxx` | 입력과 람다 로딩 | `LQL-1001`~`LQL-1013` | `LambdaAnalysisException` |
 | `LQL-2xxx` | 바이트코드 디코딩 | `LQL-2001`~`LQL-2025` | `UnsupportedLambdaShapeException` |
-| `LQL-3xxx` | 의미 해석과 Java에서 계산하는 값 | `LQL-3001`~`LQL-3067` | `TranslationException`(`LQL-3066`은 하위 클래스 `NonSargableException`) |
+| `LQL-3xxx` | 의미 해석과 Java에서 계산하는 값 | `LQL-3001`~`LQL-3068` | `TranslationException`(`LQL-3066`은 하위 클래스 `NonSargableException`) |
 | `LQL-4xxx` | 렌더링, 바인딩, 실행 | `LQL-4001`~`LQL-4045`, `LQL-4999`(내부 오류) | `LambdaQLException` 자체, 또는 JDK/JPA 표준 예외([예외](#exceptions) 참고). `LQL-4045`는 `WARN` 로그(자기 기본형 언박싱만 있는 비교는 `DEBUG`) |
 | `LQL-5xxx` | 경고(로그에 기록) | `LQL-5001`~`LQL-5014` | –(로그 한 줄. 레벨은 `WARN`이며, `LQL-5004`~`LQL-5006`, `LQL-5008`과 기본 정렬 모드의 `LQL-5003`은 `INFO`, `LQL-5009`~`LQL-5011`, `LQL-5013`은 `DEBUG`) |
 
@@ -43,6 +43,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-3065` | `TranslationException` | Dml.value: 값의 타입 {2}가 열 {0}({1})에 맞지 않습니다(U20) |
 | `LQL-3066` | `NonSargableException` | 인덱스를 쓸 수 없는 조건이며 SARGable 모드가 STRICT입니다: {0} |
 | `LQL-3067` | `TranslationException` | 파생 테이블·CTE의 행에는 id가 없어 null과 비교할 수 없습니다. 열을 비교하세요(예: x.customerId() == null): {0} |
+| `LQL-3068` | `TranslationException` | @Version 컬럼에는 대입할 수 없습니다. Hibernate가 update마다 1씩 올립니다(U15): {0} |
 | `LQL-4009` | `LambdaQLException` | null 값은 <, <=, >, >=로 비교할 수 없습니다(Java에서는 NullPointerException): {0} |
 | `LQL-4014` | `IllegalArgumentException` | limit은 0 이상이어야 합니다: {0} |
 | `LQL-4025` | `NonUniqueResultException` | one()의 조건에 맞는 행이 2개 이상입니다. 조건을 좁히거나 first()를 쓰세요: {0} |

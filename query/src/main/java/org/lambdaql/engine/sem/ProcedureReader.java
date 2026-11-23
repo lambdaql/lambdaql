@@ -92,11 +92,15 @@ public final class ProcedureReader {
             if (calls.size() != 1) throw LqlMessage.PROC_LAMBDA_SHAPE.exceptionAt(ref.describe());
             body = calls.get(0);
         }
+        // a Kotlin call that leaves out a default argument is a static call of "name$default" (receiver as the first
+        // argument), so it is checked before the receiver
+        if (body instanceof Expr.Invoke d && d.method().name().endsWith("$default")) {
+            throw LqlMessage.PROC_KOTLIN_DEFAULT.exceptionAt(ref.describe(), d.method().name());
+        }
         if (!(body instanceof Expr.Invoke inv) || !(inv.receiver() instanceof Expr.Param p) || p.index() != 0) {
             throw LqlMessage.PROC_LAMBDA_SHAPE.exceptionAt(ref.describe());
         }
         MethodRef m = inv.method();
-        if (m.name().endsWith("$default")) throw LqlMessage.PROC_KOTLIN_DEFAULT.exceptionAt(ref.describe(), m.name());
         Method stub = null;
         for (Method x : procs.getMethods()) {
             if (x.getName().equals(m.name()) && Type.getMethodDescriptor(x).equals(m.descriptor())) stub = x;

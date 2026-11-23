@@ -363,7 +363,7 @@ class KotlinQueryTest {
             .select { c, x -> c.name to x.total }
         assertEquals("with t as (select d0.customer.id as customerId, sum(d0.price) as total from Order d0"
                 + " where d0.customer is not null group by d0.customer.id) select e0.name, e1.total from Customer e0"
-                + " join t e1 on e1.customerId is not null and e1.customerId = e0.id where e1.total > 100.0", rows.toHql().hql())
+                + " join t e1 on e1.customerId = e0.id where e1.total > 100.0", rows.toHql().hql())
         // @end
         val expected = orders.filter { it.customer != null }.groupBy { it.customer!!.name }
             .mapValues { (_, os) -> os.sumOf { it.price } }.filter { it.value > 100 }.toList().sortedBy { it.first }

@@ -287,7 +287,7 @@ if (n == 0) throw new OptimisticLockException();   // checking the result is you
 
 테스트는 같은 문장을 한 번 더 실행해 0을 받는지 확인합니다. 첫 실행에서 버전이 올라갔으므로 이전 버전과 일치하는 행이 없습니다.
 
-`@Version` 필드에 직접 값을 할당하지 마십시오(규칙 U15).
+`@Version` 필드에는 값을 할당할 수 없습니다(규칙 U15). 할당하면 `LQL-3068`로 거부됩니다.
 
 <a id="many-set-calls-patch"></a>
 ## 여러 번의 `set()` 호출(PATCH)

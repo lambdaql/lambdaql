@@ -40,8 +40,24 @@ public interface EntityModel {
      * @param kind     the kind of property
      * @param id       {@code true} if this is the {@code @Id}
      * @param nonNull  {@code true} if the column can never be NULL (id, primitive type, {@code optional = false})
+     * @param version  {@code true} if this is the {@code @Version} column (it cannot be assigned, U15)
      */
-    record Property(String name, Class<?> javaType, Kind kind, boolean id, boolean nonNull) {
+    record Property(String name, Class<?> javaType, Kind kind, boolean id, boolean nonNull, boolean version) {
+
+        /**
+         * A property that is not a {@code @Version} column.
+         *
+         * <p>Example: {@code new Property("status", Integer.class, Kind.BASIC, false, true)}.
+         *
+         * @param name     property name in HQL
+         * @param javaType Java type of the value
+         * @param kind     the kind of property
+         * @param id       {@code true} if this is the {@code @Id}
+         * @param nonNull  {@code true} if the column can never be NULL
+         */
+        public Property(String name, Class<?> javaType, Kind kind, boolean id, boolean nonNull) {
+            this(name, javaType, kind, id, nonNull, false);
+        }
     }
 
     /**

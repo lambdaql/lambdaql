@@ -121,8 +121,8 @@ lambdaQL은 **람다를 절대 실행하지 않습니다**. 바이트코드를 �
 | D12 | 객체 사이의 `==`(그리고 `===`)는 객체 동일성이 아니라 **값 비교**를 뜻합니다. |
 
 NULL이 될 수 있는 숫자 속성(`Integer`)을 상수와 비교하면 Kotlin 컴파일러가 언박싱 전에 null 검사를 넣습니다.
-lambdaQL은 이 검사를 HQL에 그대로 씁니다. 그래서 결과는 Kotlin 코드를 실행한 결과와 같습니다.
-`it.cnt == 1`은 `e0.cnt is not null and e0.cnt = 1`이고, `it.cnt != 1`은 `e0.cnt is null or e0.cnt <> 1`이라 NULL 행도 반환합니다.
+lambdaQL은 소스에 쓰지 않은 이 검사를 읽지 않습니다(결정 D22). 그래서 Java와 같은 SQL 의미가 됩니다.
+`it.cnt == 1`은 `e0.cnt = 1`이고, `it.cnt != 1`은 `e0.cnt <> 1`이라 `cnt`가 NULL인 행은 반환하지 않습니다. NULL 행이 필요하면 `it.cnt == null || it.cnt != 1`처럼 직접 쓰십시오.
 
 [`ManualKotlinNotesTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)의 영역 `hidden-null-check`는 [9.4](#94-equality----and-areequal)에 있습니다.
 
@@ -135,8 +135,8 @@ lambdaQL은 이 검사를 HQL에 그대로 씁니다. 그래서 결과는 Kotlin
 | Kotlin | 컴파일 결과 | HQL |
 |---|---|---|
 | non-null 기본형 두 개: `it.qty == 5` | 비교 분기(Java와 같음) | `e0.qty = 5` |
-| nullable 기본형과 상수: `it.cnt == 1`(`Integer`) | null 검사 + 비교 | `e0.cnt is not null and e0.cnt = 1` |
-| `it.cnt != 1`(`Integer`) | null 검사 + 비교 | `e0.cnt is null or e0.cnt <> 1`(NULL 행도 반환됨, Kotlin과 같음) |
+| nullable 기본형과 상수: `it.cnt == 1`(`Integer`) | null 검사 + 비교 | `e0.cnt = 1`(null 검사는 읽지 않음, D22) |
+| `it.cnt != 1`(`Integer`) | null 검사 + 비교 | `e0.cnt <> 1`(NULL 행은 반환되지 **않음**) |
 | 참조이거나 양쪽 모두 nullable: `it.description == text`, `it.cnt == q`(`q: Int?`) | `Intrinsics.areEqual(a, b)` 호출 | `e0.description = :p1`(캡처 값 `null`: 일치하는 행 없음) |
 | `it.description != "x"` | `!Intrinsics.areEqual(a, b)` | `e0.description <> 'x'`(NULL 행은 반환되지 **않음**) |
 | 엔티티 값 두 개: `it.description == it.custName` | `Intrinsics.areEqual(a, b)` | `e0.description = e0.custName`(어느 한쪽이 NULL이면 불일치) |
@@ -150,11 +150,11 @@ lambdaQL은 이 검사를 HQL에 그대로 씁니다. 그래서 결과는 Kotlin
 [`ManualKotlinNotesTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt), 영역 `hidden-null-check`:
 
 ```kotlin
-// cnt is a nullable Integer: Kotlin checks for null before the unboxing, and the check stays in the HQL
+// cnt is a nullable Integer: the null check Kotlin adds before the unboxing is not read (SQL meaning, D22)
 val one = qb.from(Order::class.java).where { it.cnt == 1 }
-assertEquals("select e0 from Order e0 where e0.cnt is not null and e0.cnt = 1", one.toHql().hql())
-val notOne = qb.from(Order::class.java).where { it.cnt != 1 }          // NULL rows are returned, as in Kotlin
-assertEquals("select e0 from Order e0 where e0.cnt is null or e0.cnt <> 1", notOne.toHql().hql())
+assertEquals("select e0 from Order e0 where e0.cnt = 1", one.toHql().hql())
+val notOne = qb.from(Order::class.java).where { it.cnt != 1 }          // NULL rows are left out, as in SQL
+assertEquals("select e0 from Order e0 where e0.cnt <> 1", notOne.toHql().hql())
 // both sides nullable: Intrinsics.areEqual, a value comparison
 val same = qb.from(Order::class.java).where { it.cnt == q }
 assertEquals("select e0 from Order e0 where e0.cnt = :p1", same.toHql().hql())
@@ -316,17 +316,16 @@ val error = assertThrows(LambdaQLException::class.java) {
     qb.from(Order::class.java).select { it.customer?.name ?: "none" }
 }
 assertEquals("LQL-2022", error.code())
-// ?: with a number in a condition is rejected
-val number = assertThrows(LambdaQLException::class.java) {
-    qb.from(Order::class.java).where { (it.total ?: 0.0) > 3.0 }
-}
-assertEquals("LQL-2021", number.code())
+// ?: with a number: coalesce too
+val number = qb.from(Order::class.java).where { (it.total ?: 0.0) > 3.0 }
+assertEquals("select e0 from Order e0 where coalesce(e0.total, 0.0) > 3.0", number.toHql().hql())
 // in a string condition, ?: is coalesce too
 val x = qb.from(Order::class.java).where { (it.description ?: "") == "x" }
 assertEquals("select e0 from Order e0 where coalesce(e0.description, '') = 'x'", x.toHql().hql())
 ```
 
-- `?.` 뒤의 `?:`를 select 값으로 쓰면 거부됩니다(`LQL-2022`, J1). 숫자 조건의 `?:`도 거부됩니다(`LQL-2021`).
+- 숫자 조건의 `?:`도 `coalesce`입니다: `(it.total ?: 0.0) > 3.0`은 `coalesce(e0.total, 0.0) > 3.0`입니다.
+- `?.` 뒤의 `?:`를 select 값으로 쓰면 거부됩니다(`LQL-2022`, J1).
 - 컬럼에 `coalesce`가 씌워지므로 `description`의 일반 인덱스는 사용되지 않습니다.
 - DML 값의 `?:`는 [7.2](07-2-update.md#add-to-a-value-default-for-null)를 참고하십시오.
 

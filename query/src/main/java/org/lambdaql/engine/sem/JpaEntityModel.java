@@ -110,7 +110,8 @@ public final class JpaEntityModel implements EntityModel {
         if (kind == Kind.ASSOCIATION && type instanceof EntityType<?>) {
             nonNull = !optional;
         }
-        return Optional.of(new Property(name, javaType, kind, id, nonNull));
+        boolean version = attr instanceof SingularAttribute<?, ?> s && s.isVersion();
+        return Optional.of(new Property(name, javaType, kind, id, nonNull, version));
     }
 
     /**

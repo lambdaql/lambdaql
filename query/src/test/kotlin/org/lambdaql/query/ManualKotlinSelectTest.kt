@@ -406,7 +406,7 @@ class ManualKotlinSelectTest {
             .where { _, x -> x.customerId == null || x.total!! < 210 }
         assertEquals("select e0 from Customer e0 left join (select d0.customer.id as customerId, count(*) as cnt,"
             + " sum(d0.price) as total from Order d0 where d0.customer is not null group by d0.customer.id) e1"
-            + " on e1.customerId is not null and e1.customerId = e0.id where e1.customerId is null or e1.total < 210.0", small.toHql().hql())
+            + " on e1.customerId = e0.id where e1.customerId is null or e1.total < 210.0", small.toHql().hql())
         // @end
         val totals = expectedTotals().associateBy { it.customerId }
         assertEquals(customers.filter { (totals[it.id]?.total ?: 0.0) < 210 }.map { it.name }.sorted(),
@@ -420,8 +420,8 @@ class ManualKotlinSelectTest {
             .select { c, _, y -> c.name to y.total }
         assertEquals("with t as (select d0.customer.id as customerId, count(*) as cnt, sum(d0.price) as total from Order d0"
             + " where d0.customer is not null group by d0.customer.id)"
-            + " select e0.name, e2.total from Customer e0 join t e1 on e1.customerId is not null and e1.customerId = e0.id"
-            + " left join t e2 on e2.customerId is not null and e2.customerId = e0.id and e2.total > 210.0", reused.toHql().hql())
+            + " select e0.name, e2.total from Customer e0 join t e1 on e1.customerId = e0.id"
+            + " left join t e2 on e2.customerId = e0.id and e2.total > 210.0", reused.toHql().hql())
         // @end
         val byName = expectedTotals().associate { tot -> customers.first { it.id == tot.customerId }.name to tot.total }
         assertEquals(byName.map { (n, tot) -> n to (if (tot!! > 210) tot else null) }.sortedBy { it.first },

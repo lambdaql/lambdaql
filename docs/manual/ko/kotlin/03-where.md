@@ -900,7 +900,7 @@ assertEquals("select e0 from Order e0 where e0.description >= 'a' and e0.descrip
 | `!in` | 예. 비교를 뒤집어 `or`로 이음 |
 | 캡처 값 경계(`lo..hi`) | 예. 바인드 파라미터 |
 | nullable 대상(`Int?`), `LocalDate`·`LocalDateTime` 범위 | 아니요(`LQL-3008`) |
-| `downTo`, `step` | 아니요 |
+| `downTo`, `step` | 예. 값을 펼쳐 `in (:p1)`로 바인딩 |
 
 **NULL일 수 있는 대상.** Java 엔티티의 `Integer` 속성(`cnt`)은 플랫폼 타입이라 컴파일러가 비교 두 개로 컴파일합니다. lambdaQL은 null 가드를 추가하지 **않으므로**(D22) `cnt`가 NULL인 행은 반환되지 않습니다(SQL 의미).
 `?.`로 얻은 `Int?` 대상과 날짜 범위는 범위 객체로 컴파일되므로 거부됩니다. 비교 두 개로 쓰십시오.

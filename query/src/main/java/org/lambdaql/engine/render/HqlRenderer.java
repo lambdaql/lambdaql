@@ -13,6 +13,7 @@ import org.lambdaql.engine.sem.HostEvaluator;
 import org.lambdaql.query.Direction;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -1402,6 +1403,30 @@ public final class HqlRenderer {
         return x + " = false";
     }
 
+    /**
+     * Reads the values of a captured IN operand: a collection, an array (also of primitives), or any other
+     * {@code Iterable}, such as a Kotlin progression ({@code 5 downTo 1}, {@code 1..9 step 2}).
+     *
+     * <p>Example (Kotlin): {@code it.status in 5 downTo 1} reads as {@code e0.status in (5, 4, 3, 2, 1)}.
+     *
+     * @param v the captured value, not null
+     * @return the values in order
+     */
+    private static Collection<?> inValues(Object v) {
+        if (v instanceof Collection<?> col) return col;
+        if (v instanceof Object[] array) return Arrays.asList(array);
+        List<Object> list = new ArrayList<>();
+        if (v.getClass().isArray()) {
+            for (int i = 0; i < java.lang.reflect.Array.getLength(v); i++) list.add(java.lang.reflect.Array.get(v, i));
+            return list;
+        }
+        if (v instanceof Iterable<?> it) {
+            for (Object o : it) list.add(o);
+            return list;
+        }
+        throw LqlMessage.INTERNAL_ERROR.exception("IN operand " + v.getClass().getName());
+    }
+
     private String in(Expr value, Expr values, boolean positive) {
         if (values instanceof Expr.Subquery q) {
             String x = value(value, null);
@@ -1411,7 +1436,7 @@ public final class HqlRenderer {
         }
         Object v = eval(values);
         if (v == null) throw LqlMessage.IN_COLLECTION_NULL.exception();
-        Collection<?> c = v instanceof Collection<?> col ? col : List.of((Object[]) v);
+        Collection<?> c = inValues(v);
         if (c.stream().anyMatch(Objects::isNull)) {
             throw LqlMessage.IN_COLLECTION_NULL_ELEMENT.exception();
         }

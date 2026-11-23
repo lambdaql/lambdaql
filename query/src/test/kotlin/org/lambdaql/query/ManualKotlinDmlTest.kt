@@ -17,7 +17,6 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
 import java.time.LocalDateTime
 import java.util.Locale
-import java.util.Objects
 
 /**
  * Kotlin forms of UPDATE, DELETE, INSERT and upsert for the manual (chapter 7, Kotlin track, ROADMAP D56).
@@ -293,10 +292,10 @@ class ManualKotlinDmlTest {
     fun updateSubqueryCoalesce() {
         items()
         // @start region="update-sub-coalesce"
-        // sum gives NULL when there is no row; Objects.requireNonNullElse becomes coalesce and keeps the NOT NULL price valid
+        // sum gives NULL when there is no row; ?: becomes coalesce and keeps the NOT NULL price valid
         val u = qb.update(Order::class.java)
             .set { o, sub ->
-                o.price = Objects.requireNonNullElse(sub.from(Item::class.java).where { i -> i.order?.id == o.id }.sum { it.price }, 0.0)
+                o.price = sub.from(Item::class.java).where { i -> i.order?.id == o.id }.sum { it.price } ?: 0.0
             }
             .all()
         assertEquals("update Order e0 set e0.price = coalesce((select sum(s1.price) from Item s1 where s1.order.id = e0.id), 0.0)",

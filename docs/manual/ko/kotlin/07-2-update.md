@@ -76,7 +76,7 @@ assertEquals("update Order e0 set e0.custName = coalesce(e0.description, 'none')
 ```
 
 테스트 엔티티의 `cnt`는 Java `Integer`이므로 Kotlin은 플랫폼 타입으로 보고 `+=`를 컴파일합니다. `cnt`가 NULL인 행은 SQL 규칙에 따라 NULL로 남습니다.
-문자열 값의 `?:`는 `coalesce(...)`가 됩니다.
+`?:`는 문자열과 숫자 모두 `coalesce(...)`가 됩니다. `it.total = (it.total ?: 0.0) + 1`은 `set e0.total = (coalesce(e0.total, 0.0) + 1.0)`입니다.
 
 <a id="embedded-fields"></a>
 ## 임베디드 필드
@@ -224,15 +224,15 @@ assertEquals("update Order e0 set e0.price = (select sum(s1.price) from Item s1 
 ```
 
 - 다른 테이블의 집계와 같은 테이블의 집계를 모두 쓸 수 있습니다(H2, MariaDB 10.11, Oracle 23.26에서 실측). `update`에서는 MariaDB도 오류 1093을 내지 않습니다.
-- 일치하는 행이 없으면 집계는 NULL입니다. NOT NULL 컬럼이면 DB 오류가 나므로 `Objects.requireNonNullElse(…, 0.0)`로 감싸 `coalesce(...)`로 만드십시오.
+- 일치하는 행이 없으면 집계는 NULL입니다. NOT NULL 컬럼이면 DB 오류가 나므로 `?: 0.0`을 붙여 `coalesce(...)`로 만드십시오.
 
 [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt), 영역 `update-sub-coalesce`:
 
 ```kotlin
-// sum gives NULL when there is no row; Objects.requireNonNullElse becomes coalesce and keeps the NOT NULL price valid
+// sum gives NULL when there is no row; ?: becomes coalesce and keeps the NOT NULL price valid
 val u = qb.update(Order::class.java)
     .set { o, sub ->
-        o.price = Objects.requireNonNullElse(sub.from(Item::class.java).where { i -> i.order?.id == o.id }.sum { it.price }, 0.0)
+        o.price = sub.from(Item::class.java).where { i -> i.order?.id == o.id }.sum { it.price } ?: 0.0
     }
     .all()
 assertEquals("update Order e0 set e0.price = coalesce((select sum(s1.price) from Item s1 where s1.order.id = e0.id), 0.0)",
@@ -325,7 +325,7 @@ if (n == 0) throw OptimisticLockException()   // checking the result is your job
 
 테스트는 같은 문장을 한 번 더 실행합니다. 그때 `v`는 이전 버전이므로 0행이 수정되고 `OptimisticLockException`이 발생합니다.
 
-`@Version` 속성에 직접 대입하지 마십시오(규칙 U15). lambdaQL은 이 대입을 검사하지 않습니다.
+`@Version` 속성에는 대입할 수 없습니다(규칙 U15). 대입하면 `LQL-3068`로 거부됩니다.
 
 <a id="many-set-calls-patch"></a>
 ## 여러 번의 `set()` 호출(PATCH)

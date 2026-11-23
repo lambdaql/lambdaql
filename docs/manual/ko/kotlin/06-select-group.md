@@ -643,10 +643,10 @@ val rows = qb.from(Customer::class.java)
     .select { c, x -> c.name to x.total }
 assertEquals("with t as (select d0.customer.id as customerId, sum(d0.price) as total from Order d0"
         + " where d0.customer is not null group by d0.customer.id) select e0.name, e1.total from Customer e0"
-        + " join t e1 on e1.customerId is not null and e1.customerId = e0.id where e1.total > 100.0", rows.toHql().hql())
+        + " join t e1 on e1.customerId = e0.id where e1.total > 100.0", rows.toHql().hql())
 ```
 
-`x.customerId`가 nullable `Int?`이면 `x.customerId == c.id`는 `e1.customerId is not null and e1.customerId = e0.id`가 됩니다(위 영역 참고).
+`x.customerId`가 nullable `Int?`여도 `x.customerId == c.id`는 `e1.customerId = e0.id`입니다. Kotlin이 넣는 null 검사는 읽지 않습니다(결정 D22).
 
 이름 없는 파생 테이블의 조인(`CustomerTotal`은 [6.9](#69-derived-table-subquery-in-from)의 행 타입):
 
@@ -662,7 +662,7 @@ val small = qb.from(Customer::class.java)
     .where { _, x -> x.customerId == null || x.total!! < 210 }
 assertEquals("select e0 from Customer e0 left join (select d0.customer.id as customerId, count(*) as cnt,"
     + " sum(d0.price) as total from Order d0 where d0.customer is not null group by d0.customer.id) e1"
-    + " on e1.customerId is not null and e1.customerId = e0.id where e1.customerId is null or e1.total < 210.0", small.toHql().hql())
+    + " on e1.customerId = e0.id where e1.customerId is null or e1.total < 210.0", small.toHql().hql())
 ```
 
 같은 CTE를 두 번 읽는 형태:
@@ -677,8 +677,8 @@ val reused = qb.from(Customer::class.java)
     .select { c, _, y -> c.name to y.total }
 assertEquals("with t as (select d0.customer.id as customerId, count(*) as cnt, sum(d0.price) as total from Order d0"
     + " where d0.customer is not null group by d0.customer.id)"
-    + " select e0.name, e2.total from Customer e0 join t e1 on e1.customerId is not null and e1.customerId = e0.id"
-    + " left join t e2 on e2.customerId is not null and e2.customerId = e0.id and e2.total > 210.0", reused.toHql().hql())
+    + " select e0.name, e2.total from Customer e0 join t e1 on e1.customerId = e0.id"
+    + " left join t e2 on e2.customerId = e0.id and e2.total > 210.0", reused.toHql().hql())
 ```
 
 <a id="what-a-join-query-has"></a>

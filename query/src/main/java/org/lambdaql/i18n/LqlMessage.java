@@ -329,6 +329,9 @@ public enum LqlMessage {
     /** LQL-3067: A row of a derived table or CTE has no id, so it cannot be compared with null. Compare one of its columns, for example x.customerId() == null: &#123;0&#125; */
     DERIVED_ROW_NULL("LQL-3067", 1),
 
+    /** LQL-3068: The &#64;Version column cannot be assigned; Hibernate increases it in every update (U15): &#123;0&#125; */
+    VERSION_ASSIGN("LQL-3068", 1),
+
     /** LQL-4001: limit and the one-row protection are not supported yet for an entity with a composite key: &#123;0&#125; */
     COMPOSITE_KEY_LIMIT("LQL-4001", 1),
 

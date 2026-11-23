@@ -94,11 +94,9 @@ val error = assertThrows(LambdaQLException::class.java) {
     qb.from(Order::class.java).select { it.customer?.name ?: "none" }
 }
 assertEquals("LQL-2022", error.code())
-// ?: with a number in a condition is rejected
-val number = assertThrows(LambdaQLException::class.java) {
-    qb.from(Order::class.java).where { (it.total ?: 0.0) > 3.0 }
-}
-assertEquals("LQL-2021", number.code())
+// ?: with a number: coalesce too
+val number = qb.from(Order::class.java).where { (it.total ?: 0.0) > 3.0 }
+assertEquals("select e0 from Order e0 where coalesce(e0.total, 0.0) > 3.0", number.toHql().hql())
 // in a string condition, ?: is coalesce too
 val x = qb.from(Order::class.java).where { (it.description ?: "") == "x" }
 assertEquals("select e0 from Order e0 where coalesce(e0.description, '') = 'x'", x.toHql().hql())
@@ -153,8 +151,8 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 
 | 람다 | SQL | NULL 동작 |
 |---|---|---|
-| `it.cnt == 1`(`Integer`와 상수) | `e0.cnt is not null and e0.cnt = 1` | NULL: 행이 반환되지 않음. 컴파일러가 넣은 null 검사가 HQL에 남음 |
-| `it.cnt != 1` | `e0.cnt is null or e0.cnt <> 1` | NULL: 행이 반환됨(Kotlin과 같음) |
+| `it.cnt == 1`(`Integer`와 상수) | `e0.cnt = 1` | NULL: 행이 반환되지 않음. 컴파일러가 넣은 null 검사는 읽지 않음(D22) |
+| `it.cnt != 1` | `e0.cnt <> 1` | NULL: 행이 반환되지 않음(SQL 의미). 필요하면 `it.cnt == null \|\|`를 직접 씀 |
 | `it.price!! > p` | `e0.price > :p1` | NULL: 행이 반환되지 않음. `!!`는 무시됨(D23) |
 | `it.status == q`(둘 다 nullable: `q: Int?`, `String?`, enum) | `e0.status = :p1` | 컬럼이 NULL: 반환되지 않음. 캡처 값 `null`: 일치하는 행 없음(`= NULL`, `WARN` 수준 `LQL-4045`) |
 | `it.status != q`(둘 다 nullable) | `e0.status <> :p1` | 컬럼이 NULL: 반환되지 **않음**(SQL 의미, D48. Kotlin이라면 반환). 캡처 값 `null`: 일치하는 행 없음 |
@@ -173,7 +171,7 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 | 같은 경로를 `orderBy`나 `select`에만 씀 | `j1.name` + `left join e0.customer j1`. 필수 연관(`optional = false`)은 `join` | 고객 없음: 컬럼이 NULL |
 | `it.customer == null`, `it.customer != null` | `e0.customer is null`, `e0.customer is not null`(외래 키 컬럼, 조인 없음) | 고객이 없는 주문 / 고객이 있는 주문 |
 | `it.customer?.id` | `e0.customer.id`(외래 키 컬럼, 조인 없음) | 고객 없음: NULL |
-| `a ?: b` | select 값과 문자열 조건에서 `coalesce(a, b)`. 숫자 조건에서는 거부(`LQL-2021`) | [9.5](09-kotlin-notes.md#95-null-operators---and-) 참고 |
+| `a ?: b` | select 값, 조건, `set` 값에서 `coalesce(a, b)`. Boolean 조건의 `?: false`는 null 검사로 읽음 | [9.5](09-kotlin-notes.md#95-null-operators---and-) 참고 |
 | `it.id in ids` | `e0.id in (:p1)` | NULL id: 반환 안 됨 |
 | `it.id !in ids` | `e0.id not in (:p1)`. NULL이 될 수 있는 컬럼도 같음 | NULL 값: 반환되지 **않음**(SQL 의미, D48. `DEBUG` 수준 `LQL-5009`. Kotlin이라면 반환) |
 | `it.cnt in 1..5`, `it.cnt !in 1..5` | `1 <= e0.cnt and e0.cnt < 6`, `1 > e0.cnt or e0.cnt >= 6` | 대상이 NULL: 반환 안 됨. `!in`에서도 마찬가지(가드 없음, D22) |
@@ -208,7 +206,7 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 | R9 | 캡처 값 | 실행 시점의 값을 가진 바인드 파라미터 |
 | R10 | 속성 접근(`it.price`) | getter 호출. JPA 속성에 매핑됨 |
 | R11 | `Intrinsics.areEqual`로 컴파일되는 Kotlin `==`, `!=`(참조, 또는 양쪽 모두 nullable) | 값 동등성: SQL 의미의 `=` / `<>`(D48). 캡처 값 `null`은 어떤 행에도 일치하지 않음 |
-| R12 | nullable 기본형과 기본형(`it.cnt == 1`, `cnt: Integer`) | 컴파일러가 넣은 null 검사가 HQL에 남음: `e0.cnt is not null and e0.cnt = 1`, `e0.cnt is null or e0.cnt <> 1` |
+| R12 | nullable 기본형과 기본형(`it.cnt == 1`, `cnt: Integer`) | 컴파일러가 넣은 null 검사는 읽지 않음(D22): `e0.cnt = 1`, `e0.cnt <> 1` |
 | R13 | `!!` | 무시됨(D23) |
 | R14 | `?.` | NULL이 전파되는 경로 또는 값. `?.`가 없을 때와 같은 컬럼 |
 | R15 | `?:` | 값에서는 `coalesce(a, b)`. 조건 안의 boolean 엘비스는 `(x is not null and x = true)`가 됨. 값으로 쓰는 boolean 엘비스는 거부됨(KC21) |

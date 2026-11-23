@@ -188,11 +188,9 @@ class ManualKotlinNotesTest {
             qb.from(Order::class.java).select { it.customer?.name ?: "none" }
         }
         assertEquals("LQL-2022", error.code())
-        // ?: with a number in a condition is rejected
-        val number = assertThrows(LambdaQLException::class.java) {
-            qb.from(Order::class.java).where { (it.total ?: 0.0) > 3.0 }
-        }
-        assertEquals("LQL-2021", number.code())
+        // ?: with a number: coalesce too
+        val number = qb.from(Order::class.java).where { (it.total ?: 0.0) > 3.0 }
+        assertEquals("select e0 from Order e0 where coalesce(e0.total, 0.0) > 3.0", number.toHql().hql())
         // in a string condition, ?: is coalesce too
         val x = qb.from(Order::class.java).where { (it.description ?: "") == "x" }
         assertEquals("select e0 from Order e0 where coalesce(e0.description, '') = 'x'", x.toHql().hql())
@@ -200,6 +198,7 @@ class ManualKotlinNotesTest {
         // Oracle stores '' as NULL, so coalesce(NULL, '') is NULL there: compare NULL and '' as the same text
         assertEquals(orders.map { it.description ?: "" }.sorted(), text.toList().map { it ?: "" }.sorted())
         assertEquals(ids(orders.filter { (it.description ?: "") == "x" }), ids(x.toList()))
+        assertEquals(ids(orders.filter { (it.total ?: 0.0) > 3.0 }), ids(number.toList()))
     }
 
     @Test
@@ -219,11 +218,11 @@ class ManualKotlinNotesTest {
     fun hiddenNullCheck() {
         val q: Int? = 2
         // @start region="hidden-null-check"
-        // cnt is a nullable Integer: Kotlin checks for null before the unboxing, and the check stays in the HQL
+        // cnt is a nullable Integer: the null check Kotlin adds before the unboxing is not read (SQL meaning, D22)
         val one = qb.from(Order::class.java).where { it.cnt == 1 }
-        assertEquals("select e0 from Order e0 where e0.cnt is not null and e0.cnt = 1", one.toHql().hql())
-        val notOne = qb.from(Order::class.java).where { it.cnt != 1 }          // NULL rows are returned, as in Kotlin
-        assertEquals("select e0 from Order e0 where e0.cnt is null or e0.cnt <> 1", notOne.toHql().hql())
+        assertEquals("select e0 from Order e0 where e0.cnt = 1", one.toHql().hql())
+        val notOne = qb.from(Order::class.java).where { it.cnt != 1 }          // NULL rows are left out, as in SQL
+        assertEquals("select e0 from Order e0 where e0.cnt <> 1", notOne.toHql().hql())
         // both sides nullable: Intrinsics.areEqual, a value comparison
         val same = qb.from(Order::class.java).where { it.cnt == q }
         assertEquals("select e0 from Order e0 where e0.cnt = :p1", same.toHql().hql())
@@ -233,7 +232,7 @@ class ManualKotlinNotesTest {
         // @end
         val cnt: Map<Long?, Int?> = orders.associate { it.id to it.cnt }
         assertEquals(ids(orders.filter { cnt[it.id] == 1 }), ids(one.toList()))
-        assertEquals(ids(orders.filter { cnt[it.id] != 1 }), ids(notOne.toList()))
+        assertEquals(ids(orders.filter { cnt[it.id] != null && cnt[it.id] != 1 }), ids(notOne.toList()))
         assertEquals(ids(orders.filter { cnt[it.id] == q }), ids(same.toList()))
         assertEquals(ids(orders.filter { it.description != null && it.description == it.custName }), ids(columns.toList()))
     }
