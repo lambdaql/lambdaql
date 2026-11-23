@@ -1,6 +1,37 @@
 plugins {
 	id 'java-library'
 	id 'maven-publish'
+	// Kotlin only for tests (the manual's Kotlin track, ROADMAP D56); the jar has no Kotlin dependency
+	id 'org.jetbrains.kotlin.jvm' version '2.3.21'
+}
+
+// the Spring Boot BOM would pin an older Kotlin; the Kotlin tests use the compiler version
+ext['kotlin.version'] = '2.3.21'
+
+// Kotlin tests live in src/test/kotlin as their own source set and see the compiled Java test classes
+// (the entities and repositories in src/test/java), as in the query module
+sourceSets {
+	test {
+		kotlin.srcDirs = []
+	}
+	kotlinTest {
+		kotlin.srcDir 'src/test/kotlin'
+		java.srcDirs = []
+		resources.srcDirs = []
+		compileClasspath += sourceSets.main.output + sourceSets.test.output
+		runtimeClasspath += sourceSets.main.output + sourceSets.test.output
+	}
+}
+
+configurations {
+	kotlinTestImplementation.extendsFrom testImplementation
+	kotlinTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+kotlin {
+	compilerOptions {
+		jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+	}
 }
 
 // lambdaql-spring-data-jpa: one jar for Spring Boot 3 (Spring Data 3.5) and Spring Boot 4 (Spring Data 4.1)
@@ -23,10 +54,18 @@ dependencies {
 	testRuntimeOnly 'com.oracle.database.jdbc:ojdbc11:23.26.0.0.0'
 	testRuntimeOnly 'org.postgresql:postgresql'
 	testRuntimeOnly 'com.mysql:mysql-connector-j'
+
+	// Kotlin tests (src/test/kotlin)
+	kotlinTestImplementation 'org.jetbrains.kotlin:kotlin-stdlib:2.3.21'
+	// Spring Data needs kotlin-reflect for Kotlin repositories (NoClassDefFoundError ReflectJvmMapping without it)
+	kotlinTestRuntimeOnly 'org.jetbrains.kotlin:kotlin-reflect:2.3.21'
 }
 
 test {
 	useJUnitPlatform()
+	// the Kotlin tests run in the same task
+	testClassesDirs += sourceSets.kotlinTest.output.classesDirs
+	classpath += sourceSets.kotlinTest.runtimeClasspath
 	// -Dlql.db=mariadb|oracle|postgresql|mysql makes application-test.yaml import src/test/resources/lql-db-<name>.yaml
 	systemProperty 'lql.db', System.getProperty('lql.db', 'h2')
 	testLogging {
