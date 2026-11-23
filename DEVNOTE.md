@@ -238,6 +238,15 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 
 ---
 
+### 10.6 매뉴얼 예제의 테스트화(D56, 2026-11-23)
+
+- 매뉴얼의 (테스트됨) 표시를 4개 언어에서 지웠다. 모든 lambdaQL 코드 예제는 테스트 구간의 사본이다.
+- 새 테스트: `ManualJava*Test`(9개), `ManualKotlin*Test`(query 12개, spring-data-jpa 3개), `ManualSharedTest`, `ManualKotlinSharedTest` 등 27개 파일, 구간 255개.
+- `spring-data-jpa`에 Kotlin 테스트 소스 세트를 더했다. 테스트 런타임에만 `kotlin-reflect`가 있다(Spring Data가 Kotlin 리포지토리를 읽을 때 필요). 배포 런타임 클래스패스에는 Kotlin이 없다(`spring-data-jpa/gradle.properties`의 `kotlin.stdlib.default.dependency=false`).
+- 검사 도구(로컬): `.claude/tools/docs/check_regions.py`(FREE·DIFF·NOREGION), `fix_region_copies.py`(DIFF를 구간으로 교체), `check_links.py`(링크·앵커). 중첩 구간(구간 안의 구간)은 검사 도구가 읽지 못하므로 쓰지 않는다.
+- 이 작업에서 찾아 고친 버그(2026-11-23): Kotlin 언박싱 null 검사(D22 회귀), 기본형 기본값 엘비스(`set` 값에서 사라짐), `downTo`·`step`의 `ClassCastException`, 기본 인자 스텁의 오류 코드(`LQL-3062`), U15 미검사.
+- 판단이 남은 동작: Kotlin select의 `?.` 뒤 `?:`(`LQL-2022`)와 정렬 키 엘비스의 차이, `@SqlFunction` 확장 함수 허용 여부, `?.` 상관 조건의 `is not null`(행은 같음). ROADMAP 4장에 있다.
+
 ## 9. 기능별 구현·테스트 현황 (2026-11-19)
 
 매뉴얼에 있던 상태 노트와 README의 상태 표를 옮겨 현재 기준으로 합쳤다. 매뉴얼은 사용 방법만 다루고, 현황은 이 표에서 관리한다. 옮기기 전 원문은 커밋 `15f691e`, `ad202ed`에 있다.
@@ -264,21 +273,20 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 | SQL 의미 원칙(엔티티 값 비교, null 캡처 값, 정수 열과 소수 값) | 구현됨, 세 DB 테스트 | 일부 | D48(B1~B8) |
 | Kotlin `?.`·`!!`에 따른 where 조인 구분(`?.`는 필요할 때 `left join`, 섞이면 `LQL-5014`) | `feature/boot4`에서 구현(2026-11-19), 다섯 DB 테스트 | 예(`safe-call-*`, `not-null-assert`, `mixed-warn`, `update-safe-call`) | D54 |
 | 메시지와 오류 코드(`[LQL-xxxx]`, 4개 언어, `lambdaql.locale`) | 구현됨, 단위 테스트 | – | D33 |
+| Kotlin 엘비스(`?:`, 문자열·숫자·`set` 값은 `coalesce`), 범위(`in a..b`는 비교 두 개, `downTo`·`step`은 `in` 목록), 조건 형태의 `when`(상수 1개, String 2개, 범위 분기, 대상 없는 `when {}`) | 구현됨, H2 테스트(2026-11-23). 다섯 DB 실행은 전체 테스트로 | 예(`ManualKotlin*Test`, `KotlinRegressionTest`) | D21, D22, R13~R23 |
 | 분석 캐시(EntityManagerFactory별 공유) | 구현됨 | – | D47 |
-| Spring Data JPA 모듈(`LambdaQlExecutor<T>`, `Sort`, `Pageable`, DML 단축 메서드, 자동 구성) | 구현됨, 세 DB·Spring Boot 3.4.2 테스트. DML에는 호출자 트랜잭션 필요 | Kotlin 리포지토리는 아니오 | D34, D39, M12 |
+| Spring Data JPA 모듈(`LambdaQlExecutor<T>`, `Sort`, `Pageable`, DML 단축 메서드, 자동 구성) | 구현됨, 다섯 DB·Spring Boot 3.5.16·4.1.2 테스트. DML에는 호출자 트랜잭션 필요 | 예(`spring-data-jpa/src/test/kotlin`, 2026-11-23) | D34, D39, M12 |
 
 ### 미구현과 후보
 
 | 항목 | 상태 |
 |---|---|
 | 모든 경고를 오류로 바꾸는 일반 엄격 모드 | 미구현(정렬 정책과 SARGable에는 STRICT가 있음) |
-| MariaDB `lateral` 쿼리의 `row_number()` 재작성 | 미구현(Q4) |
-| `SortSpec`의 조인 형태 | 설계됨 |
+| MariaDB `lateral` 쿼리의 `row_number()` 재작성 | 미구현(Q4). 오답 재현 테스트부터 필요 |
 | 집계 기준 정렬, Oracle 오버로드 선택, 조건부 값(CASE WHEN), 일반 `LIKE`(`startsWith` 등) | v0.2 후보 |
 | insert의 조인, 엔티티 4개 이상 조인, 서브쿼리 안 엔티티 3개 이상 | 이후 |
 | UPDATE·DELETE의 명시적 조인 | 추가하지 않음(D51, 연관 경로 U9와 `sub` 사용) |
 | 복합 키 엔티티의 `limit`·`executeOne()` | 미구현 |
-| U11, U12, U15 검사 | 미구현 |
-| Kotlin 전용 형태 `?:`, 범위, `when` | 설계됨, 프로토타입으로 바이트코드 확인. 빌드 안의 Kotlin 테스트 없음 |
-| Spring Boot 4 | `feature/boot4` 진행 중(10절) |
+| U11, U12 검사 | 미구현(U15 `@Version` 대입 거부는 2026-11-23 구현, `LQL-3068`) |
+| 그 밖의 미구현·미검증 항목 | ROADMAP 4장 "매뉴얼에서 옮긴 미구현·미검증 항목"(D56) |
 | Maven Central 배포 | 미배포 |
