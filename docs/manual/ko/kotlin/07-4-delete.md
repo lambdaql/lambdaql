@@ -6,14 +6,17 @@
 ---
 
 
+[`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt), 영역 `delete`:
+
 ```kotlin
-val d = qb.delete(Order::class.java).where { it.status == 3 }
-// HQL: delete from Order e0 where e0.status = 3
+val d = qb.delete(Order::class.java).where { it.status.toInt() == 3 }
+assertEquals("delete from Order e0 where e0.status = 3", d.toHql().hql())
 val deleted = d.execute()
 
 // a path: the same rows as qb.from(Order::class.java).where { same lambda } - with !! orders without a customer stay
 val byName = qb.delete(Order::class.java).where { it.customer!!.name == null }
-// HQL: delete from Order e0 where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) is null and e0.customer.id is not null
+assertEquals("delete from Order e0 where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) is null"
+    + " and e0.customer.id is not null", byName.toHql().hql())
 ```
 
 **SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다. 이 테스트는 Java 람다를 사용합니다. 의미가 같은 Kotlin 람다는 같은 HQL을 만들므로 SQL도 같습니다.
@@ -44,48 +47,49 @@ where (select c1_0.name from customers c1_0 where c1_0.id=orders.customer_id) is
 
 MariaDB는 `delete o1_0 from orders o1_0`로 씁니다. H2와 Oracle은 `delete from orders o1_0`로 씁니다.
 
-[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `insert-delete`:
-
-```kotlin
-val i = qb.insert(Archive::class.java).values { it.id = 100L; it.price = 9.5; it.customerName = "Kim" }
-assertEquals(1, i.execute())
-val d = qb.delete(Order::class.java).where { o, sub -> !sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
-assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)", d.toHql().hql())
-```
-
-테스트는 먼저 `Archive` 행 하나를 삽입하고, 품목이 없는 주문을 삭제한 뒤, 남은 행을 Kotlin으로 같은 조건을 적용한 결과와 비교합니다.
-더 많은 문장을 Java로 작성한 테스트가 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)에 있습니다(H2, MariaDB, Oracle). 그 예제는 [이 페이지의 Java 버전](../java/07-4-delete.md)을 참고하십시오.
-
-두 번째 문장은 `qb.from(Order::class.java).where { it.customer!!.name == null }`이 반환하는 것과 **같은 행**, 즉 고객의 이름이 없는 주문을 삭제합니다. Java 테스트는 같은 조건을 Java로 써서 삭제된 행을 조회 결과와 비교합니다.
+두 번째 문장은 `qb.from(Order::class.java).where { it.customer!!.name == null }`이 반환하는 것과 **같은 행**, 즉 고객의 이름이 없는 주문을 삭제합니다. 테스트는 삭제된 행을 이 조회 결과와 비교합니다.
 고객이 **없는** 주문은 삭제되지 않습니다(규칙 U9, 결정 D36). `!!`는 연관이 반드시 있다는 선언이기 때문입니다.
 
 `?.`로 쓰면(`it.customer?.name == null`) 조회처럼 `left join`과 같은 의미가 되어 `e0.customer.id is not null`을 더하지 않습니다(결정 D54). 그래서 고객이 없는 주문도 삭제됩니다.
-같은 방식의 UPDATE 예제는 [7.2](07-2-update.md)의 `update-safe-call` 영역을 참고하십시오. 고객이 없는 주문만 삭제하려면 `it.customer == null`이라고 쓰십시오.
-
-모든 행을 삭제할 때는 `all()`이 필요합니다(규칙 U5).
+[`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt), 영역 `delete-safe-call`:
 
 ```kotlin
-qb.delete(Order::class.java).all().execute()     // delete all rows
-qb.delete(Order::class.java).execute()           // compile error: no execute()
+// ?. : no "customer exists" check, so orders without a customer are deleted too, as the select returns them (D54)
+val d = qb.delete(Order::class.java).where { it.customer?.name == null }
+assertEquals("delete from Order e0 where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) is null",
+    d.toHql().hql())
 ```
 
-id 목록으로 삭제(캡처한 컬렉션, 결정 D29):
+같은 방식의 UPDATE 예제는 [7.2](07-2-update.md)의 `update-safe-call` 영역을 참고하십시오. 고객이 없는 주문만 삭제하려면 `it.customer == null`이라고 쓰십시오.
+
+모든 행을 삭제할 때는 `all()`이 필요합니다(규칙 U5). `qb.delete(Order::class.java).execute()`처럼 `all()` 없이 쓰면 `execute()`가 없으므로 컴파일 오류입니다.
+id 목록으로 삭제할 때는 캡처한 컬렉션을 씁니다(결정 D29).
+
+[`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt), 영역 `delete-all`:
 
 ```kotlin
-qb.delete(Item::class.java).where { it.id in ids }.execute()
+// ids in a captured collection (D29)
+val byIds = qb.delete(Item::class.java).where { it.id in ids }
+assertEquals("delete from Item e0 where e0.id in (:p1)", byIds.toHql().hql())
+byIds.execute()
+// every row: all() is required (U5)
+val all = qb.delete(Order::class.java).all()
+assertEquals("delete from Order e0", all.toHql().hql())
+all.execute()
 ```
 
 `where` 안의 서브쿼리는 [5. 서브쿼리](05-subquery.md)처럼 두 번째 람다 인자 `sub`를 사용합니다.
 품목이 없는 주문을 삭제하는 예:
 
-```kotlin
-qb.delete(Order::class.java)
-    .where { o, sub -> !sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
-    .execute()
-// HQL: delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)
-```
+[`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt), 영역 `delete-not-exists`:
 
-같은 문장을 Java로 작성한 테스트가 [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)에 있습니다(영역 `dml-subquery`).
+```kotlin
+// orders without items: the subquery starts with the second lambda parameter sub
+val d = qb.delete(Order::class.java)
+    .where { o, sub -> !sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
+assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)", d.toHql().hql())
+val deleted = d.execute()
+```
 
 **데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `dml-subquery`:
 
@@ -139,17 +143,18 @@ assertEquals("delete from Order d0 where d0.id in (select t.id from (select e0.i
 - `orderBy`에는 조회와 마찬가지로 정렬 람다나 `SortSpec`을 지정합니다([4. 정렬과 페이징](04-order-paging.md) 참고).
 - `limit` 없는 `orderBy`는 오류(`IllegalStateException`)입니다. 이 경우 순서가 아무 역할을 하지 않기 때문입니다.
 
+[`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt), 영역 `delete-limit`:
+
 ```kotlin
 // the first rows of qb.from(Order::class.java).where { same }.orderBy { same }; the id is the last sort key
 val d = qb.delete(Order::class.java)
-    .where { it.status == 1 }
+    .where { it.status.toInt() == 1 }
     .orderBy { o, by -> by.asc(o.price) }
     .limit(1)
-// HQL: delete from Order e0 where e0.id in (select t.id from (select x0.id as id from Order x0 where x0.status = 1 order by x0.price asc, x0.id asc limit 1) t)
+assertEquals("delete from Order e0 where e0.id in (select t.id from (select x0.id as id from Order x0"
+    + " where x0.status = 1 order by x0.price asc, x0.id asc limit 1) t)", d.toHql().hql())
 val deleted = d.execute()
 ```
-
-같은 문장을 Java로 작성한 테스트가 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)에 있습니다(영역 `delete-limit`).
 
 **데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `delete-limit`:
 
@@ -185,14 +190,19 @@ lambdaQL은 limit을 `e0.id in (select t.id from (select x0.id as id from X x0 .
 
 문장에 id 하나를 지정하므로 2행 이상을 변경하지 않습니다. 이 보호는 롤백에 의존하지 않습니다.
 
+[`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt), 영역 `execute-one`:
+
 ```kotlin
 // one row matches: it is deleted
 val one = qb.delete(Order::class.java).where { it.id == id }.executeOne()
-// two or more rows match: nothing is deleted, NonUniqueResultException
-qb.delete(Order::class.java).where { it.price!! > 100.0 }.executeOne()
+// two or more rows match: nothing is deleted
+assertThrows(NonUniqueResultException::class.java) {
+    qb.delete(Order::class.java).where { it.price > 100.0 }.executeOne()
+}
 ```
 
-같은 문장을 Java로 작성한 테스트가 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)에 있습니다(영역 `execute-one`). id는 NULL이 될 수 없으므로 `it.id == id`는 단순한 `e0.id = :p1`이 됩니다([3.6.2](03-where.md#362--compares-values) 참고).
+두 번째 문장은 가격이 100보다 큰 주문이 둘 이상이므로 아무것도 삭제하지 않습니다. 테스트는 남은 행을 다시 읽어 확인합니다.
+id는 NULL이 될 수 없으므로 `it.id == id`는 단순한 `e0.id = :p1`이 됩니다([3.6.2](03-where.md#362--compares-values) 참고).
 
 - `executeOne()`을 `orderBy`나 `limit`과 함께 쓰면 오류(`IllegalStateException`)입니다.
 - `limit`과 `executeOne()`은 아직 복합 키 엔티티를 지원하지 않습니다.
