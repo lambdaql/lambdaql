@@ -42,7 +42,8 @@
 ### 3. D55: Spring Boot 3·4 동시 지원(2026-11-23)
 
 - 새 페이지 `13-spring-boot-versions.md`(공통): 번역본에 같은 파일을 새로 만듦. 매뉴얼 홈(`README.md`)의 공통 페이지 표와 목차, `java/README.md`·`kotlin/README.md`의 공통 페이지 줄과 목차에 13장 행 추가
-- `java/02-getting-started.md`, `kotlin/02-getting-started.md`: 요구 사항 표(Hibernate 6.6 또는 7.4, Jakarta Persistence 3.1 또는 3.2, 데이터베이스 다섯 개, Spring Boot 3.5 또는 4.1), 빌드 모듈 문장, 의존성 문장, `QueryBuilder` 빈 문장의 아티팩트 이름(`-boot3`·`-boot4`)
+- 아티팩트 구성: `lambdaql-core`와 `lambdaql-spring-data-jpa`는 Boot 3·4 공통 jar 하나, 스타터만 `lambdaql-spring-boot-starter-boot3`·`-boot4`. `lambdaql-spring-data-jpa`는 Spring Data JPA를 가져오지 않음(프로젝트의 것을 씀)
+- `java/02-getting-started.md`, `kotlin/02-getting-started.md`: 요구 사항 표(Hibernate 6.6 또는 7.4, Jakarta Persistence 3.1 또는 3.2, 데이터베이스 다섯 개, Spring Boot 3.5 또는 4.1), 빌드 모듈 문장, 의존성 문장, `QueryBuilder` 빈 문장의 아티팩트 이름
 - `java/12-spring-data-jpa.md`, `kotlin/12-spring-data-jpa.md`: 탐색 줄(다음: 13장), 아티팩트 표와 설명, Gradle·Maven 예제의 아티팩트 이름, 요구 사항 표, `spring.factories` 문장, "Spring Boot 버전" 항목, `PropertyReferenceException` 패키지 설명. Java는 영역 `find-all-spring-sort`의 코드 블록(예외를 단순 이름으로 확인)
 - `java/10-rules-and-limits.md`, `kotlin/10-rules-and-limits.md`: 환경 표의 Hibernate·Spring 행
 - `README.md`, `java/README.md`, `kotlin/README.md`: Hibernate ORM·데이터베이스·Spring Boot 행

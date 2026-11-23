@@ -416,7 +416,8 @@ class SqlByDatabaseTest {
 
     private void compare() throws IOException {
         String db = System.getProperty("lql.db", "h2").toLowerCase(Locale.ROOT);
-        Path file = Path.of("src/test/resources/expected-sql/" + db + ".sql");
+        // lql.sql.dir: another folder for the SQL of another Hibernate version (testBoot3 uses expected-sql/hibernate6)
+        Path file = Path.of(System.getProperty("lql.sql.dir", "src/test/resources/expected-sql"), db + ".sql");
         StringBuilder text = new StringBuilder()
                 .append("-- SQL that Hibernate ").append(hibernateVersion()).append(" makes for the manual examples on ").append(db).append(".\n")
                 .append("-- Made by SqlByDatabaseTest; the select list is shortened to … and the test table prefix is removed.\n");

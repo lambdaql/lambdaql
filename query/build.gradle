@@ -149,3 +149,8 @@ javadoc {
 	// The test files mark the code with  // @start region="..."  and  // @end
 	options.addStringOption('-snippet-path', file('src/test/java').absolutePath)
 }
+
+// testBoot3 (gradle/boot3-test.gradle): the same compiled tests on Spring Boot 3 and Hibernate 6.6 (ROADMAP D55).
+// Hibernate 6 writes some SQL differently, so its SQL answer files are in expected-sql/hibernate6.
+ext.boot3SqlDir = 'src/test/resources/expected-sql/hibernate6'
+apply from: rootProject.file('gradle/boot3-test.gradle')

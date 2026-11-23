@@ -31,7 +31,7 @@ cd lambdaql
 - Gradle 래퍼는 9.9.1입니다. 저장소에 `gradle/gradle-daemon-jvm.properties`가 있으므로 Gradle 데몬은 Java 21을 사용합니다.
 - 빌드에는 JDK 21과 **JDK 24 이상** 하나가 필요합니다. JDK 24 이상은 `java.lang.classfile` 리더(`src/main/java24`)를 컴파일하고 그 리더로 테스트를 한 번 더 돌립니다. 기본 버전은 25이며 `-Plql.classfile.jdk=24`처럼 바꿀 수 있습니다. Gradle이 JDK를 찾지 못하면 `~/.gradle/gradle.properties`의 `org.gradle.java.installations.paths`에 경로를 적으십시오.
 - IntelliJ IDEA에서는 **Settings > Build Tools > Gradle > Gradle JVM**을 Java 21 JDK로 설정하십시오.
-- 빌드의 주요 모듈은 `query`(아티팩트 `lambdaql-core`), `spring-data-jpa-boot3`·`spring-data-jpa-boot4`(`lambdaql-spring-data-jpa-boot3`·`-boot4`), `spring-boot-starter-boot3`·`spring-boot-starter-boot4`(`lambdaql-spring-boot-starter-boot3`·`-boot4`)입니다. `lambdaql-core`는 Spring Boot 버전과 무관한 jar 하나이고, Spring 모듈만 Boot 버전별로 나뉩니다([13. Spring Boot 3과 4](../13-spring-boot-versions.md)). Spring 모듈은 [12. Spring Data JPA](12-spring-data-jpa.md)에서 설명합니다.
+- 빌드의 주요 모듈은 `query`(아티팩트 `lambdaql-core`), `spring-data-jpa`(`lambdaql-spring-data-jpa`), `spring-boot-starter-boot3`·`spring-boot-starter-boot4`(`lambdaql-spring-boot-starter-boot3`·`-boot4`)입니다. `lambdaql-core`와 `lambdaql-spring-data-jpa`는 Spring Boot 3·4 공통 jar이고, 스타터만 Boot 버전별로 나뉩니다([13. Spring Boot 3과 4](../13-spring-boot-versions.md)). Spring 모듈은 [12. Spring Data JPA](12-spring-data-jpa.md)에서 설명합니다.
 
 단위 테스트를 실행합니다.
 
@@ -85,7 +85,7 @@ Maven:
 </dependency>
 ```
 
-Spring Data JPA나 Spring Boot를 사용하면 Boot 버전에 맞는 `lambdaql-spring-boot-starter-boot4`(`-boot3`) 또는 `lambdaql-spring-data-jpa-boot4`(`-boot3`)를 대신 추가하십시오. 이 아티팩트들은 `lambdaql-core`를 함께 가져옵니다([12.2](12-spring-data-jpa.md#122-modules) 참고).
+Spring Boot를 사용하면 Boot 버전에 맞는 `lambdaql-spring-boot-starter-boot4`(`-boot3`)를, Spring Boot 없이 Spring Data JPA만 사용하면 `lambdaql-spring-data-jpa`를 대신 추가하십시오. 두 아티팩트는 `lambdaql-core`를 함께 가져옵니다([12.2](12-spring-data-jpa.md#122-modules) 참고).
 
 > [!WARNING]
 > 버전 `1.0.0`은 저장소의 `gradle.properties`에 정의된 값이며, 첫 릴리스 전에 바뀔 수 있습니다.

@@ -1,0 +1,60 @@
+// testBoot3: the tests of a module on Spring Boot 3 (ROADMAP D55), applied by query and spring-data-jpa.
+//
+// The module is compiled once, against Spring Boot 4 (Hibernate 7). testBoot3 runs the same compiled test classes
+// with a Spring Boot 3 runtime class path (Hibernate 6.6, Spring Data 3.5): the configuration boot3TestRuntime has
+// the declared test dependencies of the module and the Spring Boot 3 BOM. "test" is followed by it, so
+//   ./gradlew test -Dlql.db=h2|mariadb|oracle|postgresql|mysql
+// checks both Spring Boot lines. Results: build/test-results/testBoot3
+//
+// A module can set ext.boot3SqlDir before applying this script: the folder (relative to the module) of the SQL
+// answer files that Hibernate 6 makes (system property lql.sql.dir).
+
+def boot3Version = (findProperty('lql.springBoot3') ?: '3.5.16').toString()
+
+configurations {
+	boot3TestRuntime {
+		canBeConsumed = false
+		canBeResolved = true
+		// the declared dependencies of the test class path, resolved again with the Spring Boot 3 BOM
+		['implementation', 'runtimeOnly', 'testImplementation', 'testRuntimeOnly', 'kotlinTestImplementation', 'kotlinTestRuntimeOnly'].each {
+			def c = configurations.findByName(it)
+			if (c != null) extendsFrom c
+		}
+	}
+}
+
+def boot3Runtime = configurations.boot3TestRuntime
+dependencyManagement {
+	configurations(boot3Runtime) {
+		imports { mavenBom "org.springframework.boot:spring-boot-dependencies:${boot3Version}" }
+	}
+}
+
+def testBoot3 = tasks.register('testBoot3', Test) {
+	description = "Runs the compiled tests on a Spring Boot ${boot3Version} runtime class path (Hibernate 6.6)."
+	group = 'verification'
+	useJUnitPlatform()
+	testClassesDirs = files({ tasks.test.testClassesDirs })
+	// the compiled main and test classes (Kotlin tests too), then the Spring Boot 3 libraries
+	def kotlinTestOutput = sourceSets.findByName('kotlinTest')?.output ?: files()
+	classpath = files({ sourceSets.main.output + sourceSets.test.output + kotlinTestOutput }) + boot3Runtime
+	systemProperty 'lql.db', System.getProperty('lql.db', 'h2')
+	systemProperty 'lql.sql.update', System.getProperty('lql.sql.update', 'false')
+	if (project.ext.has('boot3SqlDir')) systemProperty 'lql.sql.dir', project.ext.boot3SqlDir
+	// one database schema is shared, so this task never runs at the same time as the other test tasks
+	mustRunAfter tasks.test
+	doFirst {
+		// "test --tests X" also limits this task (unless it has its own --tests)
+		if (filter.commandLineIncludePatterns.isEmpty()) {
+			filter.commandLineIncludePatterns = tasks.test.filter.commandLineIncludePatterns
+		}
+		filter.failOnNoMatchingTests = tasks.test.filter.failOnNoMatchingTests
+	}
+	testLogging {
+		events "passed", "skipped", "failed"
+	}
+}
+
+tasks.named('test') { finalizedBy testBoot3 }
+tasks.named('check') { dependsOn testBoot3 }
+tasks.matching { it.name == 'testClassFile' }.configureEach { mustRunAfter testBoot3 }

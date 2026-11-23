@@ -1,3 +1,0 @@
-// lambdaql-spring-data-jpa-boot3: the Spring Data JPA module for Spring Boot 3 (ROADMAP D55).
-// The shared code is in spring-data-jpa/; only SpringDataPaths is written for this Spring Data version.
-apply from: rootProject.file('gradle/spring-data-jpa-module.gradle')

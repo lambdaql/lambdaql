@@ -77,7 +77,7 @@ fetch first ? rows only
 | 10 | [규칙과 제한](10-rules-and-limits.md) | 전체 규칙 표, Java와 SQL의 차이, 데이터베이스별 차이, 지원하지 않는 것 |
 | 11 | [오류와 언어](../11-errors-and-languages.md) (공통) | 오류 코드, 예외, 메시지 언어, 로깅 |
 | 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`, 리포지토리 default 메서드, DML 단축 메서드(`deleteAll`, `updateOne` 등), Spring `Sort`와 `Pageable`, 모듈, 트랜잭션, `QueryBuilder` 빈 |
-| 13 | [Spring Boot 3과 4](../13-spring-boot-versions.md) (공통) | 버전 표, 아티팩트(`-boot3`, `-boot4`), Hibernate 6.6과 7.4의 SQL 차이, 검증 범위 |
+| 13 | [Spring Boot 3과 4](../13-spring-boot-versions.md) (공통) | 버전 표, 아티팩트(공통 jar와 `-boot3`·`-boot4` 스타터), Hibernate 6.6과 7.4의 SQL 차이, 검증 범위 |
 
 <a id="example-entities"></a>
 ## 예제 엔티티

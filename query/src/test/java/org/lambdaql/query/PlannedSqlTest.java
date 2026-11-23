@@ -397,7 +397,8 @@ public class PlannedSqlTest {
      * @throws IOException if the file cannot be read or written
      */
     private void compare() throws IOException {
-        Path file = Path.of("src/test/resources/expected-sql/planned-" + db + ".sql");
+        // lql.sql.dir: another folder for the SQL of another Hibernate version (testBoot3 uses expected-sql/hibernate6)
+        Path file = Path.of(System.getProperty("lql.sql.dir", "src/test/resources/expected-sql"), "planned-" + db + ".sql");
         StringBuilder text = new StringBuilder()
                 .append("-- SQL that Hibernate ").append(hibernateVersion()).append(" makes on ").append(db)
                 .append(" for the PLANNED HQL in the manual (lambdaQL does not make these queries yet).\n")

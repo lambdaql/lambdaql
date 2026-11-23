@@ -1,29 +1,17 @@
-// lambdaql-spring-data-jpa for one Spring Boot line (ROADMAP D55), applied by spring-data-jpa-boot3 and
-// spring-data-jpa-boot4. The code and the tests are shared in the folder spring-data-jpa/ (not a Gradle project);
-// each module adds only the few classes that differ between the Spring Data versions (src/main/java of the module)
-// and chooses its Spring Boot BOM with lql.springBoot in its gradle.properties.
-
-apply plugin: 'java-library'
-apply plugin: 'maven-publish'
-
-def shared = rootProject.file('spring-data-jpa/src')
-
-sourceSets {
-	main {
-		java.srcDirs = [file('src/main/java'), new File(shared, 'main/java')]
-		resources.srcDirs = [new File(shared, 'main/resources')]
-	}
-	test {
-		java.srcDirs = [new File(shared, 'test/java')]
-		resources.srcDirs = [new File(shared, 'test/resources')]
-	}
+plugins {
+	id 'java-library'
+	id 'maven-publish'
 }
+
+// lambdaql-spring-data-jpa: one jar for Spring Boot 3 (Spring Data 3.5) and Spring Boot 4 (Spring Data 4.1)
+// (ROADMAP D55). It is compiled against Spring Boot 4; testBoot3 runs the same compiled tests on Spring Boot 3.
+// Spring Data and Spring Boot are compileOnly: the user's project gives them, so this jar never changes their version.
 
 dependencies {
 	api project(':query')
 	// Spring Data JPA 3.4+ (fragments from spring.factories, RepositoryMetadataAccess); ROADMAP SD8
-	api 'org.springframework.data:spring-data-jpa'
-	api 'jakarta.persistence:jakarta.persistence-api'
+	compileOnly 'org.springframework.data:spring-data-jpa'
+	compileOnly 'jakarta.persistence:jakarta.persistence-api'
 	// the auto-configuration is read only by Spring Boot; the executor works without Boot
 	compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
 
@@ -49,8 +37,10 @@ test {
 // testClassFile: the same tests on JDK 24+, where lambdaql-core reads lambdas with java.lang.classfile (D52).
 // The test class path already has the lambdaql-core jar (a project dependency), so nothing else is needed.
 apply from: rootProject.file('gradle/classfile-test.gradle')
+// testBoot3: the same compiled tests on Spring Boot 3 (Spring Data 3.5, Hibernate 6.6)
+apply from: rootProject.file('gradle/boot3-test.gradle')
 
 javadoc {
 	// Javadoc examples come from the test code ({@snippet ... region="..."})
-	options.addStringOption('-snippet-path', new File(shared, 'test/java').absolutePath)
+	options.addStringOption('-snippet-path', file('src/test/java').absolutePath)
 }

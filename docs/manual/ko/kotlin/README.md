@@ -70,7 +70,7 @@ fetch first ? rows only
 | 10 | [규칙과 제한](10-rules-and-limits.md) | 모든 규칙 표를 한곳에 |
 | 11 | [오류와 언어](../11-errors-and-languages.md) (공통) | 오류 코드, 예외, 메시지 언어, 로깅 |
 | 12 | [Spring Data JPA](12-spring-data-jpa.md) | `LambdaQlExecutor<T>`, 본문이 있는 리포지토리 메서드, DML 단축 메서드(`deleteAll`, `updateOne` 등), Spring `Sort`와 `Pageable`, 모듈, 트랜잭션, Kotlin 2.2 / `-Xjvm-default=all` |
-| 13 | [Spring Boot 3과 4](../13-spring-boot-versions.md) (공통) | 버전 표, 아티팩트(`-boot3`, `-boot4`), Hibernate 6.6과 7.4의 SQL 차이, 검증 범위 |
+| 13 | [Spring Boot 3과 4](../13-spring-boot-versions.md) (공통) | 버전 표, 아티팩트(공통 jar와 `-boot3`·`-boot4` 스타터), Hibernate 6.6과 7.4의 SQL 차이, 검증 범위 |
 
 <a id="where-to-start"></a>
 ## 어디서부터 시작할까
