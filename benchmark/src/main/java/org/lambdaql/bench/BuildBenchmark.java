@@ -5,6 +5,7 @@ import jakarta.persistence.TypedQuery;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Root;
+import org.lambdaql.Agg;
 import org.lambdaql.engine.render.RenderedQuery;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -30,6 +31,7 @@ import java.util.concurrent.TimeUnit;
  *   <li>{@code lambdaql}: {@code toHql()}: the lambda analysis comes from the cache, then lambdaQL writes the HQL.</li>
  *   <li>{@code lambdaqlQuery}: {@code toHql()} and then {@code createQuery} with that HQL, which is what lambdaQL
  *       does before it runs a query.</li>
+ *   <li>{@code lambdaqlGroup}: {@code toHql()} of the group-by query (three lambdas).</li>
  * </ul>
  */
 @State(Scope.Benchmark)
@@ -78,6 +80,20 @@ public class BuildBenchmark {
         int status = QueryBenchmark.STATUS;
         double minPrice = QueryBenchmark.MIN_PRICE;
         return db.qb.from(BenchOrder.class).where(o -> o.getStatus() == status && o.getPrice() > minPrice).toHql();
+    }
+
+    /**
+     * The group-by query of {@link QueryBenchmark#group_lambdaql}: three lambdas (groupBy, having, select) are read
+     * and the HQL is written, without running it.
+     */
+    @Benchmark
+    public RenderedQuery build_lambdaqlGroup(BenchDatabase db) {
+        double minTotal = QueryBenchmark.MIN_TOTAL;
+        return db.qb.from(BenchOrder.class)
+                .groupBy(o -> o.getCustomer().getId())
+                .having(o -> Agg.sum(o.getPrice()) > minTotal)
+                .select(o -> new CustomerTotal(o.getCustomer().getId(), Agg.count(), Agg.sum(o.getPrice())))
+                .toHql();
     }
 
     @Benchmark

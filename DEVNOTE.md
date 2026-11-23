@@ -4,8 +4,9 @@
 >
 > 이 문서는 작업을 이어받는 개발자와 에이전트를 위한 요약이다. 근거와 상세는 다음 문서에 있다.
 >
-> - [`docs/design/ROADMAP.md`](docs/design/ROADMAP.md): 결정 사항(D1~D55), 마일스톤, 규칙 표(U, J, S, Q, PR, FN 등), 세 DB 실측 기록
+> - [`docs/design/ROADMAP.md`](docs/design/ROADMAP.md): 결정 사항(D1~D57), 마일스톤, 규칙 표(U, J, S, Q, PR, FN 등), 세 DB 실측 기록
 > - [`docs/design/KOTLIN.md`](docs/design/KOTLIN.md): Kotlin 지원 설계(바이트코드 패턴, 제약 KC1~KC21)
+> - [`docs/design/BENCHMARK.md`](docs/design/BENCHMARK.md): JDBC·JPQL·Criteria·Spring Data JPA·lambdaQL 비교 벤치마크(실측)
 > - [`docs/manual/ko`](docs/manual/ko): 사용자 매뉴얼. 한국어가 원본이고 `en`·`ja`·`zh`는 번역이다.
 > - [`docs/manual/PENDING-TRANSLATION.md`](docs/manual/PENDING-TRANSLATION.md): 번역본에 아직 옮기지 않은 변경 목록
 >
@@ -38,7 +39,7 @@ qb.from(Order.class)
 | `query` | `lambdaql-core` | 분석 엔진과 `QueryBuilder`. Spring 의존 없음. Spring Boot 3·4 공통 jar 하나 |
 | `spring-data-jpa` | `lambdaql-spring-data-jpa` | 리포지토리 실행기 `LambdaQlExecutor<T>`, Spring Boot 자동 구성. Spring Boot 3·4 공통 jar 하나(Spring Data JPA는 `compileOnly`) |
 | `spring-boot-starter-boot3`·`-boot4` | `lambdaql-spring-boot-starter-boot3`·`-boot4` | 의존성 묶음. Boot 버전에 따라 다른 유일한 모듈 |
-| `benchmark` | (배포 안 함) | JDBC·JPQL·Criteria API·lambdaQL 비교(JMH) |
+| `benchmark` | (배포 안 함) | JDBC·JPQL·Criteria API·Spring Data JPA·lambdaQL 비교(JMH, 결과 `docs/design/BENCHMARK.md`) |
 
 두 공통 모듈은 Boot 4로 컴파일하고, 테스트는 세 가지로 돈다: `test`(Boot 4, JDK 21, ASM), `testBoot3`(같은 컴파일 결과를 Boot 3.5.16 런타임으로, JDK 21), `testClassFile`(Boot 4, JDK 25, `java.lang.classfile`). Hibernate 6용 SQL 정답은 `query/src/test/resources/expected-sql/hibernate6/`.
 Boot BOM은 모듈의 `gradle.properties`의 `lql.springBoot`로 고른다(루트 기본 4.1.2, `spring-boot-starter-boot3`는 3.5.16). `testBoot3`의 BOM 버전은 `lql.springBoot3`(기본 3.5.16, 결정 D55).

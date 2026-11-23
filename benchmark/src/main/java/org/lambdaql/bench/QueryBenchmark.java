@@ -42,7 +42,7 @@ import java.util.concurrent.TimeUnit;
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @Warmup(iterations = 3, time = 1)
 @Measurement(iterations = 5, time = 1)
-@Fork(1)
+@Fork(2)
 public class QueryBenchmark {
 
     /** status = 1 and price > 900: 100 rows. */

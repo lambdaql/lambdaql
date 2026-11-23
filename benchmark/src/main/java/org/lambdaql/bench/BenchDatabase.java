@@ -104,6 +104,20 @@ public class BenchDatabase {
                 ps.executeBatch();
             }
             c.commit();
+            // fresh statistics, so the planner sees the data and an automatic analyze does not run while measuring
+            String analyze = switch (System.getProperty("lql.db", "h2").toLowerCase(Locale.ROOT)) {
+                case "postgresql" -> "analyze SQ_bench_customers, SQ_bench_orders";
+                case "mariadb", "mysql" -> "analyze table SQ_bench_customers, SQ_bench_orders";
+                case "oracle" -> "begin dbms_stats.gather_table_stats(user, 'SQ_BENCH_ORDERS');"
+                        + " dbms_stats.gather_table_stats(user, 'SQ_BENCH_CUSTOMERS'); end;";
+                default -> null;
+            };
+            if (analyze != null) {
+                c.setAutoCommit(true);
+                try (Statement st = c.createStatement()) {
+                    st.execute(analyze);
+                }
+            }
         }
     }
 

@@ -2,7 +2,7 @@ plugins {
 	id 'java'
 }
 
-// Benchmarks that compare plain JDBC, JPA (JPQL and the Criteria API) and lambdaQL on the same queries.
+// Benchmarks that compare plain JDBC, JPA (JPQL and the Criteria API), Spring Data JPA and lambdaQL on the same queries.
 // Not published. Run:
 //   ./gradlew :benchmark:jmh                       H2 in memory
 //   ./gradlew :benchmark:jmh -Dlql.db=postgresql   the local PostgreSQL (LQL_DB_PASSWORD, tables SQ_bench_*)
@@ -11,6 +11,9 @@ plugins {
 
 dependencies {
 	implementation project(':query')
+	// Spring Data JPA ways (derived query methods, @Query, Specification) and the lambdaQL repository executor
+	implementation project(':spring-data-jpa')
+	implementation 'org.springframework.data:spring-data-jpa'
 	implementation 'org.hibernate.orm:hibernate-core'
 	implementation 'jakarta.persistence:jakarta.persistence-api'
 	implementation 'com.zaxxer:HikariCP'
