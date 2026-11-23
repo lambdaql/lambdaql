@@ -46,35 +46,19 @@ lambdaQL의 진입점은 다섯 개입니다.
 ## 7.1 예제 엔티티
 
 이 장은 `Order`, `Customer`, `Item`을 사용합니다([2. 시작하기](02-getting-started.md#example-entities) 참고).
-이 장에서 `Order`에는 **추가 속성**이 몇 개 있습니다.
+예제는 [`query/src/test/java/org/lambdaql/query`](https://github.com/codebit0/lambdaql/tree/main/query/src/test/java/org/lambdaql/query)의 Java 테스트 엔티티를 Kotlin 테스트에서 그대로 사용합니다.
+Kotlin은 Java getter와 setter를 속성으로 보므로 `it.status = st`처럼 대입합니다.
 
-```kotlin
-@Entity
-@Table(name = "orders")
-class Order(
-    // ... id, price, status, active, description, customer, updateAt, items as usual
-    var total: Double? = null,                 // sum of item prices
-    var cnt: Int = 0,                          // a counter (Int, so that += compiles)
-    var custName: String? = null,              // copy of the customer name
-    @Embedded var address: Address = Address(),
-)
+| 클래스 | 이 장에서 쓰는 속성 |
+|---|---|
+| `Order` | `id`(IDENTITY), `price`(`double`), `status`(`short`), `active`(`boolean`, Kotlin에서는 `isActive`), `description`, `updateAt`, `kind`(enum `Order.Kind`), `customer`. NULL이 될 수 있는 `total`(`Double`), `cnt`(`Integer`), `custName`, `address`(`@Embedded` `Address`: `city`, `zip`) |
+| `VOrder` | `id`, `status`(`Integer`), `version`(`@Version`) |
+| `Archive` | `id`(생성기 없음), `price`, `customerName` |
+| `Summary` | `customerId`(`Integer`), `total`, `cnt`(`Long`) |
+| `IdOrder` | `id`(IDENTITY), `price`, `status` |
 
-@Embeddable
-class Address(var city: String? = null, var zip: String? = null)
-```
-
-여기서 사용하는 다른 클래스:
-
-```kotlin
-@Entity class VOrder(@Id var id: Long? = null, var status: Int? = null, @Version var version: Long? = null)
-@Entity class Archive(@Id var id: Long? = null, var price: Double? = null, var customerName: String? = null)
-@Entity class Summary(@Id var customerId: Long? = null, var total: Double? = null, var cnt: Long? = null)
-@Entity class IdOrder(@Id @GeneratedValue var id: Long? = null, var price: Double? = null, var status: Int? = null)
-
-data class Line(val id: Long, val price: Double)   // input rows for insert
-```
-
-Java 테스트는 같은 이름의 Java 테스트 엔티티를 사용합니다([`query/src/test/java/org/lambdaql/query`](https://github.com/codebit0/lambdaql/tree/main/query/src/test/java/org/lambdaql/query)).
+리스트 삽입에 쓰는 `Line`과 `Ref`는 테스트 클래스 `ManualKotlinDmlTest` 안에 선언한 데이터 클래스입니다(예: `data class Line(val id: Long, val price: Double)`).
+`status`가 `short`이므로 조건은 `it.status.toInt() == 1`로 씁니다.
 
 ---
 
@@ -123,18 +107,20 @@ where o1_0.status=2
 
 Oracle은 `set`에 별칭을 씁니다(`set o1_0.status=?`). H2와 MariaDB는 쓰지 않습니다.
 
-이 장의 모든 예제는 `value`로도 쓸 수 있습니다. 문장 하나에 `value` 호출 하나를 씁니다.
+이 장의 모든 예제는 `value`로도 쓸 수 있습니다. Kotlin 문장 하나에 `value` 호출 하나를 씁니다.
+
+[`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt), 영역 `value-forms`:
 
 ```kotlin
-import org.lambdaql.Dml.value
-
-qb.update(Order::class.java)
-    .set { o -> value(o.status, st); value(o.price, o.price!! * 1.1) }
-    .where { it.status == 1 }
-    .execute()
-
-qb.update(Order::class.java).set { o -> value(o.address.city, city) }.where { it.id == id }.execute()  // embedded
-qb.update(Order::class.java).set { o -> value(o.customer?.id, cid) }.where { it.id == id }.execute()   // FK
+// Dml.value(column, value) for properties without a setter (val); one value call per statement
+val u = qb.update(Order::class.java)
+    .set { o -> value(o.status, st); value(o.price, o.price * 1.1) }
+    .where { it.status.toInt() == 1 }
+assertEquals("update Order e0 set e0.status = :p1, e0.price = (e0.price * 1.1) where e0.status = 1", u.toHql().hql())
+val embedded = qb.update(Order::class.java).set { o -> value(o.address.city, city) }.where { it.id == id }
+assertEquals("update Order e0 set e0.address.city = :p1 where e0.id = :p2", embedded.toHql().hql())
+val fk = qb.update(Order::class.java).set { o -> value(o.customer?.id, cid) }.where { it.id == id }
+assertEquals("update Order e0 set e0.customer.id = :p1 where e0.id = :p2", fk.toHql().hql())
 ```
 
 `value`의 규칙(규칙 U20):
@@ -167,7 +153,7 @@ assertEquals("update Order e0 set e0.price = (select sum(s1.price) from Item s1 
 ```
 
 - 다른 테이블의 집계와 같은 테이블의 집계를 모두 `set` 값으로 쓸 수 있습니다(H2, MariaDB 10.11, Oracle 23.26에서 실측). `update`에서는 MariaDB도 오류 1093을 내지 않습니다.
-- 일치하는 행이 없으면 `sum` 등은 NULL을 돌려줍니다. NOT NULL 컬럼이면 DB 오류가 나므로 `?: 0.0`이나 `Objects.requireNonNullElse(…, 0.0)`로 감싸십시오. `coalesce(...)`가 됩니다.
+- 일치하는 행이 없으면 `sum` 등은 NULL을 돌려줍니다. NOT NULL 컬럼이면 DB 오류가 나므로 `Objects.requireNonNullElse(…, 0.0)`로 감싸십시오. `coalesce(...)`가 됩니다([7.2](07-2-update.md#an-aggregate-from-a-subquery)의 영역 `update-sub-coalesce`).
 - insert의 `values { a, sub -> ... }`와 upsert(`onConflict { ... }.update { a, sub -> ... }`)에서도 같은 방식으로 서브쿼리를 씁니다([7.5](07-5-insert.md#a-subquery-in-a-value) 참고). 리스트 형태는 `values(list) { a, l, sub -> ... }`처럼 세 번째 인자가 `sub`입니다.
 
 ---
@@ -193,16 +179,15 @@ assertEquals("update Order e0 set e0.price = (select sum(s1.price) from Item s1 
 | Kotlin 형태 | 뜻 |
 |---|---|
 | `it.status = x` | setter 호출: `set e0.status = :p1` |
-| 오른쪽의 `!!` | 무시됨. 코드가 컴파일되도록 할 뿐임(D23) |
-| `a ?: b` | `coalesce(a, b)` |
+| `a ?: b`(문자열 값) | `coalesce(a, b)` |
 | `it.customer?.id = x` | 항상 대입함(`?.`는 무시됨) |
 | `it.cnt += 1` | 지원(`set e0.cnt = e0.cnt + 1`) |
 | `value(o.status, x)` | `val` 속성용 대입(D49). 문장마다 `value` 하나 |
 | `value(o.cnt, o.cnt + 1)` | 지원(`set e0.cnt = e0.cnt + 1`) |
-| `it.cnt++`, `it.cnt--` | **v0.1에 없음**. `+= 1`을 사용하십시오. 오류 메시지가 이를 알려 줍니다 |
-| `it.apply { }`, `with(it) { }`, `it.also { }` | **v0.1에 없음**. 직접 대입하십시오. 오류 메시지가 이를 알려 줍니다 |
-| 람다 안의 `if` / `when` | **v0.1에 없음**. 대신 `set()`을 여러 번 호출하십시오(U14) |
-| 람다 안의 지역 `val` | 거부됨. U3 문제를 숨길 수 있음 |
+| `it.cnt++`, `it.cnt--` | 거부됨(`LQL-2003`). `+= 1`을 사용하십시오 |
+| `it.apply { }`, `with(it) { }`, `it.also { }` | 거부됨(`LQL-2003`). 직접 대입하십시오 |
+| 람다 안의 `if` / `when`, 숫자 값의 `?:` | 거부됨(`LQL-2009`). 대신 `set()`을 여러 번 호출하십시오(U14) |
+| 람다 안의 지역 `val` | 거부됨(`LQL-2003`). U3 문제를 숨길 수 있음 |
 
 Kotlin에 대한 자세한 내용: [9. Kotlin 노트](09-kotlin-notes.md).
 
@@ -216,9 +201,18 @@ Kotlin에 대한 자세한 내용: [9. Kotlin 노트](09-kotlin-notes.md).
 
 SQL에서 SET 오른쪽의 모든 컬럼은 수정 **이전**의 값을 뜻합니다. lambdaQL은 이 규칙을 따릅니다.
 
+[`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt), 영역 `old-value`:
+
 ```kotlin
-.set { it.price = it.price!! * 2; it.total = it.price }
-// error: price is assigned first, then read again
+// the right side reads the value before the change
+val self = qb.update(Order::class.java).set { it.price = it.price * 1.1 }.all()             // reads itself: allowed
+val readFirst = qb.update(Order::class.java).set { it.total = it.price; it.price = 0.0 }.all() // read, then assign: allowed
+assertEquals("update Order e0 set e0.total = e0.price, e0.price = 0.0", readFirst.toHql().hql())
+// assign, then read again: an error at set() (U3), because MariaDB would read the new value
+val error = assertThrows(LambdaQLException::class.java) {
+    qb.update(Order::class.java).set { it.price = it.price * 2; it.total = it.price }
+}
+assertEquals("LQL-3042", error.code())
 ```
 
 **같은 문장에서 컬럼에 대입한 뒤 나중에 그 컬럼을 읽으면** lambdaQL은 `set(...)`을 호출하는 시점에 `TranslationException`(`LQL-3042`)을 던집니다(규칙 U3).
@@ -228,7 +222,7 @@ SQL에서 SET 오른쪽의 모든 컬럼은 수정 **이전**의 값을 뜻합�
 
 | 형태 | 허용 여부 |
 |---|---|
-| `it.price = it.price!! * 1.1`(자기 자신을 읽음) | 허용 |
+| `it.price = it.price * 1.1`(자기 자신을 읽음) | 허용 |
 | `it.total = it.price; it.price = 0.0`(먼저 읽고 나중에 대입) | 허용 |
 | `it.price = ...; it.total = it.price`(먼저 대입하고 나중에 읽음) | **오류** |
 
@@ -244,7 +238,27 @@ SQL에서 SET 오른쪽의 모든 컬럼은 수정 **이전**의 값을 뜻합�
 ### 분석 시점의 규칙 검사
 
 lambdaQL은 람다를 읽을 때 규칙 U1, U3, U4, U6을 검사하고, `set(...)`이나 `values(...)`에서 `LambdaQLException`을 던집니다(예: U1은 `LQL-3037`, U3은 `LQL-3042`, U4는 `LQL-3041`).
-이 검사는 [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)(영역 `rules`)와 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)에서 Java 람다로 테스트합니다. 이 검사에 대한 Kotlin 테스트는 아직 없습니다.
+Kotlin 람다로 쓴 다음 형태는 람다를 읽을 때 거부됩니다. U3과 U4는 위의 영역 `old-value`와 [7.2](07-2-update.md#many-set-calls-patch)의 영역 `update-patch`에 있습니다.
+
+[`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt), 영역 `assign-rules`:
+
+```kotlin
+// forms that the assignment rules reject when the lambda is read (U1, U6)
+val increment = assertThrows(LambdaQLException::class.java) {
+    qb.update(Order::class.java).set { it.cnt++ }                       // ++: write += 1
+}
+val scope = assertThrows(LambdaQLException::class.java) {
+    qb.update(Order::class.java).set { it.apply { status = 1 } }        // apply: assign directly
+}
+val other = assertThrows(LambdaQLException::class.java) {
+    qb.update(Order::class.java).set { it.customer?.name = "x" }        // a property of another table
+}
+val noNull = assertThrows(LambdaQLException::class.java) {
+    qb.update(Archive::class.java).set { it.id = null }.all()            // null into the @Id
+}
+```
+
+`++`, 스코프 함수, 지역 변수는 `UnsupportedLambdaShapeException`(`LQL-2003`)이고, 연관의 `@Id`가 아닌 속성은 `LQL-3050`, `@Id`에 대입한 `null`은 `LQL-3044`입니다.
 
 <a id="where-or-all-is-required"></a>
 ### `where`나 `all()`의 필수 지정
@@ -255,15 +269,8 @@ lambdaQL은 람다를 읽을 때 규칙 U1, U3, U4, U6을 검사하고, `set(...
 <a id="association-paths-same-rows-as-select"></a>
 ### 연관 경로: 조회와 같은 행
 
-lambdaQL은 DML에서 FK가 아닌 연관 경로를 **상관 스칼라 서브쿼리**로 씁니다. `where`와 SET 오른쪽 모두 같습니다(규칙 U9). HQL은 [7.2](07-2-update.md#a-value-from-another-table)의 Java 테스트에서 가져왔습니다.
-
-```kotlin
-.where { it.customer?.name == "Kim" }
-// → where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) = 'Kim' and e0.customer.id is not null
-
-it.custName = it.customer?.name
-// → set e0.custName = (select s1.name from Customer s1 where s1.id = fk(e0.customer))
-```
+lambdaQL은 DML에서 FK가 아닌 연관 경로를 **상관 스칼라 서브쿼리**로 씁니다. `where`와 SET 오른쪽 모두 같습니다(규칙 U9).
+예: `where { it.customer?.name == "Kim" }`은 `where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) = 'Kim' and e0.customer.id is not null`이 되고, `it.custName = it.customer?.name`은 `set e0.custName = (select s1.name from Customer s1 where s1.id = fk(e0.customer))`가 됩니다. 테스트 코드는 [7.2](07-2-update.md#a-value-from-another-table)의 영역 `update-path`에 있습니다.
 
 이렇게 하는 이유는 다음과 같습니다. lambdaQL이 경로를 Hibernate에 그대로 넘기면 Hibernate는 데이터베이스마다 다른 조인 SQL을 만듭니다
 (H2는 `merge`, MariaDB는 `update ... join`, Oracle은 인라인 뷰). 또 SET에 경로가 있으면 **고객이 없는 행이 빠졌습니다**
@@ -273,7 +280,7 @@ lambdaQL은 서브쿼리를 직접 씁니다. 그러면 문장이 자기 테이�
 조회는 `where`의 경로에 inner join을 사용합니다(결정 D36). 그래서 DML에서는 이런 경로에 lambdaQL이 `e0.customer.id is not null`을 더합니다.
 그 결과 `update`와 `delete`는 `qb.from(X::class.java).where { 같은 람다 }`가 반환하는 **바로 그 행**만 대상으로 합니다(삭제된 행을 조회 결과와 비교).
 `!!`나 표시 없이 쓴 null 가드(`it.customer == null || it.customer!!.name == ...`)가 있어도 마찬가지입니다. 조회도 이 경로에 inner join을 사용하므로(결정 D48) 검사는 유지됩니다.
-`?.`로 지난 단계가 조회에서 `left join`이 되는 조건이면(`it.status == 1 || it.customer?.name == "Kim"`, 결정 D54) 이 검사를 더하지 않습니다. 이때도 DML은 조회와 같은 행을 대상으로 합니다([7.2](07-2-update.md)의 `update-safe-call` 영역).
+`?.`로 지난 단계가 조회에서 `left join`이 되는 조건이면(`it.status.toInt() == 1 || it.customer?.name == "Kim"`, 결정 D54) 이 검사를 더하지 않습니다. 이때도 DML은 조회와 같은 행을 대상으로 합니다([7.2](07-2-update.md)의 `update-safe-call` 영역, [7.4](07-4-delete.md)의 `delete-safe-call` 영역).
 
 `@Id`로 끝나는 경로(`it.customer?.id`)는 FK 컬럼입니다. 서브쿼리도 조인도 없습니다.
 
@@ -297,10 +304,6 @@ Oracle에는 바인드 값 65,535개라는 엄격한 한도가 있습니다(ORA-
 ### limit: 앞쪽 행 변경
 
 `where { ... }` 또는 `all()` 뒤에 `orderBy { ... }.limit(n)`을 붙이면 update나 delete가 최대 `n`개 행만 변경합니다. 대상은 `qb.from(X::class.java).where { same }.orderBy { same }`의 앞쪽 `n`개 행입니다.
-
-```kotlin
-qb.delete(Order::class.java).where { it.status == 1 }.orderBy { o, by -> by.asc(o.price) }.limit(100).execute()
-```
 
 | 항목 | 규칙 |
 |---|---|
@@ -359,7 +362,7 @@ lambdaQL은 이 조건을 따로 처리하지 않습니다.
 ## 7.9 모든 규칙 U1 ~ U21(요약)
 
 lambdaQL이 람다를 읽을 때 검사하는 규칙: U1, U3, U4, U6. 컴파일러가 검사하는 규칙: U5.
-U11, U12, U15에 대한 lambdaQL의 검사는 아직 구현되지 않았습니다.
+U11, U12, U15는 lambdaQL이 검사하지 않습니다. 예를 들어 `@Version` 속성에 대입해도 오류가 나지 않습니다.
 
 | # | 규칙 |
 |---|---|
@@ -392,15 +395,15 @@ U11, U12, U15에 대한 lambdaQL의 검사는 아직 구현되지 않았습니�
 <a id="710-not-in-v01"></a>
 ## 7.10 v0.1에 없는 것
 
-| 항목 | 계획 | 지금 할 수 있는 방법 |
-|---|---|---|
-| 조건부 값(`if (c) a else b`, `when`, 값으로 쓴 토글 `!it.active`) | v0.2(CASE WHEN) | `where`가 다른 update 두 개 |
-| 대입을 고르기 위한 람다 안의 `if` | v0.2 | `set()`을 여러 번 호출(U14) |
-| `++`, `--`, `apply`, `with`, `also` | v0.2 | `+= 1`이나 직접 대입 사용 |
-| 문자열 템플릿이나 `+`(`"${it.description}_x"`) | v0.2 | – |
-| `insert ... select`의 명시적 조인 | v0.2 | 다대일 경로 사용 |
-| `returning` | 거부됨 | DML 후 다시 조회 |
-| 데이터베이스 시간(`current_timestamp`) | 거부됨 | 애플리케이션 시간을 바인드(U8) |
+| 항목 | 지금 할 수 있는 방법 |
+|---|---|
+| 조건부 값(`if (c) a else b`, `when`, 값으로 쓴 토글 `!it.isActive`), 숫자 값의 `?:`: `LQL-2009` | `where`가 다른 update 두 개 |
+| 대입을 고르기 위한 람다 안의 `if`: `LQL-2009` | `set()`을 여러 번 호출(U14) |
+| `++`, `--`, `apply`, `with`, `also`: `LQL-2003` | `+= 1`이나 직접 대입 사용 |
+| 문자열 템플릿이나 `+`(`"${it.description}_x"`): `LQL-2007` | 문자열은 람다 밖에서 만들어 캡처 |
+| `insert ... select`의 명시적 조인 | 다대일 경로 사용 |
+| `returning` | DML 후 다시 조회 |
+| 데이터베이스 시간(`current_timestamp`) | 애플리케이션 시간을 바인드(U8) |
 
 규칙을 어기면 코드 `[LQL-xxxx]`가 붙은 `LambdaQLException`이 발생합니다. 대부분의 규칙은 `TranslationException`, 대입 람다 안의 조건이나 지역 변수는 `UnsupportedLambdaShapeException`입니다. [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
 모든 규칙을 한곳에서 보려면: [10. 규칙과 제한](10-rules-and-limits.md).
