@@ -4,7 +4,7 @@
 >
 > 이 문서는 작업을 이어받는 개발자와 에이전트를 위한 요약이다. 근거와 상세는 다음 문서에 있다.
 >
-> - [`docs/design/ROADMAP.md`](docs/design/ROADMAP.md): 결정 사항(D1~D53), 마일스톤, 규칙 표(U, J, S, Q, PR, FN 등), 세 DB 실측 기록
+> - [`docs/design/ROADMAP.md`](docs/design/ROADMAP.md): 결정 사항(D1~D54), 마일스톤, 규칙 표(U, J, S, Q, PR, FN 등), 세 DB 실측 기록
 > - [`docs/design/KOTLIN.md`](docs/design/KOTLIN.md): Kotlin 지원 설계(바이트코드 패턴, 제약 KC1~KC21)
 > - [`docs/manual/ko`](docs/manual/ko): 사용자 매뉴얼. 한국어가 원본이고 `en`·`ja`·`zh`는 번역이다.
 > - [`docs/manual/PENDING-TRANSLATION.md`](docs/manual/PENDING-TRANSLATION.md): 번역본에 아직 옮기지 않은 변경 목록
@@ -50,7 +50,7 @@ qb.from(Order.class)
 - Spring Data JPA 모듈(M12): `main`은 Spring Boot 3.4.2, `feature/boot4`는 Spring Boot 4.1.2로 테스트
 - 클래스 파일 읽기(`feature/boot4`, D52): Java 21~23은 ASM, Java 24 이상은 `java.lang.classfile`(Multi-Release JAR)
 
-테스트: 세 DB(H2 2.3.230, MariaDB 10.11.18, Oracle Free 23.26.3)에서 모듈 전체 통과(2026-11-19 실측). `main` 241개. `feature/boot4`는 `test`(JDK 21, ASM) 244개와 `testClassFile`(JDK 25, ClassFile) 244개. 건너뜀은 DB별 H2 16·MariaDB 10·Oracle 9. Kotlin 람다 테스트는 `query/src/test/kotlin`에 별도 소스 세트로 있다.
+테스트: 세 DB(H2 2.3.230, MariaDB 10.11.18, Oracle Free 23.26.3)에서 모듈 전체 통과(2026-11-19 실측). `main` 241개. `feature/boot4`는 다섯 DB(H2·MariaDB·Oracle·PostgreSQL·MySQL)에서 `test`(JDK 21, ASM) 250개와 `testClassFile`(JDK 25, ClassFile) 250개(D54 구현 뒤). 건너뜀은 DB별 H2 16·MariaDB 10·Oracle 9. Kotlin 람다 테스트는 `query/src/test/kotlin`에 별도 소스 세트로 있다.
 
 아직 Maven Central에 배포하지 않았다. 버전 `1.0.0`은 `gradle.properties`의 값이며 첫 릴리스 전에 바뀔 수 있다.
 
@@ -248,6 +248,7 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 | DB 함수(`@SqlFunction`, 쿼리 안 함수, 단독 호출) | 구현됨, 세 DB 테스트 | 아니오 | D31, FN1~FN11 |
 | SARGable 경고와 모드(`SargableMode`, `lambdaql.sargable.mode`), 열 산술 검출 | 구현됨, 세 DB 테스트 | 아니오 | PR8, D50 |
 | SQL 의미 원칙(엔티티 값 비교, null 캡처 값, 정수 열과 소수 값) | 구현됨, 세 DB 테스트 | 일부 | D48(B1~B8) |
+| Kotlin `?.`·`!!`에 따른 where 조인 구분(`?.`는 필요할 때 `left join`, 섞이면 `LQL-5014`) | `feature/boot4`에서 구현(2026-11-19), 다섯 DB 테스트 | 예(`safe-call-*`, `not-null-assert`, `mixed-warn`, `update-safe-call`) | D54 |
 | 메시지와 오류 코드(`[LQL-xxxx]`, 4개 언어, `lambdaql.locale`) | 구현됨, 단위 테스트 | – | D33 |
 | 분석 캐시(EntityManagerFactory별 공유) | 구현됨 | – | D47 |
 | Spring Data JPA 모듈(`LambdaQlExecutor<T>`, `Sort`, `Pageable`, DML 단축 메서드, 자동 구성) | 구현됨, 세 DB·Spring Boot 3.4.2 테스트. DML에는 호출자 트랜잭션 필요 | Kotlin 리포지토리는 아니오 | D34, D39, M12 |

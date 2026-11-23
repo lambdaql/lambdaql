@@ -26,7 +26,7 @@ int inserted = qb.upsert(Archive.class).values(a -> { a.setId(100L); a.setPrice(
 ExecutableInsert<Archive> again = qb.upsert(Archive.class).values(a -> { a.setId(100L); a.setPrice(2.0); });
 assertEquals("insert into Archive e0 (id, price) values (100L, 2.0) on conflict(id) do update set price = excluded.price",
         again.toHql().get(0).hql());
-int updated = again.execute();                     // MariaDB counts an updated row as 2, H2 and Oracle as 1
+int updated = again.execute();                     // MariaDB and MySQL count an updated row as 2, the others as 1
 ```
 
 **SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다.

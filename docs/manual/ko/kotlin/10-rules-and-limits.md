@@ -37,9 +37,9 @@ lambdaQL은 **람다를 절대 실행하지 않습니다**. 바이트코드를 �
 람다는 Kotlin 문법으로 작성한 쿼리입니다. 따라서 다음과 같습니다.
 
 1. `it.customer?.name` 같은 경로는 **컬럼을 가리킵니다**. 호출의 연쇄가 아닙니다.
-   lambdaQL은 고객이 null인지 검사하지 않습니다(D20). `where`에서 경로는 기본적으로 inner join이므로 고객이 없는 주문은 반환되지 않습니다(D36).
-   null 가드(`... == null || ...`)를 써도 마찬가지입니다. 경로는 inner join으로 남습니다(D48). 고객이 없는 주문을 유지하려면 `leftJoin`을 사용하십시오.
-   그런 주문을 찾으려면 연관 자체를 비교하십시오: `it.customer == null`. `it.customer?.name == null`로는 반환되지 않습니다.
+   lambdaQL은 고객이 null인지 검사하지 않습니다(D20). `where`에서 `!!`나 표시 없이 지난 연관은 inner join이므로 고객이 없는 주문은 반환되지 않습니다(D36).
+   `?.`로 지난 연관은 고객이 없는 주문이 조건을 참으로 만들 수 있으면 `left join`입니다(D54). 그래서 `it.status == 1 || it.customer?.name == "Kim"`, `it.customer?.name == null`, `?.`로 쓴 null 가드는 Kotlin처럼 고객이 없는 주문을 남깁니다.
+   고객이 없는 주문만 찾으려면 연관 자체를 비교하십시오: `it.customer == null`.
 2. NULL은 **직접 작성한 곳에서만** 처리됩니다(`== null`, `!= null`, `?.`, `?:`)(D22).
    Kotlin 컴파일러가 추가하는 null 검사는 무시됩니다. 그 밖의 NULL은 SQL 규칙을 따릅니다. 조건은 UNKNOWN이 되고 행은 반환되지 않습니다.
 3. `!!`는 무시됩니다(D23). Kotlin의 메모리 규칙(객체 동일성, 박싱)은 적용되지 않습니다. `==`와 `===`는 **값 동등성**을 뜻합니다(D12, R17).
@@ -169,8 +169,10 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL 3값 논리 |
 | `it.flag == true` / `it.flag != true` | `e0.flag = true` / `e0.flag <> true` | NULL: 반환되지 않음(SQL 의미, D48) |
 | `it.flag ?: false`(조건) | `(e0.flag is not null and e0.flag = true)` | NULL은 false로 취급 |
-| `where` 안의 `it.customer?.name`, `it.customer!!.name` | `j1.name` + `join e0.customer j1`(기본은 inner join) | 고객 없음: 주문이 반환되지 않음. `it.customer?.name == null`도 마찬가지 |
-| `it.customer == null \|\| it.customer?.name == p` | `e0.customer is null or j1.name = :p1` + `join e0.customer j1` | 고객 없음: 반환되지 **않음**(inner join, D48. `DEBUG` 수준 `LQL-5009`). 유지하려면 `leftJoin` 사용 |
+| `where` 안의 `it.customer!!.name`(또는 표시 없는 경로) | `j1.name` + `join e0.customer j1` | 고객 없음: 주문이 반환되지 않음 |
+| `where` 안의 `it.customer?.name` | `j1.name` + 고객이 없는 주문이 조건을 참으로 만들 수 있으면 `left join e0.customer j1`, 아니면 `join`(D54) | `it.customer?.name == "Kim"`: 반환되지 않음(`join`). `it.status == 1 \|\| it.customer?.name == "Kim"`, `it.customer?.name == null`: 반환됨(`left join`) |
+| `it.customer == null \|\| it.customer?.name == p` | `e0.customer is null or j1.name = :p1` + `left join e0.customer j1` | 고객 없음: 반환됨(D54). `!!`로 쓰면 `join`이라 반환되지 않음(D48, `DEBUG` 수준 `LQL-5009`) |
+| 같은 연관 단계를 `?.`와 `!!`(또는 표시 없음)로 섞어 씀 | `join` | 고객 없음: 반환되지 않음. `WARN` 수준 `LQL-5014`(D54) |
 | 같은 경로를 `orderBy`나 `select`에만 씀 | `j1.name` + `left join e0.customer j1`. 필수 연관(`optional = false`)은 `join` | 고객 없음: 컬럼이 NULL |
 | `it.customer == null`, `it.customer != null` | `e0.customer is null`, `e0.customer is not null`(외래 키 컬럼, 조인 없음) | 고객이 없는 주문 / 고객이 있는 주문 |
 | `it.customer?.id` | `e0.customer.id`(외래 키 컬럼, 조인 없음) | 고객 없음: NULL |
@@ -222,7 +224,7 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 | R21 | Kotlin 문자열 함수(`startsWith`, `endsWith`, `contains`, `equals(ignoreCase)`, `lowercase`, `length`, `isNullOrEmpty`) | `like ... escape '\'`, D24 대소문자 무시 경로, `lower`, `length`, `(x is null or x = :p)` |
 | R22 | Kotlin 호스트 값(캡처한 `var`, private 속성, `companion` 값) | 실행할 때마다 읽음. 쓰기는 거부됨 |
 | R23 | 속성 참조 `Order::price` | getter와 같음. `orderBy`(`orderBy(Order::price)`)에서는 **아직 구현되지 않음**: `orderBy { it.price }`를 사용하십시오 |
-| R24 | 연관 경로(`it.customer?.name`, `it.customer!!.name`, Java 엔티티의 `it.customer.name`) | 컬럼. to-one 연관: where, order by, select가 함께 사용하는 별칭. `where`에서는 항상 inner join(D48. 연관이 없는 행을 유지하려면 `leftJoin` 사용), order by나 select에만 쓰면 `left join`(필수 연관 `optional = false`는 inner join, A4). 임베디드: 같은 테이블. 대상의 `@Id`로 끝나거나 연관을 `null`과 비교: 외래 키 컬럼, 조인 없음. 컬렉션: 오류 |
+| R24 | 연관 경로(`it.customer?.name`, `it.customer!!.name`, Java 엔티티의 `it.customer.name`) | 컬럼. to-one 연관: where, order by, select가 함께 사용하는 별칭. `where`에서는 `!!`와 표시 없는 경로는 inner join(D48), `?.`로 지난 단계는 연관이 없는 행이 조건을 참으로 만들 수 있으면 `left join`(D54. 같은 단계를 섞어 쓰면 inner join과 `LQL-5014`), order by나 select에만 쓰면 `left join`(필수 연관 `optional = false`는 inner join, A4). 임베디드: 같은 테이블. 대상의 `@Id`로 끝나거나 연관을 `null`과 비교: 외래 키 컬럼, 조인 없음. 컬렉션: 오류 |
 
 Java 전용 규칙 R4(엔티티 값에 대한 `equals`)와 R5(Java null-safe 헬퍼)는 [Java 트랙](../java/10-rules-and-limits.md)에 있습니다. Kotlin에서는 `==`가 R5와 같은 의미를 갖습니다.
 

@@ -178,6 +178,92 @@ class KotlinQueryTest {
         assertEquals(expected.sortedWith(order), q.toList().sortedWith(order))
     }
 
+    // ------------------------------------------------------------------ safe call ?. and !! in where (D54)
+
+    @Test
+    fun safeCallOr() {
+        // @start region="safe-call-or"
+        // ?. says the customer may be missing: an order without a customer stays when the rest of the OR is true
+        val q = qb.from(Order::class.java).where { it.status.toInt() == 1 || it.customer?.name == "Kim" }
+        assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", q.toHql().hql())
+        // @end
+        val expected = orders.filter { it.status.toInt() == 1 || it.customer?.name == "Kim" }
+        assertEquals(true, expected.any { it.customer == null })        // the order without a customer is in the result
+        assertEquals(ids(expected), ids(q.toList()))
+    }
+
+    @Test
+    fun safeCallNull() {
+        // @start region="safe-call-null"
+        // "no customer, or a customer without a name": a left join, as in Kotlin
+        val q = qb.from(Order::class.java).where { it.customer?.name == null }
+        assertEquals("select e0 from Order e0 left join e0.customer j1 where j1.name is null", q.toHql().hql())
+        // @end
+        assertEquals(ids(orders.filter { it.customer?.name == null }), ids(q.toList()))
+    }
+
+    @Test
+    fun safeCallAnd() {
+        // @start region="safe-call-and"
+        // a row without a customer can never match: lambdaQL keeps the inner join (the same rows)
+        val q = qb.from(Order::class.java).where { it.customer?.name == "Kim" && it.price > 100.0 }
+        assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' and e0.price > 100.0", q.toHql().hql())
+        // @end
+        assertEquals(ids(orders.filter { it.customer?.name == "Kim" && it.price > 100.0 }), ids(q.toList()))
+    }
+
+    @Test
+    fun notNullAssert() {
+        // @start region="not-null-assert"
+        // !! says the customer is always there: an inner join, so orders without a customer are left out
+        // (Kotlin itself would keep the status 1 order without a customer, because || stops before the !!)
+        val q = qb.from(Order::class.java).where { it.status.toInt() == 1 || it.customer!!.name == "Kim" }
+        assertEquals("select e0 from Order e0 join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", q.toHql().hql())
+        // @end
+        val expected = orders.filter { it.customer != null && (it.status.toInt() == 1 || it.customer.name == "Kim") }
+        assertEquals(ids(expected), ids(q.toList()))
+    }
+
+    @Test
+    fun mixedWarn() {
+        val log = org.slf4j.LoggerFactory.getLogger(org.lambdaql.engine.render.HqlRenderer::class.java) as ch.qos.logback.classic.Logger
+        val appender = ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>()
+        appender.start()
+        log.addAppender(appender)
+        try {
+            // @start region="mixed-warn"
+            // the same association with ?. in one place and !! in another: an inner join, and WARN LQL-5014
+            val q = qb.from(Order::class.java).where { it.customer?.name == "Kim" || it.customer!!.grade!! > 3 }
+            assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' or j1.grade > 3", q.toHql().hql())
+            // @end
+            val warned = appender.list.filter { it.level == ch.qos.logback.classic.Level.WARN && it.formattedMessage.startsWith("[LQL-5014]") }
+            assertEquals(1, warned.size, appender.list.toString())
+            assertEquals(true, warned[0].formattedMessage.contains("customer"))
+            val expected = orders.filter { it.customer != null && (it.customer.name == "Kim" || it.customer.grade > 3) }
+            assertEquals(ids(expected), ids(q.toList()))
+        } finally {
+            log.detachAppender(appender)
+        }
+    }
+
+    @Test
+    fun updateSafeCall() {
+        val st: Short = 7
+        // @start region="update-safe-call"
+        // UPDATE: the left join of ?. drops the "customer exists" check, so the order without a customer is changed too
+        val u = qb.update(Order::class.java)
+            .set { it.status = st }
+            .where { it.status.toInt() == 1 || it.customer?.name == "Kim" }
+        assertEquals("update Order e0 set e0.status = :p1"
+            + " where e0.status = 1 or (select s1.name from Customer s1 where s1.id = fk(e0.customer)) = 'Kim'", u.toHql().hql())
+        // @end
+        val target = orders.filter { it.status.toInt() == 1 || it.customer?.name == "Kim" }
+        assertEquals(true, target.any { it.customer == null })
+        assertEquals(target.size, u.execute())
+        val after = reload().associateBy { it.id }
+        for (o in orders) assertEquals(if (o in target) st else o.status, after[o.id]!!.status)
+    }
+
     // ------------------------------------------------------------------ update, insert, delete
 
     @Test

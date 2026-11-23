@@ -513,8 +513,18 @@ assertEquals("select e0 from Order e0 where e0.address.city is null and e0.addre
 ```
 
 `it.customer?.name`, `it.customer!!.name`, 그리고 (Java 엔티티라면) `it.customer.name`은 모두 **같은 컬럼** `j1.name`을 뜻합니다.
+다만 `where`에서는 연관 단계를 어떻게 지났는지에 따라 조인 종류가 달라집니다(결정 D54).
 
-`where`에서 연관 경로는 기본적으로 **inner join**입니다(결정 D36).
+| `where`에서 연관 단계를 지난 방법 | 조인 | 고객이 없는 주문 |
+|---|---|---|
+| `!!`, 또는 표시 없음(non-null 타입 `customer: Customer`, Java 엔티티의 플랫폼 타입) | inner `join` | 결과에 없음 |
+| `?.` | 고객이 없는 주문이 조건 전체를 참으로 만들 수 있으면 `left join`, 아니면 inner `join` | Kotlin에서 조건이 참이면 결과에 남음 |
+
+`?.`는 "연관이 없을 수 있다"를 소스에 적는 문법입니다. `!!`는 "연관이 반드시 있다"는 선언으로 봅니다.
+값의 비교는 어느 경우든 SQL 의미를 따릅니다(결정 D48). 예를 들어 `it.customer?.name != "Kim"`은 고객이 없는 주문과 맞지 않습니다.
+
+**inner join으로 충분한 경우.** `where`에서 연관 경로는 기본적으로 inner join입니다(결정 D36).
+`?.`로 지난 단계라도 고객이 없는 주문이 조건을 참으로 만들 수 없으면 inner join으로 씁니다. 결과는 같습니다.
 
 ```kotlin
 qb.from(Order::class.java)
@@ -544,17 +554,70 @@ where c1_0.name=?
 - **고객이 없는 주문**은 결과에 없습니다. 조인할 고객 행이 없기 때문입니다.
 - lambdaQL은 null 검사를 대신 추가하지 않습니다. 경로 앞에 `it.customer != null &&`를 쓸 필요가 없습니다.
 
-**null 가드로는 고객이 없는 주문이 남지 않습니다.** `where`의 경로는 항상 inner join입니다(SQL 의미, 결정 D48).
-그래서 `it.customer == null || ...`은 고객이 없는 주문과 일치하지 않습니다. 그 주문에는 조인할 고객 행이 없기 때문입니다. 이런 조건에 대해 lambdaQL은 `LQL-5009`를 `DEBUG` 수준으로 기록합니다.
-고객이 없는 주문을 남기려면 명시적 `leftJoin`(결정 D44, [6.8](06-select-group.md#68-explicit-joins) 참고)을 사용하고 `c == null || ...`이라고 쓰십시오.
+**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `safe-call-and`:
+
+```kotlin
+// a row without a customer can never match: lambdaQL keeps the inner join (the same rows)
+val q = qb.from(Order::class.java).where { it.customer?.name == "Kim" && it.price > 100.0 }
+assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' and e0.price > 100.0", q.toHql().hql())
+```
+
+**`?.`와 `||`.** 고객이 없는 주문이 조건을 참으로 만들 수 있으면 `?.`로 지난 단계는 `left join`입니다.
+status가 1이고 고객이 없는 주문도 결과에 남습니다. Kotlin에서 같은 조건을 실행한 결과와 같습니다.
+
+**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `safe-call-or`:
+
+```kotlin
+// ?. says the customer may be missing: an order without a customer stays when the rest of the OR is true
+val q = qb.from(Order::class.java).where { it.status.toInt() == 1 || it.customer?.name == "Kim" }
+assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", q.toHql().hql())
+```
+
+**데이터베이스별 SQL (Kotlin 영역의 HQL을 그대로 실행한 결과)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `safe-call-or`:
+
+```sql
+-- H2, MariaDB, Oracle (same)
+select …
+from orders o1_0
+left join customers c1_0 on c1_0.id=o1_0.customer_id
+where o1_0.status=1 or c1_0.name='Kim'
+```
+
+**`?.`와 `== null`.** `it.customer?.name == null`은 Kotlin처럼 고객이 없는 주문과 이름이 없는 고객의 주문을 모두 찾습니다.
+
+**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `safe-call-null`:
+
+```kotlin
+// "no customer, or a customer without a name": a left join, as in Kotlin
+val q = qb.from(Order::class.java).where { it.customer?.name == null }
+assertEquals("select e0 from Order e0 left join e0.customer j1 where j1.name is null", q.toHql().hql())
+```
+
+**데이터베이스별 SQL (Kotlin 영역의 HQL을 그대로 실행한 결과)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `safe-call-null`:
+
+```sql
+-- H2, MariaDB, Oracle (same)
+select …
+from orders o1_0
+left join customers c1_0 on c1_0.id=o1_0.customer_id
+where c1_0.name is null
+```
+
+**null 가드.** `?.`로 쓴 null 가드도 `left join`이 되어 고객이 없는 주문이 남습니다.
+`!!`로 쓰면 inner join이라 남지 않습니다. 이 경우 lambdaQL은 `LQL-5009`를 `DEBUG` 수준으로 기록합니다.
 
 ```kotlin
 .where { it.customer == null || it.customer?.name == name }
+// HQL: select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1
+
+.where { it.customer == null || it.customer!!.name == name }
 // HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name = :p1
 
 .where { it.customer != null && it.customer?.name == name }
 // HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is not null and j1.name = :p1
 ```
+
+아래 SQL은 같은 조건을 Java로 쓴 테스트의 결과입니다. Kotlin에서는 `!!`로 쓴 두 번째 형태와 `&&`로 쓴 세 번째 형태가 이 SQL을 만듭니다.
 
 **데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `null-guard`:
 
@@ -578,8 +641,31 @@ where c1_0.id is not null and c1_0.name=?
 
 Hibernate는 `e0.customer is null`을 `c1_0.id is null`로 씁니다. inner join 뒤에서는 이 조건이 참이 되지 않습니다.
 
-- `||`의 다른 부분도 마찬가지입니다. `it.status == 1 || it.customer?.name == name`도 inner join을 사용하므로, status가 1이지만 고객이 없는 주문은 반환되지 않습니다(Kotlin이라면 반환).
-- 이에 대한 Kotlin 테스트는 아직 없습니다. 같은 조건을 Java로 쓴 것은 테스트했습니다. [이 페이지의 Java 버전](../java/03-where.md#310-association-paths)을 참고하십시오.
+**`!!`: 연관이 반드시 있다는 선언.** `!!`로 지난 단계는 항상 inner join입니다.
+Kotlin에서는 `||`가 `!!`에 닿기 전에 끝나는 행(status 1, 고객 없음)이 남지만, lambdaQL은 그 행을 뺍니다. 그런 행을 남기려면 `?.`를 쓰십시오.
+
+**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `not-null-assert`:
+
+```kotlin
+// !! says the customer is always there: an inner join, so orders without a customer are left out
+// (Kotlin itself would keep the status 1 order without a customer, because || stops before the !!)
+val q = qb.from(Order::class.java).where { it.status.toInt() == 1 || it.customer!!.name == "Kim" }
+assertEquals("select e0 from Order e0 join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", q.toHql().hql())
+```
+
+**`?.`와 `!!`를 섞은 경우.** 조건 전체(같은 쿼리의 모든 `where`)에서 같은 연관 단계를 한 곳에서는 `?.`로, 다른 곳에서는 `!!`나 표시 없이 지나면 inner join입니다.
+lambdaQL은 `LQL-5014`를 `WARN` 수준으로 기록합니다(조건마다 한 번). 고객이 없는 주문을 남기려면 모두 `?.`로 쓰십시오.
+
+**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `mixed-warn`:
+
+```kotlin
+// the same association with ?. in one place and !! in another: an inner join, and WARN LQL-5014
+val q = qb.from(Order::class.java).where { it.customer?.name == "Kim" || it.customer!!.grade!! > 3 }
+assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' or j1.grade > 3", q.toHql().hql())
+```
+
+- 한 경로 안에서 뒤 단계가 `!!`이면 앞 단계도 inner join입니다. 예를 들어 `Item`의 `it.order?.customer!!.name`은 `join e0.order j1 join j1.customer j2`입니다. Kotlin에서도 주문이 없으면 `NullPointerException`이 나는 경로라 `LQL-5014`를 기록하지 않습니다.
+- 두 단계를 모두 `?.`로 지나면(`it.order?.customer?.name`) 필요할 때 두 단계 모두 `left join`입니다.
 
 고객이 **없는** 주문을 찾으려면 연관 자체를 비교하십시오. 조인 없이 외래 키 컬럼을 검사합니다.
 
@@ -597,16 +683,12 @@ from orders o1_0
 where o1_0.customer_id is null
 ```
 
-> [!WARNING]
-> **`?.`를 써도 고객 없는 주문은 돌아오지 않습니다.** Kotlin에서 `it.customer?.name == null`은 고객이 없을 때 `true`입니다.
-> lambdaQL에서는 여기서 경로가 inner join이므로 `it.customer?.name == null`은 고객의 이름이 없는 주문만 반환합니다.
-> 고객 없는 주문도 포함하려면 명시적 `leftJoin`과 `c == null || c.name == null`을 사용하거나([6.8](06-select-group.md#68-explicit-joins) 참고), `it.customer == null`로 쿼리를 한 번 더 실행하십시오.
-
 추가 사항:
 
 - 같은 경로는 별칭 하나를 받습니다. 이 별칭은 `where`, `orderBy`, `select`가 함께 사용합니다.
 - `it.customer?.id == 5L`은 외래 키 컬럼 `e0.customer.id`를 사용합니다. 조인이 필요 없습니다.
-- `orderBy`나 `select`에**만** 쓰인 경로는 `left join`이므로 그곳에서는 행을 잃지 않습니다(규칙 S8, J1). 같은 경로를 `where`에서도 쓰면 `orderBy`와 `select`는 `where`의 조인, 즉 inner join을 사용합니다.
+- `orderBy`나 `select`에**만** 쓰인 경로는 `left join`이므로 그곳에서는 행을 잃지 않습니다(규칙 S8, J1). `!!`가 있어도 마찬가지입니다. 같은 경로를 `where`에서도 쓰면 `orderBy`와 `select`는 `where`의 조인을 사용합니다.
+- `?.`에 따른 조인 구분은 조회, `count`, 서브쿼리, 조인 쿼리의 `where`에 적용합니다. 명시적 조인의 `on` 안의 경로는 지금처럼 `left join`입니다. 필수 연관(`optional = false`)은 항상 inner join입니다.
 - 두 엔티티의 비교(`it.customer == c`)는 **계획 중**입니다(KC13). 지금은 id를 비교하십시오: `it.customer?.id == c.id`(여기서 `c`는 캡처한 객체).
 
 <a id="311-captured-values"></a>

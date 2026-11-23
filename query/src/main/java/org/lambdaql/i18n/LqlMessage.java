@@ -504,7 +504,10 @@ public enum LqlMessage {
     SARGABLE_COLUMN_ARITHMETIC("LQL-5012", 2),
 
     /** LQL-5013: The condition computes on the columns &#123;0&#125;, so it cannot use an index on them: &#123;1&#125; */
-    SARGABLE_COLUMN_EXPRESSION("LQL-5013", 2);
+    SARGABLE_COLUMN_EXPRESSION("LQL-5013", 2),
+
+    /** LQL-5014: Kotlin: the association &#123;0&#125; is read with ?. in one place and with !! (or without a mark) in another, so it is an inner join and rows without it are left out. Write ?. everywhere to keep those rows, or !! everywhere: &#123;1&#125; */
+    SAFE_CALL_MIXED("LQL-5014", 2);
 
     private final String code;
     private final int argCount;

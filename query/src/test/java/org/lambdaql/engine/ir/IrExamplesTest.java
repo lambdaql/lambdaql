@@ -137,6 +137,19 @@ class IrExamplesTest {
         assertEquals("col0.customer.name", name.toString());
         assertEquals(List.of(true, false), name.association());   // "customer" needs a LEFT JOIN
         // @end
+        // @start region="safe-nav"
+        // Kotlin it.customer?.name: the decoder marks it.customer, the value checked by ?.
+        Expr customer = new Expr.Invoke(new Expr.Param(0, Type.getType(Object.class)),
+                new MethodRef("org/lambdaql/query/Order", "getCustomer", "()Lorg/lambdaql/query/Customer;", false, false), List.of());
+        Expr.SafeNav checked = new Expr.SafeNav(customer);
+        assertEquals(customer.type(), checked.type());
+        // the normalizer puts the mark on the column: the "customer" step was reached with ?.
+        Expr.Column safeName = new Expr.Column(0, List.of("customer", "name"), List.of(true, false), String.class,
+                false, false, List.of(true, false));
+        assertTrue(safeName.safeStep(0));
+        // the same column as without ?. (only the join kind of a where can differ)
+        assertEquals(new Expr.Column(0, List.of("customer", "name"), List.of(true, false), String.class, false, false), safeName);
+        // @end
         // @start region="host"
         // user.getName().trim(): no entity inside, so lambdaQL computes it in Java and binds it
         Expr.Host host = new Expr.Host(new Expr.Captured(0, Type.getType(String.class)), String.class, false);

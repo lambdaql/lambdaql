@@ -73,28 +73,142 @@ final class JoinPlanner {
         return root + ":" + String.join(".", names);
     }
 
+    // ------------------------------------------------------------------ Kotlin safe calls (D54)
+
+    /**
+     * How the association steps of a where condition are written (ROADMAP D54).
+     *
+     * @param safe   steps written with the Kotlin safe call {@code ?.} that may become a left join
+     * @param plain  steps written without {@code ?.} ({@code !!}, a non-null Kotlin type, or Java): inner joins
+     * @param forced steps written with {@code ?.} that are inner joins anyway: a later step of the same path is an
+     *               inner join ({@code it.customer?.address!!.city}), or the association is {@code optional = false}
+     * @param names  the property path of every step key, for messages
+     */
+    record StepUses(Set<String> safe, Set<String> plain, Set<String> forced, Map<String, String> names) {
+
+        /**
+         * The steps that are written with {@code ?.} everywhere and are not forced to an inner join.
+         *
+         * @return keys made by {@link #key(int, List)}
+         */
+        Set<String> candidates() {
+            Set<String> out = new LinkedHashSet<>(safe);
+            out.removeAll(plain);
+            out.removeAll(forced);
+            return out;
+        }
+
+        /**
+         * The steps written with {@code ?.} in one place and without it in another (WARN LQL-5014).
+         *
+         * @return keys made by {@link #key(int, List)}
+         */
+        Set<String> mixed() {
+            Set<String> out = new LinkedHashSet<>(safe);
+            out.retainAll(plain);
+            return out;
+        }
+    }
+
+    /**
+     * Reads how each association step of the condition is written.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt">KotlinQueryTest</a>):
+     * {@code it.status == 1 || it.customer?.name == "Kim"} gives {@code safe = [0:customer]}; adding
+     * {@code && it.customer!!.grade > 1} also gives {@code plain = [0:customer]}, so the step is mixed.
+     *
+     * @param condition all conditions of the query, joined with AND
+     * @param required  tells whether step {@code i} of a column is an {@code optional = false} association
+     * @return the uses of the steps
+     */
+    static StepUses stepUses(Pred condition, java.util.function.BiPredicate<Expr.Column, Integer> required) {
+        Set<String> safe = new LinkedHashSet<>(), plain = new LinkedHashSet<>(), forced = new LinkedHashSet<>();
+        Map<String, String> names = new HashMap<>();
+        for (Expr.Column c : columns(condition)) {
+            List<String> path = c.path();
+            boolean laterInner = false;
+            for (int i = path.size() - 2; i >= 0; i--) {
+                boolean fkOnly = c.idPath() && i == path.size() - 2;
+                if (!c.association().get(i) || fkOnly) continue;
+                String key = key(c.root(), path.subList(0, i + 1));
+                names.put(key, String.join(".", path.subList(0, i + 1)));
+                if (!c.safeStep(i)) {
+                    plain.add(key);
+                    laterInner = true;
+                } else if (laterInner || required.test(c, i)) {
+                    forced.add(key);
+                    laterInner = true;
+                } else {
+                    safe.add(key);
+                }
+            }
+        }
+        return new StepUses(safe, plain, forced, names);
+    }
+
+    /**
+     * Finds the {@code ?.} steps that must be left joins: those where a row without the association can make the
+     * whole condition true. Other {@code ?.} steps stay inner joins, which gives the same rows (ROADMAP D54).
+     * On a row without the association, a null check of the association or of a column behind it is TRUE (the left
+     * join gives NULL there), a condition with {@code coalesce}, a database function or a null-safe comparison on such a
+     * column can be anything, and other conditions on such a column are UNKNOWN. A child step of a left join is a
+     * left join too.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt">KotlinQueryTest</a>):
+     * {@code it.customer?.name == "Kim"} gives no left join; {@code it.status == 1 || it.customer?.name == "Kim"} and
+     * {@code it.customer?.name == null} give {@code 0:customer}.
+     *
+     * @param condition  all conditions of the query, joined with AND
+     * @param candidates the steps from {@link StepUses#candidates()}
+     * @return the keys of the steps that need a left join
+     */
+    static Set<String> safeCallLeftJoins(Pred condition, Set<String> candidates) {
+        List<String> sorted = new ArrayList<>(candidates);
+        sorted.sort(java.util.Comparator.comparingInt(String::length));
+        Set<String> out = new LinkedHashSet<>();
+        for (String key : sorted) {
+            int colon = key.indexOf(':');
+            int root = Integer.parseInt(key.substring(0, colon));
+            List<String> names = List.of(key.substring(colon + 1).split("\\."));
+            boolean parentLeft = false;
+            for (int len = 1; len < names.size(); len++) parentLeft |= out.contains(key(root, names.subList(0, len)));
+            if (parentLeft || canKeepMissing(condition, root, names, true)) out.add(key);
+        }
+        return out;
+    }
+
     // ------------------------------------------------------------------ check
 
     private static boolean canKeepMissing(Pred condition, int root, List<String> missing) {
+        return canKeepMissing(condition, root, missing, false);
+    }
+
+    /**
+     * Tells whether some row without the association {@code missing} makes the condition true.
+     *
+     * @param kotlin {@code false}: the Java null guard rule (columns behind the association are never read);
+     *               {@code true}: the left join rule of D54 (columns behind the association are NULL)
+     */
+    private static boolean canKeepMissing(Pred condition, int root, List<String> missing, boolean kotlin) {
         List<Pred> free = new ArrayList<>();
         for (Pred atom : atoms(condition)) {
-            if (fixed(atom, root, missing) == null && !free.contains(atom)) free.add(atom);
+            if (fixed(atom, root, missing, kotlin) == null && !free.contains(atom)) free.add(atom);
         }
         if (free.size() > MAX_FREE_ATOMS) return true;
         for (long bits = 0; bits < (1L << free.size()); bits++) {
             Map<Pred, Boolean> values = new HashMap<>();
             for (int i = 0; i < free.size(); i++) values.put(free.get(i), (bits & (1L << i)) != 0);
-            if (eval(condition, values, root, missing) == Value.TRUE) return true;
+            if (eval(condition, values, root, missing, kotlin) == Value.TRUE) return true;
         }
         return false;
     }
 
     private enum Value { TRUE, FALSE, UNKNOWN }
 
-    private static Value eval(Pred p, Map<Pred, Boolean> free, int root, List<String> missing) {
+    private static Value eval(Pred p, Map<Pred, Boolean> free, int root, List<String> missing, boolean kotlin) {
         return switch (p) {
             case Pred.Bool b -> b.value() ? Value.TRUE : Value.FALSE;
-            case Pred.Not n -> switch (eval(n.operand(), free, root, missing)) {
+            case Pred.Not n -> switch (eval(n.operand(), free, root, missing, kotlin)) {
                 case TRUE -> Value.FALSE;
                 case FALSE -> Value.TRUE;
                 case UNKNOWN -> Value.UNKNOWN;
@@ -102,7 +216,7 @@ final class JoinPlanner {
             case Pred.And a -> {
                 Value out = Value.TRUE;
                 for (Pred item : a.items()) {
-                    Value v = eval(item, free, root, missing);
+                    Value v = eval(item, free, root, missing, kotlin);
                     if (v == Value.FALSE) yield Value.FALSE;
                     if (v == Value.UNKNOWN) out = Value.UNKNOWN;
                 }
@@ -111,14 +225,14 @@ final class JoinPlanner {
             case Pred.Or o -> {
                 Value out = Value.FALSE;
                 for (Pred item : o.items()) {
-                    Value v = eval(item, free, root, missing);
+                    Value v = eval(item, free, root, missing, kotlin);
                     if (v == Value.TRUE) yield Value.TRUE;
                     if (v == Value.UNKNOWN) out = Value.UNKNOWN;
                 }
                 yield out;
             }
             default -> {
-                Value f = fixed(p, root, missing);
+                Value f = fixed(p, root, missing, kotlin);
                 yield f != null ? f : free.get(p) ? Value.TRUE : Value.FALSE;
             }
         };
@@ -128,20 +242,57 @@ final class JoinPlanner {
      * Gives the value of a single condition on a row where the association {@code missing} is NULL
      * (and its parent exists).
      *
+     * @param kotlin {@code true} for the left join rule of D54: a column behind the association is NULL, so its
+     *               {@code is null} is TRUE, and a condition that can be true on NULL ({@code coalesce}, a database
+     *               function, a null-safe comparison) is free
      * @return TRUE / FALSE / UNKNOWN, or {@code null} if the condition does not depend on the association
+     *         (or, with {@code kotlin}, can be anything)
      */
-    private static Value fixed(Pred atom, int root, List<String> missing) {
+    private static Value fixed(Pred atom, int root, List<String> missing, boolean kotlin) {
         if (atom instanceof Pred.IsNull n && n.operand() instanceof Expr.Column c && c.root() == root
                 && c.association().get(c.path().size() - 1)) {
             if (c.path().equals(missing)) return Value.TRUE;               // o.customer is null
             if (startsWith(missing, c.path())) return Value.FALSE;        // the parent exists
         }
+        boolean behind = false;
         for (Expr.Column c : columns(atom)) {
-            if (c.root() == root && c.path().size() > missing.size() && startsWith(c.path(), missing)) {
-                return Value.UNKNOWN;                                    // j1.name: never read in Java
-            }
+            if (c.root() == root && c.path().size() > missing.size() && startsWith(c.path(), missing)) behind = true;
         }
-        return null;
+        if (!behind) return null;
+        if (!kotlin) return Value.UNKNOWN;                                // j1.name: never read in Java
+        if (nullTolerant(atom)) return null;                              // coalesce(j1.name, 'x') = 'x' can be true
+        if (atom instanceof Pred.IsNull) return Value.TRUE;               // j1.name is null: the left join gives NULL
+        return Value.UNKNOWN;                                             // j1.name = 'Kim' on NULL
+    }
+
+    /**
+     * A condition that can be true when a column in it is NULL: coalesce, a database function, or a null-safe compare
+     * of two entity values ({@code is not distinct from}). A null-safe compare with a captured value or a constant is
+     * written as {@code =} or {@code <>} (D48), which is never true on NULL.
+     */
+    private static boolean nullTolerant(Pred atom) {
+        return switch (atom) {
+            case Pred.Cmp c -> (c.nullSafe() && !value(c.left()) && !value(c.right())) || nullTolerant(c.left()) || nullTolerant(c.right());
+            case Pred.IsNull n -> nullTolerant(n.operand());
+            case Pred.Truth t -> nullTolerant(t.operand());
+            case Pred.In in -> nullTolerant(in.value());
+            default -> true;
+        };
+    }
+
+    /** A value computed in Java or written in the lambda (not an entity value). */
+    private static boolean value(Expr e) {
+        return e instanceof Expr.Host || e instanceof Expr.Const;
+    }
+
+    private static boolean nullTolerant(Expr e) {
+        return switch (e) {
+            case Expr.Coalesce c -> true;
+            case Expr.Func f -> true;
+            case Expr.Arith a -> nullTolerant(a.left()) || nullTolerant(a.right());
+            case Expr.Neg n -> nullTolerant(n.operand());
+            default -> false;
+        };
     }
 
     // ------------------------------------------------------------------ helpers

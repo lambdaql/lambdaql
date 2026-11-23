@@ -64,6 +64,7 @@ public final class HostEvaluator {
                 yield first != null ? first : eval(c.second(), captured);
             }
             case Expr.NewObject n -> construct(n, captured);
+            case Expr.SafeNav n -> eval(n.value(), captured);
             case Expr.ArrayLength a -> java.lang.reflect.Array.getLength(eval(a.array(), captured));
             default -> throw LqlMessage.HOST_NOT_EVALUABLE.exception(e);
         };

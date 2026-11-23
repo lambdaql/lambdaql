@@ -24,7 +24,7 @@ import java.util.List;
 public sealed interface Expr permits
         Expr.Param, Expr.Captured, Expr.Const, Expr.Invoke, Expr.GetField, Expr.Arith, Expr.Neg,
         Expr.Convert, Expr.CmpResult, Expr.NewObject, Expr.ArrayLength, Expr.Coalesce, Expr.Column, Expr.Host,
-        Expr.Lambda, Expr.Root, Expr.Subquery, Expr.Aggregate, Expr.ArrayOf, Expr.Func {
+        Expr.Lambda, Expr.Root, Expr.Subquery, Expr.Aggregate, Expr.ArrayOf, Expr.Func, Expr.SafeNav {
 
     /**
      * Returns the JVM type of this value.
@@ -250,16 +250,84 @@ public sealed interface Expr permits
      * @param nonNull     {@code true} if the column can never be NULL (id, primitive, {@code nullable = false})
      * @param idPath      {@code true} if the path ends at the id of an association (a foreign key column,
      *                    so no join is needed)
+     * @param safeCall    one flag per path part: {@code true} if the lambda reached the next part of that association
+     *                    with the Kotlin safe call {@code ?.} (ROADMAP D54). Such a step may become a {@code left join}
+     *                    in a where condition. It is not part of {@link #equals}: both forms name the same column.
      */
     record Column(int root, List<String> path, List<Boolean> association, Class<?> javaType,
-                  boolean nonNull, boolean idPath) implements Expr {
-        /** Makes unmodifiable copies of the lists. */
+                  boolean nonNull, boolean idPath, List<Boolean> safeCall) implements Expr {
+        /** Makes unmodifiable copies of the lists; a missing or short {@code safeCall} list is filled with {@code false}. */
         public Column {
             path = List.copyOf(path);
             association = List.copyOf(association);
+            List<Boolean> safe = new java.util.ArrayList<>(safeCall == null ? List.of() : safeCall);
+            while (safe.size() < path.size()) safe.add(false);
+            safeCall = List.copyOf(safe.subList(0, path.size()));
         }
+
+        /**
+         * A column without Kotlin safe calls (Java, or Kotlin without {@code ?.}).
+         *
+         * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+         * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="column"}
+         *
+         * @param root        which FROM entity the path starts at
+         * @param path        property names from the root
+         * @param association one flag per path part: {@code true} for a to-one association
+         * @param javaType    Java type of the column value
+         * @param nonNull     {@code true} if the column can never be NULL
+         * @param idPath      {@code true} if the path ends at the id of an association
+         */
+        public Column(int root, List<String> path, List<Boolean> association, Class<?> javaType, boolean nonNull, boolean idPath) {
+            this(root, path, association, javaType, nonNull, idPath, List.of());
+        }
+
+        /**
+         * Tells whether the step at {@code i} was reached with {@code ?.}.
+         *
+         * @param i index of an association part of the path
+         * @return {@code true} for a Kotlin safe call on that association
+         */
+        public boolean safeStep(int i) {
+            return safeCall.get(i);
+        }
+
         @Override public Type type() { return Type.getType(javaType); }
         @Override public String toString() { return "col" + root + "." + String.join(".", path); }
+
+        /**
+         * Compares the column, not how the lambda reached it: {@code safeCall} is ignored.
+         *
+         * @param o the other object
+         * @return {@code true} for the same root, path and column facts
+         */
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof Column c && root == c.root && nonNull == c.nonNull && idPath == c.idPath
+                    && path.equals(c.path) && association.equals(c.association) && javaType.equals(c.javaType);
+        }
+
+        /** @return a hash code that ignores {@code safeCall}, like {@link #equals} */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(root, path, association, javaType, nonNull, idPath);
+        }
+    }
+
+    /**
+     * Raw node: a value that the Kotlin safe call {@code ?.} checked for null before its next member was read
+     * ({@code it.customer?.name}: the value {@code it.customer}). The decoder keeps only the non-null path of the safe
+     * call and marks the value with this node; the normalizer turns the mark into {@link Column#safeCall()} when the
+     * value is an association (ROADMAP D54). Only values that start at a lambda parameter are marked.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="safe-nav"}
+     *
+     * @param value the value that was checked for null
+     */
+    record SafeNav(Expr value) implements Expr {
+        @Override public Type type() { return value.type(); }
+        @Override public String toString() { return value + "?"; }
     }
 
     /**

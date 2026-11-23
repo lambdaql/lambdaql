@@ -460,6 +460,7 @@ public final class Decoder implements Opcodes {
             int a = nextReal(target);
             int b = a >= 0 ? nextReal(a + 1) : -1;
             if (a >= 0 && b >= 0 && insns[a].getOpcode() == POP && insns[b].getOpcode() == ACONST_NULL) {
+                markSafeCall(stack);
                 return jumpAt + 1; // keep x on the stack and go on with the non-null path
             }
             if (statements != null && a >= 0 && insns[a].getOpcode() == POP) {
@@ -471,6 +472,7 @@ public final class Decoder implements Opcodes {
         int b = a >= 0 ? nextReal(a + 1) : -1;
         if (a < 0 || b < 0 || insns[a].getOpcode() != POP) return null;
         if (insns[b].getOpcode() == ACONST_NULL) {
+            markSafeCall(stack);
             return target; // safe call: go to the non-null path (L)
         }
         // elvis: one instruction pushes the default value and then L comes right away
@@ -480,6 +482,38 @@ public final class Decoder implements Opcodes {
         Expr x = popExpr(stack, -1);
         stack.add(new Expr.Coalesce(x, dflt, x.type()));
         return target;
+    }
+
+    /**
+     * Marks the value checked by a Kotlin safe call ({@code it.customer} in {@code it.customer?.name}) with
+     * {@link Expr.SafeNav}, so the normalizer knows that step was written with {@code ?.} (ROADMAP D54).
+     * Only a value that starts at a lambda parameter is marked; assignment lambdas are not marked.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="safe-nav"}
+     *
+     * @param stack the stack; its top is the checked value
+     */
+    private void markSafeCall(List<Object> stack) {
+        if (statements != null || stack.isEmpty()) return;
+        Object top = stack.get(stack.size() - 1);
+        if (top instanceof Expr e && !(e instanceof Expr.SafeNav) && startsAtParam(e)) stack.set(stack.size() - 1, new Expr.SafeNav(e));
+    }
+
+    /**
+     * Tells whether a value is a member chain that starts at a lambda parameter ({@code it.customer}).
+     *
+     * @param e the value
+     * @return {@code true} for a parameter, or calls and casts on one
+     */
+    private static boolean startsAtParam(Expr e) {
+        return switch (e) {
+            case Expr.Param p -> true;
+            case Expr.Invoke i -> i.receiver() != null && startsAtParam(i.receiver());
+            case Expr.Convert c -> startsAtParam(c.operand());
+            case Expr.SafeNav n -> startsAtParam(n.value());
+            default -> false;
+        };
     }
 
     private boolean onlyLabelsBetween(int from, int to) {

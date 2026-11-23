@@ -290,6 +290,7 @@ public final class AssignmentReader {
             case Expr.Arith a -> new Expr.Arith(a.op(), replaceParam(a.left(), index, with), replaceParam(a.right(), index, with), a.type());
             case Expr.Neg n -> new Expr.Neg(replaceParam(n.operand(), index, with), n.type());
             case Expr.Convert c -> new Expr.Convert(replaceParam(c.operand(), index, with), c.type());
+            case Expr.SafeNav n -> new Expr.SafeNav(replaceParam(n.value(), index, with));
             case Expr.Coalesce c -> new Expr.Coalesce(replaceParam(c.first(), index, with), replaceParam(c.second(), index, with), c.type());
             case Expr.NewObject n -> new Expr.NewObject(n.type(), n.constructor(), n.args().stream().map(a -> replaceParam(a, index, with)).toList());
             default -> e;

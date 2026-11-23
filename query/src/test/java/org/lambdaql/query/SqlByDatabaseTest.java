@@ -189,6 +189,16 @@ class SqlByDatabaseTest {
                 .onConflict(a -> a.getId()).ignore();
         record("insert-ignore", ignore.toHql().get(0), () -> List.of(ignore.execute()), false);
 
+        // ---- KotlinQueryTest, safe call ?. and !! in where (D54): Java cannot write ?., so the HQL that those regions
+        // assert is run as it is
+        kotlinHql("safe-call-or", "select e0 from Order e0 left join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", false);
+        kotlinHql("safe-call-null", "select e0 from Order e0 left join e0.customer j1 where j1.name is null", false);
+        kotlinHql("safe-call-and", "select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' and e0.price > 100.0", false);
+        kotlinHql("not-null-assert", "select e0 from Order e0 join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", false);
+        kotlinHql("mixed-warn", "select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' or j1.grade > 3", false);
+        kotlinHql("update-safe-call", "update Order e0 set e0.status = :p1"
+                + " where e0.status = 1 or (select s1.name from Customer s1 where s1.id = fk(e0.customer)) = 'Kim'", true);
+
         // ---- SubqueryTest
         ex("sub-exists", qb.from(Order.class).where((o, sub) -> sub.from(Item.class)
                 .where(i -> i.getOrder().getId() == o.getId() && i.getQty() > 10).exists()));
@@ -276,6 +286,29 @@ class SqlByDatabaseTest {
         }
         assertFalse(sql.isEmpty(), "no SQL for " + id);
         out.put(id, "-- HQL: " + hql + "\n-- (this HQL is given to Hibernate directly)\n" + docForm(sql.get(0)));
+    }
+
+    /**
+     * Records the SQL of an HQL string that a Kotlin region asserts (Kotlin-only forms such as ?. in where, D54).
+     *
+     * @param id     the example name, the same as the region name
+     * @param hql    the HQL, copied from the Kotlin test
+     * @param update {@code true} for UPDATE/DELETE (run in a transaction; {@code :p1} gets the value 7)
+     */
+    private void kotlinHql(String id, String hql, boolean update) {
+        RenderedQuery rendered = new RenderedQuery(hql, update ? Map.of("p1", (short) 7) : Map.of());
+        record(id, rendered, () -> {
+            EntityManager em = emf.createEntityManager();
+            try {
+                if (!update) return em.createQuery(hql, Order.class).getResultList();
+                em.getTransaction().begin();
+                int n = em.createQuery(hql).setParameter("p1", (short) 7).executeUpdate();
+                em.getTransaction().commit();
+                return List.of(n);
+            } finally {
+                em.close();
+            }
+        }, !update);
     }
 
     private void record(String id, RenderedQuery hql, Supplier<List<?>> run) {

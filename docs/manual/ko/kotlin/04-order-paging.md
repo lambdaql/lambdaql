@@ -272,7 +272,7 @@ qb.from(Order::class.java).orderBy { o, by -> by.asc(o.kind) }
 ```
 
 별칭은 `where`와 함께 사용합니다. `where`가 같은 경로를 이미 조인했다면 정렬은 그 조인을 사용합니다.
-이 조인은 inner join입니다. `where`의 경로는 항상 inner join이므로 고객 없는 주문은 이미 빠져 있습니다(결정 D36, D48, [3.10](03-where.md#310-association-paths) 참고).
+`where`가 이 경로를 inner join으로 썼다면 고객 없는 주문은 이미 빠져 있습니다(결정 D36, D48). `?.`로 지나 `left join`이 된 경로라면(결정 D54) 정렬도 그 `left join`을 사용합니다([3.10](03-where.md#310-association-paths) 참고).
 
 <a id="46-rules-for-the-lambda-body"></a>
 ## 4.6 람다 본문의 규칙

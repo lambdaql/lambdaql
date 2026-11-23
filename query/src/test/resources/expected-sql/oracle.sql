@@ -407,6 +407,47 @@ insert into archive(id,price)
 select 300,1.0
 where not exists(select 1 from archive a2_0 where a2_0.id=300)
 
+-- @example safe-call-or
+-- HQL: select e0 from Order e0 left join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'
+select …
+from orders o1_0
+left join customers c1_0 on c1_0.id=o1_0.customer_id
+where o1_0.status=1 or c1_0.name='Kim'
+
+-- @example safe-call-null
+-- HQL: select e0 from Order e0 left join e0.customer j1 where j1.name is null
+select …
+from orders o1_0
+left join customers c1_0 on c1_0.id=o1_0.customer_id
+where c1_0.name is null
+
+-- @example safe-call-and
+-- HQL: select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' and e0.price > 100.0
+select …
+from orders o1_0
+join customers c1_0 on c1_0.id=o1_0.customer_id
+where c1_0.name='Kim' and o1_0.price>100.0
+
+-- @example not-null-assert
+-- HQL: select e0 from Order e0 join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'
+select …
+from orders o1_0
+join customers c1_0 on c1_0.id=o1_0.customer_id
+where o1_0.status=1 or c1_0.name='Kim'
+
+-- @example mixed-warn
+-- HQL: select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' or j1.grade > 3
+select …
+from orders o1_0
+join customers c1_0 on c1_0.id=o1_0.customer_id
+where c1_0.name='Kim' or c1_0.grade>3
+
+-- @example update-safe-call
+-- HQL: update Order e0 set e0.status = :p1 where e0.status = 1 or (select s1.name from Customer s1 where s1.id = fk(e0.customer)) = 'Kim'
+update orders o1_0
+set o1_0.status=?
+where o1_0.status=1 or (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)='Kim'
+
 -- @example sub-exists
 -- HQL: select e0 from Order e0 where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > 10)
 select …

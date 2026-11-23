@@ -166,6 +166,39 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 주문에 고객이 없으면 `custName`은 NULL이 됩니다.
 `where`에서는 lambdaQL이 `e0.customer.id is not null`을 더합니다. 그래서 수정 대상 행은 `qb.from(Order::class.java).where { 같은 람다 }`의 결과와 같습니다(결정 D36). Java 테스트가 이를 확인합니다.
 
+**`?.`와 `||`.** 조회에서 `?.`로 지난 단계가 `left join`이 되는 조건이면(결정 D54, [3.10](03-where.md#310-association-paths) 참고) DML은 `e0.customer.id is not null`을 더하지 않습니다.
+그래서 고객이 없는 주문도 조회와 똑같이 수정 대상이 됩니다. 위 예제처럼 `?.`만 있고 고객이 없는 행이 조건을 참으로 만들 수 없으면 검사를 그대로 둡니다.
+
+**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `update-safe-call`:
+
+```kotlin
+// UPDATE: the left join of ?. drops the "customer exists" check, so the order without a customer is changed too
+val u = qb.update(Order::class.java)
+    .set { it.status = st }
+    .where { it.status.toInt() == 1 || it.customer?.name == "Kim" }
+assertEquals("update Order e0 set e0.status = :p1"
+    + " where e0.status = 1 or (select s1.name from Customer s1 where s1.id = fk(e0.customer)) = 'Kim'", u.toHql().hql())
+```
+
+**데이터베이스별 SQL (Kotlin 영역의 HQL을 그대로 실행한 결과)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `update-safe-call`:
+
+```sql
+-- H2
+update orders o1_0
+set status=?
+where o1_0.status=1 or (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)='Kim'
+
+-- MariaDB
+update orders
+set status=?
+where status=1 or (select c1_0.name from customers c1_0 where c1_0.id=orders.customer_id)='Kim'
+
+-- Oracle
+update orders o1_0
+set o1_0.status=?
+where o1_0.status=1 or (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)='Kim'
+```
+
 <a id="an-aggregate-from-a-subquery"></a>
 ## 서브쿼리의 집계
 

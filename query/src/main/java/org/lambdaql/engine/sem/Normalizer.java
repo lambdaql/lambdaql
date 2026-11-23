@@ -423,9 +423,22 @@ public final class Normalizer {
      * @param type     the class at the end of the path
      * @param kind     ROOT (the parameter itself), ASSOCIATION or EMBEDDED
      * @param nonNull  {@code true} if the association can never be null
+     * @param safe     per name: {@code true} if the next part was read with the Kotlin safe call {@code ?.} (D54)
      */
-    private record Path(int root, List<String> names, List<Boolean> assoc, Class<?> type, String kind, boolean nonNull)
-            implements V {
+    private record Path(int root, List<String> names, List<Boolean> assoc, Class<?> type, String kind, boolean nonNull,
+                        List<Boolean> safe) implements V {
+        /** A path without safe calls so far. */
+        Path(int root, List<String> names, List<Boolean> assoc, Class<?> type, String kind, boolean nonNull) {
+            this(root, names, assoc, type, kind, nonNull, java.util.Collections.nCopies(names.size(), false));
+        }
+
+        /** The same path with its last part marked as checked by {@code ?.}. */
+        Path safeLast() {
+            if (names.isEmpty()) return this;
+            List<Boolean> s = new ArrayList<>(safe);
+            s.set(s.size() - 1, true);
+            return new Path(root, names, assoc, type, kind, nonNull, List.copyOf(s));
+        }
     }
 
     private V value(Expr e) {
@@ -459,6 +472,8 @@ public final class Normalizer {
             }
             case Expr.Root r -> new Path(r.root(), List.of(), List.of(), rootTypes.get(r.root()), "ROOT", true);
             case Expr.Convert c -> value(c.operand());
+            // Kotlin it.customer?.name: an association checked by ?. may become a left join in a where (D54)
+            case Expr.SafeNav n -> value(n.value()) instanceof Path p && p.kind().equals("ASSOCIATION") ? p.safeLast() : value(n.value());
             case Expr.Invoke inv -> invoke(inv);
             case Expr.Arith a -> new Done(new Expr.Arith(a.op(), done(value(a.left())), done(value(a.right())), a.type()));
             case Expr.Neg n -> new Done(new Expr.Neg(done(value(n.operand())), n.type()));
@@ -534,19 +549,21 @@ public final class Normalizer {
         List<String> names = new ArrayList<>(p.names());
         names.add(prop.name());
         List<Boolean> assoc = new ArrayList<>(p.assoc());
+        List<Boolean> safe = new ArrayList<>(p.safe());
+        safe.add(false);
         return switch (prop.kind()) {
             case BASIC -> {
                 assoc.add(false);
                 boolean idPath = prop.id() && p.kind().equals("ASSOCIATION");
-                yield new Done(new Expr.Column(p.root(), names, assoc, prop.javaType(), prop.nonNull(), idPath));
+                yield new Done(new Expr.Column(p.root(), names, assoc, prop.javaType(), prop.nonNull(), idPath, safe));
             }
             case EMBEDDED -> {
                 assoc.add(false);
-                yield new Path(p.root(), names, assoc, prop.javaType(), "EMBEDDED", prop.nonNull());
+                yield new Path(p.root(), names, assoc, prop.javaType(), "EMBEDDED", prop.nonNull(), safe);
             }
             case ASSOCIATION -> {
                 assoc.add(true);
-                yield new Path(p.root(), names, assoc, prop.javaType(), "ASSOCIATION", prop.nonNull());
+                yield new Path(p.root(), names, assoc, prop.javaType(), "ASSOCIATION", prop.nonNull(), safe);
             }
             case COLLECTION -> throw error(LqlMessage.COLLECTION_PATH, prop.name());
         };
@@ -585,7 +602,7 @@ public final class Normalizer {
         if (p.names().isEmpty()) throw error(LqlMessage.ENTITY_COMPARE, String.join(".", p.names()));
         if (p.kind().equals("EMBEDDED")) throw error(LqlMessage.EMBEDDABLE_COMPARE, String.join(".", p.names()));
         // an association used as a value: its foreign key (o.customer), for IS NULL checks
-        return new Expr.Column(p.root(), p.names(), p.assoc(), p.type(), p.nonNull(), false);
+        return new Expr.Column(p.root(), p.names(), p.assoc(), p.type(), p.nonNull(), false, p.safe());
     }
 
     // ------------------------------------------------------------------ subqueries (ROADMAP M8)
@@ -738,6 +755,7 @@ public final class Normalizer {
             case Expr.Invoke i -> new Expr.Invoke(i.receiver() == null ? null : toRoots(i.receiver()), i.method(),
                     i.args().stream().map(this::toRoots).toList());
             case Expr.Convert c -> new Expr.Convert(toRoots(c.operand()), c.type());
+            case Expr.SafeNav n -> new Expr.SafeNav(toRoots(n.value()));
             case Expr.GetField f -> f.receiver() == null ? f : new Expr.GetField(toRoots(f.receiver()), f.owner(), f.name(), f.type());
             case Expr.Arith a -> new Expr.Arith(a.op(), toRoots(a.left()), toRoots(a.right()), a.type());
             case Expr.Neg n -> new Expr.Neg(toRoots(n.operand()), n.type());
@@ -766,6 +784,7 @@ public final class Normalizer {
             case Expr.Invoke i -> new Expr.Invoke(i.receiver() == null ? null : substitute(i.receiver(), captured), i.method(),
                     i.args().stream().map(a -> substitute(a, captured)).toList());
             case Expr.Convert c -> new Expr.Convert(substitute(c.operand(), captured), c.type());
+            case Expr.SafeNav n -> new Expr.SafeNav(substitute(n.value(), captured));
             case Expr.GetField f -> f.receiver() == null ? f : new Expr.GetField(substitute(f.receiver(), captured), f.owner(), f.name(), f.type());
             case Expr.Arith a -> new Expr.Arith(a.op(), substitute(a.left(), captured), substitute(a.right(), captured), a.type());
             case Expr.Neg n -> new Expr.Neg(substitute(n.operand(), captured), n.type());
@@ -931,6 +950,7 @@ public final class Normalizer {
             case Expr.Arith a -> callsDbFunction(a.left()) || callsDbFunction(a.right());
             case Expr.Neg n -> callsDbFunction(n.operand());
             case Expr.Convert c -> callsDbFunction(c.operand());
+            case Expr.SafeNav n -> callsDbFunction(n.value());
             case Expr.Coalesce c -> callsDbFunction(c.first()) || callsDbFunction(c.second());
             case Expr.CmpResult c -> callsDbFunction(c.left()) || callsDbFunction(c.right());
             default -> false;
@@ -967,6 +987,7 @@ public final class Normalizer {
             case Expr.Arith a -> usesEntity(a.left()) || usesEntity(a.right());
             case Expr.Neg n -> usesEntity(n.operand());
             case Expr.Convert c -> usesEntity(c.operand());
+            case Expr.SafeNav n -> usesEntity(n.value());
             case Expr.CmpResult c -> usesEntity(c.left()) || usesEntity(c.right());
             case Expr.NewObject n -> n.args().stream().anyMatch(Normalizer::usesEntity);
             case Expr.ArrayLength a -> usesEntity(a.array());

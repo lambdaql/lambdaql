@@ -39,16 +39,25 @@ val orders = qb.from(Order::class.java)
 ```
 
 <a id="hql-the-same-for-both"></a>
-### HQL (두 언어 모두 동일)
+### HQL
+
+Java:
 
 ```
 select e0 from Order e0 join e0.customer j1
 where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
 ```
 
+Kotlin(`?.`로 지난 연관은 필요할 때 `left join`, 결정 D54):
+
+```
+select e0 from Order e0 left join e0.customer j1
+where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
+```
+
 **SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다.
 
-**데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `overview-first`:
+**데이터베이스별 SQL (Java 예제, 테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `overview-first`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -60,9 +69,9 @@ where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 
 두 `where` 호출은 `AND`로 결합됩니다.
 상수 `"Kim"`은 리터럴이고, 캡처한 `minPrice`는 바인드 파라미터(`:p1`)입니다.
-`where`의 `o.getCustomer().getName()` 같은 경로는 기본적으로 inner `join`입니다. 고객이 없는 주문은 반환되지 않습니다.
-이 예제도 마찬가지입니다. Java라면 status가 1인 주문은 고객이 없어도 조건에 맞지만, lambdaQL은 SQL 의미를 사용합니다(결정 D48).
-이런 주문을 유지하려면 `leftJoin`을 사용하십시오.
+`where`의 `o.getCustomer().getName()` 같은 경로는 기본적으로 inner `join`입니다. Java 예제는 고객이 없는 주문을 반환하지 않습니다.
+Java라면 status가 1인 주문은 고객이 없어도 조건에 맞지만, lambdaQL은 SQL 의미를 사용합니다(결정 D48). 이런 주문을 유지하려면 `leftJoin`을 사용하십시오.
+Kotlin 예제는 `?.`로 "고객이 없을 수 있음"을 적었으므로 `left join`이 되고, status가 1이며 고객이 없는 주문도 반환합니다(결정 D54). `!!`로 쓰면 Java와 같은 inner join입니다.
 
 람다는 평범한 Java나 Kotlin 코드처럼 보입니다.
 하지만 람다는 Java나 Kotlin 문법으로 쓴 **쿼리 언어**입니다.
@@ -175,7 +184,7 @@ lambdaQL은 Java나 Kotlin의 실행 규칙이 아니라 문서화된 자체 규
 |---|---|---|
 | `it.id == id`(`id: Long?`, nullable 변수) | 값 동등성: `e0.id = :p1` | Kotlin의 `==`는 원래 "같은 값"을 뜻합니다. 캡처 값 `null`은 NULL로 바인딩되어 어떤 행에도 일치하지 않습니다(`WARN` 수준 `LQL-4045`). |
 | `it.description == it.custName`, `it.description != text` | `e0.description = e0.custName`, `e0.description <> :p1`(SQL 의미) | 엔티티 값 두 개를 비교하거나 값과 `!=`로 비교하면, 값이 NULL인 행은 일치하지 않습니다. 이런 행을 유지하려면 `it.description == null \|\| ...`이라고 쓰십시오. |
-| `it.customer?.name` 또는 `it.customer!!.name` | 조인한 고객의 `name` 컬럼(`where`에서는 기본적으로 inner `join`) | 경로는 컬럼을 가리킵니다. `?.`와 `!!`는 컬럼을 바꾸지 않습니다. `!!`는 람다를 컴파일하기 위해 있을 뿐입니다. `where`에서는 고객이 없는 주문이 반환되지 않습니다. 그런 주문을 찾으려면 `it.customer == null`이라고 쓰십시오. null 가드(`it.customer == null \|\| ...`)를 써도 마찬가지입니다(SQL 의미, D48). 이런 주문을 유지하려면 `leftJoin`을 사용하십시오. |
+| `it.customer?.name` 또는 `it.customer!!.name` | 조인한 고객의 `name` 컬럼. `where`에서 `!!`는 inner `join`, `?.`는 필요할 때 `left join` | 경로는 컬럼을 가리킵니다. `?.`와 `!!`는 컬럼을 바꾸지 않고 `where`의 조인 종류만 정합니다(D54). `!!`는 "연관이 반드시 있음"이라 고객이 없는 주문이 반환되지 않습니다. `?.`는 "연관이 없을 수 있음"이라 고객이 없는 주문이 조건을 참으로 만들 수 있으면(`it.status == 1 \|\| ...`, `it.customer?.name == null`) `left join`으로 남깁니다. 고객이 없는 주문만 찾으려면 `it.customer == null`이라고 쓰십시오. |
 | `price`가 NULL일 때 `it.price!! > 100.0` | 행이 일치하지 않음(SQL 의미) | Kotlin이라면 `!!`에서 `NullPointerException`을 던집니다. lambdaQL은 `!!`를 무시하고, SQL은 UNKNOWN을 반환합니다. |
 | `it.description == null` | `e0.description is null` | null 검사를 직접 작성했으므로 lambdaQL이 이를 사용합니다. |
 

@@ -28,7 +28,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-2xxx` | 바이트코드 디코딩 | `LQL-2001`~`LQL-2025` | `UnsupportedLambdaShapeException` |
 | `LQL-3xxx` | 의미 해석과 Java에서 계산하는 값 | `LQL-3001`~`LQL-3067` | `TranslationException`(`LQL-3066`은 하위 클래스 `NonSargableException`) |
 | `LQL-4xxx` | 렌더링, 바인딩, 실행 | `LQL-4001`~`LQL-4045`, `LQL-4999`(내부 오류) | `LambdaQLException` 자체, 또는 JDK/JPA 표준 예외([예외](#exceptions) 참고). `LQL-4045`는 `WARN` 로그(자기 기본형 언박싱만 있는 비교는 `DEBUG`) |
-| `LQL-5xxx` | 경고(로그에 기록) | `LQL-5001`~`LQL-5013` | –(로그 한 줄. 레벨은 `WARN`이며, `LQL-5004`~`LQL-5006`, `LQL-5008`과 기본 정렬 모드의 `LQL-5003`은 `INFO`, `LQL-5009`~`LQL-5011`, `LQL-5013`은 `DEBUG`) |
+| `LQL-5xxx` | 경고(로그에 기록) | `LQL-5001`~`LQL-5014` | –(로그 한 줄. 레벨은 `WARN`이며, `LQL-5004`~`LQL-5006`, `LQL-5008`과 기본 정렬 모드의 `LQL-5003`은 `INFO`, `LQL-5009`~`LQL-5011`, `LQL-5013`은 `DEBUG`) |
 
 실제 코드의 예:
 
@@ -52,19 +52,20 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-4043` | `LambdaQLException` | {0}의 스텁 인자가 DB 인자와 이름은 같고 순서만 다릅니다. 스텁: {1}, DB: {2} |
 | `LQL-4044` | `LambdaQLException` | Oracle 패키지에 이 이름의 프로시저가 여러 개 있습니다(오버로드). 어느 것을 호출할지 구분할 수 없습니다: {0} |
 | `LQL-4045` | –(실행 시 `WARN` 로그, 자기 기본형 언박싱을 거친 비교는 `DEBUG`) | {0}에서 캡처 값이 null입니다. SQL에서 = NULL과 <> NULL은 어떤 행과도 맞지 않습니다. 람다에 x == null을 쓰거나 쿼리 전에 값을 확인하세요. |
-| `LQL-5001` | –(`WARN` 로그) | 함수 {0}가 열 {1}에 씌워져 있어 열의 일반 인덱스를 쓸 수 없고 전체 스캔이 될 수 있습니다. 열을 값과 비교하도록 바꾸거나 (Oracle) 함수 기반 인덱스를 만드세요: {2} |
+| `LQL-5001` | –(`WARN` 로그) | 함수 {0}가 열 {1}에 씌워져 있어 열의 일반 인덱스를 쓸 수 없고 전체 스캔이 될 수 있습니다. 열을 값과 비교하도록 바꾸거나 (Oracle, PostgreSQL) 같은 식의 함수 기반 인덱스를 만드세요: {2} |
 | `LQL-5002` | –(`WARN` 로그) | limit 없는 서브쿼리 정렬은 결과에 영향이 없어 제거했습니다(Q4): {0} |
 | `LQL-5003` | –(`INFO` 또는 `WARN` 로그) | 외부 정렬이 {0}의 정렬 규칙에 없습니다: {1}. 지금은 실행하지만 SortMode.STRICT에서는 거부됩니다. |
 | `LQL-5004` | –(`INFO` 로그) | 클래스 파일에 스텁 인자 이름이 없어 {0}의 인자 순서를 확인하지 않습니다. -parameters(Kotlin: -java-parameters)로 컴파일하거나 @DbParam을 쓰세요. |
 | `LQL-5005` | –(`INFO` 로그) | DB 메타데이터에서 {0}의 인자 정보를 읽지 못했습니다({1}). 스텁을 대조하지 않으며, IN·INOUT은 스텁 순서대로, 그 뒤에 OUT 인자가 온다고 봅니다. |
 | `LQL-5006` | –(`INFO` 로그) | {0}의 오버로드를 확인하지 못했습니다({1}). 확인 없이 호출합니다. |
-| `LQL-5007` | –(`WARN` 로그) | MariaDB 함수 {0}가 NOT DETERMINISTIC이라 행마다 다시 계산되고, 비교하는 열의 인덱스를 범위 검색에 쓰지 못합니다. 결정적 함수라면 DETERMINISTIC으로 선언하세요: {1} |
+| `LQL-5007` | –(`WARN` 로그) | 함수 {0}가 NOT DETERMINISTIC(MariaDB, MySQL) 또는 VOLATILE(PostgreSQL)이라 행마다 다시 계산되고, 비교하는 열의 인덱스를 쓰지 못합니다. 결과가 인자에만 달려 있다면 DETERMINISTIC(MariaDB, MySQL) 또는 STABLE·IMMUTABLE(PostgreSQL)로 선언하세요: {1} |
 | `LQL-5008` | –(`INFO` 로그) | {0}의 인덱스·함수 메타데이터를 읽지 못했습니다({1}). 메타데이터 없이 SARGable 검사를 계속합니다. |
 | `LQL-5009` | –(`DEBUG` 로그) | SQL 의미: {0}에서 값이 NULL인 행은 조건에 맞지 않습니다(Java의 null 처리와 다름). 포함하려면 `x == null \|\| ...`처럼 null 검사를 적으세요. |
 | `LQL-5010` | –(`DEBUG` 로그) | 열 {0}은 @Lob 열입니다. 일부 DB(예: Oracle)는 LOB를 {1}에 쓸 수 없습니다. |
 | `LQL-5011` | –(`DEBUG` 로그) | 열거형 열 {0}은 문자열로 저장되어(@Enumerated(STRING)) DB는 선언 순서가 아니라 이름 순으로 정렬합니다. |
 | `LQL-5012` | –(`WARN` 로그) | 열 {0}에 산술을 걸면 조건이 인덱스를 쓸 수 없습니다. 같은 의미로 값 쪽에 옮기세요. 소수로 나누고(o.getQty() * 2 > n 대신 o.getQty() > n / 2.0, n / 2는 정수 나눗셈), 음수를 곱했다면 비교 방향을 바꾸세요: {1} |
 | `LQL-5013` | –(`DEBUG` 로그) | 조건이 열 {0}을 계산하므로 그 열의 인덱스를 쓸 수 없습니다: {1} |
+| `LQL-5014` | –(`WARN` 로그) | Kotlin: 연관 {0}을 한 곳에서는 ?.로, 다른 곳에서는 !!나 표시 없이 읽어 inner join이 되며 연관이 없는 행은 빠집니다. 그 행을 남기려면 모두 ?.로, 아니면 모두 !!로 적으세요: {1} |
 
 `{0}`, `{1}`은 인자입니다. 예를 들어 식이나 프로시저 이름이 들어갑니다.
 전체 목록은 메시지 파일에 있습니다([번역자를 위한 안내](#for-translators) 참고).
@@ -404,19 +405,20 @@ lambdaQL은 **SLF4J API**로 로그를 남깁니다.
 | 코드 | 발생 조건 |
 |---|---|
 | `LQL-4045` | `=`·`<>`(`==`, `!=`, `equals`, `Objects.equals`)의 캡처 값이 `null`이라 맞는 행이 없을 때(SQL 의미, 결정 D48). 실행할 때만 알 수 있음. `WARN` 레벨로 기록. 크기 비교처럼 자기 기본형 언박싱(`min.doubleValue()`)을 거친 경우에는 `DEBUG` 레벨. NULL을 찾으려면 `x == null`(3.6 참고: [Java](java/03-where.md#36-null-rules) \| [Kotlin](kotlin/03-where.md#36-null-rules)) |
-| `LQL-5001` | 조건에서 DB 함수가 열을 감쌀 때(`OrderFns.discount(o.getPrice()) > 10`, 열에 적용한 Boolean 함수, `IN`이나 `IS NULL` 안의 함수). 일반 인덱스를 쓸 수 없음. `where` 람다마다 한 번 `WARN` 레벨로 기록. Oracle에서 같은 식의 함수 기반 인덱스가 있으면 기록하지 않음([8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) 참고) |
+| `LQL-5001` | 조건에서 DB 함수가 열을 감쌀 때(`OrderFns.discount(o.getPrice()) > 10`, 열에 적용한 Boolean 함수, `IN`이나 `IS NULL` 안의 함수). 일반 인덱스를 쓸 수 없음. `where` 람다마다 한 번 `WARN` 레벨로 기록. Oracle이나 PostgreSQL에서 같은 식의 함수 기반(식) 인덱스가 있으면 기록하지 않음([8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) 참고) |
 | `LQL-5002` | 서브쿼리에 `orderBy`는 있지만 `limit`이 없어 lambdaQL이 정렬을 제거할 때(정렬은 결과에 영향이 없음, 규칙 Q4) |
 | `LQL-5003` | 외부 정렬(Spring `Sort`, `SortSpec.ofPath`)이 정렬 규칙에 없는 이름을 사용하고 모드가 `SortMode.INFO`(기본값, `INFO` 레벨로 기록)나 `SortMode.WARN`(`WARN` 레벨로 기록)일 때. 정렬은 실행됨. 엔티티와 이름마다 한 번 기록([4.10 정렬 정책](java/04-order-paging.md#sort-policy) 참고) |
 | `LQL-5004` | 클래스 파일에 프로시저 스텁의 인자 이름이 없고(`-parameters`, Kotlin `-java-parameters` 없이 컴파일, `@DbParam`도 없음) 이웃한 두 인자의 타입이 같을 때. 프로시저마다 한 번 `INFO` 레벨로 기록([8.4](java/08-procedures-functions.md#84-warning-argument-order) 참고) |
 | `LQL-5005` | 프로시저 메타데이터를 읽을 수 없을 때(예: 딕셔너리 뷰나 `information_schema`에 권한이 없어 조회 실패). 스텁을 대조하지 않고 인자 배치를 스텁에서 가져옴. 프로시저마다 한 번 `INFO` 레벨로 기록([8.4](java/08-procedures-functions.md#when-the-metadata-cannot-be-read) 참고) |
 | `LQL-5006` | Oracle 오버로드 조회(`all_arguments`)만 실패할 때. 오버로드 확인 없이 호출함. `INFO` 레벨로 기록 |
-| `LQL-5007` | MariaDB 전용: 값 쪽의 `NOT DETERMINISTIC` DB 함수를 열과 비교할 때(`o.getPrice() > OrderFns.nondet(base)`). 인덱스를 범위 검색에 쓰지 못함. `WARN` 레벨로 기록 |
+| `LQL-5007` | 값 쪽의 DB 함수가 MariaDB·MySQL에서 `NOT DETERMINISTIC`, PostgreSQL에서 `VOLATILE`일 때 그 값을 열과 비교하면(`o.getPrice() > OrderFns.nondet(base)`). 함수를 행마다 계산해 비교하는 열의 인덱스를 쓰지 못함(세 DB의 실행 계획으로 확인). `WARN` 레벨로 기록 |
 | `LQL-5008` | SARGable 검사용 인덱스·함수 메타데이터를 읽을 수 없을 때(예: 권한 없음). `INFO` 레벨로 기록. `LQL-5001`은 그대로 기록하고 `LQL-5007`은 검사하지 않음 |
 | `LQL-5009` | 조건이 엔티티 값을 SQL 의미로 비교해(결정 D48) Java·Kotlin에서는 맞는 NULL 행이 빠질 수 있을 때: 엔티티 값끼리의 `==`/`equals`, 값과의 `!=`, NULL 가능 `Boolean`의 `!`, 연관 경로의 null guard(경로는 INNER JOIN 유지), 서브쿼리 `NOT IN`. 조건 문장마다 한 번 `DEBUG` 레벨로 기록(3.6.3 참고: [Java](java/03-where.md#363-write-your-null-checks-yourself) \| [Kotlin](kotlin/03-where.md#363-write-your-null-checks-yourself)) |
 | `LQL-5010` | `@Lob` 컬럼을 `order by`, `distinct`, `group by`에 쓸 때. H2와 MariaDB는 실행하지만 Oracle은 거부함(ORA-22848, ORA-22849). `=` 비교는 세 DB 모두 동작. lambdaQL은 쿼리를 바꾸지 않음. 컬럼과 사용처마다 한 번 `DEBUG` 레벨로 기록([4.5](java/04-order-paging.md#45-what-a-sort-key-can-be) 참고) |
 | `LQL-5011` | `@Enumerated(EnumType.STRING)` enum 컬럼으로 정렬할 때. DB는 이름 순으로, Java·Kotlin은 선언 순서로 정렬하므로 순서가 다를 수 있음. lambdaQL은 쿼리를 바꾸지 않음. 컬럼마다 한 번 `DEBUG` 레벨로 기록. `ORDINAL`은 기록하지 않음([4.5](java/04-order-paging.md#45-what-a-sort-key-can-be) 참고) |
 | `LQL-5012` | 컬럼 하나와 값만으로 된 산술(`+ - * /`)이 조건의 컬럼 쪽에 있을 때(`o.getCnt() * 2 > n`). 값 쪽으로 옮길 수 있음. `WARN` 레벨로 기록. `SargableMode.STRICT`에서는 `LQL-3066` 오류(결정 D50, [8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) 참고) |
 | `LQL-5013` | 컬럼끼리의 산술이나 `%`가 조건에 있을 때(`o.getPrice() * o.getCnt() > n`). 옮길 수 없으므로 `DEBUG` 레벨로만 기록. `STRICT`에서도 허용 |
+| `LQL-5014` | Kotlin 전용: `where`에서 같은 연관 단계를 한 곳에서는 `?.`로, 다른 곳에서는 `!!`나 표시 없이 지날 때(`it.customer?.name == "Kim" \|\| it.customer!!.grade!! > 3`). 그 단계는 inner join이 되어 연관이 없는 행이 빠짐. 조건마다 한 번 `WARN` 레벨로 기록(결정 D54, [3.10](kotlin/03-where.md#310-association-paths) 참고) |
 
 ```
 WARN  [LQL-5002] limit 없는 서브쿼리 정렬은 결과에 영향이 없어 제거했습니다(Q4): ...

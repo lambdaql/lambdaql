@@ -492,10 +492,18 @@ public final class HqlRenderer {
             folded.add(f);
             all = Pred.and(all, f);
         }
-        // D48: a where path is an inner join (the SQL meaning of the path); the null-guard LEFT JOIN is not used.
-        // Tell (DEBUG) when Java would keep rows that the inner join leaves out.
-        if (!JoinPlanner.leftJoins(all).isEmpty()) sqlMeaning("a null check on an association that a where path also uses");
-        whereLeftJoins = java.util.Set.of();
+        // D54: a step written with the Kotlin safe call ?. is a left join when a row without the association can make
+        // the whole condition true; other steps are inner joins (D36, D48). A step written both ways is an inner join
+        // (WARN LQL-5014).
+        JoinPlanner.StepUses uses = JoinPlanner.stepUses(all, this::requiredStep);
+        if (!uses.mixed().isEmpty()) safeCallMixed(uses.mixed().stream().map(uses.names()::get).toList(), all.toString());
+        java.util.Set<String> safeLefts = JoinPlanner.safeCallLeftJoins(all, uses.candidates());
+        // D48: other where paths are inner joins (the SQL meaning of the path); the Java null-guard LEFT JOIN is not
+        // used. Tell (DEBUG) when Java would keep rows that the inner join leaves out.
+        java.util.Set<String> javaLefts = new java.util.HashSet<>(JoinPlanner.leftJoins(all));
+        javaLefts.removeAll(safeLefts);
+        if (!javaLefts.isEmpty()) sqlMeaning("a null check on an association that a where path also uses");
+        whereLeftJoins = safeLefts;
         List<String> parts = new ArrayList<>();
         if (all instanceof Pred.Bool b) {
             if (!b.value()) parts.add("1=0");
@@ -1303,6 +1311,25 @@ public final class HqlRenderer {
         return e instanceof Expr.Host h && h.autoUnboxed();
     }
     private static final java.util.Set<String> MEANING_LOGGED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    private static final java.util.Set<String> MIXED_LOGGED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * D54: an association step written with {@code ?.} in one place and with {@code !!} (or without a mark) in another
+     * is an inner join; WARN LQL-5014 once per condition.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt">KotlinQueryTest</a>,
+     * region {@code mixed-warn}): {@code it.customer?.name == "Kim" || it.customer!!.grade > 3}.
+     *
+     * @param paths     the association paths, for example {@code [customer]}
+     * @param condition the condition text
+     */
+    private static void safeCallMixed(List<String> paths, String condition) {
+        String names = String.join(", ", paths);
+        if (LOG.isWarnEnabled() && MIXED_LOGGED.add(names + "|" + condition)) {
+            LOG.warn("{}", LqlMessage.SAFE_CALL_MIXED.format(names, condition));
+        }
+    }
 
     /** D48: entity values are compared with the SQL meaning; tell (DEBUG, once per condition text) when NULL rows drop out. */
     private static void sqlMeaning(String condition) {

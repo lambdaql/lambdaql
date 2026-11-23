@@ -272,7 +272,8 @@ lambdaQL은 서브쿼리를 직접 씁니다. 그러면 문장이 자기 테이�
 
 조회는 `where`의 경로에 inner join을 사용합니다(결정 D36). 그래서 DML에서는 이런 경로에 lambdaQL이 `e0.customer.id is not null`을 더합니다.
 그 결과 `update`와 `delete`는 `qb.from(X::class.java).where { 같은 람다 }`가 반환하는 **바로 그 행**만 대상으로 합니다(Java로 테스트함: 삭제된 행을 조회 결과와 비교).
-`it.customer == null || ...` 같은 null 가드가 있어도 마찬가지입니다. 조회도 이 경로에 inner join을 사용하므로(결정 D48) 검사는 유지됩니다.
+`!!`나 표시 없이 쓴 null 가드(`it.customer == null || it.customer!!.name == ...`)가 있어도 마찬가지입니다. 조회도 이 경로에 inner join을 사용하므로(결정 D48) 검사는 유지됩니다.
+`?.`로 지난 단계가 조회에서 `left join`이 되는 조건이면(`it.status == 1 || it.customer?.name == "Kim"`, 결정 D54) 이 검사를 더하지 않습니다. 이때도 DML은 조회와 같은 행을 대상으로 합니다([7.2](07-2-update.md)의 `update-safe-call` 영역).
 
 `@Id`로 끝나는 경로(`it.customer?.id`)는 FK 컬럼입니다. 서브쿼리도 조인도 없습니다.
 
@@ -370,7 +371,7 @@ U11, U12, U15에 대한 lambdaQL의 검사는 아직 구현되지 않았습니�
 | U6 | 선택적이지 않은 컬럼(`@Id`, `nullable=false`, 기본형)에 `null`을 대입하면 오류입니다. 컬렉션이나 연관 엔티티의 `@Id`가 아닌 속성에 대입해도 오류입니다. |
 | U7 | 캡처 값은 사용할 때마다 자체 파라미터를 받습니다. (테스트에서 STRING 컬럼과 ORDINAL 컬럼이 enum 파라미터 하나를 공유하자 오류 없이 잘못된 값이 저장되었습니다.) |
 | U8 | `LocalDateTime.now()`는 애플리케이션에서 계산하여 바인드합니다. 데이터베이스 시간(`current_timestamp`)은 지원하지 않습니다. |
-| U9 | DML에서 FK가 아닌 연관 경로는 `where`와 SET 오른쪽 모두에서 상관 스칼라 서브쿼리가 됩니다. `where`에서 조회라면 inner join할 경로(D36)에는 `customer.id is not null`을 더합니다. DML은 조회와 같은 행을 대상으로 합니다. |
+| U9 | DML에서 FK가 아닌 연관 경로는 `where`와 SET 오른쪽 모두에서 상관 스칼라 서브쿼리가 됩니다. `where`에서 조회라면 inner join할 경로(D36)에는 `customer.id is not null`을 더합니다. `?.`로 지나 조회에서 `left join`이 되는 단계에는 더하지 않습니다(D54). DML은 조회와 같은 행을 대상으로 합니다. |
 | U10 | `insert ... select`에서 소스 경로는 명시적인 `left join`이 됩니다. |
 | U11 | `it.customer = entity`는 엔티티의 `@Id`를 바인드합니다. id가 null이면 바인드가 실패합니다. |
 | U12 | IDENTITY와 SEQUENCE id는 생략할 수 있습니다. TABLE 생성기는 `values`에서만 동작하고 `insert ... select`에서는 동작하지 않습니다. 생성기가 없으면 id가 필요합니다. 그 밖의 선택적이지 않은 속성도 필요합니다. |

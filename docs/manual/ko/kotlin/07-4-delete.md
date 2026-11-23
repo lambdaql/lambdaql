@@ -11,8 +11,8 @@ val d = qb.delete(Order::class.java).where { it.status == 3 }
 // HQL: delete from Order e0 where e0.status = 3
 val deleted = d.execute()
 
-// a path: the same rows as qb.from(Order::class.java).where { same lambda } - orders without a customer stay
-val byName = qb.delete(Order::class.java).where { it.customer?.name == null }
+// a path: the same rows as qb.from(Order::class.java).where { same lambda } - with !! orders without a customer stay
+val byName = qb.delete(Order::class.java).where { it.customer!!.name == null }
 // HQL: delete from Order e0 where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) is null and e0.customer.id is not null
 ```
 
@@ -56,9 +56,11 @@ assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where
 테스트는 먼저 `Archive` 행 하나를 삽입하고, 품목이 없는 주문을 삭제한 뒤, 남은 행을 Kotlin으로 같은 조건을 적용한 결과와 비교합니다.
 더 많은 문장을 Java로 작성한 테스트가 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)에 있습니다(H2, MariaDB, Oracle). 그 예제는 [이 페이지의 Java 버전](../java/07-4-delete.md)을 참고하십시오.
 
-두 번째 문장은 `qb.from(Order::class.java).where { it.customer?.name == null }`이 반환하는 것과 **같은 행**, 즉 고객의 이름이 없는 주문을 삭제합니다. Java 테스트는 삭제된 행을 이 조회 결과와 비교합니다.
-고객이 **없는** 주문은 삭제되지 않습니다(규칙 U9, 결정 D36). null 가드(`it.customer == null || ...`)를 써도 마찬가지입니다. 조회에서도 이 경로는 inner join이기 때문입니다(결정 D48).
-고객이 없는 주문을 삭제하려면 `it.customer == null` 조건으로 삭제 문장을 한 번 더 실행하십시오.
+두 번째 문장은 `qb.from(Order::class.java).where { it.customer!!.name == null }`이 반환하는 것과 **같은 행**, 즉 고객의 이름이 없는 주문을 삭제합니다. Java 테스트는 같은 조건을 Java로 써서 삭제된 행을 조회 결과와 비교합니다.
+고객이 **없는** 주문은 삭제되지 않습니다(규칙 U9, 결정 D36). `!!`는 연관이 반드시 있다는 선언이기 때문입니다.
+
+`?.`로 쓰면(`it.customer?.name == null`) 조회처럼 `left join`과 같은 의미가 되어 `e0.customer.id is not null`을 더하지 않습니다(결정 D54). 그래서 고객이 없는 주문도 삭제됩니다.
+같은 방식의 UPDATE 예제는 [7.2](07-2-update.md)의 `update-safe-call` 영역을 참고하십시오. 고객이 없는 주문만 삭제하려면 `it.customer == null`이라고 쓰십시오.
 
 모든 행을 삭제할 때는 `all()`이 필요합니다(규칙 U5).
 
