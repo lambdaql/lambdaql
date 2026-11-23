@@ -50,7 +50,7 @@ public class ValueQuery<R> {
         this.groupBy = groupBy;
         this.havings = List.copyOf(havings);
         this.sorts = List.copyOf(sorts);
-        this.projector = new Projector(projection, loader);
+        this.projector = context.projector(projection, loader);
         this.projection = projection;
         this.loader = loader;
         this.limit = limit;

@@ -44,15 +44,32 @@ public final class SerializedLambdaExtractor {
         if (!(lambda instanceof Serializable)) {
             throw LqlMessage.LAMBDA_NOT_SERIALIZABLE.exception(lambda.getClass().getName());
         }
-        try (Capture out = new Capture()) {
+        Capture out = CAPTURE.get();
+        try {
+            out.reset();
             out.writeObject(lambda);
         } catch (Found found) {
             return new LambdaRef(lambda.getClass(), found.lambda);
         } catch (IOException e) {
+            CAPTURE.remove();                       // the stream may be in a bad state: the next call makes a new one
             throw LqlMessage.SERIALIZED_LAMBDA_FAILED.exceptionCausedBy(null, e, lambda.getClass().getName());
         }
         throw LqlMessage.NOT_A_LAMBDA.exception(lambda.getClass().getName());
     }
+
+    /**
+     * One capture stream per thread. Making an {@link ObjectOutputStream} for every call was a visible part of a
+     * query's time (benchmark, 2026-11-23). Reusing it is safe: the stream writes to nothing, {@code writeObject}
+     * restores its depth and mode even when {@link Found} stops it (it is thrown before the lambda gets a handle),
+     * and {@link ObjectOutputStream#reset()} clears it before each use.
+     */
+    private static final ThreadLocal<Capture> CAPTURE = ThreadLocal.withInitial(() -> {
+        try {
+            return new Capture();
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+    });
 
     /** Thrown inside {@link Capture} to stop serialization as soon as the lambda is found. */
     private static final class Found extends RuntimeException {

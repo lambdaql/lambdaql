@@ -72,9 +72,36 @@ public final class QueryContext {
             }
         };
 
+        /**
+         * Result builders by result shape and class loader. Looking up the constructor again for every query was a
+         * visible part of a select query's time (benchmark, 2026-11-23). The key compares the shape by value, so the
+         * same shape from many queries uses one entry.
+         */
+        final Map<ProjectorKey, Projector> projectors = new ConcurrentHashMap<>();
+
         Shared(jakarta.persistence.metamodel.Metamodel metamodel) {
             this.model = new org.lambdaql.engine.sem.RowModel(new JpaEntityModel(metamodel));
         }
+    }
+
+    /**
+     * The key of a shared result builder.
+     *
+     * @param projection the result shape
+     * @param loader     the class loader that sees the result class
+     */
+    private record ProjectorKey(org.lambdaql.engine.sem.SelectReader.Projection projection, ClassLoader loader) {
+    }
+
+    /**
+     * The result builder of a shape, made once per persistence unit and shared by all queries (D47).
+     *
+     * @param projection the result shape (columns and the constructor to call)
+     * @param loader     the class loader that sees the result class
+     * @return the builder
+     */
+    Projector projector(org.lambdaql.engine.sem.SelectReader.Projection projection, ClassLoader loader) {
+        return shared.projectors.computeIfAbsent(new ProjectorKey(projection, loader), k -> new Projector(projection, loader));
     }
 
     private static final Map<EntityManagerFactory, Shared> SHARED = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
