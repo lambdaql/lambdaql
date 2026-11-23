@@ -329,12 +329,12 @@ lambdaQL 隐藏了许多差异。有些你必须了解。
 | 项目 | 现象 | lambdaQL |
 |---|---|---|
 | `SET a = ..., b = a + 1`（在设置某列之后又读取它） | MariaDB 读取**新**值，H2 和 Oracle 读取旧值 | 分析时报错（U3） |
-| DML 中的关联路径（`it.customer?.name`） | Hibernate 在各数据库上生成不同的 join，并且会**丢失**没有 customer 的行 | lambdaQL 写出关联标量子查询（在 `where` 和 SET 中）。在 `where` 中，查询会做内连接的路径还会加上 `customer.id is not null`，所以 DML 与查询命中相同的行（U9，已测试） |
+| DML 中的关联路径（`it.customer?.name`） | Hibernate 在各数据库上生成不同的 join，并且会**丢失**没有 customer 的行 | lambdaQL 写出关联标量子查询（在 `where` 和 SET 中）。在 `where` 中，查询会做内连接的路径还会加上 `customer.id is not null`，所以 DML 与查询命中相同的行（U9） |
 | 带有同一张表子查询的 `DELETE` | MariaDB 错误 1093 | 先通过派生表读取目标 id：`d0.id in (select t.id from (select e0.id as id … where <condition>) t)`（U17）。对关联子查询也可用，在三种数据库上删除相同的行（实测）。`update` 不包装（在 MariaDB 上也可用） |
 | 同一个 enum 值只绑定一次，同时用于 STRING 列和 ORDINAL 列 | H2 和 MariaDB 会**不报错地存入错误的值** | 每个位置使用一个参数，从不共用（U7） |
 | `values(list) { }` 中的大量行 | Oracle：绑定变量硬上限为 65,535（ORA-01745），远在达到之前就已非常慢 | 拆分：每条语句最多 500 个值，全部在一个事务中执行（U13） |
 | 带 `order by ... limit` 的 `update` / `delete` | MariaDB 拒绝 `in` 子查询中的 `limit`（错误 1235）和读取目标表的子查询（错误 1093） | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`：派生表 `t` 在三个数据库上都可用。内层 select 使用查询的连接（D36），因此行与查询相同（用 Java 测试） |
-| `on conflict` / upsert | H2 和 Oracle：`merge`。MariaDB：`insert ... on duplicate key update`，更新的行计为 2。Hibernate 的 `do nothing` 在 H2 和 Oracle 上会失败 | `upsert` 和 `onConflict(...).update(...)` 使用 Hibernate 的形式。`ignore()` 写成 `insert ... select ... where not exists`。行数原样返回（D40，已测试） |
+| `on conflict` / upsert | H2 和 Oracle：`merge`。MariaDB：`insert ... on duplicate key update`，更新的行计为 2。Hibernate 的 `do nothing` 在 H2 和 Oracle 上会失败 | `upsert` 和 `onConflict(...).update(...)` 使用 Hibernate 的形式。`ignore()` 写成 `insert ... select ... where not exists`。行数原样返回（D40） |
 
 <a id="procedures-and-functions"></a>
 ### 存储过程与函数

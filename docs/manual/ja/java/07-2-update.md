@@ -9,7 +9,7 @@
 <a id="basic-form"></a>
 ## 基本形
 
-**(テスト済み)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `update`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `update`:
 
 ```java
 short st = 5;
@@ -26,7 +26,7 @@ int changed = u.execute();
 
 **SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 7.4 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `update`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `update`:
 
 ```sql
 -- H2, MariaDB
@@ -93,7 +93,7 @@ qb.update(Order.class).set(o -> o.setCustomer(customer)).where(o -> o.getId() ==
 ```
 
 関連エンティティに設定できるのは `@Id`（FK）だけです。
-`o.getCustomer().setName(x)` はエラーです。別のテーブルを変更してしまうからです（ルール U6、[7.8](07-dml.md#rules-checked-at-analysis-time) でテスト済み）。
+`o.getCustomer().setName(x)` はエラーです。別のテーブルを変更してしまうからです（ルール U6、[7.8](07-dml.md#rules-checked-at-analysis-time) を参照）。
 
 <a id="a-value-from-another-table"></a>
 ## 別のテーブルの値
@@ -101,7 +101,7 @@ qb.update(Order.class).set(o -> o.setCustomer(customer)).where(o -> o.getId() ==
 関連のパスを通して値を読みます。lambdaQL はこれを **相関スカラーサブクエリ** として出力します（ルール U9）。
 `where` の中のパスも、同じ種類のサブクエリになります。
 
-**(テスト済み)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `update-path`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `update-path`:
 
 ```java
 // a path in the condition: a subquery, plus "customer exists" (the same rows as the select, D36, U9)
@@ -115,7 +115,7 @@ ExecutableUpdate<Order> copy = qb.update(Order.class).set(o -> o.setCustName(o.g
 assertEquals("update Order e0 set e0.custName = (select s1.name from Customer s1 where s1.id = fk(e0.customer))", copy.toHql().hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `update-path`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `update-path`:
 
 ```sql
 -- H2
@@ -134,7 +134,7 @@ set o1_0.cust_name='K'
 where (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)='Kim' and o1_0.customer_id is not null
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `update-path#2`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `update-path#2`:
 
 ```sql
 -- H2
@@ -159,7 +159,7 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 引数が 2 つのラムダ `set((o, sub) -> ...)` を使います。2 番目の引数はサブクエリの起点 `sub` です（決定 D49）。
 ここでは `Agg` は必要ありません。サブクエリには [5. サブクエリ](05-subquery.md) と同じように `sum`、`avg`、... があります。
 
-**(テスト済み)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `update-sub`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `update-sub`:
 
 ```java
 // the second parameter starts a subquery, as in where((o, sub) -> ...) (D49)
@@ -222,7 +222,7 @@ where not exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id)
 
 エンティティに `@Version` フィールドがある場合、lambdaQL は `update versioned` を出力します。データベースがバージョンに 1 を加えます。
 
-**(テスト済み)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `update-versioned`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `update-versioned`:
 
 ```java
 // an entity with a version field (Version annotation): the version goes up too
@@ -230,7 +230,7 @@ ExecutableUpdate<VOrder> u = qb.update(VOrder.class).set(v -> v.setStatus(2)).wh
 assertEquals("update versioned VOrder e0 set e0.status = 2 where e0.id = 1L", u.toHql().hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `update-versioned`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `update-versioned`:
 
 ```sql
 -- H2, MariaDB
@@ -262,7 +262,7 @@ if (n == 0) throw new OptimisticLockException();   // checking the result is you
 `set()` は何回でも呼べます。すべての代入は、呼び出した順に 1 つの SET リストにまとめられます（ルール U14）。
 ルール U3 と U4 は、`set()` 呼び出しをまたいでも適用されます。
 
-**(テスト済み)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `update-patch`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `update-patch`:
 
 ```java
 // PATCH: assign only the fields that have a value; every set() adds assignments
@@ -301,7 +301,7 @@ qb.update(Order.class).set(o -> o.setStatus(0)).execute();             // compil
 
 ルールは削除と同じです（[7.4](07-4-delete.md#delete-the-first-rows-limit) を参照）。`orderBy` がなければ id 順、id は常に最後のソートキー、`limit` のない `orderBy` はエラーです。
 
-**(テスト済み)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `update-limit`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `update-limit`:
 
 ```java
 // a path in the condition: the nested select joins, so the rows are the same as the select
@@ -314,7 +314,7 @@ assertEquals("update Order e0 set e0.description = 'top' where e0.id in (select 
         + " join x0.customer k1 where k1.name = 'Kim' order by x0.price desc, x0.id asc limit 1) t)", u.toHql().hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `update-limit`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `update-limit`:
 
 ```sql
 -- H2

@@ -9,7 +9,7 @@
 <a id="one-row"></a>
 ## 1 行
 
-**(テスト済み)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `insert`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `insert`:
 
 ```java
 ExecutableInsert<Archive> i = qb.insert(Archive.class)
@@ -22,7 +22,7 @@ int generated = qb.insert(IdOrder.class).values(o -> { o.setPrice(1.0); o.setSta
 
 **SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 7.4 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `insert`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `insert`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -44,7 +44,7 @@ qb.insert(Order.class).values(o -> { value(o.getId(), id); value(o.getStatus(), 
 `values((a, sub) -> ...)` のように引数が 2 つのラムダを使うと、2 番目の引数 `sub` でサブクエリを作れます（決定 D49）。
 upsert の `values((a, sub) -> ...)` と `onConflict(...).update((a, sub) -> ...)` も同じです（[7.6](07-6-upsert.md#your-own-change-onconflictkeyupdate) を参照）。
 
-**(テスト済み)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `insert-values-sub`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `insert-values-sub`:
 
 ```java
 // values((a, sub) -> ...): a subquery can read captured values, not the new row (D49)
@@ -74,7 +74,7 @@ assertEquals("insert into Archive e0 (id, price) values (100L, (select sum(s1.pr
 
 リストの要素ごとに 1 行を挿入します。ラムダの 2 番目の引数が要素です。
 
-**(テスト済み)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `insert-list`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `insert-list`:
 
 ```java
 List<Line> lines = List.of(new Line(201, 1.0), new Line(202, 2.0));
@@ -82,7 +82,7 @@ ExecutableInsert<Archive> i = qb.insert(Archive.class).values(lines, (a, l) -> {
 assertEquals("insert into Archive (id, price) values (:p1, :p2), (:p3, :p4)", i.toHql().get(0).hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `insert-list`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `insert-list`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -96,7 +96,7 @@ VALUES 行を多数持つ 1 つの文を書きます。長いリストは、1 �
 **リストの形のサブクエリ。** `values(list, (a, l, sub) -> ...)` のように、3 番目の引数でサブクエリを作れます（決定 D49）。`qb.upsert(X.class).values(list, (a, l, sub) -> ...)` も同じです。
 サブクエリは要素の値を読めます。その値は Java で読み、行ごとに 1 つのパラメーターとしてバインドします。新しく挿入する行は読めません（3 つの DB で実測）。
 
-**(テスト済み)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `insert-list-sub`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `insert-list-sub`:
 
 ```java
 // one row per element; the subquery reads the element's value (D49)
@@ -119,7 +119,7 @@ id が IDENTITY か SEQUENCE を使う場合、id を省略できます（ルー
 
 別のエンティティから行をコピーします。`select` のラムダは対象（`a`）とソース（`o`）を受け取ります。
 
-**(テスト済み)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `insert-select`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `insert-select`:
 
 ```java
 ExecutableInsert<Archive> i = qb.insert(Archive.class)
@@ -131,7 +131,7 @@ assertEquals("insert into Archive (id, price, customerName) select e0.id, e0.pri
         + " from Order e0 left join e0.customer j1 where e0.status = 1", i.toHql().get(0).hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `insert-select`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `insert-select`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -154,7 +154,7 @@ qb.insert(Archive.class).from(Order.class).where(o -> o.getStatus() == 9)
 
 **サブクエリ。** ソースの `where` は 2 番目の引数で、`select` は 3 番目の引数で、サブクエリの起点 `sub` を受け取ります（決定 D49）。
 
-**(テスト済み)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `insert-select-sub`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `insert-select-sub`:
 
 ```java
 // where((o, sub) -> ...) on the source, and select((a, o, sub) -> ...): the third parameter starts a subquery
@@ -174,7 +174,7 @@ assertEquals("insert into Archive (id, price) select e0.id, (select sum(s2.price
 [6. 選択、集計、グループ化](06-select-group.md) の `groupBy`、`having`、`Agg` 関数を使います。
 呼び出しの順序は `from(...)`、`where(...)`、`groupBy(...)`、`having(...)`、`select(...)` です。`where`、`groupBy`、`having` は省略できます。
 
-**(テスト済み)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)、リージョン `insert-group`:
+[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)、リージョン `insert-group`:
 
 ```java
 // INSERT ... SELECT with groupBy: one summary row per customer
@@ -188,7 +188,7 @@ assertEquals("insert into Summary (customerId, total, cnt) select e0.customer.id
         + " where e0.customer is not null group by e0.customer.id having count(*) >= 2L", i.toHql().get(0).hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `insert-group`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `insert-group`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)

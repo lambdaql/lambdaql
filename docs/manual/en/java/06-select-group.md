@@ -45,7 +45,7 @@ The examples use these entities (see [2. Getting started](02-getting-started.md#
 | `Customer` | `id`, `name`, `grade` |
 | `Item` | `order`, `price`, `qty` |
 
-Examples marked **(tested)** are copied from [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java).
+Examples are copied from [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java).
 The test checks the HQL, runs the queries and compares the values with the same computation in Java. It passes on H2, MariaDB and Oracle.
 It uses the test entity from [3.3](03-where.md#33-basic-form): `price` is `double`, `status` is `short` and `Customer.id` is `int`. The test data has one order without a customer.
 
@@ -71,7 +71,7 @@ record Total(long count, Double average) {}
 `select` takes one lambda. The lambda returns one value. The result is a `ValueQuery` of that value.
 You can call `select` after `where` and after `orderBy`. The sort, `limit` and `offset` stay.
 
-**(tested)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), region `value`:
+[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), region `value`:
 
 ```java
 ValueQuery<Double> q = qb.from(Order.class)
@@ -83,7 +83,7 @@ assertEquals("select e0.price from Order e0 where e0.status = 1 order by e0.pric
 
 **About the SQL blocks.** `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 7.4, and it fails if Hibernate's SQL changes. In this chapter the select list is the point, so it is not shortened.
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `value`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `value`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -113,7 +113,7 @@ If the path ends with the `@Id` of the associated entity, there is no join.
 Call a constructor inside the lambda. Each constructor argument is a value expression.
 A Java record and a normal DTO class with a constructor both work.
 
-**(tested)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), region `record`:
+[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), region `record`:
 
 ```java
 // only the columns are selected; the record is made in Java. The path uses a left join,
@@ -123,7 +123,7 @@ ValueQuery<OrderView> q = qb.from(Order.class)
 assertEquals("select e0.id, j1.name, e0.price from Order e0 left join e0.customer j1", q.toHql().hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `record`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `record`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -192,7 +192,7 @@ Important points:
 <a id="aggregate-over-all-rows-no-group-by"></a>
 ### Aggregate over all rows (no group by)
 
-**(tested)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), region `total`:
+[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), region `total`:
 
 ```java
 // aggregates without groupBy: one row over all matching orders
@@ -202,7 +202,7 @@ ValueQuery<Total> q = qb.from(Order.class)
 assertEquals("select count(*), avg(e0.price) from Order e0 where e0.status = 1", q.toHql().hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `total`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `total`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -251,7 +251,7 @@ The tested example with `having` is in [6.6](#66-having).
 
 Return a list of keys with `List.of(...)`:
 
-**(tested)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), region `group-many`:
+[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), region `group-many`:
 
 ```java
 // many keys: List.of(...) (Kotlin listOf(...), a to b, Triple)
@@ -263,7 +263,7 @@ assertEquals("select e0.customer.id, e0.status, count(*) from Order e0 where e0.
         + " group by e0.customer.id, e0.status", q.toHql().hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `group-many`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `group-many`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -304,7 +304,7 @@ The tested example is in [6.11](#611-rules-j1-to-j8).
 `having` is a condition on groups. It uses the same lambda rules as `where` ([3. Conditions (`where`)](03-where.md)), and it can use `Agg`.
 You can call `having` many times. The conditions are joined with `AND`.
 
-**(tested)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), region `group-by`:
+[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), region `group-by`:
 
 ```java
 ValueQuery<Stat> q = qb.from(Order.class)
@@ -315,7 +315,7 @@ assertEquals("select e0.customer.id, count(*), sum(e0.price) from Order e0 group
         + " having sum(e0.price) > 200.0", q.toHql().hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `group-by`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `group-by`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -344,7 +344,7 @@ having sum(o1_0.price)>200.0
 | `one()` | the only value, or `Optional.empty()`. Two or more rows: `NonUniqueResultException` |
 | `toHql()` | the HQL and the parameters, without running the query |
 
-**(tested)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), region `distinct`:
+[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), region `distinct`:
 
 ```java
 ValueQuery<Double> q = qb.from(Order.class)
@@ -356,7 +356,7 @@ assertEquals("select distinct e0.price from Order e0 order by e0.price desc", q.
 List<Double> prices = q.toSet().stream().toList();
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `distinct`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `distinct`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -384,7 +384,7 @@ ValueQuery<Double> paged = qb.from(Order.class)
 
 The test method `pagingAndFirst` in [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) checks this HQL, `first()` and the page.
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `value-page`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `value-page`:
 
 ```sql
 -- H2, Oracle
@@ -419,10 +419,10 @@ After a join, every lambda gets all entities in join order:
 `where((o, c) -> ...)`, `orderBy((o, c, by) -> ...)` (`by` is last, rule S12) and `select((o, c) -> ...)`.
 The joined entities get the aliases `e1`, `e2`.
 
-Examples marked **(tested)** are copied from [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java).
+Examples are copied from [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java).
 The test runs each query on H2, MariaDB and Oracle and compares the rows with the same computation in Java.
 
-**(tested)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `join`:
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `join`:
 
 ```java
 SelectJoinQuery<Order, Customer> q = qb.from(Order.class)
@@ -439,7 +439,7 @@ To read values of the joined entity, use `select((o, c) -> ...)` (see below).
 <a id="left-join-and-null"></a>
 ### Left join and NULL
 
-**(tested)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `left-join`:
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `left-join`:
 
 ```java
 // c is missing for an order without a customer: c == null finds those rows
@@ -458,7 +458,7 @@ assertEquals("select e0 from Order e0 left join Customer e1 on e0.customer.id = 
 <a id="sort-and-select"></a>
 ### Sort and select
 
-**(tested)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `sort`:
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `sort`:
 
 ```java
 OrderedJoinQuery<Order, Customer> q = qb.from(Order.class)
@@ -470,7 +470,7 @@ assertEquals("select e0 from Order e0 left join Customer e1 on e0.customer.id = 
 
 The NULL order rules of [4.4](04-order-paging.md#44-null-ordering-is-the-same-on-every-database) apply. Orders without a customer have a NULL `e1.name`, so they come first with `asc`.
 
-**(tested)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `select`:
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `select`:
 
 ```java
 ValueQuery<Row> rows = qb.from(Order.class)
@@ -489,7 +489,7 @@ assertEquals("select e0.id, e1.name from Order e0 left join Customer e1 on e0.cu
 
 You can join up to three entities. The third join lambda gets all three: `(o, c, i) -> ...`.
 
-**(tested)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `three`:
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `three`:
 
 ```java
 // orders of a customer with an item of quantity > 10; an order repeats once per matching item
@@ -502,7 +502,7 @@ assertEquals("select e0 from Order e0 join Customer e1 on e0.customer.id = e1.id
 ```
 
 > [!WARNING]
-> When the join matches several rows, **the main row repeats**: once per match. `toList()` and `count()` count every repeat (tested).
+> When the join matches several rows, **the main row repeats**: once per match. `toList()` and `count()` count every repeat.
 > If you want each order once, use an `exists()` subquery ([5. Subqueries](05-subquery.md)) instead of the join, or apply `distinct()` to the join query (see [`distinct()` on a join](#distinct-on-a-join)).
 
 <a id="cross-join"></a>
@@ -510,7 +510,7 @@ assertEquals("select e0 from Order e0 join Customer e1 on e0.customer.id = e1.id
 
 `crossJoin` has no join condition. The method name says that you want every pair of rows. Write the conditions in `where`.
 
-**(tested)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `cross-join`:
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `cross-join`:
 
 ```java
 // every pair of rows; the conditions go in where
@@ -528,7 +528,7 @@ lambdaQL has no `from(Order.class, Customer.class)` (a comma join). Without a co
 
 With paging, lambdaQL adds the id of **every** entity as the last sort keys, so the pages do not overlap (rule S9).
 
-**(tested)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `cross-join-paging`:
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `cross-join-paging`:
 
 ```java
 // with paging, the id of every entity is added to the order, so pages never overlap (S9)
@@ -550,7 +550,7 @@ assertEquals("select e0.id, e1.name from Order e0 cross join Customer e1 order b
 - With `select(...)` after `distinct()`, the values are read with `select distinct`.
 - Consider an `exists` subquery ([5. Subqueries](05-subquery.md)) first. It gives the same rows without repeats, and it is often faster.
 
-**(tested)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `join-distinct`:
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `join-distinct`:
 
 ```java
 // an order with two matching items would come twice; distinct() returns it once
@@ -577,7 +577,7 @@ The forms are `join(cte, (c, x) -> ...)`, `leftJoin(cte, ...)`, `join(qb.from(..
 - A derived row has no id, so `x == null` is an error (`LQL-3067`). Compare a column instead, as in `x.customerId() == null`.
 - Hibernate 7.4 (and 6.6 before it) accepts `select distinct` of an entity, inner and left joins of a derived table or CTE, and entity joins inside a subquery (measured on the three databases).
 
-**(tested)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `join-cte`:
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `join-cte`:
 
 ```java
 // the total of each customer, joined to the customer row
@@ -595,7 +595,7 @@ assertEquals("with t as (select d0.customer.id as customerId, sum(d0.price) as t
         rows.toHql().hql());
 ```
 
-**(tested)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `join-derived`:
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `join-derived`:
 
 ```java
 // a derived table without a name; a customer without orders has no row in it (left join)
@@ -607,7 +607,7 @@ assertEquals("select e0 from Customer e0 left join (select d0.customer.id as cus
         + " where e1.customerId is null or e1.total < 210.0", small.toHql().hql());
 ```
 
-**(tested)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `cte-reuse`:
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java), region `cte-reuse`:
 
 ```java
 // the same CTE read twice is written once
@@ -642,7 +642,7 @@ Make a value query with `select` (a record, see [6.3](#63-select-a-record-or-dto
 Its rows become the table of the outer query (decision D46).
 The result is a `DerivedQuery<R>`. `R` is the row type.
 
-**(tested)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java), region `derived`:
+[`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java), region `derived`:
 
 ```java
 // the rows of a group query are the table of the outer query; r.total() reads the column "total"
@@ -667,7 +667,7 @@ The test runs the query on H2, MariaDB and Oracle and compares the rows and `cou
 
 You can also select one value of the row. Captured values inside and outside are bound in order:
 
-**(tested)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java), region `select`:
+[`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java), region `select`:
 
 ```java
 // a value of the row; captured values inside and outside are bound in order
@@ -681,7 +681,7 @@ ValueQuery<Integer> ids = qb.from(qb.from(Order.class)
 
 `limit` and `offset` of the inner query stay in the inner query (HQL `limit` and `offset`). So you can sort the top rows again:
 
-**(tested)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java), region `inner-limit`:
+[`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java), region `inner-limit`:
 
 ```java
 // the three most expensive orders, then the cheapest of them
@@ -721,7 +721,7 @@ Rules:
   lambdaQL takes the column names from the record components, in order.
 - A normal DTO class or a single value is not allowed here: lambdaQL cannot name its columns. lambdaQL throws `TranslationException` (`LQL-3064`).
 
-**(tested)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java), region `rules`:
+[`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java), region `rules`:
 
 ```java
 // J5: the row type must be a record or Kotlin data class (its components name the columns)
@@ -743,7 +743,7 @@ Hibernate also adds the `@SQLRestriction` and `@SoftDelete` conditions of an ent
 Use `qb.with(valueQuery)` to make a handle of type `Cte<R>`. Then read it with `qb.from(handle)`.
 The inner query is the same as for a derived table (6.9).
 
-**(tested)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java), region `cte`:
+[`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java), region `cte`:
 
 ```java
 Cte<Stat> t = qb.with(perCustomer());
@@ -787,7 +787,7 @@ Notes:
 
 - The CTE is named `t`. The outer query always gives it the alias `e0` (`from t e0`). HQL needs an alias (rule J6).
 - The CTE columns are named with select aliases (`as customerId`). HQL does not accept a column list after the CTE name; Hibernate adds it in the SQL (rule J6).
-- MariaDB and Oracle run a real `with`. On H2, Hibernate expands it into a derived table. The result is the same (tested on the three databases).
+- MariaDB and Oracle run a real `with`. On H2, Hibernate expands it into a derived table. The result is the same.
 - The row type rule is the same as for a derived table: a record (J5).
 - To join a CTE to an entity query, see [Join a derived table or CTE](#join-a-derived-table-or-cte) (D51).
 - You can read the same CTE twice in one query. The definition is written once (see [Join a derived table or CTE](#join-a-derived-table-or-cte)).
@@ -800,16 +800,16 @@ Notes:
 
 | # | Rule | Status |
 |---|---|---|
-| J1 | A `select` lambda returns **one value expression** or **one constructor call**. Each constructor argument is a value expression (rules in [3. Conditions (`where`)](03-where.md)). Association paths that are used only in `select` become `left join` aliases, so no rows are lost. A required association (`optional = false`) is an inner join (A4). If `where` uses the same path, `select` uses the `where` join (R24). | Implemented (tested) |
-| J2 | For a constructor, lambdaQL selects only the columns and calls the constructor in Java. It does not write `select new`. | Implemented (tested) |
-| J3 | With aggregates, every non-aggregate value in `select` and `having` (and in the values of `insert ... select`) must be a `groupBy` key. Otherwise: an error at analysis time. | Implemented (tested). The error is `TranslationException` (`LQL-3035`, see [11](../11-errors-and-languages.md)) |
-| J4 | `sum`/`avg`/`min`/`max` give NULL when there are no rows or all values are NULL. `count` gives 0. Use boxed types for values that can be NULL. A NULL for a primitive constructor argument throws `IllegalStateException`, which names the argument. | Implemented (tested) |
-| J5 | Row type of a derived table or CTE: a **Java record** (Kotlin code can also use a data class). Normal DTO classes are allowed only in simple `select`. Otherwise: `LQL-3064`. This also applies to the rows of a joined derived table or CTE (D51). A derived row cannot be compared with `null` (`LQL-3067`). | Implemented (tested) |
-| J6 | A CTE made with `qb.with(...)` names its columns with select aliases: `with t as (select d0.customer.id as customerId, ...) select e0.customerId ... from t e0`. HQL does not accept a column list after the name: Hibernate rejects `with t (col list) as (...)` with a `SyntaxException`. Hibernate writes the column list in the SQL itself (`with t (customerId,cnt,total) as (...)` on MariaDB and Oracle); H2 turns the CTE into a derived table. The outer query always uses an alias for it (`from t e0`). | Implemented (tested) |
-| J7 | `distinct()` renders `select distinct`. With sorting, the sort keys must be in the select list (a DB rule). lambdaQL checks this at analysis time. For `distinct()` on a join, a sort key must be a column of the main entity itself (D51). | Implemented (tested) |
+| J1 | A `select` lambda returns **one value expression** or **one constructor call**. Each constructor argument is a value expression (rules in [3. Conditions (`where`)](03-where.md)). Association paths that are used only in `select` become `left join` aliases, so no rows are lost. A required association (`optional = false`) is an inner join (A4). If `where` uses the same path, `select` uses the `where` join (R24). | Implemented |
+| J2 | For a constructor, lambdaQL selects only the columns and calls the constructor in Java. It does not write `select new`. | Implemented |
+| J3 | With aggregates, every non-aggregate value in `select` and `having` (and in the values of `insert ... select`) must be a `groupBy` key. Otherwise: an error at analysis time. | Implemented. The error is `TranslationException` (`LQL-3035`, see [11](../11-errors-and-languages.md)) |
+| J4 | `sum`/`avg`/`min`/`max` give NULL when there are no rows or all values are NULL. `count` gives 0. Use boxed types for values that can be NULL. A NULL for a primitive constructor argument throws `IllegalStateException`, which names the argument. | Implemented |
+| J5 | Row type of a derived table or CTE: a **Java record** (Kotlin code can also use a data class). Normal DTO classes are allowed only in simple `select`. Otherwise: `LQL-3064`. This also applies to the rows of a joined derived table or CTE (D51). A derived row cannot be compared with `null` (`LQL-3067`). | Implemented |
+| J6 | A CTE made with `qb.with(...)` names its columns with select aliases: `with t as (select d0.customer.id as customerId, ...) select e0.customerId ... from t e0`. HQL does not accept a column list after the name: Hibernate rejects `with t (col list) as (...)` with a `SyntaxException`. Hibernate writes the column list in the SQL itself (`with t (customerId,cnt,total) as (...)` on MariaDB and Oracle); H2 turns the CTE into a derived table. The outer query always uses an alias for it (`from t e0`). | Implemented |
+| J7 | `distinct()` renders `select distinct`. With sorting, the sort keys must be in the select list (a DB rule). lambdaQL checks this at analysis time. For `distinct()` on a join, a sort key must be a column of the main entity itself (D51). | Implemented |
 | J8 | Select works together with sorting ([4. Sorting and paging](04-order-paging.md)), paging and subqueries ([5. Subqueries](05-subquery.md)). Sorting by an aggregate (`by.desc(s.total())`) is a v0.2 candidate. | Implemented, except the sort by an aggregate |
 
-**(tested)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), region `rules`:
+[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), region `rules`:
 
 ```java
 // J3: a value without an aggregate must be a group key

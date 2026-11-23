@@ -64,7 +64,7 @@ fetch first ? rows only
 - キーとその方向は一緒に書きます。そのため、順序がずれることはありません。
 - lambdaQL はラムダを読み取ります。実行はしません。`by` のメソッドは順序を記述するだけです。
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `sort`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `sort`:
 
 ```kotlin
 val q = qb.from(Order::class.java)
@@ -417,7 +417,7 @@ limit ?
 - ソートキーに主エンティティの一意で NULL にならないカラムがあれば、追加しません（A5）。`nullable = false` の `@Column(unique = true)`、Hibernate の `@NaturalId`、`@Id` がこれに当たります。このキーだけですべての行の順序が決まるからです。
   NULL になりうる一意のカラムは当たりません。NULL は複数の行にありうるからです。
 - `limit` と `offset` がなければ、何も追加しません。
-- 明示的な結合（`join`、`leftJoin`、`crossJoin`）では、結合したすべてのエンティティの id も結合の順に追加します（Java のラムダでテスト済み、[6.8](06-select-group.md#68-explicit-joins) を参照）。
+- 明示的な結合（`join`、`leftJoin`、`crossJoin`）では、結合したすべてのエンティティの id も結合の順に追加します（[6.8](06-select-group.md#68-explicit-joins) を参照）。
 - まだ実装されていないもの: コレクションの fetch join と `limit`/`offset` を一緒に使うと拒否されます。
 
 これについての Kotlin のテストはまだありません。同じルールを Java でテストしています（[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)、リージョン `unique-key`）。
@@ -669,20 +669,20 @@ SortPolicy.register(emf, SortPolicy.of(SortMode.STRICT,
 
 | # | ルール | 状況 |
 |---|---|---|
-| S1 | ソートは 1 つのラムダ: `{ o, by -> by... }`。キーが 1 つなら `{ it.key }` と、省略可能な `Direction`。結合なら `{ o, c, by -> by... }`（`by` は常に最後） | 実装済み。結合の書き方 `{ o, c, by -> }` も実装済み（Java のラムダでテスト済み） |
+| S1 | ソートは 1 つのラムダ: `{ o, by -> by... }`。キーが 1 つなら `{ it.key }` と、省略可能な `Direction`。結合なら `{ o, c, by -> by... }`（`by` は常に最後） | 実装済み。結合の書き方 `{ o, c, by -> }` も実装済み |
 | S2 | キーは `Comparable`（Kotlin の nullable なキーは使える）。エンティティはキーにできない（コンパイルエラー）。キーはエンティティを使わなければならない | 実装済み |
 | S3 | 方向は `asc` / `desc` または `sort(key, Direction)` で決まる。`asc(key)`/`desc(key)`（`ASC`/`DESC`）は NULL のポリシーを使い、`asc(key, nullsFirst)`、`desc(key, nullsFirst)`、`*_NULLS_*` は書いたとおりに使う | 実装済み |
 | S4 | 本体は `by` の呼び出しをまっすぐつなげたチェーンだけ。`if`、`when`、ループは不可 | 実装済み |
 | S5 | `orderBy` はクエリごとに 1 回。`orderBy` の後に `where` は不可。`limit` の後に `orderBy` は不可（コンパイルエラー） | 実装済み |
-| S6 | 再利用は `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）で。外部の文字列は永続化ユニットのソートポリシー（`SortRules`、`SortPolicy`、`SortMode`。[4.10](#sort-policy) を参照）がチェック | `SortSpec` とソートポリシーは実装済み（Java のラムダでテスト済み）。`SortSpec` の結合の書き方はまだ実装されていない |
+| S6 | 再利用は `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）で。外部の文字列は永続化ユニットのソートポリシー（`SortRules`、`SortPolicy`、`SortMode`。[4.10](#sort-policy) を参照）がチェック | `SortSpec` とソートポリシーは実装済み。`SortSpec` の結合の書き方はまだ実装されていない |
 | S7 | キー: カラム、to-one のパス、`+ - *`、拡大変換。値の分岐は不可。Kotlin の `?.` はパスとして読む | 実装済み（Kotlin のラムダではテストされていない） |
 | S8 | `orderBy` だけで使う関連のパスは `left join` を使うので、関連のない行も残る。必須の関連（`optional = false`）は行を失わないので inner join（A4）。同じパスを `where` で使うと、ソートは `where` の結合を使う | 実装済み |
-| S9 | ページングでは、キーに id が含まれていなければルートの `@Id asc` を追加。キーに一意で NULL にならないカラム（`unique = true` かつ `nullable = false`、`@NaturalId`）があれば追加しない（A5）。コレクションの fetch join + ページングは拒否 | ルートの id と、明示的に結合したエンティティの id については実装済み（Java のラムダでテスト済み）。fetch join のチェックはまだ実装されていない |
+| S9 | ページングでは、キーに id が含まれていなければルートの `@Id asc` を追加。キーに一意で NULL にならないカラム（`unique = true` かつ `nullable = false`、`@NaturalId`）があれば追加しない（A5）。コレクションの fetch join + ページングは拒否 | ルートの id と、明示的に結合したエンティティの id については実装済み。fetch join のチェックはまだ実装されていない |
 | S10 | 解析結果はラムダごとにキャッシュされる。キャプチャした `Direction` は呼び出しのたびに読み取られる | 実装済み |
 | S11 | Spring の `Sort.Order` は `Direction` に 1:1 で対応（Spring モジュール。[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) を参照）。プロパティ名はソートポリシーのチェックを通り、エイリアスはそのまま渡される | Spring の `Sort` は実装済み、Java でテスト済み（`ignoreCase` はまだサポートしていない）。ソートポリシーと合わせた場合もテスト済み。`"price,desc_nulls_last"` のような 1 つの文字列の読み取りはまだ実装されていない |
-| S12 | 結合クエリも同じ形: `{ o, c, by -> }`、`{ o, c, i, by -> }` | 実装済み（Java のラムダでテスト済み、[6.8](06-select-group.md#68-explicit-joins) を参照） |
+| S12 | 結合クエリも同じ形: `{ o, c, by -> }`、`{ o, c, i, by -> }` | 実装済み（[6.8](06-select-group.md#68-explicit-joins) を参照） |
 | S13 | プロパティ参照は、キーが 1 つの短い書き方（`orderBy(Order::price)`）でだけ使う。コンパイルはできるが意味が間違っている参照は拒否される | まだ実装されていない（Kotlin のプロパティ参照） |
-| S14 | サブクエリのソート: `limit` があれば残し、なければ警告を出して削除。データベースの違いは lambdaQL が処理する（5 章を参照） | 実装済み（テスト済み）。MariaDB の `lateral` の書き換えはまだ実装されていない |
+| S14 | サブクエリのソート: `limit` があれば残し、なければ警告を出して削除。データベースの違いは lambdaQL が処理する（5 章を参照） | 実装済み。MariaDB の `lateral` の書き換えはまだ実装されていない |
 
 ---
 

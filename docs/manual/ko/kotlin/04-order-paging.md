@@ -64,7 +64,7 @@ fetch first ? rows only
 - 키와 방향을 함께 작성합니다. 그래서 둘의 순서가 어긋날 일이 없습니다.
 - lambdaQL은 람다를 읽기만 합니다. 실행하지 않습니다. `by` 메서드는 순서를 설명할 뿐입니다.
 
-**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `sort`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `sort`:
 
 ```kotlin
 val q = qb.from(Order::class.java)
@@ -417,7 +417,7 @@ limit ?
 - 정렬 키에 주 엔티티의 유일하고 NULL이 될 수 없는 컬럼이 있으면 추가하지 않습니다(A5). `nullable = false`인 `@Column(unique = true)`, Hibernate `@NaturalId`, `@Id`가 이에 해당하며, 이 키만으로 모든 행의 순서가 정해지기 때문입니다.
   NULL이 될 수 있는 유일 컬럼은 해당하지 않습니다. NULL은 여러 행에 있을 수 있기 때문입니다.
 - `limit`과 `offset`이 없으면 아무것도 추가하지 않습니다.
-- 명시적 조인(`join`, `leftJoin`, `crossJoin`)이 있으면 조인한 모든 엔티티의 id도 조인 순서대로 추가합니다(Java 람다로 테스트함, [6.8](06-select-group.md#68-explicit-joins) 참고).
+- 명시적 조인(`join`, `leftJoin`, `crossJoin`)이 있으면 조인한 모든 엔티티의 id도 조인 순서대로 추가합니다([6.8](06-select-group.md#68-explicit-joins) 참고).
 - 아직 구현되지 않음: 컬렉션 fetch join과 `limit`/`offset`을 함께 쓰면 거부합니다.
 
 이에 대한 Kotlin 테스트는 아직 없습니다. 같은 규칙을 Java로 테스트했습니다([`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java), 영역 `unique-key`).
@@ -536,7 +536,7 @@ qb.from(Order::class.java).orderBy(byName).toList()
 <a id="sort-policy"></a>
 ### 정렬 정책: 허용하는 외부 이름
 
-**구현됨**(결정 D43). H2, MariaDB 10.11, Oracle 23.26에서 Java 람다로 테스트함.
+**구현됨**(결정 D43).
 
 코드 밖에서 들어온 정렬 이름(요청 파라미터, Spring `Sort`나 `Pageable`)은 어느 영속 속성이든 가리킬 수 있습니다.
 **정렬 정책**은 허용하는 이름을 정합니다.
@@ -669,20 +669,20 @@ SortPolicy.register(emf, SortPolicy.of(SortMode.STRICT,
 
 | # | 규칙 | 상태 |
 |---|---|---|
-| S1 | 정렬은 람다 하나입니다: `{ o, by -> by... }`. 키가 하나면 `{ it.key }`와 선택적인 `Direction`. 조인이면 `{ o, c, by -> by... }`(`by`는 항상 마지막) | 구현됨. 조인 형태 `{ o, c, by -> }`도 구현됨(Java 람다로 테스트함) |
+| S1 | 정렬은 람다 하나입니다: `{ o, by -> by... }`. 키가 하나면 `{ it.key }`와 선택적인 `Direction`. 조인이면 `{ o, c, by -> by... }`(`by`는 항상 마지막) | 구현됨. 조인 형태 `{ o, c, by -> }`도 구현됨 |
 | S2 | 키는 `Comparable`입니다(Kotlin nullable 키 허용). 엔티티는 키가 될 수 없습니다(컴파일 오류). 키는 엔티티를 사용해야 합니다 | 구현됨 |
 | S3 | 방향은 `asc` / `desc`나 `sort(key, Direction)`으로 정합니다. `asc(key)`/`desc(key)`(`ASC`/`DESC`)는 NULL 정책을 사용하고, `asc(key, nullsFirst)`, `desc(key, nullsFirst)`, `*_NULLS_*`는 쓴 그대로 사용합니다 | 구현됨 |
 | S4 | 본문은 `by` 호출을 곧게 이은 체인뿐입니다. `if`, `when`, 반복문은 안 됩니다 | 구현됨 |
 | S5 | `orderBy`는 쿼리당 한 번. `orderBy` 뒤에 `where` 불가. `limit` 뒤에 `orderBy` 불가(컴파일 오류) | 구현됨 |
-| S6 | 재사용은 `SortSpec`(`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`)으로. 외부 문자열은 persistence unit의 정렬 정책(`SortRules`, `SortPolicy`, `SortMode`, [4.10](#sort-policy) 참고)이 검사 | `SortSpec`과 정렬 정책 구현됨(Java 람다로 테스트함). `SortSpec`의 조인 형태는 아직 구현되지 않음 |
+| S6 | 재사용은 `SortSpec`(`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`)으로. 외부 문자열은 persistence unit의 정렬 정책(`SortRules`, `SortPolicy`, `SortMode`, [4.10](#sort-policy) 참고)이 검사 | `SortSpec`과 정렬 정책 구현됨. `SortSpec`의 조인 형태는 아직 구현되지 않음 |
 | S7 | 키: 컬럼, to-one 경로, `+ - *`, 확대 변환. 값 분기는 안 됩니다. Kotlin `?.`는 경로로 읽습니다 | 구현됨(Kotlin 람다로는 테스트하지 않음) |
 | S8 | `orderBy`에만 쓰인 연관 경로는 `left join`을 사용하므로 연관이 없는 행도 유지됩니다. 필수 연관(`optional = false`)은 행을 잃지 않으므로 inner join입니다(A4). 같은 경로를 `where`에서 쓰면 정렬은 `where`의 조인을 사용합니다 | 구현됨 |
-| S9 | 페이징을 쓰면 키에 id가 없을 때 루트 `@Id asc`를 추가합니다. 키에 유일하고 NULL이 될 수 없는 컬럼(`unique = true`이고 `nullable = false`, `@NaturalId`)이 있으면 추가하지 않습니다(A5). 컬렉션 fetch join + 페이징은 거부됩니다 | 루트 id와 명시적으로 조인한 엔티티의 id는 구현됨(Java 람다로 테스트함). fetch join 검사는 아직 구현되지 않음 |
+| S9 | 페이징을 쓰면 키에 id가 없을 때 루트 `@Id asc`를 추가합니다. 키에 유일하고 NULL이 될 수 없는 컬럼(`unique = true`이고 `nullable = false`, `@NaturalId`)이 있으면 추가하지 않습니다(A5). 컬렉션 fetch join + 페이징은 거부됩니다 | 루트 id와 명시적으로 조인한 엔티티의 id는 구현됨. fetch join 검사는 아직 구현되지 않음 |
 | S10 | 분석 결과는 람다별로 캐시됩니다. 캡처한 `Direction`은 호출할 때마다 읽습니다 | 구현됨 |
-| S11 | Spring `Sort.Order`는 `Direction`에 1:1로 대응합니다(Spring 모듈, [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) 참고). 속성 이름은 정렬 정책의 검사를 거치고, 별칭은 그대로 전달합니다 | Spring `Sort`는 구현되고 Java로 테스트됨(`ignoreCase`는 아직 지원하지 않음). 정렬 정책과 함께 쓰는 경우도 테스트함. `"price,desc_nulls_last"` 같은 문자열 하나의 해석은 아직 구현되지 않음 |
-| S12 | 조인 쿼리도 같은 모양을 사용합니다: `{ o, c, by -> }`, `{ o, c, i, by -> }` | 구현됨(Java 람다로 테스트함, [6.8](06-select-group.md#68-explicit-joins) 참고) |
+| S11 | Spring `Sort.Order`는 `Direction`에 1:1로 대응합니다(Spring 모듈, [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) 참고). 속성 이름은 정렬 정책의 검사를 거치고, 별칭은 그대로 전달합니다 | Spring `Sort`는 구현됨(`ignoreCase`는 아직 지원하지 않음). 정렬 정책과 함께 써도 동작함. `"price,desc_nulls_last"` 같은 문자열 하나의 해석은 아직 구현되지 않음 |
+| S12 | 조인 쿼리도 같은 모양을 사용합니다: `{ o, c, by -> }`, `{ o, c, i, by -> }` | 구현됨([6.8](06-select-group.md#68-explicit-joins) 참고) |
 | S13 | 속성 참조는 키 하나의 짧은 형태(`orderBy(Order::price)`)에서만 사용합니다. 컴파일되지만 의미가 틀린 참조는 거부됩니다 | 아직 구현되지 않음(Kotlin 속성 참조) |
-| S14 | 서브쿼리 정렬: `limit`이 있으면 유지, 없으면 경고와 함께 제거. 데이터베이스 차이는 lambdaQL이 처리합니다(5장 참고) | 구현됨(테스트함). MariaDB `lateral` 재작성은 아직 구현되지 않음 |
+| S14 | 서브쿼리 정렬: `limit`이 있으면 유지, 없으면 경고와 함께 제거. 데이터베이스 차이는 lambdaQL이 처리합니다(5장 참고) | 구현됨. MariaDB `lateral` 재작성은 아직 구현되지 않음 |
 
 ---
 

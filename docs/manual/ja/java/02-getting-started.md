@@ -238,7 +238,7 @@ List<Order> orders = qb.from(Order.class)
 
 **SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 7.4 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `to-hql`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `to-hql`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -272,7 +272,7 @@ public List<Order> expensive(int status, double minPrice) {
 }
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `start-captured`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `start-captured`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -295,7 +295,7 @@ qb.from(Order.class)
 //      where e0.active = true and (e0.status = 1 or e0.status = 2)
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `start-many-where`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `start-many-where`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -329,7 +329,7 @@ qb.from(Order.class)
 // HQL: select e0 from Order e0 join e0.customer j1 where j1.name = :p1
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `inner-join`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `inner-join`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -373,7 +373,7 @@ null ガード（`o.getCustomer() == null || ...`）を書いても、customer �
 順序を選ぶには、先に `orderBy(...)` を呼びます。すると `first()` はその順序で最初の行を返します。`offset` はそのまま使われます。`orderBy(...).offset(1).first()` は 2 番目の行を返します。
 合う行がなければ、結果は `Optional.empty()` です。
 
-**(テスト済み)** [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)、リージョン `first`:
+[`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)、リージョン `first`:
 
 ```java
 Optional<Order> cheapest = qb.from(Order.class)
@@ -384,7 +384,7 @@ Optional<Order> firstActive = qb.from(Order.class).where(o -> o.isActive()).firs
 Optional<Order> none = qb.from(Order.class).where(o -> o.getStatus() == 9).first();
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `first`（`cheapest`）:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `first`（`cheapest`）:
 
 ```sql
 -- H2, Oracle
@@ -400,7 +400,7 @@ order by o1_0.price,o1_0.id
 limit ?
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `first#2`（`firstActive`）:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `first#2`（`firstActive`）:
 
 ```sql
 -- H2, Oracle
@@ -426,7 +426,7 @@ limit ?
 条件に合う行が多くても 1 つしかないとき（たとえばユニークキー）に `one()` を使います。
 行がなければ `Optional.empty()` になります。2 行以上が合うと `jakarta.persistence.NonUniqueResultException` を投げます。合う行ならどれでもよいときは `first()` を使ってください。
 
-**(テスト済み)** [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)、リージョン `one`:
+[`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)、リージョン `one`:
 
 ```java
 long id = knownId;
@@ -436,7 +436,7 @@ Optional<Order> missing = qb.from(Order.class).where(o -> o.getId() == -1L).one(
 assertThrows(NonUniqueResultException.class, () -> qb.from(Order.class).where(o -> o.isActive()).one());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `one`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `one`:
 
 ```sql
 -- H2, Oracle
@@ -461,7 +461,7 @@ limit ?
 
 ページ付きの画面では、where 段階のクエリを変数に入れておきます。合計を得るにはそれに `count()` を呼びます。次に、ページを得るには同じ変数に `orderBy(...).limit(...).toList()` を呼びます。
 
-**(テスト済み)** [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)、リージョン `count`:
+[`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)、リージョン `count`:
 
 ```java
 SelectQuery<Order> active = qb.from(Order.class).where(o -> o.isActive());
@@ -469,7 +469,7 @@ long total = active.count();                                   // every matching
 List<Order> page = active.orderBy((o, by) -> by.desc(o.getPrice())).limit(2).toList();
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `count`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `count`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -485,14 +485,14 @@ HQL は `select count(e0) from Order e0 where e0.active = true` です。Hiberna
 
 `exists()` は、合う行が 1 つ以上あれば `true` を返します。`select 1` を実行し、読むのは最大 1 行です。エンティティは読み込みません。
 
-**(テスト済み)** [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)、リージョン `exists`:
+[`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)、リージョン `exists`:
 
 ```java
 boolean anyRush = qb.from(Order.class).where(o -> o.getKind() == Order.Kind.RUSH).exists();
 boolean anyStatus9 = qb.from(Order.class).where(o -> o.getStatus() == 9).exists();
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `exists`（`anyRush`）:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `exists`（`anyRush`）:
 
 ```sql
 -- H2, Oracle
@@ -516,7 +516,7 @@ HQL は `select 1 from Order e0 where e0.kind = org.lambdaql.query.Order$Kind.RU
 `toSet()` は `toList()` と同じようにクエリを実行し、`SequencedSet<T>` を返します（決定 D42）。
 これは `LinkedHashSet` なので、要素は行の順序を保ちます。`orderBy` があれば、ソートの順序です。
 
-**(テスト済み)** [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)、リージョン `to-set`:
+[`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)、リージョン `to-set`:
 
 ```java
 java.util.SequencedSet<Order> byPrice = qb.from(Order.class)
@@ -541,7 +541,7 @@ SQL は `toList()` と同じです。lambdaQL は `distinct` を **付けませ�
 
 次のテストでは、`Tag.equals` は名前だけを比べ、テーブルには同じ名前の行が 2 つあります。
 
-**(テスト済み)** [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)、リージョン `to-set-check`:
+[`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)、リージョン `to-set-check`:
 
 ```java
 // Tag.equals compares only the name: two different rows would become one element, so toSet() refuses

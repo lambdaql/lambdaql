@@ -6,7 +6,7 @@
 ---
 
 
-**(tested)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `delete`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `delete`:
 
 ```java
 ExecutableDelete<Order> d = qb.delete(Order.class).where(o -> o.getStatus() == 3);
@@ -20,7 +20,7 @@ assertEquals("delete from Order e0 where (select s1.name from Customer s1 where 
 
 **About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 7.4, and it fails if Hibernate's SQL changes.
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `delete`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `delete`:
 
 ```sql
 -- H2, Oracle
@@ -32,7 +32,7 @@ delete o1_0 from orders o1_0
 where o1_0.status=3
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `delete#2`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `delete#2`:
 
 ```sql
 -- H2, Oracle
@@ -66,7 +66,7 @@ qb.delete(Item.class).where(i -> ids.contains(i.getId())).execute();
 A subquery in `where` uses a second lambda argument `sub`, as in [5. Subqueries](05-subquery.md).
 An example that deletes the orders that have no items:
 
-**(tested)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java), region `dml-subquery`:
+[`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java), region `dml-subquery`:
 
 ```java
 ExecutableDelete<Order> d = qb.delete(Order.class)
@@ -74,7 +74,7 @@ ExecutableDelete<Order> d = qb.delete(Order.class)
 assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)", d.toHql().hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `dml-subquery`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `dml-subquery`:
 
 ```sql
 -- H2, Oracle
@@ -106,7 +106,7 @@ delete from Order d0 where d0.id in (select t.id from (select e0.id as id from O
 - `update` is not wrapped. An `update` with a subquery that reads its own table works on all three databases (measured on MariaDB 10.11).
 - Entities with a composite id are not wrapped. A delete with `limit` already uses the wrapped form below (alias `x0`).
 
-**(tested)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `delete-self-subquery`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `delete-self-subquery`:
 
 ```java
 // the subquery reads the target table: lambdaQL reads the matching ids through a derived table first (U17),
@@ -133,7 +133,7 @@ Use it to work through many rows in small steps.
 - `orderBy` takes a sort lambda or a `SortSpec`, as in a select (see [4. Sorting and paging](04-order-paging.md)).
 - `orderBy` without `limit` is an error (`IllegalStateException`), because the order has no use then.
 
-**(tested)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `delete-limit`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `delete-limit`:
 
 ```java
 // the first rows of qb.from(Order.class).where(same).orderBy(same); the id is the last sort key
@@ -146,7 +146,7 @@ assertEquals("delete from Order e0 where e0.id in (select t.id from (select x0.i
 int deleted = d.execute();
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `delete-limit`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `delete-limit`:
 
 ```sql
 -- H2
@@ -180,7 +180,7 @@ lambdaQL renders the limit as `e0.id in (select t.id from (select x0.id as id fr
 
 The statement names one id, so it never changes 2 or more rows. The protection does not rely on a rollback.
 
-**(tested)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `execute-one`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `execute-one`:
 
 ```java
 // one row matches: it is deleted

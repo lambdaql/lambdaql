@@ -40,7 +40,7 @@ where o1_0.status=1
 
 Oracle 在 `set` 中写出别名（`set o1_0.status=?`）；H2 和 MariaDB 不写。
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `update`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `update`：
 
 ```kotlin
 val u = qb.update(Order::class.java)
@@ -169,7 +169,7 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 **`?.` 与 `||`。** 如果条件中用 `?.` 经过的步骤在查询中成为 `left join`（决策 D54，见 [3.10](03-where.md#310-association-paths)），DML 不会添加 `e0.customer.id is not null`。
 因此没有客户的订单也会与查询完全一样成为更新对象。像上面的示例那样，只有 `?.` 而没有客户的行无法使条件为真时，检查会保留。
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `update-safe-call`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `update-safe-call`：
 
 ```kotlin
 // UPDATE: the left join of ?. drops the "customer exists" check, so the order without a customer is changed too
@@ -205,7 +205,7 @@ where o1_0.status=1 or (select c1_0.name from customers c1_0 where c1_0.id=o1_0.
 使用带两个参数的 Lambda `set { o, sub -> ... }`。第二个参数是子查询的起点 `sub`（决策 D49）。
 这里不需要 `Agg`；子查询有 `sum`、`avg` 等，与 [5. 子查询](05-subquery.md) 中相同。
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `update-sub`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `update-sub`：
 
 ```kotlin
 // the second parameter starts a subquery, as in where { o, sub -> ... } (D49)

@@ -6,7 +6,7 @@
 ---
 
 
-**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `delete`：
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `delete`：
 
 ```java
 ExecutableDelete<Order> d = qb.delete(Order.class).where(o -> o.getStatus() == 3);
@@ -20,7 +20,7 @@ assertEquals("delete from Order e0 where (select s1.name from Customer s1 where 
 
 **关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 7.4 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `delete`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `delete`：
 
 ```sql
 -- H2, Oracle
@@ -32,7 +32,7 @@ delete o1_0 from orders o1_0
 where o1_0.status=3
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `delete#2`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `delete#2`：
 
 ```sql
 -- H2, Oracle
@@ -66,7 +66,7 @@ qb.delete(Item.class).where(i -> ids.contains(i.getId())).execute();
 `where` 中的子查询使用第二个 Lambda 参数 `sub`，与 [5. 子查询](05-subquery.md) 相同。
 删除没有明细的订单的示例：
 
-**(已测试)** [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)，region `dml-subquery`：
+[`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)，region `dml-subquery`：
 
 ```java
 ExecutableDelete<Order> d = qb.delete(Order.class)
@@ -74,7 +74,7 @@ ExecutableDelete<Order> d = qb.delete(Order.class)
 assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)", d.toHql().hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `dml-subquery`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `dml-subquery`：
 
 ```sql
 -- H2, Oracle
@@ -106,7 +106,7 @@ delete from Order d0 where d0.id in (select t.id from (select e0.id as id from O
 - `update` 不包装。读取自身表的子查询的 `update` 在三种数据库上都能运行（在 MariaDB 10.11 上实测）。
 - 复合 id 实体不包装。带 `limit` 的删除本来就使用下面的包装形式（别名 `x0`）。
 
-**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `delete-self-subquery`：
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `delete-self-subquery`：
 
 ```java
 // the subquery reads the target table: lambdaQL reads the matching ids through a derived table first (U17),
@@ -133,7 +133,7 @@ assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where
 - `orderBy` 接受排序 Lambda 或 `SortSpec`，与查询相同（见 [4. 排序与分页](04-order-paging.md)）。
 - 没有 `limit` 的 `orderBy` 是错误（`IllegalStateException`），因为这时排序没有作用。
 
-**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `delete-limit`：
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `delete-limit`：
 
 ```java
 // the first rows of qb.from(Order.class).where(same).orderBy(same); the id is the last sort key
@@ -146,7 +146,7 @@ assertEquals("delete from Order e0 where e0.id in (select t.id from (select x0.i
 int deleted = d.execute();
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `delete-limit`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `delete-limit`：
 
 ```sql
 -- H2
@@ -180,7 +180,7 @@ lambdaQL 把 limit 写成 `e0.id in (select t.id from (select x0.id as id from X
 
 语句只指定一个 id，因此绝不会改变超过一行。这种保护不依赖回滚。
 
-**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `execute-one`：
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `execute-one`：
 
 ```java
 // one row matches: it is deleted

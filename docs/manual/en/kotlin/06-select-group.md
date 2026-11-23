@@ -60,7 +60,7 @@ data class Total(val count: Long, val average: Double?)
 > If a NULL goes into such a parameter, lambdaQL throws `IllegalStateException`. For a primitive, the message names the argument and tells you to use the wrapper type.
 > `count` never gives NULL, so `count: Long` is fine.
 
-The examples marked **(tested)** come from [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt). The test uses the Java test entity (`price` is a primitive `double`, `status` is a `short`, `Customer.id` is an `int`) and these result types.
+The examples come from [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt). The test uses the Java test entity (`price` is a primitive `double`, `status` is a `short`, `Customer.id` is an `int`) and these result types.
 
 ```kotlin
 /** A row of one order (Kotlin data class). */
@@ -146,14 +146,14 @@ val pairs: List<Pair<String?, Double?>> = qb.from(Order::class.java)
 // HQL: select j1.name, e0.price from Order e0 left join e0.customer j1
 ```
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `data-class`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `data-class`:
 
 ```kotlin
 val q = qb.from(Order::class.java).select { OrderRow(it.id, it.customer?.name, it.price) }
 assertEquals("select e0.id, j1.name, e0.price from Order e0 left join e0.customer j1", q.toHql().hql())
 ```
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `pair`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `pair`:
 
 ```kotlin
 val q = qb.from(Order::class.java).where { it.status.toInt() == 1 }.select { it.customer?.name to it.price }
@@ -302,7 +302,7 @@ val counts: List<KeyCount> = qb.from(Order::class.java)
 .groupBy { Triple(it.customer?.id, it.status, it.active) }    // three keys
 ```
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `group-many` (the result is a `Triple`):
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `group-many` (the result is a `Triple`):
 
 ```kotlin
 val q = qb.from(Order::class.java)
@@ -365,7 +365,7 @@ val big: List<Stat> = qb.from(Order::class.java)
 //      having sum(e0.price) > 200.0
 ```
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `group-by`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `group-by`:
 
 ```kotlin
 val q = qb.from(Order::class.java)
@@ -547,7 +547,7 @@ val q = qb.from(Order::class.java)
 ```
 
 > [!WARNING]
-> When several rows match the join condition, **the row of the main entity repeats**: once per match. `toList()` and `count()` count every repeated row (tested in Java).
+> When several rows match the join condition, **the row of the main entity repeats**: once per match. `toList()` and `count()` count every repeated row.
 > If you need each order only once, use an `exists()` subquery ([5. Subqueries](05-subquery.md)) instead of the join, or apply `distinct()` to the join query (see [`distinct()` on a join](#distinct-on-a-join)).
 
 <a id="cross-join"></a>
@@ -592,7 +592,7 @@ This HQL is the result of the Java test, where `price` is a primitive `double`. 
 - With `select(...)` after `distinct()`, the values are read with `select distinct`.
 - Consider an `exists` subquery ([5. Subqueries](05-subquery.md)) first. It gives the same rows without repeats, and it is often faster.
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `join-distinct`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `join-distinct`:
 
 ```kotlin
 // an order with two matching items would come twice; distinct() returns it once
@@ -615,7 +615,7 @@ The forms are `join(cte) { c, x -> ... }`, `leftJoin(cte) { ... }`, `join(qb.fro
 - A derived row has no id, so `x == null` is an error (`LQL-3067`). Compare a column instead, as in `x.customerId == null`.
 - Hibernate 7.4 (and 6.6 before it) accepts `select distinct` of an entity, inner and left joins of a derived table or CTE, and entity joins inside a subquery (measured on the three databases).
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `join-cte`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `join-cte`:
 
 ```kotlin
 // the total of each customer, joined to the customer row
@@ -719,7 +719,7 @@ Rules:
 
 - The row type must be a **Kotlin data class** (or a Java record) (rule J5).
   lambdaQL takes the column names from the data class properties, in the order of the primary constructor.
-- A normal class, a `Pair`, a `Triple` or a single value cannot be used here, because lambdaQL cannot name its columns. In this case lambdaQL throws `TranslationException` (`LQL-3064`) (tested in Java with a single value).
+- A normal class, a `Pair`, a `Triple` or a single value cannot be used here, because lambdaQL cannot name its columns. In this case lambdaQL throws `TranslationException` (`LQL-3064`).
 
 To join a derived table to an entity query, see [Join a derived table or CTE](#join-a-derived-table-or-cte) (D51).
 
@@ -771,7 +771,7 @@ Notes:
 
 - The CTE is named `t`. The outer query always gives it the alias `e0` (`from t e0`). HQL needs an alias (rule J6).
 - The CTE columns are named with select aliases (`as customerId`). HQL does not accept a column list after the CTE name; Hibernate adds the column list in the SQL (rule J6).
-- MariaDB and Oracle run a real `with`. On H2, Hibernate expands it into a derived table. The result is the same (tested on the three databases with Java lambdas).
+- MariaDB and Oracle run a real `with`. On H2, Hibernate expands it into a derived table. The result is the same.
 - The row type rule is the same as for a derived table: data class or record (J5).
 - To join a CTE to an entity query, see [Join a derived table or CTE](#join-a-derived-table-or-cte) (D51).
 - You can read the same CTE twice in one query. The definition is written only once (see [Join a derived table or CTE](#join-a-derived-table-or-cte)).
@@ -784,13 +784,13 @@ Notes:
 
 | # | Rule | Status |
 |---|---|---|
-| J1 | A `select` lambda returns **one value expression** or **one constructor call**. Each constructor argument is a value expression (rules in [3. Conditions (`where`)](03-where.md)). Association paths that are used only in `select` become `left join` aliases, so no rows are lost. A required association (`optional = false`) is an inner join (A4). If `where` uses the same path, `select` uses the `where` join (R24). | Implemented (tested with Java and Kotlin lambdas) |
-| J2 | For a constructor, lambdaQL selects only the columns and calls the constructor itself. It does not write `select new`. `Pair`/`Triple` are built the same way. | Implemented (tested with Java and Kotlin lambdas) |
-| J3 | With aggregates, every non-aggregate value in `select` and `having` (and in the values of `insert ... select`) must be a `groupBy` key. Otherwise there is an error at analysis time. | Implemented (tested with Java lambdas). The error is `TranslationException` (`LQL-3035`, see [11](../11-errors-and-languages.md)) |
-| J4 | `sum`/`avg`/`min`/`max` give NULL when there are no rows or all values are NULL. `count` gives 0. Use nullable constructor parameters. A NULL for a non-null parameter throws `IllegalStateException`. | Implemented (tested with Java lambdas) |
-| J5 | Row type of a derived table or CTE: **Kotlin data class or Java record only**. Normal classes are allowed only in a simple `select`. Otherwise: `LQL-3064`. This also applies to the rows of a joined derived table or CTE (D51). A derived row cannot be compared with `null` (`LQL-3067`). | Implemented (tested with Java lambdas) |
-| J6 | A CTE made with `qb.with(...)` names its columns with select aliases: `with t as (select d0.customer.id as customerId, ...) select e0.customerId ... from t e0`. HQL does not accept a column list after the name: Hibernate rejects `with t (col list) as (...)` with a `SyntaxException`. Hibernate writes the column list in the SQL itself (`with t (customerId,cnt,total) as (...)` on MariaDB and Oracle). H2 turns the CTE into a derived table. The outer query always uses an alias (`from t e0`). | Implemented (tested with Java lambdas) |
-| J7 | `distinct()` renders `select distinct`. With sorting, the sort keys must be in the select list (a DB rule). lambdaQL checks this at analysis time. For `distinct()` on a join, the sort keys must be columns of the main entity itself (D51). | Implemented (tested with Java lambdas) |
+| J1 | A `select` lambda returns **one value expression** or **one constructor call**. Each constructor argument is a value expression (rules in [3. Conditions (`where`)](03-where.md)). Association paths that are used only in `select` become `left join` aliases, so no rows are lost. A required association (`optional = false`) is an inner join (A4). If `where` uses the same path, `select` uses the `where` join (R24). | Implemented |
+| J2 | For a constructor, lambdaQL selects only the columns and calls the constructor itself. It does not write `select new`. `Pair`/`Triple` are built the same way. | Implemented |
+| J3 | With aggregates, every non-aggregate value in `select` and `having` (and in the values of `insert ... select`) must be a `groupBy` key. Otherwise there is an error at analysis time. | Implemented. The error is `TranslationException` (`LQL-3035`, see [11](../11-errors-and-languages.md)) |
+| J4 | `sum`/`avg`/`min`/`max` give NULL when there are no rows or all values are NULL. `count` gives 0. Use nullable constructor parameters. A NULL for a non-null parameter throws `IllegalStateException`. | Implemented |
+| J5 | Row type of a derived table or CTE: **Kotlin data class or Java record only**. Normal classes are allowed only in a simple `select`. Otherwise: `LQL-3064`. This also applies to the rows of a joined derived table or CTE (D51). A derived row cannot be compared with `null` (`LQL-3067`). | Implemented |
+| J6 | A CTE made with `qb.with(...)` names its columns with select aliases: `with t as (select d0.customer.id as customerId, ...) select e0.customerId ... from t e0`. HQL does not accept a column list after the name: Hibernate rejects `with t (col list) as (...)` with a `SyntaxException`. Hibernate writes the column list in the SQL itself (`with t (customerId,cnt,total) as (...)` on MariaDB and Oracle). H2 turns the CTE into a derived table. The outer query always uses an alias (`from t e0`). | Implemented |
+| J7 | `distinct()` renders `select distinct`. With sorting, the sort keys must be in the select list (a DB rule). lambdaQL checks this at analysis time. For `distinct()` on a join, the sort keys must be columns of the main entity itself (D51). | Implemented |
 | J8 | Select works together with sorting ([4. Sorting and paging](04-order-paging.md)), paging and subqueries ([5. Subqueries](05-subquery.md)). Sorting by an aggregate (`by.desc(s.total)`) is a v0.2 candidate. | Implemented, except the sort by an aggregate |
 
 The Java test region `rules` in [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) checks J3, `Agg` in `where`, J7 and J4. See [the Java version of this page](../java/06-select-group.md#611-rules-j1-to-j8).

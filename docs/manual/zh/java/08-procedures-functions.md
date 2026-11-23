@@ -40,7 +40,7 @@ lambdaQL **从不执行**这些方法。它读取 Lambda 字节码中的调用�
 编写一个接口。在每个**抽象**方法上加上 `@SqlProcedure("NAME")`。
 你不需要编写实现。lambdaQL 也不会生成实现。
 
-**(已测试)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `declare`：
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `declare`：
 
 ```java
 /** One OUT value or more: a record in the database order. */
@@ -111,7 +111,7 @@ CREATE OR REPLACE PROCEDURE SQ_PROC_CALC(IN p_cust INT, IN p_rate DOUBLE, OUT p_
 
 使用 `qb.call(Interface.class, p -> p.method(args))`，然后调用 `execute()`。
 
-**(已测试)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `call`（MariaDB 和 Oracle）：
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `call`（MariaDB 和 Oracle）：
 
 ```java
 Double total = qb.call(OrderProcs.class, p -> p.calc(customerId, rate)).execute();
@@ -124,7 +124,7 @@ List<Line> recent = qb.call(OrderProcs.class, p -> p.recent(customerId)).execute
 
 没有结果（`void`）的存储过程使用 `exec`：
 
-**(已测试)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `exec`（MariaDB 和 Oracle）：
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `exec`（MariaDB 和 Oracle）：
 
 ```java
 qb.exec(OrderProcs.class, p -> p.purge(9)).execute();
@@ -242,14 +242,14 @@ lambdaQL 在第一次调用时检查的内容（来自 JDBC 元数据 `getProced
 | 检查项 | 能发现吗？ |
 |---|---|
 | 存储过程存在 | 能，报错 `LQL-4035` |
-| IN 和 INOUT 参数的个数 = 存根参数的个数 | 能，报错 `LQL-4036`（已测试） |
+| IN 和 INOUT 参数的个数 = 存根参数的个数 | 能，报错 `LQL-4036` |
 | INOUT 参数 = 带 `@InOut` 的参数 | 能，报错 `LQL-4036` |
 | OUT 值和结果集的个数 = 返回类型的组成部分 | 能，报错 `LQL-4038` |
-| 类型的种类（数字、字符、日期时间、布尔、二进制） | 是，错误 `LQL-4036`（已测试）。同一种类内部的差异不比对（见下文“参数类型比对”） |
-| 相同的参数名以另一种顺序排列 | 是，错误 `LQL-4043`（已测试）。仅当能获得存根参数名时（见下文） |
+| 类型的种类（数字、字符、日期时间、布尔、二进制） | 是，错误 `LQL-4036`。同一种类内部的差异不比对（见下文“参数类型比对”） |
+| 相同的参数名以另一种顺序排列 | 是，错误 `LQL-4043`。仅当能获得存根参数名时（见下文） |
 | Oracle 包存储过程名有多个重载 | 是，错误 `LQL-4044`（已在 Oracle 上测试） |
 
-**(已测试)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `rules`（MariaDB 和 Oracle）：
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `rules`（MariaDB 和 Oracle）：
 
 ```java
 // PR2: the stub is checked against the database parameters on the first call
@@ -282,7 +282,7 @@ assertEquals("LQL-3060", assertThrows(LambdaQLException.class,
 - 类文件中没有名字，并且两个相邻参数类型相同：每个存储过程以 `INFO` 级别记录一次 `LQL-5004`。
 - 类型只比对种类（见下文“参数类型比对”）。两个同一种类的参数互换时，只能通过名字发现。
 
-**(已测试)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `names`（数据库存储过程是 `SQ_PROC_DIFF(p_to, p_from)`；测试存根用 `-parameters` 编译）：
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `names`（数据库存储过程是 `SQ_PROC_DIFF(p_to, p_from)`；测试存根用 `-parameters` 编译）：
 
 ```java
 /** Argument names: with -parameters lambdaQL compares them with the database names (p_to, p_from). */
@@ -301,7 +301,7 @@ interface DiffProcs {
 }
 ```
 
-**(已测试)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `name-check`（MariaDB 和 Oracle）：
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `name-check`（MariaDB 和 Oracle）：
 
 ```java
 assertEquals(7, qb.call(DiffProcs.class, p -> p.diff(10, 3)).execute());
@@ -320,7 +320,7 @@ assertEquals("LQL-4043", assertThrows(LambdaQLException.class,
 - 无法确定种类的一方（enum、对象类型、游标）不比对。
 - 同一种类内部的差异（例如 `Integer` 参数与 `NUMBER(10,2)` 数据库参数）交给驱动转换。
 
-**(已测试)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `type-check`（MariaDB 和 Oracle）：
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `type-check`（MariaDB 和 Oracle）：
 
 ```java
 // the kind of each argument is compared with the database parameter: a string for a number parameter stops
@@ -332,7 +332,7 @@ assertEquals("LQL-4036", wrong.code(), wrong.getMessage());
 **Oracle 包重载。** Oracle 包中可以有多个同名的存储过程。
 lambdaQL 无法区分存根指的是哪一个，因此调用这样的名字会以 `LQL-4044` 停止。选择并调用某一个重载计划在以后提供。
 
-**(已测试)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `overload`（仅 Oracle）。存根 `PkgProcs` 声明了 `@SqlProcedure(pkg = "SQ_PKG", value = "TWICE")` 和 `@SqlProcedure(pkg = "SQ_PKG", value = "HALF")`：
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `overload`（仅 Oracle）。存根 `PkgProcs` 声明了 `@SqlProcedure(pkg = "SQ_PKG", value = "TWICE")` 和 `@SqlProcedure(pkg = "SQ_PKG", value = "HALF")`：
 
 ```java
 assertEquals(5.0, qb.call(PkgProcs.class, p -> p.twice(2.5)).execute(), 1e-9);
@@ -362,17 +362,17 @@ Oracle 上真正的按名字绑定（`pass_procedure_paramater_names=true` 加�
 | # | 规则 | 状态 |
 |---|---|---|
 | PR1 | 名字：注解的值原样使用。值为空时：方法名转为 UPPER_SNAKE。可以使用包名或模式名（`SQ_PKG.CALC`、`LQL.SQ_CALC`）。为避免混淆，也可以写成 `@SqlProcedure(schema = ..., pkg = ..., value = ...)`。 | 已实现。模式名和包名没有测试覆盖 |
-| PR2 | 参数**按位置**绑定。第一次调用时，会对照数据库元数据检查 IN/INOUT 参数的个数和 `@InOut` 的位置。能获得名字时也检查名字，相同名字顺序不同即为错误。也比对参数类型的种类（数字、字符、日期时间、布尔、二进制），不同即为错误（`LQL-4036`）（见 [8.4](#84-warning-argument-order)）。无法读取元数据时，跳过这些检查，参数布局取自存根（见 [8.4](#when-the-metadata-cannot-be-read)）。 | 个数、`@InOut` 和名字检查已实现（已测试）。Oracle 包重载检测也已实现（已在 Oracle 上测试）。类型比对也已实现（已在 MariaDB 和 Oracle 上测试）。没有元数据时的降级行为（`LQL-5005`、`LQL-5006`）也已实现（已在 MariaDB 和 Oracle 上测试）。 |
-| PR3 | 一个 OUT → 返回值。多个 OUT/INOUT → record。`@InOut` 标记 INOUT 参数。 | 已实现（已测试） |
+| PR2 | 参数**按位置**绑定。第一次调用时，会对照数据库元数据检查 IN/INOUT 参数的个数和 `@InOut` 的位置。能获得名字时也检查名字，相同名字顺序不同即为错误。也比对参数类型的种类（数字、字符、日期时间、布尔、二进制），不同即为错误（`LQL-4036`）（见 [8.4](#84-warning-argument-order)）。无法读取元数据时，跳过这些检查，参数布局取自存根（见 [8.4](#when-the-metadata-cannot-be-read)）。 | 个数、`@InOut` 和名字检查已实现。Oracle 包重载检测也已实现（已在 Oracle 上测试）。类型比对也已实现（已在 MariaDB 和 Oracle 上测试）。没有元数据时的降级行为（`LQL-5005`、`LQL-5006`）也已实现（已在 MariaDB 和 Oracle 上测试）。 |
+| PR3 | 一个 OUT → 返回值。多个 OUT/INOUT → record。`@InOut` 标记 INOUT 参数。 | 已实现 |
 | PR4 | 一个结果集 → `List<T>`。实体通过 Hibernate；record 通过 JDBC 并按标签匹配。不能分页。 | 已实现（已用 record 测试） |
 | PR5 | 多个结果集 → record 的 `List` 组件，按顺序。不支持 Oracle 隐式结果。 | 已实现，没有测试覆盖 |
-| PR6 | 单独调用的数据库函数在不同数据库上使用不同的路径（见 [8.8](#88-call-a-db-function-alone)）。 | 已实现（已测试） |
-| PR7 | 查询中的数据库函数：见 [8.6](#86-declare-db-functions) 和规则 FN1 至 FN11。 | 已实现（已测试） |
-| PR8 | 条件中作用于列的数据库函数会产生 WARN，因为无法使用索引（见 [8.9](#89-warning-functions-on-columns-and-indexes-sargable)）。错误码为 `LQL-5001`。 | 已实现（已测试）。在 `SargableMode.STRICT` 下为错误（`LQL-3066`，D50） |
+| PR6 | 单独调用的数据库函数在不同数据库上使用不同的路径（见 [8.8](#88-call-a-db-function-alone)）。 | 已实现 |
+| PR7 | 查询中的数据库函数：见 [8.6](#86-declare-db-functions) 和规则 FN1 至 FN11。 | 已实现 |
+| PR8 | 条件中作用于列的数据库函数会产生 WARN，因为无法使用索引（见 [8.9](#89-warning-functions-on-columns-and-indexes-sargable)）。错误码为 `LQL-5001`。 | 已实现。在 `SargableMode.STRICT` 下为错误（`LQL-3066`，D50） |
 | PR9 | 存储过程在调用方的事务中运行。需要时 lambdaQL 会在调用前刷新。调用后已加载的实体可能是过期的。 | 已实现 |
 | PR10 | 没有通用的受影响行数。请使用 OUT 参数。 | – |
 | PR11 | IN 值为 `null` 没有问题。不能使用数据库参数的默认值。 | 已实现 |
-| PR12 | Lambda 是一次存根调用。参数是捕获值、常量或它们的计算。带 OUT 参数时使用 `exec` 是错误。 | 已实现（已测试） |
+| PR12 | Lambda 是一次存根调用。参数是捕获值、常量或它们的计算。带 OUT 参数时使用 `exec` 是错误。 | 已实现 |
 | PR13 | 布尔参数在 MariaDB 和 Oracle 23ai 及以上版本中可用。 | 没有测试覆盖 |
 | PR14 | 每个 Lambda 只分析一次。每个名字的存储过程元数据只读取一次。 | 已实现 |
 | PR15 | H2 没有 OUT、INOUT、多结果集或包。请在 MariaDB 或 Oracle 上测试存储过程（例如使用 Testcontainers）。 | lambdaQL 的测试遵循这一点 |
@@ -388,7 +388,7 @@ PR11、PR12 和 PR13 有额外的 Kotlin 部分（默认参数、命名参数、
 把它声明为带有 `@SqlFunction` 的**接口静态方法**。
 方法体只能抛出异常。它在 lambdaQL 中从不执行。
 
-**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `declare`：
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `declare`：
 
 ```java
 /** Database functions: static methods of your own interface. The bodies only throw. */
@@ -428,7 +428,7 @@ public interface OrderFns {
 
 | 声明 | 状态 |
 |---|---|
-| 接口静态方法 | **推荐**（已测试） |
+| 接口静态方法 | **推荐** |
 | 类静态方法 | 已设计，没有测试覆盖 |
 | 接口 default 方法 + 单例常量 | 已设计，没有测试覆盖 |
 | 你的仓库 `implements` 函数接口（mixin） | 不支持 |
@@ -441,9 +441,9 @@ public interface OrderFns {
 <a id="87-use-db-functions-in-queries"></a>
 ## 8.7 在查询中使用数据库函数
 
-直接调用函数即可。不需要上下文参数。它可以用在 `where`、`select`、`orderBy` 和 `set` 中（已测试），也可以用在 `groupBy`、`having` 和子查询中（已设计，没有测试覆盖）。
+直接调用函数即可。不需要上下文参数。它可以用在 `where`、`select`、`orderBy` 和 `set` 中，也可以用在 `groupBy`、`having` 和子查询中（已设计，没有测试覆盖）。
 
-**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `where`：
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `where`：
 
 ```java
 // the function call is written as function('<name>' as <type>, ...); the column is its argument
@@ -451,7 +451,7 @@ SelectQuery<Order> q = qb.from(Order.class).where(o -> OrderFns.discount(o.getPr
 assertEquals("select e0 from Order e0 where function('SQ_FN_DISCOUNT' as Double, e0.price) > 100.0", q.toHql().hql());
 ```
 
-**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `captured`：
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `captured`：
 
 ```java
 // a function of captured values only is still computed by the database (the value is bound)
@@ -461,7 +461,7 @@ assertEquals("select e0 from Order e0 where e0.price > function('SQ_FN_DISCOUNT'
 
 Boolean 函数可以单独作为整个条件。lambdaQL 会加上 `= true`：
 
-**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `boolean`：
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `boolean`：
 
 ```java
 SelectQuery<Order> q = qb.from(Order.class).where(o -> OrderFns.isGold(o.getCustomer().getGrade()));
@@ -469,7 +469,7 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where function('SQ_FN_
         q.toHql().hql());
 ```
 
-**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `select`（在 `select` 和 `orderBy` 中）：
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `select`（在 `select` 和 `orderBy` 中）：
 
 ```java
 ValueQuery<Priced> q = qb.from(Order.class)
@@ -481,7 +481,7 @@ assertEquals("select e0.id, function('SQ_FN_DISCOUNT' as Double, e0.price) from 
 
 `Priced` 是 `record Priced(Long id, Double discounted)`。
 
-**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `update`：
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `update`：
 
 ```java
 ExecutableUpdate<Order> u = qb.update(Order.class)
@@ -554,7 +554,7 @@ spring.jpa.properties.lambdaql.functions.classes=com.acme.OrderFns
 static Double mixed(Double v) { throw new DbOnlyException(); }
 ```
 
-**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `registered`：
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `registered`：
 
 ```java
 // SQ_TAX is registered at start-up (lambdaql.functions.classes) and runs SQ_FN_DISCOUNT in SQL
@@ -571,7 +571,7 @@ assertEquals("select e0 from Order e0 where function('SQ_TAX' as Double, e0.pric
 
 使用带有**无参数 Lambda** 的 `qb.call(() -> ...)`：
 
-**(已测试)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `function`（H2、MariaDB 和 Oracle）：
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)，region `function`（H2、MariaDB 和 Oracle）：
 
 ```java
 Double half = qb.call(() -> MathFns.half(price)).execute();
@@ -633,7 +633,7 @@ where FN_DISCOUNT(o1_0.price)>10
 - 与 Oracle 索引比对时，表名和列名取自 Hibernate 映射。只比对只有一个列参数的函数。
 - 如果元数据查询失败（例如没有权限），lambdaQL 以 `INFO` 级别记录 `LQL-5008`。① 仍然警告，② 不检查。
 
-**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `sargable`（测试会收集日志：H2 为 `LQL-5001`，MariaDB 为 `LQL-5001` 和 `LQL-5007`，有 `SQ_FN_DISCOUNT(price)` 函数索引的 Oracle 没有警告）：
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `sargable`（测试会收集日志：H2 为 `LQL-5001`，MariaDB 为 `LQL-5001` 和 `LQL-5007`，有 `SQ_FN_DISCOUNT(price)` 函数索引的 Oracle 没有警告）：
 
 ```java
 // the function wraps the column: an index on price cannot be used (LQL-5001 at WARN),
@@ -659,7 +659,7 @@ qb.from(Order.class).where(o -> o.getPrice() > OrderFns.nondet(base)).toHql();
 - 移动后的形式必须含义相同。请像 `o.getCnt() > n / 2.0` 这样除以小数。整数除法 `n / 2` 在 `>=`、`=`、`<` 以及 `n` 为负数时会得到不同的行。如果乘以了负数，请反转比较方向。`LQL-5012` 的消息会给出这些提示。
 - 没有采用查询索引是否存在来减少警告的方式。因为权限和同义词会让“没有索引”与“无法得知”混在一起，而且列上的算术是少见的写法。
 
-**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `sargable-strict`：
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `sargable-strict`：
 
 ```java
 // STRICT: what WARN would log fails the analysis (NonSargableException, LQL-3066)
@@ -689,18 +689,18 @@ qb.from(Order.class).where(o -> o.getCnt() * o.getStatus() > n).toHql();
 | # | 规则 | 状态 |
 |---|---|---|
 | FN1 | `@SqlFunction` 是方法注解。值为空时：方法名转为 UPPER_SNAKE。 | 已实现 |
-| FN2 | lambdaQL 找到被调用的方法并读取它的注解。方法体只能抛出异常（`throw new ...`）。有实际方法体的方法是错误（`LQL-3052`），因为 Java 和数据库可能给出不同的值。 | 已实现（已测试） |
+| FN2 | lambdaQL 找到被调用的方法并读取它的注解。方法体只能抛出异常（`throw new ...`）。有实际方法体的方法是错误（`LQL-3052`），因为 Java 和数据库可能给出不同的值。 | 已实现 |
 | FN3 | 同名的所有重载必须映射到同一个数据库函数。否则报错（`LQL-3053`）。 | 已实现 |
 | FN4 | 没有注解的调用，或 lambdaQL 无法识别的调用，是错误。它从不会被悄悄跳过。 | 已实现 |
-| FN5 | 参数遵循 [3. 条件](03-where.md)中的值规则。即使参数只由捕获值构成，也会被绑定并**在数据库中**求值。 | 已实现（已测试） |
-| FN6 | 装箱调用会被跳过。返回类型取自声明的方法，必须是 `Double`、`Integer`、`Long`、`BigDecimal`、`String`、`LocalDate`、`LocalDateTime` 或 `Boolean`（`LQL-3055`）。 | 已实现（已测试） |
-| FN7 | 作用于列的函数会产生 WARN（见 [8.9](#89-warning-functions-on-columns-and-indexes-sargable)）。在 MariaDB 上，值一侧的 `NOT DETERMINISTIC` 函数也会产生 WARN（`LQL-5007`）。 | 已实现（已测试）。在 `SargableMode.STRICT` 下为错误（`LQL-3066`，D50） |
-| FN8 | 与 Hibernate 内置函数（`COALESCE`、`ROUND`、`SYSDATE` 等）同名是错误（`LQL-3054`）。Hibernate 会悄悄使用内置函数。请使用前缀或模式名（`PUBLIC.SQ_FN`）。 | 已实现（已测试） |
+| FN5 | 参数遵循 [3. 条件](03-where.md)中的值规则。即使参数只由捕获值构成，也会被绑定并**在数据库中**求值。 | 已实现 |
+| FN6 | 装箱调用会被跳过。返回类型取自声明的方法，必须是 `Double`、`Integer`、`Long`、`BigDecimal`、`String`、`LocalDate`、`LocalDateTime` 或 `Boolean`（`LQL-3055`）。 | 已实现 |
+| FN7 | 作用于列的函数会产生 WARN（见 [8.9](#89-warning-functions-on-columns-and-indexes-sargable)）。在 MariaDB 上，值一侧的 `NOT DETERMINISTIC` 函数也会产生 WARN（`LQL-5007`）。 | 已实现。在 `SargableMode.STRICT` 下为错误（`LQL-3066`，D50） |
+| FN8 | 与 Hibernate 内置函数（`COALESCE`、`ROUND`、`SYSDATE` 等）同名是错误（`LQL-3054`）。Hibernate 会悄悄使用内置函数。请使用前缀或模式名（`PUBLIC.SQ_FN`）。 | 已实现 |
 | FN9 | 仅限 Kotlin（默认参数、`inline`、`vararg`）。见 Kotlin 路线。 | 默认参数和 `vararg`：已实现。`inline`：已设计 |
 | FN10 | v0.1 只支持标量函数。用户自定义聚合函数和窗口函数计划在 v0.2 中提供。没有参数的函数渲染为 `fn()`。 | 标量函数已实现 |
 | FN11 | 已知的数据库差异：在 MariaDB 上，返回 VARCHAR 的函数可能与字符串字面量发生排序规则（collation）冲突。`BigDecimal` 结果的小数位数不同（MariaDB 和 Oracle 为 0，H2 为 1）。布尔结果需要 Oracle 23ai 及以上版本。 | 已用原型实测 |
 
-**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `rules`：
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `rules`：
 
 ```java
 // the body never runs in Java
@@ -734,9 +734,9 @@ assertEquals("LQL-3055", assertThrows(LambdaQLException.class,
 | 多个结果集 | 不支持 | 支持 | 支持（多个游标 OUT 参数） |
 | 同时有 OUT 值和结果集 | 不支持 | 支持 | 支持 |
 | 包名（`PKG.PROC`） | 不支持 | 不支持（需要 `sql_mode=ORACLE`） | 支持 |
-| 查询中的数据库函数 | 支持（已测试） | 支持（已测试） | 支持（已测试） |
-| 单独调用数据库函数 | 支持（已测试） | 支持（已测试） | 支持（已测试） |
-| lambdaQL 中的存储过程调用 | – | 支持（已测试） | 支持（已测试） |
+| 查询中的数据库函数 | 支持 | 支持 | 支持 |
+| 单独调用数据库函数 | 支持 | 支持 | 支持 |
+| lambdaQL 中的存储过程调用 | – | 支持 | 支持 |
 | 布尔参数 / 结果 | – | 支持 | 支持（23ai 及以上） |
 
 v0.1 中未计划的内容：用于动态存储过程名的字符串构建器（v0.2 候选）、选择并调用 Oracle 包存储过程的某个重载（重载检测已实现，`LQL-4044`）、表值函数、存储过程结果的分页。

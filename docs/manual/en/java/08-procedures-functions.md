@@ -40,7 +40,7 @@ lambdaQL **never runs** these methods. It reads the call in the lambda bytecode 
 Write an interface. Put `@SqlProcedure("NAME")` on each **abstract** method.
 You do not write an implementation. lambdaQL does not make one either.
 
-**(tested)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `declare`:
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `declare`:
 
 ```java
 /** One OUT value or more: a record in the database order. */
@@ -111,7 +111,7 @@ Notes:
 
 Use `qb.call(Interface.class, p -> p.method(args))`. Then call `execute()`.
 
-**(tested)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `call` (MariaDB, Oracle):
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `call` (MariaDB, Oracle):
 
 ```java
 Double total = qb.call(OrderProcs.class, p -> p.calc(customerId, rate)).execute();
@@ -124,7 +124,7 @@ List<Line> recent = qb.call(OrderProcs.class, p -> p.recent(customerId)).execute
 
 Call a procedure with no result (`void`) with `exec`.
 
-**(tested)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `exec` (MariaDB, Oracle):
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `exec` (MariaDB, Oracle):
 
 ```java
 qb.exec(OrderProcs.class, p -> p.purge(9)).execute();
@@ -197,7 +197,7 @@ Adjusted adjusted = qb.call(OrderProcs.class, p -> p.adjust(5, 10)).execute();
 | `T` is | How lambdaQL reads it |
 |---|---|
 | an entity | Hibernate result class (`StoredProcedureQuery`) |
-| a Java record (Kotlin: a data class) | JDBC `CallableStatement`, columns matched **by label**. `_` is removed and case is ignored, so `customer_id` matches `customerId` (tested with `Line`) |
+| a Java record (Kotlin: a data class) | JDBC `CallableStatement`, columns matched **by label**. `_` is removed and case is ignored, so `customer_id` matches `customerId` |
 | one value (`Long`, `String`, ...) | the first column of each row |
 
 A normal DTO class cannot be a row type here. Use a record.
@@ -242,14 +242,14 @@ These are the checks lambdaQL makes on the first call, with the JDBC metadata (`
 | Check | Found? |
 |---|---|
 | the procedure exists | yes, error `LQL-4035` |
-| number of IN and INOUT parameters = number of stub arguments | yes, error `LQL-4036` (tested) |
+| number of IN and INOUT parameters = number of stub arguments | yes, error `LQL-4036` |
 | INOUT parameters = arguments with `@InOut` | yes, error `LQL-4036` |
 | number of OUT values and result sets = parts of the return type | yes, error `LQL-4038` |
-| the kind of type (number, text, date/time, boolean, binary) | yes, error `LQL-4036` (tested). Differences within one kind are not checked (see "Argument type check" below) |
-| the same parameter names in another order | yes, error `LQL-4043` (tested). Only when the stub argument names are known (see below) |
-| an Oracle package procedure name with several overloads | yes, error `LQL-4044` (tested on Oracle) |
+| the kind of type (number, text, date/time, boolean, binary) | yes, error `LQL-4036`. Differences within one kind are not checked (see "Argument type check" below) |
+| the same parameter names in another order | yes, error `LQL-4043`. Only when the stub argument names are known (see below) |
+| an Oracle package procedure name with several overloads | yes, error `LQL-4044` |
 
-**(tested)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `rules` (MariaDB, Oracle):
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `rules` (MariaDB, Oracle):
 
 ```java
 // PR2: the stub is checked against the database parameters on the first call
@@ -282,7 +282,7 @@ So lambdaQL compares the names of the IN and INOUT arguments on the first call.
 - If the class file has no names and two neighbouring arguments have the same type, lambdaQL logs `LQL-5004` at `INFO` level, once per procedure.
 - Types are checked by kind only (see "Argument type check" below). Two arguments of the same kind in swapped order can be found only by their names.
 
-**(tested)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `names` (the database procedure is `SQ_PROC_DIFF(p_to, p_from)`. The test stubs are compiled with `-parameters`):
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `names` (the database procedure is `SQ_PROC_DIFF(p_to, p_from)`. The test stubs are compiled with `-parameters`):
 
 ```java
 /** Argument names: with -parameters lambdaQL compares them with the database names (p_to, p_from). */
@@ -301,7 +301,7 @@ interface DiffProcs {
 }
 ```
 
-**(tested)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `name-check` (MariaDB, Oracle):
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `name-check` (MariaDB, Oracle):
 
 ```java
 assertEquals(7, qb.call(DiffProcs.class, p -> p.diff(10, 3)).execute());
@@ -320,7 +320,7 @@ There are five kinds: number, text, date/time, boolean and binary. If the kinds 
 - A side whose kind cannot be decided (enum, object type, cursor) is not checked.
 - Differences within one kind (for example, an `Integer` argument and a `NUMBER(10,2)` parameter) are left to the driver's conversion.
 
-**(tested)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `type-check` (MariaDB, Oracle):
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `type-check` (MariaDB, Oracle):
 
 ```java
 // the kind of each argument is compared with the database parameter: a string for a number parameter stops
@@ -332,7 +332,7 @@ assertEquals("LQL-4036", wrong.code(), wrong.getMessage());
 **Oracle package overloads.** An Oracle package can hold several procedures with the same name.
 lambdaQL cannot tell which one the stub means, so a call to such a name stops with `LQL-4044`. Choosing one overload to call is planned for later.
 
-**(tested)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `overload` (Oracle only). The stub `PkgProcs` declares `@SqlProcedure(pkg = "SQ_PKG", value = "TWICE")` and `@SqlProcedure(pkg = "SQ_PKG", value = "HALF")`:
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `overload` (Oracle only). The stub `PkgProcs` declares `@SqlProcedure(pkg = "SQ_PKG", value = "TWICE")` and `@SqlProcedure(pkg = "SQ_PKG", value = "HALF")`:
 
 ```java
 assertEquals(5.0, qb.call(PkgProcs.class, p -> p.twice(2.5)).execute(), 1e-9);
@@ -363,17 +363,17 @@ Real name binding on Oracle (`pass_procedure_paramater_names=true` together with
 | # | Rule | Status |
 |---|---|---|
 | PR1 | Name: the annotation value as is. Empty value: method name in UPPER_SNAKE. Package or schema names (`SQ_PKG.CALC`, `LQL.SQ_CALC`) work too. To avoid confusion, you can also write `@SqlProcedure(schema = ..., pkg = ..., value = ...)`. | Implemented. Schema and package names are not covered by a test |
-| PR2 | Arguments are bound **by position**. On the first call, the count of IN/INOUT parameters and the `@InOut` positions are checked against the DB metadata. Names are checked too when they are known, and the same names in another order is an error. The kind of each argument type (number, text, date/time, boolean, binary) is checked too, and a difference is an error (`LQL-4036`, see [8.4](#84-warning-argument-order)). If the metadata cannot be read, the checks are skipped and the argument layout comes from the stub (see [8.4](#when-the-metadata-cannot-be-read)). | Count, `@InOut` and name checks implemented (tested). Detection of Oracle package overloads implemented too (tested on Oracle). Type check implemented too (tested on MariaDB and Oracle). The fallback without metadata (`LQL-5005`, `LQL-5006`) implemented (tested on MariaDB and Oracle). |
-| PR3 | One OUT → return value. Many OUT/INOUT → record. `@InOut` marks INOUT parameters. | Implemented (tested) |
-| PR4 | One result set → `List<T>`. Entities are read through Hibernate, records through JDBC with label matching. No paging. | Implemented (tested with a record) |
+| PR2 | Arguments are bound **by position**. On the first call, the count of IN/INOUT parameters and the `@InOut` positions are checked against the DB metadata. Names are checked too when they are known, and the same names in another order is an error. The kind of each argument type (number, text, date/time, boolean, binary) is checked too, and a difference is an error (`LQL-4036`, see [8.4](#84-warning-argument-order)). If the metadata cannot be read, the checks are skipped and the argument layout comes from the stub (see [8.4](#when-the-metadata-cannot-be-read)). | Count, `@InOut` and name checks implemented. Detection of Oracle package overloads implemented too. Type check implemented too. The fallback without metadata (`LQL-5005`, `LQL-5006`) implemented. |
+| PR3 | One OUT → return value. Many OUT/INOUT → record. `@InOut` marks INOUT parameters. | Implemented |
+| PR4 | One result set → `List<T>`. Entities are read through Hibernate, records through JDBC with label matching. No paging. | Implemented |
 | PR5 | Many result sets → `List` components of a record, in order. Oracle implicit results are not supported. | Implemented, not covered by a test |
-| PR6 | A DB function called alone uses a different path per database (see [8.8](#88-call-a-db-function-alone)). | Implemented (tested) |
-| PR7 | DB functions in queries: see [8.6](#86-declare-db-functions) and rules FN1 to FN11. | Implemented (tested) |
-| PR8 | A DB function on a column in a condition cannot use the index, so lambdaQL logs a WARN (see [8.9](#89-warning-functions-on-columns-and-indexes-sargable)). The code is `LQL-5001`. | Implemented (tested). An error with `SargableMode.STRICT` (`LQL-3066`, D50) |
+| PR6 | A DB function called alone uses a different path per database (see [8.8](#88-call-a-db-function-alone)). | Implemented |
+| PR7 | DB functions in queries: see [8.6](#86-declare-db-functions) and rules FN1 to FN11. | Implemented |
+| PR8 | A DB function on a column in a condition cannot use the index, so lambdaQL logs a WARN (see [8.9](#89-warning-functions-on-columns-and-indexes-sargable)). The code is `LQL-5001`. | Implemented. An error with `SargableMode.STRICT` (`LQL-3066`, D50) |
 | PR9 | The procedure runs in the calling transaction. lambdaQL flushes before the call when needed. Loaded entities can be stale after the call. | Implemented |
 | PR10 | No common affected-row count. Use an OUT parameter. | – |
 | PR11 | `null` IN values are fine. DB parameter defaults cannot be used. | Implemented |
-| PR12 | The lambda is one stub call. Arguments are captured values, constants or calculations of them. `exec` with OUT parameters is an error. | Implemented (tested) |
+| PR12 | The lambda is one stub call. Arguments are captured values, constants or calculations of them. `exec` with OUT parameters is an error. | Implemented |
 | PR13 | Boolean parameters work on MariaDB and Oracle 23ai or later. | Not covered by a test |
 | PR14 | Each lambda is analyzed once. Procedure metadata is read once per name. | Implemented |
 | PR15 | H2 has no OUT, INOUT, many result sets or packages. Test procedures on MariaDB or Oracle (for example, with Testcontainers). | The lambdaQL tests follow this |
@@ -389,7 +389,7 @@ A DB function is a function you made in the database, for example `FN_DISCOUNT(p
 Declare it as a **static method of an interface**, with `@SqlFunction`.
 The body must only throw. It never runs inside lambdaQL.
 
-**(tested)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `declare`:
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `declare`:
 
 ```java
 /** Database functions: static methods of your own interface. The bodies only throw. */
@@ -429,7 +429,7 @@ Other ways to declare:
 
 | Declaration | Status |
 |---|---|
-| interface static method | **recommended** (tested) |
+| interface static method | **recommended** |
 | class static method | designed, not covered by a test |
 | interface default method + a singleton constant | designed, not covered by a test |
 | your repository `implements` the function interface (mixin) | rejected |
@@ -443,9 +443,9 @@ Call the function **with the interface name** (`OrderFns.discount`). A static im
 ## 8.7 Use DB functions in queries
 
 Call the function directly. No context argument is needed.
-It works in `where`, `select`, `orderBy` and `set` (tested). It is also designed to work in `groupBy`, `having` and subqueries, but this is not covered by a test.
+It works in `where`, `select`, `orderBy` and `set`. It is also designed to work in `groupBy`, `having` and subqueries, but this is not covered by a test.
 
-**(tested)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `where`:
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `where`:
 
 ```java
 // the function call is written as function('<name>' as <type>, ...); the column is its argument
@@ -453,7 +453,7 @@ SelectQuery<Order> q = qb.from(Order.class).where(o -> OrderFns.discount(o.getPr
 assertEquals("select e0 from Order e0 where function('SQ_FN_DISCOUNT' as Double, e0.price) > 100.0", q.toHql().hql());
 ```
 
-**(tested)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `captured`:
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `captured`:
 
 ```java
 // a function of captured values only is still computed by the database (the value is bound)
@@ -463,7 +463,7 @@ assertEquals("select e0 from Order e0 where e0.price > function('SQ_FN_DISCOUNT'
 
 A Boolean function can be the whole condition. lambdaQL adds `= true`.
 
-**(tested)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `boolean`:
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `boolean`:
 
 ```java
 SelectQuery<Order> q = qb.from(Order.class).where(o -> OrderFns.isGold(o.getCustomer().getGrade()));
@@ -471,7 +471,7 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where function('SQ_FN_
         q.toHql().hql());
 ```
 
-**(tested)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `select` (`select` and `orderBy`):
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `select` (`select` and `orderBy`):
 
 ```java
 ValueQuery<Priced> q = qb.from(Order.class)
@@ -483,7 +483,7 @@ assertEquals("select e0.id, function('SQ_FN_DISCOUNT' as Double, e0.price) from 
 
 `Priced` is `record Priced(Long id, Double discounted)`.
 
-**(tested)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `update`:
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `update`:
 
 ```java
 ExecutableUpdate<Order> u = qb.update(Order.class)
@@ -557,7 +557,7 @@ This is useful for a function name made with quotes and mixed case (`"SQ_Fn_Mixe
 static Double mixed(Double v) { throw new DbOnlyException(); }
 ```
 
-**(tested)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `registered`:
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `registered`:
 
 ```java
 // SQ_TAX is registered at start-up (lambdaql.functions.classes) and runs SQ_FN_DISCOUNT in SQL
@@ -574,7 +574,7 @@ If such a function is not registered, lambdaQL fails when it reads the lambda (`
 
 Use `qb.call(() -> ...)` with a **lambda without arguments**.
 
-**(tested)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `function` (H2, MariaDB, Oracle):
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), region `function` (H2, MariaDB, Oracle):
 
 ```java
 Double half = qb.call(() -> MathFns.half(price)).execute();
@@ -636,7 +636,7 @@ The check runs once per `where` lambda, when its analysis is cached. A condition
 - For the Oracle index match, lambdaQL takes the table and column names from the Hibernate mapping. Only functions with one column argument are matched.
 - If the metadata lookup fails (for example, without permission), lambdaQL logs `LQL-5008` at `INFO` level. Case ① still warns, and case ② is not checked.
 
-**(tested)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `sargable` (the test captures the log: H2 gives `LQL-5001`, MariaDB gives `LQL-5001` and `LQL-5007`, and Oracle with a function-based index on `SQ_FN_DISCOUNT(price)` gives none):
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `sargable` (the test captures the log: H2 gives `LQL-5001`, MariaDB gives `LQL-5001` and `LQL-5007`, and Oracle with a function-based index on `SQ_FN_DISCOUNT(price)` gives none):
 
 ```java
 // the function wraps the column: an index on price cannot be used (LQL-5001 at WARN),
@@ -662,7 +662,7 @@ The check runs once per lambda, when its analysis is put into the shared cache. 
 - The moved form must have the same meaning. Divide by a decimal, as in `o.getCnt() > n / 2.0`. The integer division `n / 2` gives other rows with `>=`, `=`, `<` and with a negative `n`. If you multiplied by a negative number, turn the comparison around. The `LQL-5012` message explains this.
 - Looking up whether an index exists, to log fewer warnings, was not adopted. Because of permissions and synonyms, "no index" and "unknown" get mixed up, and arithmetic on columns is a rare form.
 
-**(tested)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `sargable-strict`:
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `sargable-strict`:
 
 ```java
 // STRICT: what WARN would log fails the analysis (NonSargableException, LQL-3066)
@@ -692,18 +692,18 @@ qb.from(Order.class).where(o -> o.getCnt() * o.getStatus() > n).toHql();
 | # | Rule | Status |
 |---|---|---|
 | FN1 | `@SqlFunction` is a method annotation. Empty value: method name in UPPER_SNAKE. | Implemented |
-| FN2 | lambdaQL finds the called method and reads its annotation. The method body must only throw (`throw new ...`). A method with a real body is an error (`LQL-3052`), because Java and the database could give different values. | Implemented (tested) |
+| FN2 | lambdaQL finds the called method and reads its annotation. The method body must only throw (`throw new ...`). A method with a real body is an error (`LQL-3052`), because Java and the database could give different values. | Implemented |
 | FN3 | All overloads with the same name must map to the same DB function. Otherwise it is an error (`LQL-3053`). | Implemented |
 | FN4 | A call without the annotation, or a call lambdaQL cannot identify, is an error. It is never skipped silently. | Implemented |
-| FN5 | Arguments follow the value rules of [3. Conditions](03-where.md). Even an argument made only from captured values is bound and evaluated **in the database**. | Implemented (tested) |
-| FN6 | Boxing calls are skipped. The return type comes from the declared method. It must be one of `Double`, `Integer`, `Long`, `BigDecimal`, `String`, `LocalDate`, `LocalDateTime`, `Boolean` (`LQL-3055`). | Implemented (tested) |
-| FN7 | A function on a column gives a WARN (see [8.9](#89-warning-functions-on-columns-and-indexes-sargable)). On MariaDB, a `NOT DETERMINISTIC` function on the value side gives a WARN too (`LQL-5007`). | Implemented (tested). An error with `SargableMode.STRICT` (`LQL-3066`, D50) |
-| FN8 | A name equal to a Hibernate built-in function (`COALESCE`, `ROUND`, `SYSDATE`, ...) is an error (`LQL-3054`), because Hibernate would silently use the built-in. Use a prefix or a schema name (`PUBLIC.SQ_FN`). | Implemented (tested) |
+| FN5 | Arguments follow the value rules of [3. Conditions](03-where.md). Even an argument made only from captured values is bound and evaluated **in the database**. | Implemented |
+| FN6 | Boxing calls are skipped. The return type comes from the declared method. It must be one of `Double`, `Integer`, `Long`, `BigDecimal`, `String`, `LocalDate`, `LocalDateTime`, `Boolean` (`LQL-3055`). | Implemented |
+| FN7 | A function on a column gives a WARN (see [8.9](#89-warning-functions-on-columns-and-indexes-sargable)). On MariaDB, a `NOT DETERMINISTIC` function on the value side gives a WARN too (`LQL-5007`). | Implemented. An error with `SargableMode.STRICT` (`LQL-3066`, D50) |
+| FN8 | A name equal to a Hibernate built-in function (`COALESCE`, `ROUND`, `SYSDATE`, ...) is an error (`LQL-3054`), because Hibernate would silently use the built-in. Use a prefix or a schema name (`PUBLIC.SQ_FN`). | Implemented |
 | FN9 | Kotlin only (default arguments, `inline`, `vararg`). See the Kotlin track. | Default arguments and `vararg` implemented. `inline` designed |
 | FN10 | v0.1 has scalar functions only. User aggregate and window functions are planned for v0.2. A function without arguments renders as `fn()`. | Scalar functions implemented |
 | FN11 | Known DB differences: on MariaDB, a function that returns VARCHAR can have a collation conflict with a string literal. The scale of `BigDecimal` results differs (MariaDB and Oracle 0, H2 1). Boolean results need Oracle 23ai or later. | Measured with prototypes |
 
-**(tested)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `rules`:
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `rules`:
 
 ```java
 // the body never runs in Java
@@ -737,9 +737,9 @@ assertEquals("LQL-3055", assertThrows(LambdaQLException.class,
 | Many result sets | no | yes | yes (many cursor OUT parameters) |
 | OUT values and result sets together | no | yes | yes |
 | Package names (`PKG.PROC`) | no | no (needs `sql_mode=ORACLE`) | yes |
-| DB functions in queries | yes (tested) | yes (tested) | yes (tested) |
-| A DB function called alone | yes (tested) | yes (tested) | yes (tested) |
-| Procedure calls in lambdaQL | – | yes (tested) | yes (tested) |
+| DB functions in queries | yes | yes | yes |
+| A DB function called alone | yes | yes | yes |
+| Procedure calls in lambdaQL | – | yes | yes |
 | Boolean parameters / results | – | yes | yes (23ai or later) |
 
 Not planned for v0.1: a string builder for dynamic procedure names (v0.2 candidate), calling one overload of an Oracle package procedure (overload detection is implemented, `LQL-4044`), table-valued functions, paging of procedure results.

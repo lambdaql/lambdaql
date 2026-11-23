@@ -347,7 +347,7 @@ lambdaQL 读取的是 `companion object` 函数上的注解。
 |---|---|
 | 接口 `companion object` + `@JvmStatic` | **推荐**（已实现，还没有测试覆盖） |
 | Kotlin `object` + `@JvmStatic` | 已设计，没有测试覆盖 |
-| Java 接口静态方法（从 Kotlin 调用） | 支持（Java 写法已测试） |
+| Java 接口静态方法（从 Kotlin 调用） | 支持 |
 | Kotlin 顶层函数 | 已设计，**不推荐**：如果忘了导入，可能会悄悄用上同名的标准库函数（例如 `maxOf`） |
 | 接口默认函数 + 单例常量 | 已设计，没有测试覆盖 |
 | 你的 repository 实现函数接口（mixin） | 拒绝 |
@@ -362,7 +362,7 @@ lambdaQL 读取的是 `companion object` 函数上的注解。
 <a id="87-use-db-functions-in-queries"></a>
 ## 8.7 在查询中使用数据库函数
 
-直接调用函数即可，不需要上下文参数。它可以用在 `where`、`select`、`orderBy` 和 `set` 中（已用 Java Lambda 在 [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java) 中测试），也可以用在 `groupBy`、`having` 和子查询中（已设计，没有测试覆盖）。
+直接调用函数即可，不需要上下文参数。它可以用在 `where`、`select`、`orderBy` 和 `set` 中，也可以用在 `groupBy`、`having` 和子查询中（已设计，没有测试覆盖）。
 
 ```kotlin
 qb.from(Order::class.java).where { OrderFns.discount(it.price)!! > 10 }.toList()
@@ -583,9 +583,9 @@ qb.from(Order::class.java).where { it.price!! > OrderFns.nondet(base)!! }.toList
 | 多个结果集 | 不支持 | 支持 | 支持（多个游标 OUT 参数） |
 | OUT 值与结果集同时使用 | 不支持 | 支持 | 支持 |
 | 包名（`PKG.PROC`） | 不支持 | 不支持（需要 `sql_mode=ORACLE`） | 支持 |
-| 查询中的数据库函数 | 支持（已测试） | 支持（已测试） | 支持（已测试） |
-| 单独调用数据库函数 | 支持（已测试） | 支持（已测试） | 支持（已测试） |
-| lambdaQL 中的存储过程调用 | – | 支持（已测试） | 支持（已测试） |
+| 查询中的数据库函数 | 支持 | 支持 | 支持 |
+| 单独调用数据库函数 | 支持 | 支持 | 支持 |
+| lambdaQL 中的存储过程调用 | – | 支持 | 支持 |
 | Boolean 参数 / 结果 | – | 支持 | 支持（23ai 及以上版本） |
 
 v0.1 不计划提供：用于动态存储过程名的字符串构建器（v0.2 候选）、选择并调用 Oracle 包存储过程的某个重载（重载检测已实现，`LQL-4044`）、表值函数、存储过程结果的分页。

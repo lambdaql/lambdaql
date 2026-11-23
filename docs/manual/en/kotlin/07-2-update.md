@@ -40,7 +40,7 @@ where o1_0.status=1
 
 Oracle writes the alias in `set` (`set o1_0.status=?`). H2 and MariaDB do not.
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `update`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `update`:
 
 ```kotlin
 val u = qb.update(Order::class.java)
@@ -169,7 +169,7 @@ In `where`, lambdaQL adds `e0.customer.id is not null`. So the update changes th
 **`?.` and `||`.** When a step reached with `?.` becomes a `left join` in the select (decision D54, see [3.10](03-where.md#310-association-paths)), DML does not add `e0.customer.id is not null`.
 So orders without a customer are changed too, exactly as the select returns them. When there is only `?.` and a row without a customer cannot make the condition true, as in the example above, the check stays.
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `update-safe-call`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `update-safe-call`:
 
 ```kotlin
 // UPDATE: the left join of ?. drops the "customer exists" check, so the order without a customer is changed too
@@ -205,7 +205,7 @@ where o1_0.status=1 or (select c1_0.name from customers c1_0 where c1_0.id=o1_0.
 Use a two-argument lambda `set { o, sub -> ... }`. The second argument is `sub`, the starting point for subqueries (decision D49).
 `Agg` is not needed here. The subquery has `sum`, `avg`, ... as in [5. Subqueries](05-subquery.md).
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `update-sub`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `update-sub`:
 
 ```kotlin
 // the second parameter starts a subquery, as in where { o, sub -> ... } (D49)

@@ -577,7 +577,7 @@ qb.insert(Order::class.java).values(lines) { o, l -> o.id = l.id; o.price = l.pr
 
 | Kotlin form | Meaning |
 |---|---|
-| `value(o.status, 1)` | the function imported with `import org.lambdaql.Dml.value` (D49). Use it for entities with `val` properties (no setter). It can be mixed with property assignments in one lambda (tested) |
+| `value(o.status, 1)` | the function imported with `import org.lambdaql.Dml.value` (D49). Use it for entities with `val` properties (no setter). It can be mixed with property assignments in one lambda |
 | `value(o.cnt, o.cnt + 1)` | supported |
 | `it.cnt += 1` | supported |
 | `it.cnt++`, `--` | not in v0.1. Write `it.cnt += 1` |

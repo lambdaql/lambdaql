@@ -79,7 +79,7 @@ The tested examples use the test entities in [`query/src/test/java/org/lambdaql/
 
 `value` is the static function `org.lambdaql.Dml.value` (decision D49). Import it with `import static org.lambdaql.Dml.value;` and use it in a lambda with one argument.
 
-**(tested)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `update-value`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `update-value`:
 
 ```java
 // entities without setters: Dml.value(column, value), the column written as a getter call
@@ -91,7 +91,7 @@ assertEquals("update Order e0 set e0.description = 'done' where e0.status = 2", 
 
 **About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 7.4, and it fails if Hibernate's SQL changes.
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `update-value`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `update-value`:
 
 ```sql
 -- H2, MariaDB
@@ -133,7 +133,7 @@ Rules for `value` (rule U20):
 - Inside a class that has its own `value(...)` method (for example a record with a `value` component), that method hides the static import. Write `Dml.value(...)` there.
 - A form like `o.getTotal() = 1` is a compile error in Java, so you cannot use it.
 
-**(tested)** [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java), region `value-type`:
+[`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java), region `value-type`:
 
 ```java
 // value(V, V) compiles with any two types, so lambdaQL checks the value type against the column (U20)
@@ -146,7 +146,7 @@ LambdaQLException fraction = assertThrows(LambdaQLException.class, () -> setters
 assertEquals("LQL-3065", fraction.code(), fraction.getMessage());
 ```
 
-**(tested)** [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java), region `read-value`:
+[`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java), region `read-value`:
 
 ```java
 // Dml.value(column, value) for entities without setters; constants stay literals, also when they are boxed
@@ -164,7 +164,7 @@ assertEquals("[col0.status := 2, col0.customer.id := 1]",
 The second argument of an assignment lambda is `sub`, the start of a subquery. It is the same form as `where((o, sub) -> ...)` (decision D49).
 In `insert ... select`, the third argument is `sub` (see [7.5](07-5-insert.md)).
 
-**(tested)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `update-sub`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), region `update-sub`:
 
 ```java
 // the second parameter starts a subquery, as in where((o, sub) -> ...) (D49)
@@ -243,7 +243,7 @@ These cases are allowed, because all three databases give the same result:
 | `o.setTotal(o.getPrice()); o.setPrice(0.0);` (read first, assign later) | yes |
 | `o.setPrice(...); o.setTotal(o.getPrice());` (assign first, read later) | **error** |
 
-The check works on physical columns (embedded sub-columns, FK columns) and across many `set()` calls (tested in [PATCH](07-2-update.md#many-set-calls-patch)).
+The check works on physical columns (embedded sub-columns, FK columns) and across many `set()` calls (see [PATCH](07-2-update.md#many-set-calls-patch)).
 
 <a id="assign-a-column-only-once"></a>
 ### Assign a column only once
@@ -256,7 +256,7 @@ or `setCustomer(...)` and then `getCustomer().setId(...)`.
 
 lambdaQL checks rules U1, U3, U4 and U6 when it reads the lambda. This test calls the internal class `AssignmentReader`, not the user API. In the user API, `set(...)` and `values(...)` throw the same `LambdaQLException` (for example `LQL-3037` for U1, `LQL-3042` for U3, `LQL-3041` for U4).
 
-**(tested)** [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java), region `rules`:
+[`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java), region `rules`:
 
 ```java
 // U1: only setters; no condition, no local variable
@@ -296,7 +296,7 @@ The reason is as follows. If lambdaQL gave the path to Hibernate directly, Hiber
 lambdaQL writes the subqueries itself. The statement then reads only its own table, so MariaDB's limit on reading the target table (error 1093) does not apply.
 
 A select uses an inner join for a path in `where` (decision D36). So in DML, lambdaQL adds `e0.customer.id is not null` for such a path.
-As a result, `update` and `delete` target **exactly the rows** that `qb.from(X.class).where(same lambda)` returns (tested: the deleted rows are compared with the select).
+As a result, `update` and `delete` target **exactly the rows** that `qb.from(X.class).where(same lambda)` returns (the deleted rows are compared with the select).
 The same is true with a null guard such as `o.getCustomer() == null || ...`. The select also uses an inner join for this path (decision D48), so the check stays.
 
 A path that ends with the `@Id` (`o.getCustomer().getId()`) is the FK column. No subquery, no join.
@@ -312,7 +312,7 @@ A path that ends with the `@Id` (`o.getCustomer().getId()`) is the FK column. No
 | Limit | at most 500 values per statement (fixed) |
 | Return value | the sum of all statements |
 | Transaction | all statements run in one transaction |
-| Empty list | no SQL, returns 0 (tested) |
+| Empty list | no SQL, returns 0 |
 
 Oracle has a hard limit of 65,535 bind values (ORA-01745). Parsing gets very slow long before that
 (about 6 minutes for 21,845 rows in a design test). That is why the limit is small.
@@ -357,7 +357,7 @@ A bulk statement needs a transaction. lambdaQL opens one only in a builder made 
 | Builder | Transaction |
 |---|---|
 | `new QueryBuilder(entityManagerFactory)` | `execute()` and `executeOne()` open their own transaction and commit it. On an error they roll back |
-| A builder with an `EntityManager`: `new QueryBuilder(entityManager)`, Spring's `QueryBuilder` bean, the repository executor | the caller's transaction (`@Transactional`, or an active transaction of that `EntityManager`). Without one, the statement fails with `TransactionRequiredException` before any SQL is sent (tested). In Spring repository calls, it becomes `InvalidDataAccessApiUsageException` (see [12.6](12-spring-data-jpa.md#126-transactions-and-exceptions)) |
+| A builder with an `EntityManager`: `new QueryBuilder(entityManager)`, Spring's `QueryBuilder` bean, the repository executor | the caller's transaction (`@Transactional`, or an active transaction of that `EntityManager`). Without one, the statement fails with `TransactionRequiredException` before any SQL is sent. In Spring repository calls, it becomes `InvalidDataAccessApiUsageException` (see [12.6](12-spring-data-jpa.md#126-transactions-and-exceptions)) |
 
 <a id="the-persistence-context-is-not-updated"></a>
 ### The persistence context is not updated
@@ -382,7 +382,7 @@ lambdaQL does not handle these conditions itself.
 <a id="79-all-rules-u1-to-u21-summary"></a>
 ## 7.9 All rules U1 to U21 (summary)
 
-Checked when lambdaQL reads the lambda: U1, U3, U4, U6 (tested). Checked by the compiler: U5.
+Checked when lambdaQL reads the lambda: U1, U3, U4, U6. Checked by the compiler: U5.
 The lambdaQL checks of U11, U12 and U15 are not implemented yet.
 
 | # | Rule |

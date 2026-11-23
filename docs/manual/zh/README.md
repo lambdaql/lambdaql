@@ -118,7 +118,8 @@ fetch first ? rows only
 <a id="about-the-examples"></a>
 ## 关于示例
 
-示例均为设计示例。某个功能实现后，其示例将替换为取自测试套件的代码，并附上测试文件的链接。在 3. 条件、4. 排序与分页、5. 子查询、6. 查询列、聚合与分组、7. 更新、插入、删除、8. 存储过程与数据库函数、11. 错误与语言和 12. Spring Data JPA（Java）中，这些示例标记为 **(已测试)**。Kotlin 路线中取自 Kotlin 测试的示例也同样标记。
+所有代码示例都是从测试代码中原样复制的一段。代码上方写有测试文件和片段名称（区域 `name`）。测试会检查 lambdaQL 生成的 HQL 和返回的行。
+Java 路线的示例来自 Java 测试，Kotlin 路线的示例来自 Kotlin 测试。尚未实现的功能不写进手册，而是放在 [ROADMAP](../../design/ROADMAP.md) 中。
 
 <a id="example-entities"></a>
 ## 示例实体

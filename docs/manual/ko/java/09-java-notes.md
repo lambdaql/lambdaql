@@ -234,7 +234,7 @@ public class OrderService {
 
 **SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다.
 
-**데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `this-capture`:
+**데이터베이스별 SQL** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `this-capture`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -266,7 +266,7 @@ qb.from(Order.class).where(o -> o.getStatus() == st).toList();
 | 메서드 참조 | 같은 의미 | 상태 |
 |---|---|---|
 | `where(Order::isActive)` | `where(o -> o.isActive())` | 설계됨(감지는 구현됨) |
-| `orderBy(Order::getPrice)` | `orderBy(o -> o.getPrice())` | 구현됨, 테스트함 |
+| `orderBy(Order::getPrice)` | `orderBy(o -> o.getPrice())` | 구현됨 |
 | `by` 정렬 형태 `orderBy((o, by) -> ...)`의 메서드 참조 | – | **허용 안 됨**. 람다를 사용하십시오(규칙 S13) |
 | 조인 정렬 람다 안의 메서드 참조 | – | **허용 안 됨**. 람다를 사용하십시오(규칙 S13) |
 

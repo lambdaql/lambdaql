@@ -11,7 +11,7 @@
 모든 lambdaQL 메시지는 `[LQL-xxxx]` 형식의 코드로 시작합니다.
 코드는 언어에 따라 바뀌지 않습니다. 코드 뒤의 텍스트만 번역합니다.
 
-**(테스트됨)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), 영역 `format`:
+[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), 영역 `format`:
 
 ```java
 LqlMessages.setLocale(Locale.ENGLISH);
@@ -113,7 +113,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `getMessage()` | 예외가 생성될 때 선택되어 있던 lambdaQL 언어의 메시지 |
 | `getMessage(Locale locale)` | 같은 메시지를 다른 언어로, 예: 영어는 `Locale.ROOT` |
 
-**(테스트됨)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), 영역 `exception`:
+[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), 영역 `exception`:
 
 ```java
 LqlMessages.setLocale(Locale.KOREAN);
@@ -270,7 +270,7 @@ NULL을 찾으려면 `o.getDescription() == null`이라고 씁니다.
 
 #### Java
 
-**(테스트됨)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `rules`(앞부분):
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `rules`(앞부분):
 
 ```java
 // the body never runs in Java
@@ -319,7 +319,7 @@ lambdaQL은 다음 세 곳을 이 순서로 확인합니다. 처음으로 설정
 | `ko`(예: `ko_KR`) | 한국어 |
 | 그 밖의 모든 언어(`en`, `fr`, `de`, ...) | 영어 |
 
-**(테스트됨)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), 영역 `locale`:
+[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), 영역 `locale`:
 
 ```java
 // 1. setLocale wins, 2. then -Dlambdaql.locale, 3. then the JVM default
@@ -380,7 +380,7 @@ org/lambdaql/i18n/LqlMessages_ko.properties   한국어
 - lambdaQL은 `MessageFormat`을 사용하지 않습니다. 그래서 작은따옴표(`can't`)를 그대로 쓸 수 있습니다. 숫자는 서식을 적용하지 않습니다(줄 번호 `1234567`은 `1234567` 그대로입니다).
 - 모든 키는 같은 인자로 네 파일 모두에 있어야 합니다. 단위 테스트가 이를 검사합니다. 새 메시지는 네 언어 모두로 추가해야 합니다.
 
-**(테스트됨)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), 영역 `fill`:
+[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), 영역 `fill`:
 
 ```java
 // no MessageFormat: quotes and big numbers stay as they are (rule I4)

@@ -9,7 +9,7 @@
 <a id="one-row"></a>
 ## 一行
 
-**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `insert`：
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `insert`：
 
 ```java
 ExecutableInsert<Archive> i = qb.insert(Archive.class)
@@ -22,7 +22,7 @@ int generated = qb.insert(IdOrder.class).values(o -> { o.setPrice(1.0); o.setSta
 
 **关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 7.4 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `insert`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `insert`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -44,7 +44,7 @@ qb.insert(Order.class).values(o -> { value(o.getId(), id); value(o.getStatus(), 
 使用 `values((a, sub) -> ...)` 这样带两个参数的 Lambda 时，可以用第二个参数 `sub` 构造子查询（决策 D49）。
 upsert 的 `values((a, sub) -> ...)` 和 `onConflict(...).update((a, sub) -> ...)` 也一样（见 [7.6](07-6-upsert.md#your-own-change-onconflictkeyupdate)）。
 
-**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `insert-values-sub`：
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `insert-values-sub`：
 
 ```java
 // values((a, sub) -> ...): a subquery can read captured values, not the new row (D49)
@@ -74,7 +74,7 @@ assertEquals("insert into Archive e0 (id, price) values (100L, (select sum(s1.pr
 
 列表的每个元素对应一行。第二个 Lambda 参数就是元素。
 
-**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `insert-list`：
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `insert-list`：
 
 ```java
 List<Line> lines = List.of(new Line(201, 1.0), new Line(202, 2.0));
@@ -82,7 +82,7 @@ ExecutableInsert<Archive> i = qb.insert(Archive.class).values(lines, (a, l) -> {
 assertEquals("insert into Archive (id, price) values (:p1, :p2), (:p3, :p4)", i.toHql().get(0).hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `insert-list`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `insert-list`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -96,7 +96,7 @@ lambdaQL 在 Java 中读取元素的 getter，所以每个值都是绑定参数�
 **列表形式的子查询。** 可以像 `values(list, (a, l, sub) -> ...)` 这样，用第三个参数构造子查询（决策 D49）。`qb.upsert(X.class).values(list, (a, l, sub) -> ...)` 也一样。
 子查询可以读取元素的值。该值在 Java 中读取，每行绑定为一个参数。不能读取正在插入的新行（在三种数据库上实测）。
 
-**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `insert-list-sub`：
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `insert-list-sub`：
 
 ```java
 // one row per element; the subquery reads the element's value (D49)
@@ -119,7 +119,7 @@ assertEquals("insert into Archive (id, price) values (:p1, (select sum(s1.price)
 
 从另一个实体复制行。`select` 的 Lambda 接收目标（`a`）和源（`o`）。
 
-**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `insert-select`：
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `insert-select`：
 
 ```java
 ExecutableInsert<Archive> i = qb.insert(Archive.class)
@@ -131,7 +131,7 @@ assertEquals("insert into Archive (id, price, customerName) select e0.id, e0.pri
         + " from Order e0 left join e0.customer j1 where e0.status = 1", i.toHql().get(0).hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `insert-select`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `insert-select`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -154,7 +154,7 @@ qb.insert(Archive.class).from(Order.class).where(o -> o.getStatus() == 9)
 
 **子查询。** 源的 `where` 用第二个参数、`select` 用第三个参数接收子查询的起点 `sub`（决策 D49）。
 
-**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `insert-select-sub`：
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `insert-select-sub`：
 
 ```java
 // where((o, sub) -> ...) on the source, and select((a, o, sub) -> ...): the third parameter starts a subquery
@@ -174,7 +174,7 @@ assertEquals("insert into Archive (id, price) select e0.id, (select sum(s2.price
 使用 [6. 查询列、聚合与分组](06-select-group.md) 中的 `groupBy`、`having` 和 `Agg` 函数。
 顺序是 `from(...)`、`where(...)`、`groupBy(...)`、`having(...)`、`select(...)`。`where`、`groupBy` 和 `having` 都是可选的。
 
-**(已测试)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `insert-group`：
+[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `insert-group`：
 
 ```java
 // INSERT ... SELECT with groupBy: one summary row per customer
@@ -188,7 +188,7 @@ assertEquals("insert into Summary (customerId, total, cnt) select e0.customer.id
         + " where e0.customer is not null group by e0.customer.id having count(*) >= 2L", i.toHql().get(0).hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `insert-group`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `insert-group`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)

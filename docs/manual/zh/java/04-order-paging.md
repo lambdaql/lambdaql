@@ -64,12 +64,12 @@ fetch first ? rows only
 - 排序键和它的方向写在一起。它们的顺序永远不会错乱。
 - lambdaQL 读取 Lambda，但从不执行它。`by` 的方法只是描述顺序。
 
-标记为 **(已测试)** 的示例是从 [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java) 中复制的。
+示例是从 [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java) 中复制的。
 该测试检查 HQL，执行查询，并把行的顺序与在 Java 中用同一排序得到的结果进行比较。它在 H2、MariaDB 和 Oracle 上都能通过。
 它使用 [3.3](03-where.md#33-basic-form) 中的测试实体：`price` 是 `double`，`status` 是 `short`。这些排序键永远不会为 NULL，因此它们的 HQL 中没有 `nulls` 部分。
 在其他示例中，`price` 是可以为 NULL 的 `Double`（见 [3.2](03-where.md#32-example-entities)），因此会得到 `nulls first` 或 `nulls last`（见 [4.4](#44-null-ordering-is-the-same-on-every-database)）。
 
-**(已测试)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-basic`：
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-basic`：
 
 ```java
 RenderedQuery q = qb.from(Order.class)
@@ -80,7 +80,7 @@ RenderedQuery q = qb.from(Order.class)
 assertEquals("select e0 from Order e0 where e0.active = true order by e0.price desc, e0.id asc", q.hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-basic`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-basic`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -110,7 +110,7 @@ lambdaQL 根据 Lambda 参数的个数（一个或两个）区分这些写法。
 方法引用必须是实体的 getter，例如 `Order::getPrice`。静态方法、带参数的方法，或者绑定到某个对象的引用会被拒绝（规则 S13）。
 `by` 写法（两个参数）需要 Lambda。在那里使用方法引用会被拒绝。
 
-**(已测试)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-key`（在测试实体中，`price` 是 `double`，因此没有 `nulls` 部分）：
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-key`（在测试实体中，`price` 是 `double`，因此没有 `nulls` 部分）：
 
 ```java
 assertEquals("select e0 from Order e0 order by e0.price asc",
@@ -119,7 +119,7 @@ assertEquals("select e0 from Order e0 order by e0.price desc",
         qb.from(Order.class).orderBy(Order::getPrice, Direction.DESC).toHql().hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-key`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-key`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -128,7 +128,7 @@ from orders o1_0
 order by o1_0.price
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-key#2`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-key#2`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -168,7 +168,7 @@ order by o1_0.price desc
 | `by.desc(key, true)` | `DESC_NULLS_FIRST` |
 | `by.desc(key, false)` | `DESC_NULLS_LAST` |
 
-**(已测试)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-nulls`（`description` 是可以为 NULL 的 `String`；`id` 永远不会为 NULL）：
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-nulls`（`description` 是可以为 NULL 的 `String`；`id` 永远不会为 NULL）：
 
 ```java
 // default: asc puts NULL first, desc puts NULL last (the same on every database)
@@ -181,7 +181,7 @@ assertEquals("select e0 from Order e0 order by e0.description desc nulls first, 
         qb.from(Order.class).orderBy((o, by) -> by.desc(o.getDescription(), true).asc(o.getId())).toHql().hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-nulls`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-nulls`：
 
 ```sql
 -- H2, MariaDB
@@ -195,7 +195,7 @@ from orders o1_0
 order by o1_0.description asc nulls first,o1_0.id
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-nulls#2`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-nulls#2`：
 
 ```sql
 -- H2
@@ -214,7 +214,7 @@ from orders o1_0
 order by o1_0.description,o1_0.id
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-nulls#3`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-nulls#3`：
 
 ```sql
 -- H2
@@ -246,7 +246,7 @@ Direction dir = request.isNewestFirst() ? Direction.DESC : Direction.ASC;
 
 这里的三元表达式 `request.isNewestFirst() ? ... : ...` 没有问题，因为它在 Lambda **外部**执行。
 
-**(已测试)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-dynamic`：
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-dynamic`：
 
 ```java
 Direction dir = Direction.parse(text);           // for example from a request parameter
@@ -254,7 +254,7 @@ OrderedSelectQuery<Order> q = qb.from(Order.class)
         .orderBy((o, by) -> by.sort(o.getDescription(), dir).asc(o.getId()));
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-dynamic`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-dynamic`：
 
 ```sql
 -- H2, MariaDB
@@ -268,7 +268,7 @@ from orders o1_0
 order by o1_0.description desc nulls last,o1_0.id
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-dynamic#2`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-dynamic#2`：
 
 ```sql
 -- H2
@@ -339,13 +339,13 @@ MariaDB 没有 `NULLS` 语法，因此对于不是默认值的位置，Hibernate
 | 排序键 | 是否允许 | 说明 |
 |---|---|---|
 | 列：`o.getPrice()` | 是 | 已测试 |
-| 对一路径：`o.getCustomer().getName()` | 是 | `left join`（必需关联使用 inner join），见下文（已测试） |
-| `@Lob` 列 | 是 | Oracle 会拒绝。`DEBUG` 级别的 `LQL-5010`，见下文（已测试） |
-| `@Enumerated(EnumType.STRING)` 枚举列 | 是 | 按名称排序（不是声明顺序）。`DEBUG` 级别的 `LQL-5011`，见下文（已测试） |
+| 对一路径：`o.getCustomer().getName()` | 是 | `left join`（必需关联使用 inner join），见下文 |
+| `@Lob` 列 | 是 | Oracle 会拒绝。`DEBUG` 级别的 `LQL-5010`，见下文 |
+| `@Enumerated(EnumType.STRING)` 枚举列 | 是 | 按名称排序（不是声明顺序）。`DEBUG` 级别的 `LQL-5011`，见下文 |
 | 算术运算：`o.getPrice() * 2`、`+`、`-` | 是 | 尚未测试 |
 | 拓宽转换（`int` 到 `long`） | 是 | 尚未测试 |
 | 实体：`by.desc(o.getCustomer())` | **编译错误** | 实体不是 `Comparable` |
-| 不使用实体的值：`by.asc(1)`、捕获的值 | **拒绝** | 见 [4.6](#46-rules-for-the-lambda-body)（已测试） |
+| 不使用实体的值：`by.asc(1)`、捕获的值 | **拒绝** | 见 [4.6](#46-rules-for-the-lambda-body) |
 | 作用于列的函数：`lower(name)` | 计划中 | |
 
 排序键必须是 `Comparable`。装箱类型（`Double`、`Integer`、`Long`）、`String` 以及 `java.time` 中的类型都是 `Comparable`，因此可以使用。Java 编译器会拒绝实体排序键。
@@ -354,7 +354,7 @@ MariaDB 没有 `NULLS` 语法，因此对于不是默认值的位置，Hibernate
 **关联路径使用 `left join`。** 在 HQL 中，普通路径 `order by o.customer.name` 在三种数据库上都会变成 inner join。没有客户的订单会消失。
 lambdaQL 改为添加 `left join`。没有客户的订单会保留在结果中。它们的 `j1.name` 为 NULL，因此在 `asc` 时排在最前面。
 
-**(已测试)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-path`：
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-path`：
 
 ```java
 RenderedQuery q = qb.from(Order.class)
@@ -364,7 +364,7 @@ RenderedQuery q = qb.from(Order.class)
 assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name asc nulls first, e0.id asc", q.hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-path`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-path`：
 
 ```sql
 -- H2, MariaDB
@@ -384,7 +384,7 @@ order by c1_0.name asc nulls first,o1_0.id
 所以即使路径只用于排序或 select，这类关联也使用 `join`。其他关联像上面一样使用 `left join`（规则 S8、J1）。
 如果路径上的每一步关联都是必需的，并且值不会为 NULL，排序也不会带 `nulls first/last`。
 
-**(已测试)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)，region `required-association`（测试实体 `OrderLine` 的 `@ManyToOne(optional = false) Order order`）：
+[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)，region `required-association`（测试实体 `OrderLine` 的 `@ManyToOne(optional = false) Order order`）：
 
 ```java
 // order is optional = false: a sort or select path through it cannot lose rows, so it is an inner join
@@ -400,7 +400,7 @@ assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name 
 **`@Lob` 列的排序。** 在 `orderBy`、`distinct`、`groupBy` 中使用 `@Lob` 列时，H2 和 MariaDB 会执行，Oracle 会拒绝（ORA-22848、ORA-22849，实测）。`=` 比较在三种数据库上都可以执行。
 lambdaQL 不修改查询，而是对每个列和每种用法记录一次 `DEBUG` 级别的 `LQL-5010`（B3）。
 
-**(已测试)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)，region `lob`（`OrderLine.memo` 是 `@Lob`）：
+[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)，region `lob`（`OrderLine.memo` 是 `@Lob`）：
 
 ```java
 // memo is @Lob: H2 and MariaDB sort and group it, Oracle rejects it (ORA-22848, ORA-22849).
@@ -413,7 +413,7 @@ qb.from(OrderLine.class).select(l -> l.getMemo()).distinct().toHql();
 **`EnumType.STRING` 枚举的排序。** 对于用 `@Enumerated(EnumType.STRING)` 映射的枚举列，数据库按常量**名称**的字符串顺序排序。Java 的枚举比较遵循声明顺序，因此结果的顺序可能不同（B2）。
 lambdaQL 不修改查询，而是对每个列记录一次 `DEBUG` 级别的 `LQL-5011`。`ORDINAL`（或没有 `@Enumerated`）按声明顺序排序，因此不记录。
 
-**(已测试)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)，region `enum-string-sort`：
+[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)，region `enum-string-sort`：
 
 ```java
 // kind is @Enumerated(EnumType.STRING): the database sorts by name, Java by declaration order (LQL-5011, DEBUG)
@@ -424,7 +424,7 @@ assertEquals("select e0 from Order e0 order by e0.kind asc nulls first",
 别名与 `where` 共享。如果 `where` 已经 join 了同一条路径，排序就会使用那个 join。
 这个 join 是 inner join。`where` 中的路径总是使用 inner join，因此没有客户的订单已经被排除（决策 D36、D48，见 [3.10](03-where.md#310-association-paths)）。
 
-**(已测试)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-path-where`：
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-path-where`：
 
 ```java
 String name = "Kim";
@@ -437,7 +437,7 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = :p1"
         + " order by j1.name desc nulls last, e0.price desc", q.hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-path-where`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-path-where`：
 
 ```sql
 -- H2, MariaDB
@@ -473,7 +473,7 @@ order by c1_0.name desc nulls last,o1_0.price desc
 lambdaQL 在你调用 `orderBy` 时检查这一点，并抛出 `LambdaQLException`（例如条件为 `LQL-2023`，不含实体的排序键为 `LQL-3031`）。
 每个排序键都必须使用实体。只有常量或捕获值的排序键会被拒绝。
 
-**(已测试)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-rejected`：
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-rejected`：
 
 ```java
 // a condition inside the sort lambda (rule S4)
@@ -544,7 +544,7 @@ offset ? rows
 fetch first ? rows only
 ```
 
-**(已测试)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-page`：
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-page`：
 
 ```java
 OrderedSelectQuery<Order> page = qb.from(Order.class)
@@ -556,7 +556,7 @@ assertEquals("select e0 from Order e0 order by e0.status asc, e0.id asc", page.t
 List<Order> rows = page.toList();
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-page`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-page`：
 
 ```sql
 -- H2, Oracle
@@ -587,14 +587,14 @@ lambdaQL 不会把 `LIMIT` 写入 HQL。Hibernate 会为每种数据库生成正
 
 **不带 `orderBy` 的分页。** 你可以不调用 `orderBy`，直接调用 `limit` 和 `offset`。这时 lambdaQL 按 id 对行排序，因此分页是稳定的。
 
-**(已测试)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `page-only`：
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `page-only`：
 
 ```java
 RenderedQuery q = qb.from(Order.class).where(o -> o.isActive()).limit(2).toHql();
 assertEquals("select e0 from Order e0 where e0.active = true order by e0.id asc", q.hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `page-only`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `page-only`：
 
 ```sql
 -- H2, Oracle
@@ -633,10 +633,10 @@ limit ?
 - 如果排序键中有主实体上唯一且不为 NULL 的列，也不会添加（A5）。`nullable = false` 的 `@Column(unique = true)`、Hibernate `@NaturalId`、`@Id` 都属于这种列，因为仅凭这个键就能确定所有行的顺序。
   可以为 NULL 的唯一列不属于这种列，因为多行可能都是 NULL。
 - 没有 `limit` 和 `offset` 时，不会添加任何东西。
-- 使用显式 join（`join`、`leftJoin`、`crossJoin`）时，也会按 join 的顺序添加每个被 join 实体的 id（已测试，见 [6.8](06-select-group.md#68-explicit-joins)）。
+- 使用显式 join（`join`、`leftJoin`、`crossJoin`）时，也会按 join 的顺序添加每个被 join 实体的 id（见 [6.8](06-select-group.md#68-explicit-joins)）。
 - 尚未实现：集合的 fetch join 与 `limit`/`offset` 一起使用时拒绝。
 
-**(已测试)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)，region `unique-key`（`OrderLine.code` 是 `@Column(unique = true, nullable = false)`）：
+[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)，region `unique-key`（`OrderLine.code` 是 `@Column(unique = true, nullable = false)`）：
 
 ```java
 // code is @Column(unique = true, nullable = false): it orders every row, so paging adds no id tie-breaker
@@ -674,7 +674,7 @@ qb.from(Order.class).where(o -> o.isActive()).orderBy(NEWEST).limit(20).toList()
 - 捕获的值是创建 Lambda 那一刻的值。放在 `static final` 字段中的 spec 会一直保留这些值。如果方向必须在运行时改变，请使用 `orderBy((o, by) -> by.sort(key, dir))`（见 [4.3](#43-direction)）。
 - 在 `orderBy(spec)` 之后，可以像平常一样分页：`limit`、`offset`、`toList()`、`first()`。
 
-**(已测试)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-spec`：
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-spec`：
 
 ```java
 // keep it, for example as a static final field, and use it in many queries
@@ -683,7 +683,7 @@ RenderedQuery q = qb.from(Order.class).where(o -> o.isActive()).orderBy(byDescri
 assertEquals("select e0 from Order e0 where e0.active = true order by e0.description desc nulls last, e0.id asc", q.hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-spec`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-spec`：
 
 ```sql
 -- H2, MariaDB
@@ -704,7 +704,7 @@ SQL 与用 `orderBy((o, by) -> ...)` 写出的同样排序相同。Oracle 会加
 **`then()`：在已有排序键之后追加排序键。** `a.then(b)` 先按 `a` 的排序键排序。对于相等的行，再按 `b` 的排序键排序。
 `then()` 接受另一个 `SortSpec` 或一个排序 Lambda。
 
-**(已测试)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-spec-then`（在测试实体中，`status` 和 `price` 永远不会为 NULL，因此没有 `nulls` 部分）：
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-spec-then`（在测试实体中，`status` 和 `price` 永远不会为 NULL，因此没有 `nulls` 部分）：
 
 ```java
 SortSpec<Order> byStatus = SortSpec.of(Order.class, (o, by) -> by.asc(o.getStatus()));
@@ -716,7 +716,7 @@ assertEquals("select e0 from Order e0 order by e0.status asc, e0.id desc",
         qb.from(Order.class).orderBy(byStatus.then((o, by) -> by.desc(o.getId()))).toHql().hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-spec-then`（第一个查询）：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-spec-then`（第一个查询）：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -728,7 +728,7 @@ order by o1_0.status,o1_0.price desc
 **`reversed()`：把每个排序键反过来。** `spec.reversed()` 会反转每个排序键。NULL 的位置也会一起反转：`asc`（NULL 在前）变成 `desc`（NULL 在后）。因此整个行顺序正好完全颠倒。
 这与 `Direction.reversed()` 相同（见 [4.3](#43-direction)）。`spec.reversed().reversed()` 会回到最初的顺序。
 
-**(已测试)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-spec-reversed`：
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-spec-reversed`：
 
 ```java
 SortSpec<Order> spec = SortSpec.of(Order.class, (o, by) -> by.asc(o.getDescription()).asc(o.getId()));
@@ -737,7 +737,7 @@ assertEquals("select e0 from Order e0 order by e0.description desc nulls last, e
         qb.from(Order.class).orderBy(spec.reversed()).toHql().hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-spec-reversed`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `sort-spec-reversed`：
 
 ```sql
 -- H2, MariaDB
@@ -762,7 +762,7 @@ H2 和 MariaDB 对 `desc` 本来就把 NULL 放在最后，因此不写额外的
   既没有策略也没有 `@Sortable` 字段时，**任何**持久化属性都会被接受，并且 lambdaQL 会记录 `LQL-5003`（默认为 `INFO` 级别）。
 - 关联路径使用 `left join`（必需关联使用 inner join），与排序 Lambda 中相同（规则 S8）。`then()` 可以把 `ofPath` spec 和 Lambda spec 连接起来。
 
-**(已测试)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-spec-path`：
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)，region `sort-spec-path`：
 
 ```java
 // for sorts chosen outside the code (Spring Sort uses this); only real properties are accepted
@@ -821,7 +821,7 @@ assertThrows(IllegalArgumentException.class,
 
 在 Spring Boot 中，请定义一个 `SortPolicy` bean，而不是调用 `register`（见 [12.5](12-spring-data-jpa.md#sort-policy-with-spring)）。
 
-**(已测试)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)，region `rules` 和 `strict`：
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)，region `rules` 和 `strict`：
 
 ```java
 SortRules<Order> orderRules = SortRules.of(Order.class)
@@ -834,7 +834,7 @@ SortPolicy.register(emf, SortPolicy.of(SortMode.STRICT, orderRules));
 下面示例中的 `hql(name, direction)` 是测试的辅助方法。
 它返回 `qb.from(Order.class).orderBy(SortSpec.ofPath(Order.class, name, direction)).toHql().hql()`。
 
-**(已测试)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)，region `allowed`：
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)，region `allowed`：
 
 ```java
 assertEquals("select e0 from Order e0 order by e0.price asc", hql("price", Direction.ASC));
@@ -843,7 +843,7 @@ assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name 
 assertEquals("select e0 from Order e0 order by e0.updateAt desc nulls last", hql("newest", Direction.DESC));
 ```
 
-**(已测试)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)，region `rejected`（`STRICT` 模式）：
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)，region `rejected`（`STRICT` 模式）：
 
 ```java
 // not in the rules, an unlisted association path, the path behind an alias, an entity without rules
@@ -857,7 +857,7 @@ assertEquals("select e0 from Order e0 order by e0.description asc nulls first",
         qb.from(Order.class).orderBy((o, by) -> by.asc(o.getDescription())).toHql().hql());
 ```
 
-**(已测试)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)，region `warn`：
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)，region `warn`：
 
 ```java
 // INFO (the default) and WARN: the sort runs and LQL-5003 is logged once per entity and name
@@ -878,7 +878,7 @@ assertEquals("select e0 from Order e0 order by e0.description asc nulls first", 
 - 只有当策略中没有该实体的规则（来自代码、Spring bean 或 Spring Boot 属性）时，才使用注解。
 - 在没有注册策略的默认 `INFO` 模式下也有效。
 
-**(已测试)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)，region `annotation`（上面的 `STRICT` 策略只有 `Order` 的规则）：
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)，region `annotation`（上面的 `STRICT` 策略只有 `Order` 的规则）：
 
 ```java
 // Customer has no rules in the policy, so its @Sortable fields are the rules:
@@ -895,7 +895,7 @@ assertThrows(SortNotAllowedException.class,
 **字符串形式的规则。** `allowPath(String...)` 和 `aliasPath(name, path)` 以文本形式接收属性路径。它们用于配置：[12.5](12-spring-data-jpa.md#sort-policy-with-spring) 中的 Spring Boot 属性就使用它们。
 路径会在第一次使用规则时与实体核对。在代码中请优先使用 Lambda 形式的 `allow` 和 `alias`，因为编译器会检查它们。
 
-**(已测试)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)，region `string-paths`：
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)，region `string-paths`：
 
 ```java
 // the string forms used by configuration files (lambdaql.sort.allow / lambdaql.sort.alias)
@@ -931,7 +931,7 @@ assertThrows(SortNotAllowedException.class, () -> hql("description", Direction.A
 
 | # | 规则 | 状态 |
 |---|---|---|
-| S1 | 排序是一个 Lambda：`(o, by) -> by...`。一个排序键时：`o -> key`，可选 `Direction`。join 时：`(o, c, by) -> by...`（`by` 总是最后一个） | 已实现，join 写法 `(o, c, by)` 也已实现（已测试） |
+| S1 | 排序是一个 Lambda：`(o, by) -> by...`。一个排序键时：`o -> key`，可选 `Direction`。join 时：`(o, c, by) -> by...`（`by` 总是最后一个） | 已实现，join 写法 `(o, c, by)` 也已实现 |
 | S2 | 排序键是 `Comparable`。实体不能作为排序键（编译错误）。排序键必须使用实体 | 已实现 |
 | S3 | 方向来自 `asc` / `desc` 或 `sort(key, Direction)`。`asc(key)`/`desc(key)`（`ASC`/`DESC`）使用 NULL 策略；`asc(key, nullsFirst)`、`desc(key, nullsFirst)` 和 `*_NULLS_*` 按写法使用 | 已实现 |
 | S4 | 主体只能是一条直接的 `by` 调用链。不能有 `if`、三元表达式或循环 | 已实现 |
@@ -939,12 +939,12 @@ assertThrows(SortNotAllowedException.class, () -> hql("description", Direction.A
 | S6 | 用 `SortSpec`（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）重用。外部字符串由持久化单元的排序策略（`SortRules`、`SortPolicy`、`SortMode`，见 [4.10](#sort-policy)）检查 | `SortSpec` 和排序策略已实现并测试。`SortSpec` 的 join 写法尚未实现 |
 | S7 | 排序键：列、对一路径、`+ - *`、拓宽转换。不能有值分支 | 已实现。列和对一路径已测试 |
 | S8 | 只在 `orderBy` 中使用的关联路径使用 `left join`，因此没有关联的行会被保留。必需关联（`optional = false`）不会丢失行，因此使用 inner join（A4）。如果 `where` 使用同一条路径，排序会使用 `where` 的 join | 已实现 |
-| S9 | 分页时，如果排序键不包含根实体的 `@Id`，会添加 `@Id asc`。如果排序键中有唯一且不为 NULL 的列（`unique = true` 且 `nullable = false`、`@NaturalId`），则不添加（A5）。集合 fetch join + 分页会被拒绝 | 根实体 id 和显式 join 实体的 id 部分已实现（已测试）。fetch join 检查尚未实现 |
+| S9 | 分页时，如果排序键不包含根实体的 `@Id`，会添加 `@Id asc`。如果排序键中有唯一且不为 NULL 的列（`unique = true` 且 `nullable = false`、`@NaturalId`），则不添加（A5）。集合 fetch join + 分页会被拒绝 | 根实体 id 和显式 join 实体的 id 部分已实现。fetch join 检查尚未实现 |
 | S10 | 分析结果按 Lambda 缓存。捕获的 `Direction` 每次调用都会读取 | 已实现 |
 | S11 | Spring `Sort.Order` 与 `Direction` 一一对应（Spring 模块，见 [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。属性名经过排序策略检查，别名按原样传递 | Spring `Sort` 已实现并测试（尚不支持 `ignoreCase`），与排序策略一起使用的情况也已测试。读取 `"price,desc_nulls_last"` 这样的一段文本尚未实现 |
-| S12 | join 查询使用相同的形式：`(o, c, by)`、`(o, c, i, by)` | 已实现（已测试，见 [6.8](06-select-group.md#68-explicit-joins)） |
+| S12 | join 查询使用相同的形式：`(o, c, by)`、`(o, c, i, by)` | 已实现（见 [6.8](06-select-group.md#68-explicit-joins)） |
 | S13 | 方法引用只能用于一个排序键的简短写法。能编译但含义错误的方法引用会被拒绝（见 [9. Java 说明](09-java-notes.md#99-method-references)） | 已实现（getter 引用） |
-| S14 | 子查询的排序：有 `limit` 时保留，没有 `limit` 时移除并发出警告。数据库差异由 lambdaQL 替你处理（见第 5 章） | 已实现（已测试）。MariaDB 的 `lateral` 改写尚未实现 |
+| S14 | 子查询的排序：有 `limit` 时保留，没有 `limit` 时移除并发出警告。数据库差异由 lambdaQL 替你处理（见第 5 章） | 已实现。MariaDB 的 `lateral` 改写尚未实现 |
 
 ---
 

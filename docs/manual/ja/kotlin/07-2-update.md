@@ -40,7 +40,7 @@ where o1_0.status=1
 
 Oracle は `set` にエイリアスを書きます（`set o1_0.status=?`）。H2 と MariaDB は書きません。
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `update`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `update`:
 
 ```kotlin
 val u = qb.update(Order::class.java)
@@ -169,7 +169,7 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 **`?.` と `||`。** 選択で `?.` でたどった段階が `left join` になる条件なら（決定 D54、[3.10](03-where.md#310-association-paths) を参照）、DML は `e0.customer.id is not null` を加えません。
 そのため、顧客のない注文も選択とまったく同じように更新の対象になります。上の例のように `?.` だけがあり、顧客のない行が条件を真にできない場合は、確認をそのまま残します。
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `update-safe-call`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `update-safe-call`:
 
 ```kotlin
 // UPDATE: the left join of ?. drops the "customer exists" check, so the order without a customer is changed too
@@ -205,7 +205,7 @@ where o1_0.status=1 or (select c1_0.name from customers c1_0 where c1_0.id=o1_0.
 引数が 2 つのラムダ `set { o, sub -> ... }` を使います。2 番目の引数はサブクエリの起点 `sub` です（決定 D49）。
 ここでは `Agg` は必要ありません。サブクエリには [5. サブクエリ](05-subquery.md) と同じように `sum`、`avg`、... があります。
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `update-sub`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `update-sub`:
 
 ```kotlin
 // the second parameter starts a subquery, as in where { o, sub -> ... } (D49)

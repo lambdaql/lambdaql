@@ -132,7 +132,7 @@ How it works:
 
 - **Spring Data runs interface methods with a body by itself.** It does not try to make a query from them. It just calls the body. lambdaQL does not change this. For older Kotlin, see [12.9](#129-kotlin-compile-settings).
 - **`LambdaQlExecutor<T>` is a Spring Data repository fragment.** Its implementation is listed in `META-INF/spring.factories` of `lambdaql-spring-data-jpa`. Spring Data reads this file and adds the implementation to every repository that extends `LambdaQlExecutor<T>`.
-- **One executor object is shared by all repositories.** Each call still uses the entity of its own repository. For example, `teams.count { ... }` on a `TeamRepository` counts `Team` rows (tested in Java, [`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)).
+- **One executor object is shared by all repositories.** Each call still uses the entity of its own repository. For example, `teams.count { ... }` on a `TeamRepository` counts `Team` rows ([`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)).
 
 Rules:
 
@@ -421,10 +421,10 @@ Put `@Transactional` on your service method, or use a `TransactionTemplate`. Wit
 
 | Case | What happens |
 |---|---|
-| A select inside `@Transactional` | lambdaQL runs in the same transaction. It sees changes that are not flushed yet. After a rollback, these changes are gone for lambdaQL too (tested in Java, `ExecutorTest`) |
+| A select inside `@Transactional` | lambdaQL runs in the same transaction. It sees changes that are not flushed yet. After a rollback, these changes are gone for lambdaQL too (`ExecutorTest`) |
 | A select outside a transaction | Spring uses a new `EntityManager` for the call and closes it after the call, so the returned entities are detached. This is Spring's normal behavior; it is not tested by lambdaQL |
-| An update, delete, insert or upsert inside `@Transactional` or a `TransactionTemplate` | It runs in that transaction and rolls back with it (tested in Java) |
-| An update, delete, insert or upsert outside a transaction | It fails before any SQL is sent. Nothing changes (tested in Java, see the next table) |
+| An update, delete, insert or upsert inside `@Transactional` or a `TransactionTemplate` | It runs in that transaction and rolls back with it |
+| An update, delete, insert or upsert outside a transaction | It fails before any SQL is sent. Nothing changes (see the next table) |
 
 Only `QueryBuilder(entityManagerFactory)` runs DML in its own transaction (see [7.8](07-dml.md#transactions)). Do not use it in a Spring application (see [12.8](#128-the-querybuilder-bean)).
 
@@ -432,12 +432,12 @@ Errors go through Spring's exception translation, the same as for other reposito
 
 | Case | Exception |
 |---|---|
-| `findOne` matches 2 or more rows | `IncorrectResultSizeDataAccessException` (Spring), instead of JPA's `NonUniqueResultException` (tested in Java) |
-| `deleteOne` or `updateOne` matches 2 or more rows | `IncorrectResultSizeDataAccessException`. Nothing is changed (tested in Java) |
-| An unknown property in a Spring `Sort` | `PropertyReferenceException` (tested in Java) |
-| `ignoreCase()` in a Spring `Sort` | `UnsupportedOperationException` (tested in Java) |
-| A sort name that the sort policy does not allow, in `STRICT` mode ([12.5](#sort-policy-with-spring)) | `SortNotAllowedException` (`LQL-4040`), not translated (tested in Java) |
-| An update, delete, insert or upsert without a transaction, in a repository call (a shortcut, or `execute()` inside a method with a body) | `InvalidDataAccessApiUsageException` (tested in Java), made by Spring from JPA's `TransactionRequiredException`. Outside a repository method (the `QueryBuilder` bean), JPA's `TransactionRequiredException` |
+| `findOne` matches 2 or more rows | `IncorrectResultSizeDataAccessException` (Spring), instead of JPA's `NonUniqueResultException` |
+| `deleteOne` or `updateOne` matches 2 or more rows | `IncorrectResultSizeDataAccessException`. Nothing is changed |
+| An unknown property in a Spring `Sort` | `PropertyReferenceException` |
+| `ignoreCase()` in a Spring `Sort` | `UnsupportedOperationException` |
+| A sort name that the sort policy does not allow, in `STRICT` mode ([12.5](#sort-policy-with-spring)) | `SortNotAllowedException` (`LQL-4040`), not translated |
+| An update, delete, insert or upsert without a transaction, in a repository call (a shortcut, or `execute()` inside a method with a body) | `InvalidDataAccessApiUsageException`, made by Spring from JPA's `TransactionRequiredException`. Outside a repository method (the `QueryBuilder` bean), JPA's `TransactionRequiredException` |
 | An assignment lambda that breaks a rule (U1, U3, U4, U6) | `LambdaQLException` (for example `TranslationException`, `LQL-3042`), not translated (see [7.8](07-dml.md#rules-checked-at-analysis-time)) |
 
 The `QueryBuilder` bean (12.8) is not a repository, so Spring does not translate its errors. There, `one()` and `executeOne()` with 2 or more rows throw `NonUniqueResultException`.
@@ -445,7 +445,7 @@ The `QueryBuilder` bean (12.8) is not a repository, so Spring does not translate
 <a id="127-other-fragments-and-jpaspecificationexecutor"></a>
 ## 12.7 Other fragments and `JpaSpecificationExecutor`
 
-`LambdaQlExecutor<T>` is one fragment among others. The Java test repository uses all of these at the same time (tested in Java, `ExecutorTest`):
+`LambdaQlExecutor<T>` is one fragment among others. The Java test repository uses all of these at the same time (`ExecutorTest`):
 
 | Used together with | Works | Notes |
 |---|---|---|

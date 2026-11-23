@@ -43,7 +43,7 @@ The inner lambdas (`{ i -> ... }` inside `sub.from(...).where { }`) do not need 
 
 In the HQL, the subquery root has the alias `s1`, `s2`, ... (the outer root is `e0`). A join inside a subquery gets an alias such as `s1j1`.
 
-The examples marked **(tested)** come from [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt). This test uses the Java test entity: `price` is a primitive `double` and `qty` is an `int`.
+The examples come from [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt). This test uses the Java test entity: `price` is a primitive `double` and `qty` is an `int`.
 More queries written in Java are tested in [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) (H2, MariaDB and Oracle). See [the Java version of this page](../java/05-subquery.md) for those examples.
 
 ## 5.2 EXISTS
@@ -62,7 +62,7 @@ qb.from(Order::class.java)
 //      where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > 10)
 ```
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `exists`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `exists`:
 
 ```kotlin
 val q = qb.from(Order::class.java)
@@ -125,7 +125,7 @@ qb.from(Order::class.java)
 //      where e0.customer.id in (select s1.id from Customer s1 where s1.grade > 3)
 ```
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `in`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `in`:
 
 ```kotlin
 val q = qb.from(Order::class.java)
@@ -237,7 +237,7 @@ qb.from(Order::class.java)
 //      where e0.price > (select avg(s1.price) from Order s1)
 ```
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `scalar` (the test `price` is a `double`, so there is no `!!`):
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `scalar` (the test `price` is a `double`, so there is no `!!`):
 
 ```kotlin
 val q = qb.from(Order::class.java).where { o, sub -> o.price > sub.from(Order::class.java).avg { x -> x.price } }
@@ -379,7 +379,7 @@ Every lambda of `From2` gets the two rows: `where { a, b -> ... }`, `exists()`, 
 - A subquery can have at most two entities. The join form cannot use `orderBy` or `limit`.
 - `exists`, `sum` over the joined rows, and `in` with a `left join` and an association path in ON are measured on the three databases.
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `sub-join`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `sub-join`:
 
 ```kotlin
 // customers with an order that has an item of quantity > 10: the subquery joins Order and Item (D51)
@@ -398,7 +398,7 @@ In Kotlin, `o.customer?.id == c.id` adds `s1.customer is not null and ...` (see 
 <a id="511-subqueries-in-other-places"></a>
 ## 5.11 Subqueries in other places
 
-- **Subqueries in update / delete**: the same `sub` syntax in `where`. This is implemented (tested with Java lambdas, region `dml-subquery`). See [7.4 Delete](07-4-delete.md) and [7.2 Update](07-2-update.md).
+- **Subqueries in update / delete**: the same `sub` syntax in `where`. This is implemented (region `dml-subquery`). See [7.4 Delete](07-4-delete.md) and [7.2 Update](07-2-update.md).
 - **Subqueries in a `set` value** (`o.total = sub.from(...).sum { ... }`): write them with `sub`, the second argument of the assignment lambda (decision D49). See [7.2 Update](07-2-update.md#an-aggregate-from-a-subquery).
 - **Subqueries in `from` (derived tables) and CTEs**: implemented (milestone M8-2). They do not use `sub`. Pass a value query to `qb.from(...)` or `qb.with(...)`. See [6.9 Derived table](06-select-group.md#69-derived-table-subquery-in-from) and [6.10 CTE](06-select-group.md#610-cte-with).
 

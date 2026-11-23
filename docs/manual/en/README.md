@@ -118,7 +118,8 @@ These pages are for both languages. They show code in separate Java and Kotlin s
 <a id="about-the-examples"></a>
 ## About the examples
 
-Examples are design examples. When a feature is implemented, its examples are replaced by code taken from the test suite, with a link to the test file. In 3. Conditions, 4. Sorting and paging, 5. Subqueries, 6. Select, aggregates and group by, 7. Update, insert, delete, 8. Procedures and DB functions, 11. Errors and languages and 12. Spring Data JPA (Java), these examples are marked **(tested)**. The Kotlin track marks the examples from the Kotlin tests the same way.
+Every code example is a part of the test code, copied as it is. The test file and the part name (region `name`) are written above the code. The tests check the HQL that lambdaQL makes and the rows it returns.
+Examples of the Java track come from Java tests, and examples of the Kotlin track from Kotlin tests. Features that are not implemented yet are not in the manual; they are in the [ROADMAP](../../design/ROADMAP.md).
 
 <a id="example-entities"></a>
 ## Example entities

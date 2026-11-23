@@ -60,7 +60,7 @@ data class Total(val count: Long, val average: Double?)
 > 如果 NULL 被传入这样的参数，lambdaQL 会抛出 `IllegalStateException`。对于基本类型，消息会指出是哪个参数，并提示改用包装类型。
 > `count` 永远不会返回 NULL，因此 `count: Long` 没有问题。
 
-标记为 **(已测试)** 的示例来自 [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)。该测试使用 Java 测试实体（`price` 是基本类型 `double`，`status` 是 `short`，`Customer.id` 是 `int`）和以下结果类型。
+示例来自 [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)。该测试使用 Java 测试实体（`price` 是基本类型 `double`，`status` 是 `short`，`Customer.id` 是 `int`）和以下结果类型。
 
 ```kotlin
 /** A row of one order (Kotlin data class). */
@@ -146,14 +146,14 @@ val pairs: List<Pair<String?, Double?>> = qb.from(Order::class.java)
 // HQL: select j1.name, e0.price from Order e0 left join e0.customer j1
 ```
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `data-class`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `data-class`：
 
 ```kotlin
 val q = qb.from(Order::class.java).select { OrderRow(it.id, it.customer?.name, it.price) }
 assertEquals("select e0.id, j1.name, e0.price from Order e0 left join e0.customer j1", q.toHql().hql())
 ```
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `pair`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `pair`：
 
 ```kotlin
 val q = qb.from(Order::class.java).where { it.status.toInt() == 1 }.select { it.customer?.name to it.price }
@@ -303,7 +303,7 @@ val counts: List<KeyCount> = qb.from(Order::class.java)
 .groupBy { Triple(it.customer?.id, it.status, it.active) }    // 三个键
 ```
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `group-many`（结果是 `Triple`）：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `group-many`（结果是 `Triple`）：
 
 ```kotlin
 val q = qb.from(Order::class.java)
@@ -366,7 +366,7 @@ val big: List<Stat> = qb.from(Order::class.java)
 //      having sum(e0.price) > 200.0
 ```
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `group-by`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `group-by`：
 
 ```kotlin
 val q = qb.from(Order::class.java)
@@ -593,7 +593,7 @@ join 查询的 `distinct()` 对因 join 而重复的主实体行只返回一次�
 - 在 `distinct()` 之后使用 `select(...)` 时，用 `select distinct` 查询值。
 - 请先考虑 `exists` 子查询（[5. 子查询](05-subquery.md)）。它不产生重复，返回相同的行，而且很多情况下更快。
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `join-distinct`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `join-distinct`：
 
 ```kotlin
 // an order with two matching items would come twice; distinct() returns it once
@@ -616,7 +616,7 @@ assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.
 - 派生行没有 id，所以 `x == null` 是错误（`LQL-3067`）。请像 `x.customerId == null` 这样比较列。
 - Hibernate 7.4（以前的 6.6 也是）接受实体的 `select distinct`、派生表和 CTE 的 inner/left join，以及子查询内的实体 join（在三种数据库上实测）。
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `join-cte`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `join-cte`：
 
 ```kotlin
 // the total of each customer, joined to the customer row

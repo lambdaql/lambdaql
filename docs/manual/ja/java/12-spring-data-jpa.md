@@ -91,7 +91,7 @@ Spring Data JPA 3.3 以前は **サポートしません**。lambdaQL は実行�
 
 この章の例は、テスト用のエンティティ `Member`（`id`、`name`、`active`、`grade`、`team`）と `Team`（`id`、`name`）を使います。`grade` は `Integer` なので、NULL になることがあります。
 
-**(テスト済み)** [`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)、リージョン `repository`:
+[`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)、リージョン `repository`:
 
 ```java
 /** No Impl class: Spring Data finds the LambdaQlExecutor implementation by itself. */
@@ -155,7 +155,7 @@ lambdaQL にはどちらも必要ありません。一緒に使ったときの�
 
 - **default メソッドは Spring Data 自身が実行します。** Spring Data は default メソッドからクエリを作ろうとしません。メソッドの本体を呼び出すだけです。lambdaQL はこの動きを変えません。
 - **`LambdaQlExecutor<T>` は Spring Data のリポジトリのフラグメントです。** その実装は `lambdaql-spring-data-jpa` の `META-INF/spring.factories` に書かれています。Spring Data はこのファイルを読み、`LambdaQlExecutor<T>` を継承するすべてのリポジトリに実装を追加します。
-- **実行器のオブジェクトは 1 つで、すべてのリポジトリが共有します。** それでも、各呼び出しは自分のリポジトリのエンティティを使います。たとえば `TeamRepository` の `teams.count(t -> ...)` は `Team` の行を数えます（[`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java) でテスト済み）。
+- **実行器のオブジェクトは 1 つで、すべてのリポジトリが共有します。** それでも、各呼び出しは自分のリポジトリのエンティティを使います。たとえば `TeamRepository` の `teams.count(t -> ...)` は `Team` の行を数えます（[`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java) を参照）。
 
 ルール:
 
@@ -205,7 +205,7 @@ lambdaQL にはどちらも必要ありません。一緒に使ったときの�
 短いメソッドは、`query()` に結果の関数を付けたものと同じです。`findAll(w)` は `query().where(w).toList()`、`findSet(w)` は `query().where(w).toSet()`、`findFirst(w)` は `query().where(w).first()`、`findOne(w)` は `query().where(w).one()` に当たります。結果の関数は [結果を受け取る](02-getting-started.md#getting-the-result) で説明しています。
 `findAll(Where<T>)` と `count(Where<T>)` は、`JpaRepository` の `findAll(Sort)`、`findAll(Example)`、`count()` とぶつかりません。引数の型が違うからです。
 
-**`query()`: 完全なクエリ。** **(テスト済み)** [`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)、リージョン `query`（12.3 のリポジトリの一部）:
+**`query()`: 完全なクエリ。** [`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)、リージョン `query`（12.3 のリポジトリの一部）:
 
 ```java
 /**
@@ -223,21 +223,21 @@ default List<Member> topGraded(int n) {
 
 次の例では、`repository` は `MemberRepository` です。
 
-**(テスト済み)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `find-all-sort`:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `find-all-sort`:
 
 ```java
 SortSpec<Member> byGrade = SortSpec.of(Member.class, (m, by) -> by.desc(m.getGrade()).asc(m.getId()));
 List<Member> active = repository.findAll(m -> m.isActive(), byGrade);
 ```
 
-**(テスト済み)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `find-first`（grade が最も高い、アクティブなメンバー）:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `find-first`（grade が最も高い、アクティブなメンバー）:
 
 ```java
 Optional<Member> best = repository.findFirst(m -> m.isActive(),
         SortSpec.of(Member.class, (m, by) -> by.desc(m.getGrade())));
 ```
 
-**(テスト済み)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `find-one`:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `find-one`:
 
 ```java
 Optional<Member> kim = repository.findOne(m -> m.getName().equals("Kim"));
@@ -245,14 +245,14 @@ Optional<Member> kim = repository.findOne(m -> m.getName().equals("Kim"));
 assertThrows(IncorrectResultSizeDataAccessException.class, () -> repository.findOne(m -> m.isActive()));
 ```
 
-**(テスト済み)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `count-exists`:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `count-exists`:
 
 ```java
 long active = repository.count(m -> m.isActive());
 boolean anyInTeamB = repository.exists(m -> m.getTeam().getName().equals("B"));
 ```
 
-**(テスト済み)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `find-set`:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `find-set`:
 
 ```java
 java.util.SequencedSet<Member> active = repository.findSet(m -> m.isActive(), Sort.by(Sort.Order.desc("grade"), Sort.Order.asc("id")));
@@ -282,7 +282,7 @@ java.util.SequencedSet<Member> any = repository.findSet(m -> m.isActive());
 - **`One`** は、削除と更新では 1 行保護（次の項を参照）、挿入と upsert では 1 行を意味します。
 - 呼び出し側のトランザクションが必要です（[12.6](#126-transactions-and-exceptions) を参照）。テストでは `TransactionTemplate` の中で実行しています。
 
-**(テスト済み)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `dml-shortcuts`:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `dml-shortcuts`:
 
 ```java
 int changed = repository.updateAll(m -> !m.isActive(), m -> m.setGrade(7));      // condition first
@@ -308,7 +308,7 @@ int many = repository.insertAll(List.of(new NewMember("A", 1), new NewMember("B"
 
 コアの API にも同じ保護があります: `executeOne()`（[7.4](07-4-delete.md#delete-exactly-one-row-executeone) を参照）。
 
-**(テスト済み)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `dml-one`:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `dml-one`:
 
 ```java
 int renamed = repository.updateOne(m -> m.getId() == kimId, m -> m.setName("Kim2"));   // exactly one row
@@ -341,7 +341,7 @@ assertThrows(org.springframework.dao.IncorrectResultSizeDataAccessException.clas
 
 短縮メソッドと同じく、呼び出し側のトランザクションが必要です。すべての JPA の一括文と同じように、トランザクションですでに読み込まれたエンティティは変更しません。
 
-**(テスト済み)** [`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)、リージョン `dml`（12.3 のリポジトリの一部）:
+[`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)、リージョン `dml`（12.3 のリポジトリの一部）:
 
 ```java
 /**
@@ -368,7 +368,7 @@ default int addGuest(String name) {
 
 upsert もトランザクションの中で実行します。`teams` は `TeamRepository`、`tx` は Spring の `TransactionTemplate` です。
 
-**(テスト済み)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `upsert`:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `upsert`:
 
 ```java
 int changed = tx.execute(s -> teams.upsertQuery().values(t -> { t.setId(teamId); t.setName("A2"); }).execute());
@@ -393,7 +393,7 @@ lambdaQL は、各 `Sort.Order` を `SortSpec.ofPath` で 1 つのソートキ�
 
 Spring Data JPA 自身のリポジトリは、`NATIVE` の NULL の位置をデータベースに任せます。そのため、そこではデータベースごとに順序が変わることがあります。lambdaQL は代わりに自分のルールを使います。
 
-**(テスト済み)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `find-all-spring-sort`:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `find-all-spring-sort`:
 
 ```java
 List<Member> rows = repository.findAll(m -> m.isActive(),
@@ -411,7 +411,7 @@ assertEquals("PropertyReferenceException", unknown.getClass().getSimpleName());
 - ソートキーに id が含まれていないとき、lambdaQL は id を最後のキーとして追加します。そのため、行がページの間で動きません（[タイブレーカー](04-order-paging.md#tie-breaker-automatic-id) を参照）。ソートのないページは id の順になります。
 - `Pageable.unpaged()` は、すべての行を 1 つのページで返します。
 
-**(テスト済み)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `page`:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `page`:
 
 ```java
 Page<Member> page = repository.findAll(m -> m.isActive(), PageRequest.of(1, 2, Sort.by("name")));
@@ -457,7 +457,7 @@ Spring の `Sort` や `Pageable` は常に外部のソートなので、ポリ�
 エンティティ名は永続化ユニットの中で一意です（同じ名前が 2 つあると Hibernate が起動時に止まります）。そのため、パッケージが違う同じ名前のクラスが混ざることはありません。知らない名前なら、アプリケーションの起動が `IllegalStateException`（LQL-4042）で止まります。
 パスは、ルールを最初に使うときにエンティティと照らし合わせられます（4.10 の [文字列によるルール](04-order-paging.md#rules-as-strings) を参照）。
 
-**(テスト済み)** [`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java)、リージョン `properties`（テストのプロパティ。アプリケーションでは `application.properties` や `application.yaml` に書きます）:
+[`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java)、リージョン `properties`（テストのプロパティ。アプリケーションでは `application.properties` や `application.yaml` に書きます）:
 
 ```java
 @SpringBootTest(classes = SampleApplication.class, properties = {
@@ -466,7 +466,7 @@ Spring の `Sort` や `Pageable` は常に外部のソートなので、ポリ�
         "lambdaql.sort.alias.Member.level=grade"})
 ```
 
-**(テスト済み)** [`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java)、リージョン `properties-use`:
+[`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java)、リージョン `properties-use`:
 
 ```java
 List<Member> byLevel = repository.findAll(m -> m.isActive(), Sort.by(Sort.Order.desc("level")));
@@ -489,7 +489,7 @@ public SortPolicy sortPolicy() {
 }
 ```
 
-**(テスト済み)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `sort-policy`（リージョンは `try` の中で終わります。`finally` ブロックで `SortPolicy.unregister(emf)` を呼びます）:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)、リージョン `sort-policy`（リージョンは `try` の中で終わります。`finally` ブロックで `SortPolicy.unregister(emf)` を呼びます）:
 
 ```java
 // usually a @Bean SortPolicy; the Boot auto-configuration registers it for the EntityManagerFactory
@@ -539,10 +539,10 @@ public class SortErrorHandler {
 
 | ケース | どうなるか |
 |---|---|
-| `@Transactional` の中の選択 | lambdaQL は同じトランザクションで実行されます。まだ flush されていない変更も見えます。ロールバックの後は、それらの変更は lambdaQL からも見えなくなります（`ExecutorTest` でテスト済み） |
+| `@Transactional` の中の選択 | lambdaQL は同じトランザクションで実行されます。まだ flush されていない変更も見えます。ロールバックの後は、それらの変更は lambdaQL からも見えなくなります |
 | トランザクションの外の選択 | Spring は呼び出しごとに新しい `EntityManager` を使い、呼び出しの後で閉じます。そのため、返されたエンティティは detached の状態です。これは Spring の通常の動きで、lambdaQL ではテストしていません |
-| `@Transactional` や `TransactionTemplate` の中の更新、削除、挿入、upsert | そのトランザクションで実行され、一緒にロールバックされます（テスト済み） |
-| トランザクションの外の更新、削除、挿入、upsert | SQL を送る前に失敗します。何も変更されません（テスト済み、次の表を参照） |
+| `@Transactional` や `TransactionTemplate` の中の更新、削除、挿入、upsert | そのトランザクションで実行され、一緒にロールバックされます |
+| トランザクションの外の更新、削除、挿入、upsert | SQL を送る前に失敗します。何も変更されません（次の表を参照） |
 
 自分のトランザクションで DML を実行するのは `new QueryBuilder(entityManagerFactory)` だけです（[7.8](07-dml.md#transactions) を参照）。Spring のアプリケーションでは使わないでください（[12.8](#128-the-querybuilder-bean) を参照）。
 
@@ -550,12 +550,12 @@ public class SortErrorHandler {
 
 | ケース | 例外 |
 |---|---|
-| `findOne` が 2 行以上に一致する | JPA の `NonUniqueResultException` ではなく、`IncorrectResultSizeDataAccessException`（Spring）（テスト済み） |
-| `deleteOne` や `updateOne` が 2 行以上に一致する | `IncorrectResultSizeDataAccessException`。何も変更されません（テスト済み） |
-| Spring の `Sort` に知らないプロパティがある | `PropertyReferenceException`（テスト済み） |
-| Spring の `Sort` で `ignoreCase()` を使う | `UnsupportedOperationException`（テスト済み） |
-| `STRICT` モードで、ソートポリシーが許可しないソートの名前（[12.5](#sort-policy-with-spring)） | `SortNotAllowedException`（`LQL-4040`）。変換されません（テスト済み） |
-| リポジトリの呼び出し（短縮メソッド、または default メソッドの中の `execute()`）で、トランザクションなしに更新、削除、挿入、upsert を実行する | `InvalidDataAccessApiUsageException`（テスト済み）。JPA の `TransactionRequiredException` から Spring が作ります。リポジトリのメソッドの外（`QueryBuilder` の Bean）では JPA の `TransactionRequiredException` |
+| `findOne` が 2 行以上に一致する | JPA の `NonUniqueResultException` ではなく、`IncorrectResultSizeDataAccessException`（Spring） |
+| `deleteOne` や `updateOne` が 2 行以上に一致する | `IncorrectResultSizeDataAccessException`。何も変更されません |
+| Spring の `Sort` に知らないプロパティがある | `PropertyReferenceException` |
+| Spring の `Sort` で `ignoreCase()` を使う | `UnsupportedOperationException` |
+| `STRICT` モードで、ソートポリシーが許可しないソートの名前（[12.5](#sort-policy-with-spring)） | `SortNotAllowedException`（`LQL-4040`）。変換されません |
+| リポジトリの呼び出し（短縮メソッド、または default メソッドの中の `execute()`）で、トランザクションなしに更新、削除、挿入、upsert を実行する | `InvalidDataAccessApiUsageException`。JPA の `TransactionRequiredException` から Spring が作ります。リポジトリのメソッドの外（`QueryBuilder` の Bean）では JPA の `TransactionRequiredException` |
 | ルールに違反する代入のラムダ（U1、U3、U4、U6） | `LambdaQLException`（例: `TranslationException`、`LQL-3042`）。変換されません（[7.8](07-dml.md#rules-checked-at-analysis-time) を参照） |
 
 `QueryBuilder` の Bean（12.8）はリポジトリではないので、Spring はそのエラーを変換しません。そこでは、2 行以上に一致する `one()` と `executeOne()` は `NonUniqueResultException` を投げます。
@@ -563,7 +563,7 @@ public class SortErrorHandler {
 <a id="127-other-fragments-and-jpaspecificationexecutor"></a>
 ## 12.7 ほかのフラグメントと `JpaSpecificationExecutor`
 
-`LambdaQlExecutor<T>` は数あるフラグメントの 1 つです。12.3 のリポジトリは、次のものをすべて同時に使っています（`ExecutorTest` でテスト済み）。
+`LambdaQlExecutor<T>` は数あるフラグメントの 1 つです。12.3 のリポジトリは、次のものをすべて同時に使っています。
 
 | 一緒に使うもの | 動くか | 説明 |
 |---|---|---|
@@ -590,7 +590,7 @@ Spring Boot では、自動構成 `org.lambdaql.spring.boot.LambdaQlAutoConfigur
 - リポジトリのメソッド（`LambdaQlExecutor<T>`）には、この Bean は必要ありません。
 - この Bean の更新、削除、挿入、upsert の文には、リポジトリのメソッドと同じく、呼び出し側のトランザクションが必要です。トランザクションがないと、SQL を送る前に `TransactionRequiredException` を投げます。
 
-**(テスト済み)** [`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)、リージョン `query-builder-bean`（`qb` は注入された Bean）:
+[`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)、リージョン `query-builder-bean`（`qb` は注入された Bean）:
 
 ```java
 // inject it into a service: it joins the current transaction

@@ -44,7 +44,7 @@ where (select c1_0.name from customers c1_0 where c1_0.id=orders.customer_id) is
 
 MariaDB は `delete o1_0 from orders o1_0` と書きます。H2 と Oracle は `delete from orders o1_0` と書きます。
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `insert-delete`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `insert-delete`:
 
 ```kotlin
 val i = qb.insert(Archive::class.java).values { it.id = 100L; it.price = 9.5; it.customerName = "Kim" }
@@ -119,7 +119,7 @@ delete from Order d0 where d0.id in (select t.id from (select e0.id as id from O
 - `update` は囲みません。自分のテーブルを読むサブクエリを含む `update` は、3 つの DB すべてで動きます（MariaDB 10.11 で実測）。
 - 複合 id のエンティティは囲みません。`limit` 付きの削除は、もともと下の囲んだ形（エイリアス `x0`）を使います。
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `delete-self-subquery`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `delete-self-subquery`:
 
 ```kotlin
 // the subquery reads the target table: the matching ids are read through a derived table first (U17, MariaDB 1093)

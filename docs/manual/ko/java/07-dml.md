@@ -79,7 +79,7 @@ lambdaQL에는 진입점이 다섯 개 있습니다.
 
 `value`는 정적 함수 `org.lambdaql.Dml.value`입니다(결정 D49). `import static org.lambdaql.Dml.value;`로 가져와 인자 하나의 람다 안에서 씁니다.
 
-**(테스트됨)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `update-value`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `update-value`:
 
 ```java
 // entities without setters: Dml.value(column, value), the column written as a getter call
@@ -91,7 +91,7 @@ assertEquals("update Order e0 set e0.description = 'done' where e0.status = 2", 
 
 **SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다.
 
-**데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `update-value`:
+**데이터베이스별 SQL** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `update-value`:
 
 ```sql
 -- H2, MariaDB
@@ -133,7 +133,7 @@ qb.update(Order.class).set(o -> value(o.getCustomer().getId(), cid)).where(o -> 
 - 자기 `value(...)` 메서드가 있는 클래스(예: `value` 컴포넌트가 있는 레코드) 안에서는 정적 import가 가려집니다. 그곳에서는 `Dml.value(...)`라고 쓰십시오.
 - `o.getTotal() = 1` 같은 표기는 Java에서 컴파일 오류이므로 쓸 수 없습니다.
 
-**(테스트됨)** [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java), 영역 `value-type`:
+[`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java), 영역 `value-type`:
 
 ```java
 // value(V, V) compiles with any two types, so lambdaQL checks the value type against the column (U20)
@@ -146,7 +146,7 @@ LambdaQLException fraction = assertThrows(LambdaQLException.class, () -> setters
 assertEquals("LQL-3065", fraction.code(), fraction.getMessage());
 ```
 
-**(테스트됨)** [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java), 영역 `read-value`:
+[`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java), 영역 `read-value`:
 
 ```java
 // Dml.value(column, value) for entities without setters; constants stay literals, also when they are boxed
@@ -164,7 +164,7 @@ assertEquals("[col0.status := 2, col0.customer.id := 1]",
 대입 람다의 두 번째 인자는 서브쿼리의 시작점 `sub`입니다. `where((o, sub) -> ...)`와 같은 표기입니다(결정 D49).
 `insert ... select`에서는 세 번째 인자가 `sub`입니다([7.5](07-5-insert.md) 참고).
 
-**(테스트됨)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `update-sub`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `update-sub`:
 
 ```java
 // the second parameter starts a subquery, as in where((o, sub) -> ...) (D49)
@@ -243,7 +243,7 @@ SQL에서 SET 오른쪽의 모든 컬럼은 수정 **이전**의 값을 뜻합�
 | `o.setTotal(o.getPrice()); o.setPrice(0.0);`(먼저 읽고 나중에 할당) | 허용 |
 | `o.setPrice(...); o.setTotal(o.getPrice());`(먼저 할당하고 나중에 읽음) | **오류** |
 
-이 검사는 물리 컬럼(임베디드 하위 컬럼, FK 컬럼) 단위로 동작하며, 여러 `set()` 호출 사이에도 적용됩니다([PATCH](07-2-update.md#many-set-calls-patch)에서 테스트함).
+이 검사는 물리 컬럼(임베디드 하위 컬럼, FK 컬럼) 단위로 동작하며, 여러 `set()` 호출 사이에도 적용됩니다([PATCH](07-2-update.md#many-set-calls-patch) 참고).
 
 <a id="assign-a-column-only-once"></a>
 ### 컬럼당 한 번의 할당
@@ -256,7 +256,7 @@ SQL에서 SET 오른쪽의 모든 컬럼은 수정 **이전**의 값을 뜻합�
 
 lambdaQL은 람다를 읽을 때 규칙 U1, U3, U4, U6을 검사합니다. 아래 테스트는 사용자 API가 아니라 내부 클래스 `AssignmentReader`를 호출합니다. 사용자 API에서는 `set(...)`과 `values(...)`가 같은 `LambdaQLException`을 던집니다(예: U1은 `LQL-3037`, U3은 `LQL-3042`, U4는 `LQL-3041`).
 
-**(테스트됨)** [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java), 영역 `rules`:
+[`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java), 영역 `rules`:
 
 ```java
 // U1: only setters; no condition, no local variable
@@ -296,7 +296,7 @@ o.setCustName(o.getCustomer().getName())
 lambdaQL은 서브쿼리를 직접 씁니다. 그러면 문장이 자기 테이블만 읽으므로, 대상 테이블 읽기에 대한 MariaDB의 제약(오류 1093)에 걸리지 않습니다.
 
 조회는 `where`의 경로에 inner join을 사용합니다(결정 D36). 그래서 DML에서는 이런 경로에 lambdaQL이 `e0.customer.id is not null`을 더합니다.
-그 결과 `update`와 `delete`는 `qb.from(X.class).where(같은 람다)`가 반환하는 **바로 그 행**만 대상으로 합니다(테스트함: 삭제된 행을 조회 결과와 비교).
+그 결과 `update`와 `delete`는 `qb.from(X.class).where(같은 람다)`가 반환하는 **바로 그 행**만 대상으로 합니다(삭제된 행을 조회 결과와 비교).
 `o.getCustomer() == null || ...` 같은 null 가드가 있어도 마찬가지입니다. 조회도 이 경로에 inner join을 사용하므로(결정 D48) 검사는 유지됩니다.
 
 `@Id`로 끝나는 경로(`o.getCustomer().getId()`)는 FK 컬럼입니다. 서브쿼리도 조인도 없습니다.
@@ -312,7 +312,7 @@ lambdaQL은 서브쿼리를 직접 씁니다. 그러면 문장이 자기 테이�
 | 한도 | 문장당 값 500개 이하(고정) |
 | 반환 값 | 모든 문장의 합 |
 | 트랜잭션 | 모든 문장을 한 트랜잭션에서 실행 |
-| 빈 리스트 | SQL 없음, 0 반환(테스트함) |
+| 빈 리스트 | SQL 없음, 0 반환 |
 
 Oracle에는 바인드 값 65,535개라는 엄격한 한도가 있습니다(ORA-01745). 파싱은 그보다 훨씬 전부터 매우 느려집니다
 (설계 단계 테스트에서 21,845행에 약 6분). 그래서 한도를 작게 두었습니다.
@@ -357,7 +357,7 @@ qb.delete(Order.class).where(o -> o.getStatus() == 1).orderBy((o, by) -> by.asc(
 | 빌더 | 트랜잭션 |
 |---|---|
 | `new QueryBuilder(entityManagerFactory)` | `execute()`와 `executeOne()`이 자체 트랜잭션을 열고 커밋합니다. 오류가 나면 롤백합니다 |
-| `EntityManager`를 쓰는 빌더: `new QueryBuilder(entityManager)`, Spring의 `QueryBuilder` 빈, 리포지토리 실행기 | 호출자의 트랜잭션(`@Transactional`, 또는 그 `EntityManager`의 활성 트랜잭션). 트랜잭션이 없으면 SQL을 보내기 전에 `TransactionRequiredException`으로 실패합니다(테스트함). Spring 리포지토리 호출에서는 `InvalidDataAccessApiUsageException`이 됩니다([12.6](12-spring-data-jpa.md#126-transactions-and-exceptions) 참고) |
+| `EntityManager`를 쓰는 빌더: `new QueryBuilder(entityManager)`, Spring의 `QueryBuilder` 빈, 리포지토리 실행기 | 호출자의 트랜잭션(`@Transactional`, 또는 그 `EntityManager`의 활성 트랜잭션). 트랜잭션이 없으면 SQL을 보내기 전에 `TransactionRequiredException`으로 실패합니다. Spring 리포지토리 호출에서는 `InvalidDataAccessApiUsageException`이 됩니다([12.6](12-spring-data-jpa.md#126-transactions-and-exceptions) 참고) |
 
 <a id="the-persistence-context-is-not-updated"></a>
 ### 영속성 컨텍스트 미반영
@@ -382,7 +382,7 @@ lambdaQL은 이 조건을 따로 처리하지 않습니다.
 <a id="79-all-rules-u1-to-u21-summary"></a>
 ## 7.9 전체 규칙 U1~U21(요약)
 
-lambdaQL이 람다를 읽을 때 검사하는 규칙: U1, U3, U4, U6(테스트함). 컴파일러가 검사하는 규칙: U5.
+lambdaQL이 람다를 읽을 때 검사하는 규칙: U1, U3, U4, U6. 컴파일러가 검사하는 규칙: U5.
 U11, U12, U15에 대한 lambdaQL의 검사는 아직 구현되지 않았습니다.
 
 | # | 규칙 |

@@ -93,7 +93,7 @@ Java 测试使用同名的 Java 测试实体（[`query/src/test/java/org/lambdaq
 
 `value` 是函数 `org.lambdaql.Dml.value`（决策 D49）。用 `import org.lambdaql.Dml.value` 导入后，在单参数 Lambda 中使用。
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `update-value`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `update-value`：
 
 ```kotlin
 // entities without setters (val): Dml.value(column, value)
@@ -155,7 +155,7 @@ qb.update(Order::class.java).set { o -> value(o.customer?.id, cid) }.where { it.
 赋值 Lambda 的第二个参数是子查询的起点 `sub`。写法与 `where { o, sub -> ... }` 相同（决策 D49）。
 在 `insert ... select` 中，第三个参数是 `sub`（见 [7.5](07-5-insert.md)）。
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `update-sub`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `update-sub`：
 
 ```kotlin
 // the second parameter starts a subquery, as in where { o, sub -> ... } (D49)
@@ -333,7 +333,7 @@ qb.delete(Order::class.java).where { it.status == 1 }.orderBy { o, by -> by.asc(
 | 构建器 | 事务 |
 |---|---|
 | `QueryBuilder(entityManagerFactory)` | `execute()` 和 `executeOne()` 打开自己的事务并提交。出错时回滚 |
-| 使用 `EntityManager` 的构建器：`QueryBuilder(entityManager)`、Spring 的 `QueryBuilder` bean、repository 执行器 | 使用调用方的事务（`@Transactional`，或该 `EntityManager` 中处于活动状态的事务）。没有事务时，在发送 SQL 之前以 `TransactionRequiredException` 失败（已测试，Java）。在 Spring 的 repository 调用中，它会变为 `InvalidDataAccessApiUsageException`（见 [12.6](12-spring-data-jpa.md#126-transactions-and-exceptions)） |
+| 使用 `EntityManager` 的构建器：`QueryBuilder(entityManager)`、Spring 的 `QueryBuilder` bean、repository 执行器 | 使用调用方的事务（`@Transactional`，或该 `EntityManager` 中处于活动状态的事务）。没有事务时，在发送 SQL 之前以 `TransactionRequiredException` 失败（Java）。在 Spring 的 repository 调用中，它会变为 `InvalidDataAccessApiUsageException`（见 [12.6](12-spring-data-jpa.md#126-transactions-and-exceptions)） |
 
 <a id="the-persistence-context-is-not-updated"></a>
 ### 持久化上下文不会更新

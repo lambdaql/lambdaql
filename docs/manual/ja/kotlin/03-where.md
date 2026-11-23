@@ -61,7 +61,7 @@ from orders o1_0
 where o1_0.status=1 and o1_0.price>100.0
 ```
 
-**(テスト済み)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、リージョン `captured`:
+[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、リージョン `captured`:
 
 ```kotlin
 val q = qb.from(Order::class.java).where { it.price > min && it.status.toInt() == 1 }
@@ -453,7 +453,7 @@ from orders o1_0
 where o1_0.id not in (?,?)
 ```
 
-**(テスト済み)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、リージョン `in`:
+[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、リージョン `in`:
 
 ```kotlin
 val q = qb.from(Order::class.java).where { it.status in statuses }
@@ -500,7 +500,7 @@ lambdaQL は JPA Metamodel で各ステップをチェックします。
 - 入れ子の値オブジェクトも展開します。
 - 大小比較（`<` など）と別の型との比較は、これまでどおり `LQL-3012` のエラーです。フィールドを比較してください。
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `embedded-compare`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `embedded-compare`:
 
 ```kotlin
 // address is @Embedded (city, zip): == with a value object compares each column (D48)
@@ -532,7 +532,7 @@ qb.from(Order::class.java)
 // HQL: select e0 from Order e0 join e0.customer j1 where j1.name = :p1
 ```
 
-**(テスト済み)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、リージョン `safe-call`（`name` の代わりに定数を使用）:
+[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)、リージョン `safe-call`（`name` の代わりに定数を使用）:
 
 ```kotlin
 // it.customer?.name reads as the path customer.name (inner join: orders without a customer are left out)
@@ -553,7 +553,7 @@ where c1_0.name=?
 - **顧客のない注文** は結果に入りません。結合する顧客の行がないからです。
 - lambdaQL は null チェックを代わりに追加しません。パスの前に `it.customer != null &&` を書く必要はありません。
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `safe-call-and`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `safe-call-and`:
 
 ```kotlin
 // a row without a customer can never match: lambdaQL keeps the inner join (the same rows)
@@ -564,7 +564,7 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' 
 **`?.` と `||`。** 顧客のない注文が条件を真にできるなら、`?.` でたどった段階は `left join` です。
 status が 1 で顧客のない注文も結果に残ります。Kotlin で同じ条件を実行した結果と同じです。
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `safe-call-or`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `safe-call-or`:
 
 ```kotlin
 // ?. says the customer may be missing: an order without a customer stays when the rest of the OR is true
@@ -584,7 +584,7 @@ where o1_0.status=1 or c1_0.name='Kim'
 
 **`?.` と `== null`。** `it.customer?.name == null` は、Kotlin と同じように、顧客のない注文と名前のない顧客の注文の両方を探します。
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `safe-call-null`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `safe-call-null`:
 
 ```kotlin
 // "no customer, or a customer without a name": a left join, as in Kotlin
@@ -643,7 +643,7 @@ Hibernate は `e0.customer is null` を `c1_0.id is null` と書きます。inne
 **`!!`: 関連が必ずあるという宣言。** `!!` でたどった段階は常に inner join です。
 Kotlin では `||` が `!!` に届く前に終わる行（status 1、顧客なし）が残りますが、lambdaQL はその行を除きます。そのような行を残すには `?.` を使ってください。
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `not-null-assert`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `not-null-assert`:
 
 ```kotlin
 // !! says the customer is always there: an inner join, so orders without a customer are left out
@@ -655,7 +655,7 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where e0.status = 1 or
 **`?.` と `!!` を混ぜた場合。** 条件全体（同じクエリのすべての `where`）で、同じ関連の段階をある箇所では `?.` で、別の箇所では `!!` か印なしでたどると、inner join になります。
 lambdaQL は `LQL-5014` を `WARN` レベルでログに出します（条件ごとに 1 回）。顧客のない注文を残すには、すべて `?.` で書いてください。
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `mixed-warn`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `mixed-warn`:
 
 ```kotlin
 // the same association with ?. in one place and !! in another: an inner join, and WARN LQL-5014

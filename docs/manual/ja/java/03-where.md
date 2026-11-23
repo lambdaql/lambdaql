@@ -50,7 +50,7 @@ List<Order> list = qb.from(Order.class)
 
 **SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 7.4 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `to-hql`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `to-hql`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -59,12 +59,12 @@ from orders o1_0
 where o1_0.status=1 and o1_0.price>100.0
 ```
 
-**(テスト済み)** と書かれた例は、[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java) からそのままコピーしたものです。
+例は、[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java) からそのままコピーしたものです。
 このテストは HQL をチェックし、クエリを実行して、同じ条件で Java 側で絞り込んだ行と比べます。H2、MariaDB、Oracle で通ります。
 テストのエンティティは 3.2 と少し違います。`price` は `double`、`status` は `short`、`Customer.id` は `int` で、`Order` には enum の `kind`（`Order.Kind`: `NORMAL`、`RUSH`）があります。
 
 `toHql()` は、クエリを実行せずに HQL とパラメーターを返します。
-**(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `to-hql`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `to-hql`:
 
 ```java
 RenderedQuery q = qb.from(Order.class)
@@ -83,7 +83,7 @@ assertEquals("select e0 from Order e0 where e0.status = 1 and e0.price > :p1", q
 assertEquals(Map.of("p1", 100.0), q2.parameters());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `to-hql`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `to-hql`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -92,7 +92,7 @@ from orders o1_0
 where o1_0.status=1 and o1_0.price>100.0
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `to-hql#2`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `to-hql#2`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -102,7 +102,7 @@ where o1_0.status=1 and o1_0.price>?
 ```
 
 `where()` は何回でも呼べます。条件は `AND` でつながります。
-**(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `where-many`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `where-many`:
 
 ```java
 RenderedQuery q = qb.from(Order.class)
@@ -112,7 +112,7 @@ RenderedQuery q = qb.from(Order.class)
 assertEquals("select e0 from Order e0 where (e0.status = 1 or e0.status = 3) and e0.active = true", q.hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `where-many`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `where-many`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -137,14 +137,14 @@ where (o1_0.status=1 or o1_0.status=3) and o1_0.active=true
 - 例外は 1 つあります。整数カラムと比べる小数のキャプチャ値は、小数リテラル（`2.5BD`）で書きます（[3.4](#34-comparisons) の「整数カラムと小数の値」）。数値に変換した値だけを書くので、SQL インジェクションの危険はありません。
 
 enum 定数は、完全なクラス名で書かれます。
-**(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `enum`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `enum`:
 
 ```java
 RenderedQuery q = qb.from(Order.class).where(o -> o.getKind() == Order.Kind.RUSH).toHql();
 assertEquals("select e0 from Order e0 where e0.kind = org.lambdaql.query.Order$Kind.RUSH", q.hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `enum`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `enum`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -190,7 +190,7 @@ where o1_0.kind='RUSH'
 結果は H2、MariaDB 10.11、Oracle 23.26 で正しいです（実測）。3 つの DB とも、SQL は `cnt>=2.5`、`cnt in (2.5,3.0)` のようにカラムをそのままにして小数と比べます。
 MariaDB の `EXPLAIN` はインデックスの範囲スキャン（`type=range`）を示します。Oracle はカラムに変換が付かないので、インデックスを使える形です。インデックスのヒントを与えると `INDEX RANGE SCAN` になり、3000 行のテーブルでヒントがなければ、整数リテラル（`cnt >= 99`）と同じく全件スキャンを選びます（すべて実測）。
 
-**(テスト済み)** [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)、リージョン `whole-number`:
+[`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)、リージョン `whole-number`:
 
 ```java
 // cnt is a whole number; 2.5 is compared as written (it is never cut to 2): a decimal literal
@@ -300,7 +300,7 @@ status が NULL の行を探すには、null チェックを書いてくださ�
 カラムを関数で包むことはないので、データベースはインデックスを使えます。
 
 lambdaQL は、クエリの実行時にキャプチャした値をバインドします。`null` は NULL としてバインドされ、一致しうる行がないので、lambdaQL は `LQL-4045` を `WARN` レベルでログに出します。
-**(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `null-safe`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `null-safe`:
 
 ```java
 // the SQL meaning (D48): = NULL matches no row; lambdaQL logs LQL-4045 at WARN when it runs with a null
@@ -316,7 +316,7 @@ RenderedQuery q2 = qb.from(Order.class).where(o -> Objects.equals(o.getDescripti
 assertEquals("select e0 from Order e0 where e0.description = :p1", q2.hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `null-safe`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `null-safe`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -325,7 +325,7 @@ from orders o1_0
 where o1_0.description=?
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `null-safe#2`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `null-safe#2`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -348,7 +348,7 @@ where o1_0.description=?
 
 このルールは、パスに **関連のステップがない** ときだけ適用されます。顧客のない注文があるので `o.getCustomer().getId()` は NULL になりえます。そのため、このパスの null チェックは残ります。
 
-**(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `never-null`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `never-null`:
 
 ```java
 // the id can never be NULL, so the null check is dropped (this is what Kotlin's it.id == id compiles to)
@@ -388,7 +388,7 @@ assertEquals("select e0 from Order e0 where e0.customer.id is null",
 Java では `!text.equals(null)` も `Objects.equals(null, null)` も true なので、Java ならそれらの行を返します。
 このような違いが起こりうるとき、lambdaQL は `LQL-5009` を `DEBUG` レベルで条件ごとに 1 回ログに出します。NULL の行を残すには、ラムダの中に null チェックを直接書いてください。
 
-**(テスト済み)** [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)、リージョン `sql-meaning`（H2、MariaDB、Oracle。行は description/custName の組 `a/a`、`a/b`、`null/a`、`null/null`、`b/null` で、`text` は `"a"`）:
+[`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)、リージョン `sql-meaning`（H2、MariaDB、Oracle。行は description/custName の組 `a/a`、`a/b`、`null/a`、`null/null`、`b/null` で、`text` は `"a"`）:
 
 ```java
 // two entity values: = and <> as in SQL; a row with a NULL on either side matches neither
@@ -430,7 +430,7 @@ javac の自動アンボクシングと手で書いた呼び出しは同じバ�
 NULL の行を探すには `x == null` と書いてください。
 
 **null ガードによる絞り込みの省略。** 同じキャプチャ値を null チェックすると、値が null のとき、その条件は絞り込みなしで消えます。
-**(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `captured-null-guard`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `captured-null-guard`:
 
 ```java
 Double min = null;                                       // for example an empty search field
@@ -444,7 +444,7 @@ assertEquals("select e0 from Order e0 where e0.price > :p1", q2.hql());
 assertEquals(Map.of("p1", 100.0), q2.parameters());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `captured-null-guard`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `captured-null-guard`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -452,7 +452,7 @@ select …
 from orders o1_0
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `captured-null-guard#2`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `captured-null-guard#2`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -478,7 +478,7 @@ JPA の `AttributeConverter` を持つ属性は、Java の値で比べます。H
 
 そのため、条件を Java の値で書いても、保存された行を見つけられます（H2、MariaDB、Oracle で確認済み）。
 
-**(テスト済み)** [`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java)、リージョン `convert`:
+[`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java)、リージョン `convert`:
 
 ```java
 // code is stored reversed ("abc" as "cba"); vip is stored as 'Y'/'N' (YesNoConverter)
@@ -501,7 +501,7 @@ assertEquals(List.of("abc"), codes(literal.toList()));       // Hibernate conver
 | `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | **返されない**（SQL の意味、D48。Java なら返される） |
 | `!o.getActive()`（nullable な `Boolean`） | `e0.active = false` | **返されない**（SQL の意味: NULL は false ではない） |
 
-**(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `boolean`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `boolean`:
 
 ```java
 assertEquals("select e0 from Order e0 where e0.active = true",
@@ -510,7 +510,7 @@ assertEquals("select e0 from Order e0 where e0.active = false",       // primiti
         qb.from(Order.class).where(o -> !o.isActive()).toHql().hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `boolean`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `boolean`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -519,7 +519,7 @@ from orders o1_0
 where o1_0.active=true
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `boolean#2`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `boolean#2`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -555,14 +555,14 @@ lambdaQL はこれを `CASE` ではなく `AND`/`OR` で書くので、データ
 - 2 つの文字列の `==` は、同一性の比較ではなく値の比較です（ルール R2）。[9.4](09-java-notes.md#94-strings) を参照してください。
 - ラムダの中の文字列定数はリテラルとして書かれます。引用符はエスケープされます（`''`）。
 
-**(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `string-literal`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `string-literal`:
 
 ```java
 RenderedQuery q = qb.from(Order.class).where(o -> o.getDescription().equals("O'Brien")).toHql();
 assertEquals("select e0 from Order e0 where e0.description = 'O''Brien'", q.hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `string-literal`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `string-literal`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -589,7 +589,7 @@ qb.from(Order.class).where(o -> !ids.contains(o.getId())).toList();
 ```
 
 コレクションは 1 つのバインドパラメーターになります。
-**(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `in`（テストのエンティティでは status が `short` です）:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `in`（テストのエンティティでは status が `short` です）:
 
 ```java
 List<Short> statuses = List.of((short) 2, (short) 3);
@@ -597,7 +597,7 @@ RenderedQuery q = qb.from(Order.class).where(o -> statuses.contains(o.getStatus(
 assertEquals("select e0 from Order e0 where e0.status in (:p1)", q.hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `in`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `in`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -608,7 +608,7 @@ where o1_0.status in (?,?)
 
 `!contains` は `not in` になります。NULL になりうるカラムも単純な `not in` です（SQL の意味、決定 D48）。
 値が NULL の行は `not in` に一致せず、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します。Java の `!contains` は NULL の値に対して true なので、そのような行を残すには `o.getDescription() == null || !descs.contains(o.getDescription())` のように null チェックを書いてください。
-**(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `not-in`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `not-in`:
 
 ```java
 List<Long> ids = List.of(1L, 2L);
@@ -622,7 +622,7 @@ assertEquals("select e0 from Order e0 where e0.description not in (:p1)",
         qb.from(Order.class).where(o -> !descs.contains(o.getDescription())).toHql().hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `not-in`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `not-in`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -631,7 +631,7 @@ from orders o1_0
 where o1_0.id not in (?,?)
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `not-in#2`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `not-in#2`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -673,7 +673,7 @@ lambdaQL は JPA Metamodel で各ステップをチェックします。
 - 入れ子の値オブジェクトも展開します。
 - 大小比較（`<` など）や別の型との比較は、これまでどおり `LQL-3012` のエラーです。フィールドを比べてください。
 
-**(テスト済み)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)、リージョン `embedded-compare`:
+[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)、リージョン `embedded-compare`:
 
 ```java
 // address is @Embedded (city, zip): comparing the whole value object compares each column (D48)
@@ -695,7 +695,7 @@ assertEquals("select e0 from Order e0 where e0.address.city <> :p1 or e0.address
 ```
 
 `where` の中では、関連のパスはデフォルトで **内部結合（inner join）** です（決定 D36）。
-**(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `inner-join`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `inner-join`:
 
 ```java
 String name = "Kim";
@@ -703,7 +703,7 @@ RenderedQuery q = qb.from(Order.class).where(o -> o.getCustomer().getName().equa
 assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = :p1", q.hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `inner-join`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `inner-join`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -719,7 +719,7 @@ where c1_0.name=?
 **null ガードでは顧客のない注文は残りません。** `where` のパスは常に内部結合です（SQL の意味、決定 D48）。
 そのため、`o.getCustomer() == null || ...` は顧客のない注文に一致しません。その注文には結合する顧客の行がないからです。このような条件について、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します。
 顧客のない注文を残すには、明示的な `leftJoin`（決定 D44、[6.8](06-select-group.md#68-explicit-joins) を参照）を使い、`c == null || ...` と書いてください。
-**(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `null-guard`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `null-guard`:
 
 ```java
 String name = "Kim";
@@ -737,7 +737,7 @@ RenderedQuery q2 = qb.from(Order.class)
 assertEquals("select e0 from Order e0 join e0.customer j1 where e0.customer is not null and j1.name = :p1", q2.hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `null-guard`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `null-guard`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -747,7 +747,7 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is null or c1_0.name=?
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `null-guard#2`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `null-guard#2`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -762,14 +762,14 @@ Hibernate は `e0.customer is null` を `c1_0.id is null` と書きます。内�
 - `||` の他の部分も同じです。`o.getStatus() == 1 || o.getCustomer().getName().equals(name)` も内部結合を使うので、status が 1 でも顧客のない注文は返されません（Java なら返される）。
 
 顧客の **ない** 注文を探すには、関連そのものを比較してください。結合せずに外部キーのカラムをチェックします。
-**(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `no-association`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `no-association`:
 
 ```java
 RenderedQuery q = qb.from(Order.class).where(o -> o.getCustomer() == null).toHql();
 assertEquals("select e0 from Order e0 where e0.customer is null", q.hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `no-association`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `no-association`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -779,14 +779,14 @@ where o1_0.customer_id is null
 ```
 
 関連エンティティの `@Id` で終わるパスは、外部キーのカラムです。結合は不要です。
-**(テスト済み)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `fk-path`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)、リージョン `fk-path`:
 
 ```java
 RenderedQuery q = qb.from(Order.class).where(o -> o.getCustomer().getId() == 1).toHql();
 assertEquals("select e0 from Order e0 where e0.customer.id = 1", q.hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `fk-path`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `fk-path`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)

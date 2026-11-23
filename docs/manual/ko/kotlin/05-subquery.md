@@ -43,7 +43,7 @@ Kotlin에서 `y in values`는 `values.contains(y)`로 컴파일됩니다. 그래
 
 HQL에서 서브쿼리 루트의 별칭은 `s1`, `s2`, ...입니다(바깥 루트는 `e0`). 서브쿼리 안의 조인은 `s1j1` 같은 별칭을 받습니다.
 
-**(테스트됨)** 표시가 있는 예제는 [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)에서 가져온 것입니다. 이 테스트는 Java 테스트 엔티티를 사용합니다. `price`는 기본형 `double`이고 `qty`는 `int`입니다.
+예제는 [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)에서 가져온 것입니다. 이 테스트는 Java 테스트 엔티티를 사용합니다. `price`는 기본형 `double`이고 `qty`는 `int`입니다.
 더 많은 쿼리를 Java로 작성한 테스트가 [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)에 있습니다(H2, MariaDB, Oracle). 그 예제는 [이 페이지의 Java 버전](../java/05-subquery.md)을 참고하십시오.
 
 ## 5.2 EXISTS
@@ -62,7 +62,7 @@ qb.from(Order::class.java)
 //      where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > 10)
 ```
 
-**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `exists`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `exists`:
 
 ```kotlin
 val q = qb.from(Order::class.java)
@@ -125,7 +125,7 @@ qb.from(Order::class.java)
 //      where e0.customer.id in (select s1.id from Customer s1 where s1.grade > 3)
 ```
 
-**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `in`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `in`:
 
 ```kotlin
 val q = qb.from(Order::class.java)
@@ -237,7 +237,7 @@ qb.from(Order::class.java)
 //      where e0.price > (select avg(s1.price) from Order s1)
 ```
 
-**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `scalar`(테스트의 `price`는 `double`이므로 `!!`가 없음):
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `scalar`(테스트의 `price`는 `double`이므로 `!!`가 없음):
 
 ```kotlin
 val q = qb.from(Order::class.java).where { o, sub -> o.price > sub.from(Order::class.java).avg { x -> x.price } }
@@ -379,7 +379,7 @@ where exists(select 1 from orders o1_0 where o1_0.customer_id=c1_0.id and exists
 - 서브쿼리 안의 엔티티는 두 개까지입니다. 조인 형태에서는 `orderBy`와 `limit`을 쓸 수 없습니다.
 - `exists`, 조인한 행의 `sum`, `left join`과 ON 안의 연관 경로를 쓴 `in`을 세 DB에서 실측했습니다.
 
-**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `sub-join`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `sub-join`:
 
 ```kotlin
 // customers with an order that has an item of quantity > 10: the subquery joins Order and Item (D51)

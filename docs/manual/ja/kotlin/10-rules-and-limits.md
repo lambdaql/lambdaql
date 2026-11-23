@@ -165,7 +165,7 @@ persistence unit ごとに `SargablePolicy.register(emf, SargableMode.STRICT)` �
 | `x == null`、`x != null` | `is null`、`is not null` | 2 値 |
 | `it.cnt >= 2.5`（整数カラム、小数の値） | 書いた値のまま比較する: 定数はリテラル（`e0.cnt >= 2.5`）、キャプチャ値と IN リストも小数リテラル（`e0.cnt >= 2.5BD`、`in (2.5BD, 3.0BD)`、D48 B8） | インデックスの範囲スキャンを保つ（MariaDB で実測）。以前のように値を切り捨てて間違った行を返すことはない |
 | 値オブジェクト（`@Embedded`）全体: `it.address == addr`、`it.address != addr` | カラムごとに展開: `e0.address.city = :p1 and e0.address.zip = :p2`、否定は `<> ... or ...`。`== null` はすべてのカラムの `is null`（and）、`!= null` は `is not null`（or） | カラムごとに SQL の意味（D48）: NULL のカラムは `=` にも `<>` にも一致しない。キャプチャしたオブジェクトが `null` なら一致する行なし（`WARN` レベルの `LQL-4045`） |
-| `it.id == id`（`it.id` は `Long?`、`id` はキャプチャした `Long`）、`it.id == null`: NULL になれないカラム（id、プリミティブ、`nullable = false`、パスに関連のステップがない） | `not (e0.id is null or e0.id <> :p1)` の代わりに `e0.id = :p1`。`it.id == null` は `1=0`（Java でテスト済み） | カラムに NULL はない。関連を通るパス（`it.customer?.id`）ではチェックが残る |
+| `it.id == id`（`it.id` は `Long?`、`id` はキャプチャした `Long`）、`it.id == null`: NULL になれないカラム（id、プリミティブ、`nullable = false`、パスに関連のステップがない） | `not (e0.id is null or e0.id <> :p1)` の代わりに `e0.id = :p1`。`it.id == null` は `1=0` | カラムに NULL はない。関連を通るパス（`it.customer?.id`）ではチェックが残る |
 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR` | SQL の 3 値論理 |
 | `it.flag == true` / `it.flag != true` | `e0.flag = true` / `e0.flag <> true` | NULL: 返されない（SQL の意味、D48） |
 | `it.flag ?: false`（条件） | `(e0.flag is not null and e0.flag = true)` | NULL は false として扱う |
@@ -273,7 +273,7 @@ Java だけのルール R4（エンティティの値に対する `equals`）と
 | nullable な `when` / 範囲の対象 | `else` に進む。`!in` は true | 返されない。`NOT` の下でも同じ | SQL の意味（D22） |
 | null にならない型 `String` | 決して null にならない | カラムは NULL になりうる | lambdaQL は JPA のメタデータを使う |
 | ラムダの中の `LocalDateTime.now()` | アプリの時刻 | – | **アプリの時刻** としてバインドされる。DB の時刻（`current_timestamp`）はサポートしない |
-| `Set` の中の等しい要素 | `equals` / `hashCode` が決める（`data class` ではプライマリコンストラクターのプロパティ） | 主キーで行を区別する | Set が行数より小さいと、`toSet()` と `findSet()` は `IllegalStateException` を投げる（エンティティの `equals` / `hashCode` が違う行を等しいと判断する場合や、`@Id` が一意でない場合。たとえばビュー）。`toList()` を使う（D42、Java でテスト済み） |
+| `Set` の中の等しい要素 | `equals` / `hashCode` が決める（`data class` ではプライマリコンストラクターのプロパティ） | 主キーで行を区別する | Set が行数より小さいと、`toSet()` と `findSet()` は `IllegalStateException` を投げる（エンティティの `equals` / `hashCode` が違う行を等しいと判断する場合や、`@Id` が一意でない場合。たとえばビュー）。`toList()` を使う（D42） |
 
 <a id="106-database-differences"></a>
 ## 10.6 データベースごとの違い
@@ -329,12 +329,12 @@ lambdaQL は、NULL になりうるすべてのキーについて HQL に `nulls
 | 項目 | 何が起きるか | lambdaQL |
 |---|---|---|
 | `SET a = ..., b = a + 1`（設定した後でカラムを読む） | MariaDB は **新しい** 値を読み、H2 と Oracle は古い値を読む | 解析時にエラー（U3） |
-| DML の中の関連のパス（`it.customer?.name`） | Hibernate は DB ごとに違う結合を作り、customer のない **行が失われる** | lambdaQL は相関スカラーサブクエリ（`where` の中と SET の中）を書く。`where` では、選択が内部結合するパスに `customer.id is not null` も加えるので、DML はクエリと同じ行に当たる（U9、テスト済み） |
+| DML の中の関連のパス（`it.customer?.name`） | Hibernate は DB ごとに違う結合を作り、customer のない **行が失われる** | lambdaQL は相関スカラーサブクエリ（`where` の中と SET の中）を書く。`where` では、選択が内部結合するパスに `customer.id is not null` も加えるので、DML はクエリと同じ行に当たる（U9） |
 | 同じテーブルに対するサブクエリを使う `DELETE` | MariaDB のエラー 1093 | 対象の id を先に派生テーブルで読む: `d0.id in (select t.id from (select e0.id as id … where <condition>) t)`（U17）。相関サブクエリでも動き、3 つの DB で同じ行を削除する（実測）。`update` は包まない（MariaDB でも動く） |
 | 同じ enum の値を STRING と ORDINAL のカラムに 1 回だけバインドする | H2 と MariaDB は **エラーなしで間違った値** を保存する | 場所ごとに 1 つのパラメーター。共有しない（U7） |
 | `values(list) { }` の多くの行 | Oracle: バインド数の上限は 65,535（ORA-01745）で、それよりずっと前からとても遅い | 分割する: 1 文あたり最大 500 個の値、すべて 1 つのトランザクションで実行（U13） |
-| `order by ... limit` を使う `update` / `delete` | MariaDB は `in` サブクエリの中の `limit`（エラー 1235）と、対象テーブルへのサブクエリ（エラー 1093）を拒否する | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: 派生テーブル `t` は 3 つのデータベースすべてで動く。内側の select は select の結合を使う（D36）ので、行は select と同じ（Java でテスト済み） |
-| `on conflict` / upsert | H2 と Oracle: `merge`。MariaDB: `insert ... on duplicate key update` で、更新した行は 2 と数える。Hibernate の `do nothing` は H2 と Oracle で失敗する | `upsert` と `onConflict(...).update(...)` は Hibernate の形を使う。`ignore()` は `insert ... select ... where not exists` として書く。行数はそのまま返す（D40、テスト済み） |
+| `order by ... limit` を使う `update` / `delete` | MariaDB は `in` サブクエリの中の `limit`（エラー 1235）と、対象テーブルへのサブクエリ（エラー 1093）を拒否する | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: 派生テーブル `t` は 3 つのデータベースすべてで動く。内側の select は select の結合を使う（D36）ので、行は select と同じ |
+| `on conflict` / upsert | H2 と Oracle: `merge`。MariaDB: `insert ... on duplicate key update` で、更新した行は 2 と数える。Hibernate の `do nothing` は H2 と Oracle で失敗する | `upsert` と `onConflict(...).update(...)` は Hibernate の形を使う。`ignore()` は `insert ... select ... where not exists` として書く。行数はそのまま返す（D40） |
 
 <a id="procedures-and-functions"></a>
 ### プロシージャと関数
@@ -462,7 +462,7 @@ H2 には OUT パラメーターがないので、プロシージャの機能は
 | 同時の挿入に対してアトミックな `onConflict { ... }.ignore()` | キー重複のエラーを捕捉する（`ignore()` は `not exists` を使う。[7.6](07-6-upsert.md) を参照） |
 | `insert ... select` からの upsert | `values(list) { ... }` で 1 行ずつ upsert する |
 | `limit(n)` のない update や delete での `orderBy { ... }` | `limit(n)` を加えるか、`orderBy` を取り除く（そうしないと `IllegalStateException`） |
-| 1 行だけを変更すべき update や delete を、`execute() == 1` とロールバックで確認する | `executeOne()`: 先に id を読む（最大 2 つ）。2 つなら何も変更せずに `NonUniqueResultException` を投げる。1 つならその行を `id = :p and (条件)` で変更する。2 行以上を変更することはない（D41、Java でテスト済み） |
+| 1 行だけを変更すべき update や delete を、`execute() == 1` とロールバックで確認する | `executeOne()`: 先に id を読む（最大 2 つ）。2 つなら何も変更せずに `NonUniqueResultException` を投げる。1 つならその行を `id = :p and (条件)` で変更する。2 行以上を変更することはない（D41） |
 | `executeOne()` を `orderBy` や `limit` と一緒に使う | どちらか一方を使う（そうしないと `IllegalStateException`） |
 | update や delete での `offset` | 予定なし（D42）。DML にあるのは `limit(n)` だけ。`where { }`、`orderBy { }`、`limit(n)` で対象の行を選ぶ |
 | 複合キーのエンティティでの `limit` や `executeOne()` | まだ対応していない。先に id をクエリし、その後で `delete ... where { it.id in ids }` |

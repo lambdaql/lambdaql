@@ -79,7 +79,7 @@ lambdaQL には 5 つの入口があります。
 
 `value` は静的関数 `org.lambdaql.Dml.value` です（決定 D49）。`import static org.lambdaql.Dml.value;` で取り込み、引数 1 つのラムダの中で使います。
 
-**(テスト済み)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `update-value`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `update-value`:
 
 ```java
 // entities without setters: Dml.value(column, value), the column written as a getter call
@@ -91,7 +91,7 @@ assertEquals("update Order e0 set e0.description = 'done' where e0.status = 2", 
 
 **SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 7.4 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `update-value`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `update-value`:
 
 ```sql
 -- H2, MariaDB
@@ -133,7 +133,7 @@ qb.update(Order.class).set(o -> value(o.getCustomer().getId(), cid)).where(o -> 
 - 独自の `value(...)` メソッドを持つクラス（たとえば `value` コンポーネントを持つレコード）の中では、静的インポートが隠されます。そこでは `Dml.value(...)` と書いてください。
 - `o.getTotal() = 1` のような書き方は Java ではコンパイルエラーなので使えません。
 
-**(テスト済み)** [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)、リージョン `value-type`:
+[`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)、リージョン `value-type`:
 
 ```java
 // value(V, V) compiles with any two types, so lambdaQL checks the value type against the column (U20)
@@ -146,7 +146,7 @@ LambdaQLException fraction = assertThrows(LambdaQLException.class, () -> setters
 assertEquals("LQL-3065", fraction.code(), fraction.getMessage());
 ```
 
-**(テスト済み)** [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)、リージョン `read-value`:
+[`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)、リージョン `read-value`:
 
 ```java
 // Dml.value(column, value) for entities without setters; constants stay literals, also when they are boxed
@@ -164,7 +164,7 @@ assertEquals("[col0.status := 2, col0.customer.id := 1]",
 代入ラムダの 2 番目の引数は、サブクエリの起点 `sub` です。`where((o, sub) -> ...)` と同じ書き方です（決定 D49）。
 `insert ... select` では 3 番目の引数が `sub` です（[7.5](07-5-insert.md) を参照）。
 
-**(テスト済み)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `update-sub`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `update-sub`:
 
 ```java
 // the second parameter starts a subquery, as in where((o, sub) -> ...) (D49)
@@ -243,7 +243,7 @@ SQL では、SET の右辺にあるすべてのカラムは更新 **前** の値
 | `o.setTotal(o.getPrice()); o.setPrice(0.0);`（先に読み、あとで代入） | 許可 |
 | `o.setPrice(...); o.setTotal(o.getPrice());`（先に代入し、あとで読む） | **エラー** |
 
-この確認は物理カラム（埋め込みのサブカラム、FK カラム）単位で行われ、複数の `set()` 呼び出しにまたがっても適用されます（[PATCH](07-2-update.md#many-set-calls-patch) でテスト済み）。
+この確認は物理カラム（埋め込みのサブカラム、FK カラム）単位で行われ、複数の `set()` 呼び出しにまたがっても適用されます（[PATCH](07-2-update.md#many-set-calls-patch) を参照）。
 
 <a id="assign-a-column-only-once"></a>
 ### カラムへの代入は 1 回だけ
@@ -256,7 +256,7 @@ SQL では、SET の右辺にあるすべてのカラムは更新 **前** の値
 
 lambdaQL は、ラムダを読むときにルール U1、U3、U4、U6 を確認します。次のテストはユーザー API ではなく、内部クラス `AssignmentReader` を呼びます。ユーザー API では、`set(...)` と `values(...)` が同じ `LambdaQLException` を投げます（たとえば U1 は `LQL-3037`、U3 は `LQL-3042`、U4 は `LQL-3041`）。
 
-**(テスト済み)** [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)、リージョン `rules`:
+[`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)、リージョン `rules`:
 
 ```java
 // U1: only setters; no condition, no local variable
@@ -296,7 +296,7 @@ o.setCustName(o.getCustomer().getName())
 lambdaQL はサブクエリを自分で書きます。そうすると文は自分のテーブルだけを読むので、対象テーブルの読み取りに関する MariaDB の制約（エラー 1093）に当たりません。
 
 選択では、`where` の中のパスに内部結合を使います（決定 D36）。そのため DML では、lambdaQL はそのようなパスに `e0.customer.id is not null` を加えます。
-その結果、`update` と `delete` は `qb.from(X.class).where(同じラムダ)` が返す **まったく同じ行** だけを対象にします（テスト済み: 削除した行を選択の結果と比べています）。
+その結果、`update` と `delete` は `qb.from(X.class).where(同じラムダ)` が返す **まったく同じ行** だけを対象にします（削除した行を選択の結果と比べています）。
 `o.getCustomer() == null || ...` のような null ガードがあっても同じです。選択でもこのパスに内部結合を使うので（決定 D48）、確認は残ります。
 
 `@Id` で終わるパス（`o.getCustomer().getId()`）は FK カラムです。サブクエリも結合も使いません。
@@ -312,7 +312,7 @@ lambdaQL はサブクエリを自分で書きます。そうすると文は自�
 | 上限 | 1 文あたり値 500 個以下（固定） |
 | 戻り値 | すべての文の合計 |
 | トランザクション | すべての文を 1 つのトランザクションで実行 |
-| 空のリスト | SQL なし、0 を返す（テスト済み） |
+| 空のリスト | SQL なし、0 を返す |
 
 Oracle にはバインド値 65,535 個という厳しい上限があります（ORA-01745）。パースはそれよりずっと前からとても遅くなります
 （設計時のテストでは 21,845 行で約 6 分）。そのため上限を小さくしています。
@@ -357,7 +357,7 @@ qb.delete(Order.class).where(o -> o.getStatus() == 1).orderBy((o, by) -> by.asc(
 | ビルダー | トランザクション |
 |---|---|
 | `new QueryBuilder(entityManagerFactory)` | `execute()` と `executeOne()` が自分でトランザクションを開いてコミットします。エラーのときはロールバックします |
-| `EntityManager` を使うビルダー: `new QueryBuilder(entityManager)`、Spring の `QueryBuilder` の Bean、リポジトリの実行器 | 呼び出し側のトランザクション（`@Transactional`、またはその `EntityManager` の有効なトランザクション）。トランザクションがなければ、SQL を送る前に `TransactionRequiredException` で失敗します（テスト済み）。Spring のリポジトリ呼び出しでは `InvalidDataAccessApiUsageException` になります（[12.6](12-spring-data-jpa.md#126-transactions-and-exceptions) を参照） |
+| `EntityManager` を使うビルダー: `new QueryBuilder(entityManager)`、Spring の `QueryBuilder` の Bean、リポジトリの実行器 | 呼び出し側のトランザクション（`@Transactional`、またはその `EntityManager` の有効なトランザクション）。トランザクションがなければ、SQL を送る前に `TransactionRequiredException` で失敗します。Spring のリポジトリ呼び出しでは `InvalidDataAccessApiUsageException` になります（[12.6](12-spring-data-jpa.md#126-transactions-and-exceptions) を参照） |
 
 <a id="the-persistence-context-is-not-updated"></a>
 ### 永続コンテキストへの未反映
@@ -382,7 +382,7 @@ lambdaQL はこの条件を別に処理しません。
 <a id="79-all-rules-u1-to-u21-summary"></a>
 ## 7.9 ルール U1 から U21 のすべて（まとめ）
 
-lambdaQL がラムダを読むときに確認するルール: U1、U3、U4、U6（テスト済み）。コンパイラーが確認するルール: U5。
+lambdaQL がラムダを読むときに確認するルール: U1、U3、U4、U6。コンパイラーが確認するルール: U5。
 U11、U12、U15 の lambdaQL による確認はまだ実装されていません。
 
 | # | ルール |

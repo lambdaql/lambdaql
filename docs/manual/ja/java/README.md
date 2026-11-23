@@ -55,7 +55,7 @@ fetch first ? rows only
 
 > [!NOTE]
 > **例について。**
-> 例は設計上の例です。機能が実装されると、その例はテストスイートから取ったコードに置き換えられ、テストファイルへのリンクが付きます。[3. 条件](03-where.md)、[4. ソートとページング](04-order-paging.md)、[5. サブクエリ](05-subquery.md)、[6. 選択、集計、グループ化](06-select-group.md)、[7. 更新、挿入、削除](07-dml.md)、[8. プロシージャと DB 関数](08-procedures-functions.md)、[11. エラーと言語](../11-errors-and-languages.md)、[12. Spring Data JPA](12-spring-data-jpa.md) では、それらの例に **(テスト済み)** と書いてあります。
+> コード例はすべて、Java のテストコードの一部分をそのまま写したものです。コードの上にテストファイルと部分の名前（領域 `name`）を書きます。テストは lambdaQL が作った HQL と、返した行を確認します。
 
 <a id="contents"></a>
 ## 目次

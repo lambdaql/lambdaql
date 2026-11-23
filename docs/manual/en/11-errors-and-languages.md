@@ -11,7 +11,7 @@ This page is for both languages. Code is shown in separate **Java** and **Kotlin
 Every lambdaQL message starts with a code in the form `[LQL-xxxx]`.
 The code does not depend on the language. Only the text after the code is translated.
 
-**(tested)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), region `format`:
+[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), region `format`:
 
 ```java
 LqlMessages.setLocale(Locale.ENGLISH);
@@ -113,7 +113,7 @@ Methods of `LambdaQLException`:
 | `getMessage()` | The message in the lambdaQL language that was selected when the exception was created |
 | `getMessage(Locale locale)` | The same message in another language, for example `Locale.ROOT` for English |
 
-**(tested)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), region `exception`:
+[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), region `exception`:
 
 ```java
 LqlMessages.setLocale(Locale.KOREAN);
@@ -270,7 +270,7 @@ Some methods exist only to be read inside a lambda. Their return values are plac
 
 #### Java
 
-**(tested)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `rules` (the first lines):
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), region `rules` (the first lines):
 
 ```java
 // the body never runs in Java
@@ -319,7 +319,7 @@ Then lambdaQL looks only at the **language** of that locale.
 | `ko` (for example `ko_KR`) | Korean |
 | anything else (`en`, `fr`, `de`, ...) | English |
 
-**(tested)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), region `locale`:
+[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), region `locale`:
 
 ```java
 // 1. setLocale wins, 2. then -Dlambdaql.locale, 3. then the JVM default
@@ -380,7 +380,7 @@ org/lambdaql/i18n/LqlMessages_ko.properties   Korean
 - lambdaQL does not use `MessageFormat`. So you can write a single quote (`can't`) as is. Numbers are not formatted (line `1234567` stays `1234567`).
 - Every key must exist in all four files, with the same arguments. A unit test checks this. A new message must be added in all four languages.
 
-**(tested)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), region `fill`:
+[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java), region `fill`:
 
 ```java
 // no MessageFormat: quotes and big numbers stay as they are (rule I4)

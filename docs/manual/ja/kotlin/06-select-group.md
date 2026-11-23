@@ -60,7 +60,7 @@ data class Total(val count: Long, val average: Double?)
 > このようなパラメーターに NULL が入ると、lambdaQL は `IllegalStateException` を投げます。プリミティブの場合、メッセージにはその引数と、ラッパー型を使うようにという案内が入っています。
 > `count` は決して NULL を返さないので、`count: Long` で問題ありません。
 
-**(テスト済み)** と書かれた例は [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt) から取ったものです。このテストは Java のテスト用エンティティ（`price` はプリミティブの `double`、`status` は `short`、`Customer.id` は `int`）と、次の結果の型を使います。
+例は [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt) から取ったものです。このテストは Java のテスト用エンティティ（`price` はプリミティブの `double`、`status` は `short`、`Customer.id` は `int`）と、次の結果の型を使います。
 
 ```kotlin
 /** A row of one order (Kotlin data class). */
@@ -146,14 +146,14 @@ val pairs: List<Pair<String?, Double?>> = qb.from(Order::class.java)
 // HQL: select j1.name, e0.price from Order e0 left join e0.customer j1
 ```
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `data-class`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `data-class`:
 
 ```kotlin
 val q = qb.from(Order::class.java).select { OrderRow(it.id, it.customer?.name, it.price) }
 assertEquals("select e0.id, j1.name, e0.price from Order e0 left join e0.customer j1", q.toHql().hql())
 ```
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `pair`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `pair`:
 
 ```kotlin
 val q = qb.from(Order::class.java).where { it.status.toInt() == 1 }.select { it.customer?.name to it.price }
@@ -303,7 +303,7 @@ val counts: List<KeyCount> = qb.from(Order::class.java)
 .groupBy { Triple(it.customer?.id, it.status, it.active) }    // キーが 3 つ
 ```
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `group-many`（結果は `Triple`）:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `group-many`（結果は `Triple`）:
 
 ```kotlin
 val q = qb.from(Order::class.java)
@@ -366,7 +366,7 @@ val big: List<Stat> = qb.from(Order::class.java)
 //      having sum(e0.price) > 200.0
 ```
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `group-by`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `group-by`:
 
 ```kotlin
 val q = qb.from(Order::class.java)
@@ -548,7 +548,7 @@ val q = qb.from(Order::class.java)
 ```
 
 > [!WARNING]
-> 結合の条件に一致する行が複数あると、**主エンティティの行が繰り返されます**。一致ごとに 1 回です。`toList()` と `count()` は繰り返された行もすべて数えます（Java でテスト済み）。
+> 結合の条件に一致する行が複数あると、**主エンティティの行が繰り返されます**。一致ごとに 1 回です。`toList()` と `count()` は繰り返された行もすべて数えます。
 > 注文ごとに 1 回だけ必要な場合は、結合の代わりに `exists()` のサブクエリ（[5. サブクエリ](05-subquery.md)）を使うか、結合クエリに `distinct()` を適用してください（[結合結果の `distinct()`](#distinct-on-a-join) を参照）。
 
 <a id="cross-join"></a>
@@ -593,7 +593,7 @@ val pairs = qb.from(Order::class.java)
 - `distinct()` の後に `select(...)` を書くと、値を `select distinct` で取得します。
 - まず `exists` のサブクエリ（[5. サブクエリ](05-subquery.md)）を検討してください。繰り返しなしで同じ行を返し、多くの場合より速く動きます。
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `join-distinct`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `join-distinct`:
 
 ```kotlin
 // an order with two matching items would come twice; distinct() returns it once
@@ -616,7 +616,7 @@ assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.
 - 派生した行には id がないので、`x == null` はエラー（`LQL-3067`）です。`x.customerId == null` のようにカラムを比較してください。
 - Hibernate 7.4（以前の 6.6 も）は、エンティティの `select distinct`、派生テーブルと CTE の inner/left join、サブクエリの中のエンティティの結合を受け付けます（3 つの DB で実測）。
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `join-cte`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `join-cte`:
 
 ```kotlin
 // the total of each customer, joined to the customer row
@@ -720,7 +720,7 @@ Hibernate 7.4 は派生テーブルのカラムに `c0`、`c1`、`c2` のよう�
 
 - 行の型は **Kotlin の data class**（または Java の record）でなければなりません（ルール J5）。
   lambdaQL は data class のプロパティから、プライマリコンストラクターの順でカラム名を取ります。
-- 通常のクラス、`Pair`、`Triple`、値 1 つは、ここでは使えません。lambdaQL がカラム名を決められないからです。この場合 `TranslationException`（`LQL-3064`）が発生します（Java では値 1 つでテスト済み）。
+- 通常のクラス、`Pair`、`Triple`、値 1 つは、ここでは使えません。lambdaQL がカラム名を決められないからです。この場合 `TranslationException`（`LQL-3064`）が発生します。
 
 エンティティのクエリに派生テーブルを結合する形は、[派生テーブルと CTE の結合](#join-a-derived-table-or-cte) を参照してください（D51）。
 
@@ -772,7 +772,7 @@ MariaDB と Oracle は本物の `with` を実行します。カラムのリス�
 
 - CTE の名前は `t` です。外側のクエリでは必ずエイリアス `e0` を付けます（`from t e0`）。HQL ではエイリアスが必要です（ルール J6）。
 - CTE のカラム名は select のエイリアス（`as customerId`）で決めます。HQL は CTE 名の後のカラムリストを受け付けず、カラムリストは Hibernate が SQL に追加します（ルール J6）。
-- MariaDB と Oracle は本物の `with` を実行します。H2 では、Hibernate がそれを派生テーブルに展開します。結果は同じです（3 つのデータベースで Java のラムダによりテスト済み）。
+- MariaDB と Oracle は本物の `with` を実行します。H2 では、Hibernate がそれを派生テーブルに展開します。結果は同じです。
 - 行の型のルールは派生テーブルと同じで、data class または record です（J5）。
 - エンティティのクエリに CTE を結合する形は、[派生テーブルと CTE の結合](#join-a-derived-table-or-cte) を参照してください（D51）。
 - 同じ CTE を 1 つのクエリで 2 回読めます。定義は 1 回だけ書きます（[派生テーブルと CTE の結合](#join-a-derived-table-or-cte) を参照）。
@@ -785,13 +785,13 @@ MariaDB と Oracle は本物の `with` を実行します。カラムのリス�
 
 | # | ルール | 状況 |
 |---|---|---|
-| J1 | `select` のラムダは **1 つの値の式** または **1 つのコンストラクター呼び出し** を返す。コンストラクターの各引数は値の式（[3. 条件（`where`）](03-where.md) のルール）。`select` だけで使う関連のパスは `left join` のエイリアスになるので、行は失われない。必須の関連（`optional = false`）は inner join（A4）。同じパスを `where` で使うと、`select` は `where` の結合を使う（R24）。 | 実装済み（Java と Kotlin のラムダでテスト済み） |
-| J2 | コンストラクターの場合、lambdaQL はカラムだけを選択し、コンストラクターを直接呼び出す。`select new` は書かない。`Pair`/`Triple` も同じ方法で作る。 | 実装済み（Java と Kotlin のラムダでテスト済み） |
-| J3 | 集約がある場合、`select` と `having`（と `insert ... select` の値）の中の集約でない値はすべて `groupBy` のキーでなければならない。そうでなければ、解析時にエラー。 | 実装済み（Java のラムダでテスト済み）。エラーは `TranslationException`（`LQL-3035`、[11](../11-errors-and-languages.md) を参照） |
-| J4 | 行がない、またはすべての値が NULL のとき、`sum`/`avg`/`min`/`max` は NULL を返す。`count` は 0 を返す。コンストラクターのパラメーターは nullable にする。non-null のパラメーターに NULL が入ると `IllegalStateException` が発生する。 | 実装済み（Java のラムダでテスト済み） |
-| J5 | 派生テーブルまたは CTE の行の型: **Kotlin の data class または Java の record のみ**。通常のクラスは単純な `select` でだけ使える。そうでなければ `LQL-3064`。結合した派生テーブルと CTE の行にも適用する（D51）。派生した行は `null` と比較できない（`LQL-3067`）。 | 実装済み（Java のラムダでテスト済み） |
-| J6 | `qb.with(...)` で作った CTE は、select のエイリアスでカラム名を付ける: `with t as (select d0.customer.id as customerId, ...) select e0.customerId ... from t e0`。HQL は名前の後のカラムリストを受け付けない。Hibernate は `with t (col list) as (...)` を `SyntaxException` で拒否する。カラムリストは Hibernate 自身が SQL に書く（MariaDB と Oracle で `with t (customerId,cnt,total) as (...)`）。H2 は CTE を派生テーブルに変える。外側のクエリでは必ずエイリアスを使う（`from t e0`）。 | 実装済み（Java のラムダでテスト済み） |
-| J7 | `distinct()` は `select distinct` を出力する。ソートと一緒に使う場合、ソートキーは select リストに含まれていなければならない（DB のルール）。lambdaQL は解析時にこれをチェックする。結合結果の `distinct()` では、ソートキーは主エンティティ自身のカラムでなければならない（D51）。 | 実装済み（Java のラムダでテスト済み） |
+| J1 | `select` のラムダは **1 つの値の式** または **1 つのコンストラクター呼び出し** を返す。コンストラクターの各引数は値の式（[3. 条件（`where`）](03-where.md) のルール）。`select` だけで使う関連のパスは `left join` のエイリアスになるので、行は失われない。必須の関連（`optional = false`）は inner join（A4）。同じパスを `where` で使うと、`select` は `where` の結合を使う（R24）。 | 実装済み |
+| J2 | コンストラクターの場合、lambdaQL はカラムだけを選択し、コンストラクターを直接呼び出す。`select new` は書かない。`Pair`/`Triple` も同じ方法で作る。 | 実装済み |
+| J3 | 集約がある場合、`select` と `having`（と `insert ... select` の値）の中の集約でない値はすべて `groupBy` のキーでなければならない。そうでなければ、解析時にエラー。 | 実装済み。エラーは `TranslationException`（`LQL-3035`、[11](../11-errors-and-languages.md) を参照） |
+| J4 | 行がない、またはすべての値が NULL のとき、`sum`/`avg`/`min`/`max` は NULL を返す。`count` は 0 を返す。コンストラクターのパラメーターは nullable にする。non-null のパラメーターに NULL が入ると `IllegalStateException` が発生する。 | 実装済み |
+| J5 | 派生テーブルまたは CTE の行の型: **Kotlin の data class または Java の record のみ**。通常のクラスは単純な `select` でだけ使える。そうでなければ `LQL-3064`。結合した派生テーブルと CTE の行にも適用する（D51）。派生した行は `null` と比較できない（`LQL-3067`）。 | 実装済み |
+| J6 | `qb.with(...)` で作った CTE は、select のエイリアスでカラム名を付ける: `with t as (select d0.customer.id as customerId, ...) select e0.customerId ... from t e0`。HQL は名前の後のカラムリストを受け付けない。Hibernate は `with t (col list) as (...)` を `SyntaxException` で拒否する。カラムリストは Hibernate 自身が SQL に書く（MariaDB と Oracle で `with t (customerId,cnt,total) as (...)`）。H2 は CTE を派生テーブルに変える。外側のクエリでは必ずエイリアスを使う（`from t e0`）。 | 実装済み |
+| J7 | `distinct()` は `select distinct` を出力する。ソートと一緒に使う場合、ソートキーは select リストに含まれていなければならない（DB のルール）。lambdaQL は解析時にこれをチェックする。結合結果の `distinct()` では、ソートキーは主エンティティ自身のカラムでなければならない（D51）。 | 実装済み |
 | J8 | 選択は、ソート（[4. ソートとページング](04-order-paging.md)）、ページング、サブクエリ（[5. サブクエリ](05-subquery.md)）と一緒に動作する。集約によるソート（`by.desc(s.total)`）は v0.2 の候補。 | 実装済み。集約によるソートは除く |
 
 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) の Java のテストのリージョン `rules` が、J3、`where` の中の `Agg`、J7、J4 を確認します。[このページの Java 版](../java/06-select-group.md#611-rules-j1-to-j8) を参照してください。

@@ -28,7 +28,7 @@ insert into archive(id,price,customer_name)
 values (100,9.5,'Kim')
 ```
 
-**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `insert-delete`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `insert-delete`:
 
 ```kotlin
 val i = qb.insert(Archive::class.java).values { it.id = 100L; it.price = 9.5; it.customerName = "Kim" }
@@ -54,7 +54,7 @@ qb.insert(Order::class.java).values { o -> value(o.id, id); value(o.status, 1) }
 `values { a, sub -> ... }`처럼 인자가 둘인 람다를 쓰면 두 번째 인자 `sub`로 서브쿼리를 만들 수 있습니다(결정 D49).
 upsert의 `values { a, sub -> ... }`와 `onConflict { ... }.update { a, sub -> ... }`도 같습니다([7.6](07-6-upsert.md#your-own-change-onconflictkeyupdate) 참고).
 
-**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `insert-values-sub`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `insert-values-sub`:
 
 ```kotlin
 // values { a, sub -> ... }: a subquery can read captured values, not the new row (D49)

@@ -79,7 +79,7 @@ lambdaQL 有五个入口：
 
 `value` 是静态函数 `org.lambdaql.Dml.value`（决策 D49）。用 `import static org.lambdaql.Dml.value;` 导入，在单参数 Lambda 中使用。
 
-**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `update-value`：
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `update-value`：
 
 ```java
 // entities without setters: Dml.value(column, value), the column written as a getter call
@@ -91,7 +91,7 @@ assertEquals("update Order e0 set e0.description = 'done' where e0.status = 2", 
 
 **关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 7.4 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `update-value`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `update-value`：
 
 ```sql
 -- H2, MariaDB
@@ -133,7 +133,7 @@ qb.update(Order.class).set(o -> value(o.getCustomer().getId(), cid)).where(o -> 
 - 在自身带有 `value(...)` 方法的类（例如带有 `value` 组件的 record）中，静态 import 会被遮蔽。在那里请写 `Dml.value(...)`。
 - `o.getTotal() = 1` 这样的写法在 Java 中是编译错误，不能使用。
 
-**(已测试)** [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)，region `value-type`：
+[`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)，region `value-type`：
 
 ```java
 // value(V, V) compiles with any two types, so lambdaQL checks the value type against the column (U20)
@@ -146,7 +146,7 @@ LambdaQLException fraction = assertThrows(LambdaQLException.class, () -> setters
 assertEquals("LQL-3065", fraction.code(), fraction.getMessage());
 ```
 
-**(已测试)** [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)，region `read-value`：
+[`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)，region `read-value`：
 
 ```java
 // Dml.value(column, value) for entities without setters; constants stay literals, also when they are boxed
@@ -164,7 +164,7 @@ assertEquals("[col0.status := 2, col0.customer.id := 1]",
 赋值 Lambda 的第二个参数是子查询的起点 `sub`，写法与 `where((o, sub) -> ...)` 相同（决策 D49）。
 在 `insert ... select` 中，第三个参数是 `sub`（见 [7.5](07-5-insert.md)）。
 
-**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `update-sub`：
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `update-sub`：
 
 ```java
 // the second parameter starts a subquery, as in where((o, sub) -> ...) (D49)
@@ -243,7 +243,7 @@ assertEquals("update Order e0 set e0.price = coalesce((select sum(s1.price) from
 | `o.setTotal(o.getPrice()); o.setPrice(0.0);`（先读取，后赋值） | 可以 |
 | `o.setPrice(...); o.setTotal(o.getPrice());`（先赋值，后读取） | **错误** |
 
-该检查针对物理列（嵌入的子列、外键列），也跨多个 `set()` 调用进行（在 [PATCH](07-2-update.md#many-set-calls-patch) 中测试）。
+该检查针对物理列（嵌入的子列、外键列），也跨多个 `set()` 调用进行（见 [PATCH](07-2-update.md#many-set-calls-patch)）。
 
 <a id="assign-a-column-only-once"></a>
 ### 每列只能赋值一次
@@ -256,7 +256,7 @@ assertEquals("update Order e0 set e0.price = coalesce((select sum(s1.price) from
 
 lambdaQL 在读取 Lambda 时检查规则 U1、U3、U4 和 U6。下面的测试调用的是内部类 `AssignmentReader`，而不是用户 API。用户 API 会从 `set(...)` 和 `values(...)` 抛出同样的 `LambdaQLException`（例如 U1 为 `LQL-3037`，U3 为 `LQL-3042`，U4 为 `LQL-3041`）。
 
-**(已测试)** [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)，region `rules`：
+[`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)，region `rules`：
 
 ```java
 // U1: only setters; no condition, no local variable
@@ -296,7 +296,7 @@ o.setCustName(o.getCustomer().getName())
 lambdaQL 自己编写这些子查询。这样语句只读取自己的表，所以 MariaDB 对读取目标表的限制（错误 1093）不会生效。
 
 查询对 `where` 中的路径使用内连接（决策 D36）。因此在 DML 中，lambdaQL 会为这样的路径加上 `e0.customer.id is not null`。
-这样 `update` 和 `delete` 处理的**正好是** `qb.from(X.class).where(同一个 Lambda)` 返回的那些行（已测试：把删除的行与查询结果进行比较）。
+这样 `update` 和 `delete` 处理的**正好是** `qb.from(X.class).where(同一个 Lambda)` 返回的那些行（把删除的行与查询结果进行比较）。
 有 `o.getCustomer() == null || ...` 这样的 null 守卫时也一样。查询对该路径同样使用内连接（决策 D48），所以检查保留。
 
 以 `@Id` 结尾的路径（`o.getCustomer().getId()`）是外键列。没有子查询，也没有 join。
@@ -312,7 +312,7 @@ lambdaQL 自己编写这些子查询。这样语句只读取自己的表，所�
 | 上限 | 每条语句最多 500 个值（固定） |
 | 返回值 | 所有语句的总和 |
 | 事务 | 所有语句在一个事务中执行 |
-| 空列表 | 不执行 SQL，返回 0（已测试） |
+| 空列表 | 不执行 SQL，返回 0 |
 
 Oracle 有 65,535 个绑定值的硬性上限（ORA-01745）。远在达到上限之前，解析就会变得非常慢
 （设计阶段的测试中 21,845 行大约需要 6 分钟）。所以上限设得较小。
@@ -357,7 +357,7 @@ qb.delete(Order.class).where(o -> o.getStatus() == 1).orderBy((o, by) -> by.asc(
 | 构建器 | 事务 |
 |---|---|
 | `new QueryBuilder(entityManagerFactory)` | `execute()` 和 `executeOne()` 打开自己的事务并提交。出错时回滚 |
-| 使用 `EntityManager` 的构建器：`new QueryBuilder(entityManager)`、Spring 的 `QueryBuilder` bean、repository 执行器 | 使用调用方的事务（`@Transactional`，或该 `EntityManager` 中处于活动状态的事务）。没有事务时，语句在发送任何 SQL 之前以 `TransactionRequiredException` 失败（已测试）。在 Spring 的 repository 调用中，它会变为 `InvalidDataAccessApiUsageException`（见 [12.6](12-spring-data-jpa.md#126-transactions-and-exceptions)） |
+| 使用 `EntityManager` 的构建器：`new QueryBuilder(entityManager)`、Spring 的 `QueryBuilder` bean、repository 执行器 | 使用调用方的事务（`@Transactional`，或该 `EntityManager` 中处于活动状态的事务）。没有事务时，语句在发送任何 SQL 之前以 `TransactionRequiredException` 失败。在 Spring 的 repository 调用中，它会变为 `InvalidDataAccessApiUsageException`（见 [12.6](12-spring-data-jpa.md#126-transactions-and-exceptions)） |
 
 <a id="the-persistence-context-is-not-updated"></a>
 ### 持久化上下文不会被更新
@@ -382,7 +382,7 @@ lambdaQL 不单独处理这些条件。
 <a id="79-all-rules-u1-to-u21-summary"></a>
 ## 7.9 全部规则 U1 至 U21（汇总）
 
-lambdaQL 读取 Lambda 时检查：U1、U3、U4、U6（已测试）。由编译器检查：U5。
+lambdaQL 读取 Lambda 时检查：U1、U3、U4、U6。由编译器检查：U5。
 U11、U12、U15 的 lambdaQL 检查尚未实现。
 
 | # | 规则 |

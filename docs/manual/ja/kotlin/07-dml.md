@@ -93,7 +93,7 @@ Java のテストは、同じ名前の Java のテスト用エンティティを
 
 `value` は関数 `org.lambdaql.Dml.value` です（決定 D49）。`import org.lambdaql.Dml.value` で取り込み、引数 1 つのラムダの中で使います。
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `update-value`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `update-value`:
 
 ```kotlin
 // entities without setters (val): Dml.value(column, value)
@@ -155,7 +155,7 @@ qb.update(Order::class.java).set { o -> value(o.customer?.id, cid) }.where { it.
 代入ラムダの 2 番目の引数は、サブクエリの起点 `sub` です。`where { o, sub -> ... }` と同じ書き方です（決定 D49）。
 `insert ... select` では 3 番目の引数が `sub` です（[7.5](07-5-insert.md) を参照）。
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `update-sub`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `update-sub`:
 
 ```kotlin
 // the second parameter starts a subquery, as in where { o, sub -> ... } (D49)
@@ -271,7 +271,7 @@ it.custName = it.customer?.name
 lambdaQL はサブクエリを自分で書きます。そうすると文は自分のテーブルだけを読むので、対象テーブルの読み取りに関する MariaDB の制約（エラー 1093）に当たりません。
 
 選択では、`where` の中のパスに内部結合を使います（決定 D36）。そのため DML では、lambdaQL はそのようなパスに `e0.customer.id is not null` を加えます。
-その結果、`update` と `delete` は `qb.from(X::class.java).where { 同じラムダ }` が返す **まったく同じ行** だけを対象にします（Java でテスト済み: 削除した行を選択の結果と比べています）。
+その結果、`update` と `delete` は `qb.from(X::class.java).where { 同じラムダ }` が返す **まったく同じ行** だけを対象にします（削除した行を選択の結果と比べています）。
 `!!` か印なしで書いた null ガード（`it.customer == null || it.customer!!.name == ...`）があっても同じです。選択でもこのパスに内部結合を使うので（決定 D48）、確認は残ります。
 `?.` でたどった段階が選択で `left join` になる条件なら（`it.status == 1 || it.customer?.name == "Kim"`、決定 D54）、この確認を加えません。このときも DML は選択と同じ行を対象にします（[7.2](07-2-update.md) のリージョン `update-safe-call`）。
 
@@ -288,7 +288,7 @@ lambdaQL はサブクエリを自分で書きます。そうすると文は自�
 | 上限 | 1 文あたり値 500 個以下（固定） |
 | 戻り値 | すべての文の合計 |
 | トランザクション | すべての文を 1 つのトランザクションで実行 |
-| 空のリスト | SQL なし、0 を返す（Java でテスト済み） |
+| 空のリスト | SQL なし、0 を返す |
 
 Oracle にはバインド値 65,535 個という厳しい上限があります（ORA-01745）。パースはそれよりずっと前からとても遅くなります
 （設計時のテストでは 21,845 行で約 6 分）。そのため上限を小さくしています。
@@ -333,7 +333,7 @@ qb.delete(Order::class.java).where { it.status == 1 }.orderBy { o, by -> by.asc(
 | ビルダー | トランザクション |
 |---|---|
 | `QueryBuilder(entityManagerFactory)` | `execute()` と `executeOne()` が自分でトランザクションを開いてコミットします。エラーのときはロールバックします |
-| `EntityManager` を使うビルダー: `QueryBuilder(entityManager)`、Spring の `QueryBuilder` の Bean、リポジトリの実行器 | 呼び出し側のトランザクション（`@Transactional`、またはその `EntityManager` の有効なトランザクション）。トランザクションがなければ、SQL を送る前に `TransactionRequiredException` で失敗します（テスト済み、Java）。Spring のリポジトリ呼び出しでは `InvalidDataAccessApiUsageException` になります（[12.6](12-spring-data-jpa.md#126-transactions-and-exceptions) を参照） |
+| `EntityManager` を使うビルダー: `QueryBuilder(entityManager)`、Spring の `QueryBuilder` の Bean、リポジトリの実行器 | 呼び出し側のトランザクション（`@Transactional`、またはその `EntityManager` の有効なトランザクション）。トランザクションがなければ、SQL を送る前に `TransactionRequiredException` で失敗します（Java）。Spring のリポジトリ呼び出しでは `InvalidDataAccessApiUsageException` になります（[12.6](12-spring-data-jpa.md#126-transactions-and-exceptions) を参照） |
 
 <a id="the-persistence-context-is-not-updated"></a>
 ### 永続コンテキストへの未反映
@@ -358,7 +358,7 @@ lambdaQL はこの条件を別に処理しません。
 <a id="79-all-rules-u1-to-u21-summary"></a>
 ## 7.9 ルール U1 から U21 のすべて（まとめ）
 
-lambdaQL がラムダを読むときに確認するルール: U1、U3、U4、U6（Java のラムダでテスト済み）。コンパイラーが確認するルール: U5。
+lambdaQL がラムダを読むときに確認するルール: U1、U3、U4、U6。コンパイラーが確認するルール: U5。
 U11、U12、U15 の lambdaQL による確認はまだ実装されていません。
 
 | # | ルール |

@@ -578,7 +578,7 @@ qb.insert(Order::class.java).values(lines) { o, l -> o.id = l.id; o.price = l.pr
 
 | Kotlin 형태 | 의미 |
 |---|---|
-| `value(o.status, 1)` | `import org.lambdaql.Dml.value`로 가져온 함수(D49). `val` 속성(setter 없음)을 가진 엔티티에 사용. 속성 대입과 한 람다 안에서 섞을 수 있음(테스트함) |
+| `value(o.status, 1)` | `import org.lambdaql.Dml.value`로 가져온 함수(D49). `val` 속성(setter 없음)을 가진 엔티티에 사용. 속성 대입과 한 람다 안에서 섞을 수 있음 |
 | `value(o.cnt, o.cnt + 1)` | 지원 |
 | `it.cnt += 1` | 지원 |
 | `it.cnt++`, `--` | v0.1에는 없음. `it.cnt += 1`로 작성 |

@@ -61,7 +61,7 @@ from orders o1_0
 where o1_0.status=1 and o1_0.price>100.0
 ```
 
-**(tested)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), region `captured`:
+[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), region `captured`:
 
 ```kotlin
 val q = qb.from(Order::class.java).where { it.price > min && it.status.toInt() == 1 }
@@ -453,7 +453,7 @@ from orders o1_0
 where o1_0.id not in (?,?)
 ```
 
-**(tested)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), region `in`:
+[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), region `in`:
 
 ```kotlin
 val q = qb.from(Order::class.java).where { it.status in statuses }
@@ -500,7 +500,7 @@ lambdaQL checks each step with the JPA Metamodel.
 - Nested value objects are expanded too.
 - An order compare (`<` and others) and a compare with another type are still the error `LQL-3012`. Compare the fields.
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `embedded-compare`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `embedded-compare`:
 
 ```kotlin
 // address is @Embedded (city, zip): == with a value object compares each column (D48)
@@ -532,7 +532,7 @@ qb.from(Order::class.java)
 // HQL: select e0 from Order e0 join e0.customer j1 where j1.name = :p1
 ```
 
-**(tested)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), region `safe-call` (with a constant instead of `name`):
+[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), region `safe-call` (with a constant instead of `name`):
 
 ```kotlin
 // it.customer?.name reads as the path customer.name (inner join: orders without a customer are left out)
@@ -553,7 +553,7 @@ where c1_0.name=?
 - An order **without a customer** is not in the result. There is no customer row to join.
 - lambdaQL does not add a null check for you. You do not need `it.customer != null &&` before the path.
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `safe-call-and`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `safe-call-and`:
 
 ```kotlin
 // a row without a customer can never match: lambdaQL keeps the inner join (the same rows)
@@ -564,7 +564,7 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' 
 **`?.` and `||`.** When an order without a customer can make the condition true, a step reached with `?.` is a `left join`.
 An order with status 1 and no customer is also in the result. This is the same as the result of the same condition run in Kotlin.
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `safe-call-or`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `safe-call-or`:
 
 ```kotlin
 // ?. says the customer may be missing: an order without a customer stays when the rest of the OR is true
@@ -584,7 +584,7 @@ where o1_0.status=1 or c1_0.name='Kim'
 
 **`?.` and `== null`.** `it.customer?.name == null` finds both orders without a customer and orders whose customer has no name, as in Kotlin.
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `safe-call-null`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `safe-call-null`:
 
 ```kotlin
 // "no customer, or a customer without a name": a left join, as in Kotlin
@@ -643,7 +643,7 @@ Hibernate writes `c1_0.id is null` for `e0.customer is null`. After the inner jo
 **`!!`: the association is always there.** A step reached with `!!` is always an inner join.
 In Kotlin, a row where `||` stops before it reaches the `!!` (status 1, no customer) stays, but lambdaQL leaves that row out. To keep such rows, use `?.`.
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `not-null-assert`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `not-null-assert`:
 
 ```kotlin
 // !! says the customer is always there: an inner join, so orders without a customer are left out
@@ -655,7 +655,7 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where e0.status = 1 or
 **Mixing `?.` and `!!`.** If, in the whole condition (all `where` calls of the same query), the same association step is reached with `?.` in one place and with `!!` or without a mark in another, it is an inner join.
 lambdaQL logs `LQL-5014` at `WARN` level (once per condition). To keep orders without a customer, write `?.` everywhere.
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `mixed-warn`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `mixed-warn`:
 
 ```kotlin
 // the same association with ?. in one place and !! in another: an inner join, and WARN LQL-5014

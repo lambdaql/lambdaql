@@ -64,7 +64,7 @@ fetch first ? rows only
 - 排序键和它的方向写在一起。它们的顺序永远不会错乱。
 - lambdaQL 读取 Lambda，但从不执行它。`by` 的方法只是描述顺序。
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `sort`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `sort`：
 
 ```kotlin
 val q = qb.from(Order::class.java)
@@ -682,7 +682,7 @@ SortPolicy.register(emf, SortPolicy.of(SortMode.STRICT,
 | S11 | Spring `Sort.Order` 与 `Direction` 一一对应（Spring 模块，见 [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）。属性名经过排序策略检查，别名按原样传递 | Spring `Sort` 已实现，并用 Java 测试（尚不支持 `ignoreCase`），与排序策略一起使用的情况也已测试。读取 `"price,desc_nulls_last"` 这样的一段文本尚未实现 |
 | S12 | join 查询使用相同的形式：`{ o, c, by -> }`、`{ o, c, i, by -> }` | 已实现（用 Java Lambda 测试，见 [6.8](06-select-group.md#68-explicit-joins)） |
 | S13 | 属性引用只能用于一个排序键的简短写法（`orderBy(Order::price)`）。能编译但含义错误的引用会被拒绝 | 尚未实现（Kotlin 属性引用） |
-| S14 | 子查询的排序：有 `limit` 时保留，没有 `limit` 时移除并发出警告。数据库差异由 lambdaQL 替你处理（见第 5 章） | 已实现（已测试）。MariaDB 的 `lateral` 改写尚未实现 |
+| S14 | 子查询的排序：有 `limit` 时保留，没有 `limit` 时移除并发出警告。数据库差异由 lambdaQL 替你处理（见第 5 章） | 已实现。MariaDB 的 `lateral` 改写尚未实现 |
 
 ---
 

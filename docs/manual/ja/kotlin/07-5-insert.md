@@ -28,7 +28,7 @@ insert into archive(id,price,customer_name)
 values (100,9.5,'Kim')
 ```
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `insert-delete`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `insert-delete`:
 
 ```kotlin
 val i = qb.insert(Archive::class.java).values { it.id = 100L; it.price = 9.5; it.customerName = "Kim" }
@@ -54,7 +54,7 @@ qb.insert(Order::class.java).values { o -> value(o.id, id); value(o.status, 1) }
 `values { a, sub -> ... }` のように引数が 2 つのラムダを使うと、2 番目の引数 `sub` でサブクエリを作れます（決定 D49）。
 upsert の `values { a, sub -> ... }` と `onConflict { ... }.update { a, sub -> ... }` も同じです（[7.6](07-6-upsert.md#your-own-change-onconflictkeyupdate) を参照）。
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `insert-values-sub`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `insert-values-sub`:
 
 ```kotlin
 // values { a, sub -> ... }: a subquery can read captured values, not the new row (D49)

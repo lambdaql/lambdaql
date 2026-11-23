@@ -93,7 +93,7 @@ Java 테스트는 같은 이름의 Java 테스트 엔티티를 사용합니다([
 
 `value`는 함수 `org.lambdaql.Dml.value`입니다(결정 D49). `import org.lambdaql.Dml.value`로 가져와 인자 하나의 람다 안에서 씁니다.
 
-**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `update-value`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `update-value`:
 
 ```kotlin
 // entities without setters (val): Dml.value(column, value)
@@ -155,7 +155,7 @@ qb.update(Order::class.java).set { o -> value(o.customer?.id, cid) }.where { it.
 대입 람다의 두 번째 인자는 서브쿼리의 시작점 `sub`입니다. `where { o, sub -> ... }`와 같은 표기입니다(결정 D49).
 `insert ... select`에서는 세 번째 인자가 `sub`입니다([7.5](07-5-insert.md) 참고).
 
-**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `update-sub`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `update-sub`:
 
 ```kotlin
 // the second parameter starts a subquery, as in where { o, sub -> ... } (D49)
@@ -271,7 +271,7 @@ it.custName = it.customer?.name
 lambdaQL은 서브쿼리를 직접 씁니다. 그러면 문장이 자기 테이블만 읽으므로, 대상 테이블 읽기에 대한 MariaDB의 제약(오류 1093)에 걸리지 않습니다.
 
 조회는 `where`의 경로에 inner join을 사용합니다(결정 D36). 그래서 DML에서는 이런 경로에 lambdaQL이 `e0.customer.id is not null`을 더합니다.
-그 결과 `update`와 `delete`는 `qb.from(X::class.java).where { 같은 람다 }`가 반환하는 **바로 그 행**만 대상으로 합니다(Java로 테스트함: 삭제된 행을 조회 결과와 비교).
+그 결과 `update`와 `delete`는 `qb.from(X::class.java).where { 같은 람다 }`가 반환하는 **바로 그 행**만 대상으로 합니다(삭제된 행을 조회 결과와 비교).
 `!!`나 표시 없이 쓴 null 가드(`it.customer == null || it.customer!!.name == ...`)가 있어도 마찬가지입니다. 조회도 이 경로에 inner join을 사용하므로(결정 D48) 검사는 유지됩니다.
 `?.`로 지난 단계가 조회에서 `left join`이 되는 조건이면(`it.status == 1 || it.customer?.name == "Kim"`, 결정 D54) 이 검사를 더하지 않습니다. 이때도 DML은 조회와 같은 행을 대상으로 합니다([7.2](07-2-update.md)의 `update-safe-call` 영역).
 
@@ -288,7 +288,7 @@ lambdaQL은 서브쿼리를 직접 씁니다. 그러면 문장이 자기 테이�
 | 한도 | 문장당 값 500개 이하(고정) |
 | 반환 값 | 모든 문장의 합 |
 | 트랜잭션 | 모든 문장을 한 트랜잭션에서 실행 |
-| 빈 리스트 | SQL 없음, 0 반환(Java로 테스트함) |
+| 빈 리스트 | SQL 없음, 0 반환 |
 
 Oracle에는 바인드 값 65,535개라는 엄격한 한도가 있습니다(ORA-01745). 파싱은 그보다 훨씬 전부터 매우 느려집니다
 (설계 단계 테스트에서 21,845행에 약 6분). 그래서 한도를 작게 두었습니다.
@@ -333,7 +333,7 @@ qb.delete(Order::class.java).where { it.status == 1 }.orderBy { o, by -> by.asc(
 | 빌더 | 트랜잭션 |
 |---|---|
 | `QueryBuilder(entityManagerFactory)` | `execute()`와 `executeOne()`이 자체 트랜잭션을 열고 커밋합니다. 오류가 나면 롤백합니다 |
-| `EntityManager`를 쓰는 빌더: `QueryBuilder(entityManager)`, Spring의 `QueryBuilder` 빈, 리포지토리 실행기 | 호출자의 트랜잭션(`@Transactional`, 또는 그 `EntityManager`의 활성 트랜잭션). 트랜잭션이 없으면 SQL을 보내기 전에 `TransactionRequiredException`으로 실패합니다(테스트함, Java). Spring 리포지토리 호출에서는 `InvalidDataAccessApiUsageException`이 됩니다([12.6](12-spring-data-jpa.md#126-transactions-and-exceptions) 참고) |
+| `EntityManager`를 쓰는 빌더: `QueryBuilder(entityManager)`, Spring의 `QueryBuilder` 빈, 리포지토리 실행기 | 호출자의 트랜잭션(`@Transactional`, 또는 그 `EntityManager`의 활성 트랜잭션). 트랜잭션이 없으면 SQL을 보내기 전에 `TransactionRequiredException`으로 실패합니다(Java). Spring 리포지토리 호출에서는 `InvalidDataAccessApiUsageException`이 됩니다([12.6](12-spring-data-jpa.md#126-transactions-and-exceptions) 참고) |
 
 <a id="the-persistence-context-is-not-updated"></a>
 ### 영속성 컨텍스트 미반영
@@ -358,7 +358,7 @@ lambdaQL은 이 조건을 따로 처리하지 않습니다.
 <a id="79-all-rules-u1-to-u21-summary"></a>
 ## 7.9 모든 규칙 U1 ~ U21(요약)
 
-lambdaQL이 람다를 읽을 때 검사하는 규칙: U1, U3, U4, U6(Java 람다로 테스트함). 컴파일러가 검사하는 규칙: U5.
+lambdaQL이 람다를 읽을 때 검사하는 규칙: U1, U3, U4, U6. 컴파일러가 검사하는 규칙: U5.
 U11, U12, U15에 대한 lambdaQL의 검사는 아직 구현되지 않았습니다.
 
 | # | 규칙 |

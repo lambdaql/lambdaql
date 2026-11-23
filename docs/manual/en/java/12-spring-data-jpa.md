@@ -91,7 +91,7 @@ You write no configuration and no `Impl` class.
 
 The examples in this chapter use the test entities `Member` (`id`, `name`, `active`, `grade`, `team`) and `Team` (`id`, `name`). `grade` is an `Integer`, so it can be NULL.
 
-**(tested)** [`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java), region `repository`:
+[`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java), region `repository`:
 
 ```java
 /** No Impl class: Spring Data finds the LambdaQlExecutor implementation by itself. */
@@ -155,7 +155,7 @@ How it works:
 
 - **Spring Data runs default methods by itself.** It does not try to make a query from a default method. It just calls the method body. lambdaQL does not change this.
 - **`LambdaQlExecutor<T>` is a Spring Data repository fragment.** Its implementation is listed in `META-INF/spring.factories` of `lambdaql-spring-data-jpa`. Spring Data reads this file and adds the implementation to every repository that extends `LambdaQlExecutor<T>`.
-- **One executor object is shared by all repositories.** Each call still uses the entity of its own repository. For example, `teams.count(t -> ...)` on a `TeamRepository` counts `Team` rows (tested in [`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)).
+- **One executor object is shared by all repositories.** Each call still uses the entity of its own repository. For example, `teams.count(t -> ...)` on a `TeamRepository` counts `Team` rows (see [`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)).
 
 Rules:
 
@@ -205,7 +205,7 @@ Rules:
 The short methods are the same as `query()` with a result function: `findAll(w)` is `query().where(w).toList()`, `findSet(w)` is `query().where(w).toSet()`, `findFirst(w)` is `query().where(w).first()`, and `findOne(w)` is `query().where(w).one()`. The result functions are explained in [Getting the result](02-getting-started.md#getting-the-result).
 `findAll(Where<T>)` and `count(Where<T>)` do not clash with `findAll(Sort)`, `findAll(Example)` or `count()` from `JpaRepository`, because the argument types are different.
 
-**`query()`: the full query.** **(tested)** [`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java), region `query` (a part of the repository in 12.3):
+**`query()`: the full query.** [`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java), region `query` (a part of the repository in 12.3):
 
 ```java
 /**
@@ -223,21 +223,21 @@ default List<Member> topGraded(int n) {
 
 In the next examples, `repository` is a `MemberRepository`.
 
-**(tested)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `find-all-sort`:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `find-all-sort`:
 
 ```java
 SortSpec<Member> byGrade = SortSpec.of(Member.class, (m, by) -> by.desc(m.getGrade()).asc(m.getId()));
 List<Member> active = repository.findAll(m -> m.isActive(), byGrade);
 ```
 
-**(tested)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `find-first` (the active member with the highest grade):
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `find-first` (the active member with the highest grade):
 
 ```java
 Optional<Member> best = repository.findFirst(m -> m.isActive(),
         SortSpec.of(Member.class, (m, by) -> by.desc(m.getGrade())));
 ```
 
-**(tested)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `find-one`:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `find-one`:
 
 ```java
 Optional<Member> kim = repository.findOne(m -> m.getName().equals("Kim"));
@@ -245,14 +245,14 @@ Optional<Member> kim = repository.findOne(m -> m.getName().equals("Kim"));
 assertThrows(IncorrectResultSizeDataAccessException.class, () -> repository.findOne(m -> m.isActive()));
 ```
 
-**(tested)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `count-exists`:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `count-exists`:
 
 ```java
 long active = repository.count(m -> m.isActive());
 boolean anyInTeamB = repository.exists(m -> m.getTeam().getName().equals("B"));
 ```
 
-**(tested)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `find-set`:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `find-set`:
 
 ```java
 java.util.SequencedSet<Member> active = repository.findSet(m -> m.isActive(), Sort.by(Sort.Order.desc("grade"), Sort.Order.asc("id")));
@@ -282,7 +282,7 @@ These 8 methods run an update, delete, insert or upsert in one call.
 - **`One`** means the one-row protection for delete and update (see the next part), and one row for insert and upsert.
 - They need the caller's transaction (see [12.6](#126-transactions-and-exceptions)). The test runs them in a `TransactionTemplate`.
 
-**(tested)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `dml-shortcuts`:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `dml-shortcuts`:
 
 ```java
 int changed = repository.updateAll(m -> !m.isActive(), m -> m.setGrade(7));      // condition first
@@ -308,7 +308,7 @@ The statement itself names one id, so it cannot change a second row, even if ano
 
 The core API has the same protection: `executeOne()` (see [7.4](07-4-delete.md#delete-exactly-one-row-executeone)).
 
-**(tested)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `dml-one`:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `dml-one`:
 
 ```java
 int renamed = repository.updateOne(m -> m.getId() == kimId, m -> m.setName("Kim2"));   // exactly one row
@@ -341,7 +341,7 @@ The names end with `Query`, so they do not clash with `JpaRepository` methods su
 
 They need the caller's transaction, like the shortcuts. Like every JPA bulk statement, they do not change entities already loaded in the transaction.
 
-**(tested)** [`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java), region `dml` (a part of the repository in 12.3):
+[`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java), region `dml` (a part of the repository in 12.3):
 
 ```java
 /**
@@ -368,7 +368,7 @@ default int addGuest(String name) {
 
 The upsert runs in a transaction too. `teams` is a `TeamRepository`, and `tx` is a Spring `TransactionTemplate`.
 
-**(tested)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `upsert`:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `upsert`:
 
 ```java
 int changed = tx.execute(s -> teams.upsertQuery().values(t -> { t.setId(teamId); t.setName("A2"); }).execute());
@@ -393,7 +393,7 @@ lambdaQL turns each `Sort.Order` into one sort key with `SortSpec.ofPath` (see [
 
 Spring Data JPA's own repositories leave the NULL position of `NATIVE` to the database, so the order there can be different on each database. lambdaQL uses its own rule instead.
 
-**(tested)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `find-all-spring-sort`:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `find-all-spring-sort`:
 
 ```java
 List<Member> rows = repository.findAll(m -> m.isActive(),
@@ -411,7 +411,7 @@ Paging with `findAll(where, pageable)`:
 - When the sort keys do not contain the id, lambdaQL adds the id as the last key, so a row does not move between pages (see [Tie-breaker](04-order-paging.md#tie-breaker-automatic-id)). A page without a sort is ordered by the id.
 - `Pageable.unpaged()` returns all rows in one page.
 
-**(tested)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `page`:
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `page`:
 
 ```java
 Page<Member> page = repository.findAll(m -> m.isActive(), PageRequest.of(1, 2, Sort.by("name")));
@@ -457,7 +457,7 @@ The auto-configuration reads three places.
 The entity name is unique in a persistence unit (Hibernate stops at start-up when two entities have the same name). So two classes with the same name in different packages are never mixed up. An unknown name stops the application start with `IllegalStateException` (LQL-4042).
 The paths are checked against the entity the first time the rules are used (see [Rules as strings](04-order-paging.md#rules-as-strings) in 4.10).
 
-**(tested)** [`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java), region `properties` (the properties of the test; in an application they go into `application.properties` or `application.yaml`):
+[`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java), region `properties` (the properties of the test; in an application they go into `application.properties` or `application.yaml`):
 
 ```java
 @SpringBootTest(classes = SampleApplication.class, properties = {
@@ -466,7 +466,7 @@ The paths are checked against the entity the first time the rules are used (see 
         "lambdaql.sort.alias.Member.level=grade"})
 ```
 
-**(tested)** [`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java), region `properties-use`:
+[`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java), region `properties-use`:
 
 ```java
 List<Member> byLevel = repository.findAll(m -> m.isActive(), Sort.by(Sort.Order.desc("level")));
@@ -489,7 +489,7 @@ public SortPolicy sortPolicy() {
 }
 ```
 
-**(tested)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `sort-policy` (the region ends inside a `try`; the `finally` block calls `SortPolicy.unregister(emf)`):
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `sort-policy` (the region ends inside a `try`; the `finally` block calls `SortPolicy.unregister(emf)`):
 
 ```java
 // usually a @Bean SortPolicy; the Boot auto-configuration registers it for the EntityManagerFactory
@@ -539,10 +539,10 @@ Put `@Transactional` on your service method, or use a `TransactionTemplate`. Wit
 
 | Case | What happens |
 |---|---|
-| A select inside `@Transactional` | lambdaQL runs in the same transaction. It sees changes that are not flushed yet. After a rollback, these changes are gone for lambdaQL too (tested in `ExecutorTest`) |
+| A select inside `@Transactional` | lambdaQL runs in the same transaction. It sees changes that are not flushed yet. After a rollback, these changes are gone for lambdaQL too |
 | A select outside a transaction | Spring uses a new `EntityManager` for the call and closes it after the call, so the returned entities are detached. This is Spring's normal behavior; it is not tested by lambdaQL |
-| An update, delete, insert or upsert inside `@Transactional` or a `TransactionTemplate` | It runs in that transaction and rolls back with it (tested) |
-| An update, delete, insert or upsert outside a transaction | It fails before any SQL is sent. Nothing changes (tested, see the next table) |
+| An update, delete, insert or upsert inside `@Transactional` or a `TransactionTemplate` | It runs in that transaction and rolls back with it |
+| An update, delete, insert or upsert outside a transaction | It fails before any SQL is sent. Nothing changes (see the next table) |
 
 Only `new QueryBuilder(entityManagerFactory)` runs DML in its own transaction (see [7.8](07-dml.md#transactions)). Do not use it in a Spring application (see [12.8](#128-the-querybuilder-bean)).
 
@@ -550,12 +550,12 @@ Errors go through Spring's exception translation, the same as for other reposito
 
 | Case | Exception |
 |---|---|
-| `findOne` matches 2 or more rows | `IncorrectResultSizeDataAccessException` (Spring), instead of JPA's `NonUniqueResultException` (tested) |
-| `deleteOne` or `updateOne` matches 2 or more rows | `IncorrectResultSizeDataAccessException`. Nothing is changed (tested) |
-| An unknown property in a Spring `Sort` | `PropertyReferenceException` (tested) |
-| `ignoreCase()` in a Spring `Sort` | `UnsupportedOperationException` (tested) |
-| A sort name that the sort policy does not allow, in `STRICT` mode ([12.5](#sort-policy-with-spring)) | `SortNotAllowedException` (`LQL-4040`), not translated (tested) |
-| An update, delete, insert or upsert without a transaction, in a repository call (a shortcut, or `execute()` inside a default method) | `InvalidDataAccessApiUsageException` (tested), made by Spring from JPA's `TransactionRequiredException`. Outside a repository method (the `QueryBuilder` bean), JPA's `TransactionRequiredException` |
+| `findOne` matches 2 or more rows | `IncorrectResultSizeDataAccessException` (Spring), instead of JPA's `NonUniqueResultException` |
+| `deleteOne` or `updateOne` matches 2 or more rows | `IncorrectResultSizeDataAccessException`. Nothing is changed |
+| An unknown property in a Spring `Sort` | `PropertyReferenceException` |
+| `ignoreCase()` in a Spring `Sort` | `UnsupportedOperationException` |
+| A sort name that the sort policy does not allow, in `STRICT` mode ([12.5](#sort-policy-with-spring)) | `SortNotAllowedException` (`LQL-4040`), not translated |
+| An update, delete, insert or upsert without a transaction, in a repository call (a shortcut, or `execute()` inside a default method) | `InvalidDataAccessApiUsageException`, made by Spring from JPA's `TransactionRequiredException`. Outside a repository method (the `QueryBuilder` bean), JPA's `TransactionRequiredException` |
 | An assignment lambda that breaks a rule (U1, U3, U4, U6) | `LambdaQLException` (for example `TranslationException`, `LQL-3042`), not translated (see [7.8](07-dml.md#rules-checked-at-analysis-time)) |
 
 The `QueryBuilder` bean (12.8) is not a repository, so Spring does not translate its errors. There, `one()` and `executeOne()` with 2 or more rows throw `NonUniqueResultException`.
@@ -563,7 +563,7 @@ The `QueryBuilder` bean (12.8) is not a repository, so Spring does not translate
 <a id="127-other-fragments-and-jpaspecificationexecutor"></a>
 ## 12.7 Other fragments and `JpaSpecificationExecutor`
 
-`LambdaQlExecutor<T>` is one fragment among others. The repository in 12.3 uses all of these at the same time (tested in `ExecutorTest`).
+`LambdaQlExecutor<T>` is one fragment among others. The repository in 12.3 uses all of these at the same time.
 
 | Used together with | Works | Notes |
 |---|---|---|
@@ -590,7 +590,7 @@ With Spring Boot, the auto-configuration `org.lambdaql.spring.boot.LambdaQlAutoC
 - The repository methods (`LambdaQlExecutor<T>`) do not need this bean.
 - Its update, delete, insert and upsert statements need the caller's transaction, the same as the repository methods. Without one, they throw `TransactionRequiredException` before any SQL is sent.
 
-**(tested)** [`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java), region `query-builder-bean` (`qb` is the injected bean):
+[`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java), region `query-builder-bean` (`qb` is the injected bean):
 
 ```java
 // inject it into a service: it joins the current transaction

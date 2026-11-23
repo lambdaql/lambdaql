@@ -64,12 +64,12 @@ fetch first ? rows only
 - キーとその方向は一緒に書きます。順序がずれることはありません。
 - lambdaQL はラムダを読み取ります。実行はしません。`by` のメソッドは順序を記述するだけです。
 
-**(テスト済み)** と書かれた例は、[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java) からそのままコピーしたものです。
+例は、[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java) からそのままコピーしたものです。
 このテストは HQL をチェックし、クエリを実行して、同じソートを Java 側で行った結果と行の順序を比べます。H2、MariaDB、Oracle で通ります。
 テストでは [3.3](03-where.md#33-basic-form) のテスト用エンティティを使います。`price` は `double`、`status` は `short` です。これらのキーは NULL になることがないので、HQL に `nulls` の部分がありません。
 それ以外の例では、`price` は NULL になりうる `Double` なので（[3.2](03-where.md#32-example-entities) を参照）、`nulls first` または `nulls last` が付きます（[4.4](#44-null-ordering-is-the-same-on-every-database) を参照）。
 
-**(テスト済み)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-basic`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-basic`:
 
 ```java
 RenderedQuery q = qb.from(Order.class)
@@ -80,7 +80,7 @@ RenderedQuery q = qb.from(Order.class)
 assertEquals("select e0 from Order e0 where e0.active = true order by e0.price desc, e0.id asc", q.hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-basic`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-basic`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -110,7 +110,7 @@ lambdaQL は、ラムダの引数の数（1 つか 2 つか）で書き方を区
 メソッド参照は、`Order::getPrice` のようなエンティティの getter でなければなりません。static メソッド、引数のあるメソッド、オブジェクトに束縛された参照は拒否されます（ルール S13）。
 `by` を使う書き方（引数 2 つ）にはラムダが必要です。そこでメソッド参照を使うと拒否されます。
 
-**(テスト済み)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-key`（テスト用エンティティでは `price` は `double` なので、`nulls` の部分はありません）:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-key`（テスト用エンティティでは `price` は `double` なので、`nulls` の部分はありません）:
 
 ```java
 assertEquals("select e0 from Order e0 order by e0.price asc",
@@ -119,7 +119,7 @@ assertEquals("select e0 from Order e0 order by e0.price desc",
         qb.from(Order.class).orderBy(Order::getPrice, Direction.DESC).toHql().hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-key`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-key`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -128,7 +128,7 @@ from orders o1_0
 order by o1_0.price
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-key#2`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-key#2`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -168,7 +168,7 @@ order by o1_0.price desc
 | `by.desc(key, true)` | `DESC_NULLS_FIRST` |
 | `by.desc(key, false)` | `DESC_NULLS_LAST` |
 
-**(テスト済み)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-nulls`（`description` は NULL になりうる `String`、`id` は NULL になることがありません）:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-nulls`（`description` は NULL になりうる `String`、`id` は NULL になることがありません）:
 
 ```java
 // default: asc puts NULL first, desc puts NULL last (the same on every database)
@@ -181,7 +181,7 @@ assertEquals("select e0 from Order e0 order by e0.description desc nulls first, 
         qb.from(Order.class).orderBy((o, by) -> by.desc(o.getDescription(), true).asc(o.getId())).toHql().hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-nulls`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-nulls`:
 
 ```sql
 -- H2, MariaDB
@@ -195,7 +195,7 @@ from orders o1_0
 order by o1_0.description asc nulls first,o1_0.id
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-nulls#2`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-nulls#2`:
 
 ```sql
 -- H2
@@ -214,7 +214,7 @@ from orders o1_0
 order by o1_0.description,o1_0.id
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-nulls#3`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-nulls#3`:
 
 ```sql
 -- H2
@@ -246,7 +246,7 @@ Direction dir = request.isNewestFirst() ? Direction.DESC : Direction.ASC;
 
 ここでの三項演算子 `request.isNewestFirst() ? ... : ...` は問題ありません。ラムダの **外** で実行されるからです。
 
-**(テスト済み)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-dynamic`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-dynamic`:
 
 ```java
 Direction dir = Direction.parse(text);           // for example from a request parameter
@@ -254,7 +254,7 @@ OrderedSelectQuery<Order> q = qb.from(Order.class)
         .orderBy((o, by) -> by.sort(o.getDescription(), dir).asc(o.getId()));
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-dynamic`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-dynamic`:
 
 ```sql
 -- H2, MariaDB
@@ -268,7 +268,7 @@ from orders o1_0
 order by o1_0.description desc nulls last,o1_0.id
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-dynamic#2`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-dynamic#2`:
 
 ```sql
 -- H2
@@ -339,13 +339,13 @@ MariaDB には `NULLS` 構文がないので、デフォルトと異なる位置
 | キー | 使えるか | 注意 |
 |---|---|---|
 | カラム: `o.getPrice()` | はい | テスト済み |
-| to-one のパス: `o.getCustomer().getName()` | はい | `left join`（必須の関連は inner join）、下記を参照（テスト済み） |
-| `@Lob` カラム | はい | Oracle は拒否する。`DEBUG` レベルの `LQL-5010`、下記を参照（テスト済み） |
-| `@Enumerated(EnumType.STRING)` の enum カラム | はい | 名前の順にソートされる（宣言の順ではない）。`DEBUG` レベルの `LQL-5011`、下記を参照（テスト済み） |
+| to-one のパス: `o.getCustomer().getName()` | はい | `left join`（必須の関連は inner join）、下記を参照 |
+| `@Lob` カラム | はい | Oracle は拒否する。`DEBUG` レベルの `LQL-5010`、下記を参照 |
+| `@Enumerated(EnumType.STRING)` の enum カラム | はい | 名前の順にソートされる（宣言の順ではない）。`DEBUG` レベルの `LQL-5011`、下記を参照 |
 | 算術: `o.getPrice() * 2`、`+`、`-` | はい | まだテストされていない |
 | 拡大変換（`int` から `long`） | はい | まだテストされていない |
 | エンティティ: `by.desc(o.getCustomer())` | **コンパイルエラー** | エンティティは `Comparable` ではない |
-| エンティティを使わない値: `by.asc(1)`、キャプチャした値 | **拒否** | [4.6](#46-rules-for-the-lambda-body) を参照（テスト済み） |
+| エンティティを使わない値: `by.asc(1)`、キャプチャした値 | **拒否** | [4.6](#46-rules-for-the-lambda-body) を参照 |
 | カラムへの関数: `lower(name)` | 予定 | |
 
 キーは `Comparable` でなければなりません。ボクシング型（`Double`、`Integer`、`Long`）、`String`、`java.time` の型は `Comparable` なので使えます。Java コンパイラーはエンティティのキーを拒否します。
@@ -354,7 +354,7 @@ MariaDB には `NULLS` 構文がないので、デフォルトと異なる位置
 **関連のパスには `left join` を使います。** HQL の単純なパス `order by o.customer.name` は、3 つのデータベースすべてで inner join になります。顧客のない注文が消えてしまいます。
 lambdaQL は代わりに `left join` を追加します。顧客のない注文も結果に残ります。その `j1.name` は NULL なので、`asc` では先頭に来ます。
 
-**(テスト済み)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-path`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-path`:
 
 ```java
 RenderedQuery q = qb.from(Order.class)
@@ -364,7 +364,7 @@ RenderedQuery q = qb.from(Order.class)
 assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name asc nulls first, e0.id asc", q.hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-path`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-path`:
 
 ```sql
 -- H2, MariaDB
@@ -384,7 +384,7 @@ order by c1_0.name asc nulls first,o1_0.id
 そのため、ソートや select だけで使うパスでも、このような関連には `join` を使います。それ以外の関連は、上のように `left join` を使います（ルール S8、J1）。
 パスのすべての関連の段階が必須で、値が NULL になりえなければ、ソートに `nulls first/last` も付きません。
 
-**(テスト済み)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)、リージョン `required-association`（テスト用エンティティ `OrderLine` の `@ManyToOne(optional = false) Order order`）:
+[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)、リージョン `required-association`（テスト用エンティティ `OrderLine` の `@ManyToOne(optional = false) Order order`）:
 
 ```java
 // order is optional = false: a sort or select path through it cannot lose rows, so it is an inner join
@@ -400,7 +400,7 @@ assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name 
 **`@Lob` カラムのソート。** `@Lob` カラムを `orderBy`、`distinct`、`groupBy` に使うと、H2 と MariaDB は実行しますが、Oracle は拒否します（ORA-22848、ORA-22849、実測）。`=` の比較は 3 つのデータベースすべてで動きます。
 lambdaQL はクエリを変えず、カラムと使う場所ごとに 1 回、`LQL-5010` を `DEBUG` レベルでログに出します（B3）。
 
-**(テスト済み)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)、リージョン `lob`（`OrderLine.memo` は `@Lob`）:
+[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)、リージョン `lob`（`OrderLine.memo` は `@Lob`）:
 
 ```java
 // memo is @Lob: H2 and MariaDB sort and group it, Oracle rejects it (ORA-22848, ORA-22849).
@@ -413,7 +413,7 @@ qb.from(OrderLine.class).select(l -> l.getMemo()).distinct().toHql();
 **`EnumType.STRING` の enum のソート。** `@Enumerated(EnumType.STRING)` でマッピングした enum カラムは、データベースが定数の **名前** の文字列の順にソートします。Java の enum の比較は宣言の順に従うので、結果の順序が異なることがあります（B2）。
 lambdaQL はクエリを変えず、カラムごとに 1 回、`LQL-5011` を `DEBUG` レベルでログに出します。`ORDINAL`（または `@Enumerated` なし）は宣言の順にソートするので、ログに出しません。
 
-**(テスト済み)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)、リージョン `enum-string-sort`:
+[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)、リージョン `enum-string-sort`:
 
 ```java
 // kind is @Enumerated(EnumType.STRING): the database sorts by name, Java by declaration order (LQL-5011, DEBUG)
@@ -424,7 +424,7 @@ assertEquals("select e0 from Order e0 order by e0.kind asc nulls first",
 エイリアスは `where` と共有されます。同じパスを `where` がすでに結合していれば、ソートはその結合を使います。
 この結合は inner join です。`where` のパスは常に inner join なので、顧客のない注文はすでに除かれています（決定 D36、D48、[3.10](03-where.md#310-association-paths) を参照）。
 
-**(テスト済み)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-path-where`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-path-where`:
 
 ```java
 String name = "Kim";
@@ -437,7 +437,7 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = :p1"
         + " order by j1.name desc nulls last, e0.price desc", q.hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-path-where`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-path-where`:
 
 ```sql
 -- H2, MariaDB
@@ -473,7 +473,7 @@ order by c1_0.name desc nulls last,o1_0.price desc
 lambdaQL は `orderBy` を呼んだときにこれをチェックし、`LambdaQLException` を投げます（たとえば条件なら `LQL-2023`、エンティティを使わないキーなら `LQL-3031`）。
 どのキーもエンティティを使わなければなりません。定数やキャプチャした値だけのキーは拒否されます。
 
-**(テスト済み)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-rejected`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-rejected`:
 
 ```java
 // a condition inside the sort lambda (rule S4)
@@ -544,7 +544,7 @@ offset ? rows
 fetch first ? rows only
 ```
 
-**(テスト済み)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-page`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-page`:
 
 ```java
 OrderedSelectQuery<Order> page = qb.from(Order.class)
@@ -556,7 +556,7 @@ assertEquals("select e0 from Order e0 order by e0.status asc, e0.id asc", page.t
 List<Order> rows = page.toList();
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-page`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-page`:
 
 ```sql
 -- H2, Oracle
@@ -587,14 +587,14 @@ lambdaQL は HQL に `LIMIT` を書きません。Hibernate がデータベー�
 
 **`orderBy` なしのページング。** `orderBy` を使わずに `limit` と `offset` を呼ぶこともできます。そのときは lambdaQL が行を id でソートするので、ページは安定します。
 
-**(テスト済み)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `page-only`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `page-only`:
 
 ```java
 RenderedQuery q = qb.from(Order.class).where(o -> o.isActive()).limit(2).toHql();
 assertEquals("select e0 from Order e0 where e0.active = true order by e0.id asc", q.hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `page-only`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `page-only`:
 
 ```sql
 -- H2, Oracle
@@ -633,10 +633,10 @@ limit ?
 - ソートキーに主エンティティの一意で NULL にならないカラムがあれば、追加しません（A5）。`nullable = false` の `@Column(unique = true)`、Hibernate の `@NaturalId`、`@Id` がこれに当たります。このキーだけですべての行の順序が決まるからです。
   NULL になりうる一意のカラムは当たりません。NULL は複数の行にありうるからです。
 - `limit` と `offset` がなければ、何も追加しません。
-- 明示的な結合（`join`、`leftJoin`、`crossJoin`）では、結合したすべてのエンティティの id も結合の順に追加します（テスト済み、[6.8](06-select-group.md#68-explicit-joins) を参照）。
+- 明示的な結合（`join`、`leftJoin`、`crossJoin`）では、結合したすべてのエンティティの id も結合の順に追加します（[6.8](06-select-group.md#68-explicit-joins) を参照）。
 - まだ実装されていないもの: コレクションの fetch join と `limit`/`offset` を一緒に使うと拒否されます。
 
-**(テスト済み)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)、リージョン `unique-key`（`OrderLine.code` は `@Column(unique = true, nullable = false)`）:
+[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)、リージョン `unique-key`（`OrderLine.code` は `@Column(unique = true, nullable = false)`）:
 
 ```java
 // code is @Column(unique = true, nullable = false): it orders every row, so paging adds no id tie-breaker
@@ -674,7 +674,7 @@ qb.from(Order.class).where(o -> o.isActive()).orderBy(NEWEST).limit(20).toList()
 - キャプチャした値は、ラムダが作られた時点の値です。`static final` フィールドの spec は、その値をずっと持ち続けます。実行時に方向を変える必要があるなら、`orderBy((o, by) -> by.sort(key, dir))` を使ってください（[4.3](#43-direction) を参照）。
 - `orderBy(spec)` の後は、いつもどおりページングできます: `limit`、`offset`、`toList()`、`first()`。
 
-**(テスト済み)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-spec`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-spec`:
 
 ```java
 // keep it, for example as a static final field, and use it in many queries
@@ -683,7 +683,7 @@ RenderedQuery q = qb.from(Order.class).where(o -> o.isActive()).orderBy(byDescri
 assertEquals("select e0 from Order e0 where e0.active = true order by e0.description desc nulls last, e0.id asc", q.hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-spec`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-spec`:
 
 ```sql
 -- H2, MariaDB
@@ -704,7 +704,7 @@ SQL は、同じソートを `orderBy((o, by) -> ...)` で書いた場合と同�
 **`then()`: 今あるキーの後にキーを足す。** `a.then(b)` は、まず `a` のキーでソートします。値が等しい行は、次に `b` のキーでソートします。
 `then()` には別の `SortSpec` か、ソートのラムダを渡せます。
 
-**(テスト済み)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-spec-then`（テスト用エンティティでは `status` と `price` は NULL にならないので、`nulls` の部分はありません）:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-spec-then`（テスト用エンティティでは `status` と `price` は NULL にならないので、`nulls` の部分はありません）:
 
 ```java
 SortSpec<Order> byStatus = SortSpec.of(Order.class, (o, by) -> by.asc(o.getStatus()));
@@ -716,7 +716,7 @@ assertEquals("select e0 from Order e0 order by e0.status asc, e0.id desc",
         qb.from(Order.class).orderBy(byStatus.then((o, by) -> by.desc(o.getId()))).toHql().hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-spec-then`（最初のクエリ）:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-spec-then`（最初のクエリ）:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -728,7 +728,7 @@ order by o1_0.status,o1_0.price desc
 **`reversed()`: すべてのキーを逆向きに。** `spec.reversed()` はすべてのキーを逆にします。NULL の位置も逆になります: `asc`（NULL が先頭）は `desc`（NULL が末尾）になります。そのため、行の順序全体がちょうど逆になります。
 これは `Direction.reversed()` と同じです（[4.3](#43-direction) を参照）。`spec.reversed().reversed()` は元の順序に戻ります。
 
-**(テスト済み)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-spec-reversed`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-spec-reversed`:
 
 ```java
 SortSpec<Order> spec = SortSpec.of(Order.class, (o, by) -> by.asc(o.getDescription()).asc(o.getId()));
@@ -737,7 +737,7 @@ assertEquals("select e0 from Order e0 order by e0.description desc nulls last, e
         qb.from(Order.class).orderBy(spec.reversed()).toHql().hql());
 ```
 
-**データベースごとの SQL（テスト済み）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-spec-reversed`:
+**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `sort-spec-reversed`:
 
 ```sql
 -- H2, MariaDB
@@ -762,7 +762,7 @@ H2 と MariaDB は `desc` で NULL をもともと末尾に置くので、余分
   ポリシーも `@Sortable` フィールドもなければ、永続プロパティなら **どれでも** 受け付け、lambdaQL は `LQL-5003` をログに出します（デフォルトは `INFO` レベル）。
 - 関連のパスは、ソートのラムダと同じように `left join`（必須の関連は inner join）を使います（ルール S8）。`then()` で `ofPath` の spec とラムダの spec をつなげられます。
 
-**(テスト済み)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-spec-path`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)、リージョン `sort-spec-path`:
 
 ```java
 // for sorts chosen outside the code (Spring Sort uses this); only real properties are accepted
@@ -821,7 +821,7 @@ assertThrows(IllegalArgumentException.class,
 
 Spring Boot では、`register` を呼ぶ代わりに `SortPolicy` の Bean を定義してください（[12.5](12-spring-data-jpa.md#sort-policy-with-spring) を参照）。
 
-**(テスト済み)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)、リージョン `rules` と `strict`:
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)、リージョン `rules` と `strict`:
 
 ```java
 SortRules<Order> orderRules = SortRules.of(Order.class)
@@ -834,7 +834,7 @@ SortPolicy.register(emf, SortPolicy.of(SortMode.STRICT, orderRules));
 次の例の `hql(name, direction)` はテストの補助メソッドです。
 `qb.from(Order.class).orderBy(SortSpec.ofPath(Order.class, name, direction)).toHql().hql()` を返します。
 
-**(テスト済み)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)、リージョン `allowed`:
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)、リージョン `allowed`:
 
 ```java
 assertEquals("select e0 from Order e0 order by e0.price asc", hql("price", Direction.ASC));
@@ -843,7 +843,7 @@ assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name 
 assertEquals("select e0 from Order e0 order by e0.updateAt desc nulls last", hql("newest", Direction.DESC));
 ```
 
-**(テスト済み)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)、リージョン `rejected`（`STRICT` モード）:
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)、リージョン `rejected`（`STRICT` モード）:
 
 ```java
 // not in the rules, an unlisted association path, the path behind an alias, an entity without rules
@@ -857,7 +857,7 @@ assertEquals("select e0 from Order e0 order by e0.description asc nulls first",
         qb.from(Order.class).orderBy((o, by) -> by.asc(o.getDescription())).toHql().hql());
 ```
 
-**(テスト済み)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)、リージョン `warn`:
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)、リージョン `warn`:
 
 ```java
 // INFO (the default) and WARN: the sort runs and LQL-5003 is logged once per entity and name
@@ -878,7 +878,7 @@ assertEquals("select e0 from Order e0 order by e0.description asc nulls first", 
 - アノテーションは、ポリシーにそのエンティティのルール（コード、Spring の Bean、Spring Boot のプロパティ）がないときだけ使われます。
 - ポリシーを登録していないデフォルトの `INFO` モードでも動きます。
 
-**(テスト済み)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)、リージョン `annotation`（上の `STRICT` のポリシーは `Order` のルールだけを持ちます）:
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)、リージョン `annotation`（上の `STRICT` のポリシーは `Order` のルールだけを持ちます）:
 
 ```java
 // Customer has no rules in the policy, so its @Sortable fields are the rules:
@@ -895,7 +895,7 @@ assertThrows(SortNotAllowedException.class,
 **文字列によるルール。** `allowPath(String...)` と `aliasPath(name, path)` は、プロパティのパスを文字列で受け取ります。設定ファイル向けで、[12.5](12-spring-data-jpa.md#sort-policy-with-spring) の Spring Boot のプロパティがこの形を使います。
 パスは、ルールを最初に使うときにエンティティと照らし合わせます。コードでは、コンパイラーがチェックするラムダの `allow` と `alias` を使ってください。
 
-**(テスト済み)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)、リージョン `string-paths`:
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)、リージョン `string-paths`:
 
 ```java
 // the string forms used by configuration files (lambdaql.sort.allow / lambdaql.sort.alias)
@@ -931,7 +931,7 @@ assertThrows(SortNotAllowedException.class, () -> hql("description", Direction.A
 
 | # | ルール | 状況 |
 |---|---|---|
-| S1 | ソートは 1 つのラムダ: `(o, by) -> by...`。キーが 1 つなら: `o -> key` と、省略可能な `Direction`。結合なら: `(o, c, by) -> by...`（`by` は常に最後） | 実装済み。結合の書き方 `(o, c, by)` も実装済み（テスト済み） |
+| S1 | ソートは 1 つのラムダ: `(o, by) -> by...`。キーが 1 つなら: `o -> key` と、省略可能な `Direction`。結合なら: `(o, c, by) -> by...`（`by` は常に最後） | 実装済み。結合の書き方 `(o, c, by)` も実装済み |
 | S2 | キーは `Comparable`。エンティティはキーにできない（コンパイルエラー）。キーはエンティティを使わなければならない | 実装済み |
 | S3 | 方向は `asc` / `desc` または `sort(key, Direction)` で決まる。`asc(key)`/`desc(key)`（`ASC`/`DESC`）は NULL のポリシーを使い、`asc(key, nullsFirst)`、`desc(key, nullsFirst)`、`*_NULLS_*` は書いたとおりに使う | 実装済み |
 | S4 | 本体は `by` 呼び出しのまっすぐなチェーンだけ。`if`、三項演算子、ループは不可 | 実装済み |
@@ -939,12 +939,12 @@ assertThrows(SortNotAllowedException.class, () -> hql("description", Direction.A
 | S6 | 再利用は `SortSpec` で（`of`、`ofPath`、`then`、`reversed`、`orderBy(spec)`）。外部の文字列は永続化ユニットのソートポリシー（`SortRules`、`SortPolicy`、`SortMode`。[4.10](#sort-policy) を参照）がチェックする | `SortSpec` とソートポリシーは実装済み、テスト済み。`SortSpec` の結合の書き方はまだ実装されていない |
 | S7 | キー: カラム、to-one のパス、`+ - *`、拡大変換。値の分岐は不可 | 実装済み。カラムと to-one のパスはテスト済み |
 | S8 | `orderBy` だけで使う関連のパスは `left join` を使うので、関連のない行も残る。必須の関連（`optional = false`）は行を失わないので inner join（A4）。同じパスを `where` で使うと、ソートは `where` の結合を使う | 実装済み |
-| S9 | ページングでは、キーに id が含まれていなければルートの `@Id asc` を追加。キーに一意で NULL にならないカラム（`unique = true` かつ `nullable = false`、`@NaturalId`）があれば追加しない（A5）。コレクションの fetch join + ページングは拒否 | ルートの id と、明示的に結合したエンティティの id については実装済み（テスト済み）。fetch join のチェックはまだ実装されていない |
+| S9 | ページングでは、キーに id が含まれていなければルートの `@Id asc` を追加。キーに一意で NULL にならないカラム（`unique = true` かつ `nullable = false`、`@NaturalId`）があれば追加しない（A5）。コレクションの fetch join + ページングは拒否 | ルートの id と、明示的に結合したエンティティの id については実装済み。fetch join のチェックはまだ実装されていない |
 | S10 | 解析結果はラムダごとにキャッシュされる。キャプチャした `Direction` は呼び出しのたびに読み取られる | 実装済み |
 | S11 | Spring の `Sort.Order` は `Direction` に 1:1 で対応（Spring モジュール。[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) を参照）。プロパティ名はソートポリシーのチェックを通り、エイリアスはそのまま渡される | Spring の `Sort` は実装済み、テスト済み（`ignoreCase` はまだサポートしていない）。ソートポリシーと合わせた場合もテスト済み。`"price,desc_nulls_last"` のような 1 つの文字列の読み取りはまだ実装されていない |
-| S12 | 結合クエリも同じ形: `(o, c, by)`、`(o, c, i, by)` | 実装済み（テスト済み、[6.8](06-select-group.md#68-explicit-joins) を参照） |
+| S12 | 結合クエリも同じ形: `(o, c, by)`、`(o, c, i, by)` | 実装済み（[6.8](06-select-group.md#68-explicit-joins) を参照） |
 | S13 | メソッド参照は、キーが 1 つの短い書き方でだけ使う。コンパイルはできるが意味が間違っているメソッド参照は拒否される（[9. Java の注意点](09-java-notes.md#99-method-references) を参照） | 実装済み（getter の参照） |
-| S14 | サブクエリのソート: `limit` があれば残し、なければ警告を出して削除。データベースの違いは lambdaQL が処理する（5 章を参照） | 実装済み（テスト済み）。MariaDB の `lateral` の書き換えはまだ実装されていない |
+| S14 | サブクエリのソート: `limit` があれば残し、なければ警告を出して削除。データベースの違いは lambdaQL が処理する（5 章を参照） | 実装済み。MariaDB の `lateral` の書き換えはまだ実装されていない |
 
 ---
 

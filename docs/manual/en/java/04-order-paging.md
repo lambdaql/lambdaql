@@ -64,12 +64,12 @@ fetch first ? rows only
 - The key and its direction are written together. They can never get out of order.
 - lambdaQL only reads the lambda. It never runs it. The `by` methods only describe the order.
 
-Examples marked **(tested)** are copied from [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java).
+Examples are copied from [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java).
 The test checks the HQL, runs the queries and compares the row order with the same sort in Java. It passes on H2, MariaDB and Oracle.
 It uses the test entity from [3.3](03-where.md#33-basic-form): `price` is `double` and `status` is `short`. These keys can never be NULL, so their HQL has no `nulls` part.
 In the other examples, `price` is a `Double` that can be NULL (see [3.2](03-where.md#32-example-entities)), so it gets `nulls first` or `nulls last` (see [4.4](#44-null-ordering-is-the-same-on-every-database)).
 
-**(tested)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-basic`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-basic`:
 
 ```java
 RenderedQuery q = qb.from(Order.class)
@@ -80,7 +80,7 @@ RenderedQuery q = qb.from(Order.class)
 assertEquals("select e0 from Order e0 where e0.active = true order by e0.price desc, e0.id asc", q.hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-basic`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-basic`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -110,7 +110,7 @@ lambdaQL tells the forms apart by the number of lambda arguments (one or two). T
 A method reference must be a getter of the entity, like `Order::getPrice`. A static method, a method with arguments, or a reference bound to an object is rejected (rule S13).
 The `by` form (two arguments) needs a lambda. A method reference is rejected there.
 
-**(tested)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-key` (in the test entity, `price` is a `double`, so there is no `nulls` part):
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-key` (in the test entity, `price` is a `double`, so there is no `nulls` part):
 
 ```java
 assertEquals("select e0 from Order e0 order by e0.price asc",
@@ -119,7 +119,7 @@ assertEquals("select e0 from Order e0 order by e0.price desc",
         qb.from(Order.class).orderBy(Order::getPrice, Direction.DESC).toHql().hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-key`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-key`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -128,7 +128,7 @@ from orders o1_0
 order by o1_0.price
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-key#2`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-key#2`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -168,7 +168,7 @@ Without the second argument, `asc(key)` and `desc(key)` use the default NULL pol
 | `by.desc(key, true)` | `DESC_NULLS_FIRST` |
 | `by.desc(key, false)` | `DESC_NULLS_LAST` |
 
-**(tested)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-nulls` (`description` is a `String` that can be NULL; `id` can never be NULL):
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-nulls` (`description` is a `String` that can be NULL; `id` can never be NULL):
 
 ```java
 // default: asc puts NULL first, desc puts NULL last (the same on every database)
@@ -181,7 +181,7 @@ assertEquals("select e0 from Order e0 order by e0.description desc nulls first, 
         qb.from(Order.class).orderBy((o, by) -> by.desc(o.getDescription(), true).asc(o.getId())).toHql().hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-nulls`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-nulls`:
 
 ```sql
 -- H2, MariaDB
@@ -195,7 +195,7 @@ from orders o1_0
 order by o1_0.description asc nulls first,o1_0.id
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-nulls#2`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-nulls#2`:
 
 ```sql
 -- H2
@@ -214,7 +214,7 @@ from orders o1_0
 order by o1_0.description,o1_0.id
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-nulls#3`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-nulls#3`:
 
 ```sql
 -- H2
@@ -246,7 +246,7 @@ Direction dir = request.isNewestFirst() ? Direction.DESC : Direction.ASC;
 
 The ternary `request.isNewestFirst() ? ... : ...` is fine here, because it runs **outside** the lambda.
 
-**(tested)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-dynamic`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-dynamic`:
 
 ```java
 Direction dir = Direction.parse(text);           // for example from a request parameter
@@ -254,7 +254,7 @@ OrderedSelectQuery<Order> q = qb.from(Order.class)
         .orderBy((o, by) -> by.sort(o.getDescription(), dir).asc(o.getId()));
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-dynamic`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-dynamic`:
 
 ```sql
 -- H2, MariaDB
@@ -268,7 +268,7 @@ from orders o1_0
 order by o1_0.description desc nulls last,o1_0.id
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-dynamic#2`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-dynamic#2`:
 
 ```sql
 -- H2
@@ -339,13 +339,13 @@ The SQL you get:
 | Key | Allowed | Note |
 |---|---|---|
 | Column: `o.getPrice()` | yes | tested |
-| To-one path: `o.getCustomer().getName()` | yes | `left join` (inner join for a required association), see below (tested) |
-| `@Lob` column | yes | Oracle rejects it. `LQL-5010` at `DEBUG` level, see below (tested) |
-| `@Enumerated(EnumType.STRING)` enum column | yes | Sorted by name (not by declaration order). `LQL-5011` at `DEBUG` level, see below (tested) |
+| To-one path: `o.getCustomer().getName()` | yes | `left join` (inner join for a required association), see below |
+| `@Lob` column | yes | Oracle rejects it. `LQL-5010` at `DEBUG` level, see below |
+| `@Enumerated(EnumType.STRING)` enum column | yes | Sorted by name (not by declaration order). `LQL-5011` at `DEBUG` level, see below |
 | Arithmetic: `o.getPrice() * 2`, `+`, `-` | yes | not tested yet |
 | Widening conversion (`int` to `long`) | yes | not tested yet |
 | An entity: `by.desc(o.getCustomer())` | **compile error** | an entity is not `Comparable` |
-| A value without the entity: `by.asc(1)`, a captured value | **rejected** | see [4.6](#46-rules-for-the-lambda-body) (tested) |
+| A value without the entity: `by.asc(1)`, a captured value | **rejected** | see [4.6](#46-rules-for-the-lambda-body) |
 | Function on the column: `lower(name)` | planned | |
 
 Keys must be `Comparable`. Boxed types (`Double`, `Integer`, `Long`), `String` and the `java.time` types are `Comparable`, so they work. The Java compiler refuses an entity key.
@@ -354,7 +354,7 @@ Even if your entity class implements `Comparable`, lambdaQL rejects it as a key 
 **Association paths use `left join`.** A plain path in HQL `order by o.customer.name` becomes an inner join on all three databases. Orders without a customer would disappear.
 lambdaQL adds a `left join` instead. Orders without a customer stay in the result. Their `j1.name` is NULL, so they come first with `asc`.
 
-**(tested)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-path`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-path`:
 
 ```java
 RenderedQuery q = qb.from(Order.class)
@@ -364,7 +364,7 @@ RenderedQuery q = qb.from(Order.class)
 assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name asc nulls first, e0.id asc", q.hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-path`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-path`:
 
 ```sql
 -- H2, MariaDB
@@ -384,7 +384,7 @@ order by c1_0.name asc nulls first,o1_0.id
 So for such an association, lambdaQL uses `join` even for a path that is used only in the sort or the select. Other associations use `left join` as shown above (rules S8, J1).
 When every association step of the path is required and the value can never be NULL, the sort also gets no `nulls first/last`.
 
-**(tested)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java), region `required-association` (`@ManyToOne(optional = false) Order order` in the test entity `OrderLine`):
+[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java), region `required-association` (`@ManyToOne(optional = false) Order order` in the test entity `OrderLine`):
 
 ```java
 // order is optional = false: a sort or select path through it cannot lose rows, so it is an inner join
@@ -400,7 +400,7 @@ assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name 
 **Sorting by a `@Lob` column.** When you use a `@Lob` column in `orderBy`, `distinct` or `groupBy`, H2 and MariaDB run the query, but Oracle rejects it (ORA-22848, ORA-22849, measured). An `=` comparison works on all three databases.
 lambdaQL does not change the query. It logs `LQL-5010` at `DEBUG` level once for each column and use (B3).
 
-**(tested)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java), region `lob` (`OrderLine.memo` is a `@Lob`):
+[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java), region `lob` (`OrderLine.memo` is a `@Lob`):
 
 ```java
 // memo is @Lob: H2 and MariaDB sort and group it, Oracle rejects it (ORA-22848, ORA-22849).
@@ -413,7 +413,7 @@ qb.from(OrderLine.class).select(l -> l.getMemo()).distinct().toHql();
 **Sorting by an `EnumType.STRING` enum.** For an enum column mapped with `@Enumerated(EnumType.STRING)`, the database sorts by the text order of the constant **names**. Java compares enums by declaration order, so the result order can be different (B2).
 lambdaQL does not change the query. It logs `LQL-5011` at `DEBUG` level once for each column. `ORDINAL` (or no `@Enumerated`) sorts by declaration order, so nothing is logged.
 
-**(tested)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java), region `enum-string-sort`:
+[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java), region `enum-string-sort`:
 
 ```java
 // kind is @Enumerated(EnumType.STRING): the database sorts by name, Java by declaration order (LQL-5011, DEBUG)
@@ -424,7 +424,7 @@ assertEquals("select e0 from Order e0 order by e0.kind asc nulls first",
 The alias is shared with `where`. If `where` already joined the same path, the sort uses that join.
 This join is an inner join. A path in `where` is always an inner join, so the orders without a customer are already removed (decisions D36, D48, see [3.10](03-where.md#310-association-paths)).
 
-**(tested)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-path-where`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-path-where`:
 
 ```java
 String name = "Kim";
@@ -437,7 +437,7 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = :p1"
         + " order by j1.name desc nulls last, e0.price desc", q.hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-path-where`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-path-where`:
 
 ```sql
 -- H2, MariaDB
@@ -473,7 +473,7 @@ The body must be **a straight chain of `by` calls**.
 lambdaQL checks this when you call `orderBy` and throws a `LambdaQLException` (for example `LQL-2023` for a condition, `LQL-3031` for a key without the entity).
 Every key must use the entity. A key with only a constant or a captured value is rejected.
 
-**(tested)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-rejected`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-rejected`:
 
 ```java
 // a condition inside the sort lambda (rule S4)
@@ -544,7 +544,7 @@ offset ? rows
 fetch first ? rows only
 ```
 
-**(tested)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-page`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-page`:
 
 ```java
 OrderedSelectQuery<Order> page = qb.from(Order.class)
@@ -556,7 +556,7 @@ assertEquals("select e0 from Order e0 order by e0.status asc, e0.id asc", page.t
 List<Order> rows = page.toList();
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-page`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-page`:
 
 ```sql
 -- H2, Oracle
@@ -587,14 +587,14 @@ lambdaQL does not write `LIMIT` into the HQL. Hibernate writes the right SQL for
 
 **Paging without `orderBy`.** You can call `limit` and `offset` without `orderBy`. Then lambdaQL sorts the rows by the id, so the pages are stable.
 
-**(tested)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `page-only`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `page-only`:
 
 ```java
 RenderedQuery q = qb.from(Order.class).where(o -> o.isActive()).limit(2).toHql();
 assertEquals("select e0 from Order e0 where e0.active = true order by e0.id asc", q.hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `page-only`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `page-only`:
 
 ```sql
 -- H2, Oracle
@@ -633,10 +633,10 @@ Rule: **when you use paging and the sort keys do not contain the id, lambdaQL ad
 - It is not added when the sort keys contain a unique column of the main entity that can never be NULL (A5). This means `@Column(unique = true)` with `nullable = false`, a Hibernate `@NaturalId`, or the `@Id`. Such a key alone fixes the order of all rows.
   A unique column that can be NULL does not count, because many rows can have NULL.
 - Without `limit` and `offset`, nothing is added.
-- With explicit joins (`join`, `leftJoin`, `crossJoin`), the id of every joined entity is also added, in join order (tested, see [6.8](06-select-group.md#68-explicit-joins)).
+- With explicit joins (`join`, `leftJoin`, `crossJoin`), the id of every joined entity is also added, in join order (see [6.8](06-select-group.md#68-explicit-joins)).
 - Not implemented yet: a collection fetch join together with `limit`/`offset` is rejected.
 
-**(tested)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java), region `unique-key` (`OrderLine.code` is `@Column(unique = true, nullable = false)`):
+[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java), region `unique-key` (`OrderLine.code` is `@Column(unique = true, nullable = false)`):
 
 ```java
 // code is @Column(unique = true, nullable = false): it orders every row, so paging adds no id tie-breaker
@@ -674,7 +674,7 @@ qb.from(Order.class).where(o -> o.isActive()).orderBy(NEWEST).limit(20).toList()
 - Captured values are the values at the moment the lambda was made. A spec in a `static final` field keeps them. If the direction must change at run time, use `orderBy((o, by) -> by.sort(key, dir))` (see [4.3](#43-direction)).
 - After `orderBy(spec)` you can page as usual: `limit`, `offset`, `toList()`, `first()`.
 
-**(tested)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-spec`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-spec`:
 
 ```java
 // keep it, for example as a static final field, and use it in many queries
@@ -683,7 +683,7 @@ RenderedQuery q = qb.from(Order.class).where(o -> o.isActive()).orderBy(byDescri
 assertEquals("select e0 from Order e0 where e0.active = true order by e0.description desc nulls last, e0.id asc", q.hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-spec`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-spec`:
 
 ```sql
 -- H2, MariaDB
@@ -704,7 +704,7 @@ The SQL is the same as for the same sort written in `orderBy((o, by) -> ...)`. O
 **`then()`: more keys after the existing ones.** `a.then(b)` sorts by the keys of `a` first. Rows with equal values are then sorted by the keys of `b`.
 `then()` takes another `SortSpec` or a sort lambda.
 
-**(tested)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-spec-then` (in the test entity, `status` and `price` can never be NULL, so there is no `nulls` part):
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-spec-then` (in the test entity, `status` and `price` can never be NULL, so there is no `nulls` part):
 
 ```java
 SortSpec<Order> byStatus = SortSpec.of(Order.class, (o, by) -> by.asc(o.getStatus()));
@@ -716,7 +716,7 @@ assertEquals("select e0 from Order e0 order by e0.status asc, e0.id desc",
         qb.from(Order.class).orderBy(byStatus.then((o, by) -> by.desc(o.getId()))).toHql().hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-spec-then` (the first query):
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-spec-then` (the first query):
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -728,7 +728,7 @@ order by o1_0.status,o1_0.price desc
 **`reversed()`: every key the other way.** `spec.reversed()` flips every key. The NULL position flips too: `asc` (NULLs first) becomes `desc` (NULLs last). So the whole row order is exactly backwards.
 This is the same as `Direction.reversed()` (see [4.3](#43-direction)). `spec.reversed().reversed()` gives the original order again.
 
-**(tested)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-spec-reversed`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-spec-reversed`:
 
 ```java
 SortSpec<Order> spec = SortSpec.of(Order.class, (o, by) -> by.asc(o.getDescription()).asc(o.getId()));
@@ -737,7 +737,7 @@ assertEquals("select e0 from Order e0 order by e0.description desc nulls last, e
         qb.from(Order.class).orderBy(spec.reversed()).toHql().hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-spec-reversed`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `sort-spec-reversed`:
 
 ```sql
 -- H2, MariaDB
@@ -762,7 +762,7 @@ H2 and MariaDB already put NULLs last for `desc`, so they write no extra clause.
   Without a policy and without `@Sortable` fields, **any** persistent property is accepted, and lambdaQL logs `LQL-5003` (at `INFO` level by default).
 - An association path uses a `left join` (inner join for a required association), the same as in a sort lambda (rule S8). `then()` can chain `ofPath` specs and lambda specs.
 
-**(tested)** [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-spec-path`:
+[`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java), region `sort-spec-path`:
 
 ```java
 // for sorts chosen outside the code (Spring Sort uses this); only real properties are accepted
@@ -821,7 +821,7 @@ Register a policy with `STRICT` to reject unknown names, or with `OFF` to turn t
 
 With Spring Boot, define a `SortPolicy` bean instead of calling `register` (see [12.5](12-spring-data-jpa.md#sort-policy-with-spring)).
 
-**(tested)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), regions `rules` and `strict`:
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), regions `rules` and `strict`:
 
 ```java
 SortRules<Order> orderRules = SortRules.of(Order.class)
@@ -834,7 +834,7 @@ SortPolicy.register(emf, SortPolicy.of(SortMode.STRICT, orderRules));
 In the next examples, `hql(name, direction)` is a helper method of the test.
 It returns `qb.from(Order.class).orderBy(SortSpec.ofPath(Order.class, name, direction)).toHql().hql()`.
 
-**(tested)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), region `allowed`:
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), region `allowed`:
 
 ```java
 assertEquals("select e0 from Order e0 order by e0.price asc", hql("price", Direction.ASC));
@@ -843,7 +843,7 @@ assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name 
 assertEquals("select e0 from Order e0 order by e0.updateAt desc nulls last", hql("newest", Direction.DESC));
 ```
 
-**(tested)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), region `rejected` (`STRICT` mode):
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), region `rejected` (`STRICT` mode):
 
 ```java
 // not in the rules, an unlisted association path, the path behind an alias, an entity without rules
@@ -857,7 +857,7 @@ assertEquals("select e0 from Order e0 order by e0.description asc nulls first",
         qb.from(Order.class).orderBy((o, by) -> by.asc(o.getDescription())).toHql().hql());
 ```
 
-**(tested)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), region `warn`:
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), region `warn`:
 
 ```java
 // INFO (the default) and WARN: the sort runs and LQL-5003 is logged once per entity and name
@@ -878,7 +878,7 @@ assertEquals("select e0 from Order e0 order by e0.description asc nulls first", 
 - The annotations are used only when the policy has no rules for that entity (from code, a Spring bean or Spring Boot properties).
 - They also work in the default `INFO` mode, without a registered policy.
 
-**(tested)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), region `annotation` (the `STRICT` policy above has rules only for `Order`):
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), region `annotation` (the `STRICT` policy above has rules only for `Order`):
 
 ```java
 // Customer has no rules in the policy, so its @Sortable fields are the rules:
@@ -895,7 +895,7 @@ assertThrows(SortNotAllowedException.class,
 **Rules as strings.** `allowPath(String...)` and `aliasPath(name, path)` take property paths as text. They are meant for configuration files: the Spring Boot properties in [12.5](12-spring-data-jpa.md#sort-policy-with-spring) use this form.
 The paths are checked against the entity the first time the rules are used. In code, use the lambda forms `allow` and `alias`, because the compiler checks them.
 
-**(tested)** [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), region `string-paths`:
+[`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java), region `string-paths`:
 
 ```java
 // the string forms used by configuration files (lambdaql.sort.allow / lambdaql.sort.alias)
@@ -931,7 +931,7 @@ See [5. Subqueries](05-subquery.md#59-sorting-inside-a-subquery).
 
 | # | Rule | Status |
 |---|---|---|
-| S1 | A sort is one lambda: `(o, by) -> by...`. For one key: `o -> key` with an optional `Direction`. For joins: `(o, c, by) -> by...` (`by` is always last) | Implemented. The join form `(o, c, by)` is also implemented (tested) |
+| S1 | A sort is one lambda: `(o, by) -> by...`. For one key: `o -> key` with an optional `Direction`. For joins: `(o, c, by) -> by...` (`by` is always last) | Implemented. The join form `(o, c, by)` is also implemented |
 | S2 | A key is `Comparable`. An entity cannot be a key (compile error). A key must use the entity | Implemented |
 | S3 | The direction comes from `asc` / `desc` or `sort(key, Direction)`. `asc(key)`/`desc(key)` (`ASC`/`DESC`) use the NULL policy; `asc(key, nullsFirst)`, `desc(key, nullsFirst)` and `*_NULLS_*` are used as written | Implemented |
 | S4 | The body is only a straight chain of `by` calls. No `if`, ternary or loop | Implemented |
@@ -939,12 +939,12 @@ See [5. Subqueries](05-subquery.md#59-sorting-inside-a-subquery).
 | S6 | Reuse with `SortSpec` (`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`). Outside strings are checked by the sort policy of the persistence unit (`SortRules`, `SortPolicy`, `SortMode`, see [4.10](#sort-policy)) | `SortSpec` and the sort policy are implemented and tested. The join form of `SortSpec` is not implemented yet |
 | S7 | Keys: columns, to-one paths, `+ - *`, widening. No value branches | Implemented. Columns and to-one paths are tested |
 | S8 | Association paths that are used only in `orderBy` use a `left join`, so rows without the association are kept. A required association (`optional = false`) loses no rows, so it uses an inner join (A4). If `where` uses the same path, the sort uses the `where` join | Implemented |
-| S9 | With paging, the root `@Id asc` is added if the keys do not contain the id. It is not added when the keys contain a unique column that can never be NULL (`unique = true` with `nullable = false`, `@NaturalId`) (A5). Collection fetch join + paging is rejected | Implemented for the root id and the ids of explicitly joined entities (tested). The fetch join check is not implemented yet |
+| S9 | With paging, the root `@Id asc` is added if the keys do not contain the id. It is not added when the keys contain a unique column that can never be NULL (`unique = true` with `nullable = false`, `@NaturalId`) (A5). Collection fetch join + paging is rejected | Implemented for the root id and the ids of explicitly joined entities. The fetch join check is not implemented yet |
 | S10 | The analysis is cached per lambda. A captured `Direction` is read on every call | Implemented |
 | S11 | Spring `Sort.Order` maps 1:1 to `Direction` (Spring module, see [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)). Property names go through the check of the sort policy, and an alias is passed on as it is | Spring `Sort` is implemented and tested (`ignoreCase` is not supported yet). Use with the sort policy is also tested. Reading one text such as `"price,desc_nulls_last"` is not implemented yet |
-| S12 | Join queries use the same shape: `(o, c, by)`, `(o, c, i, by)` | Implemented (tested, see [6.8](06-select-group.md#68-explicit-joins)) |
+| S12 | Join queries use the same shape: `(o, c, by)`, `(o, c, i, by)` | Implemented (see [6.8](06-select-group.md#68-explicit-joins)) |
 | S13 | Method references only in the one-key short form. A method reference that compiles but has the wrong meaning is rejected (see [9. Java notes](09-java-notes.md#99-method-references)) | Implemented (getter references) |
-| S14 | Subquery sorts: kept with `limit`, removed with a warning without `limit`. lambdaQL handles the database differences (see chapter 5) | Implemented (tested). The MariaDB `lateral` rewrite is not implemented yet |
+| S14 | Subquery sorts: kept with `limit`, removed with a warning without `limit`. lambdaQL handles the database differences (see chapter 5) | Implemented. The MariaDB `lateral` rewrite is not implemented yet |
 
 ---
 

@@ -9,7 +9,7 @@
 <a id="basic-form"></a>
 ## 基本形式
 
-**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `update`：
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `update`：
 
 ```java
 short st = 5;
@@ -26,7 +26,7 @@ int changed = u.execute();
 
 **关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 7.4 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `update`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `update`：
 
 ```sql
 -- H2, MariaDB
@@ -93,7 +93,7 @@ qb.update(Order.class).set(o -> o.setCustomer(customer)).where(o -> o.getId() ==
 ```
 
 对关联实体，只能设置它的 `@Id`（外键）。
-`o.getCustomer().setName(x)` 是错误：它会修改另一张表（规则 U6，在 [7.8](07-dml.md#rules-checked-at-analysis-time) 中测试）。
+`o.getCustomer().setName(x)` 是错误：它会修改另一张表（规则 U6，见 [7.8](07-dml.md#rules-checked-at-analysis-time)）。
 
 <a id="a-value-from-another-table"></a>
 ## 来自另一张表的值
@@ -101,7 +101,7 @@ qb.update(Order.class).set(o -> o.setCustomer(customer)).where(o -> o.getId() ==
 通过关联路径读取值。lambdaQL 把它渲染为**关联标量子查询**（规则 U9）。
 `where` 中的路径也会变成同样的子查询。
 
-**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `update-path`：
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `update-path`：
 
 ```java
 // a path in the condition: a subquery, plus "customer exists" (the same rows as the select, D36, U9)
@@ -115,7 +115,7 @@ ExecutableUpdate<Order> copy = qb.update(Order.class).set(o -> o.setCustName(o.g
 assertEquals("update Order e0 set e0.custName = (select s1.name from Customer s1 where s1.id = fk(e0.customer))", copy.toHql().hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `update-path`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `update-path`：
 
 ```sql
 -- H2
@@ -134,7 +134,7 @@ set o1_0.cust_name='K'
 where (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)='Kim' and o1_0.customer_id is not null
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `update-path#2`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `update-path#2`：
 
 ```sql
 -- H2
@@ -159,7 +159,7 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 使用两个参数的 Lambda `set((o, sub) -> ...)`。第二个参数是子查询的起点 `sub`（决策 D49）。
 这里不需要 `Agg`；子查询本身有 `sum`、`avg` 等方法，与 [5. 子查询](05-subquery.md)相同。
 
-**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `update-sub`：
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `update-sub`：
 
 ```java
 // the second parameter starts a subquery, as in where((o, sub) -> ...) (D49)
@@ -222,7 +222,7 @@ where not exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id)
 
 如果实体有 `@Version` 字段，lambdaQL 会渲染 `update versioned`。数据库会把版本号加 1。
 
-**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `update-versioned`：
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `update-versioned`：
 
 ```java
 // an entity with a version field (Version annotation): the version goes up too
@@ -230,7 +230,7 @@ ExecutableUpdate<VOrder> u = qb.update(VOrder.class).set(v -> v.setStatus(2)).wh
 assertEquals("update versioned VOrder e0 set e0.status = 2 where e0.id = 1L", u.toHql().hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `update-versioned`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `update-versioned`：
 
 ```sql
 -- H2, MariaDB
@@ -262,7 +262,7 @@ if (n == 0) throw new OptimisticLockException();   // checking the result is you
 `set()` 可以调用多次。所有赋值按调用顺序合并成一个 SET 列表（规则 U14）。
 规则 U3 和 U4 也跨 `set()` 调用生效。
 
-**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `update-patch`：
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `update-patch`：
 
 ```java
 // PATCH: assign only the fields that have a value; every set() adds assignments
@@ -300,7 +300,7 @@ qb.update(Order.class).set(o -> o.setStatus(0)).execute();             // compil
 在 `where(...)` 或 `all()` 之后写 `orderBy(...)` 和 `limit(n)`，最多更新 `n` 行：即 `qb.from(X.class).where(same).orderBy(same)` 的前 `n` 行。
 规则与删除相同（见 [7.4](07-4-delete.md#delete-the-first-rows-limit)）：没有 `orderBy` 时按 id 排序，id 总是最后一个排序键，没有 `limit` 的 `orderBy` 是错误。
 
-**(已测试)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `update-limit`：
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)，region `update-limit`：
 
 ```java
 // a path in the condition: the nested select joins, so the rows are the same as the select
@@ -313,7 +313,7 @@ assertEquals("update Order e0 set e0.description = 'top' where e0.id in (select 
         + " join x0.customer k1 where k1.name = 'Kim' order by x0.price desc, x0.id asc limit 1) t)", u.toHql().hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `update-limit`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `update-limit`：
 
 ```sql
 -- H2

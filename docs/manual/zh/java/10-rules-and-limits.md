@@ -161,7 +161,7 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 | `x == null`、`x != null` | `is null`、`is not null` | 二值 |
 | `o.getCnt() >= 2.5`（整数列，小数值） | 按写出的值比较：常量是字面量（`e0.cnt >= 2.5`），捕获值和 IN 列表也是小数字面量（`e0.cnt >= 2.5BD`、`in (2.5BD, 3.0BD)`，D48 B8） | 保持索引范围扫描（在 MariaDB 上实测）。不再像以前那样截断值而返回错误的行 |
 | 整个值对象（`@Embedded`）：`o.getAddress().equals(addr)`、`Objects.equals(o.getAddress(), addr)`、`!o.getAddress().equals(addr)` | 按列展开：`e0.address.city = :p1 and e0.address.zip = :p2`，否定为 `<> ... or ...`。`== null` 是所有列 `is null`（and），`!= null` 是 `is not null`（or） | 每列遵循 SQL 语义（D48）：NULL 列对 `=` 和 `<>` 都不匹配。捕获的对象为 `null` 时没有匹配的行（`WARN` 级别的 `LQL-4045`） |
-| 对永远不会是 NULL 的列（id、基本类型、`nullable = false`，且路径上没有关联步骤）写 `o.getId() == null` | `1=0`。与比较并列时，检查被去掉：`o.getId() != null && o.getId() == id` 得到 `e0.id = :p1`（已测试） | 该列没有 NULL。经过关联的路径（`o.getCustomer().getId()`）保留检查 |
+| 对永远不会是 NULL 的列（id、基本类型、`nullable = false`，且路径上没有关联步骤）写 `o.getId() == null` | `1=0`。与比较并列时，检查被去掉：`o.getId() != null && o.getId() == id` 得到 `e0.id = :p1` | 该列没有 NULL。经过关联的路径（`o.getCustomer().getId()`）保留检查 |
 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR` | SQL 三值逻辑 |
 | `where` 中的 `o.getCustomer().getName()` | `j1.name` + `join e0.customer j1`（默认是内连接） | 没有 customer：该订单不会被选中 |
 | `o.getCustomer() == null \|\| o.getCustomer().getName().equals(p)` | `e0.customer is null or j1.name = :p1` + `join e0.customer j1` | 没有 customer：**不**选中（内连接，D48；`DEBUG` 级别的 `LQL-5009`）。要保留，请使用 `leftJoin` |
@@ -253,7 +253,7 @@ lambdaQL 会记录 **WARN**（`LQL-5001`）。例外：在 Oracle 上，存在�
 | 字符串长度 | UTF-16 单元 | H2 为 UTF-16 单元，MariaDB 为码点 | 已在文档中说明 |
 | 与 NULL 的字符串拼接 | 文本 `"null"` | NULL（Oracle：`NULL \|\| 'x'` 为 `'x'`） | 字符串拼接已在计划中，v0.1 不支持 |
 | Lambda 中的 `LocalDateTime.now()` | 应用时间 | – | 作为**应用时间**绑定。不支持数据库时间（`current_timestamp`） |
-| `Set` 中相等的元素 | 由 `equals` / `hashCode` 决定 | 用主键区分行 | 如果 Set 比行数小，`toSet()` 和 `findSet()` 抛出 `IllegalStateException`（实体的 `equals` / `hashCode` 把不同的行视为相等，或 `@Id` 不唯一，例如视图）。请使用 `toList()`（D42，已测试） |
+| `Set` 中相等的元素 | 由 `equals` / `hashCode` 决定 | 用主键区分行 | 如果 Set 比行数小，`toSet()` 和 `findSet()` 抛出 `IllegalStateException`（实体的 `equals` / `hashCode` 把不同的行视为相等，或 `@Id` 不唯一，例如视图）。请使用 `toList()`（D42） |
 
 <a id="106-database-differences"></a>
 ## 10.6 数据库差异
@@ -309,12 +309,12 @@ lambdaQL 隐藏了许多差异，但有一些你必须了解。
 | 项目 | 现象 | lambdaQL |
 |---|---|---|
 | `SET a = ..., b = a + 1`（设置某列后再读取它） | MariaDB 读取**新**值，H2 和 Oracle 读取旧值 | 分析时报错（U3） |
-| DML 中的关联路径（`o.getCustomer().getName()`） | Hibernate 在不同数据库上生成不同的连接，并**丢失**没有 customer 的行 | lambdaQL 写成关联标量子查询（在 `where` 和 SET 中）。在 `where` 中，查询会做内连接的路径还会加上 `customer.id is not null`，使 DML 作用于与查询相同的行（U9，已测试） |
+| DML 中的关联路径（`o.getCustomer().getName()`） | Hibernate 在不同数据库上生成不同的连接，并**丢失**没有 customer 的行 | lambdaQL 写成关联标量子查询（在 `where` 和 SET 中）。在 `where` 中，查询会做内连接的路径还会加上 `customer.id is not null`，使 DML 作用于与查询相同的行（U9） |
 | 带有同表子查询的 `DELETE` | MariaDB 错误 1093 | 先通过派生表读取目标 id：`d0.id in (select t.id from (select e0.id as id … where <condition>) t)`（U17）。对关联子查询也可用，在三种数据库上删除相同的行（实测）。`update` 不包装（在 MariaDB 上也可用） |
 | 同一个枚举值只绑定一次，同时用于 STRING 列和 ORDINAL 列 | H2 和 MariaDB 会**不报错地存入错误的值** | 每个位置一个参数，从不共用（U7） |
 | `values(list, ...)` 中有很多行 | Oracle：绑定变量硬性上限 65,535（ORA-01745），远未达到上限前就已经很慢 | 拆分：每条语句最多 500 个值，全部在一个事务中执行（U13） |
-| 带 `order by ... limit` 的 `update` / `delete` | MariaDB 拒绝 `in` 子查询中的 `limit`（错误 1235）和读取目标表的子查询（错误 1093） | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`：派生表 `t` 在三个数据库上都可用。内层 select 使用查询的连接（D36），因此行与查询相同（已测试） |
-| `on conflict` / upsert | H2 和 Oracle：`merge`。MariaDB：`insert ... on duplicate key update`，更新的行计为 2。Hibernate 的 `do nothing` 在 H2 和 Oracle 上会失败 | `upsert` 和 `onConflict(...).update(...)` 使用 Hibernate 的形式。`ignore()` 写成 `insert ... select ... where not exists`。行数原样返回（D40，已测试） |
+| 带 `order by ... limit` 的 `update` / `delete` | MariaDB 拒绝 `in` 子查询中的 `limit`（错误 1235）和读取目标表的子查询（错误 1093） | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`：派生表 `t` 在三个数据库上都可用。内层 select 使用查询的连接（D36），因此行与查询相同 |
+| `on conflict` / upsert | H2 和 Oracle：`merge`。MariaDB：`insert ... on duplicate key update`，更新的行计为 2。Hibernate 的 `do nothing` 在 H2 和 Oracle 上会失败 | `upsert` 和 `onConflict(...).update(...)` 使用 Hibernate 的形式。`ignore()` 写成 `insert ... select ... where not exists`。行数原样返回（D40） |
 
 <a id="procedures-and-functions"></a>
 ### 存储过程与函数
@@ -432,7 +432,7 @@ lambdaQL 隐藏了许多差异，但有一些你必须了解。
 | 并发插入时原子的 `onConflict(...).ignore()` | 捕获键重复错误（`ignore()` 使用 `not exists`，见 [7.6](07-6-upsert.md)） |
 | 基于 `insert ... select` 的 upsert | 用 `values(list, ...)` 逐行 upsert |
 | 对更新或删除写 `orderBy(...)` 而没有 `limit(n)` | 加上 `limit(n)`，或去掉 `orderBy`（否则 `IllegalStateException`） |
-| 必须只改变一行的更新或删除，用 `execute() == 1` 和回滚来检查 | `executeOne()`：先读取 id（最多 2 个）。有 2 个时什么都不改变，并抛出 `NonUniqueResultException`。有 1 个时用 `id = :p and (条件)` 改变该行。绝不会改变超过一行（D41，已测试） |
+| 必须只改变一行的更新或删除，用 `execute() == 1` 和回滚来检查 | `executeOne()`：先读取 id（最多 2 个）。有 2 个时什么都不改变，并抛出 `NonUniqueResultException`。有 1 个时用 `id = :p and (条件)` 改变该行。绝不会改变超过一行（D41） |
 | `executeOne()` 与 `orderBy` 或 `limit` 一起使用 | 只用其中之一（否则 `IllegalStateException`） |
 | update 或 delete 上的 `offset` | 不计划提供（D42）。DML 只有 `limit(n)`。用 `where`、`orderBy(...)` 和 `limit(n)` 选择行 |
 | 对复合键实体使用 `limit` 或 `executeOne()` | 目前还不支持。先查询 id，再执行 `delete ... where ids.contains(id)` |

@@ -93,7 +93,7 @@ The Java tests use Java test entities with the same names ([`query/src/test/java
 
 `value` is the function `org.lambdaql.Dml.value` (decision D49). Import it with `import org.lambdaql.Dml.value` and use it in a lambda with one argument.
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `update-value`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `update-value`:
 
 ```kotlin
 // entities without setters (val): Dml.value(column, value)
@@ -155,7 +155,7 @@ Rules for `value` (rule U20):
 The second argument of an assignment lambda is `sub`, the starting point of a subquery. The notation is the same as `where { o, sub -> ... }` (decision D49).
 In `insert ... select`, the third argument is `sub` (see [7.5](07-5-insert.md)).
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `update-sub`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `update-sub`:
 
 ```kotlin
 // the second parameter starts a subquery, as in where { o, sub -> ... } (D49)
@@ -271,7 +271,7 @@ The reason is as follows. If lambdaQL gave the path to Hibernate as it is, Hiber
 lambdaQL writes the subqueries itself. The statement then reads only its own table, so MariaDB's limit on reading the target table (error 1093) does not apply.
 
 A select uses an inner join for a path in `where` (decision D36). So in DML, lambdaQL adds `e0.customer.id is not null` for such a path.
-As a result, `update` and `delete` target **exactly the rows** that `qb.from(X::class.java).where { same lambda }` returns (tested with Java: the deleted rows are compared with the select result).
+As a result, `update` and `delete` target **exactly the rows** that `qb.from(X::class.java).where { same lambda }` returns (the deleted rows are compared with the select result).
 This is the same with a null guard written with `!!` or without a mark (`it.customer == null || it.customer!!.name == ...`). The select also uses an inner join for this path (decision D48), so the check stays.
 When a step reached with `?.` becomes a `left join` in the select (`it.status == 1 || it.customer?.name == "Kim"`, decision D54), lambdaQL does not add this check. DML still targets the same rows as the select (the region `update-safe-call` in [7.2](07-2-update.md)).
 
@@ -288,7 +288,7 @@ A path that ends with the `@Id` (`it.customer?.id`) is the FK column. There is n
 | Limit | at most 500 values per statement (fixed) |
 | Return value | the sum of all statements |
 | Transaction | all statements run in one transaction |
-| Empty list | no SQL, returns 0 (tested with Java) |
+| Empty list | no SQL, returns 0 |
 
 Oracle has a hard limit of 65,535 bind values (ORA-01745). Parsing gets very slow long before that
 (about 6 minutes for 21,845 rows in a design test). That is why the limit is small.
@@ -333,7 +333,7 @@ A bulk statement needs a transaction. lambdaQL opens a transaction only for a bu
 | Builder | Transaction |
 |---|---|
 | `QueryBuilder(entityManagerFactory)` | `execute()` and `executeOne()` open their own transaction and commit it. On an error they roll back |
-| A builder with an `EntityManager`: `QueryBuilder(entityManager)`, Spring's `QueryBuilder` bean, the repository executor | the caller's transaction (`@Transactional`, or an active transaction of that `EntityManager`). Without a transaction, the statement fails with `TransactionRequiredException` before any SQL is sent (tested, Java). In a Spring repository call, it becomes `InvalidDataAccessApiUsageException` (see [12.6](12-spring-data-jpa.md#126-transactions-and-exceptions)) |
+| A builder with an `EntityManager`: `QueryBuilder(entityManager)`, Spring's `QueryBuilder` bean, the repository executor | the caller's transaction (`@Transactional`, or an active transaction of that `EntityManager`). Without a transaction, the statement fails with `TransactionRequiredException` before any SQL is sent (Java). In a Spring repository call, it becomes `InvalidDataAccessApiUsageException` (see [12.6](12-spring-data-jpa.md#126-transactions-and-exceptions)) |
 
 <a id="the-persistence-context-is-not-updated"></a>
 ### The persistence context is not updated
@@ -358,7 +358,7 @@ lambdaQL does not handle these conditions separately.
 <a id="79-all-rules-u1-to-u21-summary"></a>
 ## 7.9 All rules U1 to U21 (summary)
 
-Rules that lambdaQL checks when it reads the lambda: U1, U3, U4, U6 (tested with Java lambdas). Rule that the compiler checks: U5.
+Rules that lambdaQL checks when it reads the lambda: U1, U3, U4, U6. Rule that the compiler checks: U5.
 The lambdaQL checks of U11, U12 and U15 are not implemented yet.
 
 | # | Rule |

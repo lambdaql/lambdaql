@@ -43,7 +43,7 @@ lambdaQL 根据参数的个数区分这两种写法。Kotlin 会选择正确的�
 
 在 HQL 中，子查询的根别名是 `s1`、`s2` 等（外层的根是 `e0`）。子查询内部的 join 使用 `s1j1` 这样的别名。
 
-标记为 **(已测试)** 的示例来自 [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)。它使用 Java 测试实体：`price` 是基本类型 `double`，`qty` 是 `int`。
+示例来自 [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)。它使用 Java 测试实体：`price` 是基本类型 `double`，`qty` 是 `int`。
 更多用 Java 写的查询在 [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) 中测试过（H2、MariaDB 和 Oracle）。这些示例请看[本页的 Java 版本](../java/05-subquery.md)。
 
 ## 5.2 EXISTS
@@ -62,7 +62,7 @@ qb.from(Order::class.java)
 //      where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > 10)
 ```
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `exists`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `exists`：
 
 ```kotlin
 val q = qb.from(Order::class.java)
@@ -125,7 +125,7 @@ qb.from(Order::class.java)
 //      where e0.customer.id in (select s1.id from Customer s1 where s1.grade > 3)
 ```
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `in`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `in`：
 
 ```kotlin
 val q = qb.from(Order::class.java)
@@ -237,7 +237,7 @@ qb.from(Order::class.java)
 //      where e0.price > (select avg(s1.price) from Order s1)
 ```
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `scalar`（测试的 `price` 是 `double`，所以没有 `!!`）：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `scalar`（测试的 `price` 是 `double`，所以没有 `!!`）：
 
 ```kotlin
 val q = qb.from(Order::class.java).where { o, sub -> o.price > sub.from(Order::class.java).avg { x -> x.price } }
@@ -379,7 +379,7 @@ where exists(select 1 from orders o1_0 where o1_0.customer_id=c1_0.id and exists
 - 子查询中的实体最多两个。join 形式中不能使用 `orderBy` 和 `limit`。
 - `exists`、对 join 后各行的 `sum`、以及使用 `left join` 和 ON 中关联路径的 `in`，已在三种数据库上实测。
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `sub-join`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `sub-join`：
 
 ```kotlin
 // customers with an order that has an item of quantity > 10: the subquery joins Order and Item (D51)

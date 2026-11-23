@@ -40,7 +40,7 @@ lambdaQL은 이 메서드들을 **절대 실행하지 않습니다**. 람다 바
 인터페이스를 작성합니다. 각 **추상** 메서드에 `@SqlProcedure("NAME")`을 붙이십시오.
 구현은 작성하지 않습니다. lambdaQL도 구현을 만들지 않습니다.
 
-**(테스트됨)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `declare`:
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `declare`:
 
 ```java
 /** One OUT value or more: a record in the database order. */
@@ -111,7 +111,7 @@ CREATE OR REPLACE PROCEDURE SQ_PROC_CALC(IN p_cust INT, IN p_rate DOUBLE, OUT p_
 
 `qb.call(Interface.class, p -> p.method(args))`를 사용합니다. 그다음 `execute()`를 호출합니다.
 
-**(테스트됨)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `call`(MariaDB, Oracle):
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `call`(MariaDB, Oracle):
 
 ```java
 Double total = qb.call(OrderProcs.class, p -> p.calc(customerId, rate)).execute();
@@ -124,7 +124,7 @@ List<Line> recent = qb.call(OrderProcs.class, p -> p.recent(customerId)).execute
 
 결과가 없는(`void`) 프로시저는 `exec`로 호출합니다.
 
-**(테스트됨)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `exec`(MariaDB, Oracle):
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `exec`(MariaDB, Oracle):
 
 ```java
 qb.exec(OrderProcs.class, p -> p.purge(9)).execute();
@@ -197,7 +197,7 @@ Adjusted adjusted = qb.call(OrderProcs.class, p -> p.adjust(5, 10)).execute();
 | `T`가 | lambdaQL이 읽는 방법 |
 |---|---|
 | 엔티티 | Hibernate 결과 클래스(`StoredProcedureQuery`) |
-| Java 레코드(Kotlin: data class) | JDBC `CallableStatement`, 컬럼을 **레이블로** 대응. `_`를 빼고 대소문자를 무시하므로 `customer_id`가 `customerId`에 대응(`Line`으로 테스트함) |
+| Java 레코드(Kotlin: data class) | JDBC `CallableStatement`, 컬럼을 **레이블로** 대응. `_`를 빼고 대소문자를 무시하므로 `customer_id`가 `customerId`에 대응 |
 | 값 하나(`Long`, `String`, ...) | 각 행의 첫 컬럼 |
 
 일반 DTO 클래스는 여기서 행 타입으로 쓸 수 없습니다. 레코드를 사용하십시오.
@@ -242,14 +242,14 @@ MariaDB와 H2 드라이버는 이름 있는 파라미터를 지원하지 않습�
 | 확인 항목 | 발견 여부 |
 |---|---|
 | 프로시저의 존재 | 예, 오류 `LQL-4035` |
-| IN·INOUT 파라미터 개수 = 스텁 인자 개수 | 예, 오류 `LQL-4036`(테스트함) |
+| IN·INOUT 파라미터 개수 = 스텁 인자 개수 | 예, 오류 `LQL-4036` |
 | INOUT 파라미터 = `@InOut`을 붙인 인자 | 예, 오류 `LQL-4036` |
 | OUT 값과 결과 집합의 개수 = 반환 타입의 구성 요소 수 | 예, 오류 `LQL-4038` |
-| 타입의 종류(숫자, 문자, 날짜·시간, 불리언, 이진) | 예, 오류 `LQL-4036`(테스트함). 같은 종류 안의 차이는 대조하지 않음(아래 "인자 타입 대조" 참고) |
-| 같은 파라미터 이름이 다른 순서로 놓임 | 예, 오류 `LQL-4043`(테스트함). 스텁 인자 이름을 알 수 있을 때만(아래 참고) |
-| Oracle 패키지 프로시저 이름에 오버로드가 여러 개 | 예, 오류 `LQL-4044`(Oracle에서 테스트함) |
+| 타입의 종류(숫자, 문자, 날짜·시간, 불리언, 이진) | 예, 오류 `LQL-4036`. 같은 종류 안의 차이는 대조하지 않음(아래 "인자 타입 대조" 참고) |
+| 같은 파라미터 이름이 다른 순서로 놓임 | 예, 오류 `LQL-4043`. 스텁 인자 이름을 알 수 있을 때만(아래 참고) |
+| Oracle 패키지 프로시저 이름에 오버로드가 여러 개 | 예, 오류 `LQL-4044` |
 
-**(테스트됨)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `rules`(MariaDB, Oracle):
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `rules`(MariaDB, Oracle):
 
 ```java
 // PR2: the stub is checked against the database parameters on the first call
@@ -282,7 +282,7 @@ assertEquals("LQL-3060", assertThrows(LambdaQLException.class,
 - 클래스 파일에 이름이 없고 이웃한 두 인자의 타입이 같으면, 프로시저마다 한 번 `LQL-5004`를 `INFO` 레벨로 기록합니다.
 - 타입은 종류만 대조합니다(아래 "인자 타입 대조" 참고). 같은 종류의 인자 두 개가 뒤바뀐 경우는 이름으로만 찾을 수 있습니다.
 
-**(테스트됨)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `names`(DB 프로시저는 `SQ_PROC_DIFF(p_to, p_from)`. 테스트 스텁은 `-parameters`로 컴파일함):
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `names`(DB 프로시저는 `SQ_PROC_DIFF(p_to, p_from)`. 테스트 스텁은 `-parameters`로 컴파일함):
 
 ```java
 /** Argument names: with -parameters lambdaQL compares them with the database names (p_to, p_from). */
@@ -301,7 +301,7 @@ interface DiffProcs {
 }
 ```
 
-**(테스트됨)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `name-check`(MariaDB, Oracle):
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `name-check`(MariaDB, Oracle):
 
 ```java
 assertEquals(7, qb.call(DiffProcs.class, p -> p.diff(10, 3)).execute());
@@ -320,7 +320,7 @@ assertEquals("LQL-4043", assertThrows(LambdaQLException.class,
 - 종류를 정할 수 없는 쪽(enum, 객체 타입, 커서)은 대조하지 않습니다.
 - 같은 종류 안의 차이(`Integer` 인자와 `NUMBER(10,2)` 파라미터 등)는 드라이버 변환에 맡깁니다.
 
-**(테스트됨)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `type-check`(MariaDB, Oracle):
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `type-check`(MariaDB, Oracle):
 
 ```java
 // the kind of each argument is compared with the database parameter: a string for a number parameter stops
@@ -332,7 +332,7 @@ assertEquals("LQL-4036", wrong.code(), wrong.getMessage());
 **Oracle 패키지 오버로드.** Oracle 패키지에는 같은 이름의 프로시저가 여러 개 있을 수 있습니다.
 lambdaQL은 스텁이 어느 것을 가리키는지 구분할 수 없으므로, 그런 이름을 호출하면 `LQL-4044`로 중단합니다. 오버로드 하나를 골라 호출하는 기능은 이후 계획입니다.
 
-**(테스트됨)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `overload`(Oracle 전용). 스텁 `PkgProcs`는 `@SqlProcedure(pkg = "SQ_PKG", value = "TWICE")`와 `@SqlProcedure(pkg = "SQ_PKG", value = "HALF")`를 선언합니다:
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `overload`(Oracle 전용). 스텁 `PkgProcs`는 `@SqlProcedure(pkg = "SQ_PKG", value = "TWICE")`와 `@SqlProcedure(pkg = "SQ_PKG", value = "HALF")`를 선언합니다:
 
 ```java
 assertEquals(5.0, qb.call(PkgProcs.class, p -> p.twice(2.5)).execute(), 1e-9);
@@ -363,17 +363,17 @@ Oracle의 실제 이름 바인딩(`pass_procedure_paramater_names=true`와 스�
 | # | 규칙 | 상태 |
 |---|---|---|
 | PR1 | 이름: 애너테이션 값 그대로. 값이 비어 있으면 메서드 이름을 UPPER_SNAKE로. 패키지나 스키마 이름(`SQ_PKG.CALC`, `LQL.SQ_CALC`)도 동작합니다. 혼동을 피하려면 `@SqlProcedure(schema = ..., pkg = ..., value = ...)`로 쓸 수도 있습니다. | 구현됨. 스키마·패키지 이름은 테스트로 확인하지 않음 |
-| PR2 | 인자는 **위치로** 바인딩됩니다. 첫 호출에서 IN/INOUT 파라미터 개수와 `@InOut` 위치를 DB 메타데이터와 대조합니다. 이름을 알 수 있으면 이름도 대조하며, 같은 이름이 다른 순서면 오류입니다. 인자 타입의 종류(숫자, 문자, 날짜·시간, 불리언, 이진)도 대조하며, 다르면 오류(`LQL-4036`)입니다([8.4](#84-warning-argument-order) 참고). 메타데이터를 읽을 수 없으면 검사를 건너뛰고 인자 배치를 스텁에서 가져옵니다([8.4](#when-the-metadata-cannot-be-read) 참고). | 개수, `@InOut`, 이름 대조는 구현됨(테스트함). Oracle 패키지 오버로드 검출도 구현됨(Oracle에서 테스트함). 타입 대조도 구현됨(MariaDB, Oracle에서 테스트함). 메타데이터 없는 대체 동작(`LQL-5005`, `LQL-5006`)은 구현됨(MariaDB, Oracle에서 테스트함). |
-| PR3 | OUT 1개 → 반환 값. OUT/INOUT 여러 개 → 레코드. `@InOut`은 INOUT 파라미터를 표시합니다. | 구현됨(테스트함) |
-| PR4 | 결과 집합 1개 → `List<T>`. 엔티티는 Hibernate로, 레코드는 레이블 대응으로 JDBC를 통해 읽습니다. 페이징 없음. | 구현됨(레코드로 테스트함) |
+| PR2 | 인자는 **위치로** 바인딩됩니다. 첫 호출에서 IN/INOUT 파라미터 개수와 `@InOut` 위치를 DB 메타데이터와 대조합니다. 이름을 알 수 있으면 이름도 대조하며, 같은 이름이 다른 순서면 오류입니다. 인자 타입의 종류(숫자, 문자, 날짜·시간, 불리언, 이진)도 대조하며, 다르면 오류(`LQL-4036`)입니다([8.4](#84-warning-argument-order) 참고). 메타데이터를 읽을 수 없으면 검사를 건너뛰고 인자 배치를 스텁에서 가져옵니다([8.4](#when-the-metadata-cannot-be-read) 참고). | 개수, `@InOut`, 이름 대조는 구현됨. Oracle 패키지 오버로드 검출도 구현됨. 타입 대조도 구현됨(MariaDB). 메타데이터 없는 대체 동작(`LQL-5005`, `LQL-5006`)은 구현됨(MariaDB). |
+| PR3 | OUT 1개 → 반환 값. OUT/INOUT 여러 개 → 레코드. `@InOut`은 INOUT 파라미터를 표시합니다. | 구현됨 |
+| PR4 | 결과 집합 1개 → `List<T>`. 엔티티는 Hibernate로, 레코드는 레이블 대응으로 JDBC를 통해 읽습니다. 페이징 없음. | 구현됨 |
 | PR5 | 결과 집합 여러 개 → 레코드의 `List` 컴포넌트, 순서대로. Oracle 암시적 결과는 지원하지 않습니다. | 구현됨, 테스트로 확인하지 않음 |
-| PR6 | 단독으로 호출한 DB 함수는 데이터베이스마다 다른 경로를 사용합니다([8.8](#88-call-a-db-function-alone) 참고). | 구현됨(테스트함) |
-| PR7 | 쿼리 안의 DB 함수: [8.6](#86-declare-db-functions)과 규칙 FN1 ~ FN11 참고. | 구현됨(테스트함) |
-| PR8 | 조건에서 컬럼에 DB 함수를 쓰면 인덱스를 사용할 수 없으므로 WARN을 남깁니다([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). 코드는 `LQL-5001`. | 구현됨(테스트함). `SargableMode.STRICT`에서는 오류(`LQL-3066`, D50) |
+| PR6 | 단독으로 호출한 DB 함수는 데이터베이스마다 다른 경로를 사용합니다([8.8](#88-call-a-db-function-alone) 참고). | 구현됨 |
+| PR7 | 쿼리 안의 DB 함수: [8.6](#86-declare-db-functions)과 규칙 FN1 ~ FN11 참고. | 구현됨 |
+| PR8 | 조건에서 컬럼에 DB 함수를 쓰면 인덱스를 사용할 수 없으므로 WARN을 남깁니다([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). 코드는 `LQL-5001`. | 구현됨. `SargableMode.STRICT`에서는 오류(`LQL-3066`, D50) |
 | PR9 | 프로시저는 호출한 트랜잭션 안에서 실행됩니다. lambdaQL은 필요하면 호출 전에 flush합니다. 호출 후에는 로드한 엔티티가 오래된 상태일 수 있습니다. | 구현됨 |
 | PR10 | 공통된 영향받은 행 수가 없습니다. OUT 파라미터를 사용하십시오. | – |
 | PR11 | `null` IN 값은 괜찮습니다. DB 파라미터 기본값은 사용할 수 없습니다. | 구현됨 |
-| PR12 | 람다는 스텁 호출 하나입니다. 인자는 캡처 값, 상수, 또는 그것들의 계산입니다. OUT 파라미터가 있을 때 `exec`는 오류입니다. | 구현됨(테스트함) |
+| PR12 | 람다는 스텁 호출 하나입니다. 인자는 캡처 값, 상수, 또는 그것들의 계산입니다. OUT 파라미터가 있을 때 `exec`는 오류입니다. | 구현됨 |
 | PR13 | boolean 파라미터는 MariaDB와 Oracle 23ai 이상에서 동작합니다. | 테스트로 확인하지 않음 |
 | PR14 | 각 람다는 한 번 분석합니다. 프로시저 메타데이터는 이름마다 한 번 읽습니다. | 구현됨 |
 | PR15 | H2에는 OUT, INOUT, 여러 결과 집합, 패키지가 없습니다. 프로시저는 MariaDB나 Oracle에서 테스트하십시오(예: Testcontainers 사용). | lambdaQL 테스트도 이 방식을 따름 |
@@ -389,7 +389,7 @@ DB 함수는 데이터베이스에 직접 만든 함수입니다. 예: `FN_DISCO
 `@SqlFunction`을 붙인 **인터페이스의 static 메서드**로 선언합니다.
 본문은 예외를 던지기만 해야 합니다. lambdaQL 안에서 절대 실행되지 않습니다.
 
-**(테스트됨)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `declare`:
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `declare`:
 
 ```java
 /** Database functions: static methods of your own interface. The bodies only throw. */
@@ -429,7 +429,7 @@ lambdaQL 람다 **밖에서** `OrderFns.discount(...)`를 호출하면 `DbOnlyEx
 
 | 선언 | 상태 |
 |---|---|
-| 인터페이스 static 메서드 | **권장**(테스트함) |
+| 인터페이스 static 메서드 | **권장** |
 | 클래스 static 메서드 | 설계됨, 테스트로 확인하지 않음 |
 | 인터페이스 default 메서드 + 싱글턴 상수 | 설계됨, 테스트로 확인하지 않음 |
 | 리포지토리가 함수 인터페이스를 `implements`(믹스인) | 거부됨 |
@@ -443,9 +443,9 @@ lambdaQL 람다 **밖에서** `OrderFns.discount(...)`를 호출하면 `DbOnlyEx
 ## 8.7 쿼리에서 DB 함수 사용
 
 함수를 직접 호출하십시오. 컨텍스트 인자는 필요 없습니다.
-`where`, `select`, `orderBy`, `set`에서 동작합니다(테스트함). `groupBy`, `having`, 서브쿼리에서도 동작하도록 설계했지만 테스트로 확인하지는 않았습니다.
+`where`, `select`, `orderBy`, `set`에서 동작합니다. `groupBy`, `having`, 서브쿼리에서도 동작하도록 설계했지만 테스트로 확인하지는 않았습니다.
 
-**(테스트됨)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `where`:
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `where`:
 
 ```java
 // the function call is written as function('<name>' as <type>, ...); the column is its argument
@@ -453,7 +453,7 @@ SelectQuery<Order> q = qb.from(Order.class).where(o -> OrderFns.discount(o.getPr
 assertEquals("select e0 from Order e0 where function('SQ_FN_DISCOUNT' as Double, e0.price) > 100.0", q.toHql().hql());
 ```
 
-**(테스트됨)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `captured`:
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `captured`:
 
 ```java
 // a function of captured values only is still computed by the database (the value is bound)
@@ -463,7 +463,7 @@ assertEquals("select e0 from Order e0 where e0.price > function('SQ_FN_DISCOUNT'
 
 Boolean 함수는 조건 전체로 쓸 수 있습니다. lambdaQL이 `= true`를 붙입니다.
 
-**(테스트됨)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `boolean`:
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `boolean`:
 
 ```java
 SelectQuery<Order> q = qb.from(Order.class).where(o -> OrderFns.isGold(o.getCustomer().getGrade()));
@@ -471,7 +471,7 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where function('SQ_FN_
         q.toHql().hql());
 ```
 
-**(테스트됨)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `select`(`select`와 `orderBy`):
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `select`(`select`와 `orderBy`):
 
 ```java
 ValueQuery<Priced> q = qb.from(Order.class)
@@ -483,7 +483,7 @@ assertEquals("select e0.id, function('SQ_FN_DISCOUNT' as Double, e0.price) from 
 
 `Priced`는 `record Priced(Long id, Double discounted)`입니다.
 
-**(테스트됨)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `update`:
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `update`:
 
 ```java
 ExecutableUpdate<Order> u = qb.update(Order.class)
@@ -557,7 +557,7 @@ spring.jpa.properties.lambdaql.functions.classes=com.acme.OrderFns
 static Double mixed(Double v) { throw new DbOnlyException(); }
 ```
 
-**(테스트됨)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `registered`:
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `registered`:
 
 ```java
 // SQ_TAX is registered at start-up (lambdaql.functions.classes) and runs SQ_FN_DISCOUNT in SQL
@@ -574,7 +574,7 @@ assertEquals("select e0 from Order e0 where function('SQ_TAX' as Double, e0.pric
 
 **인자가 없는 람다**로 `qb.call(() -> ...)`를 사용하십시오.
 
-**(테스트됨)** [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `function`(H2, MariaDB, Oracle):
+[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java), 영역 `function`(H2, MariaDB, Oracle):
 
 ```java
 Double half = qb.call(() -> MathFns.half(price)).execute();
@@ -636,7 +636,7 @@ where FN_DISCOUNT(o1_0.price)>10
 - Oracle 인덱스 대조에 쓰는 테이블·열 이름은 Hibernate 매핑에서 가져옵니다. 열 인자 하나인 함수만 대조합니다.
 - 메타데이터 조회가 실패하면(예: 권한 없음) `LQL-5008`을 `INFO` 레벨로 기록합니다. ①은 그대로 경고하고, ②는 검사하지 않습니다.
 
-**(테스트됨)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `sargable`(테스트는 로그를 수집함: H2는 `LQL-5001`, MariaDB는 `LQL-5001`과 `LQL-5007`, `SQ_FN_DISCOUNT(price)` 함수 기반 인덱스가 있는 Oracle은 없음):
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `sargable`(테스트는 로그를 수집함: H2는 `LQL-5001`, MariaDB는 `LQL-5001`과 `LQL-5007`, `SQ_FN_DISCOUNT(price)` 함수 기반 인덱스가 있는 Oracle은 없음):
 
 ```java
 // the function wraps the column: an index on price cannot be used (LQL-5001 at WARN),
@@ -662,7 +662,7 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 - 옮긴 형태는 의미가 같아야 합니다. `o.getCnt() > n / 2.0`처럼 소수로 나누십시오. 정수 나눗셈 `n / 2`는 `>=`, `=`, `<`와 음수 `n`에서 다른 행을 냅니다. 음수를 곱했다면 비교 방향을 바꾸십시오. `LQL-5012` 메시지가 이를 안내합니다.
 - 인덱스가 있는지 조회해 경고를 줄이는 방식은 채택하지 않았습니다. 권한과 시노님 때문에 "인덱스 없음"과 "알 수 없음"이 섞이고, 컬럼 산술은 드문 형태이기 때문입니다.
 
-**(테스트됨)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `sargable-strict`:
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `sargable-strict`:
 
 ```java
 // STRICT: what WARN would log fails the analysis (NonSargableException, LQL-3066)
@@ -692,18 +692,18 @@ qb.from(Order.class).where(o -> o.getCnt() * o.getStatus() > n).toHql();
 | # | 규칙 | 상태 |
 |---|---|---|
 | FN1 | `@SqlFunction`은 메서드 애너테이션입니다. 값이 비어 있으면 메서드 이름을 UPPER_SNAKE로. | 구현됨 |
-| FN2 | lambdaQL은 호출된 메서드를 찾아 애너테이션을 읽습니다. 메서드 본문은 예외를 던지기만 해야 합니다(`throw new ...`). 실제 본문이 있는 메서드는 Java와 데이터베이스가 다른 값을 낼 수 있으므로 오류입니다(`LQL-3052`). | 구현됨(테스트함) |
+| FN2 | lambdaQL은 호출된 메서드를 찾아 애너테이션을 읽습니다. 메서드 본문은 예외를 던지기만 해야 합니다(`throw new ...`). 실제 본문이 있는 메서드는 Java와 데이터베이스가 다른 값을 낼 수 있으므로 오류입니다(`LQL-3052`). | 구현됨 |
 | FN3 | 같은 이름의 모든 오버로드는 같은 DB 함수에 대응해야 합니다. 그렇지 않으면 오류입니다(`LQL-3053`). | 구현됨 |
 | FN4 | 애너테이션이 없는 호출이나 lambdaQL이 식별할 수 없는 호출은 오류입니다. 조용히 건너뛰지 않습니다. | 구현됨 |
-| FN5 | 인자는 [3. 조건](03-where.md)의 값 규칙을 따릅니다. 캡처 값만으로 만든 인자도 바인딩되어 **데이터베이스에서** 평가됩니다. | 구현됨(테스트함) |
-| FN6 | 박싱 호출은 건너뜁니다. 반환 타입은 선언된 메서드에서 옵니다. `Double`, `Integer`, `Long`, `BigDecimal`, `String`, `LocalDate`, `LocalDateTime`, `Boolean` 중 하나여야 합니다(`LQL-3055`). | 구현됨(테스트함) |
-| FN7 | 컬럼에 대한 함수는 WARN을 냅니다([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). MariaDB에서는 값 쪽의 `NOT DETERMINISTIC` 함수도 WARN(`LQL-5007`). | 구현됨(테스트함). `SargableMode.STRICT`에서는 오류(`LQL-3066`, D50) |
-| FN8 | Hibernate 내장 함수(`COALESCE`, `ROUND`, `SYSDATE`, ...)와 같은 이름은 오류입니다(`LQL-3054`). Hibernate가 조용히 내장 함수를 사용하기 때문입니다. 접두사나 스키마 이름(`PUBLIC.SQ_FN`)을 사용하십시오. | 구현됨(테스트함) |
+| FN5 | 인자는 [3. 조건](03-where.md)의 값 규칙을 따릅니다. 캡처 값만으로 만든 인자도 바인딩되어 **데이터베이스에서** 평가됩니다. | 구현됨 |
+| FN6 | 박싱 호출은 건너뜁니다. 반환 타입은 선언된 메서드에서 옵니다. `Double`, `Integer`, `Long`, `BigDecimal`, `String`, `LocalDate`, `LocalDateTime`, `Boolean` 중 하나여야 합니다(`LQL-3055`). | 구현됨 |
+| FN7 | 컬럼에 대한 함수는 WARN을 냅니다([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). MariaDB에서는 값 쪽의 `NOT DETERMINISTIC` 함수도 WARN(`LQL-5007`). | 구현됨. `SargableMode.STRICT`에서는 오류(`LQL-3066`, D50) |
+| FN8 | Hibernate 내장 함수(`COALESCE`, `ROUND`, `SYSDATE`, ...)와 같은 이름은 오류입니다(`LQL-3054`). Hibernate가 조용히 내장 함수를 사용하기 때문입니다. 접두사나 스키마 이름(`PUBLIC.SQ_FN`)을 사용하십시오. | 구현됨 |
 | FN9 | Kotlin 전용(기본 인자, `inline`, `vararg`). Kotlin 트랙을 참고하십시오. | 기본 인자와 `vararg`는 구현됨. `inline`은 설계됨 |
 | FN10 | v0.1에는 스칼라 함수만 있습니다. 사용자 집계 함수와 윈도 함수는 v0.2에 계획되어 있습니다. 인자가 없는 함수는 `fn()`으로 렌더링됩니다. | 스칼라 함수 구현됨 |
 | FN11 | 알려진 DB 차이: MariaDB에서 VARCHAR를 반환하는 함수는 문자열 리터럴과 콜레이션 충돌이 날 수 있습니다. `BigDecimal` 결과의 스케일이 다릅니다(MariaDB와 Oracle은 0, H2는 1). boolean 결과에는 Oracle 23ai 이상이 필요합니다. | 프로토타입으로 실측 |
 
-**(테스트됨)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `rules`:
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java), 영역 `rules`:
 
 ```java
 // the body never runs in Java
@@ -737,9 +737,9 @@ assertEquals("LQL-3055", assertThrows(LambdaQLException.class,
 | 결과 집합 여러 개 | 아니요 | 예 | 예(커서 OUT 파라미터 여러 개) |
 | OUT 값과 결과 집합 함께 | 아니요 | 예 | 예 |
 | 패키지 이름(`PKG.PROC`) | 아니요 | 아니요(`sql_mode=ORACLE` 필요) | 예 |
-| 쿼리 안의 DB 함수 | 예(테스트함) | 예(테스트함) | 예(테스트함) |
-| DB 함수 단독 호출 | 예(테스트함) | 예(테스트함) | 예(테스트함) |
-| lambdaQL의 프로시저 호출 | – | 예(테스트함) | 예(테스트함) |
+| 쿼리 안의 DB 함수 | 예 | 예 | 예 |
+| DB 함수 단독 호출 | 예 | 예 | 예 |
+| lambdaQL의 프로시저 호출 | – | 예 | 예 |
 | boolean 파라미터 / 결과 | – | 예 | 예(23ai 이상) |
 
 v0.1에 계획되지 않은 것: 동적 프로시저 이름을 위한 문자열 빌더(v0.2 후보), Oracle 패키지 프로시저의 오버로드 하나를 골라 호출하는 기능(오버로드 검출은 구현됨, `LQL-4044`), 테이블 반환 함수, 프로시저 결과 페이징.

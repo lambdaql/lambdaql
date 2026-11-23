@@ -105,8 +105,8 @@ qb.exec(OrderProcs::class.java) { it.purge(30) }.execute()
 
 그 밖의 사항:
 
-- OUT 파라미터가 있는 프로시저에 `exec`을 쓰면 오류입니다(`LQL-4037`, Java로 테스트함). 실수로 OUT 값을 잃지 않도록 막습니다.
-- `@SqlProcedure`가 없는 함수를 호출하면 오류입니다(`LQL-3060`, Java로 테스트함).
+- OUT 파라미터가 있는 프로시저에 `exec`을 쓰면 오류입니다(`LQL-4037`). 실수로 OUT 값을 잃지 않도록 막습니다.
+- `@SqlProcedure`가 없는 함수를 호출하면 오류입니다(`LQL-3060`).
 - 스텁 함수의 **기본 인자**(`fun calc(id: Long, rate: Double = 1.0)`)를 쓰는 호출은 오류입니다(`LQL-3062`, 규칙 PR11). Kotlin은 DB 기본값이 아니라 Kotlin 기본값을 채워 넣기 때문입니다.
 - 파라미터의 데이터베이스 기본값은 사용할 수 없습니다. 모든 IN 파라미터를 전달하십시오.
 - IN 값으로 `null`을 쓰는 것은 괜찮습니다.
@@ -154,7 +154,7 @@ val a = qb.call(OrderProcs::class.java) { it.adjust(id, 100) }.execute()
 | `T`가 | lambdaQL이 읽는 방법 |
 |---|---|
 | 엔티티 | Hibernate 결과 클래스(`StoredProcedureQuery`) |
-| Kotlin 데이터 클래스나 Java record | JDBC `CallableStatement`, 컬럼은 **레이블로** 매칭. `_`를 빼고 대소문자를 무시하므로 `customer_id`가 `customerId`에 대응(Java에서 record로 테스트함) |
+| Kotlin 데이터 클래스나 Java record | JDBC `CallableStatement`, 컬럼은 **레이블로** 매칭. `_`를 빼고 대소문자를 무시하므로 `customer_id`가 `customerId`에 대응 |
 | 값 하나(`Long?`, `String?`, ...) | 각 행의 첫 컬럼 |
 
 일반 클래스는 여기서 행 타입으로 쓸 수 없습니다. 데이터 클래스를 사용하십시오.
@@ -201,12 +201,12 @@ Kotlin의 이름 있는 인자(`calc(rate = rate, id = id)`)는 이를 바꾸지
 | 검사 | 발견 여부 |
 |---|---|
 | 프로시저의 존재 | 예, 오류 `LQL-4035` |
-| IN·INOUT 파라미터 개수 = 스텁 인자 개수 | 예, 오류 `LQL-4036`(Java로 테스트함) |
+| IN·INOUT 파라미터 개수 = 스텁 인자 개수 | 예, 오류 `LQL-4036` |
 | INOUT 파라미터 = `@InOut`을 붙인 인자 | 예, 오류 `LQL-4036` |
 | OUT 값과 결과 집합의 개수 = 반환 타입의 구성 요소 수 | 예, 오류 `LQL-4038` |
-| 타입의 종류(숫자, 문자, 날짜·시간, 불리언, 이진) | 예, 오류 `LQL-4036`(Java로 테스트함). 같은 종류 안의 차이는 대조하지 않음(아래 "인자 타입 대조" 참고) |
-| 같은 파라미터 이름이 다른 순서로 놓임 | 예, 오류 `LQL-4043`(Java로 테스트함). 스텁 인자 이름을 알 수 있을 때만(아래 참고) |
-| Oracle 패키지 프로시저 이름에 오버로드가 여러 개 | 예, 오류 `LQL-4044`(Oracle에서 Java로 테스트함) |
+| 타입의 종류(숫자, 문자, 날짜·시간, 불리언, 이진) | 예, 오류 `LQL-4036`. 같은 종류 안의 차이는 대조하지 않음(아래 "인자 타입 대조" 참고) |
+| 같은 파라미터 이름이 다른 순서로 놓임 | 예, 오류 `LQL-4043`. 스텁 인자 이름을 알 수 있을 때만(아래 참고) |
+| Oracle 패키지 프로시저 이름에 오버로드가 여러 개 | 예, 오류 `LQL-4044` |
 
 위험한 경우의 예:
 
@@ -293,17 +293,17 @@ Oracle의 실제 이름 바인딩(`pass_procedure_paramater_names=true`와 스�
 | # | 규칙 | 상태 |
 |---|---|---|
 | PR1 | 이름: 어노테이션 값을 그대로 사용. 값이 비어 있으면 함수 이름을 UPPER_SNAKE로. 패키지나 스키마 이름(`SQ_PKG.CALC`, `LQL.SQ_CALC`)도 동작함. 혼동을 피하려면 `@SqlProcedure(schema = ..., pkg = ..., value = ...)`로 쓸 수도 있음. | 구현됨. 스키마·패키지 이름은 테스트로 확인하지 않음 |
-| PR2 | 인자는 **위치로** 바인딩됨. 첫 호출 때 IN/INOUT 파라미터 개수와 `@InOut` 위치를 DB 메타데이터와 대조함. 이름을 알 수 있으면 이름도 대조하며, 같은 이름이 다른 순서면 오류. 인자 타입의 종류(숫자, 문자, 날짜·시간, 불리언, 이진)도 대조하며, 다르면 오류(`LQL-4036`)([8.4](#84-warning-argument-order) 참고). 메타데이터를 읽을 수 없으면 검사를 건너뛰고 인자 배치를 스텁에서 가져옴([8.4](#when-the-metadata-cannot-be-read) 참고). | 개수, `@InOut`, 이름 대조는 구현됨(Java로 테스트함). Oracle 패키지 오버로드 검출도 구현됨(Oracle에서 테스트함). 타입 대조도 구현됨(Java로 테스트함). 메타데이터 없는 대체 동작(`LQL-5005`, `LQL-5006`)은 구현됨(MariaDB, Oracle에서 Java로 테스트함). |
-| PR3 | OUT 1개 → 반환 값. OUT/INOUT 여러 개 → 데이터 클래스 또는 record. `@InOut`은 INOUT 파라미터를 표시함. | 구현됨(Java로 테스트함) |
-| PR4 | 결과 집합 1개 → `List<T>`. 엔티티는 Hibernate로, 데이터 클래스/record는 레이블 매칭을 사용하는 JDBC로. 페이징 없음. | 구현됨(Java에서 record로 테스트함) |
+| PR2 | 인자는 **위치로** 바인딩됨. 첫 호출 때 IN/INOUT 파라미터 개수와 `@InOut` 위치를 DB 메타데이터와 대조함. 이름을 알 수 있으면 이름도 대조하며, 같은 이름이 다른 순서면 오류. 인자 타입의 종류(숫자, 문자, 날짜·시간, 불리언, 이진)도 대조하며, 다르면 오류(`LQL-4036`)([8.4](#84-warning-argument-order) 참고). 메타데이터를 읽을 수 없으면 검사를 건너뛰고 인자 배치를 스텁에서 가져옴([8.4](#when-the-metadata-cannot-be-read) 참고). | 개수, `@InOut`, 이름 대조는 구현됨. Oracle 패키지 오버로드 검출도 구현됨. 타입 대조도 구현됨. 메타데이터 없는 대체 동작(`LQL-5005`, `LQL-5006`)은 구현됨(MariaDB). |
+| PR3 | OUT 1개 → 반환 값. OUT/INOUT 여러 개 → 데이터 클래스 또는 record. `@InOut`은 INOUT 파라미터를 표시함. | 구현됨 |
+| PR4 | 결과 집합 1개 → `List<T>`. 엔티티는 Hibernate로, 데이터 클래스/record는 레이블 매칭을 사용하는 JDBC로. 페이징 없음. | 구현됨 |
 | PR5 | 결과 집합 여러 개 → 데이터 클래스의 `List` 속성, 순서대로. Oracle 암시적 결과는 지원하지 않음. | 구현됨, 테스트로 확인하지 않음 |
-| PR6 | 단독으로 호출한 DB 함수는 데이터베이스마다 다른 경로를 사용함([8.8](#88-call-a-db-function-alone) 참고). | 구현됨(Java로 테스트함) |
-| PR7 | 쿼리 안의 DB 함수: [8.6](#86-declare-db-functions)과 규칙 FN1 ~ FN11 참고. | 구현됨(Java로 테스트함) |
-| PR8 | 조건에서 컬럼에 DB 함수를 적용하면 인덱스를 사용할 수 없으므로 WARN을 기록함([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). 코드는 `LQL-5001`. | 구현됨(Java 람다로 테스트함). `SargableMode.STRICT`에서는 오류(`LQL-3066`, D50) |
+| PR6 | 단독으로 호출한 DB 함수는 데이터베이스마다 다른 경로를 사용함([8.8](#88-call-a-db-function-alone) 참고). | 구현됨 |
+| PR7 | 쿼리 안의 DB 함수: [8.6](#86-declare-db-functions)과 규칙 FN1 ~ FN11 참고. | 구현됨 |
+| PR8 | 조건에서 컬럼에 DB 함수를 적용하면 인덱스를 사용할 수 없으므로 WARN을 기록함([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). 코드는 `LQL-5001`. | 구현됨. `SargableMode.STRICT`에서는 오류(`LQL-3066`, D50) |
 | PR9 | 프로시저는 호출한 쪽 트랜잭션에서 실행됨. lambdaQL은 필요할 때 호출 전에 플러시함. 호출 후에는 로드된 엔티티가 오래된 상태일 수 있음. | 구현됨 |
 | PR10 | 공통된 영향받은 행 수가 없음. OUT 파라미터를 사용. | – |
 | PR11 | `null` IN 값은 괜찮음. DB 파라미터 기본값은 사용할 수 없음. 스텁 함수의 Kotlin 기본 인자는 오류(`LQL-3062`). | 구현됨 |
-| PR12 | 람다는 스텁 호출 하나. 인자는 캡처 값, 상수, 또는 그 값들의 계산. 이름 있는 인자는 단순한 값만. OUT 파라미터가 있는데 `exec`을 쓰면 오류. | 구현됨(Java로 테스트함). 이름 있는 인자는 테스트로 확인하지 않음 |
+| PR12 | 람다는 스텁 호출 하나. 인자는 캡처 값, 상수, 또는 그 값들의 계산. 이름 있는 인자는 단순한 값만. OUT 파라미터가 있는데 `exec`을 쓰면 오류. | 구현됨. 이름 있는 인자는 테스트로 확인하지 않음 |
 | PR13 | non-null `Long`/`Double`과 nullable `Long?`/`Double?` 모두 동작함. Boolean 파라미터는 MariaDB와 Oracle 23ai 이상에서 동작함. | 테스트로 확인하지 않음 |
 | PR14 | 각 람다는 한 번만 분석됨. 프로시저 메타데이터는 이름마다 한 번만 읽음. | 구현됨 |
 | PR15 | H2에는 OUT, INOUT, 여러 결과 집합, 패키지가 없음. 프로시저는 MariaDB나 Oracle에서 테스트하십시오(예: Testcontainers 사용). | lambdaQL 테스트도 이 방식을 따름 |
@@ -349,7 +349,7 @@ lambdaQL은 `companion object` 함수에 붙은 어노테이션을 읽습니다.
 |---|---|
 | 인터페이스 `companion object` + `@JvmStatic` | **권장**(구현됨, 아직 테스트로 확인하지 않음) |
 | Kotlin `object` + `@JvmStatic` | 설계됨, 테스트로 확인하지 않음 |
-| Java 인터페이스 정적 메서드(Kotlin에서 호출) | 지원(Java 형태는 테스트함) |
+| Java 인터페이스 정적 메서드(Kotlin에서 호출) | 지원 |
 | Kotlin 최상위 함수 | 설계됨, **권장하지 않음**: import를 잊으면 같은 이름의 표준 라이브러리 함수(예: `maxOf`)가 조용히 사용될 수 있음 |
 | 인터페이스 기본 함수 + 싱글턴 상수 | 설계됨, 테스트로 확인하지 않음 |
 | 리포지토리가 함수 인터페이스를 구현(믹스인) | 거부 |
@@ -365,7 +365,7 @@ lambdaQL은 `companion object` 함수에 붙은 어노테이션을 읽습니다.
 ## 8.7 쿼리에서 DB 함수 사용
 
 함수를 직접 호출하십시오. 컨텍스트 인자는 필요 없습니다.
-`where`, `select`, `orderBy`, `set`에서 동작합니다([`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)에서 Java 람다로 테스트함). `groupBy`, `having`, 서브쿼리에서도 동작하도록 설계했지만 테스트로 확인하지는 않았습니다.
+`where`, `select`, `orderBy`, `set`에서 동작합니다([`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java) 참고). `groupBy`, `having`, 서브쿼리에서도 동작하도록 설계했지만 테스트로 확인하지는 않았습니다.
 
 ```kotlin
 qb.from(Order::class.java).where { OrderFns.discount(it.price)!! > 10 }.toList()
@@ -561,13 +561,13 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 | # | 규칙 | 상태 |
 |---|---|---|
 | FN1 | `@SqlFunction`은 함수 어노테이션. 값이 비어 있으면 함수 이름을 UPPER_SNAKE로. | 구현됨 |
-| FN2 | lambdaQL은 호출된 함수를 찾아 그 어노테이션을 읽음. Kotlin에서는 `Companion` 수신 객체를 건너뜀. 본문은 예외를 던지기만 해야 함(`= throw ...`). 애플리케이션과 데이터베이스가 다른 값을 낼 수 있으므로 실제 본문이 있는 함수는 오류(`LQL-3052`). | 구현됨(Java로 테스트함) |
+| FN2 | lambdaQL은 호출된 함수를 찾아 그 어노테이션을 읽음. Kotlin에서는 `Companion` 수신 객체를 건너뜀. 본문은 예외를 던지기만 해야 함(`= throw ...`). 애플리케이션과 데이터베이스가 다른 값을 낼 수 있으므로 실제 본문이 있는 함수는 오류(`LQL-3052`). | 구현됨 |
 | FN3 | 같은 이름의 모든 오버로드는 같은 DB 함수에 대응해야 함. 그렇지 않으면 오류(`LQL-3053`). (Kotlin `Double?` 인자는 `Double?` 오버로드를 고름. Kotlin에서 본 Java 엔티티 getter는 기본형 `double` 오버로드를 고를 수 있음.) | 구현됨 |
 | FN4 | 어노테이션이 없는 호출이나 lambdaQL이 식별할 수 없는 호출은 오류. 절대 조용히 건너뛰지 않음. | 구현됨 |
-| FN5 | 인자는 [3. 조건](03-where.md)의 값 규칙을 따름. 캡처 값만으로 만든 인자도 바인딩되어 **데이터베이스에서** 평가됨. | 구현됨(Java로 테스트함) |
-| FN6 | `!!`와 박싱 호출은 건너뜀. 반환 타입은 선언된 함수에서 옴. `Double`, `Integer`, `Long`, `BigDecimal`, `String`, `LocalDate`, `LocalDateTime`, `Boolean` 중 하나에 대응해야 함(`LQL-3055`). | 구현됨(Java로 테스트함) |
-| FN7 | 컬럼에 적용한 함수는 WARN을 냄([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). MariaDB에서는 값 쪽의 `NOT DETERMINISTIC` 함수도 WARN(`LQL-5007`). | 구현됨(Java 람다로 테스트함). `SargableMode.STRICT`에서는 오류(`LQL-3066`, D50) |
-| FN8 | Hibernate 내장 함수(`COALESCE`, `ROUND`, `SYSDATE`, ...)와 같은 이름은 오류(`LQL-3054`). Hibernate가 조용히 내장 함수를 사용하기 때문. 접두사나 스키마 이름(`PUBLIC.SQ_FN`)을 사용. | 구현됨(Java로 테스트함) |
+| FN5 | 인자는 [3. 조건](03-where.md)의 값 규칙을 따름. 캡처 값만으로 만든 인자도 바인딩되어 **데이터베이스에서** 평가됨. | 구현됨 |
+| FN6 | `!!`와 박싱 호출은 건너뜀. 반환 타입은 선언된 함수에서 옴. `Double`, `Integer`, `Long`, `BigDecimal`, `String`, `LocalDate`, `LocalDateTime`, `Boolean` 중 하나에 대응해야 함(`LQL-3055`). | 구현됨 |
+| FN7 | 컬럼에 적용한 함수는 WARN을 냄([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). MariaDB에서는 값 쪽의 `NOT DETERMINISTIC` 함수도 WARN(`LQL-5007`). | 구현됨. `SargableMode.STRICT`에서는 오류(`LQL-3066`, D50) |
+| FN8 | Hibernate 내장 함수(`COALESCE`, `ROUND`, `SYSDATE`, ...)와 같은 이름은 오류(`LQL-3054`). Hibernate가 조용히 내장 함수를 사용하기 때문. 접두사나 스키마 이름(`PUBLIC.SQ_FN`)을 사용. | 구현됨 |
 | FN9 | Kotlin: 기본 인자(`LQL-3056`), `vararg`(`LQL-3057`), `inline`은 오류. | 기본 인자와 `vararg`는 구현됨. `inline`은 설계됨 |
 | FN10 | v0.1은 스칼라 함수만 지원. 사용자 집계 함수와 윈도 함수는 v0.2에 계획됨. 인자가 없는 함수는 `fn()`으로 출력됨. | 스칼라 함수 구현됨 |
 | FN11 | 알려진 DB 차이: MariaDB에서 VARCHAR를 반환하는 함수는 문자열 리터럴과 콜레이션 충돌이 날 수 있음. `BigDecimal` 결과의 스케일이 다름(MariaDB와 Oracle은 0, H2는 1). Boolean 결과는 Oracle 23ai 이상이 필요. | 프로토타입으로 실측 |
@@ -587,9 +587,9 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 | 결과 집합 여러 개 | 아니요 | 예 | 예(커서 OUT 파라미터 여러 개) |
 | OUT 값과 결과 집합을 함께 | 아니요 | 예 | 예 |
 | 패키지 이름(`PKG.PROC`) | 아니요 | 아니요(`sql_mode=ORACLE` 필요) | 예 |
-| 쿼리 안의 DB 함수 | 예(테스트함) | 예(테스트함) | 예(테스트함) |
-| DB 함수 단독 호출 | 예(테스트함) | 예(테스트함) | 예(테스트함) |
-| lambdaQL의 프로시저 호출 | – | 예(테스트함) | 예(테스트함) |
+| 쿼리 안의 DB 함수 | 예 | 예 | 예 |
+| DB 함수 단독 호출 | 예 | 예 | 예 |
+| lambdaQL의 프로시저 호출 | – | 예 | 예 |
 | Boolean 파라미터 / 결과 | – | 예 | 예(23ai 이상) |
 
 v0.1에 계획되지 않은 것: 동적 프로시저 이름을 위한 문자열 빌더(v0.2 후보), Oracle 패키지 프로시저의 오버로드 하나를 골라 호출하는 기능(오버로드 검출은 구현됨, `LQL-4044`), 테이블 반환 함수, 프로시저 결과 페이징.

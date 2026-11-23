@@ -61,7 +61,7 @@ from orders o1_0
 where o1_0.status=1 and o1_0.price>100.0
 ```
 
-**(테스트됨)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), 영역 `captured`:
+[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), 영역 `captured`:
 
 ```kotlin
 val q = qb.from(Order::class.java).where { it.price > min && it.status.toInt() == 1 }
@@ -454,7 +454,7 @@ from orders o1_0
 where o1_0.id not in (?,?)
 ```
 
-**(테스트됨)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), 영역 `in`:
+[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), 영역 `in`:
 
 ```kotlin
 val q = qb.from(Order::class.java).where { it.status in statuses }
@@ -501,7 +501,7 @@ lambdaQL은 JPA Metamodel로 각 단계를 확인합니다.
 - 중첩된 값 객체도 펼칩니다.
 - 크기 비교(`<` 등)와 다른 타입과의 비교는 여전히 `LQL-3012` 오류입니다. 필드를 비교하십시오.
 
-**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `embedded-compare`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `embedded-compare`:
 
 ```kotlin
 // address is @Embedded (city, zip): == with a value object compares each column (D48)
@@ -533,7 +533,7 @@ qb.from(Order::class.java)
 // HQL: select e0 from Order e0 join e0.customer j1 where j1.name = :p1
 ```
 
-**(테스트됨)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), 영역 `safe-call`(`name` 대신 상수 사용):
+[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt), 영역 `safe-call`(`name` 대신 상수 사용):
 
 ```kotlin
 // it.customer?.name reads as the path customer.name (inner join: orders without a customer are left out)
@@ -554,7 +554,7 @@ where c1_0.name=?
 - **고객이 없는 주문**은 결과에 없습니다. 조인할 고객 행이 없기 때문입니다.
 - lambdaQL은 null 검사를 대신 추가하지 않습니다. 경로 앞에 `it.customer != null &&`를 쓸 필요가 없습니다.
 
-**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `safe-call-and`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `safe-call-and`:
 
 ```kotlin
 // a row without a customer can never match: lambdaQL keeps the inner join (the same rows)
@@ -565,7 +565,7 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' 
 **`?.`와 `||`.** 고객이 없는 주문이 조건을 참으로 만들 수 있으면 `?.`로 지난 단계는 `left join`입니다.
 status가 1이고 고객이 없는 주문도 결과에 남습니다. Kotlin에서 같은 조건을 실행한 결과와 같습니다.
 
-**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `safe-call-or`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `safe-call-or`:
 
 ```kotlin
 // ?. says the customer may be missing: an order without a customer stays when the rest of the OR is true
@@ -585,7 +585,7 @@ where o1_0.status=1 or c1_0.name='Kim'
 
 **`?.`와 `== null`.** `it.customer?.name == null`은 Kotlin처럼 고객이 없는 주문과 이름이 없는 고객의 주문을 모두 찾습니다.
 
-**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `safe-call-null`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `safe-call-null`:
 
 ```kotlin
 // "no customer, or a customer without a name": a left join, as in Kotlin
@@ -644,7 +644,7 @@ Hibernate는 `e0.customer is null`을 `c1_0.id is null`로 씁니다. inner join
 **`!!`: 연관이 반드시 있다는 선언.** `!!`로 지난 단계는 항상 inner join입니다.
 Kotlin에서는 `||`가 `!!`에 닿기 전에 끝나는 행(status 1, 고객 없음)이 남지만, lambdaQL은 그 행을 뺍니다. 그런 행을 남기려면 `?.`를 쓰십시오.
 
-**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `not-null-assert`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `not-null-assert`:
 
 ```kotlin
 // !! says the customer is always there: an inner join, so orders without a customer are left out
@@ -656,7 +656,7 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where e0.status = 1 or
 **`?.`와 `!!`를 섞은 경우.** 조건 전체(같은 쿼리의 모든 `where`)에서 같은 연관 단계를 한 곳에서는 `?.`로, 다른 곳에서는 `!!`나 표시 없이 지나면 inner join입니다.
 lambdaQL은 `LQL-5014`를 `WARN` 수준으로 기록합니다(조건마다 한 번). 고객이 없는 주문을 남기려면 모두 `?.`로 쓰십시오.
 
-**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `mixed-warn`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `mixed-warn`:
 
 ```kotlin
 // the same association with ?. in one place and !! in another: an inner join, and WARN LQL-5014

@@ -11,7 +11,7 @@
 lambdaQL のメッセージは、すべて `[LQL-xxxx]` の形のコードで始まります。
 コードは言語に依存しません。翻訳されるのはコードの後ろのテキストだけです。
 
-**(テスト済み)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)、リージョン `format`:
+[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)、リージョン `format`:
 
 ```java
 LqlMessages.setLocale(Locale.ENGLISH);
@@ -113,7 +113,7 @@ lambdaQL の例外はすべて `org.lambdaql.LambdaQLException` を継承しま�
 | `getMessage()` | 例外が作られたときに選ばれていた lambdaQL の言語でのメッセージ |
 | `getMessage(Locale locale)` | 同じメッセージを別の言語で。たとえば英語なら `Locale.ROOT` |
 
-**(テスト済み)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)、リージョン `exception`:
+[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)、リージョン `exception`:
 
 ```java
 LqlMessages.setLocale(Locale.KOREAN);
@@ -270,7 +270,7 @@ NULL を探すには `o.getDescription() == null` と書きます。
 
 #### Java
 
-**(テスト済み)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)、リージョン `rules`（最初の部分）:
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)、リージョン `rules`（最初の部分）:
 
 ```java
 // the body never runs in Java
@@ -319,7 +319,7 @@ lambdaQL は次の 3 つの場所をこの順番でチェックします。最�
 | `ko`（たとえば `ko_KR`） | 韓国語 |
 | それ以外（`en`、`fr`、`de`、...） | 英語 |
 
-**(テスト済み)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)、リージョン `locale`:
+[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)、リージョン `locale`:
 
 ```java
 // 1. setLocale wins, 2. then -Dlambdaql.locale, 3. then the JVM default
@@ -380,7 +380,7 @@ org/lambdaql/i18n/LqlMessages_ko.properties   韓国語
 - lambdaQL は `MessageFormat` を使いません。そのため、シングルクォート（`can't`）はそのまま書けます。数値は書式化されません（行番号 `1234567` は `1234567` のままです）。
 - どのキーも 4 つのファイルすべてに、同じ引数で必要です。ユニットテストがこれをチェックします。新しいメッセージは 4 つの言語すべてで追加してください。
 
-**(テスト済み)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)、リージョン `fill`:
+[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)、リージョン `fill`:
 
 ```java
 // no MessageFormat: quotes and big numbers stay as they are (rule I4)

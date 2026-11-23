@@ -55,7 +55,7 @@ fetch first ? rows only
 
 > [!NOTE]
 > **예제에 대하여.**
-> 예제는 설계 예제입니다. 기능이 구현되면 해당 예제는 테스트 코드에서 가져온 코드로 바뀌고, 테스트 파일 링크가 붙습니다. [3. 조건](03-where.md), [4. 정렬과 페이징](04-order-paging.md), [5. 서브쿼리](05-subquery.md), [6. 조회, 집계, 그룹화](06-select-group.md), [7. 수정, 삽입, 삭제](07-dml.md), [8. 프로시저와 DB 함수](08-procedures-functions.md), [11. 오류와 언어](../11-errors-and-languages.md), [12. Spring Data JPA](12-spring-data-jpa.md)에서는 이런 예제에 **(테스트됨)** 표시가 있습니다.
+> 예제 코드는 모두 Java 테스트 코드의 한 구간을 그대로 옮긴 것입니다. 코드 위에 테스트 파일과 구간 이름(영역 `name`)을 적습니다. 테스트는 lambdaQL이 만든 HQL과 반환한 행을 확인합니다.
 
 <a id="contents"></a>
 ## 목차

@@ -61,7 +61,7 @@ from orders o1_0
 where o1_0.status=1 and o1_0.price>100.0
 ```
 
-**(已测试)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)，region `captured`：
+[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)，region `captured`：
 
 ```kotlin
 val q = qb.from(Order::class.java).where { it.price > min && it.status.toInt() == 1 }
@@ -454,7 +454,7 @@ from orders o1_0
 where o1_0.id not in (?,?)
 ```
 
-**(已测试)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)，region `in`：
+[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)，region `in`：
 
 ```kotlin
 val q = qb.from(Order::class.java).where { it.status in statuses }
@@ -501,7 +501,7 @@ lambdaQL 用 JPA Metamodel 检查路径的每一步。
 - 嵌套的值对象也会展开。
 - 大小比较（`<` 等）以及与其他类型的比较仍然是 `LQL-3012` 错误。请比较字段。
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `embedded-compare`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `embedded-compare`：
 
 ```kotlin
 // address is @Embedded (city, zip): == with a value object compares each column (D48)
@@ -533,7 +533,7 @@ qb.from(Order::class.java)
 // HQL: select e0 from Order e0 join e0.customer j1 where j1.name = :p1
 ```
 
-**(已测试)** [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)，region `safe-call`（用常量代替 `name`）：
+[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)，region `safe-call`（用常量代替 `name`）：
 
 ```kotlin
 // it.customer?.name reads as the path customer.name (inner join: orders without a customer are left out)
@@ -554,7 +554,7 @@ where c1_0.name=?
 - **没有客户的**订单不在结果中。因为没有可以连接的客户行。
 - lambdaQL 不会替你添加 null 检查。不需要在路径前面写 `it.customer != null &&`。
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `safe-call-and`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `safe-call-and`：
 
 ```kotlin
 // a row without a customer can never match: lambdaQL keeps the inner join (the same rows)
@@ -565,7 +565,7 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' 
 **`?.` 与 `||`。** 如果没有客户的订单可能使条件为真，用 `?.` 经过的步骤就是 `left join`。
 状态为 1 且没有客户的订单也保留在结果中。这与在 Kotlin 中执行同一条件的结果相同。
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `safe-call-or`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `safe-call-or`：
 
 ```kotlin
 // ?. says the customer may be missing: an order without a customer stays when the rest of the OR is true
@@ -585,7 +585,7 @@ where o1_0.status=1 or c1_0.name='Kim'
 
 **`?.` 与 `== null`。** `it.customer?.name == null` 与 Kotlin 一样，既查找没有客户的订单，也查找客户没有名字的订单。
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `safe-call-null`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `safe-call-null`：
 
 ```kotlin
 // "no customer, or a customer without a name": a left join, as in Kotlin
@@ -644,7 +644,7 @@ Hibernate 把 `e0.customer is null` 写成 `c1_0.id is null`。在内连接之�
 **`!!`：关联一定存在的声明。** 用 `!!` 经过的步骤总是内连接。
 在 Kotlin 中，`||` 在到达 `!!` 之前就结束的行（状态为 1、没有客户）会保留，但 lambdaQL 会排除这样的行。要保留这样的行，请使用 `?.`。
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `not-null-assert`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `not-null-assert`：
 
 ```kotlin
 // !! says the customer is always there: an inner join, so orders without a customer are left out
@@ -656,7 +656,7 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where e0.status = 1 or
 **混用 `?.` 和 `!!` 的情况。** 在整个条件（同一查询的所有 `where`）中，如果同一关联步骤在一处用 `?.` 经过，在另一处用 `!!` 或不加标记经过，则为内连接。
 lambdaQL 以 `WARN` 级别记录 `LQL-5014`（每个条件一次）。要保留没有客户的订单，请全部写成 `?.`。
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `mixed-warn`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `mixed-warn`：
 
 ```kotlin
 // the same association with ?. in one place and !! in another: an inner join, and WARN LQL-5014

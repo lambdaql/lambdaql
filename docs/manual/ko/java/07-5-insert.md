@@ -9,7 +9,7 @@
 <a id="one-row"></a>
 ## 한 행
 
-**(테스트됨)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `insert`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `insert`:
 
 ```java
 ExecutableInsert<Archive> i = qb.insert(Archive.class)
@@ -22,7 +22,7 @@ int generated = qb.insert(IdOrder.class).values(o -> { o.setPrice(1.0); o.setSta
 
 **SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다.
 
-**데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `insert`:
+**데이터베이스별 SQL** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `insert`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -44,7 +44,7 @@ qb.insert(Order.class).values(o -> { value(o.getId(), id); value(o.getStatus(), 
 `values((a, sub) -> ...)`처럼 인자가 둘인 람다를 쓰면 두 번째 인자 `sub`로 서브쿼리를 만들 수 있습니다(결정 D49).
 upsert의 `values((a, sub) -> ...)`와 `onConflict(...).update((a, sub) -> ...)`도 같습니다([7.6](07-6-upsert.md#your-own-change-onconflictkeyupdate) 참고).
 
-**(테스트됨)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `insert-values-sub`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `insert-values-sub`:
 
 ```java
 // values((a, sub) -> ...): a subquery can read captured values, not the new row (D49)
@@ -74,7 +74,7 @@ assertEquals("insert into Archive e0 (id, price) values (100L, (select sum(s1.pr
 
 리스트의 요소마다 한 행을 삽입합니다. 두 번째 람다 인자가 요소입니다.
 
-**(테스트됨)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `insert-list`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `insert-list`:
 
 ```java
 List<Line> lines = List.of(new Line(201, 1.0), new Line(202, 2.0));
@@ -82,7 +82,7 @@ ExecutableInsert<Archive> i = qb.insert(Archive.class).values(lines, (a, l) -> {
 assertEquals("insert into Archive (id, price) values (:p1, :p2), (:p3, :p4)", i.toHql().get(0).hql());
 ```
 
-**데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `insert-list`:
+**데이터베이스별 SQL** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `insert-list`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -96,7 +96,7 @@ VALUES 행이 여러 개인 문장 하나를 씁니다. 리스트가 길면 문�
 **리스트 형태의 서브쿼리.** `values(list, (a, l, sub) -> ...)`처럼 세 번째 인자로 서브쿼리를 만들 수 있습니다(결정 D49). `qb.upsert(X.class).values(list, (a, l, sub) -> ...)`도 같습니다.
 서브쿼리는 요소의 값을 읽을 수 있습니다. 그 값은 Java에서 읽어 행마다 파라미터 하나로 바인딩합니다. 새로 삽입하는 행은 읽을 수 없습니다(세 DB에서 실측).
 
-**(테스트됨)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `insert-list-sub`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `insert-list-sub`:
 
 ```java
 // one row per element; the subquery reads the element's value (D49)
@@ -119,7 +119,7 @@ id가 IDENTITY나 SEQUENCE를 사용하면 id를 생략할 수 있습니다(규�
 
 다른 엔티티에서 행을 복사합니다. `select` 람다는 대상(`a`)과 원본(`o`)을 받습니다.
 
-**(테스트됨)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `insert-select`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `insert-select`:
 
 ```java
 ExecutableInsert<Archive> i = qb.insert(Archive.class)
@@ -131,7 +131,7 @@ assertEquals("insert into Archive (id, price, customerName) select e0.id, e0.pri
         + " from Order e0 left join e0.customer j1 where e0.status = 1", i.toHql().get(0).hql());
 ```
 
-**데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `insert-select`:
+**데이터베이스별 SQL** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `insert-select`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -154,7 +154,7 @@ qb.insert(Archive.class).from(Order.class).where(o -> o.getStatus() == 9)
 
 **서브쿼리.** 원본의 `where`는 두 번째 인자로, `select`는 세 번째 인자로 서브쿼리의 시작점 `sub`를 받습니다(결정 D49).
 
-**(테스트됨)** [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `insert-select-sub`:
+[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `insert-select-sub`:
 
 ```java
 // where((o, sub) -> ...) on the source, and select((a, o, sub) -> ...): the third parameter starts a subquery
@@ -174,7 +174,7 @@ assertEquals("insert into Archive (id, price) select e0.id, (select sum(s2.price
 [6. 조회, 집계, 그룹화](06-select-group.md)의 `groupBy`, `having`, `Agg` 함수를 사용합니다.
 호출 순서는 `from(...)`, `where(...)`, `groupBy(...)`, `having(...)`, `select(...)`입니다. `where`, `groupBy`, `having`은 생략할 수 있습니다.
 
-**(테스트됨)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), 영역 `insert-group`:
+[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java), 영역 `insert-group`:
 
 ```java
 // INSERT ... SELECT with groupBy: one summary row per customer
@@ -188,7 +188,7 @@ assertEquals("insert into Summary (customerId, total, cnt) select e0.customer.id
         + " where e0.customer is not null group by e0.customer.id having count(*) >= 2L", i.toHql().get(0).hql());
 ```
 
-**데이터베이스별 SQL (테스트됨)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `insert-group`:
+**데이터베이스별 SQL** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `insert-group`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)

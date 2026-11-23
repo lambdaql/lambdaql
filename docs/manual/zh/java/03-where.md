@@ -50,7 +50,7 @@ List<Order> list = qb.from(Order.class)
 
 **关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 7.4 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `to-hql`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `to-hql`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -59,12 +59,12 @@ from orders o1_0
 where o1_0.status=1 and o1_0.price>100.0
 ```
 
-标记为 **(已测试)** 的示例是从 [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java) 中复制的。
+示例是从 [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java) 中复制的。
 该测试检查 HQL，执行查询，并把返回的行与在 Java 中用同一条件过滤的结果进行比较。它在 H2、MariaDB 和 Oracle 上都能通过。
 测试用的实体与 3.2 略有不同：`price` 是 `double`，`status` 是 `short`，`Customer.id` 是 `int`，并且 `Order` 有一个 enum `kind`（`Order.Kind`：`NORMAL`、`RUSH`）。
 
 `toHql()` 返回 HQL 和参数，但不执行查询。
-**(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `to-hql`：
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `to-hql`：
 
 ```java
 RenderedQuery q = qb.from(Order.class)
@@ -83,7 +83,7 @@ assertEquals("select e0 from Order e0 where e0.status = 1 and e0.price > :p1", q
 assertEquals(Map.of("p1", 100.0), q2.parameters());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `to-hql`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `to-hql`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -92,7 +92,7 @@ from orders o1_0
 where o1_0.status=1 and o1_0.price>100.0
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `to-hql#2`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `to-hql#2`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -102,7 +102,7 @@ where o1_0.status=1 and o1_0.price>?
 ```
 
 你可以多次调用 `where()`。这些条件以 `AND` 连接。
-**(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `where-many`：
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `where-many`：
 
 ```java
 RenderedQuery q = qb.from(Order.class)
@@ -112,7 +112,7 @@ RenderedQuery q = qb.from(Order.class)
 assertEquals("select e0 from Order e0 where (e0.status = 1 or e0.status = 3) and e0.active = true", q.hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `where-many`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `where-many`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -137,14 +137,14 @@ where (o1_0.status=1 or o1_0.status=3) and o1_0.active=true
 - 例外只有一个。与整数列比较的小数捕获值写成小数字面量（`2.5BD`）（参见 [3.4](#34-comparisons) 中的“整数列与小数值”）。只写入转换为数字后的值，因此没有 SQL 注入风险。
 
 enum 常量会带着完整的类名写入。
-**(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `enum`：
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `enum`：
 
 ```java
 RenderedQuery q = qb.from(Order.class).where(o -> o.getKind() == Order.Kind.RUSH).toHql();
 assertEquals("select e0 from Order e0 where e0.kind = org.lambdaql.query.Order$Kind.RUSH", q.hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `enum`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `enum`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -190,7 +190,7 @@ where o1_0.kind='RUSH'
 结果在 H2、MariaDB 10.11 和 Oracle 23.26 上正确（实测）。在三种数据库上，SQL 都像 `cnt>=2.5`、`cnt in (2.5,3.0)` 这样保持列不变，直接与小数比较。
 MariaDB 的 `EXPLAIN` 显示索引范围扫描（`type=range`）。在 Oracle 上，列没有附加转换，因此是可以使用索引的形式。给出索引提示时为 `INDEX RANGE SCAN`；在 3000 行的表上不加提示时，与整数字面量（`cnt >= 99`）一样选择全表扫描（均为实测）。
 
-**(已测试)** [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)，region `whole-number`：
+[`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)，region `whole-number`：
 
 ```java
 // cnt is a whole number; 2.5 is compared as written (it is never cut to 2): a decimal literal
@@ -301,7 +301,7 @@ qb.from(Order.class).where(o -> o.getStatus() == status).toList();
 列永远不会被函数包裹，因此数据库可以使用索引。
 
 lambdaQL 在查询执行时绑定捕获的值。`null` 以 NULL 绑定，没有可以匹配的行，因此 lambdaQL 以 `WARN` 级别记录 `LQL-4045`。
-**(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `null-safe`：
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `null-safe`：
 
 ```java
 // the SQL meaning (D48): = NULL matches no row; lambdaQL logs LQL-4045 at WARN when it runs with a null
@@ -317,7 +317,7 @@ RenderedQuery q2 = qb.from(Order.class).where(o -> Objects.equals(o.getDescripti
 assertEquals("select e0 from Order e0 where e0.description = :p1", q2.hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `null-safe`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `null-safe`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -326,7 +326,7 @@ from orders o1_0
 where o1_0.description=?
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `null-safe#2`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `null-safe#2`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -349,7 +349,7 @@ Kotlin 中 id 为 `Long?` 时的 `it.id == id` 也编译为相同的字节码，
 
 该规则只在路径**没有关联步骤**时适用。订单可以没有客户，因此 `o.getCustomer().getId()` 可能是 NULL，这条路径的 null 检查会保留。
 
-**(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `never-null`：
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `never-null`：
 
 ```java
 // the id can never be NULL, so the null check is dropped (this is what Kotlin's it.id == id compiles to)
@@ -389,7 +389,7 @@ assertEquals("select e0 from Order e0 where e0.customer.id is null",
 在 Java 中，`!text.equals(null)` 为 true，`Objects.equals(null, null)` 也为 true，因此 Java 会返回这些行。
 可能出现这种差异时，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`（每个条件一次）。要保留 NULL 行，请在 Lambda 中写出 null 检查。
 
-**(已测试)** [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)，region `sql-meaning`（H2、MariaDB 和 Oracle；各行的 description/custName 组合为 `a/a`、`a/b`、`null/a`、`null/null`、`b/null`，`text` 为 `"a"`）：
+[`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)，region `sql-meaning`（H2、MariaDB 和 Oracle；各行的 description/custName 组合为 `a/a`、`a/b`、`null/a`、`null/null`、`b/null`，`text` 为 `"a"`）：
 
 ```java
 // two entity values: = and <> as in SQL; a row with a NULL on either side matches neither
@@ -431,7 +431,7 @@ javac 的自动拆箱与手写的调用是相同的字节码，因此 lambdaQL �
 要查找 NULL 行，请写 `x == null`。
 
 **用 null 守卫省略过滤。** 如果对同一个捕获值做了 null 检查，当值为 null 时，该条件会变成无过滤并消失。
-**(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `captured-null-guard`：
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `captured-null-guard`：
 
 ```java
 Double min = null;                                       // for example an empty search field
@@ -445,7 +445,7 @@ assertEquals("select e0 from Order e0 where e0.price > :p1", q2.hql());
 assertEquals(Map.of("p1", 100.0), q2.parameters());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `captured-null-guard`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `captured-null-guard`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -453,7 +453,7 @@ select …
 from orders o1_0
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `captured-null-guard#2`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `captured-null-guard#2`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -479,7 +479,7 @@ where o1_0.price>?
 
 因此即使用 Java 值写条件，也能找到存储的行（已在 H2、MariaDB 和 Oracle 上验证）。
 
-**(已测试)** [`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java)，region `convert`：
+[`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java)，region `convert`：
 
 ```java
 // code is stored reversed ("abc" as "cba"); vip is stored as 'Y'/'N' (YesNoConverter)
@@ -502,7 +502,7 @@ assertEquals(List.of("abc"), codes(literal.toList()));       // Hibernate conver
 | `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | **不返回**（SQL 语义，D48；Java 会返回它们） |
 | `!o.getActive()`（可空 `Boolean`） | `e0.active = false` | **不返回**（SQL 语义：NULL 不是 false） |
 
-**(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `boolean`：
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `boolean`：
 
 ```java
 assertEquals("select e0 from Order e0 where e0.active = true",
@@ -511,7 +511,7 @@ assertEquals("select e0 from Order e0 where e0.active = false",       // primiti
         qb.from(Order.class).where(o -> !o.isActive()).toHql().hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `boolean`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `boolean`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -520,7 +520,7 @@ from orders o1_0
 where o1_0.active=true
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `boolean#2`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `boolean#2`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -556,14 +556,14 @@ lambdaQL 用 `AND`/`OR`（而不是 `CASE`）来写，这样数据库可以使�
 - 两个字符串之间的 `==` 是值比较，而不是同一性比较（规则 R2）。见 [9.4](09-java-notes.md#94-strings)。
 - Lambda 中的字符串常量以字面量写入。引号会被转义（`''`）。
 
-**(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `string-literal`：
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `string-literal`：
 
 ```java
 RenderedQuery q = qb.from(Order.class).where(o -> o.getDescription().equals("O'Brien")).toHql();
 assertEquals("select e0 from Order e0 where e0.description = 'O''Brien'", q.hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `string-literal`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `string-literal`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -590,7 +590,7 @@ qb.from(Order.class).where(o -> !ids.contains(o.getId())).toList();
 ```
 
 整个集合是一个绑定参数。
-**(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `in`（测试实体的 status 是 `short`）：
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `in`（测试实体的 status 是 `short`）：
 
 ```java
 List<Short> statuses = List.of((short) 2, (short) 3);
@@ -598,7 +598,7 @@ RenderedQuery q = qb.from(Order.class).where(o -> statuses.contains(o.getStatus(
 assertEquals("select e0 from Order e0 where e0.status in (:p1)", q.hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `in`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `in`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -609,7 +609,7 @@ where o1_0.status in (?,?)
 
 `!contains` 会变成 `not in`。可能为 NULL 的列也是简单的 `not in`（SQL 语义，决策 D48）。
 值为 NULL 的行不匹配 `not in`，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`。Java 的 `!contains` 对 NULL 值为 true，因此要保留这些行，请写出 null 检查，例如 `o.getDescription() == null || !descs.contains(o.getDescription())`。
-**(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `not-in`：
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `not-in`：
 
 ```java
 List<Long> ids = List.of(1L, 2L);
@@ -623,7 +623,7 @@ assertEquals("select e0 from Order e0 where e0.description not in (:p1)",
         qb.from(Order.class).where(o -> !descs.contains(o.getDescription())).toHql().hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `not-in`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `not-in`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -632,7 +632,7 @@ from orders o1_0
 where o1_0.id not in (?,?)
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `not-in#2`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `not-in#2`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -674,7 +674,7 @@ lambdaQL 用 JPA Metamodel 检查路径的每一步：
 - 嵌套的值对象也会展开。
 - 大小比较（`<` 等）以及与其他类型的比较仍然是 `LQL-3012` 错误。请比较字段。
 
-**(已测试)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)，region `embedded-compare`：
+[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)，region `embedded-compare`：
 
 ```java
 // address is @Embedded (city, zip): comparing the whole value object compares each column (D48)
@@ -696,7 +696,7 @@ assertEquals("select e0 from Order e0 where e0.address.city <> :p1 or e0.address
 ```
 
 在 `where` 中，关联路径默认是**内连接（inner join）**（决策 D36）。
-**(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `inner-join`：
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `inner-join`：
 
 ```java
 String name = "Kim";
@@ -704,7 +704,7 @@ RenderedQuery q = qb.from(Order.class).where(o -> o.getCustomer().getName().equa
 assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = :p1", q.hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `inner-join`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `inner-join`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -720,7 +720,7 @@ where c1_0.name=?
 **null 守卫不会保留没有客户的订单。** `where` 中的路径总是内连接（SQL 语义，决策 D48）。
 因此 `o.getCustomer() == null || ...` 不匹配没有客户的订单，因为这些订单没有可以连接的客户行。对于这样的条件，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`。
 要保留没有客户的订单，请使用显式的 `leftJoin`（决策 D44，见 [6.8](06-select-group.md#68-explicit-joins)），并写 `c == null || ...`。
-**(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `null-guard`：
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `null-guard`：
 
 ```java
 String name = "Kim";
@@ -738,7 +738,7 @@ RenderedQuery q2 = qb.from(Order.class)
 assertEquals("select e0 from Order e0 join e0.customer j1 where e0.customer is not null and j1.name = :p1", q2.hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `null-guard`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `null-guard`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -748,7 +748,7 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is null or c1_0.name=?
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `null-guard#2`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `null-guard#2`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -763,14 +763,14 @@ Hibernate 把 `e0.customer is null` 写成 `c1_0.id is null`。在内连接之�
 - `||` 的其他部分也一样。`o.getStatus() == 1 || o.getCustomer().getName().equals(name)` 同样使用内连接，因此 status 为 1 但没有客户的订单不会返回（Java 会返回它）。
 
 要查找**没有**客户的订单，请比较关联本身。这会检查外键列，不需要 join。
-**(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `no-association`：
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `no-association`：
 
 ```java
 RenderedQuery q = qb.from(Order.class).where(o -> o.getCustomer() == null).toHql();
 assertEquals("select e0 from Order e0 where e0.customer is null", q.hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `no-association`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `no-association`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -780,14 +780,14 @@ where o1_0.customer_id is null
 ```
 
 以关联实体的 `@Id` 结尾的路径就是外键列。不需要 join。
-**(已测试)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `fk-path`：
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)，region `fk-path`：
 
 ```java
 RenderedQuery q = qb.from(Order.class).where(o -> o.getCustomer().getId() == 1).toHql();
 assertEquals("select e0 from Order e0 where e0.customer.id = 1", q.hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `fk-path`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `fk-path`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)

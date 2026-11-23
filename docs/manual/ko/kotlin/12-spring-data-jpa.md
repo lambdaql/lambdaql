@@ -133,7 +133,7 @@ interface MemberRepository : JpaRepository<Member, Long>, LambdaQlExecutor<Membe
 
 - **본문이 있는 인터페이스 메서드는 Spring Data가 직접 실행합니다.** Spring Data는 이 메서드에서 쿼리를 만들지 않고 본문을 호출합니다. lambdaQL은 이 동작을 변경하지 않습니다. Kotlin 2.2 미만은 [12.9](#129-kotlin-compile-settings)을 참고하십시오.
 - **`LambdaQlExecutor<T>`는 Spring Data 리포지토리 프래그먼트입니다.** 구현 클래스는 `lambdaql-spring-data-jpa`의 `META-INF/spring.factories`에 등록되어 있습니다. Spring Data는 이 파일을 읽고, `LambdaQlExecutor<T>`를 상속하는 모든 리포지토리에 구현을 추가합니다.
-- **실행기 객체 하나를 모든 리포지토리가 공유합니다.** 호출마다 해당 리포지토리의 엔티티를 사용합니다. 예를 들어 `TeamRepository`에서 `teams.count { ... }`는 `Team` 행의 수를 반환합니다(Java로 테스트함, [`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)).
+- **실행기 객체 하나를 모든 리포지토리가 공유합니다.** 호출마다 해당 리포지토리의 엔티티를 사용합니다. 예를 들어 `TeamRepository`에서 `teams.count { ... }`는 `Team` 행의 수를 반환합니다([`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)).
 
 규칙:
 
@@ -433,10 +433,10 @@ class SortErrorHandler {
 
 | 경우 | 동작 |
 |---|---|
-| `@Transactional` 안의 조회 | lambdaQL은 같은 트랜잭션에서 실행되며, 아직 flush되지 않은 변경 사항도 조회합니다. 롤백 후에는 lambdaQL에서도 그 변경 사항이 조회되지 않습니다(Java로 테스트함, `ExecutorTest`) |
+| `@Transactional` 안의 조회 | lambdaQL은 같은 트랜잭션에서 실행되며, 아직 flush되지 않은 변경 사항도 조회합니다. 롤백 후에는 lambdaQL에서도 그 변경 사항이 조회되지 않습니다(`ExecutorTest`) |
 | 트랜잭션 밖의 조회 | Spring이 호출마다 새 `EntityManager`를 사용하고 호출이 끝나면 닫으므로, 반환된 엔티티는 준영속(detached) 상태입니다. Spring의 일반 동작이며 lambdaQL에서는 테스트하지 않았습니다 |
-| `@Transactional` 또는 `TransactionTemplate` 안의 수정, 삭제, 삽입, 업서트 | 그 트랜잭션에서 실행되고, 트랜잭션과 함께 롤백됩니다(Java로 테스트함) |
-| 트랜잭션 밖의 수정, 삭제, 삽입, 업서트 | SQL을 보내기 전에 실패합니다. 아무것도 변경하지 않습니다(Java로 테스트함, 다음 표 참고) |
+| `@Transactional` 또는 `TransactionTemplate` 안의 수정, 삭제, 삽입, 업서트 | 그 트랜잭션에서 실행되고, 트랜잭션과 함께 롤백됩니다 |
+| 트랜잭션 밖의 수정, 삭제, 삽입, 업서트 | SQL을 보내기 전에 실패합니다. 아무것도 변경하지 않습니다(다음 표 참고) |
 
 DML을 자체 트랜잭션에서 실행하는 빌더는 `QueryBuilder(entityManagerFactory)` 하나뿐입니다([7.8](07-dml.md#transactions) 참고). Spring 애플리케이션에서는 이 빌더를 사용하지 마십시오([12.8](#128-the-querybuilder-bean) 참고).
 
@@ -444,12 +444,12 @@ DML을 자체 트랜잭션에서 실행하는 빌더는 `QueryBuilder(entityMana
 
 | 경우 | 예외 |
 |---|---|
-| `findOne`의 조건에 맞는 행이 2개 이상 | JPA `NonUniqueResultException` 대신 Spring `IncorrectResultSizeDataAccessException`(Java로 테스트함) |
-| `deleteOne` 또는 `updateOne`의 조건에 맞는 행이 2개 이상 | `IncorrectResultSizeDataAccessException`. 아무것도 변경하지 않음(Java로 테스트함) |
-| Spring `Sort`에 없는 속성 | `PropertyReferenceException`(Java로 테스트함) |
-| Spring `Sort`의 `ignoreCase()` | `UnsupportedOperationException`(Java로 테스트함) |
-| `STRICT` 모드에서 정렬 정책이 허용하지 않는 정렬 이름([12.5](#sort-policy-with-spring)) | `SortNotAllowedException`(`LQL-4040`), 변환하지 않음(Java로 테스트함) |
-| 리포지토리 호출(단축 메서드, 또는 본문이 있는 메서드 안의 `execute()`)에서 트랜잭션 없이 수정, 삭제, 삽입, 업서트 실행 | `InvalidDataAccessApiUsageException`(Java로 테스트함). Spring이 JPA `TransactionRequiredException`을 변환한 예외입니다. 리포지토리 메서드 밖(`QueryBuilder` 빈)에서는 JPA `TransactionRequiredException` |
+| `findOne`의 조건에 맞는 행이 2개 이상 | JPA `NonUniqueResultException` 대신 Spring `IncorrectResultSizeDataAccessException` |
+| `deleteOne` 또는 `updateOne`의 조건에 맞는 행이 2개 이상 | `IncorrectResultSizeDataAccessException`. 아무것도 변경하지 않음 |
+| Spring `Sort`에 없는 속성 | `PropertyReferenceException` |
+| Spring `Sort`의 `ignoreCase()` | `UnsupportedOperationException` |
+| `STRICT` 모드에서 정렬 정책이 허용하지 않는 정렬 이름([12.5](#sort-policy-with-spring)) | `SortNotAllowedException`(`LQL-4040`), 변환하지 않음 |
+| 리포지토리 호출(단축 메서드, 또는 본문이 있는 메서드 안의 `execute()`)에서 트랜잭션 없이 수정, 삭제, 삽입, 업서트 실행 | `InvalidDataAccessApiUsageException`. Spring이 JPA `TransactionRequiredException`을 변환한 예외입니다. 리포지토리 메서드 밖(`QueryBuilder` 빈)에서는 JPA `TransactionRequiredException` |
 | 규칙(U1, U3, U4, U6)을 어긴 대입 람다 | `LambdaQLException`(예: `TranslationException`, `LQL-3042`). 변환하지 않음([7.8](07-dml.md#rules-checked-at-analysis-time) 참고) |
 
 `QueryBuilder` 빈(12.8)은 리포지토리가 아니므로 Spring의 예외 변환을 거치지 않습니다. 이 빈에서 `one()`과 `executeOne()`의 조건에 맞는 행이 2개 이상이면 `NonUniqueResultException`이 발생합니다.
@@ -457,7 +457,7 @@ DML을 자체 트랜잭션에서 실행하는 빌더는 `QueryBuilder(entityMana
 <a id="127-other-fragments-and-jpaspecificationexecutor"></a>
 ## 12.7 다른 프래그먼트와 `JpaSpecificationExecutor`
 
-`LambdaQlExecutor<T>`는 여러 프래그먼트 중 하나입니다. Java 테스트 리포지토리는 다음 구성을 모두 함께 사용합니다(Java로 테스트함, `ExecutorTest`).
+`LambdaQlExecutor<T>`는 여러 프래그먼트 중 하나입니다. Java 테스트 리포지토리는 다음 구성을 모두 함께 사용합니다(`ExecutorTest`).
 
 | 함께 사용하는 대상 | 동작 여부 | 설명 |
 |---|---|---|

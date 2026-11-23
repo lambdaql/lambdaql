@@ -165,7 +165,7 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 | `x == null`, `x != null` | `is null`, `is not null` | 2값 |
 | `it.cnt >= 2.5`(정수 컬럼, 소수 값) | 적은 값 그대로 비교: 상수는 리터럴(`e0.cnt >= 2.5`), 캡처 값과 IN 목록도 소수 리터럴(`e0.cnt >= 2.5BD`, `in (2.5BD, 3.0BD)`, D48 B8) | 인덱스 범위 스캔 유지(MariaDB에서 실측). 이전처럼 값을 잘라 잘못된 행을 반환하지 않음 |
 | 값 객체(`@Embedded`) 전체: `it.address == addr`, `it.address != addr` | 컬럼마다 펼침: `e0.address.city = :p1 and e0.address.zip = :p2`, 부정은 `<> ... or ...`. `== null`은 모든 컬럼 `is null`(and), `!= null`은 `is not null`(or) | 컬럼마다 SQL 의미(D48): NULL 컬럼은 `=`에도 `<>`에도 불일치. 캡처한 객체가 `null`이면 일치하는 행 없음(`WARN` 수준 `LQL-4045`) |
-| `it.id == id`(`it.id`는 `Long?`, `id`는 캡처한 `Long`), `it.id == null`: NULL이 될 수 없는 컬럼(id, 기본형, `nullable = false`, 경로에 연관 단계 없음) | `not (e0.id is null or e0.id <> :p1)` 대신 `e0.id = :p1`. `it.id == null`은 `1=0`(Java로 테스트함) | 컬럼에 NULL이 없음. 연관을 거치는 경로(`it.customer?.id`)는 검사 유지 |
+| `it.id == id`(`it.id`는 `Long?`, `id`는 캡처한 `Long`), `it.id == null`: NULL이 될 수 없는 컬럼(id, 기본형, `nullable = false`, 경로에 연관 단계 없음) | `not (e0.id is null or e0.id <> :p1)` 대신 `e0.id = :p1`. `it.id == null`은 `1=0` | 컬럼에 NULL이 없음. 연관을 거치는 경로(`it.customer?.id`)는 검사 유지 |
 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL 3값 논리 |
 | `it.flag == true` / `it.flag != true` | `e0.flag = true` / `e0.flag <> true` | NULL: 반환되지 않음(SQL 의미, D48) |
 | `it.flag ?: false`(조건) | `(e0.flag is not null and e0.flag = true)` | NULL은 false로 취급 |
@@ -273,7 +273,7 @@ Java 전용 규칙 R4(엔티티 값에 대한 `equals`)와 R5(Java null-safe 헬
 | nullable `when` / 범위 대상 | `else`로 감. `!in`은 true | 반환 안 됨. `NOT` 아래에서도 마찬가지 | SQL 의미(D22) |
 | non-null 타입 `String` | 절대 null이 아님 | 컬럼은 NULL일 수 있음 | lambdaQL은 JPA 메타데이터를 사용 |
 | 람다 안의 `LocalDateTime.now()` | 애플리케이션 시간 | – | **애플리케이션 시간**으로 바인딩. DB 시간(`current_timestamp`)은 지원하지 않음 |
-| `Set`의 같은 요소 | `equals` / `hashCode`가 결정(`data class`는 주 생성자의 속성) | 기본 키로 행을 구분 | Set의 크기가 행 수보다 작으면 `toSet()`과 `findSet()`이 `IllegalStateException`을 던짐(엔티티의 `equals` / `hashCode`가 서로 다른 행을 같다고 판단하거나 `@Id`가 유일하지 않은 경우, 예: 뷰). `toList()` 사용(D42, Java로 테스트함) |
+| `Set`의 같은 요소 | `equals` / `hashCode`가 결정(`data class`는 주 생성자의 속성) | 기본 키로 행을 구분 | Set의 크기가 행 수보다 작으면 `toSet()`과 `findSet()`이 `IllegalStateException`을 던짐(엔티티의 `equals` / `hashCode`가 서로 다른 행을 같다고 판단하거나 `@Id`가 유일하지 않은 경우, 예: 뷰). `toList()` 사용(D42) |
 
 <a id="106-database-differences"></a>
 ## 10.6 데이터베이스별 차이
@@ -329,12 +329,12 @@ lambdaQL은 NULL이 될 수 있는 모든 키에 대해 HQL에 `nulls first` / `
 | 항목 | 일어나는 일 | lambdaQL |
 |---|---|---|
 | `SET a = ..., b = a + 1`(설정한 뒤에 그 컬럼을 읽음) | MariaDB는 **새** 값을, H2와 Oracle은 이전 값을 읽음 | 분석할 때 오류(U3) |
-| DML 안의 연관 경로(`it.customer?.name`) | Hibernate가 DB마다 다른 조인을 만들고 고객이 없는 **행을 놓침** | lambdaQL은 상관 스칼라 서브쿼리를 씀(`where`와 SET). `where`에서 조회라면 inner join할 경로에는 `customer.id is not null`도 더함. 그래서 DML이 쿼리와 같은 행에 적용됨(U9, 테스트함) |
+| DML 안의 연관 경로(`it.customer?.name`) | Hibernate가 DB마다 다른 조인을 만들고 고객이 없는 **행을 놓침** | lambdaQL은 상관 스칼라 서브쿼리를 씀(`where`와 SET). `where`에서 조회라면 inner join할 경로에는 `customer.id is not null`도 더함. 그래서 DML이 쿼리와 같은 행에 적용됨(U9) |
 | 같은 테이블에 대한 서브쿼리가 있는 `DELETE` | MariaDB 오류 1093 | 대상 id를 파생 테이블로 먼저 읽음: `d0.id in (select t.id from (select e0.id as id … where <condition>) t)`(U17). 상관 서브쿼리에도 동작하고 세 DB에서 같은 행을 삭제(실측). `update`는 감싸지 않음(MariaDB에서도 동작) |
 | 같은 enum 값을 STRING 컬럼과 ORDINAL 컬럼에 한 번만 바인딩 | H2와 MariaDB가 **오류 없이 잘못된 값**을 저장 | 위치마다 파라미터 하나. 절대 공유하지 않음(U7) |
 | `values(list) { }`의 많은 행 | Oracle: 바인드 65,535개의 절대 제한(ORA-01745), 그 훨씬 전부터 매우 느림 | 문장당 값 500개 이하로 나누고, 모든 문장을 한 트랜잭션에서 실행(U13) |
-| `order by ... limit`이 있는 `update` / `delete` | MariaDB는 `in` 서브쿼리의 `limit`(오류 1235)과 대상 테이블을 읽는 서브쿼리(오류 1093)를 거부 | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: 파생 테이블 `t`로 세 데이터베이스 모두에서 동작. 안쪽 select가 조회의 조인(D36)을 사용하므로 조회와 같은 행을 대상으로 함(Java로 테스트함) |
-| `on conflict` / upsert | H2와 Oracle은 `merge`. MariaDB는 `insert ... on duplicate key update`이고, 수정된 행을 2로 셈. Hibernate의 `do nothing`은 H2와 Oracle에서 실패 | `upsert`와 `onConflict(...).update(...)`는 Hibernate의 형태를 사용. `ignore()`는 `insert ... select ... where not exists`로 씀. 행 수는 그대로 반환(D40, 테스트함) |
+| `order by ... limit`이 있는 `update` / `delete` | MariaDB는 `in` 서브쿼리의 `limit`(오류 1235)과 대상 테이블을 읽는 서브쿼리(오류 1093)를 거부 | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: 파생 테이블 `t`로 세 데이터베이스 모두에서 동작. 안쪽 select가 조회의 조인(D36)을 사용하므로 조회와 같은 행을 대상으로 함 |
+| `on conflict` / upsert | H2와 Oracle은 `merge`. MariaDB는 `insert ... on duplicate key update`이고, 수정된 행을 2로 셈. Hibernate의 `do nothing`은 H2와 Oracle에서 실패 | `upsert`와 `onConflict(...).update(...)`는 Hibernate의 형태를 사용. `ignore()`는 `insert ... select ... where not exists`로 씀. 행 수는 그대로 반환(D40) |
 
 <a id="procedures-and-functions"></a>
 ### 프로시저와 함수
@@ -462,7 +462,7 @@ lambdaQL은 이 목록의 모든 형태에 대해 명확한 오류를 던집니�
 | 동시 삽입에서 원자적인 `onConflict { ... }.ignore()` | 키 중복 오류를 처리(`ignore()`는 `not exists`를 사용. [7.6](07-6-upsert.md) 참고) |
 | `insert ... select`로 하는 업서트 | `values(list) { ... }`로 행마다 업서트 |
 | `limit(n)` 없이 update나 delete에 `orderBy { ... }` 지정 | `limit(n)`을 추가하거나 `orderBy`를 제거(그 외에는 `IllegalStateException`) |
-| 한 행만 변경해야 하는 update나 delete를 `execute() == 1`과 롤백으로 검사 | `executeOne()`: id를 먼저 최대 2개 읽음. 2개이면 아무것도 변경하지 않고 `NonUniqueResultException`. 1개이면 `id = :p and (조건)`으로 그 행을 변경. 2행 이상을 변경하지 않음(D41, Java로 테스트함) |
+| 한 행만 변경해야 하는 update나 delete를 `execute() == 1`과 롤백으로 검사 | `executeOne()`: id를 먼저 최대 2개 읽음. 2개이면 아무것도 변경하지 않고 `NonUniqueResultException`. 1개이면 `id = :p and (조건)`으로 그 행을 변경. 2행 이상을 변경하지 않음(D41) |
 | `executeOne()`과 `orderBy` 또는 `limit`을 함께 사용 | 둘 중 하나만 사용(그 외에는 `IllegalStateException`) |
 | update나 delete의 `offset` | 계획 없음(D42). DML에는 `limit(n)`만 있음. `where { }`, `orderBy { }`, `limit(n)`으로 대상 행을 지정 |
 | 복합 키 엔티티의 `limit` 또는 `executeOne()` | 아직 지원하지 않음. 먼저 id를 조회한 뒤 `delete ... where { it.id in ids }` |

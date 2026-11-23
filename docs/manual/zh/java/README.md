@@ -55,7 +55,7 @@ fetch first ? rows only
 
 > [!NOTE]
 > **关于示例。**
-> 示例均为设计示例。某个功能实现后，其示例将替换为取自测试套件的代码，并附上测试文件的链接。在 [3. 条件](03-where.md)、[4. 排序与分页](04-order-paging.md)、[5. 子查询](05-subquery.md)、[6. 查询列、聚合与分组](06-select-group.md)、[7. 更新、插入、删除](07-dml.md)、[8. 存储过程与数据库函数](08-procedures-functions.md)、[11. 错误与语言](../11-errors-and-languages.md) 和 [12. Spring Data JPA](12-spring-data-jpa.md) 中，这些示例标记为 **(已测试)**。
+> 所有代码示例都是从 Java 测试代码中原样复制的一段。代码上方写有测试文件和片段名称（区域 `name`）。测试会检查 lambdaQL 生成的 HQL 和返回的行。
 
 <a id="contents"></a>
 ## 目录

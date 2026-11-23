@@ -50,7 +50,7 @@ fetch first ? rows only
 ```
 
 > [!NOTE]
-> **About the examples.** Examples are design examples. When a feature is implemented, its examples are replaced by code taken from the test suite, with a link to the test file. Examples copied from the Kotlin tests are marked **(tested)** (chapters 3 to 7).
+> **About the examples.** Every code example is a part of the Kotlin test code, copied as it is. The test file and the part name (region `name`) are written above the code. The tests check the HQL that lambdaQL makes and the rows it returns.
 
 <a id="contents"></a>
 ## Contents

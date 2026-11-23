@@ -40,7 +40,7 @@ where o1_0.status=1
 
 Oracle은 `set`에 별칭을 씁니다(`set o1_0.status=?`). H2와 MariaDB는 쓰지 않습니다.
 
-**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `update`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `update`:
 
 ```kotlin
 val u = qb.update(Order::class.java)
@@ -169,7 +169,7 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 **`?.`와 `||`.** 조회에서 `?.`로 지난 단계가 `left join`이 되는 조건이면(결정 D54, [3.10](03-where.md#310-association-paths) 참고) DML은 `e0.customer.id is not null`을 더하지 않습니다.
 그래서 고객이 없는 주문도 조회와 똑같이 수정 대상이 됩니다. 위 예제처럼 `?.`만 있고 고객이 없는 행이 조건을 참으로 만들 수 없으면 검사를 그대로 둡니다.
 
-**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `update-safe-call`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `update-safe-call`:
 
 ```kotlin
 // UPDATE: the left join of ?. drops the "customer exists" check, so the order without a customer is changed too
@@ -205,7 +205,7 @@ where o1_0.status=1 or (select c1_0.name from customers c1_0 where c1_0.id=o1_0.
 인자가 둘인 람다 `set { o, sub -> ... }`를 사용하십시오. 두 번째 인자는 서브쿼리의 시작점 `sub`입니다(결정 D49).
 여기서는 `Agg`가 필요 없습니다. 서브쿼리에는 [5. 서브쿼리](05-subquery.md)처럼 `sum`, `avg`, ...가 있습니다.
 
-**(테스트됨)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `update-sub`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), 영역 `update-sub`:
 
 ```kotlin
 // the second parameter starts a subquery, as in where { o, sub -> ... } (D49)

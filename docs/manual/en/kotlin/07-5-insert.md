@@ -28,7 +28,7 @@ insert into archive(id,price,customer_name)
 values (100,9.5,'Kim')
 ```
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `insert-delete`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `insert-delete`:
 
 ```kotlin
 val i = qb.insert(Archive::class.java).values { it.id = 100L; it.price = 9.5; it.customerName = "Kim" }
@@ -54,7 +54,7 @@ qb.insert(Order::class.java).values { o -> value(o.id, id); value(o.status, 1) }
 With a two-argument lambda such as `values { a, sub -> ... }`, the second argument `sub` makes a subquery (decision D49).
 The same holds for `values { a, sub -> ... }` and `onConflict { ... }.update { a, sub -> ... }` of an upsert (see [7.6](07-6-upsert.md#your-own-change-onconflictkeyupdate)).
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `insert-values-sub`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `insert-values-sub`:
 
 ```kotlin
 // values { a, sub -> ... }: a subquery can read captured values, not the new row (D49)

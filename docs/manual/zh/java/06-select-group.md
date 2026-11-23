@@ -45,7 +45,7 @@
 | `Customer` | `id`、`name`、`grade` |
 | `Item` | `order`、`price`、`qty` |
 
-标记为 **(已测试)** 的示例是从 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) 中复制的。
+示例是从 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) 中复制的。
 该测试检查 HQL，执行查询，并把返回的值与在 Java 中进行同样计算的结果进行比较。它在 H2、MariaDB 和 Oracle 上都能通过。
 测试使用 [3.3](03-where.md#33-basic-form) 中的测试实体。`price` 是 `double`，`status` 是 `short`，`Customer.id` 是 `int`。测试数据中有一个没有客户的订单。
 
@@ -71,7 +71,7 @@ record Total(long count, Double average) {}
 `select` 接收一个 Lambda。该 Lambda 返回一个值。结果是这个值的 `ValueQuery`。
 可以在 `where` 之后和 `orderBy` 之后调用 `select`。排序、`limit` 和 `offset` 会保留。
 
-**(已测试)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `value`：
+[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `value`：
 
 ```java
 ValueQuery<Double> q = qb.from(Order.class)
@@ -83,7 +83,7 @@ assertEquals("select e0.price from Order e0 where e0.status = 1 order by e0.pric
 
 **关于 SQL 块。** `?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 7.4 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。本章的重点是 select 列表，所以 select 列表没有缩短。
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `value`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `value`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -113,7 +113,7 @@ order by o1_0.price
 在 Lambda 中调用构造函数。每个构造函数参数都是一个值表达式。
 Java record 和带构造函数的普通 DTO 类都可以使用。
 
-**(已测试)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `record`：
+[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `record`：
 
 ```java
 // only the columns are selected; the record is made in Java. The path uses a left join,
@@ -123,7 +123,7 @@ ValueQuery<OrderView> q = qb.from(Order.class)
 assertEquals("select e0.id, j1.name, e0.price from Order e0 left join e0.customer j1", q.toHql().hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `record`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `record`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -192,7 +192,7 @@ import static org.lambdaql.Agg.*;
 <a id="aggregate-over-all-rows-no-group-by"></a>
 ### 对所有行聚合（不使用 group by）
 
-**(已测试)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `total`：
+[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `total`：
 
 ```java
 // aggregates without groupBy: one row over all matching orders
@@ -202,7 +202,7 @@ ValueQuery<Total> q = qb.from(Order.class)
 assertEquals("select count(*), avg(e0.price) from Order e0 where e0.status = 1", q.toHql().hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `total`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `total`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -251,7 +251,7 @@ List<Stat> stats = qb.from(Order.class)
 
 用 `List.of(...)` 返回键的列表。
 
-**(已测试)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `group-many`：
+[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `group-many`：
 
 ```java
 // many keys: List.of(...) (Kotlin listOf(...), a to b, Triple)
@@ -263,7 +263,7 @@ assertEquals("select e0.customer.id, e0.status, count(*) from Order e0 where e0.
         + " group by e0.customer.id, e0.status", q.toHql().hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `group-many`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `group-many`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -304,7 +304,7 @@ qb.from(Order.class)
 `having` 是针对分组的条件。它使用与 `where` 相同的 Lambda 规则（[3. 条件（`where`）](03-where.md)），并且可以使用 `Agg`。
 `having` 可以调用多次。各个条件用 `AND` 连接。
 
-**(已测试)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `group-by`：
+[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `group-by`：
 
 ```java
 ValueQuery<Stat> q = qb.from(Order.class)
@@ -315,7 +315,7 @@ assertEquals("select e0.customer.id, count(*), sum(e0.price) from Order e0 group
         + " having sum(e0.price) > 200.0", q.toHql().hql());
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `group-by`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `group-by`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -344,7 +344,7 @@ having sum(o1_0.price)>200.0
 | `one()` | 唯一的值，或 `Optional.empty()`。有两行或更多行时为 `NonUniqueResultException` |
 | `toHql()` | 不执行查询，返回 HQL 和参数 |
 
-**(已测试)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `distinct`：
+[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `distinct`：
 
 ```java
 ValueQuery<Double> q = qb.from(Order.class)
@@ -356,7 +356,7 @@ assertEquals("select distinct e0.price from Order e0 order by e0.price desc", q.
 List<Double> prices = q.toSet().stream().toList();
 ```
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `distinct`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `distinct`：
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -384,7 +384,7 @@ ValueQuery<Double> paged = qb.from(Order.class)
 
 [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java) 中的测试方法 `pagingAndFirst` 检查了这个 HQL、`first()` 和这一页的内容。
 
-**各数据库的 SQL（已测试）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `value-page`：
+**各数据库的 SQL** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `value-page`：
 
 ```sql
 -- H2, Oracle
@@ -419,10 +419,10 @@ join 之后，每个 Lambda 都按 join 的顺序得到所有实体。
 即 `where((o, c) -> ...)`、`orderBy((o, c, by) -> ...)`（`by` 在最后，规则 S12）和 `select((o, c) -> ...)`。
 被 join 的实体得到别名 `e1`、`e2`。
 
-标记为 **(已测试)** 的示例是从 [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java) 中复制的。
+示例是从 [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java) 中复制的。
 测试在 H2、MariaDB 和 Oracle 上执行每个查询，并把结果行与用 Java 进行的同样计算作比较。
 
-**(已测试)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `join`：
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `join`：
 
 ```java
 SelectJoinQuery<Order, Customer> q = qb.from(Order.class)
@@ -439,7 +439,7 @@ assertEquals("select e0 from Order e0 join Customer e1 on e0.customer.id = e1.id
 <a id="left-join-and-null"></a>
 ### left join 与 NULL
 
-**(已测试)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `left-join`：
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `left-join`：
 
 ```java
 // c is missing for an order without a customer: c == null finds those rows
@@ -458,7 +458,7 @@ assertEquals("select e0 from Order e0 left join Customer e1 on e0.customer.id = 
 <a id="sort-and-select"></a>
 ### 排序与 select
 
-**(已测试)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `sort`：
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `sort`：
 
 ```java
 OrderedJoinQuery<Order, Customer> q = qb.from(Order.class)
@@ -470,7 +470,7 @@ assertEquals("select e0 from Order e0 left join Customer e1 on e0.customer.id = 
 
 [4.4](04-order-paging.md#44-null-ordering-is-the-same-on-every-database) 的 NULL 排序规则同样适用。没有客户的订单的 `e1.name` 是 NULL，所以用 `asc` 时排在最前面。
 
-**(已测试)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `select`：
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `select`：
 
 ```java
 ValueQuery<Row> rows = qb.from(Order.class)
@@ -489,7 +489,7 @@ assertEquals("select e0.id, e1.name from Order e0 left join Customer e1 on e0.cu
 
 最多可以 join 三个实体。第三个 join 的 Lambda 得到全部三个实体：`(o, c, i) -> ...`。
 
-**(已测试)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `three`：
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `three`：
 
 ```java
 // orders of a customer with an item of quantity > 10; an order repeats once per matching item
@@ -502,7 +502,7 @@ assertEquals("select e0 from Order e0 join Customer e1 on e0.customer.id = e1.id
 ```
 
 > [!WARNING]
-> 当 join 条件匹配多行时，**主实体的行会重复**：每个匹配一次。`toList()` 和 `count()` 会计入每一次重复（已测试）。
+> 当 join 条件匹配多行时，**主实体的行会重复**：每个匹配一次。`toList()` 和 `count()` 会计入每一次重复。
 > 如果每个订单只需要一次，请用 `exists()` 子查询（[5. 子查询](05-subquery.md)）代替 join，或者对 join 查询使用 `distinct()`（见 [join 结果的 `distinct()`](#distinct-on-a-join)）。
 
 <a id="cross-join"></a>
@@ -510,7 +510,7 @@ assertEquals("select e0 from Order e0 join Customer e1 on e0.customer.id = e1.id
 
 `crossJoin` 没有 join 条件。方法名表明需要所有行的组合。条件写在 `where` 中。
 
-**(已测试)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `cross-join`：
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `cross-join`：
 
 ```java
 // every pair of rows; the conditions go in where
@@ -528,7 +528,7 @@ lambdaQL 没有 `from(Order.class, Customer.class)`（逗号 join）。漏写条
 
 分页时，lambdaQL 会把**每个**实体的 id 加为最后的排序键，所以各页不会重叠（规则 S9）。
 
-**(已测试)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `cross-join-paging`：
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `cross-join-paging`：
 
 ```java
 // with paging, the id of every entity is added to the order, so pages never overlap (S9)
@@ -550,7 +550,7 @@ assertEquals("select e0.id, e1.name from Order e0 cross join Customer e1 order b
 - 在 `distinct()` 之后使用 `select(...)` 时，用 `select distinct` 查询值。
 - 请先考虑 `exists` 子查询（[5. 子查询](05-subquery.md)）。它不产生重复，返回相同的行，而且很多情况下更快。
 
-**(已测试)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `join-distinct`：
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `join-distinct`：
 
 ```java
 // an order with two matching items would come twice; distinct() returns it once
@@ -577,7 +577,7 @@ assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.
 - 派生行没有 id，所以 `x == null` 是错误（`LQL-3067`）。请像 `x.customerId() == null` 这样比较列。
 - Hibernate 7.4（以前的 6.6 也是）接受实体的 `select distinct`、派生表和 CTE 的 inner/left join，以及子查询内的实体 join（在三种数据库上实测）。
 
-**(已测试)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `join-cte`：
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `join-cte`：
 
 ```java
 // the total of each customer, joined to the customer row
@@ -595,7 +595,7 @@ assertEquals("with t as (select d0.customer.id as customerId, sum(d0.price) as t
         rows.toHql().hql());
 ```
 
-**(已测试)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `join-derived`：
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `join-derived`：
 
 ```java
 // a derived table without a name; a customer without orders has no row in it (left join)
@@ -607,7 +607,7 @@ assertEquals("select e0 from Customer e0 left join (select d0.customer.id as cus
         + " where e1.customerId is null or e1.total < 210.0", small.toHql().hql());
 ```
 
-**(已测试)** [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `cte-reuse`：
+[`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)，region `cte-reuse`：
 
 ```java
 // the same CTE read twice is written once
@@ -642,7 +642,7 @@ update 和 delete 中的 join 决定不再添加（D51）。请使用关联路�
 它的行会成为外层查询的表（决策 D46）。
 结果是 `DerivedQuery<R>`，`R` 是行类型。
 
-**(已测试)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)，region `derived`：
+[`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)，region `derived`：
 
 ```java
 // the rows of a group query are the table of the outer query; r.total() reads the column "total"
@@ -667,7 +667,7 @@ assertEquals("select e0.customerId, e0.cnt, e0.total from (select d0.customer.id
 
 也可以 select 行中的一个值。内层和外层的捕获值按顺序绑定。
 
-**(已测试)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)，region `select`：
+[`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)，region `select`：
 
 ```java
 // a value of the row; captured values inside and outside are bound in order
@@ -681,7 +681,7 @@ ValueQuery<Integer> ids = qb.from(qb.from(Order.class)
 
 内层查询的 `limit` 和 `offset` 保留在内层查询中（HQL `limit`、`offset`）。所以可以对前几行再次排序。
 
-**(已测试)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)，region `inner-limit`：
+[`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)，region `inner-limit`：
 
 ```java
 // the three most expensive orders, then the cheapest of them
@@ -721,7 +721,7 @@ Hibernate 7.4 给派生表的列起 `c0`、`c1`、`c2` 这样的名字。H2 把�
   lambdaQL 按顺序从 record 组件中取得列名。
 - 这里不能使用普通 DTO 类或单个值，因为 lambdaQL 无法确定列名。这时会抛出 `TranslationException`（`LQL-3064`）。
 
-**(已测试)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)，region `rules`：
+[`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)，region `rules`：
 
 ```java
 // J5: the row type must be a record or Kotlin data class (its components name the columns)
@@ -743,7 +743,7 @@ v0.1 中尚不支持：派生表之间的 join，以及在 update、delete 或 i
 用 `qb.with(valueQuery)` 创建一个类型为 `Cte<R>` 的句柄，然后用 `qb.from(handle)` 读取它。
 内层查询与派生表（6.9）相同。
 
-**(已测试)** [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)，region `cte`：
+[`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)，region `cte`：
 
 ```java
 Cte<Stat> t = qb.with(perCustomer());
@@ -800,16 +800,16 @@ MariaDB 和 Oracle 执行真正的 `with`。列清单由 Hibernate 自己写出�
 
 | # | 规则 | 状态 |
 |---|---|---|
-| J1 | `select` 的 Lambda 返回**一个值表达式**或**一次构造函数调用**。每个构造函数参数都是一个值表达式（[3. 条件（`where`）](03-where.md) 的规则）。只在 `select` 中使用的关联路径会变成 `left join` 别名，因此不会丢失行。必需关联（`optional = false`）是内连接（A4）。如果 `where` 使用同一条路径，`select` 会使用 `where` 的 join（R24）。 | 已实现（已测试） |
-| J2 | 对于构造函数，lambdaQL 只查询列，并在 Java 中调用构造函数。它不会写 `select new`。 | 已实现（已测试） |
-| J3 | 有聚合时，`select` 和 `having`（以及 `insert ... select` 的值）中每个非聚合值都必须是 `groupBy` 的键。否则会在分析时报错。 | 已实现（已测试）。错误是 `TranslationException`（`LQL-3035`，见 [11](../11-errors-and-languages.md)） |
-| J4 | 没有行或所有值都是 NULL 时，`sum`/`avg`/`min`/`max` 返回 NULL，`count` 返回 0。对可能为 NULL 的值请使用装箱类型。NULL 进入基本类型的构造函数参数时，会抛出指出该参数的 `IllegalStateException`。 | 已实现（已测试） |
-| J5 | 派生表或 CTE 的行类型：**Java record**（Kotlin 代码也可以使用 data class）。普通 DTO 类只允许用于简单 `select`。否则为 `LQL-3064`。也适用于被 join 的派生表和 CTE 的行（D51）。派生行不能与 `null` 比较（`LQL-3067`）。 | 已实现（已测试） |
-| J6 | 用 `qb.with(...)` 创建的 CTE 用 select 别名为列命名：`with t as (select d0.customer.id as customerId, ...) select e0.customerId ... from t e0`。HQL 不接受名称后面的列清单。Hibernate 会以 `SyntaxException` 拒绝 `with t (col list) as (...)`。列清单由 Hibernate 自己写进 SQL（在 MariaDB 和 Oracle 上为 `with t (customerId,cnt,total) as (...)`）。H2 把 CTE 变成派生表。外层查询总是使用别名（`from t e0`）。 | 已实现（已测试） |
-| J7 | `distinct()` 渲染为 `select distinct`。与排序一起使用时，排序键必须在 select 列表中（数据库的规则）。lambdaQL 会在分析时检查这一点。在 join 结果的 `distinct()` 中，排序键必须是主实体自身的列（D51）。 | 已实现（已测试） |
+| J1 | `select` 的 Lambda 返回**一个值表达式**或**一次构造函数调用**。每个构造函数参数都是一个值表达式（[3. 条件（`where`）](03-where.md) 的规则）。只在 `select` 中使用的关联路径会变成 `left join` 别名，因此不会丢失行。必需关联（`optional = false`）是内连接（A4）。如果 `where` 使用同一条路径，`select` 会使用 `where` 的 join（R24）。 | 已实现 |
+| J2 | 对于构造函数，lambdaQL 只查询列，并在 Java 中调用构造函数。它不会写 `select new`。 | 已实现 |
+| J3 | 有聚合时，`select` 和 `having`（以及 `insert ... select` 的值）中每个非聚合值都必须是 `groupBy` 的键。否则会在分析时报错。 | 已实现。错误是 `TranslationException`（`LQL-3035`，见 [11](../11-errors-and-languages.md)） |
+| J4 | 没有行或所有值都是 NULL 时，`sum`/`avg`/`min`/`max` 返回 NULL，`count` 返回 0。对可能为 NULL 的值请使用装箱类型。NULL 进入基本类型的构造函数参数时，会抛出指出该参数的 `IllegalStateException`。 | 已实现 |
+| J5 | 派生表或 CTE 的行类型：**Java record**（Kotlin 代码也可以使用 data class）。普通 DTO 类只允许用于简单 `select`。否则为 `LQL-3064`。也适用于被 join 的派生表和 CTE 的行（D51）。派生行不能与 `null` 比较（`LQL-3067`）。 | 已实现 |
+| J6 | 用 `qb.with(...)` 创建的 CTE 用 select 别名为列命名：`with t as (select d0.customer.id as customerId, ...) select e0.customerId ... from t e0`。HQL 不接受名称后面的列清单。Hibernate 会以 `SyntaxException` 拒绝 `with t (col list) as (...)`。列清单由 Hibernate 自己写进 SQL（在 MariaDB 和 Oracle 上为 `with t (customerId,cnt,total) as (...)`）。H2 把 CTE 变成派生表。外层查询总是使用别名（`from t e0`）。 | 已实现 |
+| J7 | `distinct()` 渲染为 `select distinct`。与排序一起使用时，排序键必须在 select 列表中（数据库的规则）。lambdaQL 会在分析时检查这一点。在 join 结果的 `distinct()` 中，排序键必须是主实体自身的列（D51）。 | 已实现 |
 | J8 | 查询列可以与排序（[4. 排序与分页](04-order-paging.md)）、分页和子查询（[5. 子查询](05-subquery.md)）一起使用。按聚合排序（`by.desc(s.total())`）是 v0.2 候选。 | 已实现，按聚合排序除外 |
 
-**(已测试)** [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `rules`：
+[`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)，region `rules`：
 
 ```java
 // J3: a value without an aggregate must be a group key

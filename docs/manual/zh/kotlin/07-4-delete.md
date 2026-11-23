@@ -44,7 +44,7 @@ where (select c1_0.name from customers c1_0 where c1_0.id=orders.customer_id) is
 
 MariaDB 写成 `delete o1_0 from orders o1_0`。H2 和 Oracle 写成 `delete from orders o1_0`。
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `insert-delete`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `insert-delete`：
 
 ```kotlin
 val i = qb.insert(Archive::class.java).values { it.id = 100L; it.price = 9.5; it.customerName = "Kim" }
@@ -119,7 +119,7 @@ delete from Order d0 where d0.id in (select t.id from (select e0.id as id from O
 - `update` 不做包装。带有读取自身表的子查询的 `update` 在三种数据库上都能工作（在 MariaDB 10.11 上实测）。
 - 复合 id 实体不做包装。带 `limit` 的删除本来就使用下面的包装形式（别名 `x0`）。
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `delete-self-subquery`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `delete-self-subquery`：
 
 ```kotlin
 // the subquery reads the target table: the matching ids are read through a derived table first (U17, MariaDB 1093)

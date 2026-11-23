@@ -43,7 +43,7 @@ Kotlin では、`y in values` は `values.contains(y)` にコンパイルされ�
 
 HQL では、サブクエリのルートのエイリアスは `s1`、`s2`、... です（外側のルートは `e0`）。サブクエリの中の結合には `s1j1` のようなエイリアスが付きます。
 
-**(テスト済み)** と書かれた例は [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt) から取ったものです。このテストは Java のテスト用エンティティを使います。`price` はプリミティブの `double`、`qty` は `int` です。
+例は [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt) から取ったものです。このテストは Java のテスト用エンティティを使います。`price` はプリミティブの `double`、`qty` は `int` です。
 Java で書いたほかのクエリのテストは [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) にあります（H2、MariaDB、Oracle）。それらの例は [このページの Java 版](../java/05-subquery.md) を参照してください。
 
 ## 5.2 EXISTS
@@ -62,7 +62,7 @@ qb.from(Order::class.java)
 //      where exists (select 1 from Item s1 where s1.order.id = e0.id and s1.qty > 10)
 ```
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `exists`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `exists`:
 
 ```kotlin
 val q = qb.from(Order::class.java)
@@ -125,7 +125,7 @@ qb.from(Order::class.java)
 //      where e0.customer.id in (select s1.id from Customer s1 where s1.grade > 3)
 ```
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `in`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `in`:
 
 ```kotlin
 val q = qb.from(Order::class.java)
@@ -237,7 +237,7 @@ qb.from(Order::class.java)
 //      where e0.price > (select avg(s1.price) from Order s1)
 ```
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `scalar`（テストの `price` は `double` なので `!!` はありません）:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `scalar`（テストの `price` は `double` なので `!!` はありません）:
 
 ```kotlin
 val q = qb.from(Order::class.java).where { o, sub -> o.price > sub.from(Order::class.java).avg { x -> x.price } }
@@ -379,7 +379,7 @@ where exists(select 1 from orders o1_0 where o1_0.customer_id=c1_0.id and exists
 - サブクエリの中のエンティティは 2 つまでです。結合の形では `orderBy` と `limit` を使えません。
 - `exists`、結合した行の `sum`、`left join` と ON の中の関連のパスを使った `in` を、3 つの DB で実測しました。
 
-**(テスト済み)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `sub-join`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)、リージョン `sub-join`:
 
 ```kotlin
 // customers with an order that has an item of quantity > 10: the subquery joins Order and Item (D51)
@@ -398,7 +398,7 @@ Kotlin の `o.customer?.id == c.id` は `s1.customer is not null and ...` を追
 <a id="511-subqueries-in-other-places"></a>
 ## 5.11 ほかの場所でのサブクエリ
 
-- **update / delete の中のサブクエリ**: `where` で同じ `sub` の構文を使います。実装済みです（Java のラムダでテスト済み、リージョン `dml-subquery`）。[7.4 削除](07-4-delete.md) と [7.2 更新](07-2-update.md) を参照してください。
+- **update / delete の中のサブクエリ**: `where` で同じ `sub` の構文を使います。実装済みです（リージョン `dml-subquery`）。[7.4 削除](07-4-delete.md) と [7.2 更新](07-2-update.md) を参照してください。
 - **`set` の値の中のサブクエリ**（`o.total = sub.from(...).sum { ... }`）: 代入ラムダの 2 つ目の引数 `sub` で書きます（決定 D49）。[7.2 更新](07-2-update.md#an-aggregate-from-a-subquery) を参照してください。
 - **`from` の中のサブクエリ（派生テーブル）と CTE**: 実装済みです（マイルストーン M8-2）。`sub` は使わず、値のクエリを `qb.from(...)` か `qb.with(...)` に渡します。[6.9 派生テーブル](06-select-group.md#69-derived-table-subquery-in-from) と [6.10 CTE](06-select-group.md#610-cte-with) を参照してください。
 

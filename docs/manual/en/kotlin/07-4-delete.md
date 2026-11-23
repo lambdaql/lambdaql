@@ -44,7 +44,7 @@ where (select c1_0.name from customers c1_0 where c1_0.id=orders.customer_id) is
 
 MariaDB writes `delete o1_0 from orders o1_0`. H2 and Oracle write `delete from orders o1_0`.
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `insert-delete`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `insert-delete`:
 
 ```kotlin
 val i = qb.insert(Archive::class.java).values { it.id = 100L; it.price = 9.5; it.customerName = "Kim" }
@@ -119,7 +119,7 @@ delete from Order d0 where d0.id in (select t.id from (select e0.id as id from O
 - `update` is not wrapped. An `update` with a subquery on its own table works on all three databases (measured on MariaDB 10.11).
 - An entity with a composite id is not wrapped. A delete with `limit` already uses the wrapped form below (alias `x0`).
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `delete-self-subquery`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `delete-self-subquery`:
 
 ```kotlin
 // the subquery reads the target table: the matching ids are read through a derived table first (U17, MariaDB 1093)

@@ -55,7 +55,7 @@ fetch first ? rows only
 
 > [!NOTE]
 > **About the examples.**
-> Examples are design examples. When a feature is implemented, its examples are replaced by code taken from the test suite, with a link to the test file. In [3. Conditions](03-where.md), [4. Sorting and paging](04-order-paging.md), [5. Subqueries](05-subquery.md), [6. Select, aggregates and group by](06-select-group.md), [7. Update, insert, delete](07-dml.md), [8. Procedures and DB functions](08-procedures-functions.md), [11. Errors and languages](../11-errors-and-languages.md) and [12. Spring Data JPA](12-spring-data-jpa.md), these examples are marked **(tested)**.
+> Every code example is a part of the Java test code, copied as it is. The test file and the part name (region `name`) are written above the code. The tests check the HQL that lambdaQL makes and the rows it returns.
 
 <a id="contents"></a>
 ## Contents

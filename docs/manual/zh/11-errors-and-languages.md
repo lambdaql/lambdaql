@@ -11,7 +11,7 @@
 每条 lambdaQL 消息都以 `[LQL-xxxx]` 形式的错误码开头。
 错误码与语言无关。只翻译错误码后面的文本。
 
-**(已测试)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)，region `format`：
+[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)，region `format`：
 
 ```java
 LqlMessages.setLocale(Locale.ENGLISH);
@@ -113,7 +113,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `getMessage()` | 使用异常创建时所选 lambdaQL 语言的消息 |
 | `getMessage(Locale locale)` | 同一条消息的其他语言版本，例如用 `Locale.ROOT` 获取英文 |
 
-**(已测试)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)，region `exception`：
+[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)，region `exception`：
 
 ```java
 LqlMessages.setLocale(Locale.KOREAN);
@@ -270,7 +270,7 @@ lambdaQL 也会缓存失败的结果，所以有问题的 Lambda 下次会很快
 
 #### Java
 
-**(已测试)** [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `rules`（开头部分）：
+[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)，region `rules`（开头部分）：
 
 ```java
 // the body never runs in Java
@@ -319,7 +319,7 @@ lambdaQL 按以下顺序检查这三个位置。使用第一个已设置的值�
 | `ko`（例如 `ko_KR`） | 韩文 |
 | 其他所有语言（`en`、`fr`、`de` 等） | 英文 |
 
-**(已测试)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)，region `locale`：
+[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)，region `locale`：
 
 ```java
 // 1. setLocale wins, 2. then -Dlambdaql.locale, 3. then the JVM default
@@ -380,7 +380,7 @@ org/lambdaql/i18n/LqlMessages_ko.properties   韩文
 - lambdaQL 不使用 `MessageFormat`。因此单引号（`can't`）可以按原样书写。数字不做格式化（行号 `1234567` 仍然是 `1234567`）。
 - 每个键都必须以相同的参数存在于全部四个文件中。单元测试会检查这一点。新消息必须以全部四种语言添加。
 
-**(已测试)** [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)，region `fill`：
+[`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)，region `fill`：
 
 ```java
 // no MessageFormat: quotes and big numbers stay as they are (rule I4)

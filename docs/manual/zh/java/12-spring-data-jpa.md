@@ -90,7 +90,7 @@ dependencies {
 
 本章的示例使用测试实体 `Member`（`id`、`name`、`active`、`grade`、`team`）和 `Team`（`id`、`name`）。`grade` 是 `Integer`，因此可以为 NULL。
 
-**(已测试)** [`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)，region `repository`：
+[`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)，region `repository`：
 
 ```java
 /** No Impl class: Spring Data finds the LambdaQlExecutor implementation by itself. */
@@ -152,7 +152,7 @@ public interface MemberRepository extends JpaRepository<Member, Long>, LambdaQlE
 
 - **默认方法由 Spring Data 自身执行。** Spring Data 不会尝试从默认方法生成查询，它只是调用方法主体。lambdaQL 不改变这一点。
 - **`LambdaQlExecutor<T>` 是一个 Spring Data repository fragment。** 它的实现登记在 `lambdaql-spring-data-jpa` 的 `META-INF/spring.factories` 中。Spring Data 读取该文件，并把实现添加到每个继承了 `LambdaQlExecutor<T>` 的 repository 中。
-- **所有 repository 共享一个执行器对象。** 每次调用仍然使用它自己的 repository 的实体。例如，在 `TeamRepository` 上调用 `teams.count(t -> ...)` 统计的是 `Team` 的行（已在 [`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java) 中测试）。
+- **所有 repository 共享一个执行器对象。** 每次调用仍然使用它自己的 repository 的实体。例如，在 `TeamRepository` 上调用 `teams.count(t -> ...)` 统计的是 `Team` 的行（见 [`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)）。
 
 规则：
 
@@ -201,7 +201,7 @@ public interface MemberRepository extends JpaRepository<Member, Long>, LambdaQlE
 这些简短方法等同于 `query()` 加上一个结果函数：`findAll(w)` 是 `query().where(w).toList()`，`findSet(w)` 是 `query().where(w).toSet()`，`findFirst(w)` 是 `query().where(w).first()`，`findOne(w)` 是 `query().where(w).one()`，依此类推。结果函数的说明见[获取结果](02-getting-started.md#getting-the-result)。
 `findAll(Where<T>)` 和 `count(Where<T>)` 与 `JpaRepository` 的 `findAll(Sort)`、`findAll(Example)` 或 `count()` 不冲突，因为参数类型不同。
 
-**`query()`：完整的查询。** **(已测试)** [`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)，region `query`（12.3 中 repository 的一部分）：
+**`query()`：完整的查询。** [`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)，region `query`（12.3 中 repository 的一部分）：
 
 ```java
 /**
@@ -219,21 +219,21 @@ default List<Member> topGraded(int n) {
 
 在下面的示例中，`repository` 是一个 `MemberRepository`。
 
-**(已测试)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `find-all-sort`：
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `find-all-sort`：
 
 ```java
 SortSpec<Member> byGrade = SortSpec.of(Member.class, (m, by) -> by.desc(m.getGrade()).asc(m.getId()));
 List<Member> active = repository.findAll(m -> m.isActive(), byGrade);
 ```
 
-**(已测试)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `find-first`（等级最高的活跃成员）：
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `find-first`（等级最高的活跃成员）：
 
 ```java
 Optional<Member> best = repository.findFirst(m -> m.isActive(),
         SortSpec.of(Member.class, (m, by) -> by.desc(m.getGrade())));
 ```
 
-**(已测试)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `find-one`：
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `find-one`：
 
 ```java
 Optional<Member> kim = repository.findOne(m -> m.getName().equals("Kim"));
@@ -241,14 +241,14 @@ Optional<Member> kim = repository.findOne(m -> m.getName().equals("Kim"));
 assertThrows(IncorrectResultSizeDataAccessException.class, () -> repository.findOne(m -> m.isActive()));
 ```
 
-**(已测试)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `count-exists`：
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `count-exists`：
 
 ```java
 long active = repository.count(m -> m.isActive());
 boolean anyInTeamB = repository.exists(m -> m.getTeam().getName().equals("B"));
 ```
 
-**(已测试)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `find-set`：
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `find-set`：
 
 ```java
 java.util.SequencedSet<Member> active = repository.findSet(m -> m.isActive(), Sort.by(Sort.Order.desc("grade"), Sort.Order.asc("id")));
@@ -278,7 +278,7 @@ java.util.SequencedSet<Member> any = repository.findSet(m -> m.isActive());
 - **`One`** 对删除和更新表示单行保护（见下一部分），对插入和 upsert 表示一行。
 - 它们需要调用方的事务（见 [12.6](#126-transactions-and-exceptions)）。测试在 `TransactionTemplate` 中执行它们。
 
-**(已测试)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `dml-shortcuts`：
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `dml-shortcuts`：
 
 ```java
 int changed = repository.updateAll(m -> !m.isActive(), m -> m.setGrade(7));      // condition first
@@ -303,7 +303,7 @@ int many = repository.insertAll(List.of(new NewMember("A", 1), new NewMember("B"
 语句本身只指定一个 id，因此即使另一个事务在此期间添加了匹配的行，它也无法改变第二行。这种保护不依赖回滚。
 核心 API 有同样的保护：`executeOne()`（见 [7.4](07-4-delete.md#delete-exactly-one-row-executeone)）。
 
-**(已测试)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `dml-one`：
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `dml-one`：
 
 ```java
 int renamed = repository.updateOne(m -> m.getId() == kimId, m -> m.setName("Kim2"));   // exactly one row
@@ -333,7 +333,7 @@ assertThrows(org.springframework.dao.IncorrectResultSizeDataAccessException.clas
 这些方法名以 `Query` 结尾，因此不会与 `delete(...)` 等 `JpaRepository` 方法冲突。语句与使用 `QueryBuilder` 时相同（见 [7. 更新、插入、删除](07-dml.md)）。处理的行与使用同一个 `where` Lambda 的查询相同。
 它们与快捷方法一样需要调用方的事务。与所有 JPA 批量语句一样，它们不会修改事务中已加载的实体。
 
-**(已测试)** [`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)，region `dml`（12.3 中 repository 的一部分）：
+[`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)，region `dml`（12.3 中 repository 的一部分）：
 
 ```java
 /**
@@ -360,7 +360,7 @@ default int addGuest(String name) {
 
 upsert 也在事务中执行。`teams` 是 `TeamRepository`，`tx` 是 Spring 的 `TransactionTemplate`。
 
-**(已测试)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `upsert`：
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `upsert`：
 
 ```java
 int changed = tx.execute(s -> teams.upsertQuery().values(t -> { t.setId(teamId); t.setName("A2"); }).execute());
@@ -385,7 +385,7 @@ lambdaQL 用 `SortSpec.ofPath` 把每个 `Sort.Order` 转换为一个排序键�
 
 Spring Data JPA 自身的 repository 把 `NATIVE` 的 NULL 位置交给数据库决定，因此那里的顺序在不同数据库上可能不同。lambdaQL 则使用自己的规则。
 
-**(已测试)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `find-all-spring-sort`：
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `find-all-spring-sort`：
 
 ```java
 List<Member> rows = repository.findAll(m -> m.isActive(),
@@ -403,7 +403,7 @@ assertEquals("PropertyReferenceException", unknown.getClass().getSimpleName());
 - 当排序键不包含 id 时，lambdaQL 会把 id 添加为最后一个键，这样行不会在页之间移动（见[决胜键](04-order-paging.md#tie-breaker-automatic-id)）。没有排序的页按 id 排序。
 - `Pageable.unpaged()` 在一页中返回所有行。
 
-**(已测试)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `page`：
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `page`：
 
 ```java
 Page<Member> page = repository.findAll(m -> m.isActive(), PageRequest.of(1, 2, Sort.by("name")));
@@ -446,7 +446,7 @@ Spring `Sort` 或 `Pageable` 始终是外部排序，因此策略会检查其中
 实体名在持久化单元中唯一（两个实体同名时 Hibernate 会在启动时失败），因此不同包中同名的类不会混淆。未知的名称会使应用启动失败，抛出 `IllegalStateException`（LQL-4042）。
 路径会在第一次使用规则时与实体核对（见 4.10 中的[字符串形式的规则](04-order-paging.md#rules-as-strings)）。
 
-**(已测试)** [`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java)，region `properties`（测试的属性；在应用中写在 `application.properties` 或 `application.yaml` 中）：
+[`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java)，region `properties`（测试的属性；在应用中写在 `application.properties` 或 `application.yaml` 中）：
 
 ```java
 @SpringBootTest(classes = SampleApplication.class, properties = {
@@ -455,7 +455,7 @@ Spring `Sort` 或 `Pageable` 始终是外部排序，因此策略会检查其中
         "lambdaql.sort.alias.Member.level=grade"})
 ```
 
-**(已测试)** [`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java)，region `properties-use`：
+[`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java)，region `properties-use`：
 
 ```java
 List<Member> byLevel = repository.findAll(m -> m.isActive(), Sort.by(Sort.Order.desc("level")));
@@ -478,7 +478,7 @@ public SortPolicy sortPolicy() {
 }
 ```
 
-**(已测试)** [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `sort-policy`（region 在 `try` 内结束；`finally` 块调用 `SortPolicy.unregister(emf)`）：
+[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)，region `sort-policy`（region 在 `try` 内结束；`finally` 块调用 `SortPolicy.unregister(emf)`）：
 
 ```java
 // usually a @Bean SortPolicy; the Boot auto-configuration registers it for the EntityManagerFactory
@@ -527,10 +527,10 @@ public class SortErrorHandler {
 
 | 情况 | 结果 |
 |---|---|
-| 在 `@Transactional` 内部执行查询 | lambdaQL 在同一个事务中运行。它能看到尚未 flush 的更改。回滚之后，这些更改对 lambdaQL 也不再存在（已在 `ExecutorTest` 中测试） |
+| 在 `@Transactional` 内部执行查询 | lambdaQL 在同一个事务中运行。它能看到尚未 flush 的更改。回滚之后，这些更改对 lambdaQL 也不再存在 |
 | 在事务外部执行查询 | Spring 为这次调用使用一个新的 `EntityManager`，调用结束后关闭它，因此返回的实体处于游离（detached）状态。这是 Spring 的正常行为；lambdaQL 没有对此进行测试 |
-| 在 `@Transactional` 或 `TransactionTemplate` 内部执行更新、删除、插入或 upsert | 在该事务中执行，并随它一起回滚（已测试） |
-| 在事务外部执行更新、删除、插入或 upsert | 在发送任何 SQL 之前失败。什么都不改变（已测试，见下一张表） |
+| 在 `@Transactional` 或 `TransactionTemplate` 内部执行更新、删除、插入或 upsert | 在该事务中执行，并随它一起回滚 |
+| 在事务外部执行更新、删除、插入或 upsert | 在发送任何 SQL 之前失败。什么都不改变（见下一张表） |
 
 只有 `new QueryBuilder(entityManagerFactory)` 会在自己的事务中执行 DML（见 [7.8](07-dml.md#transactions)）。不要在 Spring 应用中使用它（见 [12.8](#128-the-querybuilder-bean)）。
 
@@ -538,12 +538,12 @@ public class SortErrorHandler {
 
 | 情况 | 异常 |
 |---|---|
-| `findOne` 匹配 2 行或更多行 | `IncorrectResultSizeDataAccessException`（Spring），而不是 JPA 的 `NonUniqueResultException`（已测试） |
-| `deleteOne` 或 `updateOne` 匹配 2 行或更多行 | `IncorrectResultSizeDataAccessException`。什么都不改变（已测试） |
-| Spring `Sort` 中有未知属性 | `PropertyReferenceException`（已测试） |
-| Spring `Sort` 中使用 `ignoreCase()` | `UnsupportedOperationException`（已测试） |
-| 在 `STRICT` 模式下，排序策略不允许的排序名称（[12.5](#sort-policy-with-spring)） | `SortNotAllowedException`（`LQL-4040`），不转换（已测试） |
-| 在 repository 调用中（快捷方法，或默认方法内部的 `execute()`）没有事务时执行更新、删除、插入或 upsert | `InvalidDataAccessApiUsageException`（已测试），由 Spring 从 JPA 的 `TransactionRequiredException` 转换而来。在 repository 方法外部（`QueryBuilder` bean）则是 JPA 的 `TransactionRequiredException` |
+| `findOne` 匹配 2 行或更多行 | `IncorrectResultSizeDataAccessException`（Spring），而不是 JPA 的 `NonUniqueResultException` |
+| `deleteOne` 或 `updateOne` 匹配 2 行或更多行 | `IncorrectResultSizeDataAccessException`。什么都不改变 |
+| Spring `Sort` 中有未知属性 | `PropertyReferenceException` |
+| Spring `Sort` 中使用 `ignoreCase()` | `UnsupportedOperationException` |
+| 在 `STRICT` 模式下，排序策略不允许的排序名称（[12.5](#sort-policy-with-spring)） | `SortNotAllowedException`（`LQL-4040`），不转换 |
+| 在 repository 调用中（快捷方法，或默认方法内部的 `execute()`）没有事务时执行更新、删除、插入或 upsert | `InvalidDataAccessApiUsageException`，由 Spring 从 JPA 的 `TransactionRequiredException` 转换而来。在 repository 方法外部（`QueryBuilder` bean）则是 JPA 的 `TransactionRequiredException` |
 | 违反规则（U1、U3、U4、U6）的赋值 Lambda | `LambdaQLException`（例如 `TranslationException`，`LQL-3042`），不做转换（见 [7.8](07-dml.md#rules-checked-at-analysis-time)） |
 
 `QueryBuilder` bean（12.8）不是 repository，因此 Spring 不会转换它的错误。在那里，`one()` 和 `executeOne()` 遇到 2 行或更多行时会抛出 `NonUniqueResultException`。
@@ -551,7 +551,7 @@ public class SortErrorHandler {
 <a id="127-other-fragments-and-jpaspecificationexecutor"></a>
 ## 12.7 其他 fragment 与 `JpaSpecificationExecutor`
 
-`LambdaQlExecutor<T>` 只是众多 fragment 中的一个。12.3 中的 repository 同时使用了以下所有内容（已在 `ExecutorTest` 中测试）：
+`LambdaQlExecutor<T>` 只是众多 fragment 中的一个。12.3 中的 repository 同时使用了以下所有内容：
 
 | 一起使用的对象 | 可用 | 说明 |
 |---|---|---|
@@ -578,7 +578,7 @@ repository.count();                                                        // Sp
 - repository 方法（`LambdaQlExecutor<T>`）不需要这个 bean。
 - 它的更新、删除、插入和 upsert 语句与 repository 方法一样，需要调用方的事务。没有事务时，它们会在发送任何 SQL 之前抛出 `TransactionRequiredException`。
 
-**(已测试)** [`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)，region `query-builder-bean`（`qb` 是注入的 bean）：
+[`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)，region `query-builder-bean`（`qb` 是注入的 bean）：
 
 ```java
 // inject it into a service: it joins the current transaction

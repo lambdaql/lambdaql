@@ -577,7 +577,7 @@ qb.insert(Order::class.java).values(lines) { o, l -> o.id = l.id; o.price = l.pr
 
 | Kotlin の書き方 | 意味 |
 |---|---|
-| `value(o.status, 1)` | `import org.lambdaql.Dml.value` でインポートした関数（D49）。`val` プロパティ（setter なし）を持つエンティティに使います。プロパティへの代入と同じラムダの中で混ぜられます（テスト済み） |
+| `value(o.status, 1)` | `import org.lambdaql.Dml.value` でインポートした関数（D49）。`val` プロパティ（setter なし）を持つエンティティに使います。プロパティへの代入と同じラムダの中で混ぜられます |
 | `value(o.cnt, o.cnt + 1)` | サポート |
 | `it.cnt += 1` | サポート |
 | `it.cnt++`、`--` | v0.1 ではサポートしません。`it.cnt += 1` と書いてください |

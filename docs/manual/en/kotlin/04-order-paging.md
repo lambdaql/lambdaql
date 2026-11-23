@@ -64,7 +64,7 @@ fetch first ? rows only
 - The key and its direction are written together. They can never get out of order.
 - lambdaQL only reads the lambda. It never runs it. The `by` methods only describe the order.
 
-**(tested)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `sort`:
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt), region `sort`:
 
 ```kotlin
 val q = qb.from(Order::class.java)
@@ -417,7 +417,7 @@ Rule: **when you use paging and the sort keys do not contain the id, lambdaQL ad
 - It is not added when the sort keys contain a unique column of the main entity that can never be NULL (A5). This means `@Column(unique = true)` with `nullable = false`, Hibernate `@NaturalId`, and `@Id`. Such a key alone fixes the order of all rows.
   A unique column that can be NULL does not count, because many rows can be NULL.
 - Without `limit` and `offset`, nothing is added.
-- With explicit joins (`join`, `leftJoin`, `crossJoin`), the id of every joined entity is also added, in join order (tested with Java lambdas, see [6.8](06-select-group.md#68-explicit-joins)).
+- With explicit joins (`join`, `leftJoin`, `crossJoin`), the id of every joined entity is also added, in join order (see [6.8](06-select-group.md#68-explicit-joins)).
 - Not implemented yet: a collection fetch join together with `limit`/`offset` is rejected.
 
 There is no Kotlin test for this yet. The same rule is tested in Java ([`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java), region `unique-key`).
@@ -669,20 +669,20 @@ See [5. Subqueries](05-subquery.md#59-sorting-inside-a-subquery).
 
 | # | Rule | Status |
 |---|---|---|
-| S1 | A sort is one lambda: `{ o, by -> by... }`. For one key: `{ it.key }` with an optional `Direction`. For joins: `{ o, c, by -> by... }` (`by` is always last) | Implemented. The join form `{ o, c, by -> }` is also implemented (tested with Java lambdas) |
+| S1 | A sort is one lambda: `{ o, by -> by... }`. For one key: `{ it.key }` with an optional `Direction`. For joins: `{ o, c, by -> by... }` (`by` is always last) | Implemented. The join form `{ o, c, by -> }` is also implemented |
 | S2 | A key is `Comparable` (Kotlin nullable keys are allowed). An entity cannot be a key (compile error). A key must use the entity | Implemented |
 | S3 | The direction comes from `asc` / `desc` or `sort(key, Direction)`. `asc(key)`/`desc(key)` (`ASC`/`DESC`) use the NULL policy. `asc(key, nullsFirst)`, `desc(key, nullsFirst)` and `*_NULLS_*` are used as written | Implemented |
 | S4 | The body is only a straight chain of `by` calls. No `if`, `when` or loop | Implemented |
 | S5 | `orderBy` once per query. No `where` after `orderBy`. No `orderBy` after `limit` (compile error) | Implemented |
-| S6 | Reuse with `SortSpec` (`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`). Outside strings are checked by the sort policy of the persistence unit (`SortRules`, `SortPolicy`, `SortMode`, see [4.10](#sort-policy)) | `SortSpec` and the sort policy implemented (tested with Java lambdas). The join form of `SortSpec` is not implemented yet |
+| S6 | Reuse with `SortSpec` (`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`). Outside strings are checked by the sort policy of the persistence unit (`SortRules`, `SortPolicy`, `SortMode`, see [4.10](#sort-policy)) | `SortSpec` and the sort policy implemented. The join form of `SortSpec` is not implemented yet |
 | S7 | Keys: columns, to-one paths, `+ - *`, widening. No value branches. Kotlin `?.` is read as a path | Implemented (not tested with Kotlin lambdas) |
 | S8 | Association paths that are used only in `orderBy` use a `left join`, so rows without the association are kept. A required association (`optional = false`) loses no rows, so it uses an inner join (A4). If `where` uses the same path, the sort uses the `where` join | Implemented |
-| S9 | With paging, the root `@Id asc` is added if the keys do not contain the id. It is not added when the keys contain a unique column that can never be NULL (`unique = true` and `nullable = false`, `@NaturalId`) (A5). Collection fetch join + paging is rejected | Implemented for the root id and the ids of explicitly joined entities (tested with Java lambdas). The fetch join check is not implemented yet |
+| S9 | With paging, the root `@Id asc` is added if the keys do not contain the id. It is not added when the keys contain a unique column that can never be NULL (`unique = true` and `nullable = false`, `@NaturalId`) (A5). Collection fetch join + paging is rejected | Implemented for the root id and the ids of explicitly joined entities. The fetch join check is not implemented yet |
 | S10 | The analysis is cached per lambda. A captured `Direction` is read on every call | Implemented |
 | S11 | Spring `Sort.Order` maps 1:1 to `Direction` (Spring module, see [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)). Its property names go through the sort policy, and an alias is passed on as it is | Spring `Sort` implemented and tested with Java (`ignoreCase` not supported yet). Use together with the sort policy is also tested. Reading one text such as `"price,desc_nulls_last"` is not implemented yet |
-| S12 | Join queries use the same shape: `{ o, c, by -> }`, `{ o, c, i, by -> }` | Implemented (tested with Java lambdas, see [6.8](06-select-group.md#68-explicit-joins)) |
+| S12 | Join queries use the same shape: `{ o, c, by -> }`, `{ o, c, i, by -> }` | Implemented (see [6.8](06-select-group.md#68-explicit-joins)) |
 | S13 | Property references only in the one-key short form (`orderBy(Order::price)`). A reference that compiles but has the wrong meaning is rejected | Not implemented yet (Kotlin property references) |
-| S14 | Subquery sorts: kept with `limit`, removed with a warning without `limit`. lambdaQL handles the database differences (see chapter 5) | Implemented (tested). The MariaDB `lateral` rewrite is not implemented yet |
+| S14 | Subquery sorts: kept with `limit`, removed with a warning without `limit`. lambdaQL handles the database differences (see chapter 5) | Implemented. The MariaDB `lateral` rewrite is not implemented yet |
 
 ---
 

@@ -133,7 +133,7 @@ interface MemberRepository : JpaRepository<Member, Long>, LambdaQlExecutor<Membe
 
 - **本体を持つインターフェースメソッドは、Spring Data 自身が実行します。** Spring Data はそれらからクエリを作ろうとしません。本体を呼び出すだけです。lambdaQL はこの動きを変えません。Kotlin 2.2 より前については [12.9](#129-kotlin-compile-settings) を参照してください。
 - **`LambdaQlExecutor<T>` は Spring Data のリポジトリのフラグメントです。** その実装は `lambdaql-spring-data-jpa` の `META-INF/spring.factories` に書かれています。Spring Data はこのファイルを読み、`LambdaQlExecutor<T>` を継承するすべてのリポジトリに実装を追加します。
-- **実行器のオブジェクトは 1 つで、すべてのリポジトリが共有します。** それでも、各呼び出しは自分のリポジトリのエンティティを使います。たとえば `TeamRepository` の `teams.count { ... }` は `Team` の行を数えます（Java でテスト済み、[`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)）。
+- **実行器のオブジェクトは 1 つで、すべてのリポジトリが共有します。** それでも、各呼び出しは自分のリポジトリのエンティティを使います。たとえば `TeamRepository` の `teams.count { ... }` は `Team` の行を数えます（[`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)）。
 
 ルール:
 
@@ -433,10 +433,10 @@ class SortErrorHandler {
 
 | ケース | どうなるか |
 |---|---|
-| `@Transactional` の中の選択 | lambdaQL は同じトランザクションで実行されます。まだ flush されていない変更も見えます。ロールバックの後は、それらの変更は lambdaQL からも見えなくなります（Java でテスト済み、`ExecutorTest`） |
+| `@Transactional` の中の選択 | lambdaQL は同じトランザクションで実行されます。まだ flush されていない変更も見えます。ロールバックの後は、それらの変更は lambdaQL からも見えなくなります（`ExecutorTest`） |
 | トランザクションの外の選択 | Spring は呼び出しごとに新しい `EntityManager` を使い、呼び出しの後で閉じます。そのため、返されたエンティティは detached の状態です。これは Spring の通常の動きで、lambdaQL ではテストしていません |
-| `@Transactional` や `TransactionTemplate` の中の更新、削除、挿入、upsert | そのトランザクションで実行され、一緒にロールバックされます（Java でテスト済み） |
-| トランザクションの外の更新、削除、挿入、upsert | SQL を送る前に失敗します。何も変更されません（Java でテスト済み、次の表を参照） |
+| `@Transactional` や `TransactionTemplate` の中の更新、削除、挿入、upsert | そのトランザクションで実行され、一緒にロールバックされます |
+| トランザクションの外の更新、削除、挿入、upsert | SQL を送る前に失敗します。何も変更されません（次の表を参照） |
 
 自分のトランザクションで DML を実行するのは `QueryBuilder(entityManagerFactory)` だけです（[7.8](07-dml.md#transactions) を参照）。Spring のアプリケーションでは使わないでください（[12.8](#128-the-querybuilder-bean) を参照）。
 
@@ -444,12 +444,12 @@ class SortErrorHandler {
 
 | ケース | 例外 |
 |---|---|
-| `findOne` が 2 行以上に一致する | JPA の `NonUniqueResultException` ではなく、`IncorrectResultSizeDataAccessException`（Spring）（Java でテスト済み） |
-| `deleteOne` や `updateOne` が 2 行以上に一致する | `IncorrectResultSizeDataAccessException`。何も変更されません（Java でテスト済み） |
-| Spring の `Sort` に知らないプロパティがある | `PropertyReferenceException`（Java でテスト済み） |
-| Spring の `Sort` で `ignoreCase()` を使う | `UnsupportedOperationException`（Java でテスト済み） |
-| `STRICT` モードで、ソートポリシーが許可しないソートの名前（[12.5](#sort-policy-with-spring)） | `SortNotAllowedException`（`LQL-4040`）。変換されません（Java でテスト済み） |
-| リポジトリの呼び出し（短縮メソッド、または本体を持つメソッドの中の `execute()`）で、トランザクションなしに更新、削除、挿入、upsert を実行する | `InvalidDataAccessApiUsageException`（Java でテスト済み）。JPA の `TransactionRequiredException` から Spring が作ります。リポジトリのメソッドの外（`QueryBuilder` の Bean）では JPA の `TransactionRequiredException` |
+| `findOne` が 2 行以上に一致する | JPA の `NonUniqueResultException` ではなく、`IncorrectResultSizeDataAccessException`（Spring） |
+| `deleteOne` や `updateOne` が 2 行以上に一致する | `IncorrectResultSizeDataAccessException`。何も変更されません |
+| Spring の `Sort` に知らないプロパティがある | `PropertyReferenceException` |
+| Spring の `Sort` で `ignoreCase()` を使う | `UnsupportedOperationException` |
+| `STRICT` モードで、ソートポリシーが許可しないソートの名前（[12.5](#sort-policy-with-spring)） | `SortNotAllowedException`（`LQL-4040`）。変換されません |
+| リポジトリの呼び出し（短縮メソッド、または本体を持つメソッドの中の `execute()`）で、トランザクションなしに更新、削除、挿入、upsert を実行する | `InvalidDataAccessApiUsageException`。JPA の `TransactionRequiredException` から Spring が作ります。リポジトリのメソッドの外（`QueryBuilder` の Bean）では JPA の `TransactionRequiredException` |
 | ルールに違反する代入のラムダ（U1、U3、U4、U6） | `LambdaQLException`（例: `TranslationException`、`LQL-3042`）。変換されません（[7.8](07-dml.md#rules-checked-at-analysis-time) を参照） |
 
 `QueryBuilder` の Bean（12.8）はリポジトリではないので、Spring はそのエラーを変換しません。そこでは、2 行以上に一致する `one()` と `executeOne()` は `NonUniqueResultException` を投げます。
@@ -457,7 +457,7 @@ class SortErrorHandler {
 <a id="127-other-fragments-and-jpaspecificationexecutor"></a>
 ## 12.7 ほかのフラグメントと `JpaSpecificationExecutor`
 
-`LambdaQlExecutor<T>` は数あるフラグメントの 1 つです。Java のテストのリポジトリは、次のものをすべて同時に使っています（Java でテスト済み、`ExecutorTest`）。
+`LambdaQlExecutor<T>` は数あるフラグメントの 1 つです。Java のテストのリポジトリは、次のものをすべて同時に使っています（`ExecutorTest`）。
 
 | 一緒に使うもの | 動くか | 説明 |
 |---|---|---|

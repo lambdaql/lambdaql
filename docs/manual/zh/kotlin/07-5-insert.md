@@ -28,7 +28,7 @@ insert into archive(id,price,customer_name)
 values (100,9.5,'Kim')
 ```
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `insert-delete`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `insert-delete`：
 
 ```kotlin
 val i = qb.insert(Archive::class.java).values { it.id = 100L; it.price = 9.5; it.customerName = "Kim" }
@@ -54,7 +54,7 @@ qb.insert(Order::class.java).values { o -> value(o.id, id); value(o.status, 1) }
 使用 `values { a, sub -> ... }` 这样带两个参数的 Lambda 时，可以用第二个参数 `sub` 构造子查询（决策 D49）。
 upsert 的 `values { a, sub -> ... }` 和 `onConflict { ... }.update { a, sub -> ... }` 也一样（见 [7.6](07-6-upsert.md#your-own-change-onconflictkeyupdate)）。
 
-**(已测试)** [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `insert-values-sub`：
+[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `insert-values-sub`：
 
 ```kotlin
 // values { a, sub -> ... }: a subquery can read captured values, not the new row (D49)

@@ -18,7 +18,7 @@ Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../
 - [10.6 Database differences](#106-database-differences)
 - [10.7 Not supported, and what to write instead](#107-not-supported-and-what-to-write-instead)
 - [10.8 Caching: a lambda is analyzed once](#108-caching-a-lambda-is-analyzed-once)
-- [10.9 Tested environment](#109-tested-environment)
+- [10.9 Tested environment]
 
 How to read the examples:
 
@@ -162,7 +162,7 @@ See [8. Procedures and DB functions](08-procedures-functions.md).
 | `x == null`, `x != null` | `is null`, `is not null` | 2-valued |
 | `o.getCnt() >= 2.5` (integer column, decimal value) | compares the value as written: a constant is a literal (`e0.cnt >= 2.5`), a captured value and an IN list are also decimal literals (`e0.cnt >= 2.5BD`, `in (2.5BD, 3.0BD)`, D48 B8) | the index range scan stays (measured on MariaDB). The value is no longer cut, which returned wrong rows before |
 | A whole value object (`@Embedded`): `o.getAddress().equals(addr)`, `Objects.equals(o.getAddress(), addr)`, `!o.getAddress().equals(addr)` | expanded per column: `e0.address.city = :p1 and e0.address.zip = :p2`, the negation is `<> ... or ...`. `== null` is `is null` on every column (and), `!= null` is `is not null` (or) | SQL meaning per column (D48): a NULL column matches neither `=` nor `<>`. A captured object that is `null`: no matching row (`LQL-4045` at `WARN` level) |
-| `o.getId() == null` on a column that can never be NULL (the id, a primitive, `nullable = false`, no association step on the path) | `1=0`. Next to a compare, the check is dropped: `o.getId() != null && o.getId() == id` gives `e0.id = :p1` (tested) | The column has no NULL. A path through an association (`o.getCustomer().getId()`) keeps the check |
+| `o.getId() == null` on a column that can never be NULL (the id, a primitive, `nullable = false`, no association step on the path) | `1=0`. Next to a compare, the check is dropped: `o.getId() != null && o.getId() == id` gives `e0.id = :p1` | The column has no NULL. A path through an association (`o.getCustomer().getId()`) keeps the check |
 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL 3-valued logic |
 | `o.getCustomer().getName()` in `where` | `j1.name` + `join e0.customer j1` (inner join by default) | No customer: the order is not selected |
 | `o.getCustomer() == null \|\| o.getCustomer().getName().equals(p)` | `e0.customer is null or j1.name = :p1` + `join e0.customer j1` | No customer: **not** selected (inner join, D48; `LQL-5009` at `DEBUG` level). Use `leftJoin` to keep them |
@@ -254,7 +254,7 @@ More differences:
 | String length | UTF-16 units | H2 UTF-16 units, MariaDB code points | Documented |
 | String concatenation with NULL | `"null"` text | NULL (Oracle: `NULL \|\| 'x'` is `'x'`) | String concatenation is planned, not in v0.1 |
 | `LocalDateTime.now()` in a lambda | App time | – | Bound as **app time**. DB time (`current_timestamp`) is not supported |
-| Equal elements in a `Set` | `equals` / `hashCode` decide | The primary key tells rows apart | `toSet()` and `findSet()` throw `IllegalStateException` if the set is smaller than the number of rows (the entity's `equals` / `hashCode` treats different rows as equal, or its `@Id` is not unique, for example a view). Use `toList()` (D42, tested) |
+| Equal elements in a `Set` | `equals` / `hashCode` decide | The primary key tells rows apart | `toSet()` and `findSet()` throw `IllegalStateException` if the set is smaller than the number of rows (the entity's `equals` / `hashCode` treats different rows as equal, or its `@Id` is not unique, for example a view). Use `toList()` (D42) |
 
 <a id="106-database-differences"></a>
 ## 10.6 Database differences
@@ -310,12 +310,12 @@ needed there. Only Oracle gets a `NULLS` clause. To change the NULL position, us
 | Item | What happens | lambdaQL |
 |---|---|---|
 | `SET a = ..., b = a + 1` (read a column after you set it) | MariaDB reads the **new** value, H2 and Oracle read the old value | Error at analysis time (U3) |
-| Association path in DML (`o.getCustomer().getName()`) | Hibernate makes different joins per DB and **loses rows** with no customer | lambdaQL writes a correlated scalar subquery (in `where` and in SET). In `where`, a path that a select would inner join also gets `customer.id is not null`. So the DML changes the same rows as the query (U9, tested) |
+| Association path in DML (`o.getCustomer().getName()`) | Hibernate makes different joins per DB and **loses rows** with no customer | lambdaQL writes a correlated scalar subquery (in `where` and in SET). In `where`, a path that a select would inner join also gets `customer.id is not null`. So the DML changes the same rows as the query (U9) |
 | `DELETE` with a subquery on the same table | MariaDB error 1093 | The target ids are read first through a derived table: `d0.id in (select t.id from (select e0.id as id … where <condition>) t)` (U17). This works with correlated subqueries too, and it deletes the same rows on the three DBs (measured). `update` is not wrapped (it works on MariaDB too) |
 | The same enum value bound once for a STRING and an ORDINAL column | H2 and MariaDB store a **wrong value without error** | One parameter per place, never shared (U7) |
 | Many rows in `values(list, ...)` | Oracle: hard limit of 65,535 binds (ORA-01745), very slow long before that | Split into statements of at most 500 values, and all statements run in one transaction (U13) |
-| `update` / `delete` with `order by ... limit` | MariaDB rejects `limit` in an `in` subquery (error 1235) and a subquery that reads the target table (error 1093) | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: the derived table `t` works on all three databases. The inner select uses the joins of the query (D36), so it targets the same rows as the query (tested) |
-| `on conflict` / upsert | H2 and Oracle: `merge`. MariaDB: `insert ... on duplicate key update`, and an updated row counts as 2. Hibernate's `do nothing` fails on H2 and Oracle | `upsert` and `onConflict(...).update(...)` use Hibernate's form. `ignore()` is written as `insert ... select ... where not exists`. The row count is returned as it is (D40, tested) |
+| `update` / `delete` with `order by ... limit` | MariaDB rejects `limit` in an `in` subquery (error 1235) and a subquery that reads the target table (error 1093) | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: the derived table `t` works on all three databases. The inner select uses the joins of the query (D36), so it targets the same rows as the query |
+| `on conflict` / upsert | H2 and Oracle: `merge`. MariaDB: `insert ... on duplicate key update`, and an updated row counts as 2. Hibernate's `do nothing` fails on H2 and Oracle | `upsert` and `onConflict(...).update(...)` use Hibernate's form. `ignore()` is written as `insert ... select ... where not exists`. The row count is returned as it is (D40) |
 
 <a id="procedures-and-functions"></a>
 ### Procedures and functions
@@ -433,7 +433,7 @@ lambdaQL throws a clear error for every form in this list. "Planned" means a lat
 | An atomic `onConflict(...).ignore()` under concurrent inserts | Handle the duplicate key error (`ignore()` uses `not exists`, see [7.6](07-6-upsert.md)) |
 | Upsert from `insert ... select` | Upsert row by row with `values(list, ...)` |
 | `orderBy(...)` on update or delete without `limit(n)` | Add `limit(n)`, or remove `orderBy` (`IllegalStateException` otherwise) |
-| An update or delete that must change one row, checked with `execute() == 1` and a rollback | `executeOne()`: it reads the ids first (at most 2). With 2 it changes nothing and throws `NonUniqueResultException`. With 1 it changes that row by `id = :p and (condition)`. It never changes more than one row (D41, tested) |
+| An update or delete that must change one row, checked with `execute() == 1` and a rollback | `executeOne()`: it reads the ids first (at most 2). With 2 it changes nothing and throws `NonUniqueResultException`. With 1 it changes that row by `id = :p and (condition)`. It never changes more than one row (D41) |
 | `executeOne()` together with `orderBy` or `limit` | Use only one of them (`IllegalStateException` otherwise) |
 | `offset` on update or delete | Not planned (D42). DML has only `limit(n)`. Choose the target rows with `where`, `orderBy(...)` and `limit(n)` |
 | `limit` or `executeOne()` on an entity with a composite key | Not supported yet. Query the ids first, then `delete ... where ids.contains(id)` |

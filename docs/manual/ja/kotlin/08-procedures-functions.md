@@ -105,8 +105,8 @@ qb.exec(OrderProcs::class.java) { it.purge(30) }.execute()
 
 その他の点:
 
-- OUT パラメーターを持つプロシージャに `exec` を使うとエラーです（`LQL-4037`、Java でテスト済み）。OUT の値をうっかり失うことを防ぎます。
-- `@SqlProcedure` のない関数を呼ぶとエラーです（`LQL-3060`、Java でテスト済み）。
+- OUT パラメーターを持つプロシージャに `exec` を使うとエラーです（`LQL-4037`）。OUT の値をうっかり失うことを防ぎます。
+- `@SqlProcedure` のない関数を呼ぶとエラーです（`LQL-3060`）。
 - スタブ関数の **デフォルト引数**（`fun calc(id: Long, rate: Double = 1.0)`）を使う呼び出しはエラーです（`LQL-3062`、ルール PR11）。Kotlin は DB のデフォルト値ではなく Kotlin のデフォルト値を入れてしまうからです。
 - パラメーターに対するデータベースのデフォルト値は使えません。すべての IN パラメーターを渡してください。
 - IN の値に `null` を使っても構いません。
@@ -154,7 +154,7 @@ val a = qb.call(OrderProcs::class.java) { it.adjust(id, 100) }.execute()
 | `T` が | lambdaQL の読み方 |
 |---|---|
 | エンティティ | Hibernate の結果クラス（`StoredProcedureQuery`） |
-| Kotlin の data class または Java の record | JDBC の `CallableStatement`。カラムは **ラベルで** 対応付けます。`_` を取り除き、大文字と小文字を区別しないので、`customer_id` は `customerId` に対応します（Java では record でテスト済み） |
+| Kotlin の data class または Java の record | JDBC の `CallableStatement`。カラムは **ラベルで** 対応付けます。`_` を取り除き、大文字と小文字を区別しないので、`customer_id` は `customerId` に対応します |
 | 値 1 つ（`Long?`、`String?`、...） | 各行の最初のカラム |
 
 通常のクラスはここでは行の型として使えません。data class を使ってください。
@@ -201,12 +201,12 @@ Kotlin の名前付き引数（`calc(rate = rate, id = id)`）を使っても、
 | 確認項目 | 検出するか |
 |---|---|
 | プロシージャの存在 | はい、エラー `LQL-4035` |
-| IN・INOUT のパラメーターの数 = スタブの引数の数 | はい、エラー `LQL-4036`（Java でテスト済み） |
+| IN・INOUT のパラメーターの数 = スタブの引数の数 | はい、エラー `LQL-4036` |
 | INOUT のパラメーター = `@InOut` を付けた引数 | はい、エラー `LQL-4036` |
 | OUT の値と結果セットの数 = 戻り値の型の構成要素の数 | はい、エラー `LQL-4038` |
-| 型の種類（数値、文字、日付・時刻、真偽値、バイナリ） | はい、エラー `LQL-4036`（Java でテスト済み）。同じ種類の中の違いは照合しない（下の「引数の型の照合」を参照） |
-| 同じパラメーター名が別の順序で並ぶ | はい、エラー `LQL-4043`（Java でテスト済み）。スタブの引数名が分かるときだけ（下を参照） |
-| Oracle パッケージのプロシージャ名に複数のオーバーロードがある | はい、エラー `LQL-4044`（Oracle で Java によりテスト済み） |
+| 型の種類（数値、文字、日付・時刻、真偽値、バイナリ） | はい、エラー `LQL-4036`。同じ種類の中の違いは照合しない（下の「引数の型の照合」を参照） |
+| 同じパラメーター名が別の順序で並ぶ | はい、エラー `LQL-4043`。スタブの引数名が分かるときだけ（下を参照） |
+| Oracle パッケージのプロシージャ名に複数のオーバーロードがある | はい、エラー `LQL-4044` |
 
 危険なケースの例:
 
@@ -293,17 +293,17 @@ Oracle での実際の名前によるバインド（`pass_procedure_paramater_na
 | # | ルール | 状況 |
 |---|---|---|
 | PR1 | 名前: アノテーションの値をそのまま使う。値が空の場合は関数名を UPPER_SNAKE にしたもの。パッケージ名やスキーマ名（`SQ_PKG.CALC`、`LQL.SQ_CALC`）も使える。混乱を避けるために `@SqlProcedure(schema = ..., pkg = ..., value = ...)` と書くこともできる。 | 実装済み。スキーマ名とパッケージ名はテストで確認していません |
-| PR2 | 引数は **位置で** バインドされる。最初の呼び出しで、IN/INOUT のパラメーターの数と `@InOut` の位置を DB のメタデータと照合する。名前が分かれば名前も照合し、同じ名前が別の順序ならエラー。引数の型の種類（数値、文字、日付・時刻、真偽値、バイナリ）も照合し、違えばエラー（`LQL-4036`）（[8.4](#84-warning-argument-order) を参照）。メタデータを読めない場合は、チェックを省き、引数の並びをスタブから取る（[8.4](#when-the-metadata-cannot-be-read) を参照）。 | 数、`@InOut`、名前の照合は実装済み（Java でテスト済み）。Oracle パッケージのオーバーロードの検出も実装済み（Oracle でテスト済み）。型の照合も実装済み（Java でテスト済み）。メタデータなしの代わりの動作（`LQL-5005`、`LQL-5006`）は実装済み（MariaDB、Oracle で Java によりテスト済み）。 |
-| PR3 | OUT 1 つ → 戻り値。OUT/INOUT が複数 → data class または record。`@InOut` は INOUT パラメーターを示す。 | 実装済み（Java でテスト済み） |
-| PR4 | 結果セット 1 つ → `List<T>`。エンティティは Hibernate で、data class/record はラベルで対応付ける JDBC で読む。ページングなし。 | 実装済み（Java で record によりテスト済み） |
+| PR2 | 引数は **位置で** バインドされる。最初の呼び出しで、IN/INOUT のパラメーターの数と `@InOut` の位置を DB のメタデータと照合する。名前が分かれば名前も照合し、同じ名前が別の順序ならエラー。引数の型の種類（数値、文字、日付・時刻、真偽値、バイナリ）も照合し、違えばエラー（`LQL-4036`）（[8.4](#84-warning-argument-order) を参照）。メタデータを読めない場合は、チェックを省き、引数の並びをスタブから取る（[8.4](#when-the-metadata-cannot-be-read) を参照）。 | 数、`@InOut`、名前の照合は実装済み。Oracle パッケージのオーバーロードの検出も実装済み。型の照合も実装済み。メタデータなしの代わりの動作（`LQL-5005`、`LQL-5006`）は実装済み（MariaDB）。 |
+| PR3 | OUT 1 つ → 戻り値。OUT/INOUT が複数 → data class または record。`@InOut` は INOUT パラメーターを示す。 | 実装済み |
+| PR4 | 結果セット 1 つ → `List<T>`。エンティティは Hibernate で、data class/record はラベルで対応付ける JDBC で読む。ページングなし。 | 実装済み |
 | PR5 | 複数の結果セット → data class の `List` プロパティに順番どおり。Oracle の暗黙の結果はサポートしない。 | 実装済み、テストでは確認していません |
-| PR6 | 単独で呼び出す DB 関数は、データベースごとに異なる経路を使う（[8.8](#88-call-a-db-function-alone) を参照）。 | 実装済み（Java でテスト済み） |
-| PR7 | クエリの中の DB 関数: [8.6](#86-declare-db-functions) とルール FN1 から FN11 を参照。 | 実装済み（Java でテスト済み） |
-| PR8 | 条件の中でカラムに DB 関数を適用すると、インデックスが使えないため WARN を出す（[8.9](#89-warning-functions-on-columns-and-indexes-sargable) を参照）。コードは `LQL-5001`。 | 実装済み（Java のラムダでテスト済み）。`SargableMode.STRICT` ではエラー（`LQL-3066`、D50） |
+| PR6 | 単独で呼び出す DB 関数は、データベースごとに異なる経路を使う（[8.8](#88-call-a-db-function-alone) を参照）。 | 実装済み |
+| PR7 | クエリの中の DB 関数: [8.6](#86-declare-db-functions) とルール FN1 から FN11 を参照。 | 実装済み |
+| PR8 | 条件の中でカラムに DB 関数を適用すると、インデックスが使えないため WARN を出す（[8.9](#89-warning-functions-on-columns-and-indexes-sargable) を参照）。コードは `LQL-5001`。 | 実装済み。`SargableMode.STRICT` ではエラー（`LQL-3066`、D50） |
 | PR9 | プロシージャは呼び出し元のトランザクションの中で実行される。lambdaQL は必要なときに呼び出しの前にフラッシュする。呼び出しのあと、読み込み済みのエンティティが古い状態になっていることがある。 | 実装済み |
 | PR10 | 共通の影響行数はない。OUT パラメーターを使う。 | – |
 | PR11 | IN の値に `null` を使える。DB のパラメーターのデフォルト値は使えない。スタブ関数の Kotlin のデフォルト引数はエラー（`LQL-3062`）。 | 実装済み |
-| PR12 | ラムダはスタブの呼び出し 1 つ。引数はキャプチャ値、定数、またはそれらの計算。名前付き引数は単純な値だけ。OUT パラメーターがあるときに `exec` を使うとエラー。 | 実装済み（Java でテスト済み）。名前付き引数はテストで確認していません |
+| PR12 | ラムダはスタブの呼び出し 1 つ。引数はキャプチャ値、定数、またはそれらの計算。名前付き引数は単純な値だけ。OUT パラメーターがあるときに `exec` を使うとエラー。 | 実装済み。名前付き引数はテストで確認していません |
 | PR13 | null を許容しない `Long`/`Double` も、null 許容の `Long?`/`Double?` も使える。Boolean のパラメーターは MariaDB と Oracle 23ai 以降で使える。 | テストでは確認していません |
 | PR14 | 各ラムダは 1 回だけ解析される。プロシージャのメタデータは名前ごとに 1 回だけ読む。 | 実装済み |
 | PR15 | H2 には OUT、INOUT、複数の結果セット、パッケージがない。プロシージャは MariaDB か Oracle でテストしてください（たとえば Testcontainers を使って）。 | lambdaQL のテストもこの方式に従っています |
@@ -349,7 +349,7 @@ lambdaQL は `companion object` の関数に付いたアノテーションを読
 |---|---|
 | インターフェースの `companion object` + `@JvmStatic` | **推奨**（実装済み、まだテストでは確認していません） |
 | Kotlin の `object` + `@JvmStatic` | 設計済み、テストでは確認していません |
-| Java インターフェースの static メソッド（Kotlin から呼び出す） | サポート（Java の形はテスト済み） |
+| Java インターフェースの static メソッド（Kotlin から呼び出す） | サポート |
 | Kotlin のトップレベル関数 | 設計済み、**非推奨**: import を忘れると、同じ名前の標準ライブラリ関数（たとえば `maxOf`）が黙って使われることがあります |
 | インターフェースの default 関数 + シングルトンの定数 | 設計済み、テストでは確認していません |
 | リポジトリが関数インターフェースを実装する（ミックスイン） | 拒否 |
@@ -365,7 +365,7 @@ lambdaQL は `companion object` の関数に付いたアノテーションを読
 ## 8.7 クエリでの DB 関数の使用
 
 関数を直接呼び出してください。コンテキストの引数は必要ありません。
-`where`、`select`、`orderBy`、`set` で使えます（[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java) で Java のラムダによりテスト済み）。`groupBy`、`having`、サブクエリでも使えるように設計しましたが、テストでは確認していません。
+`where`、`select`、`orderBy`、`set` で使えます。`groupBy`、`having`、サブクエリでも使えるように設計しましたが、テストでは確認していません。
 
 ```kotlin
 qb.from(Order::class.java).where { OrderFns.discount(it.price)!! > 10 }.toList()
@@ -561,13 +561,13 @@ persistence unit ごとに `SargablePolicy.register(emf, SargableMode.STRICT)` �
 | # | ルール | 状況 |
 |---|---|---|
 | FN1 | `@SqlFunction` は関数のアノテーション。値が空の場合は関数名を UPPER_SNAKE にしたもの。 | 実装済み |
-| FN2 | lambdaQL は呼び出された関数を見つけ、そのアノテーションを読む。Kotlin では `Companion` のレシーバーを読み飛ばす。本体は例外を投げるだけでなければならない（`= throw ...`）。アプリケーションとデータベースで異なる値になる可能性があるため、本当の本体を持つ関数はエラー（`LQL-3052`）。 | 実装済み（Java でテスト済み） |
+| FN2 | lambdaQL は呼び出された関数を見つけ、そのアノテーションを読む。Kotlin では `Companion` のレシーバーを読み飛ばす。本体は例外を投げるだけでなければならない（`= throw ...`）。アプリケーションとデータベースで異なる値になる可能性があるため、本当の本体を持つ関数はエラー（`LQL-3052`）。 | 実装済み |
 | FN3 | 同じ名前のオーバーロードは、すべて同じ DB 関数に対応しなければならない。そうでなければエラー（`LQL-3053`）。（Kotlin の `Double?` の引数は `Double?` のオーバーロードを選ぶ。Kotlin から見た Java のエンティティの getter は、プリミティブの `double` のオーバーロードを選ぶことがある。） | 実装済み |
 | FN4 | アノテーションのない呼び出しや、lambdaQL が特定できない呼び出しはエラー。黙って読み飛ばすことはない。 | 実装済み |
-| FN5 | 引数は [3. 条件](03-where.md) の値のルールに従う。キャプチャ値だけで作った引数でも、バインドされて **データベースで** 評価される。 | 実装済み（Java でテスト済み） |
-| FN6 | `!!` とボクシングの呼び出しは読み飛ばす。戻り値の型は宣言された関数から決まる。`Double`、`Integer`、`Long`、`BigDecimal`、`String`、`LocalDate`、`LocalDateTime`、`Boolean` のいずれかに対応しなければならない（`LQL-3055`）。 | 実装済み（Java でテスト済み） |
-| FN7 | カラムに適用した関数は WARN を出す（[8.9](#89-warning-functions-on-columns-and-indexes-sargable) を参照）。MariaDB では、値の側の `NOT DETERMINISTIC` な関数も WARN（`LQL-5007`）。 | 実装済み（Java のラムダでテスト済み）。`SargableMode.STRICT` ではエラー（`LQL-3066`、D50） |
-| FN8 | Hibernate の組み込み関数（`COALESCE`、`ROUND`、`SYSDATE`、...）と同じ名前はエラー（`LQL-3054`）。Hibernate が黙って組み込み関数を使うため。接頭辞かスキーマ名（`PUBLIC.SQ_FN`）を使う。 | 実装済み（Java でテスト済み） |
+| FN5 | 引数は [3. 条件](03-where.md) の値のルールに従う。キャプチャ値だけで作った引数でも、バインドされて **データベースで** 評価される。 | 実装済み |
+| FN6 | `!!` とボクシングの呼び出しは読み飛ばす。戻り値の型は宣言された関数から決まる。`Double`、`Integer`、`Long`、`BigDecimal`、`String`、`LocalDate`、`LocalDateTime`、`Boolean` のいずれかに対応しなければならない（`LQL-3055`）。 | 実装済み |
+| FN7 | カラムに適用した関数は WARN を出す（[8.9](#89-warning-functions-on-columns-and-indexes-sargable) を参照）。MariaDB では、値の側の `NOT DETERMINISTIC` な関数も WARN（`LQL-5007`）。 | 実装済み。`SargableMode.STRICT` ではエラー（`LQL-3066`、D50） |
+| FN8 | Hibernate の組み込み関数（`COALESCE`、`ROUND`、`SYSDATE`、...）と同じ名前はエラー（`LQL-3054`）。Hibernate が黙って組み込み関数を使うため。接頭辞かスキーマ名（`PUBLIC.SQ_FN`）を使う。 | 実装済み |
 | FN9 | Kotlin: デフォルト引数（`LQL-3056`）、`vararg`（`LQL-3057`）、`inline` はエラー。 | デフォルト引数と `vararg` は実装済み。`inline` は設計済み |
 | FN10 | v0.1 はスカラー関数だけをサポート。ユーザー定義の集約関数とウィンドウ関数は v0.2 の予定。引数のない関数は `fn()` として出力される。 | スカラー関数は実装済み |
 | FN11 | 既知の DB の違い: MariaDB では、VARCHAR を返す関数が文字列リテラルと照合順序の衝突を起こすことがある。`BigDecimal` の結果のスケールが異なる（MariaDB と Oracle は 0、H2 は 1）。Boolean の結果には Oracle 23ai 以降が必要。 | プロトタイプで実測 |
@@ -587,9 +587,9 @@ persistence unit ごとに `SargablePolicy.register(emf, SargableMode.STRICT)` �
 | 複数の結果セット | いいえ | はい | はい（複数のカーソル OUT パラメーター） |
 | OUT の値と結果セットの組み合わせ | いいえ | はい | はい |
 | パッケージ名（`PKG.PROC`） | いいえ | いいえ（`sql_mode=ORACLE` が必要） | はい |
-| クエリの中の DB 関数 | はい（テスト済み） | はい（テスト済み） | はい（テスト済み） |
-| DB 関数の単独呼び出し | はい（テスト済み） | はい（テスト済み） | はい（テスト済み） |
-| lambdaQL でのプロシージャ呼び出し | – | はい（テスト済み） | はい（テスト済み） |
+| クエリの中の DB 関数 | はい | はい | はい |
+| DB 関数の単独呼び出し | はい | はい | はい |
+| lambdaQL でのプロシージャ呼び出し | – | はい | はい |
 | Boolean のパラメーター / 結果 | – | はい | はい（23ai 以降） |
 
 v0.1 では予定していないもの: 動的なプロシージャ名のための文字列ビルダー（v0.2 の候補）、Oracle パッケージのプロシージャのオーバーロードを 1 つ選んで呼ぶ機能（オーバーロードの検出は実装済み、`LQL-4044`）、テーブル値関数、プロシージャの結果のページング。

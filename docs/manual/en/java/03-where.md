@@ -50,7 +50,7 @@ List<Order> list = qb.from(Order.class)
 
 **About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 7.4, and it fails if Hibernate's SQL changes.
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `to-hql`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `to-hql`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -59,12 +59,12 @@ from orders o1_0
 where o1_0.status=1 and o1_0.price>100.0
 ```
 
-Examples marked **(tested)** are copied from [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java).
+Examples are copied from [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java).
 The test checks the HQL, runs the queries and compares the rows with the result of the same filter in Java. It passes on H2, MariaDB and Oracle.
 The test entity is a little different from 3.2: `price` is `double`, `status` is `short`, `Customer.id` is `int`, and `Order` has an enum `kind` (`Order.Kind`: `NORMAL`, `RUSH`).
 
 `toHql()` returns the HQL and the parameters without running the query.
-**(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `to-hql`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `to-hql`:
 
 ```java
 RenderedQuery q = qb.from(Order.class)
@@ -83,7 +83,7 @@ assertEquals("select e0 from Order e0 where e0.status = 1 and e0.price > :p1", q
 assertEquals(Map.of("p1", 100.0), q2.parameters());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `to-hql`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `to-hql`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -92,7 +92,7 @@ from orders o1_0
 where o1_0.status=1 and o1_0.price>100.0
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `to-hql#2`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `to-hql#2`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -102,7 +102,7 @@ where o1_0.status=1 and o1_0.price>?
 ```
 
 You can call `where()` more than once. The conditions are joined with `AND`.
-**(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `where-many`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `where-many`:
 
 ```java
 RenderedQuery q = qb.from(Order.class)
@@ -112,7 +112,7 @@ RenderedQuery q = qb.from(Order.class)
 assertEquals("select e0 from Order e0 where (e0.status = 1 or e0.status = 3) and e0.active = true", q.hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `where-many`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `where-many`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -137,14 +137,14 @@ A method reference works too. `where(Order::isActive)` is the same as `where(o -
 - There is one exception. A decimal captured value that is compared with an integer column is written as a decimal literal (`2.5BD`) (see "An integer column and a decimal value" in [3.4](#34-comparisons)). Only the value converted to a number is written, so there is no SQL injection risk.
 
 An enum constant is written with its full class name.
-**(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `enum`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `enum`:
 
 ```java
 RenderedQuery q = qb.from(Order.class).where(o -> o.getKind() == Order.Kind.RUSH).toHql();
 assertEquals("select e0 from Order e0 where e0.kind = org.lambdaql.query.Order$Kind.RUSH", q.hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `enum`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `enum`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -190,7 +190,7 @@ lambdaQL does not change the comparison to an integer comparison (`>= 3`). The S
 The results are correct on H2, MariaDB 10.11 and Oracle 23.26 (measured). On all three databases the SQL keeps the column as it is and compares it with a decimal, like `cnt>=2.5` and `cnt in (2.5,3.0)`.
 MariaDB's `EXPLAIN` shows an index range scan (`type=range`). On Oracle no conversion is put on the column, so the index can be used. With an index hint the plan is `INDEX RANGE SCAN`. Without a hint, on a 3000-row table Oracle chooses a full scan, the same as for a whole-number literal (`cnt >= 99`) (all measured).
 
-**(tested)** [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java), region `whole-number`:
+[`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java), region `whole-number`:
 
 ```java
 // cnt is a whole number; 2.5 is compared as written (it is never cut to 2): a decimal literal
@@ -300,7 +300,7 @@ To find rows where status is NULL, write the null check. `o.getStatus() == null`
 The column is not wrapped in a function, so the database can use an index.
 
 lambdaQL binds a captured value when the query runs. `null` is bound as NULL, and no row can match, so lambdaQL logs `LQL-4045` at `WARN` level.
-**(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `null-safe`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `null-safe`:
 
 ```java
 // the SQL meaning (D48): = NULL matches no row; lambdaQL logs LQL-4045 at WARN when it runs with a null
@@ -316,7 +316,7 @@ RenderedQuery q2 = qb.from(Order.class).where(o -> Objects.equals(o.getDescripti
 assertEquals("select e0 from Order e0 where e0.description = :p1", q2.hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `null-safe`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `null-safe`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -325,7 +325,7 @@ from orders o1_0
 where o1_0.description=?
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `null-safe#2`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `null-safe#2`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -348,7 +348,7 @@ Kotlin's `it.id == id` with a `Long?` id compiles to the same bytecode, so the K
 
 The rule applies only when the path has **no association step**. Some orders have no customer, so `o.getCustomer().getId()` can be NULL, and the null check on this path stays.
 
-**(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `never-null`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `never-null`:
 
 ```java
 // the id can never be NULL, so the null check is dropped (this is what Kotlin's it.id == id compiles to)
@@ -388,7 +388,7 @@ assertEquals("select e0 from Order e0 where e0.customer.id is null",
 In Java, `!text.equals(null)` is true and `Objects.equals(null, null)` is true, so Java would return such rows.
 When this difference can happen, lambdaQL logs `LQL-5009` at `DEBUG` level, once per condition. To keep the NULL rows, write the null check in the lambda.
 
-**(tested)** [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java), region `sql-meaning` (H2, MariaDB and Oracle. The rows are the description/custName pairs `a/a`, `a/b`, `null/a`, `null/null`, `b/null`, and `text` is `"a"`):
+[`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java), region `sql-meaning` (H2, MariaDB and Oracle. The rows are the description/custName pairs `a/a`, `a/b`, `null/a`, `null/null`, `b/null`, and `text` is `"a"`):
 
 ```java
 // two entity values: = and <> as in SQL; a row with a NULL on either side matches neither
@@ -430,7 +430,7 @@ javac's automatic unboxing and the hand-written call are the same bytecode, so l
 To find NULL rows, write `x == null`.
 
 **Skipping a filter with a null guard.** If the same captured value is checked for null, the condition disappears with no filter when the value is null.
-**(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `captured-null-guard`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `captured-null-guard`:
 
 ```java
 Double min = null;                                       // for example an empty search field
@@ -444,7 +444,7 @@ assertEquals("select e0 from Order e0 where e0.price > :p1", q2.hql());
 assertEquals(Map.of("p1", 100.0), q2.parameters());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `captured-null-guard`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `captured-null-guard`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -452,7 +452,7 @@ select …
 from orders o1_0
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `captured-null-guard#2`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `captured-null-guard#2`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -478,7 +478,7 @@ An attribute with a JPA `AttributeConverter` is compared with its Java value. Hi
 
 So a condition written with Java values finds the stored rows (checked on H2, MariaDB and Oracle).
 
-**(tested)** [`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java), region `convert`:
+[`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java), region `convert`:
 
 ```java
 // code is stored reversed ("abc" as "cba"); vip is stored as 'Y'/'N' (YesNoConverter)
@@ -501,7 +501,7 @@ The rows with `getActive()` are for a nullable `Boolean` column.
 | `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | **not returned** (SQL meaning, D48. Java would return them) |
 | `!o.getActive()` (nullable `Boolean`) | `e0.active = false` | **not returned** (SQL meaning: NULL is not false) |
 
-**(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `boolean`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `boolean`:
 
 ```java
 assertEquals("select e0 from Order e0 where e0.active = true",
@@ -510,7 +510,7 @@ assertEquals("select e0 from Order e0 where e0.active = false",       // primiti
         qb.from(Order.class).where(o -> !o.isActive()).toHql().hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `boolean`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `boolean`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -519,7 +519,7 @@ from orders o1_0
 where o1_0.active=true
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `boolean#2`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `boolean#2`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -555,14 +555,14 @@ If the two sides share the same condition (for example `o.isActive() == o.isActi
 - `==` on two strings is a value compare, not an identity compare (rule R2). See [9.4](09-java-notes.md#94-strings).
 - A string constant in the lambda is written as a literal. A quote is escaped (`''`).
 
-**(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `string-literal`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `string-literal`:
 
 ```java
 RenderedQuery q = qb.from(Order.class).where(o -> o.getDescription().equals("O'Brien")).toHql();
 assertEquals("select e0 from Order e0 where e0.description = 'O''Brien'", q.hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `string-literal`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `string-literal`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -589,7 +589,7 @@ qb.from(Order.class).where(o -> !ids.contains(o.getId())).toList();
 ```
 
 The collection becomes one bind parameter.
-**(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `in` (the status of the test entity is `short`):
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `in` (the status of the test entity is `short`):
 
 ```java
 List<Short> statuses = List.of((short) 2, (short) 3);
@@ -597,7 +597,7 @@ RenderedQuery q = qb.from(Order.class).where(o -> statuses.contains(o.getStatus(
 assertEquals("select e0 from Order e0 where e0.status in (:p1)", q.hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `in`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `in`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -608,7 +608,7 @@ where o1_0.status in (?,?)
 
 `!contains` gives `not in`. A column that can be NULL also gets a plain `not in` (SQL meaning, decision D48).
 A row whose value is NULL does not match `not in`, and lambdaQL logs `LQL-5009` at `DEBUG` level. Java's `!contains` is true for a NULL value, so to keep such rows, write a null check like `o.getDescription() == null || !descs.contains(o.getDescription())`.
-**(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `not-in`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `not-in`:
 
 ```java
 List<Long> ids = List.of(1L, 2L);
@@ -622,7 +622,7 @@ assertEquals("select e0 from Order e0 where e0.description not in (:p1)",
         qb.from(Order.class).where(o -> !descs.contains(o.getDescription())).toHql().hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `not-in`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `not-in`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -631,7 +631,7 @@ from orders o1_0
 where o1_0.id not in (?,?)
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `not-in#2`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `not-in#2`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -673,7 +673,7 @@ lambdaQL checks each step with the JPA Metamodel.
 - Nested value objects are expanded too.
 - Order comparisons (`<` and so on) and comparisons with another type are still the error `LQL-3012`. Compare the fields.
 
-**(tested)** [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java), region `embedded-compare`:
+[`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java), region `embedded-compare`:
 
 ```java
 // address is @Embedded (city, zip): comparing the whole value object compares each column (D48)
@@ -695,7 +695,7 @@ assertEquals("select e0 from Order e0 where e0.address.city <> :p1 or e0.address
 ```
 
 In `where`, an association path is an **inner join** by default (decision D36).
-**(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `inner-join`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `inner-join`:
 
 ```java
 String name = "Kim";
@@ -703,7 +703,7 @@ RenderedQuery q = qb.from(Order.class).where(o -> o.getCustomer().getName().equa
 assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = :p1", q.hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `inner-join`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `inner-join`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -719,7 +719,7 @@ where c1_0.name=?
 **A null guard does not keep orders without a customer.** A path in `where` is always an inner join (SQL meaning, decision D48).
 So `o.getCustomer() == null || ...` does not match an order without a customer, because that order has no customer row to join. For such a condition, lambdaQL logs `LQL-5009` at `DEBUG` level.
 To keep orders without a customer, use an explicit `leftJoin` (decision D44, see [6.8](06-select-group.md#68-explicit-joins)) and write `c == null || ...`.
-**(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `null-guard`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `null-guard`:
 
 ```java
 String name = "Kim";
@@ -737,7 +737,7 @@ RenderedQuery q2 = qb.from(Order.class)
 assertEquals("select e0 from Order e0 join e0.customer j1 where e0.customer is not null and j1.name = :p1", q2.hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `null-guard`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `null-guard`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -747,7 +747,7 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is null or c1_0.name=?
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `null-guard#2`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `null-guard#2`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -762,14 +762,14 @@ Hibernate writes `e0.customer is null` as `c1_0.id is null`. After the inner joi
 - The same holds for other parts of an `||`. `o.getStatus() == 1 || o.getCustomer().getName().equals(name)` also uses an inner join, so an order with status 1 but without a customer is not returned (Java would return it).
 
 To find orders **without** a customer, compare the association itself. This checks the foreign key column, with no join.
-**(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `no-association`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `no-association`:
 
 ```java
 RenderedQuery q = qb.from(Order.class).where(o -> o.getCustomer() == null).toHql();
 assertEquals("select e0 from Order e0 where e0.customer is null", q.hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `no-association`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `no-association`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
@@ -779,14 +779,14 @@ where o1_0.customer_id is null
 ```
 
 A path that ends with the `@Id` of the associated entity is the foreign key column. No join is needed.
-**(tested)** [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `fk-path`:
+[`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java), region `fk-path`:
 
 ```java
 RenderedQuery q = qb.from(Order.class).where(o -> o.getCustomer().getId() == 1).toHql();
 assertEquals("select e0 from Order e0 where e0.customer.id = 1", q.hql());
 ```
 
-**SQL by database (tested)** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `fk-path`:
+**SQL by database** — from `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `fk-path`:
 
 ```sql
 -- H2, MariaDB, Oracle (same)
