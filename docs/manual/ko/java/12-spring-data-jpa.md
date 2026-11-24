@@ -23,11 +23,11 @@ Spring Data JPA에서는 리포지토리 인터페이스를 작성합니다. lam
 <a id="122-modules"></a>
 ## 12.2 모듈
 
-코어는 Spring에 의존하지 않으므로 일반 JPA에서도 사용할 수 있습니다. `lambdaql-core`와 `lambdaql-spring-data-jpa`는 Spring Boot 3·4 공통이고, 스타터만 Spring Boot 버전마다 따로 있습니다(이름 끝 `-boot3`, `-boot4`, [13. Spring Boot 3과 4](../13-spring-boot-versions.md)).
+코어는 Spring에 의존하지 않으므로 일반 JPA에서도 사용할 수 있습니다. `lambdaql`과 `lambdaql-spring-data-jpa`는 Spring Boot 3·4 공통이고, 스타터만 Spring Boot 버전마다 따로 있습니다(이름 끝 `-boot3`, `-boot4`, [13. Spring Boot 3과 4](../13-spring-boot-versions.md)).
 
 | 아티팩트 | 포함 내용 | 필요한 경우 |
 |---|---|---|
-| `lambdaql-core` | 엔진과 `QueryBuilder`. Spring 의존성 없음. Spring Boot 3·4 공통 | 항상. 아래 아티팩트가 함께 가져옴 |
+| `lambdaql` | 엔진과 `QueryBuilder`. Spring 의존성 없음. Spring Boot 3·4 공통 | 항상. 아래 아티팩트가 함께 가져옴 |
 | `lambdaql-spring-data-jpa` | `LambdaQlExecutor<T>`, Spring Data 등록, Spring Boot 자동 구성(`QueryBuilder` 빈). Spring Data JPA 3.5·4.1 공통. Spring Data JPA는 프로젝트의 것을 씀 | Spring Boot 없이 Spring Data JPA를 사용할 때 |
 | `lambdaql-spring-boot-starter-boot4`, `lambdaql-spring-boot-starter-boot3` | 코드 없음. `lambdaql-spring-data-jpa`와 그 Boot 버전의 `spring-boot-starter-data-jpa`를 가져옴 | Spring Boot를 사용할 때(프로젝트의 Boot 버전에 맞춤) |
 
@@ -42,7 +42,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.lambdaql:lambdaql-spring-boot-starter-boot4:1.0.0'
+    implementation 'io.github.lambdaql:lambdaql-spring-boot-starter-boot4:1.0.0'
 }
 ```
 
@@ -50,23 +50,23 @@ Maven:
 
 ```xml
 <dependency>
-  <groupId>org.lambdaql</groupId>
+  <groupId>io.github.lambdaql</groupId>
   <artifactId>lambdaql-spring-boot-starter-boot4</artifactId>
   <version>1.0.0</version>
 </dependency>
 ```
 
-Spring Boot 없이 사용할 때는 기존 Spring Data JPA 구성(Spring Data JPA, Hibernate, JDBC 드라이버)에 `lambdaql-spring-data-jpa`를 추가하십시오. 이 아티팩트는 `lambdaql-core`를 함께 가져오고, Spring Data JPA는 프로젝트에 있는 것(3.5 또는 4.1)을 씁니다.
+Spring Boot 없이 사용할 때는 기존 Spring Data JPA 구성(Spring Data JPA, Hibernate, JDBC 드라이버)에 `lambdaql-spring-data-jpa`를 추가하십시오. 이 아티팩트는 `lambdaql`을 함께 가져오고, Spring Data JPA는 프로젝트에 있는 것(3.5 또는 4.1)을 씁니다.
 
 ```groovy
 dependencies {
-    implementation 'org.lambdaql:lambdaql-spring-data-jpa:1.0.0'
+    implementation 'io.github.lambdaql:lambdaql-spring-data-jpa:1.0.0'
 }
 ```
 
 ```xml
 <dependency>
-  <groupId>org.lambdaql</groupId>
+  <groupId>io.github.lambdaql</groupId>
   <artifactId>lambdaql-spring-data-jpa</artifactId>
   <version>1.0.0</version>
 </dependency>

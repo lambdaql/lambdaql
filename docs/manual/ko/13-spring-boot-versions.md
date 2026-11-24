@@ -6,7 +6,7 @@
 이 페이지는 두 언어 모두를 위한 것입니다.
 
 lambdaQL은 Spring Boot 3(Hibernate 6.6)과 Spring Boot 4(Hibernate 7.4)를 함께 지원합니다.
-코어 `lambdaql-core`와 Spring Data JPA 모듈 `lambdaql-spring-data-jpa`는 두 버전에 공통인 jar입니다. 스타터만 Spring Boot 버전마다 따로 있고, 이름 끝이 `-boot3` 또는 `-boot4`입니다.
+코어 `lambdaql`과 Spring Data JPA 모듈 `lambdaql-spring-data-jpa`는 두 버전에 공통인 jar입니다. 스타터만 Spring Boot 버전마다 따로 있고, 이름 끝이 `-boot3` 또는 `-boot4`입니다.
 두 공통 jar는 Spring Boot 4로 컴파일하며, 같은 jar가 Spring Boot 3 런타임에서도 동작합니다.
 
 <a id="131-versions"></a>
@@ -18,7 +18,7 @@ lambdaQL은 Spring Boot 3(Hibernate 6.6)과 Spring Boot 4(Hibernate 7.4)를 함�
 | Hibernate ORM | 6.6(6.6.53으로 테스트) | 7.4(7.4.13으로 테스트) |
 | Jakarta Persistence | 3.1 | 3.2 |
 | Spring Data JPA | 3.5(3.5.13으로 테스트) | 4.1(4.1.2로 테스트) |
-| 코어 | `lambdaql-core` | `lambdaql-core`(같은 jar) |
+| 코어 | `lambdaql` | `lambdaql`(같은 jar) |
 | Spring Data JPA 모듈 | `lambdaql-spring-data-jpa` | `lambdaql-spring-data-jpa`(같은 jar) |
 | 스타터 | `lambdaql-spring-boot-starter-boot3` | `lambdaql-spring-boot-starter-boot4` |
 | Java | 21 이상 | 21 이상 |
@@ -36,7 +36,7 @@ Spring Boot 4, Gradle(Groovy DSL):
 
 ```groovy
 dependencies {
-    implementation 'org.lambdaql:lambdaql-spring-boot-starter-boot4:1.0.0'
+    implementation 'io.github.lambdaql:lambdaql-spring-boot-starter-boot4:1.0.0'
 }
 ```
 
@@ -44,7 +44,7 @@ Spring Boot 3, Gradle(Kotlin DSL):
 
 ```gradle-kts
 dependencies {
-    implementation("org.lambdaql:lambdaql-spring-boot-starter-boot3:1.0.0")
+    implementation("io.github.lambdaql:lambdaql-spring-boot-starter-boot3:1.0.0")
 }
 ```
 
@@ -52,21 +52,21 @@ Maven:
 
 ```xml
 <dependency>
-  <groupId>org.lambdaql</groupId>
+  <groupId>io.github.lambdaql</groupId>
   <artifactId>lambdaql-spring-boot-starter-boot4</artifactId>
   <version>1.0.0</version>
 </dependency>
 ```
 
 - Spring Boot 없이 Spring Data JPA만 쓰면 `lambdaql-spring-data-jpa`를 추가하십시오. Spring Data JPA 3.5와 4.1 어느 쪽에서도 동작하며, Spring Data JPA는 프로젝트에 있는 것을 씁니다(이 아티팩트가 버전을 바꾸지 않음).
-- Spring 없이 JPA만 쓰면 `lambdaql-core` 하나면 됩니다. Hibernate 6.6과 7.4 어느 쪽에서도 동작합니다.
+- Spring 없이 JPA만 쓰면 `lambdaql` 하나면 됩니다. Hibernate 6.6과 7.4 어느 쪽에서도 동작합니다.
 - 스타터는 프로젝트의 Spring Boot 버전에 맞추십시오. 스타터는 그 버전의 `spring-boot-starter-data-jpa`를 가져오므로, Spring Boot 4 프로젝트에 `-boot3` 스타터를 넣으면 Spring Data와 Hibernate의 버전이 섞일 수 있습니다.
 
 <a id="133-what-is-the-same"></a>
 ## 13.3 같은 것
 
 - API, 람다 표현식 작성 규칙, 오류 코드, 설정(`lambdaql.*` 프로퍼티)이 같습니다.
-- lambdaQL이 만드는 **HQL이 같습니다**. 두 버전이 같은 `lambdaql-core`를 쓰기 때문입니다.
+- lambdaQL이 만드는 **HQL이 같습니다**. 두 버전이 같은 `lambdaql`을 쓰기 때문입니다.
 - 쿼리가 반환하는 **행이 같습니다**. 검증 범위는 13.5에 정리했습니다.
 
 Hibernate가 HQL을 SQL로 바꾸는 방식은 버전마다 조금 다릅니다. 매뉴얼의 DB별 SQL 블록은 Hibernate 7.4의 것입니다. 차이는 13.4에 정리했습니다.

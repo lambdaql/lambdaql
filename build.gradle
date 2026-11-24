@@ -74,7 +74,7 @@ subprojects { subproject ->
     }
 
     // a module can choose its artifact name with lql.artifactName in its gradle.properties
-    // (the "query" folder is published as lambdaql-core, ROADMAP D34)
+    // (the "query" folder is published as lambdaql, ROADMAP D64)
     def artifactName = subproject.findProperty('lql.artifactName') ?: "${rootProject.name}-${project.name}"
 
     plugins.withId('java-library') {
@@ -111,6 +111,30 @@ subprojects { subproject ->
                     }
                     java {
                         withSourcesJar()
+                    }
+                    // the information Maven Central requires in every POM
+                    pom {
+                        name = artifactName
+                        description = subproject.findProperty('lql.description') ?: 'lambdaQL: JPA queries written as Java and Kotlin lambda expressions'
+                        url = 'https://github.com/lambdaql/lambdaql'
+                        licenses {
+                            license {
+                                name = 'The Apache License, Version 2.0'
+                                url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+                            }
+                        }
+                        developers {
+                            developer {
+                                id = 'lambdaql'
+                                name = 'lambdaQL'
+                                organizationUrl = 'https://github.com/lambdaql'
+                            }
+                        }
+                        scm {
+                            connection = 'scm:git:https://github.com/lambdaql/lambdaql.git'
+                            developerConnection = 'scm:git:ssh://git@github.com/lambdaql/lambdaql.git'
+                            url = 'https://github.com/lambdaql/lambdaql'
+                        }
                     }
                 }
             }

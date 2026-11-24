@@ -39,7 +39,7 @@ cd lambdaql
 
 | 모듈 | 아티팩트 | 설명 |
 |---|---|---|
-| `query` | `lambdaql-core` | 쿼리 엔진. Spring Boot 3·4 공통 |
+| `query` | `lambdaql` | 쿼리 엔진. Spring Boot 3·4 공통 |
 | `spring-data-jpa` | `lambdaql-spring-data-jpa` | Spring Data JPA 연동. Spring Boot 3·4 공통([12. Spring Data JPA](12-spring-data-jpa.md)) |
 | `spring-boot-starter-boot3`, `spring-boot-starter-boot4` | `lambdaql-spring-boot-starter-boot3`, `-boot4` | Spring Boot 버전별 스타터([13. Spring Boot 3과 4](../13-spring-boot-versions.md)) |
 
@@ -60,7 +60,7 @@ cd lambdaql
 ./gradlew publishToMavenLocal
 ```
 
-그다음 `lambdaql-core`를 프로젝트에 추가합니다.
+그다음 `lambdaql`을 프로젝트에 추가합니다.
 
 Gradle(Groovy DSL):
 
@@ -71,7 +71,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.lambdaql:lambdaql-core:1.0.0'
+    implementation 'io.github.lambdaql:lambdaql:1.0.0'
 }
 ```
 
@@ -79,13 +79,13 @@ Maven:
 
 ```xml
 <dependency>
-  <groupId>org.lambdaql</groupId>
-  <artifactId>lambdaql-core</artifactId>
+  <groupId>io.github.lambdaql</groupId>
+  <artifactId>lambdaql</artifactId>
   <version>1.0.0</version>
 </dependency>
 ```
 
-Spring Boot를 사용하면 Boot 버전에 맞는 `lambdaql-spring-boot-starter-boot4`(`-boot3`)를, Spring Boot 없이 Spring Data JPA만 사용하면 `lambdaql-spring-data-jpa`를 대신 추가하십시오. 두 아티팩트는 `lambdaql-core`를 함께 가져옵니다([12.2](12-spring-data-jpa.md#122-modules) 참고).
+Spring Boot를 사용하면 Boot 버전에 맞는 `lambdaql-spring-boot-starter-boot4`(`-boot3`)를, Spring Boot 없이 Spring Data JPA만 사용하면 `lambdaql-spring-data-jpa`를 대신 추가하십시오. 두 아티팩트는 `lambdaql`을 함께 가져옵니다([12.2](12-spring-data-jpa.md#122-modules) 참고).
 
 > [!WARNING]
 > 버전 `1.0.0`은 저장소의 `gradle.properties`에 정의된 값이며, 첫 릴리스 전에 바뀔 수 있습니다.

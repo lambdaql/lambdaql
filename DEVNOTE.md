@@ -36,7 +36,7 @@ qb.from(Order.class)
 
 | 모듈 | 아티팩트 | 내용 |
 |---|---|---|
-| `query` | `lambdaql-core` | 분석 엔진과 `QueryBuilder`. Spring 의존 없음. Spring Boot 3·4 공통 jar 하나 |
+| `query` | `lambdaql` | 분석 엔진과 `QueryBuilder`. Spring 의존 없음. Spring Boot 3·4 공통 jar 하나 |
 | `spring-data-jpa` | `lambdaql-spring-data-jpa` | 리포지토리 실행기 `LambdaQlExecutor<T>`, Spring Boot 자동 구성. Spring Boot 3·4 공통 jar 하나(Spring Data JPA는 `compileOnly`) |
 | `spring-boot-starter-boot3`·`-boot4` | `lambdaql-spring-boot-starter-boot3`·`-boot4` | 의존성 묶음. Boot 버전에 따라 다른 유일한 모듈 |
 | `benchmark` | (배포 안 함) | JDBC·JPQL·Criteria API·Spring Data JPA·lambdaQL 비교(JMH, 결과 `docs/design/BENCHMARK.md`) |
@@ -213,7 +213,7 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
   - Decoder 입력은 그대로 ASM 트리 `MethodNode`다. 버전 검사는 ASM `ClassReader`에만 있고 트리 클래스는 자료 구조라 버전 제한이 없다. 그래서 읽기만 나눴다.
   - `org.lambdaql.engine.load.MethodReader`(패키지 전용) 두 벌: `src/main/java`는 ASM `ClassReader`, `src/main/java24`는 `java.lang.classfile`로 읽어 같은 `MethodNode`를 만든다(짧은·넓은 형태는 ASM과 같은 정규 opcode로, 프레임·지역 변수 표·try-catch는 복사하지 않음). `BytecodeLoader`가 이것을 부르고, `BytecodeLoader.readerName()`이 `asm`/`classfile`을 돌려준다.
   - `query/build.gradle`: `java24` 소스 세트(JDK 25 툴체인, `--release 24`), jar의 `META-INF/versions/24`와 `Multi-Release: true`, 소스 jar도 같은 배치. jar 안 클래스 버전: 기본 major 65, versions/24 major 68(실측).
-  - 테스트 태스크 `testClassFile`(`gradle/classfile-test.gradle`, `query`와 `spring-data-jpa`가 적용): JDK 25에서 lambdaql-core jar를 클래스패스에 둬 MR 선택을 그대로 쓴다. `test`가 끝나면 이어서 돌고(`finalizedBy`), `--tests` 필터를 넘겨받는다. `check`도 의존한다. `spring-data-jpa`의 `ReaderSelectionTest`, `query`의 `LoadExamplesTest.readerName`이 기대 리더(`lql.reader.expected`)를 확인한다.
+  - 테스트 태스크 `testClassFile`(`gradle/classfile-test.gradle`, `query`와 `spring-data-jpa`가 적용): JDK 25에서 lambdaql jar를 클래스패스에 둬 MR 선택을 그대로 쓴다. `test`가 끝나면 이어서 돌고(`finalizedBy`), `--tests` 필터를 넘겨받는다. `check`도 의존한다. `spring-data-jpa`의 `ReaderSelectionTest`, `query`의 `LoadExamplesTest.readerName`이 기대 리더(`lql.reader.expected`)를 확인한다.
   - `ReaderEquivalenceTest`: main·Java 테스트·Kotlin 테스트 클래스의 모든 메서드(1000개 이상)를 활성 리더와 ASM `ClassReader`로 각각 읽어 명령어(opcode, 피연산자, 점프 대상, 줄 번호)를 비교한다. 줄 번호를 1 바꾼 변조로 실패하는 것을 확인함.
   - 함정: 리더 이름을 `static final String` 상수로 두면 javac가 호출하는 쪽에 값을 복사해 MR 교체가 보이지 않는다. 메서드로 둔다.
   - 결과(2026-11-19): 세 DB 모두 `test` 244개, `testClassFile` 244개 통과. JDK 24 실행은 이 PC에 JDK 24가 없어 미측정(JDK 25.0.5.1로 확인).

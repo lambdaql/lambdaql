@@ -73,8 +73,8 @@ test {
 	}
 }
 
-// testClassFile: the same tests on JDK 24+, where lambdaql-core reads lambdas with java.lang.classfile (D52).
-// The test class path already has the lambdaql-core jar (a project dependency), so nothing else is needed.
+// testClassFile: the same tests on JDK 24+, where the lambdaql core jar reads lambdas with java.lang.classfile (D52).
+// The test class path already has the lambdaql core jar (a project dependency), so nothing else is needed.
 apply from: rootProject.file('gradle/classfile-test.gradle')
 // testBoot3: the same compiled tests on Spring Boot 3 (Spring Data 3.5, Hibernate 6.6)
 apply from: rootProject.file('gradle/boot3-test.gradle')

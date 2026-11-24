@@ -57,7 +57,7 @@ dependencies {
 	implementation 'org.ow2.asm:asm-util:9.11.1'   // opcode names in error messages
 
 
-	// lambdaql-core has no Spring dependency (ROADMAP D34). JPA and Hibernate are given by the user at run time.
+	// The lambdaql core jar has no Spring dependency (ROADMAP D34). JPA and Hibernate are given by the user at run time.
 	compileOnly 'jakarta.persistence:jakarta.persistence-api'
 	// Hibernate (7.4 on this Boot 4 branch) is given by the user at run time; core uses it only for DB function
 	// registration and mapping lookups (ROADMAP M11)

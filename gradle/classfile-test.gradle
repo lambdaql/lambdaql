@@ -1,6 +1,6 @@
 // The java.lang.classfile reader test (ROADMAP D52), applied by the modules that analyze lambdas.
 //
-// lambdaql-core is a Multi-Release JAR: Java 21-23 read class files with ASM, Java 24 and later with
+// The lambdaql core jar is a Multi-Release JAR: Java 21-23 read class files with ASM, Java 24 and later with
 // java.lang.classfile (META-INF/versions/24). The task testClassFile runs the same tests on JDK 24+ with the jar
 // on the class path, so the JVM picks the java.lang.classfile reader. "test" (JDK 21) is followed by it, so
 //   ./gradlew test -Dlql.db=h2|mariadb|oracle
@@ -18,7 +18,7 @@ def testClassFile = tasks.register('testClassFile', Test) {
 	useJUnitPlatform()
 	// read when the task runs, so changes made later to the test task (Kotlin test folders) are seen
 	testClassesDirs = files({ tasks.test.testClassesDirs })
-	// a module can change this (lambdaql-core puts its own jar in place of its class folders)
+	// a module can change this (the core module puts its own jar in place of its class folders)
 	classpath = files({ tasks.test.classpath })
 	systemProperty 'lql.db', System.getProperty('lql.db', 'h2')
 	// the SQL answer files are written by the test task only
@@ -39,7 +39,7 @@ def testClassFile = tasks.register('testClassFile', Test) {
 }
 
 tasks.named('test', Test) {
-	// the tests on JDK 21 use ASM (lambdaql-core's own tests use its class folders, other modules the jar)
+	// the tests on JDK 21 use ASM (the core's own tests use its class folders, other modules the jar)
 	systemProperty 'lql.reader.expected', 'asm'
 	finalizedBy testClassFile
 }

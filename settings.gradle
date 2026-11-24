@@ -13,10 +13,10 @@ plugins {
 
 rootProject.name = 'lambdaql'
 
-// Spring Boot lines (ROADMAP D55): lambdaql-core and lambdaql-spring-data-jpa are one jar each for Spring Boot 3 and 4.
+// Spring Boot lines (ROADMAP D55): the lambdaql core jar and lambdaql-spring-data-jpa are one jar each for Spring Boot 3 and 4.
 // They are compiled against Spring Boot 4; testBoot3 (gradle/boot3-test.gradle) runs the same tests on Spring Boot 3.
 // Only the starters depend on the Spring Boot line: their names end with -boot3 / -boot4.
-// query                       -> lambdaql-core: engine and QueryBuilder, no Spring dependency
+// query                       -> lambdaql:      engine and QueryBuilder, no Spring dependency
 // spring-data-jpa             -> lambdaql-spring-data-jpa: repository executor fragment and Boot auto-configuration
 // spring-boot-starter-boot3/4 -> lambdaql-spring-boot-starter-boot3/4: dependencies only, for each Spring Boot line
 // benchmark                   -> not published: JDBC, JPQL, Criteria API and lambdaQL on the same queries (JMH)
