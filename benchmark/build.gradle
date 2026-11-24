@@ -7,6 +7,10 @@ plugins {
 //   ./gradlew :benchmark:jmh                       H2 in memory
 //   ./gradlew :benchmark:jmh -Dlql.db=postgresql   the local PostgreSQL (LQL_DB_PASSWORD, tables SQ_bench_*)
 //   ./gradlew :benchmark:jmh -Pjmh.include=Select  only the benchmarks whose name matches
+// Three points per query (the same inherited methods):
+//   FirstCall*  the first call in a new JVM          -Pjmh.include='FirstCall'
+//   After1000*  calls 1,001 to 1,200 in a new JVM    -Pjmh.include='After1000'
+//   QueryBenchmark, SpringDataBenchmark: the long-run average (JIT done)  -Pjmh.include='^org.lambdaql.bench.(Query|SpringData)Benchmark'
 // Results: build/jmh/results-<db>.json (JMH JSON) and the console.
 
 dependencies {

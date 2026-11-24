@@ -497,18 +497,13 @@ public final class HqlRenderer {
             folded.add(f);
             all = Pred.and(all, f);
         }
-        // D54: a step written with the Kotlin safe call ?. is a left join when a row without the association can make
-        // the whole condition true; other steps are inner joins (D36, D48). A step written both ways is an inner join
-        // (WARN LQL-5014).
-        JoinPlanner.StepUses uses = JoinPlanner.stepUses(all, this::requiredStep);
-        if (!uses.mixed().isEmpty()) safeCallMixed(uses.mixed().stream().map(uses.names()::get).toList(), all.toString());
-        java.util.Set<String> safeLefts = JoinPlanner.safeCallLeftJoins(all, uses.candidates());
-        // D48: other where paths are inner joins (the SQL meaning of the path); the Java null-guard LEFT JOIN is not
-        // used. Tell (DEBUG) when Java would keep rows that the inner join leaves out.
-        java.util.Set<String> javaLefts = new java.util.HashSet<>(JoinPlanner.leftJoins(all));
-        javaLefts.removeAll(safeLefts);
-        if (!javaLefts.isEmpty()) sqlMeaning("a null check on an association that a where path also uses");
-        whereLeftJoins = safeLefts;
+        // D54 (revised 2026-11-23): one rule for Java and Kotlin. An association step is an inner join unless a row
+        // without the association can make the whole condition true; a comparison through a step written with !!,
+        // without a mark or in Java counts only for rows that have the association (it gets "is not null" when it
+        // could be true on NULL columns). See JoinPlanner.plan.
+        JoinPlanner.WherePlan plan = JoinPlanner.plan(all, this::requiredStep);
+        whereLeftJoins = plan.lefts();
+        for (int i = 0; i < folded.size(); i++) folded.set(i, JoinPlanner.guard(folded.get(i), plan));
         List<String> parts = new ArrayList<>();
         if (all instanceof Pred.Bool b) {
             if (!b.value()) parts.add("1=0");
@@ -1173,6 +1168,7 @@ public final class HqlRenderer {
         if (item.arg() == null) return asc ? Direction.ASC : Direction.DESC;
         Object v = eval(item.arg());
         boolean first = switch (v) {
+            case org.lambdaql.query.Nulls n -> n == org.lambdaql.query.Nulls.FIRST;
             case Boolean b -> b;
             case Number n -> n.intValue() != 0;
             case null, default -> throw LqlMessage.NULLS_FIRST_NULL.exception(item);
@@ -1193,6 +1189,7 @@ public final class HqlRenderer {
             // a non-null value is still NULL behind a missing association, unless every association step is required (A4)
             case Expr.Column c -> c.nonNull() && allStepsRequired(c);
             case Expr.Const c -> !c.isNull();
+            case Expr.Case c -> c.values().stream().allMatch(this::sortNonNull) && sortNonNull(c.otherwise());
             case Expr.Arith a -> sortNonNull(a.left()) && sortNonNull(a.right()) && a.op() != ArithOp.DIV && a.op() != ArithOp.REM;
             case Expr.Neg n -> sortNonNull(n.operand());
             default -> false;
@@ -1280,14 +1277,65 @@ public final class HqlRenderer {
             case Pred.IsNull n -> isNull(n.operand(), true);
             case Pred.Truth t -> truth(t.operand(), true);
             case Pred.In in -> in(in.value(), in.values(), true);
+            case Pred.Like l -> like(l);
             case Pred.Not n -> switch (n.operand()) {
                 case Pred.IsNull x -> isNull(x.operand(), false);
                 case Pred.Truth t -> truth(t.operand(), false);
                 case Pred.In in -> in(in.value(), in.values(), false);
                 case Pred.Cmp c -> cmp(c.op().negate(), c.left(), c.right(), c.nullSafe());
+                case Pred.Like l -> like((Pred.Like) Pred.not(l));
                 default -> "not (" + pred(n.operand()) + ")";
             };
         };
+    }
+
+    /**
+     * Renders a value chosen by conditions (ROADMAP D62): {@code case when c1 then v1 ... else v end}.
+     *
+     * <p>Example: {@code o.isActive() ? 1 : 2} renders {@code case when e0.active = true then 1 else 2 end}.
+     *
+     * @param c    the case
+     * @param peer the type of the other side of a comparison, for literals (may be null)
+     * @return the HQL
+     */
+    private String caseWhen(Expr.Case c, Class<?> peer) {
+        StringBuilder sb = new StringBuilder("case");
+        for (int i = 0; i < c.conds().size(); i++) {
+            sb.append(" when ").append(pred(c.conds().get(i))).append(" then ").append(value(c.values().get(i), peer));
+        }
+        return sb.append(" else ").append(value(c.otherwise(), peer)).append(" end").toString();
+    }
+
+    /**
+     * Renders a text match as {@code like} with the escape character {@code !}: {@code %}, {@code _} and {@code !}
+     * in the text are escaped, so {@code startsWith("50%")} finds only texts that start with "50%".
+     * A constant becomes a literal; a captured value is bound. A captured {@code null} is an error (Java would throw).
+     *
+     * <p>Example: {@code o.getName().startsWith(p)} with {@code p = "Ki"} renders {@code e0.name like :p1 escape '!'}
+     * with the value {@code Ki%}; with Kotlin {@code ignoreCase = true}: {@code lower(e0.name) like :p1 escape '!'}.
+     *
+     * @param l the match
+     * @return the HQL
+     */
+    private String like(Pred.Like l) {
+        String x = value(l.value(), null);
+        Object t = l.text() instanceof Expr.Const c ? c.value() : eval(l.text());
+        if (t == null) throw LqlMessage.LIKE_TEXT_NULL.exception(l.toString());
+        String text = t.toString();
+        if (l.ignoreCase()) {
+            x = "lower(" + x + ")";
+            text = text.toLowerCase(java.util.Locale.ROOT);
+        }
+        String esc = text.replace("!", "!!").replace("%", "!%").replace("_", "!_");
+        String pattern = switch (l.kind()) {
+            case PREFIX -> esc + "%";
+            case SUFFIX -> "%" + esc;
+            case ANY -> "%" + esc + "%";
+        };
+        String rhs = l.text() instanceof Expr.Const
+                ? literal(new Expr.Const(pattern, org.objectweb.asm.Type.getType(String.class)), String.class)
+                : bindRaw(pattern);
+        return x + (l.negated() ? " not like " : " like ") + rhs + " escape '!'";
     }
 
     private String join(List<Pred> items, String sep) {
@@ -1345,23 +1393,6 @@ public final class HqlRenderer {
     private static final java.util.Set<String> MEANING_LOGGED = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private static final java.util.Set<String> MIXED_LOGGED = java.util.concurrent.ConcurrentHashMap.newKeySet();
-
-    /**
-     * D54: an association step written with {@code ?.} in one place and with {@code !!} (or without a mark) in another
-     * is an inner join; WARN LQL-5014 once per condition.
-     *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt">KotlinQueryTest</a>,
-     * region {@code mixed-warn}): {@code it.customer?.name == "Kim" || it.customer!!.grade > 3}.
-     *
-     * @param paths     the association paths, for example {@code [customer]}
-     * @param condition the condition text
-     */
-    private static void safeCallMixed(List<String> paths, String condition) {
-        String names = String.join(", ", paths);
-        if (LOG.isWarnEnabled() && MIXED_LOGGED.add(names + "|" + condition)) {
-            LOG.warn("{}", LqlMessage.SAFE_CALL_MIXED.format(names, condition));
-        }
-    }
 
     /** D48: entity values are compared with the SQL meaning; tell (DEBUG, once per condition text) when NULL rows drop out. */
     private static void sqlMeaning(String condition) {
@@ -1485,6 +1516,7 @@ public final class HqlRenderer {
                     : "(" + value(a.left(), peer) + " " + a.op().symbol() + " " + value(a.right(), peer) + ")";
             case Expr.Neg n -> "-(" + value(n.operand(), peer) + ")";
             case Expr.Coalesce c -> "coalesce(" + value(c.first(), peer) + ", " + value(c.second(), peerType(c.first())) + ")";
+            case Expr.Case c -> caseWhen(c, peer);
             case Expr.Subquery q -> subquery(q, null);
             case Expr.Aggregate a -> switch (a.fn()) {
                 case COUNT_ALL -> "count(*)";
@@ -1615,6 +1647,7 @@ public final class HqlRenderer {
             case Expr.Arith a -> isHostLike(a.left()) && isHostLike(a.right());
             case Expr.Neg n -> isHostLike(n.operand());
             case Expr.Coalesce c -> isHostLike(c.first()) && isHostLike(c.second());
+            case Expr.Case c -> false;
             default -> true;
         };
     }

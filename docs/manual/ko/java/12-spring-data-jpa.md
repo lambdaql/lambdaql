@@ -15,7 +15,7 @@ Spring Data JPA에서는 리포지토리 인터페이스를 작성합니다. lam
 
 | 구성 요소 | 기능 | 절 |
 |---|---|---|
-| `LambdaQlExecutor<T>` | 모든 리포지토리에서 람다 조건으로 `findAll`, `findSet`, `findFirst`, `findOne`, `count`, `exists`, `query()` 실행 | [12.3](#123-repository-setup), [12.4](#124-executor-methods) |
+| `LambdaQlExecutor<T>` | 모든 리포지토리에서 람다 표현식 조건으로 `findAll`, `findSet`, `findFirst`, `findOne`, `count`, `exists`, `query()` 실행 | [12.3](#123-repository-setup), [12.4](#124-executor-methods) |
 | Spring `Sort`와 `Pageable` | `findAll(where, sort)`, `findSet(where, sort)`, Spring `Page`를 반환하는 `findAll(where, pageable)` | [12.5](#125-spring-sort-and-pageable) |
 | 수정, 삭제, 삽입, 업서트 | `deleteAll(where)`, `updateOne(where, set)` 같은 단축 메서드가 호출 한 번으로 문장을 실행. `updateQuery()`, `deleteQuery()`, `insertQuery()`, `upsertQuery()`가 리포지토리 엔티티에 대해 [7. 수정, 삽입, 삭제](07-dml.md)의 문장을 시작. 모두 호출자의 트랜잭션 필요 | [12.4](#124-executor-methods), [12.6](#126-transactions-and-exceptions) |
 | `QueryBuilder` 빈 | 서비스에서 사용할 `QueryBuilder` 빈을 Spring Boot가 생성 | [12.8](#128-the-querybuilder-bean) |
@@ -76,9 +76,9 @@ dependencies {
 
 | 항목 | 버전 |
 |---|---|
-| Java | 21 |
-| Spring Boot | 3.5 또는 4.1(3.5.16, 4.1.2로 테스트) |
-| Spring Data JPA | 3.5 또는 4.1(3.5.13, 4.1.2로 테스트) |
+| Java | 21 이상 |
+| Spring Boot | 3.5 또는 4.1 |
+| Spring Data JPA | 3.5 또는 4.1 |
 | Hibernate | 6.6 또는 7.4(Spring Boot에 포함) |
 
 Spring Data JPA 3.3 이하는 **지원하지 않습니다**. lambdaQL은 실행기를 `META-INF/spring.factories`에 등록하며, Spring Data는 3.4부터 이 파일에서 리포지토리 프래그먼트를 읽습니다.
@@ -89,10 +89,9 @@ Spring Data JPA 3.3 이하는 **지원하지 않습니다**. lambdaQL은 실행�
 리포지토리의 `extends` 목록에 `LambdaQlExecutor<T>`를 추가합니다. `T`는 리포지토리의 엔티티입니다.
 별도 구성과 `Impl` 클래스는 작성하지 않습니다.
 
-이 장의 예제는 테스트 엔티티 `Member`(`id`, `name`, `active`, `grade`, `team`)와 `Team`(`id`, `name`)을 사용합니다. `grade`는 `Integer`이므로 NULL일 수 있습니다.
+이 장의 예제는 예제 엔티티 `Member`(`id`, `name`, `active`, `grade`, `team`)와 `Team`(`id`, `name`)을 사용합니다. `grade`는 `Integer`이므로 NULL일 수 있습니다.
 
-[`ManualMemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualMemberRepository.java), 영역 `repository`:
-
+<!-- region: ManualMemberRepository.java#repository -->
 ```java
 /** No Impl class: Spring Data finds the LambdaQlExecutor implementation by itself. */
 public interface ManualMemberRepository extends JpaRepository<Member, Long>, LambdaQlExecutor<Member>,
@@ -118,7 +117,7 @@ public interface ManualMemberRepository extends JpaRepository<Member, Long>, Lam
     default List<Member> topGraded(int n) {
         return query()
                 .where(m -> m.isActive())
-                .orderBy((m, by) -> by.desc(m.getGrade()).asc(m.getId()))
+                .orderBy(m -> desc(m.getGrade()).asc(m.getId()))
                 .limit(n)
                 .toList();
     }
@@ -149,13 +148,13 @@ public interface ManualMemberRepository extends JpaRepository<Member, Long>, Lam
 마지막 세 메서드는 수정, 삭제, 삽입 문장을 실행합니다. 이 메서드에는 트랜잭션이 필요합니다([12.6](#126-transactions-and-exceptions) 참고).
 
 이 리포지토리는 `JpaSpecificationExecutor<Member>`도 상속합니다. lambdaQL에는 필요하지 않으며, 함께 사용할 때의 동작을 보여 주기 위한 구성입니다.
-테스트의 다른 리포지토리 [`MemberRepository`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)는 같은 메서드에 직접 작성한 프래그먼트 `MemberRepositoryCustom`까지 상속합니다([12.7](#127-other-fragments-and-jpaspecificationexecutor) 참고).
+다른 예제 리포지토리 [`MemberRepository`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)는 같은 메서드에 직접 작성한 프래그먼트 `MemberRepositoryCustom`까지 상속합니다([12.7](#127-other-fragments-and-jpaspecificationexecutor) 참고).
 
 동작 방식:
 
 - **default 메서드는 Spring Data가 직접 실행합니다.** Spring Data는 default 메서드에서 쿼리를 만들지 않고 메서드 본문을 호출합니다. lambdaQL은 이 동작을 변경하지 않습니다.
 - **`LambdaQlExecutor<T>`는 Spring Data 리포지토리 프래그먼트입니다.** 구현 클래스는 `lambdaql-spring-data-jpa`의 `META-INF/spring.factories`에 등록되어 있습니다. Spring Data는 이 파일을 읽고, `LambdaQlExecutor<T>`를 상속하는 모든 리포지토리에 구현을 추가합니다.
-- **실행기 객체 하나를 모든 리포지토리가 공유합니다.** 호출마다 해당 리포지토리의 엔티티를 사용합니다. 예를 들어 `TeamRepository`에서 `teams.count(t -> ...)`는 `Team` 행의 수를 반환합니다([`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java) 참고).
+- **실행기 객체 하나를 모든 리포지토리가 공유합니다.** 호출마다 해당 리포지토리의 엔티티를 사용합니다. 예를 들어 `TeamRepository`에서 `teams.count(t -> ...)`는 `Team` 행의 수를 반환합니다.
 
 규칙:
 
@@ -166,10 +165,12 @@ public interface ManualMemberRepository extends JpaRepository<Member, Long>, Lam
 | 3 | lambdaQL 쿼리는 **default 메서드**나 서비스에 작성하십시오. 추상 메서드는 계속 Spring Data 쿼리 메서드(`findByName` 등)로 동작합니다. |
 | 4 | Spring Boot 없이도 리포지토리 부분은 일반 Spring Data이므로 동작합니다. `QueryBuilder` 빈만 자동으로 생성되지 않습니다([12.8](#128-the-querybuilder-bean) 참고). |
 
+예제 코드: [`ManualMemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualMemberRepository.java)(`repository`).
+
 <a id="124-executor-methods"></a>
 ## 12.4 실행기 메서드
 
-`Where<T>`는 `where(...)`와 같은 조건 람다입니다([3. 조건](03-where.md) 참고). `SortSpec<T>`는 lambdaQL 정렬입니다([4.10](04-order-paging.md#410-reusable-and-external-sorts) 참고).
+`Where<T>`는 `where(...)`와 같은 조건 람다 표현식입니다([3. 조건](03-where.md) 참고). `SortSpec<T>`는 lambdaQL 정렬입니다([4.10](04-order-paging.md#410-reusable-and-external-sorts) 참고).
 `Sort`, `Pageable`, `Page`는 Spring Data 타입입니다.
 
 | 메서드 | 반환 | 설명 |
@@ -205,8 +206,10 @@ public interface ManualMemberRepository extends JpaRepository<Member, Long>, Lam
 짧은 메서드는 `query()`에 결과 함수를 붙인 형태와 같습니다. `findAll(w)`는 `query().where(w).toList()`, `findSet(w)`는 `query().where(w).toSet()`, `findFirst(w)`는 `query().where(w).first()`, `findOne(w)`는 `query().where(w).one()`에 해당합니다. 결과 함수는 [결과 가져오기](02-getting-started.md#getting-the-result)에서 설명합니다.
 `findAll(Where<T>)`와 `count(Where<T>)`는 인자 타입이 다르므로 `JpaRepository`의 `findAll(Sort)`, `findAll(Example)`, `count()`와 충돌하지 않습니다.
 
-**`query()`: 전체 쿼리.** [`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java), 영역 `query`(12.3 리포지토리의 일부):
+**`query()`: 전체 쿼리.**
+12.3 리포지토리의 일부:
 
+<!-- region: MemberRepository.java#query -->
 ```java
 /**
  * @param n how many
@@ -215,7 +218,7 @@ public interface ManualMemberRepository extends JpaRepository<Member, Long>, Lam
 default List<Member> topGraded(int n) {
     return query()
             .where(m -> m.isActive())
-            .orderBy((m, by) -> by.desc(m.getGrade()).asc(m.getId()))
+            .orderBy(m -> desc(m.getGrade()).asc(m.getId()))
             .limit(n)
             .toList();
 }
@@ -223,37 +226,34 @@ default List<Member> topGraded(int n) {
 
 다음 예제에서 `repository`는 `MemberRepository`입니다.
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), 영역 `find-all-sort`:
-
+<!-- region: ExecutorTest.java#find-all-sort -->
 ```java
-SortSpec<Member> byGrade = SortSpec.of(Member.class, (m, by) -> by.desc(m.getGrade()).asc(m.getId()));
+SortSpec<Member> byGrade = SortSpec.of(Member.class, m -> desc(m.getGrade()).asc(m.getId()));
 List<Member> active = repository.findAll(m -> m.isActive(), byGrade);
 ```
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), 영역 `find-first`(등급이 가장 높은 활성 회원):
+등급이 가장 높은 활성 회원:
 
+<!-- region: ExecutorTest.java#find-first -->
 ```java
 Optional<Member> best = repository.findFirst(m -> m.isActive(),
-        SortSpec.of(Member.class, (m, by) -> by.desc(m.getGrade())));
+        SortSpec.of(Member.class, m -> desc(m.getGrade())));
 ```
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), 영역 `find-one`:
-
+<!-- region: ExecutorTest.java#find-one -->
 ```java
 Optional<Member> kim = repository.findOne(m -> m.getName().equals("Kim"));
 // two or more rows: Spring's IncorrectResultSizeDataAccessException
 assertThrows(IncorrectResultSizeDataAccessException.class, () -> repository.findOne(m -> m.isActive()));
 ```
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), 영역 `count-exists`:
-
+<!-- region: ExecutorTest.java#count-exists -->
 ```java
 long active = repository.count(m -> m.isActive());
 boolean anyInTeamB = repository.exists(m -> m.getTeam().getName().equals("B"));
 ```
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), 영역 `find-set`:
-
+<!-- region: ExecutorTest.java#find-set -->
 ```java
 java.util.SequencedSet<Member> active = repository.findSet(m -> m.isActive(), Sort.by(Sort.Order.desc("grade"), Sort.Order.asc("id")));
 java.util.SequencedSet<Member> any = repository.findSet(m -> m.isActive());
@@ -280,10 +280,9 @@ java.util.SequencedSet<Member> any = repository.findSet(m -> m.isActive());
 - **조건이 먼저**, 대입이 다음에 옵니다: `updateAll(m -> !m.isActive(), m -> m.setGrade(7))`.
 - **`All`** 은 조건에 맞는 모든 행(삭제, 수정) 또는 목록의 모든 요소(삽입, 업서트)를 뜻합니다.
 - **`One`** 은 삭제와 수정에서 1행 보호(다음 절 참고), 삽입과 업서트에서 한 행을 뜻합니다.
-- 호출자의 트랜잭션이 필요합니다([12.6](#126-transactions-and-exceptions) 참고). 테스트는 `TransactionTemplate` 안에서 실행합니다.
+- 호출자의 트랜잭션이 필요합니다([12.6](#126-transactions-and-exceptions) 참고). 예제는 `TransactionTemplate` 안에서 호출합니다.
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), 영역 `dml-shortcuts`:
-
+<!-- region: ExecutorTest.java#dml-shortcuts -->
 ```java
 int changed = repository.updateAll(m -> !m.isActive(), m -> m.setGrade(7));      // condition first
 int deleted = repository.deleteAll(m -> m.getTeam() == null);                     // bulk: no cascade
@@ -292,7 +291,7 @@ int many = repository.insertAll(List.of(new NewMember("A", 1), new NewMember("B"
         (m, r) -> { m.setName(r.name()); m.setGrade(r.grade()); m.setActive(true); });
 ```
 
-`NewMember`는 테스트의 레코드 `record NewMember(String name, int grade)`입니다.
+`NewMember`는 예제의 레코드 `record NewMember(String name, int grade)`입니다.
 
 <a id="one-row-protection-deleteone-and-updateone"></a>
 ### 1행 보호: `deleteOne`과 `updateOne`
@@ -308,8 +307,7 @@ int many = repository.insertAll(List.of(new NewMember("A", 1), new NewMember("B"
 
 코어 API에도 같은 보호가 있습니다: `executeOne()`([7.4](07-4-delete.md#delete-exactly-one-row-executeone) 참고).
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), 영역 `dml-one`:
-
+<!-- region: ExecutorTest.java#dml-one -->
 ```java
 int renamed = repository.updateOne(m -> m.getId() == kimId, m -> m.setName("Kim2"));   // exactly one row
 // two or more rows match: nothing changes
@@ -330,19 +328,20 @@ assertThrows(org.springframework.dao.IncorrectResultSizeDataAccessException.clas
 
 많은 행을 빠르게 삭제할 때 사용하십시오. cascade나 `@PreRemove`가 필요하면 Spring Data의 메서드를 사용하십시오.
 
-컴파일러는 인자(인자 없음, `Iterable`, 람다)에 따라 메서드를 선택합니다. javac와 kotlinc 2.3.21의 바이트코드로 확인했습니다(실측).
+컴파일러는 인자(인자 없음, `Iterable`, 람다 표현식)에 따라 메서드를 선택합니다. javac와 kotlinc 2.3.21의 바이트 opcode로 확인했습니다(실측).
 
 <a id="builders-for-complex-statements"></a>
 ### 복잡한 문장을 위한 빌더
 
 `updateQuery()`, `deleteQuery()`, `insertQuery()`, `upsertQuery()`는 완전한 문장을 시작합니다. 단축 메서드로 표현할 수 없는 경우에 사용하십시오: `set()` 여러 번, `all()`, `orderBy(...).limit(n)`([7.4](07-4-delete.md#delete-the-first-rows-limit) 참고), `toHql()`, `onConflict(...)`.
 
-메서드 이름이 `Query`로 끝나므로 `delete(...)` 같은 `JpaRepository` 메서드와 충돌하지 않습니다. 문장은 `QueryBuilder`로 만드는 문장과 같습니다([7. 수정, 삽입, 삭제](07-dml.md) 참고). 대상 행은 같은 `where` 람다로 조회한 행과 같습니다.
+메서드 이름이 `Query`로 끝나므로 `delete(...)` 같은 `JpaRepository` 메서드와 충돌하지 않습니다. 문장은 `QueryBuilder`로 만드는 문장과 같습니다([7. 수정, 삽입, 삭제](07-dml.md) 참고). 대상 행은 같은 `where` 람다 표현식으로 조회한 행과 같습니다.
 
 단축 메서드와 마찬가지로 호출자의 트랜잭션이 필요합니다. 모든 JPA 벌크 문장과 마찬가지로, 트랜잭션 안에 이미 로드된 엔티티에는 반영되지 않습니다.
 
-[`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java), 영역 `dml`(12.3 리포지토리의 일부):
+12.3 리포지토리의 일부:
 
+<!-- region: MemberRepository.java#dml -->
 ```java
 /**
  * @param grade the new grade
@@ -368,13 +367,14 @@ default int addGuest(String name) {
 
 업서트도 트랜잭션 안에서 실행합니다. `teams`는 `TeamRepository`이고, `tx`는 Spring `TransactionTemplate`입니다.
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), 영역 `upsert`:
-
+<!-- region: ExecutorTest.java#upsert -->
 ```java
 int changed = tx.execute(s -> teams.upsertQuery().values(t -> { t.setId(teamId); t.setName("A2"); }).execute());
 ```
 
 업서트는 데이터베이스가 보고한 행 수를 반환합니다. 삽입이면 1이고, 수정이면 H2와 Oracle은 1, MariaDB는 2입니다([7.6](07-6-upsert.md#the-row-count) 참고).
+
+예제 코드: [`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)(`query`, `dml`), [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)(`find-all-sort`, `find-first`, `find-one`, `count-exists`, `find-set`, `dml-shortcuts`, `dml-one`, `upsert`).
 
 <a id="125-spring-sort-and-pageable"></a>
 ## 12.5 Spring `Sort`와 `Pageable`
@@ -393,8 +393,7 @@ lambdaQL은 각 `Sort.Order`를 `SortSpec.ofPath`로 정렬 키 하나로 변환
 
 Spring Data JPA 자체 리포지토리는 `NATIVE`의 NULL 위치를 데이터베이스에 맡기므로 데이터베이스마다 순서가 다를 수 있습니다. lambdaQL은 자체 규칙을 적용합니다.
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), 영역 `find-all-spring-sort`:
-
+<!-- region: ExecutorTest.java#find-all-spring-sort -->
 ```java
 List<Member> rows = repository.findAll(m -> m.isActive(),
         Sort.by(Sort.Order.desc("grade"), Sort.Order.asc("team.name"), Sort.Order.asc("id")));
@@ -411,8 +410,7 @@ assertEquals("PropertyReferenceException", unknown.getClass().getSimpleName());
 - 정렬 키에 id가 없으면 lambdaQL이 id를 마지막 키로 추가하므로, 행이 페이지 사이에서 이동하지 않습니다([동순위 처리](04-order-paging.md#tie-breaker-automatic-id) 참고). 정렬이 없는 페이지는 id 순서입니다.
 - `Pageable.unpaged()`는 모든 행을 한 페이지로 반환합니다.
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), 영역 `page`:
-
+<!-- region: ExecutorTest.java#page -->
 ```java
 Page<Member> page = repository.findAll(m -> m.isActive(), PageRequest.of(1, 2, Sort.by("name")));
 // page 1 (the second page) of the active members by name; the total comes from a count query
@@ -425,15 +423,15 @@ Page<Member> page = repository.findAll(m -> m.isActive(), PageRequest.of(1, 2, S
 <a id="sort-policy-with-spring"></a>
 ### Spring에서의 정렬 정책
 
-정렬 정책(결정 D43)은 허용하는 외부 정렬 이름을 정합니다. `SortRules`, `SortMode`와 규칙은 [4.10](04-order-paging.md#sort-policy)에서 설명합니다.
-Spring `Sort`나 `Pageable`은 항상 외부 정렬이므로 정책이 그 안의 이름을 모두 검사합니다. 정렬 람다는 검사하지 않습니다.
+정렬 정책은 허용하는 외부 정렬 이름을 정합니다. `SortRules`, `SortMode`와 규칙은 [4.10](04-order-paging.md#sort-policy)에서 설명합니다.
+Spring `Sort`나 `Pageable`은 항상 외부 정렬이므로 정책이 그 안의 이름을 모두 검사합니다. 정렬 람다 표현식은 검사하지 않습니다.
 
 **규칙의 출처.** Spring Boot에서는 자동 구성이 `EntityManagerFactory`의 정책을 만들고, 모든 싱글턴 빈을 만든 뒤 등록합니다.
 자동 구성이 읽는 곳은 세 가지입니다.
 
 | 출처 | 제공 내용 |
 |---|---|
-| `SortPolicy` 빈 | 모드와 람다로 작성한 `SortRules` |
+| `SortPolicy` 빈 | 모드와 람다 표현식으로 작성한 `SortRules` |
 | 프로퍼티 `lambdaql.sort.*` | 모드와 문자열로 작성한 규칙 |
 | `@Sortable` 필드([4.10](04-order-paging.md#rules-from-sortable)) | 빈이나 프로퍼티에 규칙이 없는 엔티티의 규칙 |
 
@@ -450,15 +448,16 @@ Spring `Sort`나 `Pageable`은 항상 외부 정렬이므로 정책이 그 안�
 | `lambdaql.sort.allow.<Entity>` | 허용 경로를 쉼표로 구분. 예: `name,team.name` |
 | `lambdaql.sort.alias.<Entity>.<외부 이름>` | 별칭의 경로. 예: `lambdaql.sort.alias.Member.level=grade` |
 
-**SARGable 모드 프로퍼티.** `lambdaql.sargable.mode`는 `OFF`, `WARN`(기본값), `STRICT` 중 하나입니다(결정 D50). 자동 구성이 `lambdaql.sort.mode`와 같은 방식으로 등록합니다. `STRICT`이면 인덱스를 쓸 수 없는 조건의 분석이 `NonSargableException`(`LQL-3066`)으로 실패합니다([8.9](08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) 참고).
+**SARGable 모드 프로퍼티.** `lambdaql.sargable.mode`는 `OFF`, `WARN`(기본값), `STRICT` 중 하나입니다. 자동 구성이 `lambdaql.sort.mode`와 같은 방식으로 등록합니다. `STRICT`이면 인덱스를 쓸 수 없는 조건의 분석이 `NonSargableException`(`LQL-3066`)으로 실패합니다([8.9](08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) 참고).
 
 `<Entity>`에는 JPA 엔티티 이름을 씁니다. 기본값은 단순 클래스 이름이고, `@Entity(name = ...)`로 바꿀 수 있습니다.
 
 엔티티 이름은 persistence unit 안에서 유일합니다(같은 이름이 둘이면 Hibernate가 시작 단계에서 중단). 그래서 패키지가 다른 같은 이름의 클래스도 섞이지 않습니다. 없는 이름이면 애플리케이션 시작이 `IllegalStateException`(LQL-4042)으로 중단됩니다.
 경로는 규칙을 처음 사용할 때 엔티티와 대조합니다(4.10의 [문자열 규칙](04-order-paging.md#rules-as-strings) 참고).
 
-[`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java), 영역 `properties`(테스트의 프로퍼티. 애플리케이션에서는 `application.properties`나 `application.yaml`에 작성):
+애플리케이션에서는 `application.properties`나 `application.yaml`에 작성:
 
+<!-- region: SortPropertiesTest.java#properties -->
 ```java
 @SpringBootTest(classes = SampleApplication.class, properties = {
         "lambdaql.sort.mode=STRICT",
@@ -466,21 +465,19 @@ Spring `Sort`나 `Pageable`은 항상 외부 정렬이므로 정책이 그 안�
         "lambdaql.sort.alias.Member.level=grade"})
 ```
 
-[`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java), 영역 `properties-use`:
-
+<!-- region: SortPropertiesTest.java#properties-use -->
 ```java
 List<Member> byLevel = repository.findAll(m -> m.isActive(), Sort.by(Sort.Order.desc("level")));
 List<Member> byTeam = repository.findAll(m -> m.isActive(), Sort.by("team.name", "name"));
 assertThrows(SortNotAllowedException.class, () -> repository.findAll(m -> m.isActive(), Sort.by("grade")));
 ```
 
-이 테스트는 자동 구성의 정책 등록도 확인합니다.
+자동 구성이 이 프로퍼티로 정렬 정책을 등록합니다.
 
 **`SortPolicy` 빈.** 컴파일러가 검사하는 규칙을 쓰려면 `SortPolicy` 빈을 정의하십시오. 같은 자동 구성 단계가 이 빈을 등록합니다.
-다음 설정 클래스는 테스트 안의 `static` 클래스입니다. 이 빈을 넣은 컨텍스트에서 테스트는 `Sort.Order.desc("level")`이 `grade`로 정렬되고 `Sort.by("grade")`가 `SortNotAllowedException`으로 거부되는지 확인합니다. 그다음 예제는 같은 정책을 직접 등록합니다.
+이 빈이 있으면 `Sort.Order.desc("level")`은 `grade`로 정렬되고 `Sort.by("grade")`는 `SortNotAllowedException`으로 거부됩니다. 그다음 예제는 같은 정책을 직접 등록합니다.
 
-[`ManualJavaSpringTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualJavaSpringTest.java), 영역 `sort-policy-bean`:
-
+<!-- region: ManualJavaSpringTest.java#sort-policy-bean -->
 ```java
 @Configuration
 static class SortConfig {
@@ -495,8 +492,9 @@ static class SortConfig {
 }
 ```
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), 영역 `sort-policy`(영역은 `try` 안에서 끝나며, `finally` 블록에서 `SortPolicy.unregister(emf)`를 호출함):
+아래 코드는 `try` 블록 안의 부분입니다. `finally` 블록에서 `SortPolicy.unregister(emf)`를 호출해 정책을 해제합니다.
 
+<!-- region: ExecutorTest.java#sort-policy -->
 ```java
 // usually a @Bean SortPolicy; the Boot auto-configuration registers it for the EntityManagerFactory
 org.lambdaql.query.SortPolicy.register(emf, org.lambdaql.query.SortPolicy.of(org.lambdaql.query.SortMode.STRICT,
@@ -517,15 +515,16 @@ try {
 
 **HTTP 400 응답.** lambdaQL은 웹 의존성이 없으므로 HTTP 상태를 정하지 않습니다. 웹 애플리케이션은 보통 `@ExceptionHandler(SortNotAllowedException.class)`에서 400 Bad Request로 응답하고, 오류 코드는 `e.code()`(`"LQL-4040"`)로 읽습니다.
 
-
 메시지에는 엔티티 클래스와 정렬 이름이 들어 있습니다. 클라이언트에 엔티티 이름을 노출하지 않으려면 `e.code()`만 보내십시오.
+
+예제 코드: [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)(`find-all-spring-sort`, `page`, `sort-policy`), [`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java)(`properties`, `properties-use`), [`ManualJavaSpringTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualJavaSpringTest.java)(`sort-policy-bean`).
 
 <a id="126-transactions-and-exceptions"></a>
 ## 12.6 트랜잭션과 예외
 
 실행기는 현재 트랜잭션에 연결되는 Spring의 공유 `EntityManager`를 사용합니다.
 
-**lambdaQL은 메서드에 `@Transactional`을 붙이지 않습니다.** 의도한 설계입니다(결정 D41).
+**lambdaQL은 메서드에 `@Transactional`을 붙이지 않습니다.** 의도한 설계입니다.
 수정, 삭제, 삽입, 업서트에는 호출자의 트랜잭션이 필요합니다. 단축 메서드(`deleteAll`, `updateOne` 등), 빌더(`updateQuery()` 등), `QueryBuilder` 빈 모두 같습니다.
 
 서비스 메서드에 `@Transactional`을 붙이거나 `TransactionTemplate`을 사용하십시오. 트랜잭션이 없으면 SQL을 보내기 전에 호출이 실패합니다.
@@ -537,8 +536,7 @@ try {
 | `@Transactional` 또는 `TransactionTemplate` 안의 수정, 삭제, 삽입, 업서트 | 그 트랜잭션에서 실행되고, 트랜잭션과 함께 롤백됩니다 |
 | 트랜잭션 밖의 수정, 삭제, 삽입, 업서트 | SQL을 보내기 전에 실패합니다. 아무것도 변경하지 않습니다(다음 표 참고) |
 
-[`ManualJavaSpringTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualJavaSpringTest.java), 영역 `detached`:
-
+<!-- region: ManualJavaSpringTest.java#detached -->
 ```java
 // outside a transaction each call uses a new EntityManager: the returned entity is detached
 Member kim = repository.findOne(m -> m.getName().equals("Kim")).orElseThrow();
@@ -558,9 +556,11 @@ DML을 자체 트랜잭션에서 실행하는 빌더는 `new QueryBuilder(entity
 | Spring `Sort`의 `ignoreCase()` | `UnsupportedOperationException` |
 | `STRICT` 모드에서 정렬 정책이 허용하지 않는 정렬 이름([12.5](#sort-policy-with-spring)) | `SortNotAllowedException`(`LQL-4040`), 변환하지 않음 |
 | 리포지토리 호출(단축 메서드, 또는 default 메서드 안의 `execute()`)에서 트랜잭션 없이 수정, 삭제, 삽입, 업서트 실행 | `InvalidDataAccessApiUsageException`. Spring이 JPA `TransactionRequiredException`을 변환한 예외입니다. 리포지토리 메서드 밖(`QueryBuilder` 빈)에서는 JPA `TransactionRequiredException` |
-| 규칙(U1, U3, U4, U6)을 어긴 대입 람다 | `LambdaQLException`(예: `TranslationException`, `LQL-3042`). 변환하지 않음([7.8](07-dml.md#rules-checked-at-analysis-time) 참고) |
+| 규칙(U1, U3, U4, U6)을 어긴 대입 람다 표현식 | `LambdaQLException`(예: `TranslationException`, `LQL-3042`). 변환하지 않음([7.8](07-dml.md#rules-checked-at-analysis-time) 참고) |
 
 `QueryBuilder` 빈(12.8)은 리포지토리가 아니므로 Spring의 예외 변환을 거치지 않습니다. 이 빈에서 `one()`과 `executeOne()`의 조건에 맞는 행이 2개 이상이면 `NonUniqueResultException`이 발생합니다.
+
+예제 코드: [`ManualJavaSpringTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualJavaSpringTest.java)(`detached`).
 
 <a id="127-other-fragments-and-jpaspecificationexecutor"></a>
 ## 12.7 다른 프래그먼트와 `JpaSpecificationExecutor`
@@ -569,20 +569,21 @@ DML을 자체 트랜잭션에서 실행하는 빌더는 `new QueryBuilder(entity
 
 | 함께 사용하는 대상 | 동작 여부 | 설명 |
 |---|---|---|
-| 직접 작성한 프래그먼트(`MemberRepositoryCustom`과 `MemberRepositoryImpl`) | 동작 | Spring Data가 평소와 같이 `Impl` 클래스를 찾음 |
-| `JpaSpecificationExecutor<T>` | 동작 | lambdaQL 람다는 인자가 하나, `Specification` 람다는 인자가 셋이므로 Java가 항상 올바른 `findAll`을 선택 |
+| 직접 작성한 프래그먼트(`MemberRepositoryCustom`과 `MemberRepositoryImpl`) | 동작 | Spring Data가 기존 방식대로 `Impl` 클래스를 찾음 |
+| `JpaSpecificationExecutor<T>` | 동작 | lambdaQL 람다 표현식은 인자가 하나, `Specification` 람다 표현식은 인자가 셋이므로 Java가 항상 올바른 `findAll`을 선택 |
 | `JpaRepository` 메서드(`findAll()`, `count()`, `save(...)`) | 동작 | 인자 타입이 다름 |
 
 다음 예제의 `repository`는 `MemberRepository`입니다.
 
-[`ManualJavaSpringTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualJavaSpringTest.java), 영역 `fragments`:
-
+<!-- region: ManualJavaSpringTest.java#fragments -->
 ```java
 long byHand = repository.countByHand();                                               // hand-written fragment
 List<Member> bySpec = repository.findAll((root, query, cb) -> cb.isTrue(root.get("active")));   // Specification: three arguments
 List<Member> byLambda = repository.findAll(m -> m.isActive());                        // lambdaQL Where: one argument
 long total = repository.count();                                                      // Spring Data's own count()
 ```
+
+예제 코드: [`ManualJavaSpringTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualJavaSpringTest.java)(`fragments`).
 
 <a id="128-the-querybuilder-bean"></a>
 ## 12.8 `QueryBuilder` 빈
@@ -594,8 +595,9 @@ Spring Boot에서는 자동 구성 `org.lambdaql.spring.boot.LambdaQlAutoConfigu
 - 리포지토리 메서드(`LambdaQlExecutor<T>`)에는 이 빈이 필요하지 않습니다.
 - 이 빈으로 만든 수정, 삭제, 삽입, 업서트 문장에도 리포지토리 메서드와 마찬가지로 호출자의 트랜잭션이 필요합니다. 트랜잭션이 없으면 SQL을 보내기 전에 `TransactionRequiredException`이 발생합니다.
 
-[`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java), 영역 `query-builder-bean`(`qb`는 주입받은 빈):
+`qb`는 주입받은 빈:
 
+<!-- region: AutoConfigurationTest.java#query-builder-bean -->
 ```java
 // inject it into a service: it joins the current transaction
 TransactionTemplate tx = new TransactionTemplate(txManager);
@@ -607,8 +609,7 @@ long seen = tx.execute(status -> {
 
 Spring Boot 없이 사용하거나 `EntityManagerFactory` 빈이 둘 이상이면 빈을 직접 만드십시오. 자동 구성과 마찬가지로 공유 `EntityManager`를 사용합니다.
 
-[`ManualJavaStartTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java), 영역 `config`:
-
+<!-- region: ManualJavaStartTest.java#config -->
 ```java
 @Configuration
 public static class LambdaQlConfig {
@@ -625,6 +626,8 @@ Spring 애플리케이션에서는 `new QueryBuilder(entityManagerFactory)`를 �
 
 **`@DataJpaTest` 테스트.** `@DataJpaTest` 슬라이스 테스트는 일부 자동 구성만 로드합니다. 리포지토리 메서드는 동작하지만 `QueryBuilder` 빈은 생성되지 않습니다.
 테스트에 이 빈이 필요하면 `@SpringBootTest`처럼 자동 구성 전체를 로드하는 테스트를 쓰십시오.
+
+예제 코드: [`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)(`query-builder-bean`), [`ManualJavaStartTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java)(`config`).
 
 <a id="129-kotlin-repositories"></a>
 ## 12.9 Kotlin 리포지토리

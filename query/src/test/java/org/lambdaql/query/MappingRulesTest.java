@@ -1,5 +1,7 @@
 package org.lambdaql.query;
 
+import static org.lambdaql.query.By.*;
+
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
@@ -71,16 +73,16 @@ class MappingRulesTest {
     void requiredAssociation() {
         // @start region="required-association"
         // order is optional = false: a sort or select path through it cannot lose rows, so it is an inner join
-        OrderedSelectQuery<OrderLine> sorted = qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getOrder().getPrice()));
+        OrderedSelectQuery<OrderLine> sorted = qb.from(OrderLine.class).orderBy(l -> asc(l.getOrder().getPrice()));
         assertEquals("select e0 from OrderLine e0 join e0.order j1 order by j1.price asc", sorted.toHql().hql());
         ValueQuery<Double> values = qb.from(OrderLine.class).select(l -> l.getOrder().getPrice());
         assertEquals("select j1.price from OrderLine e0 join e0.order j1", values.toHql().hql());
         // an association that can be missing keeps the left join (Order.customer)
         assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name asc nulls first",
-                qb.from(Order.class).orderBy((o, by) -> by.asc(o.getCustomer().getName())).toHql().hql());
+                qb.from(Order.class).orderBy(o -> asc(o.getCustomer().getName())).toHql().hql());
         // @end
-        assertEquals(3, inTransaction(q -> q.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getOrder().getPrice())).toList()).size());
-        assertEquals(prices, qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getOrder().getPrice()))
+        assertEquals(3, inTransaction(q -> q.from(OrderLine.class).orderBy(l -> asc(l.getOrder().getPrice())).toList()).size());
+        assertEquals(prices, qb.from(OrderLine.class).orderBy(l -> asc(l.getOrder().getPrice()))
                 .select(l -> l.getOrder().getPrice()).toList());
         assertEquals(prices, values.toList().stream().sorted(Comparator.naturalOrder()).toList());
     }
@@ -90,12 +92,12 @@ class MappingRulesTest {
         // @start region="unique-key"
         // code is @Column(unique = true, nullable = false): it orders every row, so paging adds no id tie-breaker
         assertEquals("select e0 from OrderLine e0 order by e0.code asc",
-                qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getCode())).limit(2).toHql().hql());
+                qb.from(OrderLine.class).orderBy(l -> asc(l.getCode())).limit(2).toHql().hql());
         // a key that is not unique still gets the id tie-breaker (S9)
         assertEquals("select e0 from OrderLine e0 join e0.order j1 order by j1.price asc, e0.id asc",
-                qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getOrder().getPrice())).limit(2).toHql().hql());
+                qb.from(OrderLine.class).orderBy(l -> asc(l.getOrder().getPrice())).limit(2).toHql().hql());
         // @end
-        assertEquals(List.of("memo-10.0", "memo-20.0"), inTransaction(q -> q.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getCode())).limit(2)
+        assertEquals(List.of("memo-10.0", "memo-20.0"), inTransaction(q -> q.from(OrderLine.class).orderBy(l -> asc(l.getCode())).limit(2)
                 .toList().stream().map(OrderLine::getCode).toList()));
     }
 
@@ -111,7 +113,7 @@ class MappingRulesTest {
             // @start region="lob"
             // memo is @Lob: H2 and MariaDB sort and group it, Oracle rejects it (ORA-22848, ORA-22849).
             // lambdaQL keeps the query and logs LQL-5010 at DEBUG
-            qb.from(OrderLine.class).orderBy((l, by) -> by.asc(l.getMemo())).toHql();
+            qb.from(OrderLine.class).orderBy(l -> asc(l.getMemo())).toHql();
             qb.from(OrderLine.class).groupBy(l -> l.getMemo()).select(l -> l.getMemo()).toHql();
             qb.from(OrderLine.class).select(l -> l.getMemo()).distinct().toHql();
             // @end
@@ -121,7 +123,7 @@ class MappingRulesTest {
             // @start region="enum-string-sort"
             // kind is @Enumerated(EnumType.STRING): the database sorts by name, Java by declaration order (LQL-5011, DEBUG)
             assertEquals("select e0 from Order e0 order by e0.kind asc nulls first",
-                    qb.from(Order.class).orderBy((o, by) -> by.asc(o.getKind())).toHql().hql());
+                    qb.from(Order.class).orderBy(o -> asc(o.getKind())).toHql().hql());
             // @end
             assertEquals(1, appender.list.stream().filter(e -> e.getFormattedMessage().startsWith("[LQL-5011]")).count(),
                     String.valueOf(appender.list));
@@ -140,7 +142,7 @@ class MappingRulesTest {
         em.getTransaction().commit();
         em.close();
         // @start region="embedded-compare"
-        // address is @Embedded (city, zip): comparing the whole value object compares each column (D48)
+        // address is @Embedded (city, zip): comparing the whole value object compares each column
         Address addr = new Address("Seoul", "04524");
         SelectQuery<Order> same = qb.from(Order.class).where(o -> o.getAddress().equals(addr));
         assertEquals("select e0 from Order e0 where e0.address.city = :p1 and e0.address.zip = :p2", same.toHql().hql());

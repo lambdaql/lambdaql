@@ -125,6 +125,50 @@ class KotlinRegressionTest {
         assertEquals("LQL-3062", error.code())
     }
 
+    @Test
+    fun twoStepPath() {
+        val em = emf.createEntityManager()
+        em.transaction.begin()
+        val kim = Customer(1, "Kim", null)
+        em.persist(kim)
+        val withCustomer = Order().apply { status = 7; price = 1.0; isActive = true; customer = kim }
+        val withoutCustomer = Order().apply { status = 7; price = 1.0; isActive = true }
+        em.persist(withCustomer)
+        em.persist(withoutCustomer)
+        for (o in listOf(withCustomer, withoutCustomer, null)) em.persist(Item().apply { order = o; price = 1.0; qty = 1 })
+        em.transaction.commit()
+        em.close()
+        // the comparison goes through !! at the last step: no item without an order or a customer can match,
+        // so both steps are inner joins
+        val kimItems = qb.from(Item::class.java).where { it.order?.customer!!.name == "Kim" }
+        assertEquals("select e0 from Item e0 join e0.order j1 join j1.customer j2 where j2.name = 'Kim'", kimItems.toHql().hql())
+        // ?. at both steps and "is null": an item without an order, or with an order without a customer, matches
+        val noName = qb.from(Item::class.java).where { it.order?.customer?.name == null }
+        assertEquals("select e0 from Item e0 left join e0.order j1 left join j1.customer j2 where j2.name is null",
+            noName.toHql().hql())
+        val read = emf.createEntityManager()
+        val items = read.createQuery("select i from Item i left join fetch i.order o left join fetch o.customer", Item::class.java).resultList
+        read.close()
+        assertEquals(items.filter { it.order?.customer?.name == "Kim" }.map { it.id }.sorted(), kimItems.toList().map { it.id }.sorted())
+        assertEquals(items.filter { it.order?.customer?.name == null }.map { it.id }.sorted(), noName.toList().map { it.id }.sorted())
+    }
+
+    @Test
+    fun hostValueIf() {
+        for (flag in listOf(true, false)) {
+            // @start region="host-if"
+            // flag and both values are captured values or constants: computed in Kotlin, bound as :p1
+            val q = qb.from(Order::class.java).where { it.status.toInt() == if (flag) 1 else 2 }
+            assertEquals("select e0 from Order e0 where e0.status = :p1", q.toHql().hql())
+            // @end
+            assertEquals(ids(orders().filter { it.status.toInt() == if (flag) 1 else 2 }), ids(q.toList()))
+        }
+        // a condition that reads the entity is not computed in Kotlin: it becomes case when
+        val q = qb.from(Order::class.java).where { it.status.toInt() == if (it.isActive) 1 else 2 }
+        assertEquals("select e0 from Order e0 where e0.status = case when e0.active = true then 1 else 2 end", q.toHql().hql())
+        assertEquals(ids(orders().filter { it.status.toInt() == if (it.isActive) 1 else 2 }), ids(q.toList()))
+    }
+
     /** Minimal Spring context: the datasource chosen by application-test.yaml and the test entities. */
     @EnableAutoConfiguration
     @AutoConfigurationPackage(basePackages = ["org.lambdaql.query"])

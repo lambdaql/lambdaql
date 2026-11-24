@@ -1,5 +1,7 @@
 package org.lambdaql.query;
 
+import static org.lambdaql.query.By.*;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.AfterAll;
@@ -206,7 +208,7 @@ class FunctionTest {
     void selectAndSort() {
         // @start region="select"
         ValueQuery<Priced> q = qb.from(Order.class)
-                .orderBy((o, by) -> by.desc(OrderFns.discount(o.getPrice())))
+                .orderBy(o -> desc(OrderFns.discount(o.getPrice())))
                 .select(o -> new Priced(o.getId(), OrderFns.discount(o.getPrice())));
         assertEquals("select e0.id, function('SQ_FN_DISCOUNT' as Double, e0.price) from Order e0"
                 + " order by function('SQ_FN_DISCOUNT' as Double, e0.price) desc nulls last", q.toHql().hql());

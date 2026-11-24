@@ -1,5 +1,7 @@
 package org.lambdaql.query;
 
+import static org.lambdaql.query.By.*;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -133,7 +135,7 @@ class ManualJavaSelectTest {
     void valuePage() {
         // @start region="value-page"
         ValueQuery<Double> paged = qb.from(Order.class)
-                .orderBy((o, by) -> by.desc(o.getPrice()))
+                .orderBy(o -> desc(o.getPrice()))
                 .select(o -> o.getPrice())
                 .limit(2).offset(1);
         // paging adds the id as the last sort key

@@ -1,5 +1,8 @@
 package org.lambdaql.engine.sem;
 
+import static org.lambdaql.query.By.*;
+import org.lambdaql.query.Nulls;
+
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.Test;
 import org.lambdaql.LambdaQLException;
@@ -53,13 +56,13 @@ class SortReaderTest {
 
     @Test
     void chainBecomesItems() {
-        assertEquals("[desc(col0.price), asc(col0.id)]", items((o, by) -> by.desc(o.getPrice()).asc(o.getId())));
-        // true / false come as the int constants 1 / 0
-        assertEquals("[asc(col0.description, 0)]", items((o, by) -> by.asc(o.getDescription(), false)));
+        assertEquals("[desc(col0.price), asc(col0.id)]", items(o -> desc(o.getPrice()).asc(o.getId())));
+        // the NULL position is a constant of the enum Nulls
+        assertEquals("[asc(col0.description, LAST)]", items(o -> asc(o.getDescription(), Nulls.LAST)));
         assertEquals("[sort(col0.customer.name, DESC_NULLS_LAST)]",
-                items((o, by) -> by.sort(o.getCustomer().getName(), Direction.DESC_NULLS_LAST)));
+                items(o -> sort(o.getCustomer().getName(), Direction.DESC_NULLS_LAST)));
         Direction dir = Direction.ASC;
-        assertEquals("[sort(col0.price, host(captured0))]", items((o, by) -> by.sort(o.getPrice(), dir)));
+        assertEquals("[sort(col0.price, host(captured0))]", items(o -> sort(o.getPrice(), dir)));
     }
 
     @Test
@@ -87,9 +90,9 @@ class SortReaderTest {
 
     @Test
     void notAChain() {
-        assertThrows(LambdaQLException.class, () -> items((o, by) -> by));
+        assertThrows(LambdaQLException.class, () -> items(o -> "x"));          // a key without the entity
         assertThrows(LambdaQLException.class,
-                () -> items((o, by) -> by.asc(o.getPrice(), o.isActive())));   // NULL position from the entity
+                () -> items(o -> sort(o.getPrice(), o.getPrice() > 1 ? Direction.ASC : Direction.DESC)));   // direction from the entity
     }
 
     @Test

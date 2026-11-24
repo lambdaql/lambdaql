@@ -45,10 +45,10 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.name=?
 
 -- @example null-guard
--- HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name = :p1
+-- HQL: select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1
 select …
 from orders o1_0
-join customers c1_0 on c1_0.id=o1_0.customer_id
+left join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is null or c1_0.name=?
 
 -- @example null-guard#2
@@ -118,10 +118,10 @@ from orders o1_0
 where o1_0.description not in (?,?)
 
 -- @example overview-first
--- HQL: select e0 from Order e0 join e0.customer j1 where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
+-- HQL: select e0 from Order e0 left join e0.customer j1 where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
 select …
 from orders o1_0
-join customers c1_0 on c1_0.id=o1_0.customer_id
+left join customers c1_0 on c1_0.id=o1_0.customer_id
 where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 
 -- @example start-captured
@@ -162,11 +162,11 @@ from orders o1_0
 where o1_0.customer_id=5
 
 -- @example null-guard-name-null
--- HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name is null
+-- HQL: select e0 from Order e0 left join e0.customer j1 where e0.customer is null or (e0.customer is not null and j1.name is null)
 select …
 from orders o1_0
-join customers c1_0 on c1_0.id=o1_0.customer_id
-where c1_0.id is null or c1_0.name is null
+left join customers c1_0 on c1_0.id=o1_0.customer_id
+where c1_0.id is null or (c1_0.id is not null and c1_0.name is null)
 
 -- @example sort-basic
 -- HQL: select e0 from Order e0 where e0.active = true order by e0.price desc, e0.id asc
@@ -424,13 +424,13 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.name='Kim' and o1_0.price>100.0
 
 -- @example not-null-assert
--- HQL: select e0 from Order e0 join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'
+-- HQL: select e0 from Order e0 left join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'
 select …
 from orders o1_0
-join customers c1_0 on c1_0.id=o1_0.customer_id
+left join customers c1_0 on c1_0.id=o1_0.customer_id
 where o1_0.status=1 or c1_0.name='Kim'
 
--- @example mixed-warn
+-- @example safe-and-assert
 -- HQL: select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' or j1.grade > 3
 select …
 from orders o1_0

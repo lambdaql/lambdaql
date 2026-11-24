@@ -65,9 +65,9 @@ Boot BOM은 모듈의 `gradle.properties`의 `lql.springBoot`로 고른다(루�
 
 | 항목 | 값 / 주의 |
 |---|---|
-| JDK | **21**(`jvm.version=21`) + **24 이상 하나**(`feature/boot4`, D52). 21은 기본 컴파일과 `test`, 24 이상은 `src/main/java24` 컴파일(`--release 24`)과 `testClassFile`. 버전은 `-Plql.classfile.jdk`(기본 25). Gradle이 찾을 수 있게 `~/.gradle/gradle.properties`의 `org.gradle.java.installations.paths`에 등록(이 PC: Homebrew `openjdk@25`) |
-| Gradle | wrapper **9.9.1**(`feature/boot4`, 2026-11-19. `main`은 8.10). 데몬 JVM은 `gradle/gradle-daemon-jvm.properties`(`toolchainVersion=21`)로 고정 |
-| IntelliJ | Gradle JVM을 21로 지정(`main`의 Gradle 8.10은 최신 JDK에서 "incompatible" 오류) |
+| JDK | **21**(`jvm.version=21`, Java toolchain) + **24 이상 하나**(D52). 21은 컴파일(Java·Kotlin)과 `test`, 24 이상은 `src/main/java24` 컴파일(`--release 24`)과 `testClassFile`. 버전은 `-Plql.classfile.jdk`(기본 25). 없는 JDK는 foojay toolchain resolver(`settings.gradle`, 2026-11-24)가 내려받음. 설치된 JDK를 못 찾으면 `~/.gradle/gradle.properties`의 `org.gradle.java.installations.paths`에 등록(이 PC: Homebrew `openjdk@25`) |
+| Gradle | wrapper **9.9.1**(`main`은 8.10). 데몬 JVM은 `gradle/gradle-daemon-jvm.properties`(`toolchainVersion=25`, 2026-11-24 21에서 변경)로 고정. 컴파일과 기본 테스트는 toolchain 21이라 데몬 JDK와 무관 |
+| IntelliJ | Gradle JVM을 25로 지정(데몬 JVM과 같게) |
 | 의존성 | `feature/boot4`: Spring Boot BOM 4.1.2(Hibernate ORM 7.4.13), Kotlin 2.3.21(테스트만), ASM 9.11.1(`implementation`: 사용자에게는 런타임 전용, 2026-11-19) |
 | ASM | 새 JDK 릴리스마다 최신 ASM으로 갱신한다. 구버전은 새 클래스 파일 버전을 읽지 못한다(D9). `feature/boot4`에서는 Java 21~23 실행에서만 쓰고, 24 이상은 `java.lang.classfile`(D52) |
 | 테스트 DB | `application-test.yaml`(H2, `ddl-auto: create-drop`). `-Dlql.db=mariadb|oracle`이면 `lql-db-<이름>.yaml`을 `spring.config.import`로 읽는다. 테이블은 `SqPrefixNamingStrategy`로 `SQ_` 접두가 붙는다 |
@@ -104,7 +104,7 @@ Javadoc 빌드는 `--snippet-path src/test/java`를 쓴다. Javadoc의 `{@snippe
 
 1. **번역**: `PENDING-TRANSLATION.md`의 항목을 en → ja → zh 순서로 반영한다(작성자 결정, 언어마다 순서대로). 31쪽이 한국어와 달라져 있어 바뀐 페이지를 통째로 다시 옮기는 방식이 정확하다. 2026-11-19에 en 작업을 시작했다가 작성자 요청으로 중지했다(변경 없음).
 2. **Spring Boot 4 지원**: `feature/boot4` 브랜치에서 진행 중(10절). 세 DB 테스트 통과, 남은 일은 jar 하나(D52) 구현과 매뉴얼 갱신.
-3. **남은 미구현·v0.2 후보**(9절과 ROADMAP 기준): MariaDB `lateral` 재작성(Q4), `SortSpec`의 조인 형태, 집계 기준 정렬, Oracle 오버로드 선택, 조건부 값(CASE WHEN), 일반 `LIKE`, insert의 조인, 엔티티 4개 이상 조인, 복합 키 엔티티의 `limit`·`executeOne()`, U11·U12·U15 검사.
+3. **남은 미구현·v0.2 후보**(9절과 ROADMAP 기준): MariaDB `lateral` 재작성(Q4), `SortSpec`의 조인 형태, 집계 기준 정렬, Oracle 오버로드 선택, CASE WHEN 2단계 이후, insert의 조인, 엔티티 4개 이상 조인, 복합 키 엔티티의 `limit`·`executeOne()`, U11·U12·U15 검사.
 
 ---
 
@@ -238,6 +238,15 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 
 ---
 
+### 10.7 벤치마크 중에 바꾼 코드(2026-11-23)
+
+- 집계 쿼리에서 JPQL과의 차이를 찾으려고 JMH 스택 프로파일러로 살폈다(결과는 `docs/design/BENCHMARK.md`).
+- 바꾼 것(커밋 `bc7e73e`):
+  - 쿼리마다 `Class.forName`으로 찾던 결과 생성자를 영속성 단위별로 캐시한다(`QueryContext.Shared.projectors`).
+  - 람다마다 새로 만들던 `ObjectOutputStream`을 스레드별로 재사용한다(`SerializedLambdaExtractor`).
+- 두 변경의 효과는 측정 오차 안이었다(실측).
+- 렌더링 결과(HQL)는 캐시하지 않는다. 같은 람다라도 캡처 값에 따라 HQL이 달라질 수 있기 때문이다(값이 `null`이면 `is null`, 정수 열과 소수 값, IN 목록 펼치기).
+
 ### 10.6 매뉴얼 예제의 테스트화(D56, 2026-11-23)
 
 - 매뉴얼의 (테스트됨) 표시를 4개 언어에서 지웠다. 모든 lambdaQL 코드 예제는 테스트 구간의 사본이다.
@@ -271,9 +280,12 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 | DB 함수(`@SqlFunction`, 쿼리 안 함수, 단독 호출) | 구현됨, 세 DB 테스트 | 아니오 | D31, FN1~FN11 |
 | SARGable 경고와 모드(`SargableMode`, `lambdaql.sargable.mode`), 열 산술 검출 | 구현됨, 세 DB 테스트 | 아니오 | PR8, D50 |
 | SQL 의미 원칙(엔티티 값 비교, null 캡처 값, 정수 열과 소수 값) | 구현됨, 세 DB 테스트 | 일부 | D48(B1~B8) |
-| Kotlin `?.`·`!!`에 따른 where 조인 구분(`?.`는 필요할 때 `left join`, 섞이면 `LQL-5014`) | `feature/boot4`에서 구현(2026-11-19), 다섯 DB 테스트 | 예(`safe-call-*`, `not-null-assert`, `mixed-warn`, `update-safe-call`) | D54 |
+| where 연관 경로의 조인 판정(연관 행이 없어도 전체 조건이 참이 될 수 있을 때만 `left join`, `LQL-5014` 폐지) | 2026-11-24 재개정 구현, H2 테스트. 다섯 DB 미실행 | 예(`safe-call-*`, `not-null-assert`, `safe-and-assert`, `update-safe-call`) | D54 |
 | 메시지와 오류 코드(`[LQL-xxxx]`, 4개 언어, `lambdaql.locale`) | 구현됨, 단위 테스트 | – | D33 |
 | Kotlin 엘비스(`?:`, 문자열·숫자·`set` 값은 `coalesce`), 범위(`in a..b`는 비교 두 개, `downTo`·`step`은 `in` 목록), 조건 형태의 `when`(상수 1개, String 2개, 범위 분기, 대상 없는 `when {}`) | 구현됨, H2 테스트(2026-11-23). 다섯 DB 실행은 전체 테스트로 | 예(`ManualKotlin*Test`, `KotlinRegressionTest`) | D21, D22, R13~R23 |
+| 정렬 API(`By.asc/desc/sort`, `Nulls`, `SortKeys`) | 2026-11-24 구현, H2 테스트 | 예 | D59 |
+| 텍스트 일치(`startsWith`, `endsWith`, `contains`를 `like ... escape '!'`로, Kotlin `ignoreCase`) | 2026-11-24 구현, H2 테스트 | 예(`KotlinLikeTest`) | D60 |
+| 값을 고르는 조건: 캡처 값만이면 바인드 파라미터, 엔티티 값이면 `case when`(where 비교, select, groupBy, 정렬 키, set 값) | 2026-11-24 구현(CASE WHEN 1단계), H2 테스트. 다른 DB SQL 답안 미검증 | 예(`KotlinCaseWhenTest`, `KotlinRegressionTest`) | D61, D62 |
 | 분석 캐시(EntityManagerFactory별 공유) | 구현됨 | – | D47 |
 | Spring Data JPA 모듈(`LambdaQlExecutor<T>`, `Sort`, `Pageable`, DML 단축 메서드, 자동 구성) | 구현됨, 다섯 DB·Spring Boot 3.5.16·4.1.2 테스트. DML에는 호출자 트랜잭션 필요 | 예(`spring-data-jpa/src/test/kotlin`, 2026-11-23) | D34, D39, M12 |
 
@@ -283,7 +295,7 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 |---|---|
 | 모든 경고를 오류로 바꾸는 일반 엄격 모드 | 미구현(정렬 정책과 SARGable에는 STRICT가 있음) |
 | MariaDB `lateral` 쿼리의 `row_number()` 재작성 | 미구현(Q4). 오답 재현 테스트부터 필요 |
-| 집계 기준 정렬, Oracle 오버로드 선택, 조건부 값(CASE WHEN), 일반 `LIKE`(`startsWith` 등) | v0.2 후보 |
+| 집계 기준 정렬, Oracle 오버로드 선택, CASE WHEN 2단계 이후(boolean `c ? x : y`, 대상이 있는 `when`) | v0.2 후보 |
 | insert의 조인, 엔티티 4개 이상 조인, 서브쿼리 안 엔티티 3개 이상 | 이후 |
 | UPDATE·DELETE의 명시적 조인 | 추가하지 않음(D51, 연관 경로 U9와 `sub` 사용) |
 | 복합 키 엔티티의 `limit`·`executeOne()` | 미구현 |

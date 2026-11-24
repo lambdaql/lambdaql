@@ -35,6 +35,7 @@ import java.util.List;
 public final class SortReader {
 
     private static final String BY = "org/lambdaql/query/By";
+    private static final String SORT_KEYS = "org/lambdaql/query/SortKeys";
 
     private final List<Class<?>> roots;
     private final EntityModel model;
@@ -60,10 +61,46 @@ public final class SortReader {
      *                                 or a key cannot become SQL
      */
     public static List<SortItem> readSortBy(LambdaRef ref, List<Class<?>> roots, EntityModel model) {
-        if (!ref.isLambdaBody()) {
-            throw LqlMessage.METHOD_REFERENCE_IN_SORT_BUILDER.exceptionAt(ref.describe());
+        SortReader r = new SortReader(ref, roots, model);
+        if (!ref.isLambdaBody()) {                         // Order::getPrice: one key, ascending
+            return List.of(new SortItem(r.key(getterReference(ref)), SortItem.Kind.ASC, null));
         }
-        return new SortReader(ref, roots, model).chain(body(ref));
+        Expr top = body(ref);
+        if (isChain(top)) return r.chain(top);             // desc(o.getPrice()).asc(o.getId())
+        return List.of(new SortItem(r.key(top), SortItem.Kind.ASC, null));   // o -> o.getPrice()
+    }
+
+    /**
+     * Tells whether the value of a sort lambda is made with the functions of {@code By}
+     * ({@code desc(o.getPrice()).asc(o.getId())}) and not a plain key ({@code o.getPrice()}).
+     *
+     * <p>Example: the body of {@code o -> desc(o.getPrice())} is a chain; the body of {@code o -> o.getPrice()} is not.
+     *
+     * @param e the decoded value of the lambda
+     * @return {@code true} for a call of {@code By} or {@code SortKeys}
+     */
+    static boolean isChain(Expr e) {
+        while (e instanceof Expr.Convert c) e = c.operand();
+        return e instanceof Expr.Invoke inv
+                && (inv.method().owner().equals(SORT_KEYS) || inv.method().owner().equals(BY) && inv.receiver() == null);
+    }
+
+    /**
+     * Tells whether a sort body picks a whole chain of {@code By} calls by a condition. Such a body is rejected
+     * with {@code LQL-2023}; a condition inside one key ({@code o.isActive() ? 0 : 1}) is allowed.
+     *
+     * <p>Example: {@code flag ? desc(o.getPrice()) : asc(o.getId())} returns {@code true}.
+     *
+     * @param e the decoded body
+     * @return {@code true} if a branch value is a sort chain
+     */
+    static boolean choosesChain(Expr e) {
+        while (e instanceof Expr.Convert c) e = c.operand();
+        return switch (e) {
+            case Expr.Case c -> c.values().stream().anyMatch(SortReader::isChain) || isChain(c.otherwise());
+            case Expr.Choose c -> isChain(c.whenTrue()) || isChain(c.whenFalse());
+            default -> false;
+        };
     }
 
     /**
@@ -81,6 +118,7 @@ public final class SortReader {
     public static Expr readSortKey(LambdaRef ref, Class<?> root, EntityModel model) {
         SortReader r = new SortReader(ref, List.of(root), model);
         Expr raw = ref.isLambdaBody() ? body(ref) : getterReference(ref);
+        if (isChain(raw)) throw r.error(LqlMessage.SORT_KEYS_WITH_DIRECTION);
         return r.key(raw);
     }
 
@@ -159,25 +197,26 @@ public final class SortReader {
 
     private static Expr body(LambdaRef ref) {
         Node node = Decoder.decodeValue(ref, BytecodeLoader.load(ref));
-        if (node instanceof Node.Value v) return v.value();
+        if (node instanceof Node.Value v && !choosesChain(v.value())) return v.value();
         throw LqlMessage.CONDITION_IN_SORT.exceptionAt(ref.describe());
     }
 
     private List<SortItem> chain(Expr top) {
-        int byIndex = roots.size();
         List<SortItem> items = new ArrayList<>();
         Expr e = top;
         while (true) {
             while (e instanceof Expr.Convert c) e = c.operand();
-            if (e instanceof Expr.Param p && p.index() == byIndex) break;
-            if (e instanceof Expr.Invoke inv && inv.receiver() != null && inv.method().owner().equals(BY)) {
-                items.add(0, item(inv));
+            if (e instanceof Expr.Invoke inv && inv.receiver() != null && inv.method().owner().equals(SORT_KEYS)) {
+                items.add(0, item(inv));                   // .asc(...) after the first key
                 e = inv.receiver();
                 continue;
             }
+            if (e instanceof Expr.Invoke inv && inv.receiver() == null && inv.method().owner().equals(BY)) {
+                items.add(0, item(inv));                   // the first key: By.desc(...)
+                break;
+            }
             throw error(LqlMessage.SORT_NOT_CHAIN, e);
         }
-        if (items.isEmpty()) throw error(LqlMessage.SORT_NO_KEY);
         return List.copyOf(items);
     }
 

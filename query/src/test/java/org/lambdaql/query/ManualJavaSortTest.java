@@ -1,5 +1,7 @@
 package org.lambdaql.query;
 
+import static org.lambdaql.query.By.*;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.AfterEach;
@@ -87,7 +89,7 @@ class ManualJavaSortTest {
         // @start region="sort-overview"
         OrderedSelectQuery<Order> page = qb.from(Order.class)
                 .where(o -> o.isActive())
-                .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getCustomer().getName()).asc(o.getId()))
+                .orderBy(o -> desc(o.getPrice()).asc(o.getCustomer().getName()).asc(o.getId()))
                 .limit(2).offset(2);
         assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.active = true"
                 + " order by e0.price desc, j1.name asc nulls first, e0.id asc", page.toHql().hql());
@@ -107,13 +109,13 @@ class ManualJavaSortTest {
         // @start region="sort-direction"
         // the second argument: false = NULL last
         OrderedSelectQuery<Order> nullsLast = qb.from(Order.class)
-                .orderBy((o, by) -> by.desc(o.getDescription(), false).asc(o.getId()));
+                .orderBy(o -> desc(o.getDescription(), Nulls.LAST).asc(o.getId()));
         assertEquals("select e0 from Order e0 order by e0.description desc nulls last, e0.id asc",
                 nullsLast.toHql().hql());
         // a direction from a variable: the ternary runs outside the lambda
         Direction dir = newestFirst ? Direction.DESC : Direction.ASC;
         OrderedSelectQuery<Order> newest = qb.from(Order.class)
-                .orderBy((o, by) -> by.sort(o.getUpdateAt(), dir).asc(o.getId()));   // dir is read on every call
+                .orderBy(o -> sort(o.getUpdateAt(), dir).asc(o.getId()));   // dir is read on every call
         assertEquals("select e0 from Order e0 order by e0.updateAt desc nulls last, e0.id asc", newest.toHql().hql());
         // @end
         assertEquals(all.stream().sorted(Comparator.comparing(Order::getUpdateAt).reversed()).map(Order::getId).toList(),
@@ -129,14 +131,14 @@ class ManualJavaSortTest {
         // @start region="sort-body"
         // allowed: a simple chain of by calls
         assertEquals("select e0 from Order e0 order by e0.price desc, e0.id asc",
-                qb.from(Order.class).orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId())).toHql().hql());
-        // rejected: a key chosen by a condition
+                qb.from(Order.class).orderBy(o -> desc(o.getPrice()).asc(o.getId())).toHql().hql());
+        // rejected: sort functions chosen by a condition (a condition inside one key is allowed)
         LambdaQLException choice = assertThrows(LambdaQLException.class,
-                () -> qb.from(Order.class).orderBy((o, by) -> flag ? by.desc(o.getPrice()) : by.asc(o.getId())));
+                () -> qb.from(Order.class).orderBy(o -> flag ? desc(o.getPrice()) : asc(o.getId())));
         assertEquals("LQL-2023", choice.code());
         // rejected: a key without the entity
         LambdaQLException constant = assertThrows(LambdaQLException.class,
-                () -> qb.from(Order.class).orderBy((o, by) -> by.asc(1)));
+                () -> qb.from(Order.class).orderBy(o -> asc(1)));
         assertEquals("LQL-3031", constant.code());
         // @end
     }
@@ -146,7 +148,7 @@ class ManualJavaSortTest {
         // @start region="page"
         OrderedSelectQuery<Order> page = qb.from(Order.class)
                 .where(o -> o.getStatus() == 1)
-                .orderBy((o, by) -> by.desc(o.getPrice()))
+                .orderBy(o -> desc(o.getPrice()))
                 .limit(2)       // page size
                 .offset(2);     // skip 2 rows (page 2)
         assertEquals("select e0 from Order e0 where e0.status = 1 order by e0.price desc, e0.id asc",
@@ -163,11 +165,11 @@ class ManualJavaSortTest {
         // @start region="sort-arith"
         // arithmetic on columns
         OrderedSelectQuery<Order> doubled = qb.from(Order.class)
-                .orderBy((o, by) -> by.desc(o.getPrice() * 2).asc(o.getId()));
+                .orderBy(o -> desc(o.getPrice() * 2).asc(o.getId()));
         assertEquals("select e0 from Order e0 order by (e0.price * 2.0) desc, e0.id asc", doubled.toHql().hql());
         // a widening conversion (short to long)
         OrderedSelectQuery<Order> widened = qb.from(Order.class)
-                .orderBy((o, by) -> by.asc((long) o.getStatus()).asc(o.getId()));
+                .orderBy(o -> asc((long) o.getStatus()).asc(o.getId()));
         assertEquals("select e0 from Order e0 order by e0.status asc, e0.id asc", widened.toHql().hql());
         // @end
         assertEquals(all.stream().sorted(Comparator.comparing(Order::getPrice).reversed()).map(Order::getId).toList(),

@@ -168,6 +168,7 @@ public final class SelectReader {
             case Expr.Arith a -> hasAggregate(a.left()) || hasAggregate(a.right());
             case Expr.Neg n -> hasAggregate(n.operand());
             case Expr.Coalesce c -> hasAggregate(c.first()) || hasAggregate(c.second());
+            case Expr.Case c -> c.exprs().stream().anyMatch(SelectReader::hasAggregate);
             default -> false;
         };
     }
@@ -185,6 +186,7 @@ public final class SelectReader {
             case Pred.IsNull n -> bare(n.operand(), out);
             case Pred.Truth t -> bare(t.operand(), out);
             case Pred.In in -> bare(in.value(), out);
+            case Pred.Like l -> bare(l.value(), out);
             case Pred.Bool b -> { }
         }
         return out;
@@ -202,6 +204,7 @@ public final class SelectReader {
                 bare(c.first(), out);
                 bare(c.second(), out);
             }
+            case Expr.Case c -> c.exprs().forEach(x -> bare(x, out));
             default -> { }
         }
     }

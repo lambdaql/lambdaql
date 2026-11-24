@@ -8,95 +8,83 @@
 <a id="what-is-lambdaql"></a>
 ## lambdaQL이란?
 
-lambdaQL은 JPA와 Hibernate 7.4 위에서 동작하는 Java와 Kotlin용 쿼리 라이브러리입니다.
+lambdaQL은 JPA와 Hibernate 위에서 동작하는 Java·Kotlin용 쿼리 라이브러리입니다.
 
-- 쿼리를 **람다**로 작성합니다.
-- lambdaQL은 각 람다의 **바이트코드를 읽습니다**. 람다를 **절대 실행하지 않습니다**.
-- lambdaQL은 바이트코드로부터 **HQL**(Hibernate Query Language)을 만듭니다.
-- 람다에 직접 쓴 상수(`1`, `100.0`, `"Kim"`)는 HQL에 그대로 씁니다. 람다가 캡처한 값은 **바인드 파라미터**가 됩니다.
-- Hibernate가 데이터베이스에서 HQL을 실행합니다.
+- lambdaQL은 JPA 쿼리를 **람다 표현식**을 활용하여 표현하고 작성합니다.
+- 람다 표현식 부분을 실행하지 않고 **분석하여 쿼리로 변환합니다**.
+- lambdaQL은 메서드와 람다 표현식 실행 결과를 **HQL(JPQL)** 쿼리로 만듭니다.
 
 ### Java
 
-[`ManualSharedTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java), 영역 `overview-first`:
-
+<!-- region: ManualSharedTest.java#overview-first -->
 ```java
 long minPrice = 100;
 
 SelectQuery<Order> q = qb.from(Order.class)
         .where(o -> o.getStatus() == 1 || o.getCustomer().getName().equals("Kim"))
         .where(o -> o.getPrice() > minPrice);
-assertEquals("select e0 from Order e0 join e0.customer j1"
+assertEquals("select e0 from Order e0 left join e0.customer j1"
         + " where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1", q.toHql().hql());
 List<Order> rows = q.toList();
 ```
 
 ### Kotlin
 
-[`ManualKotlinSharedTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSharedTest.kt), 영역 `overview-first`:
-
+<!-- region: ManualKotlinSharedTest.kt#overview-first -->
 ```kotlin
 val minPrice = 100.0
 
 val q = qb.from(Order::class.java)
-    .where { it.status.toInt() == 1 || it.customer?.name == "Kim" }
+    .where { it.status.toInt() == 1 || it.customer!!.name == "Kim" }
     .where { it.price > minPrice }
-// ?. says the customer may be missing: a left join (D54)
 assertEquals("select e0 from Order e0 left join e0.customer j1"
     + " where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1", q.toHql().hql())
 val rows = q.toList()
 ```
 
 <a id="hql-the-same-for-both"></a>
-### HQL
-
-Java:
-
-```
-select e0 from Order e0 join e0.customer j1
-where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
-```
-
-Kotlin(`?.`로 지난 연관은 필요할 때 `left join`, 결정 D54):
+### HQL (두 언어 모두 동일)
 
 ```
 select e0 from Order e0 left join e0.customer j1
 where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1
 ```
 
-**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다.
+**데이터베이스별 SQL**
 
-**데이터베이스별 SQL (Java 예제)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `overview-first`:
-
+<!-- sql: overview-first -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-join customers c1_0 on c1_0.id=o1_0.customer_id
+left join customers c1_0 on c1_0.id=o1_0.customer_id
 where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 ```
 
-두 `where` 호출은 `AND`로 결합됩니다.
-상수 `"Kim"`은 리터럴이고, 캡처한 `minPrice`는 바인드 파라미터(`:p1`)입니다.
-`where`의 `o.getCustomer().getName()` 같은 경로는 기본적으로 inner `join`입니다. Java 예제는 고객이 없는 주문을 반환하지 않습니다.
-Java라면 status가 1인 주문은 고객이 없어도 조건에 맞지만, lambdaQL은 SQL 의미를 사용합니다(결정 D48). 이런 주문을 유지하려면 `leftJoin`을 사용하십시오.
-Kotlin 예제는 `?.`로 "고객이 없을 수 있음"을 적었으므로 `left join`이 되고, status가 1이며 고객이 없는 주문도 반환합니다(결정 D54). `!!`로 쓰면 Java와 같은 inner join입니다.
+- 두 `where` 호출은 `AND`로 결합됩니다.
+- 상수 `"Kim"`은 리터럴로 쿼리에 기록되고, 캡처한 `minPrice`는 바인드 파라미터(`:p1`)로 처리됩니다.
+- `where`에서 `o.getCustomer().getName()`처럼 연관 엔티티의 속성을 쓰면, lambdaQL은 고객 테이블을 조인합니다.
+  고객이 없는 주문이 조건에 맞을 수 있으면 `left join`, 맞을 수 없으면 inner `join`입니다.
+  - 위 예제는 status가 1인 주문이면 고객이 없어도 조건에 맞으므로 `left join`입니다. 
+  - Where 조건이 `o.getCustomer().getName().equals("Kim")` 하나뿐이라면 inner `join`입니다.
 
-람다는 평범한 Java나 Kotlin 코드처럼 보입니다.
-하지만 람다는 Java나 Kotlin 문법으로 쓴 **쿼리 언어**입니다.
-`o.getCustomer().getName()`(Kotlin에서는 `it.customer?.name`)은 getter를 호출하지 않습니다. **컬럼을 가리킵니다**.
+람다 표현식은 평범한 Java나 Kotlin 코드처럼 보입니다.
+하지만 lambdaQL에서 람다 표현식은 Java나 Kotlin 문법으로 쓴 **쿼리 언어**입니다.
+`o.getCustomer().getName()`(Kotlin에서는 `it.customer?.name`)은 getter를 호출하지 않으며 **컬럼명으로 평가됩니다.**.
+
+예제 코드: [`ManualSharedTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java)(`overview-first`), [`ManualKotlinSharedTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSharedTest.kt)(`overview-first`).
 
 <a id="why-lambdaql"></a>
 ## 왜 lambdaQL인가?
 
 | 목표 | lambdaQL의 방법 |
 |---|---|
-| 타입 안전성 | 컴파일러가 람다를 검사합니다. IDE에서 속성 이름을 바꾸면 쿼리의 이름도 함께 바뀝니다. |
+| 타입 안전성 | 컴파일러가 람다 표현식을 검사합니다. IDE에서 속성 이름을 바꾸면 쿼리의 이름도 함께 바뀝니다. |
 | 생성 코드 없음 | 메타모델 생성기나 Q-클래스가 필요 없습니다. lambdaQL은 Hibernate가 실행 시점에 이미 가지고 있는 JPA Metamodel을 사용합니다. |
 | 익숙한 문법 | 이미 알고 있는 `==`, `&&`, `\|\|`, `!`, getter나 속성, 메서드 호출을 사용합니다. |
 | 안전한 값 | 캡처 값과 계산한 값은 항상 바인드 파라미터가 됩니다. 코드에 컴파일된 상수만 쿼리 텍스트에 씁니다(작은따옴표는 escape함). |
-| 람다를 실행하지 않음 | 엔티티 객체를 만들지 않습니다. getter를 호출하지 않습니다. 람다에서 `NullPointerException`이 발생하지 않습니다. |
-| 명확한 오류 | lambdaQL이 번역할 수 없는 형태의 람다가 있으면 코드가 붙은 오류를 던집니다. 추측하지 않습니다. |
+| 람다 표현식을 분석하여 변환 | 람다 표현식 부분을 실행하지 않고 분석합니다. 엔티티 객체를 만들지 않고 getter를 호출하지 않으므로 직관적인 쿼리문을 만들 수 있습니다. |
+| 분석 실패는 오류 | lambdaQL은 람다 표현식을 쿼리로 분석하지 못하면 코드가 붙은 예외를 던집니다. |
 
 <a id="how-it-works-5-steps"></a>
 ## 동작 방식 (5단계)
@@ -107,35 +95,37 @@ Kotlin 예제는 `?.`로 "고객이 없을 수 있음"을 적었으므로 `left 
      result ◄── 5. run with Hibernate ◄── 4. build HQL ◄──────┘
 ```
 
-| 단계 | 하는 일 | 상태 |
-|---|---|---|
-| 1. 람다 본문 찾기 | 람다는 `Serializable`입니다. lambdaQL은 직렬화 훅을 통해 `SerializedLambda`를 얻습니다(`setAccessible` 없음). 이를 통해 어떤 메서드가 람다 본문을 담고 있는지, 어떤 값이 캡처되었는지 알 수 있습니다. | 구현됨 |
-| 2. 바이트코드 읽기 | lambdaQL은 그 메서드 하나만 읽습니다. Java 21~23에서는 ASM을, Java 24 이상에서는 JDK의 `java.lang.classfile`을 씁니다. 클래스 파일을 읽을 뿐 코드를 실행하지 않습니다. | 구현됨 |
-| 3. 조건 다시 만들기 | Java와 Kotlin은 `&&`, `\|\|`, `!`를 점프로 컴파일합니다. lambdaQL은 이 점프로부터 원래의 논리 트리를 다시 만듭니다. | 구현됨. Kotlin 전용 형태 중 `?.`, `!!`, `?:`(`coalesce`), 컬렉션의 `in`, 범위의 `in`(`a..b`)을 테스트함 |
-| 4. HQL 만들기 | getter와 속성은 JPA 속성 경로가 됩니다(`o.getPrice()` 또는 `it.price` → `e0.price`). 람다 안의 상수는 리터럴이 되고, 캡처 값은 파라미터(`:p1`)가 됩니다. | 구현됨 |
-| 5. 실행 | lambdaQL은 파라미터를 바인딩하고 Hibernate로 HQL을 실행합니다. 각 람다의 분석 결과는 캐시되므로 바이트코드는 한 번만 읽습니다. | `toList()`와 `toSet()`(`limit` / `offset` 포함), `first()`, `one()`, `count()`, `exists()`에 대해 구현됨 |
+| 단계 | 하는 일 |
+|---|---|
+| 1. 람다 표현식 본문 찾기 | lambdaQL은 람다 표현식의 본문이 컴파일된 위치와 람다 표현식이 캡처한 값을 찾습니다. |
+| 2. 바이트 opcode 읽기 | lambdaQL은 1단계에서 찾은 람다 표현식 본문의 컴파일된 코드(바이트 opcode)를 읽습니다. 코드를 실행하지는 않습니다. Java 21~23에서는 ASM을, Java 24 이상에서는 JDK의 `java.lang.classfile`을 씁니다. |
+| 3. 조건 다시 만들기 | Java와 Kotlin은 `&&`, `\|\|`, `!`를 점프 opcode로 컴파일합니다. lambdaQL은 이 점프 opcode로부터 원래의 논리 트리를 다시 만듭니다. |
+| 4. HQL 만들기 | getter와 속성은 JPA 속성 경로가 됩니다(`o.getPrice()` 또는 `it.price` → `e0.price`). 람다 표현식 안의 상수는 리터럴이 되고, 캡처 값은 파라미터(`:p1`)가 됩니다. |
+| 5. 실행 | lambdaQL은 파라미터를 바인딩하고 Hibernate로 HQL을 실행합니다. 각 람다 표현식의 분석 결과는 캐시되므로 바이트 opcode는 한 번만 읽습니다. |
 
-람다 하나를 읽는 데는 몇 마이크로초가 걸립니다. 캐시 덕분에 lambdaQL은 람다의 바이트코드를 한 번만 읽습니다.
+lambdaQL은 람다 표현식마다 분석 결과를 캐시하므로 바이트 opcode는 한 번만 읽고 분석합니다.   
+새 JVM의 첫 호출은 람다 표현식 분석 때문에 JPQL보다 약 26ms 더 걸리지만, 그 이후 쿼리마다 더해지는 비용은 약 0.5~3µs로 매우 적습니다(H2 실측, [벤치마크](../../design/BENCHMARK.md)).
 
-lambdaQL에 전달하는 Kotlin 람다 리터럴은 Java 람다와 같은 종류의 직렬화 가능한 람다로 컴파일됩니다.
+
+lambdaQL에 전달하는 Kotlin 람다 표현식 리터럴은 Java 람다 표현식과 같은 종류의 직렬화 가능한 람다 표현식으로 컴파일됩니다.
 그래서 하나의 엔진으로 두 언어를 모두 읽을 수 있습니다.
 
 <a id="design-principles"></a>
 ## 설계 원칙
 
 <a id="one-lambda-per-clause"></a>
-### 절마다 람다 하나
+### 쿼리 절마다 람다 표현식 하나
 
-각 절은 람다 **하나**를 받습니다. 컬럼마다 람다를 하나씩 쓰지 않습니다.
+`where`, `orderBy`, `select` 같은 쿼리 절은 각각 람다 표현식 **하나**를 받습니다.
+각 절의 람다 표현식 하나에 조회할 컬럼이나 정렬 키를 모두 적습니다.
 
 #### Java
 
-[`ManualSharedTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java), 영역 `one-lambda-per-clause`:
-
+<!-- region: ManualSharedTest.java#one-lambda-per-clause -->
 ```java
 ValueQuery<OrderView> q = qb.from(Order.class)
         .where(o -> o.getStatus() == 1 && o.isActive())                 // one condition lambda
-        .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId()))     // one sort lambda for all keys
+        .orderBy(o -> desc(o.getPrice()).asc(o.getId()))     // one sort lambda for all keys
         .select(o -> new OrderView(o.getId(), o.getPrice()));          // one select lambda
 assertEquals("select e0.id, e0.price from Order e0 where e0.status = 1 and e0.active = true"
         + " order by e0.price desc, e0.id asc", q.toHql().hql());
@@ -143,30 +133,28 @@ assertEquals("select e0.id, e0.price from Order e0 where e0.status = 1 and e0.ac
 
 #### Kotlin
 
-[`ManualKotlinSharedTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSharedTest.kt), 영역 `one-lambda-per-clause`:
-
+<!-- region: ManualKotlinSharedTest.kt#one-lambda-per-clause -->
 ```kotlin
 val q = qb.from(Order::class.java)
     .where { it.status.toInt() == 1 && it.isActive }               // one condition lambda
-    .orderBy { o, by -> by.desc(o.price).asc(o.id) }               // one sort lambda for all keys
+    .orderBy { o -> desc(o.price).asc(o.id) }               // one sort lambda for all keys
     .select { OrderView(it.id, it.price) }                         // one select lambda
 assertEquals("select e0.id, e0.price from Order e0 where e0.status = 1 and e0.active = true"
     + " order by e0.price desc, e0.id asc", q.toHql().hql())
 ```
 
-정렬 빌더 `by`나 서브쿼리 팩토리 `sub` 같은 헬퍼는 **람다 인자**입니다.
-이름은 마음대로 지을 수 있습니다. 이 매뉴얼에서는 `by`와 `sub`를 사용합니다.
-
 <a id="no-static-helpers-except-agg"></a>
-### `Agg`와 `Dml`을 제외하면 정적 헬퍼가 없음
+### 정적 헬퍼 `By`, `Agg`, `Dml`
 
-정적 헬퍼 클래스는 두 개뿐입니다. 집계(`count`, `sum`, `avg`, `min`, `max`, `countDistinct`)를 위한 `org.lambdaql.Agg`와, setter가 없는 엔티티에 값을 대입하는 `org.lambdaql.Dml`(`Dml.value(column, value)`, 결정 D49)입니다.
-두 클래스의 정적 임포트는 선택 사항입니다.
+| 클래스 | 용도 |
+|---|---|
+| `org.lambdaql.query.By` | 정렬 함수(`asc`, `desc`, `sort`) |
+| `org.lambdaql.Agg` | 집계(`count`, `sum`, `avg`, `min`, `max`, `countDistinct`) |
+| `org.lambdaql.Dml` | setter가 없는 엔티티에 값 대입(`Dml.value(column, value)`) |
 
 #### Java
 
-[`ManualSharedTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java), 영역 `agg`:
-
+<!-- region: ManualSharedTest.java#agg -->
 ```java
 ValueQuery<CustomerTotal> q = qb.from(Order.class)
         .groupBy(o -> o.getCustomer().getId())
@@ -178,8 +166,7 @@ assertEquals("select e0.customer.id, count(*), sum(e0.price) from Order e0 group
 
 #### Kotlin
 
-[`ManualKotlinSharedTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSharedTest.kt), 영역 `agg`:
-
+<!-- region: ManualKotlinSharedTest.kt#agg -->
 ```kotlin
 val q = qb.from(Order::class.java)
     .groupBy { it.customer?.id }
@@ -189,11 +176,8 @@ assertEquals("select e0.customer.id, count(*), sum(e0.price) from Order e0 group
     + " having sum(e0.price) > 1000.0", q.toHql().hql())
 ```
 
-직접 만든 데이터베이스 함수도 정적 메서드이지만, 선언은 직접 합니다
-(8. 프로시저와 DB 함수 참고: [Java](java/08-procedures-functions.md) | [Kotlin](kotlin/08-procedures-functions.md)).
-
 <a id="a-lambda-is-a-query-not-code"></a>
-### 람다는 코드가 아니라 쿼리
+### 람다 표현식은 코드가 아니라 쿼리 표현식
 
 lambdaQL은 Java나 Kotlin의 실행 규칙이 아니라 문서화된 자체 규칙을 따릅니다.
 
@@ -203,13 +187,13 @@ lambdaQL은 Java나 Kotlin의 실행 규칙이 아니라 문서화된 자체 규
 |---|---|---|
 | `o.getId() == id`(두 `Long` 객체) | 값 동등성: `e0.id = :p1` | 쿼리에서 객체에 대한 `==`는 "같은 객체"가 아니라 "같은 값"을 뜻합니다. 캡처 값 `null`은 NULL로 바인딩되어 어떤 행에도 일치하지 않습니다(`WARN` 수준 `LQL-4045`). NULL을 찾으려면 `o.getId() == null`이라고 쓰십시오. |
 | `Objects.equals(o.getDescription(), o.getCustName())`, `!text.equals(o.getDescription())` | `e0.description = e0.custName`, `e0.description <> :p1`(SQL 의미) | 엔티티 값 두 개를 비교하거나 값과 `!=`로 비교하면, 값이 NULL인 행은 일치하지 않습니다. Java라면 이 중 일부 행을 반환합니다. 이런 행을 유지하려면 `o.getDescription() == null \|\| ...`이라고 쓰십시오. |
-| `o.getCustomer().getName()` | 조인한 고객의 `name` 컬럼(`where`에서는 기본적으로 inner `join`) | 경로는 컬럼을 가리킵니다. lambdaQL은 customer가 null인지 검사하지 않습니다. `where`에서는 고객이 없는 주문이 반환되지 않습니다. 그런 주문을 찾으려면 `o.getCustomer() == null`이라고 쓰십시오. null 가드(`o.getCustomer() == null \|\| ...`)를 써도 마찬가지입니다(SQL 의미, D48). 이런 주문을 유지하려면 `leftJoin`을 사용하십시오. |
-| `status`가 NULL일 때 `o.getStatus() == 1` | 행이 일치하지 않음(SQL 의미) | Java라면 `NullPointerException`을 던집니다. SQL은 UNKNOWN을 반환합니다. |
+| `o.getCustomer().getName()` | 조인한 고객의 `name` 컬럼 | 고객 테이블을 inner `join` 또는 `left join`으로 조인합니다. 자세한 규칙은 [3.10 연관 경로](java/03-where.md#310-association-paths)를 참고하십시오. |
+| `status` 컬럼이 NULL일 때 `o.getStatus() == 1` | 행이 반환되지 않음(SQL 의미) | `status` 컬럼이 NULL인 행은 결과에 없습니다. |
 | `o.getDescription() == null` | `e0.description is null` | null 검사를 직접 작성했으므로 lambdaQL이 이를 사용합니다. |
 
 > [!TIP]
 > IntelliJ는 `o.getId() == id`에 "Number objects compared using `==`" 경고를 표시할 수 있습니다.
-> lambdaQL 람다에서는 의도한 동작입니다. `@SuppressWarnings("NumberEquality")`를 사용할 수 있습니다.
+> lambdaQL 람다 표현식에서는 의도한 동작입니다. 메서드에 `@SuppressWarnings("NumberEquality")`를 선언하여 경고를 없앨 수 있습니다.
 
 #### Kotlin
 
@@ -217,15 +201,16 @@ lambdaQL은 Java나 Kotlin의 실행 규칙이 아니라 문서화된 자체 규
 |---|---|---|
 | `it.id == id`(`id: Long?`, nullable 변수) | 값 동등성: `e0.id = :p1` | Kotlin의 `==`는 원래 "같은 값"을 뜻합니다. 캡처 값 `null`은 NULL로 바인딩되어 어떤 행에도 일치하지 않습니다(`WARN` 수준 `LQL-4045`). |
 | `it.description == it.custName`, `it.description != text` | `e0.description = e0.custName`, `e0.description <> :p1`(SQL 의미) | 엔티티 값 두 개를 비교하거나 값과 `!=`로 비교하면, 값이 NULL인 행은 일치하지 않습니다. 이런 행을 유지하려면 `it.description == null \|\| ...`이라고 쓰십시오. |
-| `it.customer?.name` 또는 `it.customer!!.name` | 조인한 고객의 `name` 컬럼. `where`에서 `!!`는 inner `join`, `?.`는 필요할 때 `left join` | 경로는 컬럼을 가리킵니다. `?.`와 `!!`는 컬럼을 바꾸지 않고 `where`의 조인 종류만 정합니다(D54). `!!`는 "연관이 반드시 있음"이라 고객이 없는 주문이 반환되지 않습니다. `?.`는 "연관이 없을 수 있음"이라 고객이 없는 주문이 조건을 참으로 만들 수 있으면(`it.status == 1 \|\| ...`, `it.customer?.name == null`) `left join`으로 남깁니다. 고객이 없는 주문만 찾으려면 `it.customer == null`이라고 쓰십시오. |
-| `price`가 NULL일 때 `it.price!! > 100.0` | 행이 일치하지 않음(SQL 의미) | Kotlin이라면 `!!`에서 `NullPointerException`을 던집니다. lambdaQL은 `!!`를 무시하고, SQL은 UNKNOWN을 반환합니다. |
+| `it.customer?.name` 또는 `it.customer!!.name` | 조인한 고객의 `name` 컬럼 | 고객 테이블을 inner `join` 또는 `left join`으로 조인합니다. 자세한 규칙은 [3.10 연관 경로](kotlin/03-where.md#310-association-paths)를 참고하십시오. |
+| `price` 컬럼이 NULL일 때 `it.price!! > 100.0` | 행이 반환되지 않음(SQL 의미) | `price` 컬럼이 NULL인 행은 결과에 없습니다. |
 | `it.description == null` | `e0.description is null` | null 검사를 직접 작성했으므로 lambdaQL이 이를 사용합니다. |
 
-lambdaQL은 **직접 작성한 곳에서만** null을 처리합니다.
-람다 안의 모든 비교와 메서드는 SQL 의미를 따릅니다(결정 D48). 캡처 값과 연관 경로도 마찬가지입니다.
-결과가 Java나 Kotlin과 다를 수 있으면 lambdaQL은 `LQL-5009`를 `DEBUG` 수준으로 기록합니다. `=`나 `<>`에 캡처 값 `null`이 쓰이면 `LQL-4045`를 `WARN` 수준으로 기록합니다.
-3. 조건([Java](java/03-where.md) | [Kotlin](kotlin/03-where.md))과
-10. 규칙과 제한([Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md))을 참고하십시오.
+**NULL은 SQL과 동일하게 다룹니다.**   
+비교하는 컬럼이 NULL인 행은 NULL 비교 조건에 맞지 않아 결과에 없습니다.
+예를 들어 `where(o -> !text.equals(o.getDescription()))`(Kotlin은 `where { it.description != text }`)는 HQL `e0.description <> :p1`이 됩니다.   
+`description` 컬럼이 NULL인 주문은 이 조건에 맞지 않아 결과에 없습니다. Java나 Kotlin의 리스트에서는 NULL이 `text`와 다르므로 포함되는 것과 다릅니다.
+NULL인 주문도 받으려면 `o.getDescription() == null || !text.equals(o.getDescription())`처럼 null 검사를 직접 적으십시오.   
+자세한 규칙은 3.6 NULL 규칙([Java](java/03-where.md#36-null-rules) | [Kotlin](kotlin/03-where.md#36-null-rules))을 참고하십시오.
 
 ### SARGable SQL
 
@@ -251,40 +236,38 @@ lambdaQL은 인덱스를 사용할 수 있는("SARGable") SQL을 만듭니다.
 <a id="java-and-kotlin"></a>
 ### Java와 Kotlin
 
-Java와 Kotlin은 **같은 엔진**을 사용합니다.
-의미가 같은 Kotlin 람다와 Java 람다는 같은 HQL을 만듭니다.
-일부 Kotlin 형태는 지원하지 않습니다. 이런 형태에 대해 lambdaQL은 명확한 오류를 던집니다([9. Kotlin 노트](kotlin/09-kotlin-notes.md) 참고).
-Java 전용 세부 사항은 [9. Java 노트](java/09-java-notes.md)에 있습니다.
+Java와 Kotlin은 같은 분석 엔진을 사용합니다. 그러므로 의미가 같은 Kotlin 람다 표현식과 Java 람다 표현식은 같은 HQL을 만듭니다.
+예를 들어 Java의 `o.getPrice() > 100`과 Kotlin의 `it.price > 100.0`은 둘 다 `e0.price > 100.0`이 됩니다.
+다만 모든 문법을 쿼리로 변경할 수는 없습니다. 반복문, `switch`와 Kotlin의 대상이 있는 `when (x)`, 컬럼에 대한 대부분의 문자열 함수(`trim()` 등) 같은 문법을 쓰면 lambdaQL은 쿼리를 실행하기 전에 오류를 냅니다.
+언어별 차이는 9장([Java 노트](java/09-java-notes.md) | [Kotlin 노트](kotlin/09-kotlin-notes.md))을 참고하십시오.
 
 <a id="fail-loudly"></a>
-### 조용히 넘어가지 않기
+### 분석할 수 없는 람다 표현식
 
-lambdaQL은 어떤 형태의 의미를 모르면 추측하지 않습니다.
-`[LQL-2004]` 같은 코드가 붙은 예외를 던집니다([11. 오류와 언어](11-errors-and-languages.md) 참고).
+lambdaQL은 람다 표현식을 쿼리로 분석하지 못하면 `[LQL-2004]` 같은 코드가 붙은 예외를 던집니다([11. 오류와 언어](11-errors-and-languages.md) 참고).
 
 거부되는 형태의 예:
 
 | 형태 | Java | Kotlin |
 |---|---|---|
 | 조건에 따라 선택되는 값 | `o.getStatus() == (flag ? 1 : 2)` | `it.status == if (flag) 1 else 2` |
-| 람다 안의 반복문이나 지역 변수 | 예, 거부됨 | 예, 거부됨 |
-| 람다가 아닌 것 | 익명 클래스 | `object : ...` 식, 또는 Kotlin 함수 타입 값(`val f: (Order) -> Boolean`) |
+| 람다 표현식 안의 반복문이나 지역 변수 | 예, 거부됨 | 예, 거부됨 |
+| 람다 표현식이 아닌 것 | 익명 클래스 | `object : ...` 식, 또는 Kotlin 함수 타입 값(`val f: (Order) -> Boolean`) |
 | SQL에서 의미가 없는 메서드 호출 | 예, 거부됨 | 예, 거부됨(직접 만든 non-inline 확장 함수도 포함) |
+
+예제 코드: [`ManualSharedTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java)(`one-lambda-per-clause`, `agg`), [`ManualKotlinSharedTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSharedTest.kt)(`one-lambda-per-clause`, `agg`).
 
 <a id="comparison-with-other-approaches"></a>
 ## 다른 방식과의 비교
 
-이 표는 짧고 중립적인 요약입니다. 각 도구는 서로 다른 요구에 적합합니다.
-
 | | JPQL / HQL 문자열 | JPA Criteria API | QueryDSL | lambdaQL |
 |---|---|---|---|---|
-| 쿼리 작성 방식 | 문자열 안의 텍스트 | Java 빌더 객체 | 생성된 Q-클래스 | 람다 |
-| 컴파일러 검사 | 아니요(실행 시점에 Hibernate가 검사) | 예 | 예 | 예 |
-| 생성 코드 필요 | 아니요 | 선택(정적 메타모델) | 예(Q-클래스) | 아니요 |
-| IDE 이름 변경에 안전 | 아니요 | 정적 메타모델 사용 시 | 예 | 예 |
-| 모양 | SQL | Java 빌더 코드 | SQL 같은 Java | 평범한 Java / Kotlin 식 |
-| Kotlin | 문자열 | 동작하지만 장황함 | 동작함 | 지원(같은 엔진) |
-| 성숙도 | 표준 | 표준 | 성숙, 널리 사용됨 | 초기 개발, 미출시 |
+| 쿼리 작성 방식 | 문자열 안의 텍스트 | Java 빌더 객체 | 생성된 Q-클래스 | 람다 표현식 |
+| 컴파일러 검사 | ❌(실행 시점에 Hibernate가 검사) | ✅ | ✅ | ✅ |
+| 생성 코드 필요 | ❌ | 선택(정적 메타모델) | ✅(Q-클래스) | ❌ |
+| IDE 이름 변경에 안전 | ❌ | 정적 메타모델 사용 시 | ✅ | ✅ |
+| 모양 | SQL | Java 빌더 코드 | SQL 유사한 Java 메소드 | SQL과 유사한 Java / Kotlin 람다 표현식 |
+| Kotlin | 문자열 | 동작하지만 장황함 | 동작함 | 지원 |
 
 <a id="next"></a>
 ## 다음

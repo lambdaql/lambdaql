@@ -63,13 +63,13 @@ subprojects { subproject ->
     plugins.withId('java') {
         def javaVersion = properties.getOrDefault("jvm.version", 21) as int
         java {
-//            toolchain {
-//                languageVersion.set(JavaLanguageVersion.of(javaVersion))
-//            }
+            // The Gradle daemon runs on JDK 25 (gradle/gradle-daemon-jvm.properties), but compiling and the default
+            // tests use JDK 21: the lowest Java version lambdaQL supports, and the bytecode a Java 21 user's javac
+            // makes. Kotlin follows this toolchain too. src/main/java24 and testClassFile choose their own JDK.
+            toolchain {
+                languageVersion.set(JavaLanguageVersion.of(javaVersion))
+            }
             [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
-            // Gradle 9: the project-level properties are gone; set them on the java extension
-            sourceCompatibility = JavaVersion.toVersion(javaVersion)
-            targetCompatibility = JavaVersion.toVersion(javaVersion)
         }
     }
 

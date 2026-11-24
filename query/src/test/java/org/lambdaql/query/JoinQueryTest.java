@@ -1,5 +1,7 @@
 package org.lambdaql.query;
 
+import static org.lambdaql.query.By.*;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -125,7 +127,7 @@ class JoinQueryTest {
         // @start region="sort"
         OrderedJoinQuery<Order, Customer> q = qb.from(Order.class)
                 .leftJoin(Customer.class, (o, c) -> o.getCustomer().getId() == c.getId())
-                .orderBy((o, c, by) -> by.asc(c.getName()).asc(o.getId()));
+                .orderBy((o, c) -> asc(c.getName()).asc(o.getId()));
         assertEquals("select e0 from Order e0 left join Customer e1 on e0.customer.id = e1.id"
                 + " order by e1.name asc nulls first, e0.id asc", q.toHql().hql());
         // @end
@@ -135,7 +137,7 @@ class JoinQueryTest {
         // @start region="select"
         ValueQuery<Row> rows = qb.from(Order.class)
                 .leftJoin(Customer.class, (o, c) -> o.getCustomer().getId() == c.getId())
-                .orderBy((o, c, by) -> by.asc(o.getId()))
+                .orderBy((o, c) -> asc(o.getId()))
                 .select((o, c) -> new Row(o.getId(), c.getName()));
         assertEquals("select e0.id, e1.name from Order e0 left join Customer e1 on e0.customer.id = e1.id"
                 + " order by e0.id asc", rows.toHql().hql());
@@ -190,7 +192,7 @@ class JoinQueryTest {
                 .distinct();
         assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.id where e1.qty > 0", q.toHql().hql());
         // a sort key must be a column of the main entity (J7)
-        OrderedJoinQuery<Order, Item> sorted = q.orderBy((o, i, by) -> by.desc(o.getPrice()));
+        OrderedJoinQuery<Order, Item> sorted = q.orderBy((o, i) -> desc(o.getPrice()));
         assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.id where e1.qty > 0"
                 + " order by e0.price desc", sorted.toHql().hql());
         // @end
@@ -202,7 +204,7 @@ class JoinQueryTest {
                 sorted.toList().stream().map(Order::getId).toList());
         // paging adds only the main id: distinct rows do not repeat
         assertTrue(sorted.limit(1).toHql().hql().endsWith("order by e0.price desc, e0.id asc"));
-        LambdaQLException j7 = assertThrows(LambdaQLException.class, () -> q.orderBy((o, i, by) -> by.desc(i.getQty())));
+        LambdaQLException j7 = assertThrows(LambdaQLException.class, () -> q.orderBy((o, i) -> desc(i.getQty())));
         assertEquals("LQL-3046", j7.code());
     }
 
@@ -283,7 +285,7 @@ class JoinQueryTest {
         // with paging, the id of every entity is added to the order, so pages never overlap (S9)
         ValueQuery<Row> pairs = qb.from(Order.class)
                 .crossJoin(Customer.class)
-                .orderBy((o, c, by) -> by.desc(o.getPrice()))
+                .orderBy((o, c) -> desc(o.getPrice()))
                 .select((o, c) -> new Row(o.getId(), c.getName()));
         assertEquals("select e0.id, e1.name from Order e0 cross join Customer e1 order by e0.price desc, e0.id asc, e1.id asc",
                 pairs.limit(5).toHql().hql());

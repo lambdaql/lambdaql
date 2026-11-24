@@ -8,29 +8,32 @@
 lambdaQL 매뉴얼의 **Java 트랙**입니다. 이 트랙의 모든 페이지에는 **Java 코드만** 있습니다.
 쿼리를 Kotlin으로 작성한다면 [Kotlin 트랙](../kotlin/README.md)을 읽으십시오. 같은 번호의 같은 장으로 구성되어 있습니다.
 
-lambdaQL은 Java와 Kotlin용 쿼리 라이브러리입니다.
-평소처럼 람다를 작성하면 lambdaQL이 람다의 바이트코드를 읽어 Hibernate 7 HQL 쿼리를 만듭니다.
-람다는 절대 실행되지 않습니다.
+lambdaQL은 JPA와 Hibernate 위에서 동작하는 Java·Kotlin용 쿼리 라이브러리입니다.
+쿼리의 조건과 정렬을 람다 표현식으로 작성하면 lambdaQL이 람다 표현식의 바이트 opcode를 분석해 HQL 쿼리를 만듭니다.
 
-[`ManualJavaStartTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java), 영역 `readme`:
-
+<!-- region: ManualJavaStartTest.java#readme -->
 ```java
 double minPrice = 100;
 OrderedSelectQuery<Order> query = qb.from(Order.class)
         .where(o -> o.getStatus() == 1 && o.getPrice() > minPrice)
-        .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId()))
+        .orderBy(o -> desc(o.getPrice()).asc(o.getId()))
         .limit(20);
 assertEquals("select e0 from Order e0 where e0.status = 1 and e0.price > :p1"
         + " order by e0.price desc, e0.id asc", query.toHql().hql());
 List<Order> orders = query.toList();
 ```
 
-`toHql()`은 쿼리를 실행하지 않고 HQL을 돌려줍니다. 예제의 `assertEquals`는 테스트가 확인하는 HQL입니다.
+`toHql()`은 쿼리를 실행하지 않고 HQL을 돌려줍니다. `assertEquals`의 문자열이 lambdaQL이 만드는 HQL입니다.
 `price`와 `id`는 NULL이 될 수 없는 컬럼이므로 정렬에 `nulls` 부분이 없습니다.
+`desc`와 `asc`는 클래스 `By`의 정렬 함수입니다(`import static org.lambdaql.query.By.*;`, [4.1](04-order-paging.md#41-one-lambda-for-the-whole-sort) 참고).
 
 > [!NOTE]
 > **예제에 대하여.**
-> 예제 코드는 모두 Java 테스트 코드의 한 구간을 그대로 옮긴 것입니다. 코드 위에 테스트 파일과 구간 이름(영역 `name`)을 적습니다. 테스트는 lambdaQL이 만든 HQL과 반환한 행을 확인합니다.
+> 예제 코드는 모두 저장소의 실행 가능한 Java 코드에서 그대로 옮긴 것입니다.
+> 각 절 끝의 "예제 코드:" 줄에 원본 파일을 링크합니다.
+> 데이터베이스별 SQL 블록에서 `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다.
+
+예제 코드: [`ManualJavaStartTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java)(`readme`).
 
 <a id="contents"></a>
 ## 목차
@@ -57,7 +60,7 @@ List<Order> orders = query.toList();
 <a id="example-entities"></a>
 ## 예제 엔티티
 
-예제는 주로 다음 세 테스트 엔티티를 사용합니다. 속성의 타입과 원본 파일은 [시작하기](02-getting-started.md#example-entities)에 있습니다.
+예제는 주로 다음 세 예제 엔티티를 사용합니다. 속성의 타입과 원본 파일은 [시작하기](02-getting-started.md#example-entities)에 있습니다.
 
 | 엔티티 | 필드 |
 |---|---|
@@ -70,7 +73,7 @@ List<Order> orders = query.toList();
 
 | 항목 | 버전 |
 |---|---|
-| Java | 21 |
+| Java | 21 이상 |
 | 컴파일러 | javac (Eclipse 컴파일러인 ECJ는 보장하지 않음) |
 | Hibernate ORM | 6.6 또는 7.4 (6.6.53, 7.4.13으로 테스트) |
 | 검증한 데이터베이스 | H2 2.3, MariaDB 10.11, MySQL 8.4, PostgreSQL 17, Oracle 23.26 (23ai) |

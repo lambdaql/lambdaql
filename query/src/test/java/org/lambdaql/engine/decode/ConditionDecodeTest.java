@@ -209,11 +209,11 @@ class ConditionDecodeTest {
     }
 
     @Test
-    void valueTernaryIsRejected() {
+    void valueTernaryBecomesOneValue() {
         // @start region="value-ternary"
-        boolean flag = true;
-        LambdaQLException e = assertThrows(LambdaQLException.class, () -> cond(o -> o.getStatus() == (flag ? 1 : 2)));
-        assertEquals("LQL-2021", e.code());
+        // a ternary that reads the entity becomes one CASE WHEN value
+        assertEquals("param0.getStatus[] = case when truth(param0.isActive[]) then 1 else 2 end",
+                cond(o -> o.getStatus() == (o.isActive() ? 1 : 2)));
         // @end
     }
 

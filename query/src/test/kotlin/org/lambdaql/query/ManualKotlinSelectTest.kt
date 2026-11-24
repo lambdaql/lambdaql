@@ -1,5 +1,8 @@
 package org.lambdaql.query
 
+import org.lambdaql.query.By.asc
+import org.lambdaql.query.By.desc
+
 import jakarta.persistence.EntityManagerFactory
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -95,7 +98,7 @@ class ManualKotlinSelectTest {
         // @start region="value"
         val q = qb.from(Order::class.java)
             .where { it.status.toInt() == 1 }
-            .orderBy { o, by -> by.asc(o.price) }
+            .orderBy { o -> asc(o.price) }
             .select { it.price }
         assertEquals("select e0.price from Order e0 where e0.status = 1 order by e0.price asc", q.toHql().hql())
         val prices: List<Double> = q.toList()
@@ -248,7 +251,7 @@ class ManualKotlinSelectTest {
         assertEquals("LQL-3005", where.code())
         // J7: with distinct, the sort key must be selected
         val j7 = assertThrows(LambdaQLException::class.java) {
-            qb.from(Order::class.java).orderBy { o, by -> by.asc(o.id) }.select { it.price }.distinct().toHql()
+            qb.from(Order::class.java).orderBy { o -> asc(o.id) }.select { it.price }.distinct().toHql()
         }
         assertEquals("LQL-3046", j7.code())
         // J4: sum over no rows is NULL; the non-null parameter of StrictTotal(val total: Double) cannot take it
@@ -264,7 +267,7 @@ class ManualKotlinSelectTest {
     fun distinct() {
         // @start region="distinct"
         val q = qb.from(Order::class.java)
-            .orderBy { o, by -> by.desc(o.price) }
+            .orderBy { o -> desc(o.price) }
             .select { it.price }
             .distinct()
         assertEquals("select distinct e0.price from Order e0 order by e0.price desc", q.toHql().hql())
@@ -281,7 +284,7 @@ class ManualKotlinSelectTest {
         // @start region="value-page"
         // paging adds the id as the last key (S9), so the pages do not overlap
         val page = qb.from(Order::class.java)
-            .orderBy { o, by -> by.desc(o.price) }
+            .orderBy { o -> desc(o.price) }
             .select { it.price }
             .limit(2).offset(1)
         assertEquals("select e0.price from Order e0 order by e0.price desc, e0.id asc", page.toHql().hql())
@@ -324,13 +327,13 @@ class ManualKotlinSelectTest {
         // @start region="join-sort-select"
         val sorted = qb.from(Order::class.java)
             .leftJoin(Customer::class.java) { o, c -> o.customer?.id == c.id }
-            .orderBy { o, c, by -> by.asc(c.name).asc(o.id) }
+            .orderBy { o, c -> asc(c.name).asc(o.id) }
         assertEquals("select e0 from Order e0 left join Customer e1 on e0.customer is not null and e0.customer.id = e1.id"
             + " order by e1.name asc nulls first, e0.id asc", sorted.toHql().hql())
         // the order without a customer has customerName = null
         val rows = qb.from(Order::class.java)
             .leftJoin(Customer::class.java) { o, c -> o.customer?.id == c.id }
-            .orderBy { o, _, by -> by.asc(o.id) }
+            .orderBy { o, _ -> asc(o.id) }
             .select { o, c -> Row(o.id, c.name) }
         assertEquals("select e0.id, e1.name from Order e0 left join Customer e1 on e0.customer is not null and e0.customer.id = e1.id"
             + " order by e0.id asc", rows.toHql().hql())
@@ -375,7 +378,7 @@ class ManualKotlinSelectTest {
         // with paging, the id of every entity is added to the order, so the pages do not overlap (S9)
         val pairs = qb.from(Order::class.java)
             .crossJoin(Customer::class.java)
-            .orderBy { o, _, by -> by.desc(o.price) }
+            .orderBy { o, _ -> desc(o.price) }
             .select { o, c -> Row(o.id, c.name) }
         assertEquals("select e0.id, e1.name from Order e0 cross join Customer e1 order by e0.price desc, e0.id asc, e1.id asc",
             pairs.limit(5).toHql().hql())
@@ -444,7 +447,7 @@ class ManualKotlinSelectTest {
                 .groupBy { it.customer?.id }
                 .select { CustomerTotal(it.customer?.id, Agg.count(), Agg.sum(it.price)) })
             .where { r -> r.total!! > 100 }
-            .orderBy { r, by -> by.desc(r.total) }
+            .orderBy { r -> desc(r.total) }
         assertEquals("select e0.customerId, e0.cnt, e0.total from (select d0.customer.id as customerId, count(*) as cnt,"
             + " sum(d0.price) as total from Order d0 where d0.customer is not null group by d0.customer.id) e0"
             + " where e0.total > 100.0 order by e0.total desc nulls last", q.toHql().hql())
@@ -459,10 +462,10 @@ class ManualKotlinSelectTest {
         // @start region="derived-limit"
         // the three most expensive orders, then the cheapest of them
         val cheapestOfTop = qb.from(qb.from(Order::class.java)
-                .orderBy { o, by -> by.desc(o.price) }
+                .orderBy { o -> desc(o.price) }
                 .limit(3)
                 .select { Priced(it.id, it.price) })
-            .orderBy { r, by -> by.asc(r.price) }
+            .orderBy { r -> asc(r.price) }
             .first()
         // @end
         val top = orders.sortedWith(compareByDescending<Order> { it.price }.thenBy { it.id }).take(3)

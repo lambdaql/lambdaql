@@ -1,5 +1,7 @@
 package org.lambdaql.spring
 
+import org.lambdaql.query.By.desc
+
 import jakarta.persistence.EntityManager
 import org.lambdaql.query.QueryBuilder
 import org.lambdaql.spring.sample.Member
@@ -26,7 +28,7 @@ interface KtMemberRepository : JpaRepository<Member, Long>, LambdaQlExecutor<Mem
     fun topGraded(n: Int): List<Member> =
         query()
             .where { it.isActive }
-            .orderBy { m, by -> by.desc(m.grade).asc(m.id) }
+            .orderBy { m -> desc(m.grade).asc(m.id) }
             .limit(n)
             .toList()
 

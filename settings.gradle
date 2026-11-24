@@ -6,6 +6,11 @@ pluginManagement {
     }
 }
 
+plugins {
+    // downloads a missing JDK (21 for compiling and testing, 25 for java24 and testClassFile, 25 for the daemon)
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
+
 rootProject.name = 'lambdaql'
 
 // Spring Boot lines (ROADMAP D55): lambdaql-core and lambdaql-spring-data-jpa are one jar each for Spring Boot 3 and 4.

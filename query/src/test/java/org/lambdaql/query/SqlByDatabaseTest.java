@@ -1,5 +1,7 @@
 package org.lambdaql.query;
 
+import static org.lambdaql.query.By.*;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.Test;
@@ -106,32 +108,32 @@ class SqlByDatabaseTest {
         ex("null-guard-name-null", qb.from(Order.class).where(o -> o.getCustomer() == null || o.getCustomer().getName() == null));
 
         // ---- SortQueryTest
-        ex("sort-basic", qb.from(Order.class).where(o -> o.isActive()).orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId())));
-        ex("sort-nulls", qb.from(Order.class).orderBy((o, by) -> by.asc(o.getDescription()).asc(o.getId())));
-        ex("sort-nulls#2", qb.from(Order.class).orderBy((o, by) -> by.asc(o.getDescription(), false).asc(o.getId())));
-        ex("sort-nulls#3", qb.from(Order.class).orderBy((o, by) -> by.desc(o.getDescription(), true).asc(o.getId())));
+        ex("sort-basic", qb.from(Order.class).where(o -> o.isActive()).orderBy(o -> desc(o.getPrice()).asc(o.getId())));
+        ex("sort-nulls", qb.from(Order.class).orderBy(o -> asc(o.getDescription()).asc(o.getId())));
+        ex("sort-nulls#2", qb.from(Order.class).orderBy(o -> asc(o.getDescription(), Nulls.LAST).asc(o.getId())));
+        ex("sort-nulls#3", qb.from(Order.class).orderBy(o -> desc(o.getDescription(), Nulls.FIRST).asc(o.getId())));
         Direction dir = Direction.parse("desc");
-        ex("sort-dynamic", qb.from(Order.class).orderBy((o, by) -> by.sort(o.getDescription(), dir).asc(o.getId())));
+        ex("sort-dynamic", qb.from(Order.class).orderBy(o -> sort(o.getDescription(), dir).asc(o.getId())));
         Direction dir2 = Direction.parse("asc_nulls_last");
-        ex("sort-dynamic#2", qb.from(Order.class).orderBy((o, by) -> by.sort(o.getDescription(), dir2).asc(o.getId())));
-        ex("sort-path", qb.from(Order.class).orderBy((o, by) -> by.asc(o.getCustomer().getName()).asc(o.getId())));
+        ex("sort-dynamic#2", qb.from(Order.class).orderBy(o -> sort(o.getDescription(), dir2).asc(o.getId())));
+        ex("sort-path", qb.from(Order.class).orderBy(o -> asc(o.getCustomer().getName()).asc(o.getId())));
         ex("sort-path-where", qb.from(Order.class).where(o -> o.getCustomer().getName().equals(name))
-                .orderBy((o, by) -> by.desc(o.getCustomer().getName()).desc(o.getPrice())));
+                .orderBy(o -> desc(o.getCustomer().getName()).desc(o.getPrice())));
         ex("sort-key", qb.from(Order.class).orderBy(o -> o.getPrice()));
         ex("sort-key#2", qb.from(Order.class).orderBy(Order::getPrice, Direction.DESC));
-        ex("sort-page", qb.from(Order.class).orderBy((o, by) -> by.asc(o.getStatus())).limit(2).offset(2));
+        ex("sort-page", qb.from(Order.class).orderBy(o -> asc(o.getStatus())).limit(2).offset(2));
         ex("page-only", qb.from(Order.class).where(o -> o.isActive()).limit(2));
-        SortSpec<Order> byDescription = SortSpec.of(Order.class, (o, by) -> by.desc(o.getDescription()).asc(o.getId()));
+        SortSpec<Order> byDescription = SortSpec.of(Order.class, o -> desc(o.getDescription()).asc(o.getId()));
         ex("sort-spec", qb.from(Order.class).where(o -> o.isActive()).orderBy(byDescription));
-        SortSpec<Order> byStatus = SortSpec.of(Order.class, (o, by) -> by.asc(o.getStatus()));
-        SortSpec<Order> byPrice = SortSpec.of(Order.class, (o, by) -> by.desc(o.getPrice()));
+        SortSpec<Order> byStatus = SortSpec.of(Order.class, o -> asc(o.getStatus()));
+        SortSpec<Order> byPrice = SortSpec.of(Order.class, o -> desc(o.getPrice()));
         ex("sort-spec-then", qb.from(Order.class).orderBy(byStatus.then(byPrice)));
-        SortSpec<Order> spec = SortSpec.of(Order.class, (o, by) -> by.asc(o.getDescription()).asc(o.getId()));
+        SortSpec<Order> spec = SortSpec.of(Order.class, o -> asc(o.getDescription()).asc(o.getId()));
         ex("sort-spec-reversed", qb.from(Order.class).orderBy(spec.reversed()));
 
         // ---- ResultQueryTest
-        OrderedSelectQuery<Order> cheapest = qb.from(Order.class).orderBy((o, by) -> by.asc(o.getPrice()));
-        record("first", qb.from(Order.class).orderBy((o, by) -> by.asc(o.getPrice())).limit(1).toHql(),
+        OrderedSelectQuery<Order> cheapest = qb.from(Order.class).orderBy(o -> asc(o.getPrice()));
+        record("first", qb.from(Order.class).orderBy(o -> asc(o.getPrice())).limit(1).toHql(),
                 () -> cheapest.first().stream().toList());
         SelectQuery<Order> active = qb.from(Order.class).where(o -> o.isActive());
         record("first#2", qb.from(Order.class).where(o -> o.isActive()).limit(1).toHql(), () -> active.first().stream().toList());
@@ -194,8 +196,8 @@ class SqlByDatabaseTest {
         kotlinHql("safe-call-or", "select e0 from Order e0 left join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", false);
         kotlinHql("safe-call-null", "select e0 from Order e0 left join e0.customer j1 where j1.name is null", false);
         kotlinHql("safe-call-and", "select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' and e0.price > 100.0", false);
-        kotlinHql("not-null-assert", "select e0 from Order e0 join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", false);
-        kotlinHql("mixed-warn", "select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' or j1.grade > 3", false);
+        kotlinHql("not-null-assert", "select e0 from Order e0 left join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", false);
+        kotlinHql("safe-and-assert", "select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' or j1.grade > 3", false);
         kotlinHql("update-safe-call", "update Order e0 set e0.status = :p1"
                 + " where e0.status = 1 or (select s1.name from Customer s1 where s1.id = fk(e0.customer)) = 'Kim'", true);
 
@@ -211,12 +213,12 @@ class SqlByDatabaseTest {
         ex("sub-count", qb.from(Order.class).where((o, sub) -> sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).count() >= 2));
         ex("sub-top-one", qb.from(Order.class).where((o, sub) -> o.getId().equals(sub.from(Order.class)
                 .where(x -> x.getCustomer().getId() == o.getCustomer().getId())
-                .orderBy((x, by) -> by.desc(x.getPrice())).limit(1).select(x -> x.getId()).first())));
+                .orderBy(x -> desc(x.getPrice())).limit(1).select(x -> x.getId()).first())));
         ex("sub-nested", qb.from(Customer.class).where((c, sub) -> sub.from(Order.class).where((o, sub2) -> o.getCustomer().getId() == c.getId()
                 && sub2.from(Item.class).where(i -> i.getOrder().getId() == o.getId() && i.getQty() > 10).exists()).exists()));
 
         // ---- ProjectionTest (the select list is the point, so it is kept)
-        val("value", qb.from(Order.class).where(o -> o.getStatus() == 1).orderBy((o, by) -> by.asc(o.getPrice()))
+        val("value", qb.from(Order.class).where(o -> o.getStatus() == 1).orderBy(o -> asc(o.getPrice()))
                 .select(o -> o.getPrice()));
         val("record", qb.from(Order.class).select(o -> new ProjectionTest.OrderView(o.getId(), o.getCustomer().getName(), o.getPrice())));
         val("group-by", qb.from(Order.class).groupBy(o -> o.getCustomer().getId()).having(o -> Agg.sum(o.getPrice()) > 200)
@@ -226,8 +228,8 @@ class SqlByDatabaseTest {
                 .select(o -> new ProjectionTest.KeyCount(o.getCustomer().getId(), o.getStatus(), Agg.count())));
         val("total", qb.from(Order.class).where(o -> o.getStatus() == 1)
                 .select(o -> new ProjectionTest.Total(Agg.count(), Agg.avg(o.getPrice()))));
-        val("distinct", qb.from(Order.class).orderBy((o, by) -> by.desc(o.getPrice())).select(o -> o.getPrice()).distinct());
-        ValueQuery<Double> paged = qb.from(Order.class).orderBy((o, by) -> by.desc(o.getPrice())).select(o -> o.getPrice()).limit(2).offset(1);
+        val("distinct", qb.from(Order.class).orderBy(o -> desc(o.getPrice())).select(o -> o.getPrice()).distinct());
+        ValueQuery<Double> paged = qb.from(Order.class).orderBy(o -> desc(o.getPrice())).select(o -> o.getPrice()).limit(2).offset(1);
         record("value-page", paged.toHql(), paged::toList, false);
         ExecutableInsert<Summary> insertGroup = qb.insert(Summary.class).from(Order.class).where(o -> o.getCustomer() != null)
                 .groupBy(o -> o.getCustomer().getId()).having(o -> Agg.count() >= 2)
@@ -235,13 +237,13 @@ class SqlByDatabaseTest {
         record("insert-group", insertGroup.toHql().get(0), () -> List.of(insertGroup.execute()), false);
 
         ExecutableDelete<Order> deleteLimit = qb.delete(Order.class).where(o -> o.getStatus() == 1)
-                .orderBy((o, by) -> by.asc(o.getPrice())).limit(1);
+                .orderBy(o -> asc(o.getPrice())).limit(1);
         record("delete-limit", deleteLimit.toHql(), () -> List.of(deleteLimit.execute()), false);
         ExecutableDelete<Order> deleteSub = qb.delete(Order.class)
                 .where((o, sub) -> !sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists());
         record("dml-subquery", deleteSub.toHql(), () -> List.of(deleteSub.execute()), false);
         ExecutableUpdate<Order> updateLimit = qb.update(Order.class).set(o -> o.setDescription("top"))
-                .where(o -> o.getCustomer().getName().equals("Kim")).orderBy((o, by) -> by.desc(o.getPrice())).limit(1);
+                .where(o -> o.getCustomer().getName().equals("Kim")).orderBy(o -> desc(o.getPrice())).limit(1);
         record("update-limit", updateLimit.toHql(), () -> List.of(updateLimit.execute()), false);
 
         compare();

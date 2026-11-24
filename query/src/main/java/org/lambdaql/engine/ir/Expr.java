@@ -24,7 +24,7 @@ import java.util.List;
 public sealed interface Expr permits
         Expr.Param, Expr.Captured, Expr.Const, Expr.Invoke, Expr.GetField, Expr.Arith, Expr.Neg,
         Expr.Convert, Expr.CmpResult, Expr.NewObject, Expr.ArrayLength, Expr.Coalesce, Expr.Column, Expr.Host,
-        Expr.Lambda, Expr.Root, Expr.Subquery, Expr.Aggregate, Expr.ArrayOf, Expr.Func, Expr.SafeNav {
+        Expr.Lambda, Expr.Root, Expr.Subquery, Expr.Aggregate, Expr.ArrayOf, Expr.Func, Expr.SafeNav, Expr.Choose, Expr.Case {
 
     /**
      * Returns the JVM type of this value.
@@ -234,6 +234,101 @@ public sealed interface Expr permits
      */
     record Coalesce(Expr first, Expr second, Type type) implements Expr {
         @Override public String toString() { return "coalesce(" + first + ", " + second + ")"; }
+    }
+
+    /**
+     * A value ternary made only of captured values and constants: {@code flag ? 1 : 2}, Kotlin {@code if (flag) 1 else 2}.
+     * It is computed in Java when the query runs, like any other captured value (ROADMAP D61).
+     *
+     * <p>Example: {@code o.getStatus() == (flag ? 1 : 2)} binds {@code 1} or {@code 2} as {@code :p1}.
+     *
+     * @param cond      the condition (no entity value in it)
+     * @param whenTrue  the value when the condition is true
+     * @param whenFalse the value when the condition is false
+     * @param type      JVM type of the result
+     */
+    record Choose(Pred cond, Expr whenTrue, Expr whenFalse, Type type) implements Expr {
+        @Override public String toString() { return "(" + cond + " ? " + whenTrue + " : " + whenFalse + ")"; }
+    }
+
+    /**
+     * A value chosen by conditions on the entity: {@code o.isActive() ? 1 : 2}, Kotlin {@code when { a -> x; else -> y }}.
+     * Rendered as {@code case when c1 then v1 ... else v end} (ROADMAP D62).
+     *
+     * <p>Example: {@code select(o -> o.isActive() ? "Y" : "N")} selects {@code case when e0.active = true then 'Y' else 'N' end}.
+     *
+     * @param conds     the conditions, tested in order
+     * @param values    the value of each condition
+     * @param otherwise the value when no condition is true
+     * @param type      JVM type of the result
+     */
+    record Case(List<Pred> conds, List<Expr> values, Expr otherwise, Type type) implements Expr {
+        /** Makes unmodifiable copies of the lists. */
+        public Case {
+            conds = List.copyOf(conds);
+            values = List.copyOf(values);
+        }
+
+        /**
+         * Every value inside: the operands of the conditions, the values and the otherwise value.
+         *
+         * <p>Example: for {@code case when e0.active = true then 1 else 2 end}: {@code [e0.active, true, 1, 2]}.
+         *
+         * @return the values, in order
+         */
+        public List<Expr> exprs() {
+            List<Expr> out = new java.util.ArrayList<>();
+            for (Pred p : conds) operands(p, out);
+            out.addAll(values);
+            out.add(otherwise);
+            return out;
+        }
+
+        /**
+         * The same case with every value inside replaced.
+         *
+         * <p>Example: {@code c.map(x -> rename(x))} renames the columns in the conditions and the values.
+         *
+         * @param f the replacement
+         * @return the new case
+         */
+        public Case map(java.util.function.Function<Expr, Expr> f) {
+            return new Case(conds.stream().map(p -> mapPred(p, f)).toList(), values.stream().map(f).toList(), f.apply(otherwise), type);
+        }
+
+        private static void operands(Pred p, List<Expr> out) {
+            switch (p) {
+                case Pred.Cmp c -> { out.add(c.left()); out.add(c.right()); }
+                case Pred.IsNull n -> out.add(n.operand());
+                case Pred.Truth t -> out.add(t.operand());
+                case Pred.In in -> { out.add(in.value()); out.add(in.values()); }
+                case Pred.Like l -> { out.add(l.value()); out.add(l.text()); }
+                case Pred.And a -> a.items().forEach(x -> operands(x, out));
+                case Pred.Or o -> o.items().forEach(x -> operands(x, out));
+                case Pred.Not n -> operands(n.operand(), out);
+                case Pred.Bool b -> { }
+            }
+        }
+
+        private static Pred mapPred(Pred p, java.util.function.Function<Expr, Expr> f) {
+            return switch (p) {
+                case Pred.Cmp c -> new Pred.Cmp(c.op(), f.apply(c.left()), f.apply(c.right()), c.nullSafe());
+                case Pred.IsNull n -> new Pred.IsNull(f.apply(n.operand()));
+                case Pred.Truth t -> new Pred.Truth(f.apply(t.operand()));
+                case Pred.In in -> new Pred.In(f.apply(in.value()), f.apply(in.values()));
+                case Pred.Like l -> new Pred.Like(f.apply(l.value()), f.apply(l.text()), l.kind(), l.ignoreCase(), l.negated());
+                case Pred.And a -> new Pred.And(a.items().stream().map(x -> mapPred(x, f)).toList());
+                case Pred.Or o -> new Pred.Or(o.items().stream().map(x -> mapPred(x, f)).toList());
+                case Pred.Not n -> new Pred.Not(mapPred(n.operand(), f));
+                case Pred.Bool b -> b;
+            };
+        }
+
+        @Override public String toString() {
+            StringBuilder sb = new StringBuilder("case");
+            for (int i = 0; i < conds.size(); i++) sb.append(" when ").append(conds.get(i)).append(" then ").append(values.get(i));
+            return sb.append(" else ").append(otherwise).append(" end").toString();
+        }
     }
 
     /**

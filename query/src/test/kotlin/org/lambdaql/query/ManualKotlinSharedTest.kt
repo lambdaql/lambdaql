@@ -1,5 +1,7 @@
 package org.lambdaql.query
 
+import org.lambdaql.query.By.desc
+
 import jakarta.persistence.EntityManagerFactory
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
@@ -66,14 +68,13 @@ class ManualKotlinSharedTest {
         val minPrice = 100.0
 
         val q = qb.from(Order::class.java)
-            .where { it.status.toInt() == 1 || it.customer?.name == "Kim" }
+            .where { it.status.toInt() == 1 || it.customer!!.name == "Kim" }
             .where { it.price > minPrice }
-        // ?. says the customer may be missing: a left join (D54)
         assertEquals("select e0 from Order e0 left join e0.customer j1"
             + " where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1", q.toHql().hql())
         val rows = q.toList()
         // @end
-        // orders without a customer stay when the status is 1, as in Kotlin
+        // an order without a customer stays when its status is 1, as in Kotlin (|| stops before the !!)
         assertEquals(ids(orders.filter { (it.status.toInt() == 1 || it.customer?.name == "Kim") && it.price > minPrice }), ids(rows))
     }
 
@@ -82,7 +83,7 @@ class ManualKotlinSharedTest {
         // @start region="one-lambda-per-clause"
         val q = qb.from(Order::class.java)
             .where { it.status.toInt() == 1 && it.isActive }               // one condition lambda
-            .orderBy { o, by -> by.desc(o.price).asc(o.id) }               // one sort lambda for all keys
+            .orderBy { o -> desc(o.price).asc(o.id) }               // one sort lambda for all keys
             .select { OrderView(it.id, it.price) }                         // one select lambda
         assertEquals("select e0.id, e0.price from Order e0 where e0.status = 1 and e0.active = true"
             + " order by e0.price desc, e0.id asc", q.toHql().hql())
@@ -114,7 +115,7 @@ class ManualKotlinSharedTest {
         // @start region="readme-first"
         val orders = qb.from(Order::class.java)
             .where { it.status.toInt() == 1 && it.price > minPrice }
-            .orderBy { o, by -> by.desc(o.price).asc(o.id) }
+            .orderBy { o -> desc(o.price).asc(o.id) }
             .limit(20)
             .toList()
         // @end
@@ -123,7 +124,7 @@ class ManualKotlinSharedTest {
         assertEquals("select e0 from Order e0 where e0.status = 1 and e0.price > :p1 order by e0.price desc, e0.id asc",
             qb.from(Order::class.java)
                 .where { it.status.toInt() == 1 && it.price > minPrice }
-                .orderBy { o, by -> by.desc(o.price).asc(o.id) }
+                .orderBy { o -> desc(o.price).asc(o.id) }
                 .limit(20).toHql().hql())
     }
 

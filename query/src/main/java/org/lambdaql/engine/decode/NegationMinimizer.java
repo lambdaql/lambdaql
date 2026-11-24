@@ -65,6 +65,9 @@ public final class NegationMinimizer {
         if (p instanceof Pred.Cmp c) {
             return new Pair(new Form(c, 0), new Form(Pred.not(c), 0));
         }
+        if (p instanceof Pred.Like l) {
+            return new Pair(new Form(l, 0), new Form(Pred.not(l), 0));
+        }
         if (p instanceof Pred.Bool b) {
             return new Pair(new Form(b, 0), new Form(Pred.not(b), 0));
         }

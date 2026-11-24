@@ -60,7 +60,7 @@ public class SelectJoinQuery<T, U> {
     }
 
     /**
-     * A sort on all entities with the builder last: {@code (o, c, by) -> by.desc(...)} (D18).
+     * A sort on all entities: {@code (o, c) -> asc(c.getName()).desc(o.getPrice())}, or one key {@code (o, c) -> c.getName()}.
      *
      * @param <T> the main entity type
      * @param <U> the joined entity type
@@ -72,10 +72,9 @@ public class SelectJoinQuery<T, U> {
          *
          * @param o an entity
          * @param c an entity
-         * @param by the sort builder
-         * @return the builder
+         * @return one key, or the keys made with {@link By}
          */
-        By sort(T o, U c, By by);
+        Comparable<?> sort(T o, U c);
     }
 
     /**

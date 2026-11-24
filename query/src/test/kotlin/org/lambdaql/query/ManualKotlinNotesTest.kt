@@ -1,5 +1,7 @@
 package org.lambdaql.query
 
+import org.lambdaql.query.By.desc
+
 import jakarta.persistence.EntityManagerFactory
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
@@ -99,7 +101,7 @@ class ManualKotlinNotesTest {
         // lambdas with two parameters use names
         val q = qb.from(Order::class.java)
             .where { o, sub -> sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
-            .orderBy { o, by -> by.desc(o.price).asc(o.id) }
+            .orderBy { o -> desc(o.price).asc(o.id) }
         assertEquals("select e0 from Order e0 where exists (select 1 from Item s1 where s1.order.id = e0.id)"
             + " order by e0.price desc, e0.id asc", q.toHql().hql())
         // @end
@@ -113,7 +115,7 @@ class ManualKotlinNotesTest {
     fun equality() {
         val text = "abc"
         // @start region="equality"
-        // plain = and <> (D48): a row whose description is NULL matches neither
+        // plain = and <>: a row whose description is NULL matches neither
         val same = qb.from(Order::class.java).where { it.description == text }
         assertEquals("select e0 from Order e0 where e0.description = :p1", same.toHql().hql())
         val other = qb.from(Order::class.java).where { it.description != "x" }
@@ -144,7 +146,7 @@ class ManualKotlinNotesTest {
     @Test
     fun pathForms() {
         // @start region="path-forms"
-        // ?. and !! on a path: the same column; in this condition both are an inner join
+        // ?. and !! on a path: the same column; no order without a customer can match, so both are an inner join
         val safe = qb.from(Order::class.java).where { it.customer?.name == "Kim" }
         assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim'", safe.toHql().hql())
         val sure = qb.from(Order::class.java).where { it.customer!!.name == "Kim" }
@@ -165,7 +167,7 @@ class ManualKotlinNotesTest {
         // orders without a customer: the FK column, no join
         val none = qb.from(Order::class.java).where { it.customer == null }
         assertEquals("select e0 from Order e0 where e0.customer is null", none.toHql().hql())
-        // orders without a customer, and orders of a customer without a name: a left join (D54)
+        // orders without a customer, and orders of a customer without a name: a left join
         val safe = qb.from(Order::class.java).where { it.customer?.name == null }
         assertEquals("select e0 from Order e0 left join e0.customer j1 where j1.name is null", safe.toHql().hql())
         // only orders of a customer without a name: the inner join leaves out orders without a customer
@@ -218,7 +220,7 @@ class ManualKotlinNotesTest {
     fun hiddenNullCheck() {
         val q: Int? = 2
         // @start region="hidden-null-check"
-        // cnt is a nullable Integer: the null check Kotlin adds before the unboxing is not read (SQL meaning, D22)
+        // cnt is a nullable Integer: the null check Kotlin adds before the unboxing is not read (SQL meaning)
         val one = qb.from(Order::class.java).where { it.cnt == 1 }
         assertEquals("select e0 from Order e0 where e0.cnt = 1", one.toHql().hql())
         val notOne = qb.from(Order::class.java).where { it.cnt != 1 }          // NULL rows are left out, as in SQL
@@ -252,7 +254,7 @@ class ManualKotlinNotesTest {
         assertEquals("select e0 from Order e0 where 1 <= e0.status and e0.status < 3", until.toHql().hql())
         val captured = qb.from(Order::class.java).where { it.status.toInt() in lo..hi }
         assertEquals("select e0 from Order e0 where :p1 <= e0.status and e0.status <= :p2", captured.toHql().hql())
-        // a captured collection (D29)
+        // a captured collection
         val inIds = qb.from(Order::class.java).where { it.id in ids }
         assertEquals("select e0 from Order e0 where e0.id in (:p1)", inIds.toHql().hql())
         // a nullable target gets no null guard: NULL rows are returned by neither in nor !in (SQL)

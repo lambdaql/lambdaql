@@ -47,9 +47,6 @@ public enum LqlMessage {
     /** LQL-1010: An assignment needs a lambda, not a method reference. */
     METHOD_REFERENCE_IN_ASSIGNMENT("LQL-1010", 0),
 
-    /** LQL-1011: A sort builder needs a lambda, not a method reference (S13). */
-    METHOD_REFERENCE_IN_SORT_BUILDER("LQL-1011", 0),
-
     /** LQL-1012: A method reference must be a getter of the entity, for example Order::getPrice (S13). */
     METHOD_REFERENCE_NOT_GETTER("LQL-1012", 0),
 
@@ -80,7 +77,7 @@ public enum LqlMessage {
     /** LQL-2008: This invokedynamic is not supported: &#123;0&#125; */
     INVOKEDYNAMIC_NOT_SUPPORTED("LQL-2008", 1),
 
-    /** LQL-2009: An assignment lambda cannot have conditions (if, ?:) (U1). Put the condition in where. */
+    /** LQL-2009: An assignment lambda can use a condition (if, ?:) only to pick a value (U1). Put the condition that picks rows in where. */
     CONDITION_IN_ASSIGNMENT("LQL-2009", 0),
 
     /** LQL-2010: switch (and Kotlin when) is not supported yet. */
@@ -116,16 +113,16 @@ public enum LqlMessage {
     /** LQL-2020: The condition lambda returns a value that is not a boolean. */
     NOT_BOOLEAN_CONDITION("LQL-2020", 0),
 
-    /** LQL-2021: The condition could not be rebuilt as a logical expression. Forms that need the same condition more than once (such as a value ternary) are not supported. */
+    /** LQL-2021: The condition could not be rebuilt as a logical expression. Forms that need the same condition more than once are not supported. */
     CONDITION_NOT_RESTORED("LQL-2021", 0),
 
-    /** LQL-2022: A select or groupBy lambda cannot have conditions (if, ?:) (J1). */
+    /** LQL-2022: A select or groupBy lambda can use a condition (if, ?:) only to pick a value (J1). */
     CONDITION_IN_SELECT("LQL-2022", 0),
 
-    /** LQL-2023: A sort lambda cannot have conditions (if, ?:). Chain by calls instead (S4). */
+    /** LQL-2023: A sort lambda can use a condition (if, ?:) only inside a key value. Do not pick a chain of sort functions by a condition (S4). */
     CONDITION_IN_SORT("LQL-2023", 0),
 
-    /** LQL-2024: A subquery value lambda cannot have conditions. */
+    /** LQL-2024: A subquery value lambda can use a condition only to pick a value. */
     CONDITION_IN_SUBQUERY_VALUE("LQL-2024", 0),
 
     /** LQL-2025: An array element has no value. */
@@ -217,9 +214,6 @@ public enum LqlMessage {
 
     /** LQL-3029: The object cannot be created: &#123;0&#125; */
     HOST_OBJECT_UNCREATABLE("LQL-3029", 1),
-
-    /** LQL-3030: There is no sort key. Use by.asc(...) or by.desc(...). */
-    SORT_NO_KEY("LQL-3030", 0),
 
     /** LQL-3031: A sort key must use an entity value. A constant or captured value cannot be sorted: &#123;0&#125; */
     SORT_KEY_NO_ENTITY("LQL-3031", 1),
@@ -331,6 +325,9 @@ public enum LqlMessage {
 
     /** LQL-3068: The &#64;Version column cannot be assigned; Hibernate increases it in every update (U15): &#123;0&#125; */
     VERSION_ASSIGN("LQL-3068", 1),
+
+    /** LQL-3069: With a Direction argument, the sort lambda must be one key, not the functions of By: write orderBy(o -> sort(o.getPrice(), direction)) instead. */
+    SORT_KEYS_WITH_DIRECTION("LQL-3069", 0),
 
     /** LQL-4001: limit and the one-row protection are not supported yet for an entity with a composite key: &#123;0&#125; */
     COMPOSITE_KEY_LIMIT("LQL-4001", 1),
@@ -467,6 +464,12 @@ public enum LqlMessage {
     /** LQL-4045: A captured value is null in &#123;0&#125;. In SQL, = NULL and &lt;&gt; NULL match no row; use x == null in the lambda, or check the value before the query. */
     NULL_CAPTURED_COMPARE("LQL-4045", 1),
 
+    /** LQL-4046: The sort function &#123;0&#125; of By is only for sort lambdas; lambdaQL reads it and never runs it. */
+    SORT_OUTSIDE_LAMBDA("LQL-4046", 1),
+
+    /** LQL-4047: The text for startsWith, endsWith or contains is null (Java would throw NullPointerException): &#123;0&#125; */
+    LIKE_TEXT_NULL("LQL-4047", 1),
+
     /** LQL-4999: Internal error in lambdaQL. Please report it: &#123;0&#125; */
     INTERNAL_ERROR("LQL-4999", 1),
 
@@ -507,10 +510,8 @@ public enum LqlMessage {
     SARGABLE_COLUMN_ARITHMETIC("LQL-5012", 2),
 
     /** LQL-5013: The condition computes on the columns &#123;0&#125;, so it cannot use an index on them: &#123;1&#125; */
-    SARGABLE_COLUMN_EXPRESSION("LQL-5013", 2),
+    SARGABLE_COLUMN_EXPRESSION("LQL-5013", 2);
 
-    /** LQL-5014: Kotlin: the association &#123;0&#125; is read with ?. in one place and with !! (or without a mark) in another, so it is an inner join and rows without it are left out. Write ?. everywhere to keep those rows, or !! everywhere: &#123;1&#125; */
-    SAFE_CALL_MIXED("LQL-5014", 2);
 
     private final String code;
     private final int argCount;

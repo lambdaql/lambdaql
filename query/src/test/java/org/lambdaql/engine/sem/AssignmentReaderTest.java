@@ -55,7 +55,7 @@ class AssignmentReaderTest {
     void valueForm() {
         // @start region="read-value"
         // Dml.value(column, value) for entities without setters; constants stay literals, also when they are boxed
-        // for the generic value(V, V) (D37, D49)
+        // for the generic value(V, V)
         assertEquals("[col0.status := 2, col0.price := 1.0]",
                 setters(o -> { value(o.getStatus(), (short) 2); value(o.getPrice(), 1.0); }));
         // setters and value can be mixed in one lambda

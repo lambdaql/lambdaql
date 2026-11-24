@@ -79,8 +79,11 @@ public final class ConditionReducer {
         collect(root, order, preds, new IdentityHashMap<>());
         boolean changed = false;
         for (Node.Test x : order) {
-            x.onTrue = skipDegenerate(x.onTrue);
-            x.onFalse = skipDegenerate(x.onFalse);
+            Node t = skipDegenerate(x.onTrue);
+            Node f = skipDegenerate(x.onFalse);
+            if (t != x.onTrue || f != x.onFalse) changed = true;   // a test that did not matter was dropped
+            x.onTrue = t;
+            x.onFalse = f;
             if (x.onTrue instanceof Node.Test y && preds.getOrDefault(y, 0) == 1 && y != x) {
                 if (x.onFalse == y.onFalse) {                       // R1
                     x.atom = Pred.and(x.atom, y.atom);

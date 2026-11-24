@@ -1,5 +1,7 @@
 package org.lambdaql.query
 
+import org.lambdaql.query.By.desc
+
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
@@ -207,7 +209,7 @@ class ManualKotlinFunctionTest {
     fun selectAndSort() {
         // @start region="select"
         val q = qb.from(Order::class.java)
-            .orderBy { o, by -> by.desc(OrderFns.discount(o.price)) }
+            .orderBy { o -> desc(OrderFns.discount(o.price)) }
             .select { Priced(it.id, OrderFns.discount(it.price)) }
         assertEquals("select e0.id, function('SQ_FN_DISCOUNT' as Double, e0.price) from Order e0"
             + " order by function('SQ_FN_DISCOUNT' as Double, e0.price) desc nulls last", q.toHql().hql())

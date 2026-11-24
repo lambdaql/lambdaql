@@ -115,15 +115,16 @@ class ManualJavaWhereTest {
     void ternaryOutside() {
         boolean flag = true;
         // @start region="ternary-outside"
-        // a value chosen by a ternary inside the lambda is rejected
-        assertThrows(LambdaQLException.class,
-                () -> qb.from(Order.class).where(o -> o.getStatus() == (flag ? 1 : 2)).toList());
-        // choose the value before the lambda
-        int wanted = flag ? 1 : 2;
-        SelectQuery<Order> query = qb.from(Order.class).where(o -> o.getStatus() == wanted);
+        // a ternary of captured values and constants: computed in Java, bound as :p1
+        SelectQuery<Order> query = qb.from(Order.class).where(o -> o.getStatus() == (flag ? 1 : 2));
         assertEquals("select e0 from Order e0 where e0.status = :p1", query.toHql().hql());
+        // a ternary that reads the entity becomes case when
+        SelectQuery<Order> byEntity = qb.from(Order.class).where(o -> o.getStatus() == (o.isActive() ? 1 : 2));
+        assertEquals("select e0 from Order e0 where e0.status = case when e0.active = true then 1 else 2 end",
+                byEntity.toHql().hql());
         // @end
         assertEquals(javaIds(o -> o.getStatus() == 1), ids(query.toList()));
+        assertEquals(javaIds(o -> o.getStatus() == (o.isActive() ? 1 : 2)), ids(byEntity.toList()));
     }
 
     @Test
@@ -182,17 +183,18 @@ class ManualJavaWhereTest {
     void booleanCompare() {
         // @start region="boolean-compare"
         int s = 1;
-        // a boolean column compared with a condition needs the condition twice: rejected
-        UnsupportedLambdaShapeException e = assertThrows(UnsupportedLambdaShapeException.class,
-                () -> qb.from(Order.class).where(o -> o.isActive() == (o.getStatus() > s)));
-        assertEquals("LQL-2021", e.code());
-        // write the two cases with && and ||
+        // a boolean column compared with a condition: the condition becomes case when
+        SelectQuery<Order> compared = qb.from(Order.class).where(o -> o.isActive() == (o.getStatus() > s));
+        assertEquals("select e0 from Order e0 where e0.active = case when e0.status > :p1 then true else false end",
+                compared.toHql().hql());
+        // the same rows with && and ||: plain comparisons that an index can serve
         SelectQuery<Order> query = qb.from(Order.class)
                 .where(o -> (o.isActive() && o.getStatus() > s) || (!o.isActive() && o.getStatus() <= s));
         assertEquals("select e0 from Order e0 where (e0.active = true and e0.status > :p1)"
                 + " or (e0.active = false and e0.status <= :p2)", query.toHql().hql());
         // @end
         assertEquals(javaIds(o -> o.isActive() == (o.getStatus() > 1)), ids(query.toList()));
+        assertEquals(javaIds(o -> o.isActive() == (o.getStatus() > 1)), ids(compared.toList()));
     }
 
     @Test
@@ -231,9 +233,9 @@ class ManualJavaWhereTest {
         Customer c = new Customer(1, "Kim", null);
         String code = "b";
         // @start region="rejected-forms"
-        // a String method on an entity value
+        // a String method on an entity value other than startsWith, endsWith and contains
         assertEquals("LQL-3008", assertThrows(LambdaQLException.class,
-                () -> qb.from(Order.class).where(o -> o.getDescription().startsWith("a"))).code());
+                () -> qb.from(Order.class).where(o -> o.getDescription().trim().equals("a"))).code());
         // string concatenation inside the lambda, even of captured values only
         assertEquals("LQL-2007", assertThrows(LambdaQLException.class,
                 () -> qb.from(Order.class).where(o -> o.getDescription().equals("A" + code))).code());

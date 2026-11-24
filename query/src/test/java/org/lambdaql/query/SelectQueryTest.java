@@ -136,7 +136,7 @@ class SelectQueryTest {
     @Test
     void nullSafeCapturedValue() {
         // @start region="null-safe"
-        // the SQL meaning (D48): = NULL matches no row; lambdaQL logs LQL-4045 at WARN when it runs with a null
+        // the SQL meaning: = NULL matches no row; lambdaQL logs LQL-4045 at WARN when it runs with a null
         String d = null;
         RenderedQuery q = qb.from(Order.class).where(o -> Objects.equals(o.getDescription(), d)).toHql();
         assertEquals("select e0 from Order e0 where e0.description = :p1", q.hql());
@@ -168,20 +168,19 @@ class SelectQueryTest {
     void nullGuardKeepsRowsWithoutAssociation() {
         // @start region="null-guard"
         String name = "Kim";
-        // the SQL meaning (D48): a where path is an inner join, so "customer is null" never matches here
-        // (lambdaQL logs LQL-5009 at DEBUG); to keep orders without a customer, use leftJoin (D44)
+        // the null guard keeps orders without a customer, as in Java: a left join
         RenderedQuery q = qb.from(Order.class)
                 .where(o -> o.getCustomer() == null || o.getCustomer().getName().equals(name))
                 .toHql();
-        assertEquals("select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name = :p1", q.hql());
+        assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1", q.hql());
 
-        // the guard removes those orders, so an inner join is right
+        // no order without a customer can match: an inner join
         RenderedQuery q2 = qb.from(Order.class)
                 .where(o -> o.getCustomer() != null && o.getCustomer().getName().equals(name))
                 .toHql();
         assertEquals("select e0 from Order e0 join e0.customer j1 where e0.customer is not null and j1.name = :p1", q2.hql());
         // @end
-        assertEquals(javaIds(o -> o.getCustomer() != null && name.equals(o.getCustomer().getName())),
+        assertEquals(javaIds(o -> o.getCustomer() == null || name.equals(o.getCustomer().getName())),
                 ids(qb.from(Order.class).where(o -> o.getCustomer() == null || o.getCustomer().getName().equals(name)).toList()));
         assertEquals(javaIds(o -> o.getCustomer() != null && name.equals(o.getCustomer().getName())),
                 ids(qb.from(Order.class).where(o -> o.getCustomer() != null && o.getCustomer().getName().equals(name)).toList()));
@@ -191,8 +190,9 @@ class SelectQueryTest {
                         .where(o -> o.getCustomer() == null || o.getCustomer().getName().equals(name))
                         .where(o -> o.getCustomer().getName() != null)
                         .toHql().hql());
-        // with the inner join (D48), orders without a customer never match, whatever the status
-        assertEquals(javaIds(o -> o.getCustomer() != null && name.equals(o.getCustomer().getName())),
+        // a status 1 order without a customer matches the first part, as in Java: a left join
+        assertEquals(javaIds(o -> (o.getCustomer() == null && o.getStatus() == 1)
+                        || (o.getCustomer() != null && name.equals(o.getCustomer().getName()))),
                 ids(qb.from(Order.class)
                         .where(o -> (o.getCustomer() == null && o.getStatus() == 1) || o.getCustomer().getName().equals(name))
                         .toList()));
@@ -228,7 +228,7 @@ class SelectQueryTest {
         // the id can never be NULL: a plain NOT IN
         assertEquals("select e0 from Order e0 where e0.id not in (:p1)",
                 qb.from(Order.class).where(o -> !ids.contains(o.getId())).toHql().hql());
-        // a column that can be NULL: the SQL meaning (D48), a NULL value is not "not in" the list (DEBUG LQL-5009);
+        // a column that can be NULL: the SQL meaning, a NULL value is not "not in" the list (DEBUG LQL-5009);
         // to keep those rows, write o.getDescription() == null || !descs.contains(o.getDescription())
         List<String> descs = Arrays.asList("a", "b");
         assertEquals("select e0 from Order e0 where e0.description not in (:p1)",

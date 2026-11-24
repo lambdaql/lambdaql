@@ -1,5 +1,8 @@
 package org.lambdaql.query
 
+import org.lambdaql.query.By.desc
+import org.lambdaql.query.By.sort
+
 import jakarta.persistence.EntityManagerFactory
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
@@ -82,7 +85,7 @@ class KotlinQueryTest {
         // @start region="sort"
         val q = qb.from(Order::class.java)
             .where { it.isActive }
-            .orderBy { o, by -> by.desc(o.price).asc(o.customer?.name) }
+            .orderBy { o -> desc(o.price).asc(o.customer?.name) }
             .limit(3)
         assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.active = true"
             + " order by e0.price desc, j1.name asc nulls first, e0.id asc", q.toHql().hql())
@@ -205,7 +208,7 @@ class KotlinQueryTest {
     @Test
     fun safeCallAnd() {
         // @start region="safe-call-and"
-        // a row without a customer can never match: lambdaQL keeps the inner join (the same rows)
+        // no order without a customer can match: an inner join, also with ?.
         val q = qb.from(Order::class.java).where { it.customer?.name == "Kim" && it.price > 100.0 }
         assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' and e0.price > 100.0", q.toHql().hql())
         // @end
@@ -215,30 +218,34 @@ class KotlinQueryTest {
     @Test
     fun notNullAssert() {
         // @start region="not-null-assert"
-        // !! says the customer is always there: an inner join, so orders without a customer are left out
-        // (Kotlin itself would keep the status 1 order without a customer, because || stops before the !!)
+        // !! counts only for orders with a customer; || stops before it, so the status 1 order without a customer
+        // stays, as in Kotlin: a left join
         val q = qb.from(Order::class.java).where { it.status.toInt() == 1 || it.customer!!.name == "Kim" }
-        assertEquals("select e0 from Order e0 join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", q.toHql().hql())
+        assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", q.toHql().hql())
         // @end
-        val expected = orders.filter { it.customer != null && (it.status.toInt() == 1 || it.customer.name == "Kim") }
+        val expected = orders.filter { it.status.toInt() == 1 || it.customer?.name == "Kim" }
         assertEquals(ids(expected), ids(q.toList()))
     }
 
     @Test
-    fun mixedWarn() {
+    fun safeAndAssert() {
         val log = org.slf4j.LoggerFactory.getLogger(org.lambdaql.engine.render.HqlRenderer::class.java) as ch.qos.logback.classic.Logger
         val appender = ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>()
         appender.start()
         log.addAppender(appender)
         try {
-            // @start region="mixed-warn"
-            // the same association with ?. in one place and !! in another: an inner join, and WARN LQL-5014
+            // @start region="safe-and-assert"
+            // the same association with ?. in one place and !! in another: neither side can match an order without
+            // a customer, so an inner join (no warning)
             val q = qb.from(Order::class.java).where { it.customer?.name == "Kim" || it.customer!!.grade!! > 3 }
             assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' or j1.grade > 3", q.toHql().hql())
+            // ?. side true without a customer: a left join, and the !! side counts only with a customer
+            val keep = qb.from(Order::class.java).where { it.customer?.name == null || it.customer!!.grade == null }
+            assertEquals("select e0 from Order e0 left join e0.customer j1"
+                + " where j1.name is null or (e0.customer is not null and j1.grade is null)", keep.toHql().hql())
             // @end
-            val warned = appender.list.filter { it.level == ch.qos.logback.classic.Level.WARN && it.formattedMessage.startsWith("[LQL-5014]") }
-            assertEquals(1, warned.size, appender.list.toString())
-            assertEquals(true, warned[0].formattedMessage.contains("customer"))
+            assertEquals(0, appender.list.count { it.level == ch.qos.logback.classic.Level.WARN }, appender.list.toString())
+            assertEquals(ids(orders.filter { it.customer?.name == null || (it.customer != null && it.customer.grade == null) }), ids(keep.toList()))
             val expected = orders.filter { it.customer != null && (it.customer.name == "Kim" || it.customer.grade > 3) }
             assertEquals(ids(expected), ids(q.toList()))
         } finally {
@@ -314,7 +321,7 @@ class KotlinQueryTest {
     @Test
     fun updateWithSubquery() {
         // @start region="update-sub"
-        // the second parameter starts a subquery, as in where { o, sub -> ... } (D49)
+        // the second parameter starts a subquery, as in where { o, sub -> ... }
         val u = qb.update(Order::class.java)
             .set { o, sub -> o.price = sub.from(Item::class.java).where { i -> i.order?.id == o.id }.sum { it.price } }
             .where { o, sub -> sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
@@ -332,7 +339,7 @@ class KotlinQueryTest {
     @Test
     fun insertValuesWithSubquery() {
         // @start region="insert-values-sub"
-        // values { a, sub -> ... }: a subquery can read captured values, not the new row (D49)
+        // values { a, sub -> ... }: a subquery can read captured values, not the new row
         val i = qb.insert(Archive::class.java)
             .values { a, sub -> a.id = 100L; a.price = sub.from(Item::class.java).sum { it.price } }
         assertEquals("insert into Archive (id, price) values (100L, (select sum(s1.price) from Item s1))", i.toHql()[0].hql())
@@ -373,7 +380,7 @@ class KotlinQueryTest {
     @Test
     fun joinInSubquery() {
         // @start region="sub-join"
-        // customers with an order that has an item of quantity > 10: the subquery joins Order and Item (D51)
+        // customers with an order that has an item of quantity > 10: the subquery joins Order and Item
         val q = qb.from(Customer::class.java).where { c, sub ->
             sub.from(Order::class.java)
                 .join(Item::class.java) { o, i -> i.order?.id == o.id }
@@ -406,7 +413,7 @@ class KotlinQueryTest {
     @Test
     fun embeddedCompare() {
         // @start region="embedded-compare"
-        // address is @Embedded (city, zip): == with a value object compares each column (D48)
+        // address is @Embedded (city, zip): == with a value object compares each column
         val addr = Address("Seoul", "04524")
         val same = qb.from(Order::class.java).where { it.address == addr }
         assertEquals("select e0 from Order e0 where e0.address.city = :p1 and e0.address.zip = :p2", same.toHql().hql())

@@ -1,5 +1,7 @@
 package org.lambdaql.query
 
+import org.lambdaql.query.By.desc
+
 import jakarta.persistence.EntityManagerFactory
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -78,7 +80,7 @@ class ManualKotlinSubqueryTest {
     @Test
     fun notIn() {
         // @start region="not-in"
-        // the SQL meaning (D48): NOT IN. The grades are 5, 2 and NULL, so no row matches: x NOT IN (5, 2, NULL)
+        // the SQL meaning: NOT IN. The grades are 5, 2 and NULL, so no row matches: x NOT IN (5, 2, NULL)
         // is never true. To skip the NULL, say so in the subquery: where { c -> c.grade != null }
         val q = qb.from(Order::class.java)
             .where { o, sub -> o.status.toInt() !in sub.from(Customer::class.java).select { c -> c.grade } }
@@ -126,7 +128,7 @@ class ManualKotlinSubqueryTest {
             .where { o, sub ->
                 o.id == sub.from(Order::class.java)
                     .where { x -> x.customer?.id == o.customer?.id }
-                    .orderBy { x, by -> by.desc(x.price) }
+                    .orderBy { x -> desc(x.price) }
                     .limit(1)
                     .select { x -> x.id }
                     .first()

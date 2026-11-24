@@ -1,5 +1,7 @@
 package org.lambdaql.query;
 
+import static org.lambdaql.query.By.*;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -130,7 +132,7 @@ class SubqueryTest {
     @Test
     void notInIsNotExists() {
         // @start region="not-in"
-        // the SQL meaning (D48): NOT IN. The grades are 5, 2 and NULL, so no row matches: x NOT IN (5, 2, NULL)
+        // the SQL meaning: NOT IN. The grades are 5, 2 and NULL, so no row matches: x NOT IN (5, 2, NULL)
         // is never true. To skip the NULL, say so in the subquery: where(c -> c.getGrade() != null)
         SelectQuery<Order> q = qb.from(Order.class)
                 .where((o, sub) -> !sub.from(Customer.class).select(c -> c.getGrade()).contains((int) o.getStatus()));
@@ -172,7 +174,7 @@ class SubqueryTest {
         SelectQuery<Order> q = qb.from(Order.class)
                 .where((o, sub) -> o.getId().equals(sub.from(Order.class)
                         .where(x -> x.getCustomer().getId() == o.getCustomer().getId())
-                        .orderBy((x, by) -> by.desc(x.getPrice()))
+                        .orderBy(x -> desc(x.getPrice()))
                         .limit(1)
                         .select(x -> x.getId())
                         .first()));
@@ -231,7 +233,7 @@ class SubqueryTest {
     @Test
     void joinInSubquery() {
         // @start region="sub-join"
-        // customers with an order that has an item of quantity > 10: the subquery joins Order and Item (D51)
+        // customers with an order that has an item of quantity > 10: the subquery joins Order and Item
         SelectQuery<Customer> q = qb.from(Customer.class).where((c, sub) -> sub.from(Order.class)
                 .join(Item.class, (o, i) -> i.getOrder().getId() == o.getId())
                 .where((o, i) -> o.getCustomer().getId() == c.getId() && i.getQty() > 10)

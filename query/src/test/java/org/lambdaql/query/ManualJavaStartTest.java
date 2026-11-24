@@ -1,5 +1,7 @@
 package org.lambdaql.query;
 
+import static org.lambdaql.query.By.*;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -185,7 +187,7 @@ class ManualJavaStartTest {
         double minPrice = 100;
         OrderedSelectQuery<Order> query = qb.from(Order.class)
                 .where(o -> o.getStatus() == 1 && o.getPrice() > minPrice)
-                .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId()))
+                .orderBy(o -> desc(o.getPrice()).asc(o.getId()))
                 .limit(20);
         assertEquals("select e0 from Order e0 where e0.status = 1 and e0.price > :p1"
                 + " order by e0.price desc, e0.id asc", query.toHql().hql());

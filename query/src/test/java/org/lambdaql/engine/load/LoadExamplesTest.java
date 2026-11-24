@@ -97,7 +97,7 @@ class LoadExamplesTest {
     @Test
     void readerName() {
         // @start region="reader-name"
-        // Java 21 to 23 read class files with ASM; Java 24 and later with java.lang.classfile (from the jar, D52)
+        // Java 21 to 23 read class files with ASM; Java 24 and later with java.lang.classfile (from the jar)
         String reader = BytecodeLoader.readerName();
         assertTrue(reader.equals("asm") || reader.equals("classfile"));
         // @end

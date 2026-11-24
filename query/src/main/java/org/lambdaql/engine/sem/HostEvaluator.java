@@ -63,10 +63,74 @@ public final class HostEvaluator {
                 Object first = eval(c.first(), captured);
                 yield first != null ? first : eval(c.second(), captured);
             }
+            case Expr.Case c -> evalCase(c, captured);
             case Expr.NewObject n -> construct(n, captured);
             case Expr.SafeNav n -> eval(n.value(), captured);
             case Expr.ArrayLength a -> java.lang.reflect.Array.getLength(eval(a.array(), captured));
+            case Expr.Choose c -> holds(c.cond(), captured) ? eval(c.whenTrue(), captured) : eval(c.whenFalse(), captured);
             default -> throw LqlMessage.HOST_NOT_EVALUABLE.exception(e);
+        };
+    }
+
+    private Object evalCase(Expr.Case c, Object[] captured) {
+        for (int i = 0; i < c.conds().size(); i++) {
+            if (holds(c.conds().get(i), captured)) return eval(c.values().get(i), captured);
+        }
+        return eval(c.otherwise(), captured);
+    }
+
+    /**
+     * Evaluates the condition of a value ternary of captured values (ROADMAP D61), with Java's meaning.
+     *
+     * <p>Example: for {@code flag ? 1 : 2}, the condition {@code flag} is true when the captured boolean is true.
+     *
+     * @param p        the condition (no entity value in it)
+     * @param captured the captured values
+     * @return the result
+     * @throws NullPointerException when Java would throw it (a null compared with {@code <}, or unboxed)
+     */
+    boolean holds(org.lambdaql.engine.ir.Pred p, Object[] captured) {
+        return switch (p) {
+            case org.lambdaql.engine.ir.Pred.Bool b -> b.value();
+            case org.lambdaql.engine.ir.Pred.Not n -> !holds(n.operand(), captured);
+            case org.lambdaql.engine.ir.Pred.And a -> a.items().stream().allMatch(x -> holds(x, captured));
+            case org.lambdaql.engine.ir.Pred.Or o -> o.items().stream().anyMatch(x -> holds(x, captured));
+            case org.lambdaql.engine.ir.Pred.IsNull n -> eval(n.operand(), captured) == null;
+            case org.lambdaql.engine.ir.Pred.Truth t -> {
+                Object v = eval(t.operand(), captured);
+                if (v == null) throw new NullPointerException(t.toString());
+                yield v instanceof Boolean b ? b : ((Number) v).intValue() != 0;
+            }
+            case org.lambdaql.engine.ir.Pred.Cmp c -> compare(c.op(), eval(c.left(), captured), eval(c.right(), captured), c);
+            default -> throw LqlMessage.HOST_NOT_EVALUABLE.exception(p);
+        };
+    }
+
+    private static boolean compare(org.lambdaql.engine.ir.CmpOp op, Object a, Object b, Object where) {
+        if ((a instanceof Number || a instanceof Character) && (b instanceof Number || b instanceof Character)) {
+            int r = decimal(a instanceof Character ch ? (int) ch : (Number) a).compareTo(decimal(b instanceof Character ch ? (int) ch : (Number) b));
+            return switch (op) {
+                case EQ -> r == 0;
+                case NE -> r != 0;
+                case LT -> r < 0;
+                case LE -> r <= 0;
+                case GT -> r > 0;
+                case GE -> r >= 0;
+            };
+        }
+        return switch (op) {
+            case EQ -> java.util.Objects.equals(a, b);
+            case NE -> !java.util.Objects.equals(a, b);
+            default -> {
+                if (a == null || b == null) throw new NullPointerException(String.valueOf(where));
+                @SuppressWarnings("unchecked") int r = ((Comparable<Object>) a).compareTo(b);
+                yield switch (op) {
+                    case LT -> r < 0;
+                    case LE -> r <= 0;
+                    case GT -> r > 0;
+                    default -> r >= 0;
+                };
+            }
         };
     }
 

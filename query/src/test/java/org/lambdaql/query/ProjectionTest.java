@@ -1,5 +1,7 @@
 package org.lambdaql.query;
 
+import static org.lambdaql.query.By.*;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -91,7 +93,7 @@ class ProjectionTest {
         // @start region="value"
         ValueQuery<Double> q = qb.from(Order.class)
                 .where(o -> o.getStatus() == 1)
-                .orderBy((o, by) -> by.asc(o.getPrice()))
+                .orderBy(o -> asc(o.getPrice()))
                 .select(o -> o.getPrice());
         assertEquals("select e0.price from Order e0 where e0.status = 1 order by e0.price asc", q.toHql().hql());
         // @end
@@ -173,7 +175,7 @@ class ProjectionTest {
     void distinct() {
         // @start region="distinct"
         ValueQuery<Double> q = qb.from(Order.class)
-                .orderBy((o, by) -> by.desc(o.getPrice()))
+                .orderBy(o -> desc(o.getPrice()))
                 .select(o -> o.getPrice())
                 .distinct();
         assertEquals("select distinct e0.price from Order e0 order by e0.price desc", q.toHql().hql());
@@ -188,7 +190,7 @@ class ProjectionTest {
     @Test
     void pagingAndFirst() {
         ValueQuery<Double> q = qb.from(Order.class)
-                .orderBy((o, by) -> by.desc(o.getPrice()))
+                .orderBy(o -> desc(o.getPrice()))
                 .select(o -> o.getPrice());
         List<Double> sorted = orders.stream().sorted(Comparator.comparing(Order::getPrice).reversed()
                 .thenComparing(Order::getId)).map(Order::getPrice).toList();
@@ -205,7 +207,7 @@ class ProjectionTest {
         sql.setLevel(ch.qos.logback.classic.Level.DEBUG);
         try {
             Long tied = qb.from(Order.class).where(o -> o.getPrice() == 150)
-                    .orderBy((o, by) -> by.desc(o.getPrice())).select(o -> o.getId()).first().orElseThrow();
+                    .orderBy(o -> desc(o.getPrice())).select(o -> o.getId()).first().orElseThrow();
             assertEquals(orders.stream().filter(o -> o.getPrice() == 150).map(Order::getId).min(Comparator.naturalOrder()).orElseThrow(), tied);
             String last = seen.list.get(seen.list.size() - 1).getFormattedMessage().replaceAll("\\s+", " ");
             assertTrue(last.matches(".*order by o1_0\\.price desc, ?o1_0\\.id.*"), last);
@@ -232,7 +234,7 @@ class ProjectionTest {
                 .collect(Collectors.groupingBy(ProjectionTest::customerId));
         long expected = groups.values().stream().filter(l -> l.size() >= 2).count();
         assertEquals(expected, i.execute());
-        List<Stat> rows = qb.from(Summary.class).orderBy((s, by) -> by.asc(s.getCustomerId()))
+        List<Stat> rows = qb.from(Summary.class).orderBy(s -> asc(s.getCustomerId()))
                 .select(s -> new Stat(s.getCustomerId(), s.getCnt(), s.getTotal())).toList();
         List<Stat> want = groups.entrySet().stream().filter(e -> e.getValue().size() >= 2)
                 .map(e -> new Stat(e.getKey(), e.getValue().size(), e.getValue().stream().mapToDouble(Order::getPrice).sum()))
@@ -253,7 +255,7 @@ class ProjectionTest {
         assertEquals("LQL-3005", where.code());
         // J7: with distinct, the sort key must be selected
         LambdaQLException j7 = assertThrows(LambdaQLException.class, () -> qb.from(Order.class)
-                .orderBy((o, by) -> by.asc(o.getId())).select(o -> o.getPrice()).distinct().toHql());
+                .orderBy(o -> asc(o.getId())).select(o -> o.getPrice()).distinct().toHql());
         assertEquals("LQL-3046", j7.code());
         // J4: the group without orders gives NULL; a primitive argument cannot take it
         assertThrows(IllegalStateException.class, () -> qb.from(Order.class)

@@ -1,5 +1,8 @@
 package org.lambdaql.query
 
+import org.lambdaql.query.By.asc
+import org.lambdaql.query.By.desc
+
 import jakarta.persistence.EntityManagerFactory
 import jakarta.persistence.NonUniqueResultException
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -95,7 +98,7 @@ class ManualKotlinStartTest {
         // @start region="readme"
         val q = qb.from(Order::class.java)
             .where { it.status.toInt() == 1 && it.price > minPrice }
-            .orderBy { o, by -> by.desc(o.price).asc(o.id) }
+            .orderBy { o -> desc(o.price).asc(o.id) }
             .limit(20)
         assertEquals("select e0 from Order e0 where e0.status = 1 and e0.price > :p1"
             + " order by e0.price desc, e0.id asc", q.toHql().hql())
@@ -175,7 +178,7 @@ class ManualKotlinStartTest {
     @Test
     fun first() {
         // @start region="first"
-        val byPrice = qb.from(Order::class.java).orderBy { o, by -> by.asc(o.price) }
+        val byPrice = qb.from(Order::class.java).orderBy { o -> asc(o.price) }
         val cheapest: Order? = byPrice.first().orElse(null)
         // first() reads one row like limit(1); paging adds the id as the last sort key
         assertEquals("select e0 from Order e0 order by e0.price asc, e0.id asc", byPrice.limit(1).toHql().hql())
@@ -212,7 +215,7 @@ class ManualKotlinStartTest {
         // @start region="count"
         val active = qb.from(Order::class.java).where { it.isActive }
         val total: Long = active.count()                       // every matching row
-        val page = active.orderBy { o, by -> by.desc(o.price) }.limit(2)
+        val page = active.orderBy { o -> desc(o.price) }.limit(2)
         assertEquals("select e0 from Order e0 where e0.active = true order by e0.price desc, e0.id asc", page.toHql().hql())
         val rows: List<Order> = page.toList()
         // @end
@@ -237,7 +240,7 @@ class ManualKotlinStartTest {
     @Test
     fun toSet() {
         // @start region="to-set"
-        val sorted = qb.from(Order::class.java).orderBy { o, by -> by.desc(o.price) }
+        val sorted = qb.from(Order::class.java).orderBy { o -> desc(o.price) }
         assertEquals("select e0 from Order e0 order by e0.price desc", sorted.toHql().hql())
         val byPrice: java.util.SequencedSet<Order> = sorted.toSet()
         // @end

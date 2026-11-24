@@ -5,9 +5,7 @@
 
 ---
 
-
-[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `delete`:
-
+<!-- region: DmlQueryTest.java#delete -->
 ```java
 ExecutableDelete<Order> d = qb.delete(Order.class).where(o -> o.getStatus() == 3);
 assertEquals("delete from Order e0 where e0.status = 3", d.toHql().hql());
@@ -18,10 +16,9 @@ assertEquals("delete from Order e0 where (select s1.name from Customer s1 where 
         + " and e0.customer.id is not null", byName.toHql().hql());
 ```
 
-**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다.
+**데이터베이스별 SQL**
 
-**데이터베이스별 SQL** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `delete`:
-
+<!-- sql: delete -->
 ```sql
 -- H2, Oracle
 delete from orders o1_0
@@ -32,8 +29,9 @@ delete o1_0 from orders o1_0
 where o1_0.status=3
 ```
 
-**데이터베이스별 SQL** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `delete#2`:
+**데이터베이스별 SQL**
 
+<!-- sql: delete#2 -->
 ```sql
 -- H2, Oracle
 delete from orders o1_0
@@ -46,24 +44,22 @@ where (select c1_0.name from customers c1_0 where c1_0.id=orders.customer_id) is
 
 MariaDB는 `delete o1_0 from orders o1_0`로 씁니다. H2와 Oracle은 `delete from orders o1_0`로 씁니다.
 
-두 번째 문장은 `qb.from(Order.class).where(o -> o.getCustomer().getName() == null)`이 반환하는 것과 **같은 행**, 즉 고객의 이름이 없는 주문을 삭제합니다. 테스트는 삭제된 행을 이 조회 결과와 비교합니다.
-고객이 **없는** 주문은 삭제되지 않습니다(규칙 U9, 결정 D36). null 가드(`o.getCustomer() == null || ...`)를 써도 마찬가지입니다. 조회에서도 이 경로는 inner join이기 때문입니다(결정 D48).
-고객이 없는 주문을 삭제하려면 `o.getCustomer() == null` 조건으로 삭제 문장을 한 번 더 실행하십시오.
+두 번째 문장은 `qb.from(Order.class).where(o -> o.getCustomer().getName() == null)`이 반환하는 것과 **같은 행**, 즉 고객의 이름이 없는 주문을 삭제합니다.
+고객이 **없는** 주문은 이 조건에 맞지 않으므로 삭제되지 않습니다(규칙 U9). 조회에서도 이 경로는 inner join입니다.
+고객이 없는 주문도 삭제하려면 null 가드(`o.getCustomer() == null || ...`)를 함께 쓰십시오. 조회와 마찬가지로 고객이 없는 주문도 대상이 됩니다.
 
 모든 행을 삭제할 때는 `all()`이 필요합니다(규칙 U5). `where`도 `all()`도 없으면 `execute()`가 없으므로 컴파일되지 않습니다.
 
-[`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java), 영역 `delete-all`:
-
+<!-- region: ManualJavaDmlTest.java#delete-all -->
 ```java
 ExecutableDelete<Order> d = qb.delete(Order.class).all();
 assertEquals("delete from Order e0", d.toHql().hql());
 int deleted = d.execute();
 ```
 
-id 목록으로 삭제(캡처한 컬렉션, 결정 D29):
+id 목록으로 삭제(캡처한 컬렉션):
 
-[`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java), 영역 `delete-in`:
-
+<!-- region: ManualJavaDmlTest.java#delete-in -->
 ```java
 List<Long> ids = all;                               // ids read before, for example from a request
 ExecutableDelete<Item> d = qb.delete(Item.class).where(i -> ids.contains(i.getId()));
@@ -71,19 +67,19 @@ assertEquals("delete from Item e0 where e0.id in (:p1)", d.toHql().hql());
 int deleted = d.execute();
 ```
 
-`where` 안의 서브쿼리는 [5. 서브쿼리](05-subquery.md)처럼 두 번째 람다 인자 `sub`를 사용합니다.
+`where` 안의 서브쿼리는 [5. 서브쿼리](05-subquery.md)처럼 두 번째 람다 표현식 인자 `sub`를 사용합니다.
 품목이 없는 주문을 삭제하는 예:
 
-[`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java), 영역 `dml-subquery`:
-
+<!-- region: SubqueryTest.java#dml-subquery -->
 ```java
 ExecutableDelete<Order> d = qb.delete(Order.class)
         .where((o, sub) -> !sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists());
 assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)", d.toHql().hql());
 ```
 
-**데이터베이스별 SQL** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `dml-subquery`:
+**데이터베이스별 SQL**
 
+<!-- sql: dml-subquery -->
 ```sql
 -- H2, Oracle
 delete from orders o1_0
@@ -96,6 +92,8 @@ where not exists(select 1 from items i1_0 where i1_0.order_id=orders.id)
 
 모든 JPA 벌크 문장과 마찬가지로, delete는 JPA `cascade`나 `orphanRemoval`을 실행하지 않고 이미 로드된 엔티티에도 반영되지 않습니다(규칙 U16).
 delete에는 트랜잭션이 필요합니다([7.8](07-dml.md#transactions) 참고).
+
+예제 코드: [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`delete`), [`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`delete-all`, `delete-in`), [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)(`dml-subquery`).
 
 <a id="delete-with-a-subquery-on-the-same-table"></a>
 ## 같은 테이블을 읽는 서브쿼리
@@ -114,8 +112,7 @@ delete from Order d0 where d0.id in (select t.id from (select e0.id as id from O
 - `update`는 감싸지 않습니다. 자기 테이블을 읽는 서브쿼리가 있는 `update`는 세 DB 모두에서 동작합니다(MariaDB 10.11에서 실측).
 - 복합 id 엔티티는 감싸지 않습니다. `limit`이 있는 delete는 원래 아래의 감싼 형태(별칭 `x0`)를 사용합니다.
 
-[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `delete-self-subquery`:
-
+<!-- region: DmlQueryTest.java#delete-self-subquery -->
 ```java
 // the subquery reads the target table: lambdaQL reads the matching ids through a derived table first (U17),
 // because MariaDB cannot delete from a table that a subquery reads (error 1093)
@@ -130,6 +127,8 @@ assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where
         unused.toHql().hql());
 ```
 
+예제 코드: [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`delete-self-subquery`).
+
 <a id="delete-the-first-rows-limit"></a>
 ## 앞쪽 행 삭제: `limit`
 
@@ -138,24 +137,24 @@ assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where
 
 - `orderBy`가 없으면 id 순서입니다.
 - lambdaQL은 id를 마지막 정렬 키로 추가하므로 순서가 항상 같습니다(규칙 S9, [동순위 처리](04-order-paging.md#tie-breaker-automatic-id) 참고).
-- `orderBy`에는 조회와 마찬가지로 정렬 람다나 `SortSpec`을 지정합니다([4. 정렬과 페이징](04-order-paging.md) 참고).
+- `orderBy`에는 조회와 마찬가지로 정렬 람다 표현식이나 `SortSpec`을 지정합니다([4. 정렬과 페이징](04-order-paging.md) 참고).
 - `limit` 없는 `orderBy`는 오류(`IllegalStateException`)입니다. 이 경우 순서가 아무 역할을 하지 않기 때문입니다.
 
-[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `delete-limit`:
-
+<!-- region: DmlQueryTest.java#delete-limit -->
 ```java
 // the first rows of qb.from(Order.class).where(same).orderBy(same); the id is the last sort key
 ExecutableDelete<Order> d = qb.delete(Order.class)
         .where(o -> o.getStatus() == 1)
-        .orderBy((o, by) -> by.asc(o.getPrice()))
+        .orderBy(o -> asc(o.getPrice()))
         .limit(1);
 assertEquals("delete from Order e0 where e0.id in (select t.id from (select x0.id as id from Order x0"
         + " where x0.status = 1 order by x0.price asc, x0.id asc limit 1) t)", d.toHql().hql());
 int deleted = d.execute();
 ```
 
-**데이터베이스별 SQL** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `delete-limit`:
+**데이터베이스별 SQL**
 
+<!-- sql: delete-limit -->
 ```sql
 -- H2
 delete from orders o1_0
@@ -172,9 +171,11 @@ where o1_0.id in (select t1_0.c0 from (select o2_0.id c0 from orders o2_0 where 
 
 lambdaQL은 limit을 `e0.id in (select t.id from (select x0.id as id from X x0 ... order by ... limit n) t)`로 렌더링합니다.
 
-- 안쪽 select는 조인을 포함해 조회 규칙을 따릅니다(결정 D36). 따라서 이 문장은 조회가 반환하는 행과 정확히 같은 행을 삭제합니다.
+- 안쪽 select는 조인을 포함해 조회 규칙을 따릅니다. 따라서 이 문장은 조회가 반환하는 행과 정확히 같은 행을 삭제합니다.
 - 파생 테이블 `t`는 MariaDB를 위한 것입니다. 파생 테이블이 없으면 MariaDB는 `in` 서브쿼리의 `limit`(오류 1235)과 대상 테이블을 읽는 서브쿼리(오류 1093)를 거부합니다.
 - H2와 Oracle은 `fetch first 1 rows only`, MariaDB는 `limit 1`로 씁니다.
+
+예제 코드: [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`delete-limit`).
 
 <a id="delete-exactly-one-row-executeone"></a>
 ## 정확히 한 행 삭제: `executeOne()`
@@ -188,8 +189,7 @@ lambdaQL은 limit을 `e0.id in (select t.id from (select x0.id as id from X x0 .
 
 문장에 id 하나를 지정하므로 2행 이상을 변경하지 않습니다. 이 보호는 롤백에 의존하지 않습니다.
 
-[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java), 영역 `execute-one`:
-
+<!-- region: DmlQueryTest.java#execute-one -->
 ```java
 // one row matches: it is deleted
 int one = qb.delete(Order.class).where(o -> o.getId() == id).executeOne();
@@ -204,6 +204,7 @@ assertThrows(jakarta.persistence.NonUniqueResultException.class,
 
 ---
 
----
-
 [7. 수정, 삽입, 삭제 (Java)](07-dml.md) | [7.2 수정(update)](07-2-update.md) | **7.4 삭제(delete)** | [7.5 삽입(insert)](07-5-insert.md) | [7.6 업서트(upsert)](07-6-upsert.md) | [Kotlin](../kotlin/07-4-delete.md)
+
+예제 코드: [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`execute-one`).
+

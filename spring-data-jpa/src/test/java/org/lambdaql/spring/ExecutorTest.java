@@ -1,5 +1,7 @@
 package org.lambdaql.spring;
 
+import static org.lambdaql.query.By.*;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.lambdaql.query.SortSpec;
@@ -82,7 +84,7 @@ class ExecutorTest {
     @Test
     void findAllSorted() {
         // @start region="find-all-sort"
-        SortSpec<Member> byGrade = SortSpec.of(Member.class, (m, by) -> by.desc(m.getGrade()).asc(m.getId()));
+        SortSpec<Member> byGrade = SortSpec.of(Member.class, m -> desc(m.getGrade()).asc(m.getId()));
         List<Member> active = repository.findAll(m -> m.isActive(), byGrade);
         // @end
         assertEquals(all.stream().filter(Member::isActive).sorted(GRADE_DESC_NULLS_LAST.thenComparing(BY_ID))
@@ -165,7 +167,7 @@ class ExecutorTest {
     void findFirstAndOne() {
         // @start region="find-first"
         Optional<Member> best = repository.findFirst(m -> m.isActive(),
-                SortSpec.of(Member.class, (m, by) -> by.desc(m.getGrade())));
+                SortSpec.of(Member.class, m -> desc(m.getGrade())));
         // @end
         assertEquals("Lee", best.orElseThrow().getName());
         assertEquals(all.stream().filter(Member::isActive).map(Member::getId).min(Comparator.naturalOrder()).orElseThrow(),

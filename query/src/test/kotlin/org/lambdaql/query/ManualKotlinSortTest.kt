@@ -1,5 +1,9 @@
 package org.lambdaql.query
 
+import org.lambdaql.query.By.asc
+import org.lambdaql.query.By.desc
+import org.lambdaql.query.By.sort
+
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
@@ -89,7 +93,7 @@ class ManualKotlinSortTest {
     @Test
     fun shortForm() {
         // @start region="short-form"
-        // one key: no by. asc unless a Direction is given
+        // one key: the key alone, ascending unless a Direction is given
         val byPrice = qb.from(Order::class.java).orderBy { it.price }
         assertEquals("select e0 from Order e0 order by e0.price asc", byPrice.toHql().hql())
         val newest = qb.from(Order::class.java).orderBy({ it.updateAt }, Direction.DESC)
@@ -105,11 +109,11 @@ class ManualKotlinSortTest {
         val newestFirst = true      // for example from a request parameter
         // @start region="nulls-and-direction"
         // the second argument: true = NULL first, false = NULL last
-        val nullsLast = qb.from(Order::class.java).orderBy { o, by -> by.asc(o.description, false).asc(o.id) }
+        val nullsLast = qb.from(Order::class.java).orderBy { o -> asc(o.description, Nulls.LAST).asc(o.id) }
         assertEquals("select e0 from Order e0 order by e0.description asc nulls last, e0.id asc", nullsLast.toHql().hql())
         // a direction from a variable: choose it outside the lambda
         val dir = if (newestFirst) Direction.DESC else Direction.ASC
-        val byDate = qb.from(Order::class.java).orderBy { o, by -> by.sort(o.updateAt, dir).asc(o.id) }
+        val byDate = qb.from(Order::class.java).orderBy { o -> sort(o.updateAt, dir).asc(o.id) }
         assertEquals("select e0 from Order e0 order by e0.updateAt desc nulls last, e0.id asc", byDate.toHql().hql())
         // the short form with a NULL position
         val byName = qb.from(Order::class.java).orderBy({ it.customer?.name }, Direction.DESC_NULLS_LAST)
@@ -123,7 +127,7 @@ class ManualKotlinSortTest {
     }
 
     /** The same sort lambda with a direction given at run time. */
-    private fun byDate(dir: Direction) = qb.from(Order::class.java).orderBy { o, by -> by.sort(o.updateAt, dir).asc(o.id) }
+    private fun byDate(dir: Direction) = qb.from(Order::class.java).orderBy { o -> sort(o.updateAt, dir).asc(o.id) }
 
     @Test
     fun directionReadOnEveryRun() {
@@ -145,7 +149,7 @@ class ManualKotlinSortTest {
     fun sortPath() {
         // @start region="sort-path"
         // a path used only for sorting is a left join: the orders without a customer stay
-        val q = qb.from(Order::class.java).orderBy { o, by -> by.asc(o.customer?.name).asc(o.id) }
+        val q = qb.from(Order::class.java).orderBy { o -> asc(o.customer?.name).asc(o.id) }
         assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name asc nulls first, e0.id asc", q.toHql().hql())
         // @end
         assertEquals(ids(orders.sortedWith(compareBy<Order, String?>(nullsFirst()) { it.customer?.name }.then(byId))), ids(q.toList()))
@@ -156,10 +160,10 @@ class ManualKotlinSortTest {
         // @start region="sort-keys"
         // arithmetic, a widening conversion and the Elvis operator of a value
         assertEquals("select e0 from Order e0 order by (e0.price * 2.0) asc",
-            qb.from(Order::class.java).orderBy { o, by -> by.asc(o.price * 2) }.toHql().hql())
+            qb.from(Order::class.java).orderBy { o -> asc(o.price * 2) }.toHql().hql())
         assertEquals("select e0 from Order e0 order by e0.status asc",
-            qb.from(Order::class.java).orderBy { o, by -> by.asc(o.status.toLong()) }.toHql().hql())
-        val elvis = qb.from(Order::class.java).orderBy { o, by -> by.asc(o.description ?: "").asc(o.id) }
+            qb.from(Order::class.java).orderBy { o -> asc(o.status.toLong()) }.toHql().hql())
+        val elvis = qb.from(Order::class.java).orderBy { o -> asc(o.description ?: "").asc(o.id) }
         assertEquals("select e0 from Order e0 order by coalesce(e0.description, '') asc nulls first, e0.id asc", elvis.toHql().hql())
         // @end
         assertEquals(ids(orders.sortedWith(compareBy<Order> { it.description ?: "" }.then(byId))), ids(elvis.toList()))
@@ -180,7 +184,7 @@ class ManualKotlinSortTest {
     fun requiredAssociation() {
         // @start region="required-association"
         // order is optional = false: a sort or select path through it cannot lose rows, so it is an inner join
-        val sorted = qb.from(OrderLine::class.java).orderBy { l, by -> by.asc(l.order.price) }
+        val sorted = qb.from(OrderLine::class.java).orderBy { l -> asc(l.order.price) }
         assertEquals("select e0 from OrderLine e0 join e0.order j1 order by j1.price asc", sorted.toHql().hql())
         val prices = qb.from(OrderLine::class.java).select { it.order.price }
         assertEquals("select j1.price from OrderLine e0 join e0.order j1", prices.toHql().hql())
@@ -188,7 +192,7 @@ class ManualKotlinSortTest {
         val expected = orders.sortedBy { it.id }.take(3).map { it.price }.sorted()
         assertEquals(expected, sorted.select { it.order.price }.toList())
         assertEquals(expected, prices.toList().sorted())
-        assertEquals(3, inTransaction { it.from(OrderLine::class.java).orderBy { l, by -> by.asc(l.order.price) }.toList().size })
+        assertEquals(3, inTransaction { it.from(OrderLine::class.java).orderBy { l -> asc(l.order.price) }.toList().size })
     }
 
     @Test
@@ -207,14 +211,14 @@ class ManualKotlinSortTest {
             // @start region="lob"
             // memo is @Lob: H2 and MariaDB sort it, group it and make it distinct, Oracle rejects it (ORA-22848, ORA-22849).
             // lambdaQL keeps the query and logs LQL-5010 at DEBUG
-            qb.from(OrderLine::class.java).orderBy { l, by -> by.asc(l.memo) }.toHql()
+            qb.from(OrderLine::class.java).orderBy { l -> asc(l.memo) }.toHql()
             qb.from(OrderLine::class.java).groupBy { it.memo }.select { it.memo }.toHql()
             qb.from(OrderLine::class.java).select { it.memo }.distinct().toHql()
             // @end
             assertEquals(3, appender.list.count { it.formattedMessage.startsWith("[LQL-5010]") }, appender.list.toString())
             // @start region="enum-string-sort"
             // kind is @Enumerated(EnumType.STRING): the database sorts by name, Kotlin by declaration order (LQL-5011, DEBUG)
-            val q = qb.from(Order::class.java).orderBy { o, by -> by.asc(o.kind) }
+            val q = qb.from(Order::class.java).orderBy { o -> asc(o.kind) }
             assertEquals("select e0 from Order e0 order by e0.kind asc nulls first", q.toHql().hql())
             // @end
             assertEquals(1, appender.list.count { it.formattedMessage.startsWith("[LQL-5011]") }, appender.list.toString())
@@ -230,15 +234,15 @@ class ManualKotlinSortTest {
         val flag = true
         // @start region="lambda-rules"
         // allowed: a straight chain of by calls
-        qb.from(Order::class.java).orderBy { o, by -> by.desc(o.price).asc(o.id) }
-        // rejected when orderBy is called: a key chosen by a condition
+        qb.from(Order::class.java).orderBy { o -> desc(o.price).asc(o.id) }
+        // rejected when orderBy is called: sort functions chosen by a condition (a condition inside one key is allowed)
         val branch = assertThrows(LambdaQLException::class.java) {
-            qb.from(Order::class.java).orderBy { o, by -> if (flag) by.desc(o.price) else by.asc(o.id) }
+            qb.from(Order::class.java).orderBy { o -> if (flag) desc(o.price) else asc(o.id) }
         }
         assertEquals("LQL-2023", branch.code())
         // rejected: a key that does not use the entity
         val constant = assertThrows(LambdaQLException::class.java) {
-            qb.from(Order::class.java).orderBy { _, by -> by.asc(1) }
+            qb.from(Order::class.java).orderBy { _ -> asc(1) }
         }
         assertEquals("LQL-3031", constant.code())
         // @end
@@ -249,7 +253,7 @@ class ManualKotlinSortTest {
         // @start region="page"
         val page = qb.from(Order::class.java)
             .where { it.status.toInt() == 1 }
-            .orderBy { o, by -> by.desc(o.price) }
+            .orderBy { o -> desc(o.price) }
             .limit(2)      // page size
             .offset(2)     // skip 2 rows (page 2)
         // limit and offset go to Hibernate; the id is added as the last key
@@ -261,7 +265,7 @@ class ManualKotlinSortTest {
         assertThrows(IllegalArgumentException::class.java) { qb.from(Order::class.java).orderBy { it.price }.offset(-1) }
         // the id is not added twice
         assertEquals("select e0 from Order e0 order by e0.id desc",
-            qb.from(Order::class.java).orderBy { o, by -> by.desc(o.id) }.limit(2).toHql().hql())
+            qb.from(Order::class.java).orderBy { o -> desc(o.id) }.limit(2).toHql().hql())
     }
 
     @Test
@@ -280,9 +284,9 @@ class ManualKotlinSortTest {
         // keep the where step in a value: count() gives the number of all rows, orderBy ... limit gives one page
         val active = qb.from(Order::class.java).where { it.isActive }
         val total = active.count()
-        val page = active.orderBy { o, by -> by.desc(o.price) }.limit(2).toList()
+        val page = active.orderBy { o -> desc(o.price) }.limit(2).toList()
         // first() reads one row; offset(1).first() is the second row
-        val second = active.orderBy { o, by -> by.desc(o.price) }.offset(1).first()
+        val second = active.orderBy { o -> desc(o.price) }.offset(1).first()
         // @end
         val expected = orders.filter { it.isActive }.sortedWith(compareByDescending<Order> { it.price }.then(byId))
         assertEquals(expected.size.toLong(), total)
@@ -295,12 +299,12 @@ class ManualKotlinSortTest {
         // @start region="unique-key"
         // code is @Column(unique = true, nullable = false): it orders every row, so paging adds no id tie-breaker
         assertEquals("select e0 from OrderLine e0 order by e0.code asc",
-            qb.from(OrderLine::class.java).orderBy { l, by -> by.asc(l.code) }.limit(2).toHql().hql())
+            qb.from(OrderLine::class.java).orderBy { l -> asc(l.code) }.limit(2).toHql().hql())
         // a key that is not unique still gets the id tie-breaker (S9)
         assertEquals("select e0 from OrderLine e0 join e0.order j1 order by j1.price asc, e0.id asc",
-            qb.from(OrderLine::class.java).orderBy { l, by -> by.asc(l.order.price) }.limit(2).toHql().hql())
+            qb.from(OrderLine::class.java).orderBy { l -> asc(l.order.price) }.limit(2).toHql().hql())
         // @end
-        val codes = inTransaction { it.from(OrderLine::class.java).orderBy { l, by -> by.asc(l.code) }.limit(2).toList().map { l -> l.code } }
+        val codes = inTransaction { it.from(OrderLine::class.java).orderBy { l -> asc(l.code) }.limit(2).toList().map { l -> l.code } }
         assertEquals(orders.sortedBy { it.id }.take(3).map { "memo-" + it.price }.sorted().take(2), codes)
     }
 
@@ -308,7 +312,7 @@ class ManualKotlinSortTest {
     fun sortSpec() {
         // @start region="sort-spec"
         // keep it in a value (for example at the top level or in a companion object) and use it in many queries
-        val byDescription = SortSpec.of(Order::class.java) { o, by -> by.desc(o.description).asc(o.id) }
+        val byDescription = SortSpec.of(Order::class.java) { o -> desc(o.description).asc(o.id) }
         val q = qb.from(Order::class.java).where { it.isActive }.orderBy(byDescription)
         assertEquals("select e0 from Order e0 where e0.active = true order by e0.description desc nulls last, e0.id asc",
             q.toHql().hql())
@@ -321,13 +325,13 @@ class ManualKotlinSortTest {
     @Test
     fun sortSpecThen() {
         // @start region="sort-spec-then"
-        val byStatus = SortSpec.of(Order::class.java) { o, by -> by.asc(o.status) }
-        val byPrice = SortSpec.of(Order::class.java) { o, by -> by.desc(o.price) }
+        val byStatus = SortSpec.of(Order::class.java) { o -> asc(o.status) }
+        val byPrice = SortSpec.of(Order::class.java) { o -> desc(o.price) }
         val q = qb.from(Order::class.java).orderBy(byStatus.then(byPrice))
         assertEquals("select e0 from Order e0 order by e0.status asc, e0.price desc", q.toHql().hql())
         // then() also takes a sort lambda
         assertEquals("select e0 from Order e0 order by e0.status asc, e0.id desc",
-            qb.from(Order::class.java).orderBy(byStatus.then { o, by -> by.desc(o.id) }).toHql().hql())
+            qb.from(Order::class.java).orderBy(byStatus.then { o -> desc(o.id) }).toHql().hql())
         // @end
         assertEquals(ids(orders.sortedWith(compareBy<Order> { it.status }.thenByDescending { it.price })), ids(q.toList()))
     }
@@ -335,7 +339,7 @@ class ManualKotlinSortTest {
     @Test
     fun sortSpecReversed() {
         // @start region="sort-spec-reversed"
-        val spec = SortSpec.of(Order::class.java) { o, by -> by.asc(o.description).asc(o.id) }
+        val spec = SortSpec.of(Order::class.java) { o -> asc(o.description).asc(o.id) }
         // every key is reversed, the NULL position too: asc nulls first -> desc nulls last
         val q = qb.from(Order::class.java).orderBy(spec.reversed())
         assertEquals("select e0 from Order e0 order by e0.description desc nulls last, e0.id desc", q.toHql().hql())
@@ -381,7 +385,7 @@ class ManualKotlinSortTest {
         }
         // a sort lambda is your code: never checked
         assertEquals("select e0 from Order e0 order by e0.description asc nulls first",
-            qb.from(Order::class.java).orderBy { o, by -> by.asc(o.description) }.toHql().hql())
+            qb.from(Order::class.java).orderBy { o -> asc(o.description) }.toHql().hql())
         // @end
         assertEquals(orders.map { it.updateAt }.sortedWith(nullsFirst(naturalOrder<LocalDateTime>())).reversed(),
             newest.toList().map { it.updateAt })

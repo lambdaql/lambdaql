@@ -1,5 +1,7 @@
 package org.lambdaql.spring.sample;
 
+import static org.lambdaql.query.By.*;
+
 import org.lambdaql.spring.LambdaQlExecutor;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -33,7 +35,7 @@ public interface MemberRepository extends JpaRepository<Member, Long>, LambdaQlE
     default List<Member> topGraded(int n) {
         return query()
                 .where(m -> m.isActive())
-                .orderBy((m, by) -> by.desc(m.getGrade()).asc(m.getId()))
+                .orderBy(m -> desc(m.getGrade()).asc(m.getId()))
                 .limit(n)
                 .toList();
     }

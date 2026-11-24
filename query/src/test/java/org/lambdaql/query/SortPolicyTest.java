@@ -1,5 +1,7 @@
 package org.lambdaql.query;
 
+import static org.lambdaql.query.By.*;
+
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -72,7 +74,7 @@ class SortPolicyTest {
                 () -> qb.from(Item.class).orderBy(SortSpec.ofPath(Item.class, "qty", Direction.ASC)).toHql());
         // a sort written as a lambda is code, not outside input: never checked
         assertEquals("select e0 from Order e0 order by e0.description asc nulls first",
-                qb.from(Order.class).orderBy((o, by) -> by.asc(o.getDescription())).toHql().hql());
+                qb.from(Order.class).orderBy(o -> asc(o.getDescription())).toHql().hql());
         // @end
     }
 

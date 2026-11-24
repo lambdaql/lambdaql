@@ -1,5 +1,7 @@
 package org.lambdaql.query;
 
+import static org.lambdaql.query.By.*;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -159,7 +161,7 @@ class DmlQueryTest {
     void updateWithSubquery() {
         items();
         // @start region="update-sub"
-        // the second parameter starts a subquery, as in where((o, sub) -> ...) (D49)
+        // the second parameter starts a subquery, as in where((o, sub) -> ...)
         ExecutableUpdate<Order> u = qb.update(Order.class)
                 .set((o, sub) -> o.setPrice(sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).sum(i -> i.getPrice())))
                 .where((o, sub) -> sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists());
@@ -212,7 +214,7 @@ class DmlQueryTest {
         List<Order> all = orders();
         List<Ref> refs = List.of(new Ref(301, all.get(0).getId()), new Ref(302, all.get(2).getId()));
         // @start region="insert-list-sub"
-        // one row per element; the subquery reads the element's value (D49)
+        // one row per element; the subquery reads the element's value
         ExecutableInsert<Archive> i = qb.insert(Archive.class).values(refs, (a, r, sub) -> {
             a.setId(r.id());
             a.setPrice(sub.from(Item.class).where(x -> x.getOrder().getId() == r.orderId()).sum(x -> x.getPrice()));
@@ -230,7 +232,7 @@ class DmlQueryTest {
         items();
         long first = orders().get(0).getId();
         // @start region="insert-values-sub"
-        // values((a, sub) -> ...): a subquery can read captured values, not the new row (D49)
+        // values((a, sub) -> ...): a subquery can read captured values, not the new row
         ExecutableInsert<Archive> i = qb.insert(Archive.class)
                 .values((a, sub) -> {
                     a.setId(100L);
@@ -281,7 +283,7 @@ class DmlQueryTest {
     void updateWithAssociationPath() {
         List<Long> target = ids(qb.from(Order.class).where(o -> o.getCustomer().getName().equals("Kim")).toList());
         // @start region="update-path"
-        // a path in the condition: a subquery, plus "customer exists" (the same rows as the select, D36, U9)
+        // a path in the condition: a subquery, plus "customer exists" (the same rows as the select, U9)
         ExecutableUpdate<Order> u = qb.update(Order.class)
                 .set(o -> o.setCustName("K"))
                 .where(o -> o.getCustomer().getName().equals("Kim"));
@@ -468,7 +470,7 @@ class DmlQueryTest {
         // the first rows of qb.from(Order.class).where(same).orderBy(same); the id is the last sort key
         ExecutableDelete<Order> d = qb.delete(Order.class)
                 .where(o -> o.getStatus() == 1)
-                .orderBy((o, by) -> by.asc(o.getPrice()))
+                .orderBy(o -> asc(o.getPrice()))
                 .limit(1);
         assertEquals("delete from Order e0 where e0.id in (select t.id from (select x0.id as id from Order x0"
                 + " where x0.status = 1 order by x0.price asc, x0.id asc limit 1) t)", d.toHql().hql());
@@ -477,7 +479,7 @@ class DmlQueryTest {
         assertEquals(1, deleted);
         assertTrue(orders().stream().noneMatch(o -> o.getId() == cheapest));
         assertEquals(3, orders().size());
-        assertThrows(IllegalStateException.class, () -> qb.delete(Order.class).all().orderBy((o, by) -> by.asc(o.getId())).toHql());
+        assertThrows(IllegalStateException.class, () -> qb.delete(Order.class).all().orderBy(o -> asc(o.getId())).toHql());
     }
 
     @Test
@@ -487,7 +489,7 @@ class DmlQueryTest {
         ExecutableUpdate<Order> u = qb.update(Order.class)
                 .set(o -> o.setDescription("top"))
                 .where(o -> o.getCustomer().getName().equals("Kim"))
-                .orderBy((o, by) -> by.desc(o.getPrice()))
+                .orderBy(o -> desc(o.getPrice()))
                 .limit(1);
         assertEquals("update Order e0 set e0.description = 'top' where e0.id in (select t.id from (select x0.id as id from Order x0"
                 + " join x0.customer k1 where k1.name = 'Kim' order by x0.price desc, x0.id asc limit 1) t)", u.toHql().hql());

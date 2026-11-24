@@ -1,5 +1,7 @@
 package org.lambdaql.query;
 
+import static org.lambdaql.query.By.*;
+
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +25,7 @@ class AnalysisCacheTest {
 
     private static String hql(QueryBuilder qb, int min) {
         // the same lambda class every time this method runs
-        return qb.from(Order.class).where(o -> o.getStatus() > min).orderBy((o, by) -> by.desc(o.getPrice())).toHql().hql();
+        return qb.from(Order.class).where(o -> o.getStatus() > min).orderBy(o -> desc(o.getPrice())).toHql().hql();
     }
 
     @Test

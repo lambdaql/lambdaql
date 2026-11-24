@@ -146,6 +146,7 @@ public final class AssignmentReader {
             case Expr.Arith a -> new Expr.Arith(a.op(), reroot(a.left(), from, to), reroot(a.right(), from, to), a.type());
             case Expr.Neg n -> new Expr.Neg(reroot(n.operand(), from, to), n.type());
             case Expr.Coalesce c -> new Expr.Coalesce(reroot(c.first(), from, to), reroot(c.second(), from, to), c.type());
+            case Expr.Case c -> c.map(x -> reroot(x, from, to));
             case Expr.Aggregate a -> a.arg() == null ? a : new Expr.Aggregate(a.fn(), reroot(a.arg(), from, to), a.type());
             case Expr.Func f -> new Expr.Func(f.key(), f.sql(), f.asType(), f.args().stream().map(x -> reroot(x, from, to)).toList(), f.type());
             case Expr.Subquery q -> new Expr.Subquery(q.kind(), q.root(), q.entity(),
@@ -165,6 +166,7 @@ public final class AssignmentReader {
             case org.lambdaql.engine.ir.Pred.IsNull n -> new org.lambdaql.engine.ir.Pred.IsNull(reroot(n.operand(), from, to));
             case org.lambdaql.engine.ir.Pred.Truth t -> new org.lambdaql.engine.ir.Pred.Truth(reroot(t.operand(), from, to));
             case org.lambdaql.engine.ir.Pred.In i -> new org.lambdaql.engine.ir.Pred.In(reroot(i.value(), from, to), reroot(i.values(), from, to));
+            case org.lambdaql.engine.ir.Pred.Like l -> new org.lambdaql.engine.ir.Pred.Like(reroot(l.value(), from, to), reroot(l.text(), from, to), l.kind(), l.ignoreCase(), l.negated());
             case org.lambdaql.engine.ir.Pred.And a -> new org.lambdaql.engine.ir.Pred.And(a.items().stream().map(x -> reroot(x, from, to)).toList());
             case org.lambdaql.engine.ir.Pred.Or o -> new org.lambdaql.engine.ir.Pred.Or(o.items().stream().map(x -> reroot(x, from, to)).toList());
             case org.lambdaql.engine.ir.Pred.Not n -> new org.lambdaql.engine.ir.Pred.Not(reroot(n.operand(), from, to));
@@ -292,6 +294,7 @@ public final class AssignmentReader {
             case Expr.Convert c -> new Expr.Convert(replaceParam(c.operand(), index, with), c.type());
             case Expr.SafeNav n -> new Expr.SafeNav(replaceParam(n.value(), index, with));
             case Expr.Coalesce c -> new Expr.Coalesce(replaceParam(c.first(), index, with), replaceParam(c.second(), index, with), c.type());
+            case Expr.Case c -> c.map(x -> replaceParam(x, index, with));
             case Expr.NewObject n -> new Expr.NewObject(n.type(), n.constructor(), n.args().stream().map(a -> replaceParam(a, index, with)).toList());
             default -> e;
         };
@@ -308,6 +311,10 @@ public final class AssignmentReader {
             case org.lambdaql.engine.ir.Pred.In i -> {
                 collect(i.value(), out);
                 collect(i.values(), out);
+            }
+            case org.lambdaql.engine.ir.Pred.Like l -> {
+                collect(l.value(), out);
+                collect(l.text(), out);
             }
             case org.lambdaql.engine.ir.Pred.And a -> a.items().forEach(x -> collect(x, out));
             case org.lambdaql.engine.ir.Pred.Or o -> o.items().forEach(x -> collect(x, out));
@@ -335,6 +342,7 @@ public final class AssignmentReader {
                 collect(c.first(), out);
                 collect(c.second(), out);
             }
+            case Expr.Case c -> c.exprs().forEach(x -> collect(x, out));
             case Expr.Aggregate a -> {
                 if (a.arg() != null) collect(a.arg(), out);
             }

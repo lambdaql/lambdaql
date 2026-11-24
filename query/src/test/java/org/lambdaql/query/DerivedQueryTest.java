@@ -1,5 +1,7 @@
 package org.lambdaql.query;
 
+import static org.lambdaql.query.By.*;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -93,7 +95,7 @@ class DerivedQueryTest {
                         .groupBy(o -> o.getCustomer().getId())
                         .select(o -> new Stat(o.getCustomer().getId(), Agg.count(), Agg.sum(o.getPrice()))))
                 .where(r -> r.total() > 100)
-                .orderBy((r, by) -> by.desc(r.total()));
+                .orderBy(r -> desc(r.total()));
         assertEquals("select e0.customerId, e0.cnt, e0.total from (select d0.customer.id as customerId, count(*) as cnt,"
                 + " sum(d0.price) as total from Order d0 where d0.customer is not null group by d0.customer.id) e0"
                 + " where e0.total > 100.0 order by e0.total desc nulls last", q.toHql().hql());
@@ -140,10 +142,10 @@ class DerivedQueryTest {
         // @start region="inner-limit"
         // the three most expensive orders, then the cheapest of them
         Optional<Priced> cheapestOfTop = qb.from(qb.from(Order.class)
-                        .orderBy((o, by) -> by.desc(o.getPrice()))
+                        .orderBy(o -> desc(o.getPrice()))
                         .limit(3)
                         .select(o -> new Priced(o.getId(), o.getPrice())))
-                .orderBy((r, by) -> by.asc(r.price()))
+                .orderBy(r -> asc(r.price()))
                 .first();
         // @end
         Order expected = orders.stream().sorted(Comparator.comparing(Order::getPrice).reversed()).limit(3)

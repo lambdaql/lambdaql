@@ -33,11 +33,10 @@ class ManualKotlinErrorsTest {
     @Test
     fun catchTheError() {
         val qb = QueryBuilder(emf)
-        val flag = true
         // @start region="catch"
         val logged = try {
             qb.from(Order::class.java)
-                .where { it.status.toInt() == if (flag) 1 else 2 }   // a value if: not supported
+                .where { when (it.status.toInt()) { 1, 2 -> true; else -> false } }   // a when on a value: not supported
                 .toList()
             null
         } catch (e: LambdaQLException) {
@@ -45,17 +44,16 @@ class ManualKotlinErrorsTest {
             "lambdaQL error ${e.code()}: ${e.getMessage(Locale.ROOT)}"
         }
         // @end
-        assertTrue(logged != null && logged.startsWith("lambdaQL error LQL-2021: [LQL-2021] "), logged)
+        assertTrue(logged != null && logged.startsWith("lambdaQL error LQL-2010: [LQL-2010] "), logged)
     }
 
     @Test
     fun checkTheCode() {
-        val flag = true
         val qb = QueryBuilder(emf)
         // @start region="check-code"
         // org.junit.jupiter.api.assertThrows
-        val e = assertThrows<LambdaQLException> { qb.from(Order::class.java).where { it.status.toInt() == if (flag) 1 else 2 } }
-        assertEquals("LQL-2021", e.code())                           // good
+        val e = assertThrows<LambdaQLException> { qb.from(Order::class.java).where { when (it.status.toInt()) { 1, 2 -> true; else -> false } } }
+        assertEquals("LQL-2010", e.code())                           // good
         assertInstanceOf(UnsupportedLambdaShapeException::class.java, e)
         // assertEquals("Could not ...", e.message)                 // do not do this
         // @end

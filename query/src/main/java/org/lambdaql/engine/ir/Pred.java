@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
  * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
  * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="and-or"}
  */
-public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In, Pred.And, Pred.Or, Pred.Not, Pred.Bool {
+public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In, Pred.Like, Pred.And, Pred.Or, Pred.Not, Pred.Bool {
 
     /**
      * A compare: {@code left op right}.
@@ -71,6 +71,35 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
      */
     record In(Expr value, Expr values) implements Pred {
         @Override public String toString() { return value + " in " + values; }
+    }
+
+    /**
+     * A text match: {@code startsWith}, {@code endsWith} or {@code contains} on an entity value, rendered as
+     * {@code like} with an escaped pattern.
+     *
+     * <p>Example: {@code o.getName().startsWith(p)} is {@code Like(col0.name, p, PREFIX, false, false)} and renders
+     * {@code e0.name like :p1 escape '!'} with the value {@code p + "%"}.
+     *
+     * @param value      the entity value (a text column)
+     * @param text       the text to find: a constant or a captured value
+     * @param kind       where the text must be
+     * @param ignoreCase {@code true} for Kotlin {@code ignoreCase = true}: both sides in lower case
+     * @param negated    {@code true} for {@code not like}
+     */
+    record Like(Expr value, Expr text, Kind kind, boolean ignoreCase, boolean negated) implements Pred {
+        /** Where the text must be in the value. */
+        public enum Kind {
+            /** {@code startsWith}: {@code text%}. */
+            PREFIX,
+            /** {@code endsWith}: {@code %text}. */
+            SUFFIX,
+            /** {@code contains}: {@code %text%}. */
+            ANY
+        }
+
+        @Override public String toString() {
+            return value + (negated ? " not " : " ") + kind.name().toLowerCase() + (ignoreCase ? "-ic " : " ") + text;
+        }
     }
 
     /**
@@ -190,6 +219,7 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
         if (p instanceof Not n) return n.operand();
         if (p instanceof Cmp c) return new Cmp(c.op().negate(), c.left(), c.right(), c.nullSafe());
         if (p instanceof Bool b) return b.value() ? Bool.FALSE : Bool.TRUE;
+        if (p instanceof Like l) return new Like(l.value(), l.text(), l.kind(), l.ignoreCase(), !l.negated());
         return new Not(p);
     }
 

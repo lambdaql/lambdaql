@@ -1,5 +1,8 @@
 package org.lambdaql.query
 
+import org.lambdaql.query.By.asc
+import org.lambdaql.query.By.desc
+
 import jakarta.persistence.EntityManagerFactory
 import jakarta.persistence.NonUniqueResultException
 import jakarta.persistence.OptimisticLockException
@@ -241,7 +244,7 @@ class ManualKotlinDmlTest {
     @Test
     fun updatePath() {
         // @start region="update-path"
-        // a path in the condition: a subquery, plus "customer exists" (the same rows as the select, D36, U9)
+        // a path in the condition: a subquery, plus "customer exists" (the same rows as the select, U9)
         val u = qb.update(Order::class.java)
             .set { it.custName = "K" }
             .where { it.customer?.name == "Kim" }
@@ -379,7 +382,7 @@ class ManualKotlinDmlTest {
         val u = qb.update(Order::class.java)
             .set { it.description = "top" }
             .where { it.customer?.name == "Kim" }
-            .orderBy { o, by -> by.desc(o.price) }
+            .orderBy { o -> desc(o.price) }
             .limit(1)
         assertEquals("update Order e0 set e0.description = 'top' where e0.id in (select t.id from (select x0.id as id from Order x0"
             + " join x0.customer k1 where k1.name = 'Kim' order by x0.price desc, x0.id asc limit 1) t)", u.toHql().hql())
@@ -510,7 +513,7 @@ class ManualKotlinDmlTest {
     @Test
     fun deleteSafeCall() {
         // @start region="delete-safe-call"
-        // ?. : no "customer exists" check, so orders without a customer are deleted too, as the select returns them (D54)
+        // ?. : no "customer exists" check, so orders without a customer are deleted too, as the select returns them
         val d = qb.delete(Order::class.java).where { it.customer?.name == null }
         assertEquals("delete from Order e0 where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) is null",
             d.toHql().hql())
@@ -528,7 +531,7 @@ class ManualKotlinDmlTest {
         items()
         val ids = qb.from(Item::class.java).toList().map { it.id }
         // @start region="delete-all"
-        // ids in a captured collection (D29)
+        // ids in a captured collection
         val byIds = qb.delete(Item::class.java).where { it.id in ids }
         assertEquals("delete from Item e0 where e0.id in (:p1)", byIds.toHql().hql())
         byIds.execute()
@@ -562,7 +565,7 @@ class ManualKotlinDmlTest {
         // the first rows of qb.from(Order::class.java).where { same }.orderBy { same }; the id is the last sort key
         val d = qb.delete(Order::class.java)
             .where { it.status.toInt() == 1 }
-            .orderBy { o, by -> by.asc(o.price) }
+            .orderBy { o -> asc(o.price) }
             .limit(1)
         assertEquals("delete from Order e0 where e0.id in (select t.id from (select x0.id as id from Order x0"
             + " where x0.status = 1 order by x0.price asc, x0.id asc limit 1) t)", d.toHql().hql())
@@ -642,7 +645,7 @@ class ManualKotlinDmlTest {
         items()
         val refs = listOf(Ref(301L, before[0].id!!), Ref(302L, before[2].id!!))
         // @start region="insert-list-sub"
-        // one row per element; the subquery reads the element's value (D49)
+        // one row per element; the subquery reads the element's value
         val i = qb.insert(Archive::class.java).values(refs) { a, r, sub ->
             a.id = r.id
             a.price = sub.from(Item::class.java).where { x -> x.order?.id == r.orderId }.sum { x -> x.price }
@@ -764,7 +767,7 @@ class ManualKotlinDmlTest {
     fun upsertWithSubquery() {
         items()
         // @start region="upsert-sub"
-        // a subquery in the inserted value and in the update on conflict (D49)
+        // a subquery in the inserted value and in the update on conflict
         val up = qb.insert(Archive::class.java)
             .values { a, sub -> a.id = 100L; a.price = sub.from(Item::class.java).sum { x -> x.price } }
             .onConflict { it.id }

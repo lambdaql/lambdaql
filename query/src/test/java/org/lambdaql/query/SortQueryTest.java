@@ -1,5 +1,7 @@
 package org.lambdaql.query;
 
+import static org.lambdaql.query.By.*;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -94,13 +96,13 @@ class SortQueryTest {
         // @start region="sort-basic"
         RenderedQuery q = qb.from(Order.class)
                 .where(o -> o.isActive())
-                .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId()))
+                .orderBy(o -> desc(o.getPrice()).asc(o.getId()))
                 .toHql();
         // price and id can never be NULL, so there is no "nulls" part
         assertEquals("select e0 from Order e0 where e0.active = true order by e0.price desc, e0.id asc", q.hql());
         // @end
         List<Order> rows = qb.from(Order.class).where(o -> o.isActive())
-                .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId())).toList();
+                .orderBy(o -> desc(o.getPrice()).asc(o.getId())).toList();
         assertEquals(all.stream().filter(Order::isActive)
                 .sorted(Comparator.comparing(Order::getPrice).reversed().thenComparing(BY_ID))
                 .map(Order::getId).toList(), ids(rows));
@@ -111,21 +113,21 @@ class SortQueryTest {
         // @start region="sort-nulls"
         // default: asc puts NULL first, desc puts NULL last (the same on every database)
         assertEquals("select e0 from Order e0 order by e0.description asc nulls first, e0.id asc",
-                qb.from(Order.class).orderBy((o, by) -> by.asc(o.getDescription()).asc(o.getId())).toHql().hql());
+                qb.from(Order.class).orderBy(o -> asc(o.getDescription()).asc(o.getId())).toHql().hql());
         // the second argument chooses: true = NULL first, false = NULL last
         assertEquals("select e0 from Order e0 order by e0.description asc nulls last, e0.id asc",
-                qb.from(Order.class).orderBy((o, by) -> by.asc(o.getDescription(), false).asc(o.getId())).toHql().hql());
+                qb.from(Order.class).orderBy(o -> asc(o.getDescription(), Nulls.LAST).asc(o.getId())).toHql().hql());
         assertEquals("select e0 from Order e0 order by e0.description desc nulls first, e0.id asc",
-                qb.from(Order.class).orderBy((o, by) -> by.desc(o.getDescription(), true).asc(o.getId())).toHql().hql());
+                qb.from(Order.class).orderBy(o -> desc(o.getDescription(), Nulls.FIRST).asc(o.getId())).toHql().hql());
         // @end
         assertEquals(javaIds(nullsFirst(Order::getDescription).thenComparing(BY_ID)),
-                ids(qb.from(Order.class).orderBy((o, by) -> by.asc(o.getDescription()).asc(o.getId())).toList()));
+                ids(qb.from(Order.class).orderBy(o -> asc(o.getDescription()).asc(o.getId())).toList()));
         assertEquals(javaIds(nullsLast(Order::getDescription).thenComparing(BY_ID)),
-                ids(qb.from(Order.class).orderBy((o, by) -> by.asc(o.getDescription(), false).asc(o.getId())).toList()));
+                ids(qb.from(Order.class).orderBy(o -> asc(o.getDescription(), Nulls.LAST).asc(o.getId())).toList()));
         assertEquals(javaIds(nullsLast(Order::getDescription).reversed().thenComparing(BY_ID)),
-                ids(qb.from(Order.class).orderBy((o, by) -> by.desc(o.getDescription(), true).asc(o.getId())).toList()));
+                ids(qb.from(Order.class).orderBy(o -> desc(o.getDescription(), Nulls.FIRST).asc(o.getId())).toList()));
         assertEquals(javaIds(nullsFirst(Order::getDescription).reversed().thenComparing(BY_ID)),
-                ids(qb.from(Order.class).orderBy((o, by) -> by.desc(o.getDescription()).asc(o.getId())).toList()));
+                ids(qb.from(Order.class).orderBy(o -> desc(o.getDescription()).asc(o.getId())).toList()));
     }
 
     @Test
@@ -136,7 +138,7 @@ class SortQueryTest {
             // @start region="sort-dynamic"
             Direction dir = Direction.parse(text);           // for example from a request parameter
             OrderedSelectQuery<Order> q = qb.from(Order.class)
-                    .orderBy((o, by) -> by.sort(o.getDescription(), dir).asc(o.getId()));
+                    .orderBy(o -> sort(o.getDescription(), dir).asc(o.getId()));
             // @end
             hql.add(q.toHql().hql());
             rows.add(ids(q.toList()));
@@ -152,13 +154,13 @@ class SortQueryTest {
     void associationPathIsLeftJoin() {
         // @start region="sort-path"
         RenderedQuery q = qb.from(Order.class)
-                .orderBy((o, by) -> by.asc(o.getCustomer().getName()).asc(o.getId()))
+                .orderBy(o -> asc(o.getCustomer().getName()).asc(o.getId()))
                 .toHql();
         // a path used only for sorting is a LEFT JOIN: the order without a customer stays
         assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name asc nulls first, e0.id asc", q.hql());
         // @end
         List<Order> rows = qb.from(Order.class)
-                .orderBy((o, by) -> by.asc(o.getCustomer().getName()).asc(o.getId())).toList();
+                .orderBy(o -> asc(o.getCustomer().getName()).asc(o.getId())).toList();
         assertEquals(5, rows.size());
         assertEquals(javaIds(nullsFirst((Order o) -> o.getCustomer() == null ? null : o.getCustomer().getName())
                 .thenComparing(BY_ID)), ids(rows));
@@ -170,7 +172,7 @@ class SortQueryTest {
         String name = "Kim";
         RenderedQuery q = qb.from(Order.class)
                 .where(o -> o.getCustomer().getName().equals(name))
-                .orderBy((o, by) -> by.desc(o.getCustomer().getName()).desc(o.getPrice()))
+                .orderBy(o -> desc(o.getCustomer().getName()).desc(o.getPrice()))
                 .toHql();
         // the condition already joined the customer, so the sort uses the same inner join
         assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = :p1"
@@ -194,7 +196,7 @@ class SortQueryTest {
     void paging() {
         // @start region="sort-page"
         OrderedSelectQuery<Order> page = qb.from(Order.class)
-                .orderBy((o, by) -> by.asc(o.getStatus()))
+                .orderBy(o -> asc(o.getStatus()))
                 .limit(2)
                 .offset(2);
         // status has ties, so the id is added as the last key and rows do not move between pages
@@ -208,7 +210,7 @@ class SortQueryTest {
         Set<Long> seen = new HashSet<>();
         List<Long> walked = new ArrayList<>();
         for (int offset = 0; offset < 5; offset += 2) {
-            for (Order o : qb.from(Order.class).orderBy((x, by) -> by.asc(x.getStatus())).limit(2).offset(offset).toList()) {
+            for (Order o : qb.from(Order.class).orderBy(x -> asc(x.getStatus())).limit(2).offset(offset).toList()) {
                 walked.add(o.getId());
                 seen.add(o.getId());
             }
@@ -218,7 +220,7 @@ class SortQueryTest {
 
         // the id is not added twice
         assertEquals("select e0 from Order e0 order by e0.id desc",
-                qb.from(Order.class).orderBy((o, by) -> by.desc(o.getId())).limit(2).toHql().hql());
+                qb.from(Order.class).orderBy(o -> desc(o.getId())).limit(2).toHql().hql());
     }
 
     @Test
@@ -235,7 +237,7 @@ class SortQueryTest {
     void reusableSpec() {
         // @start region="sort-spec"
         // keep it, for example as a static final field, and use it in many queries
-        SortSpec<Order> byDescription = SortSpec.of(Order.class, (o, by) -> by.desc(o.getDescription()).asc(o.getId()));
+        SortSpec<Order> byDescription = SortSpec.of(Order.class, o -> desc(o.getDescription()).asc(o.getId()));
         RenderedQuery q = qb.from(Order.class).where(o -> o.isActive()).orderBy(byDescription).toHql();
         assertEquals("select e0 from Order e0 where e0.active = true order by e0.description desc nulls last, e0.id asc", q.hql());
         // @end
@@ -247,13 +249,13 @@ class SortQueryTest {
     @Test
     void specThen() {
         // @start region="sort-spec-then"
-        SortSpec<Order> byStatus = SortSpec.of(Order.class, (o, by) -> by.asc(o.getStatus()));
-        SortSpec<Order> byPrice = SortSpec.of(Order.class, (o, by) -> by.desc(o.getPrice()));
+        SortSpec<Order> byStatus = SortSpec.of(Order.class, o -> asc(o.getStatus()));
+        SortSpec<Order> byPrice = SortSpec.of(Order.class, o -> desc(o.getPrice()));
         assertEquals("select e0 from Order e0 order by e0.status asc, e0.price desc",
                 qb.from(Order.class).orderBy(byStatus.then(byPrice)).toHql().hql());
         // then() also takes a lambda
         assertEquals("select e0 from Order e0 order by e0.status asc, e0.id desc",
-                qb.from(Order.class).orderBy(byStatus.then((o, by) -> by.desc(o.getId()))).toHql().hql());
+                qb.from(Order.class).orderBy(byStatus.then(o -> desc(o.getId()))).toHql().hql());
         // @end
         assertEquals(javaIds(Comparator.comparing(Order::getStatus).thenComparing(Comparator.comparing(Order::getPrice).reversed())),
                 ids(qb.from(Order.class).orderBy(byStatus.then(byPrice)).toList()));
@@ -262,7 +264,7 @@ class SortQueryTest {
     @Test
     void specReversed() {
         // @start region="sort-spec-reversed"
-        SortSpec<Order> spec = SortSpec.of(Order.class, (o, by) -> by.asc(o.getDescription()).asc(o.getId()));
+        SortSpec<Order> spec = SortSpec.of(Order.class, o -> asc(o.getDescription()).asc(o.getId()));
         // every key is reversed, the NULL position too: asc nulls first -> desc nulls last
         assertEquals("select e0 from Order e0 order by e0.description desc nulls last, e0.id desc",
                 qb.from(Order.class).orderBy(spec.reversed()).toHql().hql());
@@ -297,9 +299,9 @@ class SortQueryTest {
         // @start region="sort-rejected"
         // a condition inside the sort lambda (rule S4)
         assertThrows(LambdaQLException.class, () -> qb.from(Order.class)
-                .orderBy((o, by) -> o.isActive() ? by.asc(o.getPrice()) : by.desc(o.getPrice())));
+                .orderBy(o -> o.isActive() ? asc(o.getPrice()) : desc(o.getPrice())));
         // a key without the entity
-        assertThrows(LambdaQLException.class, () -> qb.from(Order.class).orderBy((o, by) -> by.asc(1)));
+        assertThrows(LambdaQLException.class, () -> qb.from(Order.class).orderBy(o -> asc(1)));
         // @end
     }
 

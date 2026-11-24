@@ -12,10 +12,10 @@
 | 부분 | 대상 | 어노테이션 | 호출 방법 |
 |---|---|---|---|
 | [8.1 ~ 8.5](#81-declare-procedures) | **저장 프로시저** | 인터페이스의 추상 함수에 `@SqlProcedure` | `qb.call(OrderProcs::class.java) { it.calc(id, rate) }.execute()` |
-| [8.6 ~ 8.10](#86-declare-db-functions) | **DB 함수**(스칼라) | 인터페이스 `companion object` 안의 `@JvmStatic` 함수에 `@SqlFunction` | 어떤 람다 안에서든 직접 호출: `where { OrderFns.discount(it.price)!! > 10 }` |
+| [8.6 ~ 8.10](#86-declare-db-functions) | **DB 함수**(스칼라) | 인터페이스 `companion object` 안의 `@JvmStatic` 함수에 `@SqlFunction` | 어떤 람다 표현식 안에서든 직접 호출: `where { OrderFns.discount(it.price)!! > 10 }` |
 
 두 경우 모두 시그니처는 Kotlin 인터페이스에 **한 번만** 작성합니다.
-lambdaQL은 이 함수들을 **절대 실행하지 않습니다**. 람다 바이트코드에서 호출을 읽고 데이터베이스를 호출합니다.
+이 함수들의 본문은 호출되지 않습니다. lambdaQL은 람다 표현식 바이트 opcode에서 호출을 읽고 데이터베이스의 프로시저나 함수를 호출합니다.
 
 <a id="contents"></a>
 ## 목차
@@ -40,8 +40,7 @@ lambdaQL은 이 함수들을 **절대 실행하지 않습니다**. 람다 바이
 인터페이스를 작성하십시오. 각 **추상** 함수에 `@SqlProcedure("NAME")`을 붙이십시오.
 구현은 작성하지 않습니다. lambdaQL도 구현을 만들지 않습니다.
 
-[`ManualKotlinProcedureTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt), 영역 `declare`:
-
+<!-- region: ManualKotlinProcedureTest.kt#declare -->
 ```kotlin
 /** Two OUT values: a data class, in the database order. */
 data class Stat(val total: Double?, val cnt: Int?)
@@ -74,7 +73,7 @@ interface OrderProcs {
 }
 ```
 
-이 장의 프로시저는 테스트가 데이터베이스마다 만들고 끝나면 삭제합니다(`SQ_PROC_CALC` 등). 테스트의 `Order`는 `customer_id`와 `price` 컬럼을 가집니다.
+이 장의 예제는 데이터베이스에 만들어 둔 프로시저(`SQ_PROC_CALC` 등)를 호출합니다. 예제의 `Order`는 `customer_id`와 `price` 컬럼을 가집니다.
 
 참고:
 
@@ -86,6 +85,8 @@ interface OrderProcs {
 - 인터페이스와 결과 데이터 클래스는 DB 시그니처의 복사본입니다. 타입 안전성을 위한 대가입니다. lambdaQL은 그 일부를 데이터베이스와 대조하여 검사합니다(규칙 PR2).
 - 프로시저(추상 함수)와 DB 함수(`companion object` 안)를 **같은 인터페이스**에 둘 수 있습니다.
 
+예제 코드: [`ManualKotlinProcedureTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt)(`declare`).
+
 ---
 
 <a id="82-call-procedures"></a>
@@ -93,8 +94,7 @@ interface OrderProcs {
 
 `qb.call(Interface::class.java) { it.function(args) }`를 사용하십시오. 그다음 `execute()`를 호출합니다.
 
-[`ManualKotlinProcedureTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt), 영역 `call`:
-
+<!-- region: ManualKotlinProcedureTest.kt#call -->
 ```kotlin
 val total: Double? = qb.call(OrderProcs::class.java) { it.calc(customerId, rate) }.execute()
 val stat: Stat = qb.call(OrderProcs::class.java) { it.stat(customerId) }.execute()
@@ -105,14 +105,11 @@ val same: Double? = qb.call(OrderProcs::class.java) { it.calc(rate = rate, custo
 
 결과가 없는 프로시저는 `exec`으로 호출합니다.
 
-[`ManualKotlinProcedureTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt), 영역 `exec`:
-
+<!-- region: ManualKotlinProcedureTest.kt#exec -->
 ```kotlin
 // no result: exec, not call
 qb.exec(OrderProcs::class.java) { it.purge(9) }.execute()
 ```
-
-테스트는 각 결과를 시드 데이터로 Kotlin에서 계산한 값과 비교합니다. `exec` 뒤에는 남은 주문을 확인합니다.
 
 결과가 없는 함수에는 왜 `call`이 아니라 `exec`을 쓸까요?
 
@@ -120,9 +117,9 @@ qb.exec(OrderProcs::class.java) { it.purge(9) }.execute()
 - `run`은 선택하지 않았습니다. Kotlin에서 인자를 빠뜨리면 `run { }`이 조용히 표준 라이브러리의 `run`이 됩니다.
 
 <a id="what-the-lambda-may-contain-rule-pr12"></a>
-### 람다에 들어갈 수 있는 것(규칙 PR12)
+### 람다 표현식에 들어갈 수 있는 것(규칙 PR12)
 
-람다 본문은 **스텁 함수 호출 하나**입니다. 그 밖에는 아무것도 없습니다.
+람다 표현식 본문은 **스텁 함수 호출 하나**입니다. 그 밖에는 아무것도 없습니다.
 
 | 허용 | 허용 안 됨 |
 |---|---|
@@ -140,10 +137,9 @@ qb.exec(OrderProcs::class.java) { it.purge(9) }.execute()
 - IN 값으로 `null`을 쓰는 것은 괜찮습니다.
 - non-null 파라미터(`calc`의 `Int`, `Double`)와 nullable 파라미터(`stat`의 `Int?`) 모두 동작합니다(규칙 PR13).
 
-`@SqlProcedure`가 없는 함수를 호출하면 lambdaQL이 람다를 읽을 때 오류가 납니다(`LQL-3060`). 데이터베이스를 조회하기 전이므로 H2에서도 확인합니다.
+`@SqlProcedure`가 없는 함수를 호출하면 lambdaQL이 람다 표현식을 읽을 때 오류가 납니다(`LQL-3060`). 데이터베이스를 조회하기 전이므로 H2에서도 확인합니다.
 
-[`ManualKotlinProcedureTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt), 영역 `not-annotated`:
-
+<!-- region: ManualKotlinProcedureTest.kt#not-annotated -->
 ```kotlin
 // only @SqlProcedure functions of the stub can be called
 assertEquals("LQL-3060", assertThrows<LambdaQLException> {
@@ -153,8 +149,7 @@ assertEquals("LQL-3060", assertThrows<LambdaQLException> {
 
 스텁과 데이터베이스의 대조, `exec`의 OUT 검사:
 
-[`ManualKotlinProcedureTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt), 영역 `rules`:
-
+<!-- region: ManualKotlinProcedureTest.kt#rules -->
 ```kotlin
 // the stub is checked against the database parameters on the first call
 assertEquals("LQL-4036", assertThrows<LambdaQLException> {
@@ -165,6 +160,8 @@ assertEquals("LQL-4037", assertThrows<LambdaQLException> {
     qb.exec(OrderProcs::class.java) { it.calc(1, 1.0) }.execute()
 }.code())
 ```
+
+예제 코드: [`ManualKotlinProcedureTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt)(`call`, `exec`, `not-annotated`, `rules`).
 
 ---
 
@@ -190,8 +187,7 @@ assertEquals("LQL-4037", assertThrows<LambdaQLException> {
 
 파라미터에 `@InOut`을 표시하십시오. 전달한 값은 **들어가는** 값입니다. **나오는** 값은 반환된 데이터 클래스의 속성입니다.
 
-[`ManualKotlinProcedureTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt), 영역 `inout`:
-
+<!-- region: ManualKotlinProcedureTest.kt#inout -->
 ```kotlin
 // 10 goes in as the INOUT value; the new balance comes back in the data class
 val adjusted: Adjusted = qb.call(OrderProcs::class.java) { it.adjust(5, 10) }.execute()
@@ -233,6 +229,8 @@ MariaDB와 Oracle은 `SELECT *`의 컬럼을 서로 다른 순서로 반환하�
 프로시저에는 공통된 "영향받은 행 수" 결과가 없습니다(Oracle은 -1을 반환).
 그 수가 필요하면 OUT 파라미터로 반환하십시오.
 
+예제 코드: [`ManualKotlinProcedureTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt)(`inout`).
+
 ---
 
 <a id="84-warning-argument-order"></a>
@@ -271,10 +269,9 @@ Kotlin의 이름 있는 인자(`calc(rate = rate, id = id)`)는 이를 바꾸지
 - 클래스 파일에 이름이 없고 이웃한 두 인자의 타입이 같으면, 프로시저마다 한 번 `LQL-5004`를 `INFO` 레벨로 기록합니다.
 - 타입은 종류만 대조합니다(아래 "인자 타입 대조" 참고). 같은 종류의 인자 두 개가 뒤바뀐 경우는 이름으로만 찾을 수 있습니다.
 
-테스트의 Kotlin 스텁은 `-java-parameters` 없이 컴파일하므로 `@DbParam`으로 이름을 지정합니다.
+`-java-parameters` 없이 컴파일하면 `@DbParam`으로 이름을 지정하십시오. 아래 스텁이 그 예입니다.
 
-[`ManualKotlinProcedureTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt), 영역 `names`:
-
+<!-- region: ManualKotlinProcedureTest.kt#names -->
 ```kotlin
 /** kotlinc keeps argument names only with -java-parameters; @DbParam gives the database name without it. */
 interface DiffProcs {
@@ -289,8 +286,7 @@ interface DiffProcs {
 }
 ```
 
-[`ManualKotlinProcedureTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt), 영역 `name-check`:
-
+<!-- region: ManualKotlinProcedureTest.kt#name-check -->
 ```kotlin
 assertEquals(7, qb.call(DiffProcs::class.java) { it.diff(10, 3) }.execute())
 // the same names in another order: stopped before the call (it would run with the values swapped)
@@ -306,17 +302,16 @@ assertEquals("LQL-4036", assertThrows<LambdaQLException> {
 **권장:** `-java-parameters`로 컴파일하고 DB와 같은 이름을 쓰거나(공통 접두사는 생략 가능) `@DbParam`을 붙이십시오. 그러면 뒤바뀐 순서를 검출합니다.
 
 **인자 타입 대조.** 첫 호출 때 각 인자의 타입과 DB 파라미터 타입의 종류를 대조합니다.
-종류는 숫자, 문자, 날짜·시간, 불리언, 이진 다섯 가지이며, 다르면 호출 전에 `LQL-4036`으로 중단합니다. 위 영역의 `text`가 이 경우입니다.
+종류는 숫자, 문자, 날짜·시간, 불리언, 이진 다섯 가지이며, 다르면 호출 전에 `LQL-4036`으로 중단합니다. 위 예제의 `text`가 이 경우입니다.
 
 - 불리언 인자는 숫자 파라미터에도 맞는 것으로 봅니다. MariaDB의 `BOOLEAN`은 `TINYINT(1)`이고, Oracle 23 이전에는 `BOOLEAN` 타입이 없습니다.
 - 종류를 정할 수 없는 쪽(enum, 객체 타입, 커서)은 대조하지 않습니다.
 - 같은 종류 안의 차이(`Int?` 인자와 `NUMBER(10,2)` 파라미터 등)는 드라이버 변환에 맡깁니다.
 
 **Oracle 패키지 오버로드.** Oracle 패키지에는 같은 이름의 프로시저가 여러 개 있을 수 있습니다.
-lambdaQL은 스텁이 어느 것을 가리키는지 구분할 수 없으므로, 그런 이름을 호출하면 `LQL-4044`로 중단합니다(Oracle에서만 실행하는 테스트).
+lambdaQL은 스텁이 어느 것을 가리키는지 구분할 수 없으므로, 그런 이름을 호출하면 `LQL-4044`로 중단합니다(Oracle에만 해당).
 
-[`ManualKotlinProcedureTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt), 영역 `package`:
-
+<!-- region: ManualKotlinProcedureTest.kt#package -->
 ```kotlin
 /** Oracle package procedures: TWICE has one form, HALF has two (an overload). */
 interface PkgProcs {
@@ -328,8 +323,7 @@ interface PkgProcs {
 }
 ```
 
-[`ManualKotlinProcedureTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt), 영역 `overload`:
-
+<!-- region: ManualKotlinProcedureTest.kt#overload -->
 ```kotlin
 assertEquals(5.0, qb.call(PkgProcs::class.java) { it.twice(2.5) }.execute()!!, 1e-9)
 // HALF has two overloads in the package: lambdaQL cannot tell which one to call
@@ -348,7 +342,7 @@ assertEquals("LQL-4044", assertThrows<LambdaQLException> {
 - 조회는 성공했지만 프로시저가 없으면 여전히 `LQL-4035`입니다.
 - Oracle 오버로드 조회(`all_arguments`)만 실패하면 `LQL-5006`을 `INFO` 레벨로 기록하고, 오버로드 확인 없이 호출합니다.
 
-이 대체 동작은 Java 테스트가 확인합니다(`ProcedureTest`의 테스트 메서드 `withoutMetadata`, 실패를 모의함).
+예제 코드: [`ManualKotlinProcedureTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt)(`names`, `name-check`, `package`, `overload`).
 
 ---
 
@@ -364,14 +358,14 @@ assertEquals("LQL-4044", assertThrows<LambdaQLException> {
 | PR5 | Oracle 암시적 결과는 지원하지 않음. `SYS_REFCURSOR` OUT 파라미터를 사용. | – |
 | PR6 | 단독으로 호출한 DB 함수는 데이터베이스마다 다른 경로를 사용함([8.8](#88-call-a-db-function-alone) 참고). | 구현됨 |
 | PR7 | 쿼리 안의 DB 함수: [8.6](#86-declare-db-functions)과 규칙 FN1 ~ FN11 참고. | 구현됨 |
-| PR8 | 조건에서 컬럼에 DB 함수를 적용하면 인덱스를 사용할 수 없으므로 WARN을 기록함([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). 코드는 `LQL-5001`. | 구현됨. `SargableMode.STRICT`에서는 오류(`LQL-3066`, D50) |
+| PR8 | 조건에서 컬럼에 DB 함수를 적용하면 인덱스를 사용할 수 없으므로 WARN을 기록함([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). 코드는 `LQL-5001`. | 구현됨. `SargableMode.STRICT`에서는 오류(`LQL-3066`) |
 | PR9 | 프로시저는 호출한 쪽 트랜잭션에서 실행됨. lambdaQL은 필요할 때 호출 전에 플러시함. 호출 후에는 로드된 엔티티가 오래된 상태일 수 있음. | 구현됨 |
 | PR10 | 공통된 영향받은 행 수가 없음. OUT 파라미터를 사용. | – |
 | PR11 | `null` IN 값은 괜찮음. DB 파라미터 기본값은 사용할 수 없음. | 구현됨 |
-| PR12 | 람다는 스텁 호출 하나. 인자는 캡처 값, 상수, 또는 그 값들의 계산. 이름 있는 인자는 단순한 값만. OUT 파라미터가 있는데 `exec`을 쓰면 오류. | 구현됨 |
+| PR12 | 람다 표현식은 스텁 호출 하나. 인자는 캡처 값, 상수, 또는 그 값들의 계산. 이름 있는 인자는 단순한 값만. OUT 파라미터가 있는데 `exec`을 쓰면 오류. | 구현됨 |
 | PR13 | non-null 파라미터(`Int`, `Double`)와 nullable 파라미터(`Int?`, `Double?`) 모두 동작함. | 구현됨 |
-| PR14 | 각 람다는 한 번만 분석됨. 프로시저 메타데이터는 이름마다 한 번만 읽음. | 구현됨 |
-| PR15 | H2에는 OUT, INOUT, 패키지가 없음. 프로시저는 MariaDB, MySQL, PostgreSQL, Oracle 같은 데이터베이스에서 테스트하십시오(예: Testcontainers 사용). | lambdaQL 테스트도 이 방식을 따름 |
+| PR14 | 각 람다 표현식은 한 번만 분석됨. 프로시저 메타데이터는 이름마다 한 번만 읽음. | 구현됨 |
+| PR15 | H2에는 OUT, INOUT, 패키지가 없음. 프로시저는 MariaDB, MySQL, PostgreSQL, Oracle 같은 데이터베이스에서 테스트하십시오(예: Testcontainers 사용). | – |
 
 ---
 
@@ -380,10 +374,9 @@ assertEquals("LQL-4044", assertThrows<LambdaQLException> {
 
 DB 함수는 데이터베이스에 직접 만든 함수입니다. 예를 들면 `SQ_FN_DISCOUNT(price)`입니다.
 Kotlin 인터페이스에는 정적 함수가 없으므로 인터페이스의 **`companion object`** 안에 **`@JvmStatic`**과 `@SqlFunction`을 붙여 선언하십시오.
-본문은 예외를 던지기만 해야 합니다. lambdaQL 안에서는 절대 실행되지 않습니다.
+본문은 예외를 던지기만 해야 합니다. 본문은 호출되지 않습니다. 람다 표현식 밖에서 직접 호출하면 예외를 던집니다.
 
-[`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt), 영역 `declare`:
-
+<!-- region: ManualKotlinFunctionTest.kt#declare -->
 ```kotlin
 /** Database functions: functions in the companion object of your own interface. The bodies only throw. */
 interface OrderFns {
@@ -401,9 +394,9 @@ interface OrderFns {
 }
 ```
 
-테스트는 두 함수를 데이터베이스마다 만들고(H2는 `CREATE ALIAS`) 끝나면 삭제합니다. `SQ_FN_DISCOUNT`는 가격의 90%, `SQ_FN_IS_GOLD`는 등급 5 이상이면 참입니다.
+예제는 데이터베이스에 만들어 둔 두 함수를 사용합니다(H2는 `CREATE ALIAS`로 만듦). `SQ_FN_DISCOUNT`는 가격의 90%, `SQ_FN_IS_GOLD`는 등급 5 이상이면 참입니다.
 
-lambdaQL 람다 **밖에서** `OrderFns.discount(...)`를 호출하면 `DbOnlyException`(`LQL-4034`)이 발생합니다. 의도한 동작입니다([8.10](#810-function-rules-fn1-to-fn11-summary)의 영역 `rules` 참고).
+lambdaQL 람다 표현식 **밖에서** `OrderFns.discount(...)`를 호출하면 `DbOnlyException`(`LQL-4034`)이 발생합니다. 의도한 동작입니다([8.10](#810-function-rules-fn1-to-fn11-summary) 참고).
 
 `@SqlFunction`의 값은 두 가지입니다.
 
@@ -426,10 +419,9 @@ lambdaQL은 `companion object` 함수에 붙은 어노테이션을 읽습니다.
 | 함수 타입 값(`val fn: (Double?) -> Double?`) | 거부(`LQL-3008`) |
 | 기본 인자, `vararg`가 있는 `@SqlFunction` | 거부(FN9: 기본 인자는 `LQL-3056`, `vararg`는 `LQL-3057`) |
 
-`object`, 최상위 함수, Java 정적 메서드는 같은 HQL을 만듭니다. 테스트는 이 형태들을 실행하고 Java 정적 메서드와 함수 타입 값도 확인합니다.
+`object`, 최상위 함수, Java 정적 메서드는 같은 HQL을 만듭니다.
 
-[`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt), 영역 `other-forms`:
-
+<!-- region: ManualKotlinFunctionTest.kt#other-forms -->
 ```kotlin
 // a Kotlin object with @JvmStatic, and a top-level function: the same HQL
 val inObject = qb.from(Order::class.java).where { PriceFns.discount(it.price)!! > 100 }
@@ -439,16 +431,17 @@ assertEquals(inObject.toHql().hql(), topLevel.toHql().hql())
 
 함수는 **인터페이스 이름과 함께** 호출하십시오(`OrderFns.discount`). 함수를 import해도 동작하지만, 같은 이름의 멤버 함수가 그 함수를 가릴 수 있습니다.
 
+예제 코드: [`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt)(`declare`, `other-forms`).
+
 ---
 
 <a id="87-use-db-functions-in-queries"></a>
 ## 8.7 쿼리에서 DB 함수 사용
 
 함수를 직접 호출하십시오. 컨텍스트 인자는 필요 없습니다.
-`where`, `select`, `orderBy`, `set`에서 동작합니다. 테스트는 각 쿼리를 실행하고, 결과 행을 Kotlin으로 같은 계산을 한 결과와 비교합니다.
+`where`, `select`, `orderBy`, `set`에서 동작합니다.
 
-[`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt), 영역 `where`:
-
+<!-- region: ManualKotlinFunctionTest.kt#where -->
 ```kotlin
 // the function call is written as function('<name>' as <type>, ...); the column is its argument
 val q = qb.from(Order::class.java).where { OrderFns.discount(it.price)!! > 100 }
@@ -457,8 +450,7 @@ assertEquals("select e0 from Order e0 where function('SQ_FN_DISCOUNT' as Double,
 
 Boolean을 반환하는 함수는 단독으로 조건이 됩니다(`... = true`).
 
-[`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt), 영역 `boolean`:
-
+<!-- region: ManualKotlinFunctionTest.kt#boolean -->
 ```kotlin
 val q = qb.from(Order::class.java).where { OrderFns.isGold(it.customer!!.grade)!! }
 assertEquals("select e0 from Order e0 join e0.customer j1 where function('SQ_FN_IS_GOLD' as Boolean, j1.grade) = true",
@@ -467,8 +459,7 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where function('SQ_FN_
 
 캡처 값만 인자로 쓰면 컬럼 쪽은 깨끗하게 유지되고, 함수는 바인딩한 값으로 데이터베이스에서 계산됩니다.
 
-[`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt), 영역 `captured`:
-
+<!-- region: ManualKotlinFunctionTest.kt#captured -->
 ```kotlin
 // a function of captured values only is still computed by the database (the value is bound)
 val q = qb.from(Order::class.java).where { it.price > OrderFns.discount(base)!! }
@@ -477,11 +468,10 @@ assertEquals("select e0 from Order e0 where e0.price > function('SQ_FN_DISCOUNT'
 
 `select`와 `orderBy`(`Priced`는 `data class Priced(val id: Long?, val discounted: Double?)`):
 
-[`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt), 영역 `select`:
-
+<!-- region: ManualKotlinFunctionTest.kt#select -->
 ```kotlin
 val q = qb.from(Order::class.java)
-    .orderBy { o, by -> by.desc(OrderFns.discount(o.price)) }
+    .orderBy { o -> desc(OrderFns.discount(o.price)) }
     .select { Priced(it.id, OrderFns.discount(it.price)) }
 assertEquals("select e0.id, function('SQ_FN_DISCOUNT' as Double, e0.price) from Order e0"
     + " order by function('SQ_FN_DISCOUNT' as Double, e0.price) desc nulls last", q.toHql().hql())
@@ -489,8 +479,7 @@ assertEquals("select e0.id, function('SQ_FN_DISCOUNT' as Double, e0.price) from 
 
 `set`:
 
-[`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt), 영역 `update`:
-
+<!-- region: ManualKotlinFunctionTest.kt#update -->
 ```kotlin
 val u = qb.update(Order::class.java)
     .set { it.price = OrderFns.discount(it.price)!! }
@@ -499,19 +488,7 @@ assertEquals("update Order e0 set e0.price = function('SQ_FN_DISCOUNT' as Double
     u.toHql().hql())
 ```
 
-**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. [`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java)는 같은 형태의 HQL(이름 `FN_DISCOUNT`)을 Hibernate에 직접 넘기고, H2 2.3, MariaDB 10.11, Oracle 23.26(Hibernate 7.4)에서 나온 SQL을 기록합니다. Hibernate의 SQL이 바뀌면 테스트가 실패합니다.
-
-**데이터베이스별 SQL(이 형태의 HQL에 대한 Hibernate SQL)** — `PlannedSqlTest`가 기록했습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `08-function`:
-
-```sql
--- H2, MariaDB, Oracle (same)
--- HQL: select o from Order o where function('FN_DISCOUNT' as Double, o.price) > 10
-select …
-from orders o1_0
-where FN_DISCOUNT(o1_0.price)>10
-```
-
-테스트 설정에는 `lambdaql.functions.classes` 설정이 있습니다. 이 설정이 있으면 Hibernate는 등록하지 않은 함수에도 이름의 대소문자(`FN_DISCOUNT`)를 유지합니다(세 데이터베이스에서 관찰함, 원인은 아직 확인하지 않음).
+`lambdaql.functions.classes` 설정이 있으면 Hibernate는 등록하지 않은 함수에도 이름의 대소문자(`FN_DISCOUNT`)를 유지합니다(세 데이터베이스에서 관찰함, 원인은 아직 확인하지 않음).
 등록이 전혀 없으면 Hibernate가 이름을 소문자로 쓸 수 있습니다. 따옴표 없는 이름은 어느 쪽이든 동작합니다.
 
 `!!`는 컴파일러를 위한 것일 뿐입니다(함수가 `Double?`을 반환하므로). lambdaQL은 이를 건너뜁니다(규칙 FN6).
@@ -558,31 +535,24 @@ spring.jpa.properties.lambdaql.functions.classes=com.acme.OrderFns
 `value`는 쿼리의 이름이고 `sql`은 SQL의 이름입니다. 두 이름이 다르면 함수를 등록해야 합니다.
 따옴표로 감싸 대소문자를 섞어 만든 함수 이름(`"SQ_Fn_Mixed"`)에 유용합니다. 등록하지 않으면 H2와 Oracle에서 이름이 소문자가 될 수 있습니다.
 
-이런 함수가 등록되어 있지 않으면 lambdaQL은 람다를 읽을 때 실패합니다(`LQL-3058`). [8.10](#810-function-rules-fn1-to-fn11-summary)의 `BadFns.unregistered`(`value = "SQ_TAX_KT"`, `sql = "SQ_FN_DISCOUNT"`)가 이 경우입니다. 등록한 함수의 실행은 Java 테스트(`FunctionTest`, 영역 `registered`)가 확인합니다.
+이런 함수가 등록되어 있지 않으면 lambdaQL은 람다 표현식을 읽을 때 실패합니다(`LQL-3058`). [8.10](#810-function-rules-fn1-to-fn11-summary)의 `BadFns.unregistered`(`value = "SQ_TAX_KT"`, `sql = "SQ_FN_DISCOUNT"`)가 이 경우입니다. 등록 방법은 [등록](#registration-optional)을 참고하십시오.
+
+예제 코드: [`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt)(`where`, `boolean`, `captured`, `select`, `update`).
 
 ---
 
 <a id="88-call-a-db-function-alone"></a>
 ## 8.8 DB 함수 단독 호출
 
-**인자가 없는 람다**와 함께 `qb.call { ... }`을 사용하십시오.
+**인자가 없는 람다 표현식**와 함께 `qb.call { ... }`을 사용하십시오.
 
-[`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt), 영역 `call`:
-
+<!-- region: ManualKotlinFunctionTest.kt#call -->
 ```kotlin
 // a function on its own: a lambda without parameters
 val discounted: Double? = qb.call { OrderFns.discount(price) }.execute()
 ```
 
-람다는 `@SqlFunction` 호출 하나여야 합니다(`LQL-3063`).
-
-**데이터베이스별 SQL(이 형태의 HQL에 대한 Hibernate SQL)** — `PlannedSqlTest`가 이름 `FN_DISCOUNT`로 기록했습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `08-function-alone`:
-
-```sql
--- H2, MariaDB, Oracle (same)
--- HQL: select function('FN_DISCOUNT' as Double, :p1)
-select FN_DISCOUNT(?)
-```
+람다 표현식은 `@SqlFunction` 호출 하나여야 합니다(`LQL-3063`).
 
 이 쿼리는 FROM 없이 `select FN_DISCOUNT(?)`로 실행됩니다. Oracle은 23ai부터만 이를 받아들입니다. Oracle에서는 lambdaQL이 대신 JDBC 함수 호출을 사용합니다(아래 표 참고).
 
@@ -597,6 +567,8 @@ lambdaQL이 실행하는 방법(규칙 PR6):
 
 lambdaQL은 먼저 대기 중인 변경을 플러시하므로(PR9와 같음) 함수는 최신 변경을 봅니다.
 
+예제 코드: [`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt)(`call`).
+
 ---
 
 <a id="89-warning-functions-on-columns-and-indexes-sargable"></a>
@@ -607,17 +579,8 @@ lambdaQL은 **인덱스를 사용할 수 있는** SQL을 만들려고 합니다(
 
 [8.7](#87-use-db-functions-in-queries)의 `where { OrderFns.discount(it.price)!! > 100 }`은 `function('SQ_FN_DISCOUNT' as Double, e0.price) > 100.0`이 되며, `price`의 인덱스를 사용하지 않습니다.
 
-**데이터베이스별 SQL(이 형태의 HQL에 대한 Hibernate SQL)** — `PlannedSqlTest`가 기록했습니다. `expected-sql/` [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql), [`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql), [`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)의 예제 `08-function`:
-
-```sql
--- H2, MariaDB, Oracle (same)
-select …
-from orders o1_0
-where FN_DISCOUNT(o1_0.price)>10
-```
-
 따라서 lambdaQL은 이 형태에 **WARN**을 기록합니다.
-검사는 `where` 람다마다 한 번, 분석 결과를 캐시할 때 수행합니다. `@SqlFunction`이 없는 조건은 DB를 조회하지 않습니다.
+검사는 `where` 람다 표현식마다 한 번, 분석 결과를 캐시할 때 수행합니다. `@SqlFunction`이 없는 조건은 DB를 조회하지 않습니다.
 
 | 경우 | 코드 | H2 | MariaDB | Oracle |
 |---|---|---|---|---|
@@ -627,10 +590,9 @@ where FN_DISCOUNT(o1_0.price)>10
 - Oracle 인덱스 대조에 쓰는 테이블·열 이름은 Hibernate 매핑에서 가져옵니다. 열 인자 하나인 함수만 대조합니다.
 - 메타데이터 조회가 실패하면(예: 권한 없음) `LQL-5008`을 `INFO` 레벨로 기록합니다. ①은 그대로 경고하고, ②는 검사하지 않습니다.
 
-테스트는 경고 코드를 데이터베이스별로 확인합니다. H2는 `LQL-5001`, MariaDB와 MySQL은 `LQL-5001`과 `LQL-5007`, 함수 기반 인덱스가 있는 PostgreSQL은 `LQL-5007`, 함수 기반 인덱스가 있는 Oracle은 경고가 없습니다. `CheckFns.nondet`은 `discount`와 같은 형태의 `@SqlFunction`(`SQ_FN_NONDET`)이며, MariaDB와 MySQL에서는 `NOT DETERMINISTIC`, PostgreSQL에서는 `VOLATILE`로 만듭니다.
+아래 예제가 기록하는 경고 코드는 데이터베이스마다 다릅니다. H2는 `LQL-5001`, MariaDB와 MySQL은 `LQL-5001`과 `LQL-5007`, 함수 기반 인덱스가 있는 PostgreSQL은 `LQL-5007`, 함수 기반 인덱스가 있는 Oracle은 경고가 없습니다. `CheckFns.nondet`은 `discount`와 같은 형태의 `@SqlFunction`(`SQ_FN_NONDET`)이며, MariaDB와 MySQL에서는 `NOT DETERMINISTIC`, PostgreSQL에서는 `VOLATILE`로 선언한 함수입니다.
 
-[`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt), 영역 `sargable`:
-
+<!-- region: ManualKotlinFunctionTest.kt#sargable -->
 ```kotlin
 // the function wraps the column: an index on price cannot be used (LQL-5001 at WARN),
 // unless Oracle or PostgreSQL has a function-based index on SQ_FN_DISCOUNT(price)
@@ -639,16 +601,16 @@ qb.from(Order::class.java).where { OrderFns.discount(it.price)!! > 100 }.toHql()
 qb.from(Order::class.java).where { it.price > CheckFns.nondet(base)!! }.toHql()
 ```
 
-**SARGable 모드**(결정 D50). `SargableMode`에는 세 값이 있습니다.
+**SARGable 모드**. `SargableMode`에는 세 값이 있습니다.
 
 - `OFF`: 검사하지 않고 메타데이터도 조회하지 않습니다.
 - `WARN`(기본값): 경고를 기록합니다.
 - `STRICT`: `WARN`이라면 경고를 기록할 경우(`LQL-5001`, `LQL-5007`, `LQL-5012`)에 분석이 `org.lambdaql.NonSargableException`(`LQL-3066`)으로 실패합니다.
 
 persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 지정하고 `SargablePolicy.unregister(emf)`로 해제합니다. Spring에서는 `lambdaql.sargable.mode=STRICT`를 씁니다([12](12-spring-data-jpa.md) 참고).
-검사는 람다마다 한 번, 분석 결과를 공유 캐시에 넣을 때 실행됩니다. 그래서 첫 쿼리 전에 모드를 등록하십시오.
+검사는 람다 표현식마다 한 번, 분석 결과를 공유 캐시에 넣을 때 실행됩니다. 그래서 첫 쿼리 전에 모드를 등록하십시오.
 
-**컬럼에 대한 산술**(결정 D50).
+**컬럼에 대한 산술**.
 
 - 컬럼 하나와 값만으로 된 `+ - * /`(`it.cnt * 2 > n`)는 값 쪽으로 옮길 수 있습니다. lambdaQL은 `LQL-5012`를 `WARN` 수준으로 기록하고, `STRICT`에서는 오류입니다.
 - 컬럼끼리의 산술(`it.price!! * it.cnt > n`)과 `%`는 옮길 수 없으므로 `LQL-5013`을 `DEBUG` 수준으로만 기록합니다. `STRICT`에서도 허용합니다.
@@ -657,8 +619,7 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 
 `STRICT` 모드와 컬럼 산술:
 
-[`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt), 영역 `sargable-strict`:
-
+<!-- region: ManualKotlinFunctionTest.kt#sargable-strict -->
 ```kotlin
 // STRICT: what WARN would log fails the analysis (NonSargableException, LQL-3066)
 SargablePolicy.register(emf, SargableMode.STRICT)
@@ -680,6 +641,8 @@ qb.from(Order::class.java).where { it.cnt!! * it.status > n }.toHql()
 - MariaDB에서는 함수가 실제로 결정적이면 `DETERMINISTIC`으로 선언하십시오.
 - Oracle에서는 같은 식의 함수 기반 인덱스가 있으면 경고가 사라집니다(이런 인덱스에는 `DETERMINISTIC` 함수가 필요합니다).
 
+예제 코드: [`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt)(`sargable`, `sargable-strict`).
+
 ---
 
 <a id="810-function-rules-fn1-to-fn11-summary"></a>
@@ -690,10 +653,10 @@ qb.from(Order::class.java).where { it.cnt!! * it.status > n }.toHql()
 | FN1 | `@SqlFunction`은 함수 어노테이션. 값이 비어 있으면 함수 이름을 UPPER_SNAKE로. | 구현됨 |
 | FN2 | lambdaQL은 호출된 함수를 찾아 그 어노테이션을 읽음. Kotlin에서는 `Companion` 수신 객체를 건너뜀. 본문은 예외를 던지기만 해야 함(`= throw ...`). 애플리케이션과 데이터베이스가 다른 값을 낼 수 있으므로 실제 본문이 있는 함수는 오류(`LQL-3052`). | 구현됨 |
 | FN3 | 같은 이름의 모든 오버로드는 같은 DB 함수에 대응해야 함. 그렇지 않으면 오류(`LQL-3053`). (Kotlin `Double?` 인자는 `Double?` 오버로드를 고름. Kotlin에서 본 Java 엔티티 getter는 기본형 `double` 오버로드를 고를 수 있음.) | 구현됨 |
-| FN4 | 어노테이션이 없는 호출이나 lambdaQL이 식별할 수 없는 호출은 오류. 절대 조용히 건너뛰지 않음. | 구현됨 |
+| FN4 | 어노테이션이 없는 호출이나 lambdaQL이 식별할 수 없는 호출은 오류. 조용히 건너뛰지 않음. | 구현됨 |
 | FN5 | 인자는 [3. 조건](03-where.md)의 값 규칙을 따름. 캡처 값만으로 만든 인자도 바인딩되어 **데이터베이스에서** 평가됨. | 구현됨 |
 | FN6 | `!!`와 박싱 호출은 건너뜀. 반환 타입은 선언된 함수에서 옴. `Double`, `Integer`, `Long`, `BigDecimal`, `String`, `LocalDate`, `LocalDateTime`, `Boolean` 중 하나에 대응해야 함(`LQL-3055`). | 구현됨 |
-| FN7 | 컬럼에 적용한 함수는 WARN을 냄([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). MariaDB에서는 값 쪽의 `NOT DETERMINISTIC` 함수도 WARN(`LQL-5007`). | 구현됨. `SargableMode.STRICT`에서는 오류(`LQL-3066`, D50) |
+| FN7 | 컬럼에 적용한 함수는 WARN을 냄([8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고). MariaDB에서는 값 쪽의 `NOT DETERMINISTIC` 함수도 WARN(`LQL-5007`). | 구현됨. `SargableMode.STRICT`에서는 오류(`LQL-3066`) |
 | FN8 | Hibernate 내장 함수(`COALESCE`, `ROUND`, `SYSDATE`, ...)와 같은 이름은 오류(`LQL-3054`). Hibernate가 조용히 내장 함수를 사용하기 때문. 접두사나 스키마 이름(`PUBLIC.SQ_FN`)을 사용. | 구현됨 |
 | FN9 | Kotlin: 기본 인자를 쓰는 호출(`LQL-3056`), `vararg`(`LQL-3057`)는 오류. | 구현됨 |
 | FN10 | 스칼라 함수만 지원. 인자가 없는 함수는 `fn()`으로 출력됨. | 구현됨 |
@@ -701,8 +664,7 @@ qb.from(Order::class.java).where { it.cnt!! * it.status > n }.toHql()
 
 규칙을 어기는 선언:
 
-[`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt), 영역 `bad-declare`:
-
+<!-- region: ManualKotlinFunctionTest.kt#bad-declare -->
 ```kotlin
 /** Functions that break the rules. */
 interface BadFns {
@@ -726,8 +688,7 @@ interface BadFns {
 }
 ```
 
-[`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt), 영역 `rules`:
-
+<!-- region: ManualKotlinFunctionTest.kt#rules -->
 ```kotlin
 // the body never runs in Kotlin
 assertEquals("LQL-4034", assertThrows<DbOnlyException> { OrderFns.discount(1.0) }.code())
@@ -748,7 +709,9 @@ assertEquals("LQL-3058", assertThrows<LambdaQLException> {
 }.code())
 ```
 
-내장 함수 이름(`LQL-3054`)과 반환 타입(`LQL-3055`) 검사는 Java 테스트(`FunctionTest`, 영역 `rules`)가 확인합니다.
+내장 함수와 같은 이름(`LQL-3054`, FN8)과 대응하지 않는 반환 타입(`LQL-3055`, FN6)도 람다 표현식을 읽을 때 거부됩니다.
+
+예제 코드: [`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt)(`bad-declare`, `rules`).
 
 ---
 
@@ -764,11 +727,11 @@ assertEquals("LQL-3058", assertThrows<LambdaQLException> {
 | DB 함수 단독 호출 | 예 | 예 | 예 | 예 |
 | Boolean 결과의 DB 함수 | 예 | 예 | 예 | 예(23ai 이상) |
 
-표는 이 장의 테스트가 다루는 범위입니다. 테스트는 데이터베이스마다 프로시저와 함수를 만들고 끝나면 삭제합니다.
+표는 각 데이터베이스에서 동작을 확인한 범위입니다.
 
 지원하지 않는 것: Oracle 패키지 프로시저의 오버로드 하나를 골라 호출하는 기능(오버로드 검출은 구현됨, `LQL-4044`), 테이블 반환 함수, 프로시저 결과 페이징.
 
-이 장의 오류는 `[LQL-xxxx]` 코드가 있는 `LambdaQLException`(또는 그 하위 클래스)입니다. 람다를 읽을 때는 `LQL-3052`~`LQL-3063`과, `SargableMode.STRICT`에서 인덱스를 쓸 수 없는 조건의 `LQL-3066`(`NonSargableException`, [8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고)입니다. 호출을 실행할 때는 `LQL-4034`~`LQL-4039`, `LQL-4043`, `LQL-4044`입니다. 호출 중에 `LQL-5004`, `LQL-5005`, `LQL-5006`을 `INFO` 레벨로 기록할 수도 있습니다. 조건 안의 DB 함수에 대해서는 `LQL-5001`, `LQL-5007`(`WARN`)과 `LQL-5008`(`INFO`)을 기록할 수 있습니다. [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
+이 장의 오류는 `[LQL-xxxx]` 코드가 있는 `LambdaQLException`(또는 그 하위 클래스)입니다. 람다 표현식을 읽을 때는 `LQL-3052`~`LQL-3063`과, `SargableMode.STRICT`에서 인덱스를 쓸 수 없는 조건의 `LQL-3066`(`NonSargableException`, [8.9](#89-warning-functions-on-columns-and-indexes-sargable) 참고)입니다. 호출을 실행할 때는 `LQL-4034`~`LQL-4039`, `LQL-4043`, `LQL-4044`입니다. 호출 중에 `LQL-5004`, `LQL-5005`, `LQL-5006`을 `INFO` 레벨로 기록할 수도 있습니다. 조건 안의 DB 함수에 대해서는 `LQL-5001`, `LQL-5007`(`WARN`)과 `LQL-5008`(`INFO`)을 기록할 수 있습니다. [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
 
 ---
 

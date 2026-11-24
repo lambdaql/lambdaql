@@ -47,6 +47,7 @@ public final class Normalizer {
     private static final String VALUES = "org/lambdaql/query/Values";
     private static final String FROM2 = "org/lambdaql/query/From2";
     private static final String BY = "org/lambdaql/query/By";
+    private static final String SORT_KEYS = "org/lambdaql/query/SortKeys";
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(Normalizer.class);
 
     /** Entity class of every query root, by root index; shared by a query and its subqueries. */
@@ -225,6 +226,7 @@ public final class Normalizer {
             case Pred.IsNull n -> isNull(n.operand());
             case Pred.Truth t -> truth(t.operand());
             case Pred.In in -> new Pred.In(done(value(in.value())), host(in.values(), Collection.class, true));
+            case Pred.Like l -> l;
             case Pred.And a -> {
                 Pred out = Pred.Bool.TRUE;
                 for (Pred item : a.items()) out = Pred.and(out, pred(item));
@@ -324,8 +326,59 @@ public final class Normalizer {
                     && !usesEntity(inv.args().get(0))) {
                 return new Pred.In(done(value(inv.args().get(1))), host(inv.args().get(0), Collection.class, true));
             }
+            Pred like = like(inv);
+            if (like != null) return like;
         }
         return new Pred.Truth(done(value(e)));
+    }
+
+    /**
+     * Reads {@code startsWith}, {@code endsWith} and {@code contains} on an entity value as a text match: Java
+     * {@code o.getName().startsWith(p)} and Kotlin {@code it.name.startsWith(p)} (also {@code ignoreCase = true}).
+     * The text must be a constant or a captured value; other forms are left to the generic method rule.
+     *
+     * <p>Example: {@code o.getName().contains(p)} becomes {@code Like(col0.name, p, ANY, false, false)}.
+     *
+     * @param inv the call
+     * @return the match, or {@code null} if the call is not one of these forms
+     */
+    private Pred like(Expr.Invoke inv) {
+        MethodRef m = inv.method();
+        String base = m.name().endsWith("$default") ? m.name().substring(0, m.name().length() - "$default".length()) : m.name();
+        Pred.Like.Kind kind = switch (base) {
+            case "startsWith" -> Pred.Like.Kind.PREFIX;
+            case "endsWith" -> Pred.Like.Kind.SUFFIX;
+            case "contains" -> Pred.Like.Kind.ANY;
+            default -> null;
+        };
+        if (kind == null) return null;
+        Type[] args = Type.getArgumentTypes(m.descriptor());
+        Expr target, text;
+        boolean ignoreCase = false;
+        if (!m.isStatic() && m.owner().equals("java/lang/String") && args.length == 1 && isText(args[0])) {
+            target = inv.receiver();
+            text = inv.args().get(0);
+        } else if (m.isStatic() && m.owner().startsWith("kotlin/text/StringsKt") && args.length >= 2 && isText(args[1])) {
+            target = inv.args().get(0);
+            text = inv.args().get(1);
+            if (!m.name().endsWith("$default") && args.length >= 3) {
+                if (!(inv.args().get(2) instanceof Expr.Const c)) return null;     // ignoreCase must be written in the lambda
+                ignoreCase = c.value() instanceof Boolean b ? b : c.value() instanceof Number n && n.intValue() != 0;
+            }
+        } else {
+            return null;
+        }
+        if (!usesEntity(target) || usesEntity(text)) return null;
+        Expr bare = text;
+        while (bare instanceof Expr.Convert c) bare = c.operand();           // Kotlin casts a constant to CharSequence
+        if (bare instanceof Expr.Const) text = bare;
+        Expr value = done(value(target));
+        Expr t = text instanceof Expr.Const ? text : host(text, String.class, false);
+        return new Pred.Like(value, t, kind, ignoreCase, false);
+    }
+
+    private static boolean isText(Type t) {
+        return t.getDescriptor().equals("Ljava/lang/String;") || t.getDescriptor().equals("Ljava/lang/CharSequence;");
     }
 
     private Pred eq(Expr a, Expr b) {
@@ -479,6 +532,7 @@ public final class Normalizer {
             case Expr.Arith a -> new Done(new Expr.Arith(a.op(), done(value(a.left())), done(value(a.right())), a.type()));
             case Expr.Neg n -> new Done(new Expr.Neg(done(value(n.operand())), n.type()));
             case Expr.Coalesce c -> new Done(new Expr.Coalesce(done(value(c.first())), done(value(c.second())), c.type()));
+            case Expr.Case c -> new Done(new Expr.Case(c.conds().stream().map(x -> NegationMinimizer.minimize(pred(x))).toList(), c.values().stream().map(v -> done(value(v))).toList(), done(value(c.otherwise())), c.type()));
             case Expr.GetField f -> throw error(LqlMessage.FIELD_ACCESS, f.name());
             default -> throw error(LqlMessage.EXPRESSION_NOT_SQL, e);
         };
@@ -714,14 +768,20 @@ public final class Normalizer {
         LambdaRef ref = innerRef(l);
         Normalizer inner = new Normalizer(this, root, -1);
         var node = org.lambdaql.engine.decode.Decoder.decodeValue(ref, BytecodeLoader.load(ref));
-        if (!(node instanceof org.lambdaql.engine.decode.Node.Value v)) throw error(LqlMessage.CONDITION_IN_SORT);
+        if (!(node instanceof org.lambdaql.engine.decode.Node.Value v) || SortReader.choosesChain(v.value())) {
+            throw error(LqlMessage.CONDITION_IN_SORT);
+        }
         List<Expr> captured = outerTerms(l.captured());
         List<org.lambdaql.engine.ir.SortItem> items = new ArrayList<>();
         Expr e = v.value();
+        if (!SortReader.isChain(e)) {                      // one key: x -> x.getPrice()
+            Expr key = inner.done(inner.value(substitute(e, captured)));
+            return List.of(new org.lambdaql.engine.ir.SortItem(key, org.lambdaql.engine.ir.SortItem.Kind.ASC, null));
+        }
         while (true) {
             while (e instanceof Expr.Convert c) e = c.operand();
-            if (e instanceof Expr.Param p && p.index() == 1) break;
-            if (e instanceof Expr.Invoke inv && inv.method().owner().equals(BY) && inv.receiver() != null) {
+            if (e instanceof Expr.Invoke inv && (inv.method().owner().equals(SORT_KEYS) && inv.receiver() != null
+                    || inv.method().owner().equals(BY) && inv.receiver() == null)) {
                 org.lambdaql.engine.ir.SortItem.Kind kind = switch (inv.method().name()) {
                     case "asc" -> org.lambdaql.engine.ir.SortItem.Kind.ASC;
                     case "desc" -> org.lambdaql.engine.ir.SortItem.Kind.DESC;
@@ -731,6 +791,7 @@ public final class Normalizer {
                 Expr key = inner.done(inner.value(substitute(inv.args().get(0), captured)));
                 Expr arg = inv.args().size() > 1 ? inner.done(inner.value(substitute(inv.args().get(1), captured))) : null;
                 items.add(0, new org.lambdaql.engine.ir.SortItem(key, kind, arg));
+                if (inv.receiver() == null) break;         // the first key: By.desc(...)
                 e = inv.receiver();
                 continue;
             }
@@ -761,6 +822,7 @@ public final class Normalizer {
             case Expr.Arith a -> new Expr.Arith(a.op(), toRoots(a.left()), toRoots(a.right()), a.type());
             case Expr.Neg n -> new Expr.Neg(toRoots(n.operand()), n.type());
             case Expr.Coalesce c -> new Expr.Coalesce(toRoots(c.first()), toRoots(c.second()), c.type());
+            case Expr.Case c -> c.map(this::toRoots);
             default -> e;
         };
     }
@@ -772,6 +834,7 @@ public final class Normalizer {
             case Pred.IsNull n -> new Pred.IsNull(substitute(n.operand(), captured));
             case Pred.Truth t -> new Pred.Truth(substitute(t.operand(), captured));
             case Pred.In in -> new Pred.In(substitute(in.value(), captured), substitute(in.values(), captured));
+            case Pred.Like l -> new Pred.Like(substitute(l.value(), captured), substitute(l.text(), captured), l.kind(), l.ignoreCase(), l.negated());
             case Pred.And a -> new Pred.And(a.items().stream().map(i -> substitute(i, captured)).toList());
             case Pred.Or o -> new Pred.Or(o.items().stream().map(i -> substitute(i, captured)).toList());
             case Pred.Not n -> new Pred.Not(substitute(n.operand(), captured));
@@ -790,6 +853,8 @@ public final class Normalizer {
             case Expr.Arith a -> new Expr.Arith(a.op(), substitute(a.left(), captured), substitute(a.right(), captured), a.type());
             case Expr.Neg n -> new Expr.Neg(substitute(n.operand(), captured), n.type());
             case Expr.Coalesce c -> new Expr.Coalesce(substitute(c.first(), captured), substitute(c.second(), captured), c.type());
+            case Expr.Case c -> c.map(x -> substitute(x, captured));
+            case Expr.Choose c -> new Expr.Choose(substitute(c.cond(), captured), substitute(c.whenTrue(), captured), substitute(c.whenFalse(), captured), c.type());
             case Expr.CmpResult c -> new Expr.CmpResult(substitute(c.left(), captured), substitute(c.right(), captured), c.nanGreater());
             case Expr.NewObject n -> new Expr.NewObject(n.type(), n.constructor(), n.args().stream().map(a -> substitute(a, captured)).toList());
             case Expr.Lambda l -> new Expr.Lambda(l.owner(), l.method(), l.descriptor(), l.isStatic(),
@@ -953,6 +1018,7 @@ public final class Normalizer {
             case Expr.Convert c -> callsDbFunction(c.operand());
             case Expr.SafeNav n -> callsDbFunction(n.value());
             case Expr.Coalesce c -> callsDbFunction(c.first()) || callsDbFunction(c.second());
+            case Expr.Case c -> c.exprs().stream().anyMatch(this::callsDbFunction);
             case Expr.CmpResult c -> callsDbFunction(c.left()) || callsDbFunction(c.right());
             default -> false;
         };
@@ -993,6 +1059,7 @@ public final class Normalizer {
             case Expr.NewObject n -> n.args().stream().anyMatch(Normalizer::usesEntity);
             case Expr.ArrayLength a -> usesEntity(a.array());
             case Expr.Coalesce c -> usesEntity(c.first()) || usesEntity(c.second());
+            case Expr.Case c -> c.exprs().stream().anyMatch(Normalizer::usesEntity);
             case Expr.Column c -> true;
             case Expr.Root r -> true;
             case Expr.Subquery q -> true;

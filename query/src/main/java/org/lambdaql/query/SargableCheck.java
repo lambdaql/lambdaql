@@ -98,19 +98,48 @@ final class SargableCheck {
             case Pred.Or o -> o.items().forEach(i -> arithmetic(i, where, strict));
             case Pred.Not n -> arithmetic(n.operand(), where, strict);
             case Pred.Cmp c -> {
+                caseSide(c.left(), where, strict);
+                caseSide(c.right(), where, strict);
                 arithmeticSide(c.left(), c.right(), where, strict);
                 arithmeticSide(c.right(), c.left(), where, strict);
                 subqueryArithmetic(c.left(), where, strict);
                 subqueryArithmetic(c.right(), where, strict);
             }
             case Pred.In in -> {
+                caseSide(in.value(), where, strict);
                 if (computed(in.value())) expression(in.value(), where);
                 subqueryArithmetic(in.values(), where, strict);
             }
             case Pred.Truth t -> subqueryArithmetic(t.operand(), where, strict);
+            case Pred.Like l -> {
+                // Kotlin ignoreCase = true: lower(column) like ..., an ordinary index on the column is not used
+                if (l.ignoreCase()) {
+                    List<String> names = distinct(columns(l.value())).stream().map(c -> String.join(".", c.path())).toList();
+                    report(LqlMessage.SARGABLE_COLUMN_EXPRESSION.format(String.join(", ", names), where), strict);
+                }
+            }
             case Pred.IsNull n -> { }
             case Pred.Bool b -> { }
         }
+    }
+
+    /**
+     * A compared value chosen by conditions on columns ({@code case when e0.active = true then 1 else 2 end},
+     * ROADMAP D62): the database computes it per row, so an index on those columns is not used. Reported at WARN
+     * (LQL-5013), or the analysis fails in {@link SargableMode#STRICT}.
+     *
+     * <p>Example: {@code o.getStatus() == (o.isActive() ? 1 : 2)} warns about {@code active}.
+     *
+     * @param side   one side of a comparison
+     * @param where  the lambda, for the message
+     * @param strict whether the analysis fails instead
+     */
+    private static void caseSide(Expr side, String where, boolean strict) {
+        Expr e = side;
+        while (e instanceof Expr.Convert c) e = c.operand();
+        if (!(e instanceof Expr.Case)) return;
+        List<String> names = distinct(columns(e)).stream().map(c -> String.join(".", c.path())).toList();
+        if (!names.isEmpty()) report(LqlMessage.SARGABLE_COLUMN_EXPRESSION.format(String.join(", ", names), where), strict);
     }
 
     private static void subqueryArithmetic(Expr e, String where, boolean strict) {
@@ -153,6 +182,7 @@ final class SargableCheck {
             case Expr.Arith a -> hasFunc(a.left()) || hasFunc(a.right());
             case Expr.Neg n -> hasFunc(n.operand());
             case Expr.Coalesce c -> hasFunc(c.first()) || hasFunc(c.second());
+            case Expr.Case c -> c.exprs().stream().anyMatch(SargableCheck::hasFunc);
             default -> false;
         };
     }
@@ -182,6 +212,7 @@ final class SargableCheck {
                 columnFunctions(in.value(), roots, out);
                 subqueries(in.values(), roots, out);
             }
+            case Pred.Like l -> columnFunctions(l.value(), roots, out);
             case Pred.Bool b -> { }
         }
     }
@@ -210,6 +241,7 @@ final class SargableCheck {
                 columnFunctions(c.first(), roots, out);
                 columnFunctions(c.second(), roots, out);
             }
+            case Expr.Case c -> c.exprs().forEach(x -> columnFunctions(x, roots, out));
             default -> { }
         }
     }
@@ -241,6 +273,7 @@ final class SargableCheck {
                 collect(c.first(), out);
                 collect(c.second(), out);
             }
+            case Expr.Case c -> c.exprs().forEach(x -> collect(x, out));
             default -> { }
         }
     }

@@ -53,7 +53,7 @@ class KotlinSelectTest {
     @Test
     fun safeCall() {
         // @start region="safe-call"
-        // it.customer?.name reads as the path customer.name (inner join: orders without a customer are left out)
+        // it.customer?.name reads as the path customer.name; no order without a customer can match, so an inner join
         val q = qb.from(Order::class.java).where { it.customer?.name == "Kim" }
         assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim'", q.toHql().hql())
         // @end

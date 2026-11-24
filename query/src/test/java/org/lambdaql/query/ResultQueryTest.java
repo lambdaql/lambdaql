@@ -1,5 +1,7 @@
 package org.lambdaql.query;
 
+import static org.lambdaql.query.By.*;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.NonUniqueResultException;
@@ -67,7 +69,7 @@ class ResultQueryTest {
     void first() {
         // @start region="first"
         Optional<Order> cheapest = qb.from(Order.class)
-                .orderBy((o, by) -> by.asc(o.getPrice()))
+                .orderBy(o -> asc(o.getPrice()))
                 .first();
         // without orderBy, "first" is the row with the smallest id
         Optional<Order> firstActive = qb.from(Order.class).where(o -> o.isActive()).first();
@@ -79,7 +81,7 @@ class ResultQueryTest {
         assertTrue(none.isEmpty());
         // offset is kept: the second cheapest
         assertEquals(all.stream().sorted(Comparator.comparing(Order::getPrice)).skip(1).findFirst().orElseThrow().getId(),
-                qb.from(Order.class).orderBy((o, by) -> by.asc(o.getPrice())).offset(1).first().orElseThrow().getId());
+                qb.from(Order.class).orderBy(o -> asc(o.getPrice())).offset(1).first().orElseThrow().getId());
     }
 
     @Test
@@ -101,7 +103,7 @@ class ResultQueryTest {
         // @start region="count"
         SelectQuery<Order> active = qb.from(Order.class).where(o -> o.isActive());
         long total = active.count();                                   // every matching row
-        List<Order> page = active.orderBy((o, by) -> by.desc(o.getPrice())).limit(2).toList();
+        List<Order> page = active.orderBy(o -> desc(o.getPrice())).limit(2).toList();
         // @end
         assertEquals("select count(e0) from Order e0 where e0.active = true", active.countHql().hql());
         assertEquals(all.stream().filter(Order::isActive).count(), total);
@@ -126,7 +128,7 @@ class ResultQueryTest {
     void toSet() {
         // @start region="to-set"
         java.util.SequencedSet<Order> byPrice = qb.from(Order.class)
-                .orderBy((o, by) -> by.desc(o.getPrice()))
+                .orderBy(o -> desc(o.getPrice()))
                 .toSet();
         // @end
         assertEquals(all.stream().sorted(Comparator.comparing(Order::getPrice).reversed()).map(Order::getId).toList(),

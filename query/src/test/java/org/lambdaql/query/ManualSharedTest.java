@@ -1,5 +1,7 @@
 package org.lambdaql.query;
 
+import static org.lambdaql.query.By.*;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -93,13 +95,13 @@ class ManualSharedTest {
         SelectQuery<Order> q = qb.from(Order.class)
                 .where(o -> o.getStatus() == 1 || o.getCustomer().getName().equals("Kim"))
                 .where(o -> o.getPrice() > minPrice);
-        assertEquals("select e0 from Order e0 join e0.customer j1"
+        assertEquals("select e0 from Order e0 left join e0.customer j1"
                 + " where (e0.status = 1 or j1.name = 'Kim') and e0.price > :p1", q.toHql().hql());
         List<Order> rows = q.toList();
         // @end
-        // the inner join leaves out orders without a customer, even with status 1 (SQL meaning)
-        assertEquals(ids(orders.stream().filter(o -> o.getCustomer() != null
-                && (o.getStatus() == 1 || "Kim".equals(customerName(o))) && o.getPrice() > minPrice).toList()), ids(rows));
+        // an order without a customer stays when its status is 1, as in Java
+        assertEquals(ids(orders.stream().filter(o -> (o.getStatus() == 1 || "Kim".equals(customerName(o)))
+                && o.getPrice() > minPrice).toList()), ids(rows));
     }
 
     @Test
@@ -107,7 +109,7 @@ class ManualSharedTest {
         // @start region="one-lambda-per-clause"
         ValueQuery<OrderView> q = qb.from(Order.class)
                 .where(o -> o.getStatus() == 1 && o.isActive())                 // one condition lambda
-                .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId()))     // one sort lambda for all keys
+                .orderBy(o -> desc(o.getPrice()).asc(o.getId()))     // one sort lambda for all keys
                 .select(o -> new OrderView(o.getId(), o.getPrice()));          // one select lambda
         assertEquals("select e0.id, e0.price from Order e0 where e0.status = 1 and e0.active = true"
                 + " order by e0.price desc, e0.id asc", q.toHql().hql());
@@ -142,7 +144,7 @@ class ManualSharedTest {
         // @start region="readme-first"
         List<Order> orders = qb.from(Order.class)
                 .where(o -> o.getStatus() == 1 && o.getPrice() > minPrice)
-                .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId()))
+                .orderBy(o -> desc(o.getPrice()).asc(o.getId()))
                 .limit(20)
                 .toList();
         // @end
@@ -152,7 +154,7 @@ class ManualSharedTest {
         assertEquals("select e0 from Order e0 where e0.status = 1 and e0.price > :p1 order by e0.price desc, e0.id asc",
                 qb.from(Order.class)
                         .where(o -> o.getStatus() == 1 && o.getPrice() > minPrice)
-                        .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId()))
+                        .orderBy(o -> desc(o.getPrice()).asc(o.getId()))
                         .limit(20).toHql().hql());
     }
 
@@ -173,12 +175,11 @@ class ManualSharedTest {
 
     @Test
     void catchTheError() {
-        boolean flag = true;
         // @start region="catch"
         String logged;
         try {
             qb.from(Order.class)
-                    .where(o -> o.getStatus() == (flag ? 1 : 2))   // a value ternary: not supported
+                    .where(o -> switch (o.getStatus()) { case 1, 2 -> true; default -> false; })   // a switch: not supported
                     .toList();
             logged = null;
         } catch (LambdaQLException e) {
@@ -186,16 +187,15 @@ class ManualSharedTest {
             logged = "lambdaQL error " + e.code() + ": " + e.getMessage(Locale.ROOT);
         }
         // @end
-        assertTrue(logged != null && logged.startsWith("lambdaQL error LQL-2021: [LQL-2021] "), logged);
+        assertTrue(logged != null && logged.startsWith("lambdaQL error LQL-2010: [LQL-2010] "), logged);
     }
 
     @Test
     void checkTheCode() {
-        boolean flag = true;
         // @start region="check-code"
         var e = assertThrows(LambdaQLException.class,
-                () -> qb.from(Order.class).where(o -> o.getStatus() == (flag ? 1 : 2)));
-        assertEquals("LQL-2021", e.code());                 // good
+                () -> qb.from(Order.class).where(o -> switch (o.getStatus()) { case 1, 2 -> true; default -> false; }));
+        assertEquals("LQL-2010", e.code());                 // good
         assertInstanceOf(UnsupportedLambdaShapeException.class, e);
         // assertEquals("Could not ...", e.getMessage());   // do not do this
         // @end

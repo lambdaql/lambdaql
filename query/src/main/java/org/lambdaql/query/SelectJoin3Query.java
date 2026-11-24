@@ -65,7 +65,7 @@ public class SelectJoin3Query<T, U, V> {
     }
 
     /**
-     * A sort on all entities with the builder last: {@code (o, c, i, by) -> by.desc(...)} (D18).
+     * A sort on all entities: {@code (o, c, i) -> asc(c.getName()).desc(i.getQty())}, or one key.
      *
      * @param <T> the main entity type
      * @param <U> the joined entity type
@@ -79,10 +79,9 @@ public class SelectJoin3Query<T, U, V> {
          * @param o an entity
          * @param c an entity
          * @param i an entity
-         * @param by the sort builder
-         * @return the builder
+         * @return one key, or the keys made with {@link By}
          */
-        By sort(T o, U c, V i, By by);
+        Comparable<?> sort(T o, U c, V i);
     }
 
     /**

@@ -255,20 +255,6 @@ public class SelectQuery<T> {
     }
 
     /**
-     * Sorts ascending by one key: {@code o -> o.getPrice()} or {@code Order::getPrice}. NULL comes first (D16).
-     *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
-     * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-key"}
-     *
-     * @param key the key lambda or a getter reference
-     * @return the sorted query
-     * @throws org.lambdaql.LambdaAnalysisException if the key cannot become SQL
-     */
-    public OrderedSelectQuery<T> orderBy(SortKey<T> key) {
-        return orderBy(key, Direction.ASC);
-    }
-
-    /**
      * Sorts by one key with a direction: {@code orderBy(o -> o.getPrice(), Direction.DESC)}.
      * The direction can be a value known only at run time.
      *
@@ -281,7 +267,7 @@ public class SelectQuery<T> {
      * @throws NullPointerException                          if {@code direction} is null
      * @throws org.lambdaql.LambdaAnalysisException if the key cannot become SQL
      */
-    public OrderedSelectQuery<T> orderBy(SortKey<T> key, Direction direction) {
+    public OrderedSelectQuery<T> orderBy(SortBy<T> key, Direction direction) {
         Objects.requireNonNull(direction, "direction");
         LambdaRef ref = QueryContext.read(key);
         Expr k = context.analyzeSortKey(ref, entityClass);

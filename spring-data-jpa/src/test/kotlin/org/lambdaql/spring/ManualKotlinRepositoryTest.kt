@@ -1,5 +1,7 @@
 package org.lambdaql.spring
 
+import org.lambdaql.query.By.desc
+
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -101,12 +103,12 @@ class ManualKotlinRepositoryTest {
     @Test
     fun executorMethods() {
         // @start region="executor"
-        val byGrade = SortSpec.of(Member::class.java) { m, by -> by.desc(m.grade).asc(m.id) }
+        val byGrade = SortSpec.of(Member::class.java) { m -> desc(m.grade).asc(m.id) }
         val active: List<Member> = repository.findAll({ it.isActive }, byGrade)
 
         // the active member with the highest grade
         val best: Optional<Member> = repository.findFirst({ it.isActive },
-            SortSpec.of(Member::class.java) { m, by -> by.desc(m.grade) })
+            SortSpec.of(Member::class.java) { m -> desc(m.grade) })
 
         val kim: Optional<Member> = repository.findOne { it.name == "Kim" }
         // two or more rows: Spring's IncorrectResultSizeDataAccessException

@@ -10,21 +10,21 @@
 <a id="contents"></a>
 ## 목차
 
-- [10.1 기본 규칙: 람다는 쿼리](#101-the-base-rule-a-lambda-is-a-query)
+- [10.1 기본 규칙: 람다 표현식은 쿼리](#101-the-base-rule-a-lambda-is-a-query)
 - [10.2 SARGable 규칙(인덱스 친화적인 SQL)](#102-sargable-rule-index-friendly-sql)
 - [10.3 NULL 규칙](#103-null-rules)
 - [10.4 연산자 규칙(R1 ~ R24)](#104-operator-rules-r1-to-r24)
 - [10.5 Java와 SQL의 차이](#105-java-and-sql-differences)
 - [10.6 데이터베이스별 차이](#106-database-differences)
 - [10.7 지원하지 않는 것과 대신 작성할 것](#107-not-supported-and-what-to-write-instead)
-- [10.8 캐싱: 람다는 한 번 분석됨](#108-caching-a-lambda-is-analyzed-once)
-- [10.9 테스트한 환경](#109-tested-environment)
+- [10.8 캐싱: 람다 표현식은 한 번 분석됨](#108-caching-a-lambda-is-analyzed-once)
+- [10.9 지원 환경](#109-tested-environment)
 
 예제 읽는 법:
 
-- 예제는 테스트 코드의 구간이며, `assertEquals`가 lambdaQL이 만드는 HQL을 보여 줍니다.
-- 람다에 직접 쓴 상수(숫자, 문자열, boolean, `null`, enum 상수)는 HQL에 리터럴로 씁니다.
-  캡처 값과 계산한 값은 항상 바인드 파라미터(`:p1`, `:p2`, ...)입니다(D37).
+- `assertEquals`의 문자열이 lambdaQL이 만드는 HQL입니다.
+- 람다 표현식에 직접 쓴 상수(숫자, 문자열, boolean, `null`, enum 상수)는 HQL에 리터럴로 씁니다.
+  캡처 값과 계산한 값은 항상 바인드 파라미터(`:p1`, `:p2`, ...)입니다.
 - 엔티티: `Order`(`id`, `price`, `status`, `active`, `description`, `customer`, `updateAt`),
   `Customer`(`id`, `name`, `grade`, `orders`), `Item`(`order`, `price`, `qty`).
   10.3의 행은 `Order`의 속성 `cnt`(`Integer`), `custName`(`String`), `address`(`@Embedded`, `city`와 `zip`)도 사용합니다.
@@ -33,21 +33,22 @@
 ---
 
 <a id="101-the-base-rule-a-lambda-is-a-query"></a>
-## 10.1 기본 규칙: 람다는 쿼리
+## 10.1 기본 규칙: 람다 표현식은 쿼리
 
-lambdaQL은 **람다를 절대 실행하지 않습니다**. 바이트코드를 읽고 HQL을 씁니다.
-람다는 Java 문법으로 작성한 쿼리입니다. 그래서:
+lambdaQL은 조건, 정렬, 대입 람다 표현식을 **호출하지 않습니다**. 바이트 opcode를 분석해 HQL을 씁니다.
+캡처 값만으로 된 식과 `select`의 생성자 호출은 Java에서 계산합니다.
+람다 표현식은 Java 문법으로 작성한 쿼리입니다. 그래서:
 
 1. `o.getCustomer().getName()` 같은 경로는 **컬럼을 가리킵니다**. 호출의 연쇄가 아닙니다.
-   lambdaQL은 고객이 null인지 검사하지 않습니다(D20). `where`에서 경로는 기본적으로 inner join이므로 고객이 없는 주문은 선택되지 않습니다(D36).
-   null 가드(`... == null || ...`)를 써도 마찬가지입니다. 경로는 inner join으로 남습니다(D48). 고객이 없는 주문을 유지하려면 `leftJoin`을 사용하십시오.
+   getter를 호출하지 않으므로 `NullPointerException`이 생기지 않습니다. 이 경로의 비교는 고객이 있는 주문에서만 참입니다.
+   `where`에서 고객이 없는 주문이 조건에 맞을 수 있으면 `left join`, 맞을 수 없으면 inner join입니다. 결과는 람다 표현식을 리스트에 실행한 결과와 같습니다.
+   null 가드(`o.getCustomer() == null || ...`)를 쓰면 고객이 없는 주문도 선택됩니다.
    그런 주문을 찾으려면 연관 자체를 비교하십시오: `o.getCustomer() == null`.
-2. NULL은 **직접 작성한 곳에서만** 처리합니다(`== null`, `!= null`)(D22).
-   그 밖의 NULL은 SQL 규칙을 따릅니다. 조건은 UNKNOWN이 되고 행은 선택되지 않습니다.
-3. Java 메모리 규칙(객체 동일성, 박싱 캐시, 문자열 intern, NPE)은 적용되지 않습니다.
-   객체 사이의 `==`는 **값 동등성**을 뜻합니다(D12).
-4. **어떤 형태에 대한 규칙이 없으면 lambdaQL은 추측하지 않습니다.** 코드 `[LQL-xxxx]`와 소스 줄이 담긴
-   명확한 오류를 던집니다. "아마 맞을" SQL을 절대 만들지 않습니다.
+2. NULL은 **직접 작성한 곳에서만** 처리합니다(`== null`, `!= null`).
+   그 밖의 NULL은 SQL 규칙을 따릅니다. 비교하는 값이 NULL인 행은 반환되지 않습니다.
+3. Java 메모리 규칙(객체 동일성, 박싱 캐시, 문자열 intern)은 적용되지 않습니다.
+   객체 사이의 `==`는 **값 동등성**을 뜻합니다.
+4. **분석할 수 없는 람다 표현식은 오류입니다.** lambdaQL은 쿼리로 분석하지 못하면 코드 `[LQL-xxxx]`와 소스 줄이 담긴 예외를 던집니다.
 
 <a id="102-sargable-rule-index-friendly-sql"></a>
 ## 10.2 SARGable 규칙(인덱스 친화적인 SQL)
@@ -59,15 +60,14 @@ lambdaQL의 기본 규칙입니다(설계 3.9절).
 |---|---|
 | 1 | **컬럼 쪽에 함수, 연산자, `CASE`를 두지 않습니다.** 값을 바꿔야 한다면 바인딩 전에 Java에서 파라미터를 바꿉니다(예: `Locale.ROOT`로 소문자 변환) |
 | 2 | 두 형태가 같은 의미라면 단순 비교와 `AND` / `OR` / `NOT`만 있는 형태를 고릅니다. 올바른 3값 논리가 먼저이고, 그 안에서 SARGable 형태를 고릅니다 |
-| 3 | 각 렌더링 규칙은 H2, MariaDB, Oracle에서 `EXPLAIN`으로 확인합니다 |
+| 3 | 렌더링 규칙은 H2, MariaDB, Oracle의 `EXPLAIN` 결과를 기준으로 정합니다 |
 
 <a id="examples"></a>
 ### 예
 
-**단순한 `=`와 `<>`를 쓰는 동등 비교**(결정 D48)
+**단순한 `=`와 `<>`를 쓰는 동등 비교**
 
-[`ManualJavaRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaRulesTest.java), 영역 `plain-equals`:
-
+<!-- region: ManualJavaRulesTest.java#plain-equals -->
 ```java
 // when the query runs, text is not null
 SelectQuery<Order> same = qb.from(Order.class).where(o -> o.getDescription() == text);
@@ -80,17 +80,16 @@ assertEquals("select e0 from Order e0 where e0.description <> :p1", other.toHql(
 lambdaQL은 `is [not] distinct from`을 쓰지 않습니다. 이 형태는 Oracle에서 인덱스를 사용할 수 없는 `decode(...)`가 됩니다.
 엔티티 값은 SQL 의미를 따르므로 단순한 `=`나 `<>`가 항상 올바릅니다. 캡처 값 `null`은 NULL로 바인딩되어 어떤 행에도 일치하지 않습니다(`WARN` 수준 `LQL-4045`).
 
-**boolean 컬럼과 조건의 비교**(D25)는 거부됩니다(`LQL-2021`). 두 경우를 `&&`와 `||`로 나누어 쓰면 `AND`/`OR`가 됩니다.
+**boolean 컬럼과 조건의 비교**에서 조건 쪽은 `case when`이 되어 인덱스를 쓰지 못합니다(`WARN` 수준 `LQL-5013`). 두 경우를 `&&`와 `||`로 나누어 쓰면 `AND`/`OR`가 됩니다.
 
-[`ManualJavaWhereTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java), 영역 `boolean-compare`:
-
+<!-- region: ManualJavaWhereTest.java#boolean-compare -->
 ```java
 int s = 1;
-// a boolean column compared with a condition needs the condition twice: rejected
-UnsupportedLambdaShapeException e = assertThrows(UnsupportedLambdaShapeException.class,
-        () -> qb.from(Order.class).where(o -> o.isActive() == (o.getStatus() > s)));
-assertEquals("LQL-2021", e.code());
-// write the two cases with && and ||
+// a boolean column compared with a condition: the condition becomes case when
+SelectQuery<Order> compared = qb.from(Order.class).where(o -> o.isActive() == (o.getStatus() > s));
+assertEquals("select e0 from Order e0 where e0.active = case when e0.status > :p1 then true else false end",
+        compared.toHql().hql());
+// the same rows with && and ||: plain comparisons that an index can serve
 SelectQuery<Order> query = qb.from(Order.class)
         .where(o -> (o.isActive() && o.getStatus() > s) || (!o.isActive() && o.getStatus() <= s));
 assertEquals("select e0 from Order e0 where (e0.active = true and e0.status > :p1)"
@@ -100,7 +99,7 @@ assertEquals("select e0 from Order e0 where (e0.active = true and e0.status > :p
 `CASE` 형태(`e0.active = case when ... end`)는 올바른 행을 주지만 전체 스캔이 필요하므로
 lambdaQL은 사용하지 않습니다.
 
-**서브쿼리를 사용한 NOT IN**은 `NOT IN`으로 씁니다(SQL 의미, D48). 서브쿼리에 NULL이 있으면 행이 반환되지 않습니다. NULL을 건너뛰려면 서브쿼리에 null 검사를 추가하십시오(10.3 참고).
+**서브쿼리를 사용한 NOT IN**은 `NOT IN`으로 씁니다(SQL 의미). 서브쿼리에 NULL이 있으면 행이 반환되지 않습니다. NULL을 건너뛰려면 서브쿼리에 null 검사를 추가하십시오(10.3 참고).
 
 <a id="what-the-measurements-showed"></a>
 ### 측정 결과
@@ -122,18 +121,18 @@ MariaDB 10.11과 Oracle 23ai, 20,000 ~ 50,000행:
 컬럼 쪽의 DB 함수(`OrderFns.discount(o.getPrice()) > 10`)는 일반 인덱스를 사용할 수 없습니다.
 lambdaQL은 **WARN**(`LQL-5001`)을 기록합니다. 예외: Oracle에서 같은 식의 함수 기반 인덱스가 있으면 기록하지 않습니다.
 MariaDB에서 `NOT DETERMINISTIC`(기본값) 함수는 인자가 파라미터뿐이어도 전체 스캔이 되므로(`o.getPrice() > OrderFns.discount(rate)`) 이 경우에도 경고합니다(`LQL-5007`).
-`SargableMode.STRICT`에서는 경고 대신 분석이 실패합니다(`LQL-3066`, 결정 D50).
+`SargableMode.STRICT`에서는 경고 대신 분석이 실패합니다(`LQL-3066`).
 
-**SARGable 모드**(결정 D50). `SargableMode`에는 세 값이 있습니다.
+**SARGable 모드**. `SargableMode`에는 세 값이 있습니다.
 
 - `OFF`: 검사하지 않고 메타데이터도 조회하지 않습니다.
 - `WARN`(기본값): 경고를 기록합니다.
 - `STRICT`: `WARN`이라면 경고를 기록할 경우(`LQL-5001`, `LQL-5007`, `LQL-5012`)에 분석이 `org.lambdaql.NonSargableException`(`LQL-3066`)으로 실패합니다.
 
 persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 지정하고 `SargablePolicy.unregister(emf)`로 해제합니다. Spring에서는 `lambdaql.sargable.mode=STRICT`를 씁니다([12](12-spring-data-jpa.md) 참고).
-검사는 람다마다 한 번, 분석 결과를 공유 캐시에 넣을 때 실행됩니다. 그래서 첫 쿼리 전에 모드를 등록하십시오.
+검사는 람다 표현식마다 한 번, 분석 결과를 공유 캐시에 넣을 때 실행됩니다. 그래서 첫 쿼리 전에 모드를 등록하십시오.
 
-**컬럼에 대한 산술**(결정 D50).
+**컬럼에 대한 산술**.
 
 - 컬럼 하나와 값만으로 된 `+ - * /`(`o.getCnt() * 2 > n`)는 값 쪽으로 옮길 수 있습니다. lambdaQL은 `LQL-5012`를 `WARN` 수준으로 기록하고, `STRICT`에서는 오류입니다.
 - 컬럼끼리의 산술(`o.getPrice() * o.getCnt() > n`)과 `%`는 옮길 수 없으므로 `LQL-5013`을 `DEBUG` 수준으로만 기록합니다. `STRICT`에서도 허용합니다.
@@ -141,32 +140,36 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 - 인덱스가 있는지 조회해 경고를 줄이는 방식은 채택하지 않았습니다. 권한과 시노님 때문에 "인덱스 없음"과 "알 수 없음"이 섞이고, 컬럼 산술은 드문 형태이기 때문입니다.
 [8. 프로시저와 DB 함수](08-procedures-functions.md)를 참고하십시오.
 
+예제 코드: [`ManualJavaRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaRulesTest.java)(`plain-equals`), [`ManualJavaWhereTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java)(`boolean-compare`).
+
 <a id="103-null-rules"></a>
 ## 10.3 NULL 규칙
 
-| 람다 | SQL | NULL 동작 |
+| 람다 표현식 | SQL | NULL 동작 |
 |---|---|---|
-| `o.getId() == 10L`(언박싱, 한쪽이 기본형) | `e0.id = 10` | NULL: UNKNOWN, 행이 선택되지 않음(Java라면 NPE) |
+| `o.getId() == 10L`(언박싱, 한쪽이 기본형) | `e0.id = 10` | NULL: 행이 반환되지 않음 |
 | `o.getId() == p`(두 객체: `Long`, `String`, enum, ...) | `e0.id = :p1` | 컬럼이 NULL: 선택되지 않음. 캡처 값 `null`: 일치하는 행 없음(`= NULL`, `WARN` 수준 `LQL-4045`) |
-| `o.getDescription() != p` | `e0.description <> :p1` | 컬럼이 NULL: 선택되지 **않음**(SQL 의미, D48. Java라면 선택). 캡처 값 `null`: 일치하는 행 없음 |
-| `o.getDescription() == o.getCustName()`(엔티티 값 두 개) | `e0.description = e0.custName` | 어느 한쪽이 NULL: 선택되지 않음. NULL과 NULL도 마찬가지(SQL 의미, D48) |
-| `o.getDescription().equals(p)` | `e0.description = :p1` | description이 NULL: UNKNOWN(Java라면 NPE) |
+| `o.getDescription() != p` | `e0.description <> :p1` | 컬럼이 NULL: 선택되지 **않음**(SQL 의미, . Java라면 선택). 캡처 값 `null`: 일치하는 행 없음 |
+| `o.getDescription() == o.getCustName()`(엔티티 값 두 개) | `e0.description = e0.custName` | 어느 한쪽이 NULL: 선택되지 않음. NULL과 NULL도 마찬가지(SQL 의미) |
+| `o.getDescription().equals(p)` | `e0.description = :p1` | description이 NULL: 행이 반환되지 않음 |
 | `Objects.equals(o.getDescription(), p)`, `"x".equals(o.getDescription())`, `Boolean.TRUE.equals(o.getActive())` | `==`와 같음 | `==`와 같음 |
 | `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | NULL: 선택되지 않음(SQL 의미) |
 | `!o.getActive()`(nullable `Boolean`) | `e0.active = false` | NULL: 선택되지 않음(NULL은 false가 아님) |
 | `x == null`, `x != null` | `is null`, `is not null` | 2값 |
-| `o.getCnt() >= 2.5`(정수 컬럼, 소수 값) | 적은 값 그대로 비교: 상수는 리터럴(`e0.cnt >= 2.5`), 캡처 값과 IN 목록도 소수 리터럴(`e0.cnt >= 2.5BD`, `in (2.5BD, 3.0BD)`, D48 B8) | 인덱스 범위 스캔 유지(MariaDB에서 실측). 이전처럼 값을 잘라 잘못된 행을 반환하지 않음 |
-| 값 객체(`@Embedded`) 전체: `o.getAddress().equals(addr)`, `Objects.equals(o.getAddress(), addr)`, `!o.getAddress().equals(addr)` | 컬럼마다 펼침: `e0.address.city = :p1 and e0.address.zip = :p2`, 부정은 `<> ... or ...`. `== null`은 모든 컬럼 `is null`(and), `!= null`은 `is not null`(or) | 컬럼마다 SQL 의미(D48): NULL 컬럼은 `=`에도 `<>`에도 불일치. 캡처한 객체가 `null`이면 일치하는 행 없음(`WARN` 수준 `LQL-4045`) |
+| `o.getCnt() >= 2.5`(정수 컬럼, 소수 값) | 적은 값 그대로 비교: 상수는 리터럴(`e0.cnt >= 2.5`), 캡처 값과 IN 목록도 소수 리터럴(`e0.cnt >= 2.5BD`, `in (2.5BD, 3.0BD)`) | 인덱스 범위 스캔 유지(MariaDB에서 실측). 이전처럼 값을 잘라 잘못된 행을 반환하지 않음 |
+| 값 객체(`@Embedded`) 전체: `o.getAddress().equals(addr)`, `Objects.equals(o.getAddress(), addr)`, `!o.getAddress().equals(addr)` | 컬럼마다 펼침: `e0.address.city = :p1 and e0.address.zip = :p2`, 부정은 `<> ... or ...`. `== null`은 모든 컬럼 `is null`(and), `!= null`은 `is not null`(or) | 컬럼마다 SQL 의미: NULL 컬럼은 `=`에도 `<>`에도 불일치. 캡처한 객체가 `null`이면 일치하는 행 없음(`WARN` 수준 `LQL-4045`) |
 | NULL이 될 수 없는 컬럼(id, 기본형, `nullable = false`, 경로에 연관 단계 없음)의 `o.getId() == null` | `1=0`. 비교와 함께 쓰면 검사를 제거: `o.getId() != null && o.getId() == id`는 `e0.id = :p1` | 컬럼에 NULL이 없음. 연관을 거치는 경로(`o.getCustomer().getId()`)는 검사 유지 |
 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL 3값 논리 |
-| `where` 안의 `o.getCustomer().getName()` | `j1.name` + `join e0.customer j1`(기본은 inner join) | 고객이 없으면 주문이 선택되지 않음 |
-| `o.getCustomer() == null \|\| o.getCustomer().getName().equals(p)` | `e0.customer is null or j1.name = :p1` + `join e0.customer j1` | 고객이 없으면 선택되지 **않음**(inner join, D48. `DEBUG` 수준 `LQL-5009`). 유지하려면 `leftJoin` 사용 |
+| `where` 안의 `o.getCustomer().getName().equals(p)` | `j1.name = :p1` + `join e0.customer j1` | 고객이 없으면 주문이 선택되지 않음 |
+| `o.getStatus() == 1 \|\| o.getCustomer().getName().equals(p)` | `e0.status = 1 or j1.name = :p1` + `left join e0.customer j1` | 고객이 없어도 status가 1이면 선택됨 |
+| `o.getCustomer() == null \|\| o.getCustomer().getName().equals(p)` | `e0.customer is null or j1.name = :p1` + `left join e0.customer j1` | 고객이 없으면 선택됨(Java와 같음) |
+| `o.getCustomer() == null \|\| o.getCustomer().getName() == null` | `e0.customer is null or (e0.customer is not null and j1.name is null)` + `left join e0.customer j1` | 경로를 거친 `is null` 비교에는 `e0.customer is not null`을 더함 |
 | `orderBy`나 `select`에만 쓴 `o.getCustomer().getName()` | `j1.name` + `left join e0.customer j1`. 필수 연관(`optional = false`)은 `join` | 고객이 없으면 컬럼이 NULL |
 | `o.getCustomer() == null`, `o.getCustomer() != null` | `e0.customer is null`, `e0.customer is not null`(FK 컬럼, 조인 없음) | 고객이 없는 주문 / 고객이 있는 주문 |
 | `o.getCustomer().getId()` | `e0.customer.id`(FK 컬럼, 조인 없음) | 고객이 없으면 NULL |
 | `ids.contains(o.getId())` | `e0.id in (:p1)` | id가 NULL: 선택되지 않음 |
-| `!ids.contains(o.getId())` | `e0.id not in (:p1)`. NULL이 될 수 있는 컬럼도 같음 | NULL 값: 선택되지 **않음**(SQL 의미, D48. `DEBUG` 수준 `LQL-5009`. Java라면 선택) |
-| `!...contains(x)`가 있는 서브쿼리 | `x not in (select ...)` | 서브쿼리에 NULL이 있으면 어떤 행도 선택되지 않음(SQL 의미, D48) |
+| `!ids.contains(o.getId())` | `e0.id not in (:p1)`. NULL이 될 수 있는 컬럼도 같음 | NULL 값: 선택되지 **않음**(SQL 의미, . `DEBUG` 수준 `LQL-5009`. Java라면 선택) |
+| `!...contains(x)`가 있는 서브쿼리 | `x not in (select ...)` | 서브쿼리에 NULL이 있으면 어떤 행도 선택되지 않음(SQL 의미) |
 | `Agg.sum`, `avg`, `min`, `max` | `sum(...)` ... | 행이 없거나 모든 값이 NULL이면 NULL |
 | `Agg.count()` | `count(*)` | 행이 없으면 0 |
 
@@ -178,7 +181,7 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 | 객체 사이의 `==` / `!=`, `Objects.equals`, `col.equals(p)`, `p.equals(col)` | 예. 단, 일치하는 행이 없음(`= NULL`). 쿼리가 실행될 때 `LQL-4045`를 `WARN` 수준으로 기록 |
 | 같은 값에 대한 null 가드 아래: `p == null \|\| o.getStatus() > p` | 예. 가드는 쿼리가 실행될 때 Java에서 결정합니다. `p == null`이면 필터 없음, 다른 값이면 `e0.status > :p1`. 자기 기본형 언박싱만 있는 비교는 가드 위치와 상관없음 |
 | 언박싱 비교(`o.getPrice() > p`, `Double p`) | 예. 단, 일치하는 행이 없음(`> NULL`). 자기 기본형으로의 언박싱은 실행하지 않음. 쿼리가 실행될 때 `LQL-4045`를 `DEBUG` 수준으로 기록 |
-| 캡처 값에 대한 메서드 호출(`p.trim()`), 다른 기본형으로 바꾸는 언박싱(`p.intValue()`, `Double p`) | **아니요.** Java에서 값을 계산할 때 오류(`LQL-4012`, Java라면 NPE) |
+| 캡처 값에 대한 메서드 호출(`p.trim()`), 다른 기본형으로 바꾸는 언박싱(`p.intValue()`, `Double p`) | **아니요.** Java에서 값을 계산할 때 오류(`LQL-4012`) |
 | `in`에 쓰는 컬렉션의 `null` 요소 | **아니요.** 바인딩할 때 오류 |
 | `NaN`, `Infinity` | **아니요.** 항상 오류 |
 
@@ -187,10 +190,10 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 
 설계(3.6절)의 규칙 표를 줄인 것입니다.
 
-| # | 람다 형태 | 의미 |
+| # | 람다 표현식 형태 | 의미 |
 |---|---|---|
 | R1 | 기본형 비교, 또는 한쪽이 기본형(`o.getId() == 10L`, `o.getStatus() > p`) | `=`, `<>`, `<`, ... SQL NULL 규칙 |
-| R2 | 객체 `==` / `!=`(`Long`, `String`, `Boolean`, enum) | 객체 동일성이 아니라 값 동등성. SQL 의미의 `=` / `<>`(D48). 캡처 값 `null`은 어떤 행에도 일치하지 않음 |
+| R2 | 객체 `==` / `!=`(`Long`, `String`, `Boolean`, enum) | 객체 동일성이 아니라 값 동등성. SQL 의미의 `=` / `<>`. 캡처 값 `null`은 어떤 행에도 일치하지 않음 |
 | R3 | `x == null`, `x != null` | `IS NULL`, `IS NOT NULL` |
 | R4 | `a.equals(b)` | `a = b`, SQL NULL 규칙 |
 | R5 | `Objects.equals(a, b)`, `"x".equals(a)`, `Boolean.TRUE.equals(a)` | R2와 같음 |
@@ -200,18 +203,18 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 | R9 | 캡처 값 | 실행 시점의 값을 가진 바인드 파라미터 |
 | R10 | 속성 접근 | getter 호출, JPA 속성에 매핑 |
 | R11 ~ R23 | Kotlin 규칙 | [이 페이지의 Kotlin 버전](../kotlin/10-rules-and-limits.md) 참고 |
-| R24 | 연관 경로(`o.getCustomer().getName()`) | 컬럼. to-one 연관: where, order by, select가 공유하는 별칭. `where`에서는 항상 inner join(D48. 연관이 없는 행을 유지하려면 `leftJoin` 사용), order by나 select에만 쓰면 `left join`(필수 연관 `optional = false`는 inner join, A4). 임베디드: 같은 테이블. 대상 `@Id`로 끝나거나 연관을 `null`과 비교: FK 컬럼, 조인 없음. 컬렉션: 오류 |
+| R24 | 연관 경로(`o.getCustomer().getName()`) | 컬럼. to-one 연관: where, order by, select가 공유하는 별칭. `where`에서는 연관이 없는 행이 조건에 맞을 수 있으면 `left join`, 맞을 수 없으면 inner join(결과는 람다 표현식을 리스트에 실행한 결과와 같음), order by나 select에만 쓰면 `left join`(필수 연관 `optional = false`는 inner join, A4). 임베디드: 같은 테이블. 대상 `@Id`로 끝나거나 연관을 `null`과 비교: FK 컬럼, 조인 없음. 컬렉션: 오류 |
 
 그 밖의 규칙:
 
 - `x.compareTo(y) > 0`, `isBefore`, `isAfter`는 `x > y` 등이 됩니다.
-- 람다에 직접 쓴 상수(컴파일 시점 `static final` 상수 포함)는 리터럴입니다: `o.getPrice() > 100`은 `e0.price > 100.0`, `"O'Brien"`은 `'O''Brien'`. 캡처 값과 계산한 값(`new BigDecimal("1.5")`)은 바인드 파라미터입니다(D37). 예외: 정수 컬럼과 비교하는 소수 캡처 값은 소수 리터럴(`2.5BD`, D48 B8).
-- javac는 가끔 `!`의 위치를 옮깁니다(드 모르간, 이중 부정). 그래도 결과는 절대 바뀌지 않습니다.
+- 람다 표현식에 직접 쓴 상수(컴파일 시점 `static final` 상수 포함)는 리터럴입니다: `o.getPrice() > 100`은 `e0.price > 100.0`, `"O'Brien"`은 `'O''Brien'`. 캡처 값과 계산한 값(`new BigDecimal("1.5")`)은 바인드 파라미터입니다. 예외: 정수 컬럼과 비교하는 소수 캡처 값은 소수 리터럴(`2.5BD`).
+- javac는 가끔 `!`의 위치를 옮깁니다(드 모르간, 이중 부정). 그래도 결과는 바뀌지 않습니다.
   lambdaQL은 각 조건을 정확히 한 번씩 유지하며 논리를 "단순화"하지 않습니다.
 - Java에서 항상 참인 조건(`x > 5 || !(x > 5)`)을 작성해도 단순화하지 않습니다.
   SQL에서는 `x`가 NULL인 행이 빠집니다. 이것이 SQL 규칙입니다.
-- IntelliJ는 `o.getId() == p`에 "Number objects compared using `==`" 경고를 냅니다. lambdaQL 람다 안에서는
-  의도한 형태(값 동등성)입니다. 원한다면 `@SuppressWarnings("NumberEquality")`를 사용하십시오.
+- IntelliJ는 `o.getId() == p`에 "Number objects compared using `==`" 경고를 냅니다. lambdaQL 람다 표현식 안에서는
+  의도한 형태(값 동등성)입니다. 메서드에 `@SuppressWarnings("NumberEquality")`를 선언하여 경고를 없앨 수 있습니다.
 
 어떤 Java 타입이 R1이 되고 어떤 타입이 R2가 되는지는 [9.3](09-java-notes.md#93-equality-of-boxed-values)을 참고하십시오.
 
@@ -223,11 +226,11 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 
 | # | 차이 | lambdaQL이 하는 일 |
 |---|---|---|
-| G1 | `status`가 NULL일 때 Java에서 `!Objects.equals(status, 1)`은 true이지만, SQL에서 `status <> 1`은 UNKNOWN | `status <> 1`로 렌더링: SQL 의미(D48). NULL 행은 제외되고 `LQL-5009`를 `DEBUG` 수준으로 기록. 이런 행을 유지하려면 `status == null \|\| ...`이라고 쓰십시오 |
+| G1 | `status`가 NULL일 때 Java에서 `!Objects.equals(status, 1)`은 true이지만, SQL `status <> 1`은 그 행을 반환하지 않음 | `status <> 1`로 렌더링: SQL 의미. NULL 행은 제외되고 `LQL-5009`를 `DEBUG` 수준으로 기록. 이런 행을 유지하려면 `status == null \|\| ...`이라고 쓰십시오 |
 | G2 | `!Boolean.TRUE.equals(active)`, `!active`(nullable)와 Java | `active <> :p1`, `active = false`로 렌더링: NULL Boolean은 false가 아님(SQL 의미) |
-| G3 | NULL 파라미터를 쓴 `name = ?`는 0행을 반환 | 그대로 유지(SQL 의미, D48). 실행할 때 `LQL-4045`를 `WARN` 수준으로 기록. NULL을 찾으려면 `x == null`이라고 쓰십시오 |
-| G4 | `status NOT IN (1, NULL)`은 항상 0행을 반환 | 캡처한 컬렉션의 `null`은 오류. 서브쿼리 `NOT IN`은 SQL 의미를 유지(D48): 서브쿼리에 null 검사를 추가하십시오 |
-| G5 | Java는 NPE를 던지지만(언박싱, `o.getName().startsWith(...)`), SQL은 그냥 행을 반환 | 문서화함: 엔티티 NULL은 SQL 규칙을 따름 |
+| G3 | NULL 파라미터를 쓴 `name = ?`는 0행을 반환 | 그대로 유지(SQL 의미). 실행할 때 `LQL-4045`를 `WARN` 수준으로 기록. NULL을 찾으려면 `x == null`이라고 쓰십시오 |
+| G4 | `status NOT IN (1, NULL)`은 항상 0행을 반환 | 캡처한 컬렉션의 `null`은 오류. 서브쿼리 `NOT IN`은 SQL 의미를 유지: 서브쿼리에 null 검사를 추가하십시오 |
+| G5 | 엔티티의 컬럼 값이 NULL인 경우 | 문서화함: 그 행은 SQL 규칙에 따라 반환되지 않음 |
 | G6 | `NaN`: H2는 NaN을 가장 큰 값으로 정렬하고 `NaN = NaN`이 true, MariaDB는 저장할 수 없음, Oracle은 `BINARY_DOUBLE`에만 저장 가능 | 캡처한 NaN이나 Infinity는 오류. 저장된 NaN은 DB를 따름 |
 | G7 | `float` 컬럼과 `double` 값의 비교: DB마다 결과가 다름 | float/double에 대해 **Java와 비트 단위까지 같은 결과를 약속하지 않음**. lambdaQL은 `CAST`를 추가하지 않음. 컬럼 매핑을 직접 선택하십시오(예: Oracle `binary_float` / `binary_double`) |
 | G9 | `x > 5 \|\| !(x > 5)`는 NULL 행을 빼냄 | 단순화하지 않고 작성한 그대로 렌더링 |
@@ -235,7 +238,7 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 | G11 | 문자열: MariaDB `_ci`는 대소문자와 끝의 공백을 무시, Oracle은 `''`를 NULL로 저장, Oracle `NLS_SORT`는 JVM 로캘을 따름 | 문서화함: 문자열 비교와 정렬은 DB를 따름. Oracle에서는 `NLS_SORT=BINARY`를 설정하십시오(세션 초기화나 `-Duser.language=en`). Oracle에서 `"".equals(x)`와 `isEmpty()`는 다르게 동작 |
 | G12 | 객체에 대한 Java `==`는 동일성(128 이상의 `Long`, `new String`은 false) | lambdaQL은 `==`를 값 동등성으로 정의 |
 | G13 | 0/1 이외의 값을 담은 레거시 boolean 컬럼(MariaDB `TINYINT(1)`, Oracle `NUMBER(1)`)은 다르게 읽힘 | Hibernate가 만든 DDL(`bit(1)`, Oracle 23 `boolean`)은 괜찮음. 레거시 스키마는 주의하십시오 |
-| G14 | Oracle 23 버그: 복합 조건에 대한 `WHERE (a AND b) = false` / `IS FALSE` / `IS NULL`은 행을 잃음 | lambdaQL은 복합 조건을 boolean 테스트로 절대 감싸지 않음. 부정은 항상 `NOT(...)` |
+| G14 | Oracle 23 버그: 복합 조건에 대한 `WHERE (a AND b) = false` / `IS FALSE` / `IS NULL`은 행을 잃음 | lambdaQL은 복합 조건을 boolean 테스트로 감싸지 않음. 부정은 항상 `NOT(...)` |
 | G15 | Oracle `CHAR` 컬럼은 `String` 바인드와 일치하지 않음 | 문서화함: 엔티티 매핑에 주의하십시오 |
 
 더 많은 차이:
@@ -247,9 +250,9 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 | `BigDecimal` 나눗셈과 함수 결과 | Java 스케일 규칙 | DB가 스케일을 정함(예: 함수 결과에 대해 H2는 1, MariaDB와 Oracle은 0) | 문서화함 |
 | 유니코드 대소문자 무시(`ſ`, `İ`) | Java 규칙 | DB 콜레이션 | DB를 따름 |
 | 문자열 길이 | UTF-16 단위 | H2는 UTF-16 단위, MariaDB는 코드 포인트 | 문서화함 |
-| NULL과 문자열 연결 | `"null"` 텍스트 | NULL(Oracle: `NULL \|\| 'x'`는 `'x'`) | 람다 안의 문자열 연결은 거부됨(`LQL-2007`) |
-| 람다 안의 `LocalDateTime.now()` | 앱 시각 | – | **앱 시각**으로 바인딩. DB 시각(`current_timestamp`)은 지원하지 않음 |
-| `Set`의 같은 요소 | `equals` / `hashCode`가 결정 | 기본 키로 행을 구분 | Set의 크기가 행 수보다 작으면 `toSet()`과 `findSet()`이 `IllegalStateException`을 던짐(엔티티의 `equals` / `hashCode`가 서로 다른 행을 같다고 판단하거나 `@Id`가 유일하지 않은 경우, 예: 뷰). `toList()` 사용(D42) |
+| NULL과 문자열 연결 | `"null"` 텍스트 | NULL(Oracle: `NULL \|\| 'x'`는 `'x'`) | 람다 표현식 안의 문자열 연결은 거부됨(`LQL-2007`) |
+| 람다 표현식 안의 `LocalDateTime.now()` | 앱 시각 | – | **앱 시각**으로 바인딩. DB 시각(`current_timestamp`)은 지원하지 않음 |
+| `Set`의 같은 요소 | `equals` / `hashCode`가 결정 | 기본 키로 행을 구분 | Set의 크기가 행 수보다 작으면 `toSet()`과 `findSet()`이 `IllegalStateException`을 던짐(엔티티의 `equals` / `hashCode`가 서로 다른 행을 같다고 판단하거나 `@Id`가 유일하지 않은 경우, 예: 뷰). `toList()` 사용 |
 
 <a id="106-database-differences"></a>
 ## 10.6 데이터베이스별 차이
@@ -261,8 +264,8 @@ lambdaQL은 많은 차이를 감춥니다. 알아야 하는 것도 있습니다.
 
 | 항목 | H2 | MariaDB | Oracle | lambdaQL |
 |---|---|---|---|---|
-| NULL 위치, `ASC` | 처음 | 처음 | **마지막** | 모든 DB에서 `ASC`는 NULLS FIRST(D16) |
-| NULL 위치, `DESC` | 마지막 | 마지막 | **처음** | 모든 DB에서 `DESC`는 NULLS LAST(D16) |
+| NULL 위치, `ASC` | 처음 | 처음 | **마지막** | 모든 DB에서 `ASC`는 NULLS FIRST |
+| NULL 위치, `DESC` | 마지막 | 마지막 | **처음** | 모든 DB에서 `DESC`는 NULLS LAST |
 | `NULLS FIRST/LAST` 문법 | 있음 | **없음**(문법 오류) | 있음 | Hibernate가 MariaDB에서 `CASE`로 흉내 냄: 정렬에 **인덱스를 쓰지 못함** |
 | 페이징 SQL | `offset ? rows fetch first ? rows only` | `limit ?,?` | `offset ? rows fetch first ? rows only` | Hibernate에 전달(`setFirstResult` / `setMaxResults`) |
 | 같은 값을 가진 행의 순서 | – | – | 무작위 | 페이징할 때 키에 id가 없으면 lambdaQL이 루트 `@Id asc`를 추가. 유일하고 NULL이 될 수 없는 키(`unique = true`이고 `nullable = false`, `@NaturalId`)가 있으면 추가하지 않음(A5) |
@@ -274,15 +277,15 @@ lambdaQL은 많은 차이를 감춥니다. 알아야 하는 것도 있습니다.
 lambdaQL은 NULL이 될 수 있는 모든 키에 대해 HQL에 `nulls first` / `nulls last`를 씁니다. 필수 연관만 거치고 NULL이 될 수 없는 경로에는 쓰지 않습니다. 데이터베이스 기본값과 같으면 Hibernate가 이를 뺍니다.
 기본값(`ASC` = NULLS FIRST, `DESC` = NULLS LAST)은 H2, MariaDB와 같으므로 그쪽에서는 추가 SQL이
 필요 없습니다. Oracle에만 `NULLS` 절이 붙습니다. NULL 위치를 바꾸려면
-`by.asc(key, false)`(NULL이 마지막)나 `by.desc(key, true)`(NULL이 처음)를 사용하십시오(D35). MariaDB에서는 이들이 `CASE` 흉내를 사용합니다.
+`asc(key, Nulls.LAST)`(NULL이 마지막)나 `desc(key, Nulls.FIRST)`(NULL이 처음)를 사용하십시오. MariaDB에서는 이들이 `CASE` 흉내를 사용합니다.
 
 <a id="conditions-and-values"></a>
 ### 조건과 값
 
 | 항목 | H2 | MariaDB | Oracle |
 |---|---|---|---|
-| `is not distinct from` | 기본 지원 | `<=>`(인덱스 사용) | `decode(...)`(인덱스 없음). lambdaQL은 이 형태를 쓰지 않음(D48) |
-| `is [not] true`, `coalesce(boolean, false)` | 동작 | 동작 | **ORA-00932**. lambdaQL은 절대 쓰지 않음 |
+| `is not distinct from` | 기본 지원 | `<=>`(인덱스 사용) | `decode(...)`(인덱스 없음). lambdaQL은 이 형태를 쓰지 않음 |
+| `is [not] true`, `coalesce(boolean, false)` | 동작 | 동작 | **ORA-00932**. lambdaQL은 쓰지 않음 |
 | 빈 문자열 `''` | 값 | 값 | **NULL** |
 | 대소문자와 끝의 공백 | 정확히 일치 | `_ci`: 무시 | 정확히 일치(정렬은 `NLS_SORT`) |
 | `NaN` | 저장됨, 가장 큰 값 | 저장할 수 없음 | `BINARY_DOUBLE`만 |
@@ -304,12 +307,12 @@ lambdaQL은 NULL이 될 수 있는 모든 키에 대해 HQL에 `nulls first` / `
 | 항목 | 일어나는 일 | lambdaQL |
 |---|---|---|
 | `SET a = ..., b = a + 1`(설정한 뒤 컬럼을 읽음) | MariaDB는 **새** 값을, H2와 Oracle은 이전 값을 읽음 | 분석 시점에 오류(U3) |
-| DML 안의 연관 경로(`o.getCustomer().getName()`) | Hibernate가 DB마다 다른 조인을 만들고 고객이 없는 **행을 잃음** | lambdaQL은 상관 스칼라 서브쿼리를 씀(`where`와 SET). `where`에서 조회라면 inner join할 경로에는 `customer.id is not null`도 더함. 그래서 DML이 쿼리와 같은 행에 적용됨(U9) |
+| DML 안의 연관 경로(`o.getCustomer().getName()`) | Hibernate가 DB마다 다른 조인을 만들고 고객이 없는 **행을 잃음** | lambdaQL은 상관 스칼라 서브쿼리를 씀(`where`와 SET). `where`에서 조회라면 inner join할 경로에는 `customer.id is not null`도 더함(`left join`할 경로에는 더하지 않음). 그래서 DML이 쿼리와 같은 행에 적용됨(U9) |
 | 같은 테이블에 대한 서브쿼리가 있는 `DELETE` | MariaDB 오류 1093 | 대상 id를 파생 테이블로 먼저 읽음: `d0.id in (select t.id from (select e0.id as id … where <condition>) t)`(U17). 상관 서브쿼리에도 동작하고 세 DB에서 같은 행을 삭제(실측). `update`는 감싸지 않음(MariaDB에서도 동작) |
-| STRING 컬럼과 ORDINAL 컬럼에 같은 enum 값을 한 번만 바인딩 | H2와 MariaDB는 **오류 없이 잘못된 값**을 저장 | 위치마다 파라미터 하나, 절대 공유하지 않음(U7) |
+| STRING 컬럼과 ORDINAL 컬럼에 같은 enum 값을 한 번만 바인딩 | H2와 MariaDB는 **오류 없이 잘못된 값**을 저장 | 위치마다 파라미터 하나, 공유하지 않음(U7) |
 | `values(list, ...)`의 많은 행 | Oracle: 바인드 65,535개의 고정 제한(ORA-01745), 그보다 훨씬 전부터 매우 느림 | 문장당 값 500개 이하로 나누고, 모든 문장을 한 트랜잭션에서 실행(U13) |
-| `order by ... limit`이 있는 `update` / `delete` | MariaDB는 `in` 서브쿼리의 `limit`(오류 1235)과 대상 테이블을 읽는 서브쿼리(오류 1093)를 거부 | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: 파생 테이블 `t`로 세 데이터베이스 모두에서 동작. 안쪽 select가 조회의 조인(D36)을 사용하므로 조회와 같은 행을 대상으로 함 |
-| `on conflict` / upsert | H2와 Oracle은 `merge`. MariaDB는 `insert ... on duplicate key update`이고, 수정된 행을 2로 셈. Hibernate의 `do nothing`은 H2와 Oracle에서 실패 | `upsert`와 `onConflict(...).update(...)`는 Hibernate의 형태를 사용. `ignore()`는 `insert ... select ... where not exists`로 씀. 행 수는 그대로 반환(D40) |
+| `order by ... limit`이 있는 `update` / `delete` | MariaDB는 `in` 서브쿼리의 `limit`(오류 1235)과 대상 테이블을 읽는 서브쿼리(오류 1093)를 거부 | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: 파생 테이블 `t`로 세 데이터베이스 모두에서 동작. 안쪽 select가 조회의 조인을 사용하므로 조회와 같은 행을 대상으로 함 |
+| `on conflict` / upsert | H2와 Oracle은 `merge`. MariaDB는 `insert ... on duplicate key update`이고, 수정된 행을 2로 셈. Hibernate의 `do nothing`은 H2와 Oracle에서 실패 | `upsert`와 `onConflict(...).update(...)`는 Hibernate의 형태를 사용. `ignore()`는 `insert ... select ... where not exists`로 씀. 행 수는 그대로 반환 |
 
 <a id="procedures-and-functions"></a>
 ### 프로시저와 함수
@@ -322,7 +325,7 @@ lambdaQL은 NULL이 될 수 있는 모든 키에 대해 HQL에 `nulls first` / `
 | boolean 파라미터와 결과 | – | 있음 | 23ai 이상 |
 | 가상 컬럼 / 함수 인덱스 안의 저장 함수 | – | 불가(오류 1901) | 가능(함수 기반 인덱스) |
 
-H2에는 OUT 파라미터가 없으므로 프로시저 기능은 MariaDB와 Oracle에서 확인합니다.
+H2에는 OUT 파라미터가 없으므로 프로시저 기능은 MariaDB나 Oracle에서 확인하십시오.
 
 <a id="107-not-supported-and-what-to-write-instead"></a>
 ## 10.7 지원하지 않는 것과 대신 작성할 것
@@ -330,66 +333,67 @@ H2에는 OUT 파라미터가 없으므로 프로시저 기능은 MariaDB와 Orac
 lambdaQL은 이 목록의 형태에 대해 대부분 명확한 오류를 던집니다. 컴파일되지 않는 형태는 표에 따로 적었습니다.
 
 <a id="lambda-form-and-loading"></a>
-### 람다 형태와 로딩
+### 람다 표현식 형태와 로딩
 
 | 지원하지 않음 | 대신 작성할 것 |
 |---|---|
-| 익명 클래스, `Serializable`이 아닌 함수형 인터페이스(`java.util.function.Predicate`) | 람다 리터럴(정렬 키에는 getter 메서드 참조도 가능) |
-| 조건의 메서드 참조(`where(Order::isActive)`, `LQL-1009`) | 람다: `where(o -> o.isActive())` |
-| 지역 변수, 반복문, `switch`, `try`가 있는 블록 람다 | 식 하나. 값은 람다 밖에서 계산 |
-| 캡처한 변수에 쓰기 | 람다 밖에서 계산(Java도 캡처한 지역 변수가 사실상 final이어야 함) |
-| ECJ(Eclipse 컴파일러)로 컴파일한 람다 | 보장하지 않음. javac로만 테스트 |
-| Java 21~23에서 실행할 때, 번들된 ASM이 모르는 더 새로운 JDK용으로 컴파일한 람다 | ASM 업데이트(lambdaQL은 ASM을 셰이딩하지 않음). Java 24 이상에서 실행하면 해당 없음(`java.lang.classfile` 사용) |
+| 익명 클래스, `Serializable`이 아닌 함수형 인터페이스(`java.util.function.Predicate`) | 람다 표현식 리터럴(정렬 키에는 getter 메서드 참조도 가능) |
+| 조건의 메서드 참조(`where(Order::isActive)`, `LQL-1009`) | 람다 표현식: `where(o -> o.isActive())` |
+| 지역 변수, 반복문, `switch`, `try`가 있는 블록 람다 표현식 | 식 하나. 값은 람다 표현식 밖에서 계산 |
+| 캡처한 변수에 쓰기 | 람다 표현식 밖에서 계산(Java도 캡처한 지역 변수가 사실상 final이어야 함) |
+| ECJ(Eclipse 컴파일러)로 컴파일한 람다 표현식 | 보장하지 않음. javac를 사용 |
+| Java 21~23에서 실행할 때, 번들된 ASM이 모르는 더 새로운 JDK용으로 컴파일한 람다 표현식 | ASM 업데이트(lambdaQL은 ASM을 셰이딩하지 않음). Java 24 이상에서 실행하면 해당 없음(`java.lang.classfile` 사용) |
 
 <a id="conditions"></a>
 ### 조건
 
 | 지원하지 않음 | 대신 작성할 것 |
 |---|---|
-| 일반 삼항 연산자 `c ? x : y`, 값 삼항 연산자 `o.getId() == (c ? p1 : p2)` | `&&` / `\|\|`. 값은 람다 밖에서 고름 |
+| boolean 삼항 연산자 `c ? x : y` | `&&` / `\|\|`. 값을 고르는 삼항 연산자는 지원: 캡처 값과 상수만 쓰면 바인드 파라미터, 엔티티 값을 쓰면 `case when`([3.5.1](03-where.md#351-values-chosen-by-a-condition)) |
 | (지원: `c ? x : false`, `c ? true : x`, `c ? false : true`) | 각각 `AND`, `OR`, `NOT`을 뜻함 |
 | 단락 평가를 하지 않는 `&`, `\|`, `^` | `&&`, `\|\|` |
 | 엔티티 `==` 엔티티(`o.getCustomer() == c`) | `o.getCustomer().getId() == c.getId()`(`LQL-3011`) |
 | 값 객체(`@Embedded`)의 크기 비교, 다른 타입과의 비교(`LQL-3012`) | 필드를 비교. 같은 타입과의 같음 비교(`equals`, `==`, `!=`, `null`)는 지원 |
 | 컬렉션 경로(`c.getOrders()...`, `@OneToMany`, `@ManyToMany`, `LQL-3010`) | `exists()` 서브쿼리나 조인 |
 | `c.getOrders().contains(x)` | `exists()` 서브쿼리 |
-| 람다 안에서 만든 컬렉션(`List.of(1, 2)`) | 밖에서 만들어 캡처. (`groupBy` 키는 예외) |
+| 람다 표현식 안에서 만든 컬렉션(`List.of(1, 2)`) | 밖에서 만들어 캡처. (`groupBy` 키는 예외) |
 | 캡처한 컬렉션의 `null` 요소 | null을 제거. NULL 행을 원하면 `\|\| x == null`을 추가 |
 | 캡처한 `NaN` / `Infinity` | 쿼리 전에 값을 확인 |
 | `isNaN()` | – |
 | 엔티티 값에 대한 그 밖의 메서드 호출(`o.items(...)`, 직접 만든 메서드) | 컬럼으로 조건을 작성 |
-| 문자열 연결(`o.getDescription() + "_x"`, `"A" + code`도) | 문자열은 람다 밖에서 만듦(`LQL-2007`) |
-| 람다 안의 스트림과 다른 람다 | 캡처한 컬렉션의 `contains`나 서브쿼리 |
+| 문자열 연결(`o.getDescription() + "_x"`, `"A" + code`도) | 문자열은 람다 표현식 밖에서 만듦(`LQL-2007`) |
+| 람다 표현식 안의 스트림과 다른 람다 표현식 | 캡처한 컬렉션의 `contains`나 서브쿼리 |
 
 <a id="functions-and-strings"></a>
 ### 함수와 문자열
 
 | 지원하지 않음 | 대신 작성할 것 |
 |---|---|
-| 엔티티 값에 대한 Java `String` 메서드(`startsWith`, `contains`, `trim`, `toUpperCase`, `LQL-3008`) | – |
+| 엔티티 값에 대한 Java `String` 메서드(`trim`, `toUpperCase` 등, `LQL-3008`). `startsWith`, `endsWith`, `contains`는 `like`로 지원 | – |
 | 날짜 함수(`YEAR(col) == 2024`) | 범위: `o.getUpdateAt() >= from && o.getUpdateAt() < to` |
 | 제네릭 반환 타입(`<X> X nvl(X, X)`), 엔티티, 컬렉션, `void`를 반환하는 `@SqlFunction` | 다음 중 하나: `Double`, `Integer`, `Long`, `BigDecimal`, `String`, `LocalDate`, `LocalDateTime`, `Boolean` |
 | Hibernate 내장 함수(`COALESCE`, `ROUND`, `SYSDATE`, ...)와 이름이 같은 `@SqlFunction` | 접두사나 스키마 이름(`PUBLIC.SQ_FN`) 사용 |
 | DB 함수로 쓰는 함수형 인터페이스 상수, 믹스인 | 인터페이스 `static` 메서드 |
 | `@SqlFunction` 없이 엔티티 값에 쓰는 직접 만든 static 메서드 | `@SqlFunction`을 붙인 DB 함수나 컬럼으로 만든 조건 |
 | 사용자 집계 함수나 윈도 함수 | – |
-| 쿼리 람다 밖이나 `where`에서 `Agg.*` 호출 | `select` / `having`에서 사용 |
+| 쿼리 람다 표현식 밖이나 `where`에서 `Agg.*` 호출 | `select` / `having`에서 사용 |
+| 정렬 람다 표현식 밖에서 `By`의 정렬 함수 호출(`IllegalStateException`, `LQL-4046`) | `orderBy`, `SortSpec.of`, `then`의 람다 표현식 안에서 사용 |
 
 <a id="sort-and-paging"></a>
 ### 정렬과 페이징
 
 | 지원하지 않음 | 대신 작성할 것 |
 |---|---|
-| 정렬 람다 안의 조건이나 반복문(`if (x) by.asc(...)`) | 쿼리 두 개를 만들거나 `Direction`을 캡처 값으로 전달: `by.sort(o.getPrice(), dir)` |
+| 정렬 람다 표현식 안의 조건이나 반복문(`if (x) asc(...)`) | 쿼리 두 개를 만들거나 `Direction`을 캡처 값으로 전달: `sort(o.getPrice(), dir)` |
+| 정렬 함수와 함께 쓴 `Direction` 인자(`orderBy(o -> desc(o.getPrice()), dir)`, `LQL-3069`) | `orderBy(o -> sort(o.getPrice(), dir))` 또는 키 하나: `orderBy(o -> o.getPrice(), dir)` |
 | `orderBy` 두 번, `orderBy` 뒤의 `where`, `limit` 뒤의 `orderBy` | 모든 키를 담은 `orderBy` 하나(이 형태들은 컴파일되지 않음) |
-| 정렬 키로 쓴 엔티티(`by.desc(o.getCustomer())`) | 컬럼: `by.desc(o.getCustomer().getName())`(컴파일되지 않음) |
-| 조인 정렬 람다 안의 메서드 참조 | 람다 |
+| 정렬 키로 쓴 엔티티(`desc(o.getCustomer())`, 컴파일되지 않음) | 컬럼: `desc(o.getCustomer().getName())` |
 | 정렬 이름과 방향을 함께 담은 문자열 하나(`"price,desc_nulls_last"`) | 방향은 `Direction.parse(text)`, 이름은 `SortSpec.ofPath`. 이름은 정렬 정책이 검사([4.10](04-order-paging.md#sort-policy)) |
 | 조인 결과의 `distinct()`에서 조인한 엔티티의 컬럼이나 연관 경로로 정렬(J7, `LQL-3046`) | 주 엔티티 자신의 컬럼으로 정렬하거나 `exists` 서브쿼리 사용 |
 | `limit` / `offset`과 함께 쓴 컬렉션 fetch join | 먼저 페이징한 뒤 컬렉션을 로드 |
 | Spring `Sort`의 `ignoreCase()`([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)) | `ignoreCase()` 없는 정렬 |
 | 함수 키(`lower(name)`) | – |
-| 집계 별칭으로 정렬(`by.desc(s.total())`) | – |
+| 집계 별칭으로 정렬(`desc(s.total())`) | – |
 
 <a id="limits-subqueries"></a>
 ### 서브쿼리
@@ -417,21 +421,21 @@ lambdaQL은 이 목록의 형태에 대해 대부분 명확한 오류를 던집�
 | 같은 문장에서 설정한 뒤 컬럼을 읽기 | 의도적으로 이전 값을 사용하거나 update를 두 번 실행 |
 | 같은 컬럼을 두 번 설정 | 대입 하나 |
 | 조건부 값(`c ? a : b`, 토글 `!o.isActive()`) | `where`가 다른 update 두 개를 사용 |
-| `set` 람다 안에서 어떤 컬럼을 설정할지 고르는 `if` | `set()`을 여러 번 호출 |
+| `set` 람다 표현식 안에서 어떤 컬럼을 설정할지 고르는 `if` | `set()`을 여러 번 호출 |
 | 연관의 `@Id`가 아닌 속성 설정(`o.getCustomer().setName(x)`) | `Customer`를 직접 수정 |
 | 필수 컬럼(`@Id`, `nullable = false`, 기본형)에 `null` 넣기 | – |
 | `@Version` 속성을 직접 쓰기 | lambdaQL이 대신 `update versioned`를 사용 |
 | 값 안의 문자열 연결 | – |
-| update나 delete의 명시적 조인 | 추가하지 않음(D51). 연관 경로(U9)나 `sub`(D49) 사용 |
+| update나 delete의 명시적 조인 | 추가하지 않음. 연관 경로(U9)나 `sub` 사용 |
 | 명시적 조인이 있는 `insert ... select` | 다대일 경로를 사용 |
 | 동시 삽입에서 원자적인 `onConflict(...).ignore()` | 키 중복 오류를 처리(`ignore()`는 `not exists`를 사용. [7.6](07-6-upsert.md) 참고) |
 | `insert ... select`로 하는 업서트 | `values(list, ...)`로 행마다 업서트 |
 | `limit(n)` 없이 update나 delete에 `orderBy(...)` 지정 | `limit(n)`을 추가하거나 `orderBy`를 제거(그 외에는 `IllegalStateException`) |
-| 한 행만 변경해야 하는 update나 delete를 `execute() == 1`과 롤백으로 검사 | `executeOne()`: id를 먼저 최대 2개 읽음. 2개이면 아무것도 변경하지 않고 `NonUniqueResultException`. 1개이면 `id = :p and (조건)`으로 그 행을 변경. 2행 이상을 변경하지 않음(D41) |
+| 한 행만 변경해야 하는 update나 delete를 `execute() == 1`과 롤백으로 검사 | `executeOne()`: id를 먼저 최대 2개 읽음. 2개이면 아무것도 변경하지 않고 `NonUniqueResultException`. 1개이면 `id = :p and (조건)`으로 그 행을 변경. 2행 이상을 변경하지 않음 |
 | `executeOne()`과 `orderBy` 또는 `limit`을 함께 사용 | 둘 중 하나만 사용(그 외에는 `IllegalStateException`) |
-| update나 delete의 `offset` | 계획 없음(D42). DML에는 `limit(n)`만 있음. `where`, `orderBy(...)`, `limit(n)`으로 대상 행을 지정 |
+| update나 delete의 `offset` | 계획 없음. DML에는 `limit(n)`만 있음. `where`, `orderBy(...)`, `limit(n)`으로 대상 행을 지정 |
 | 복합 키 엔티티의 `limit` 또는 `executeOne()` | 먼저 id를 조회한 뒤 `delete ... where ids.contains(id)` |
-| Spring 공유 `EntityManager`로 트랜잭션 없이 DML 실행(lambdaQL에는 `@Transactional`이 없음, D41) | `@Transactional` 또는 `TransactionTemplate` 안에서 호출 |
+| Spring 공유 `EntityManager`로 트랜잭션 없이 DML 실행(lambdaQL에는 `@Transactional`이 없음) | `@Transactional` 또는 `TransactionTemplate` 안에서 호출 |
 | 리포지토리 메서드 `deleteAll(where)`(벌크 삭제)에서 cascade나 `@PreRemove` 기대 | Spring Data의 `deleteAll(Iterable)` 또는 `delete(entity)` 사용([12.4](12-spring-data-jpa.md#deleteallwhere-is-not-spring-datas-deleteall) 참고) |
 | `returning` | DML 뒤에 다시 조회 |
 | DB 시각(`current_timestamp`) | 앱 시각을 전달(`LocalDateTime.now()`는 값으로 바인딩됨) |
@@ -448,38 +452,37 @@ DML 문장에는 트랜잭션이 필요합니다. `QueryBuilder(EntityManagerFac
 
 | 지원하지 않음 | 대신 작성할 것 |
 |---|---|
-| 람다 안의 스텁 메서드 호출 하나 외의 모든 것(로그, 중첩 호출, 분기) | 호출 하나. 인자는 미리 계산 |
+| 람다 표현식 안의 스텁 메서드 호출 하나 외의 모든 것(로그, 중첩 호출, 분기) | 호출 하나. 인자는 미리 계산 |
 | OUT 파라미터가 있는 프로시저에 `exec` | `call` |
 | 인자의 DB 기본값 | 모든 인자를 전달 |
 | Oracle 패키지 프로시저의 오버로드 하나를 골라 호출(오버로드가 있는 이름은 검출함: `LQL-4044`), 동적 프로시저 이름 | – |
 | Oracle 암시적 결과(`DBMS_SQL.RETURN_RESULT`), MariaDB 패키지, 프로시저 결과 페이징 | 지원하지 않음 |
 
 <a id="108-caching-a-lambda-is-analyzed-once"></a>
-## 10.8 캐싱: 람다는 한 번 분석됨
+## 10.8 캐싱: 람다 표현식은 한 번 분석됨
 
-바이트코드 읽기는 느린 부분이므로 lambdaQL은 이를 **람다마다 한 번** 합니다.
+바이트 opcode 읽기는 느린 부분이므로 lambdaQL은 이를 **람다 표현식마다 한 번** 합니다.
 
 | 항목 | 규칙 |
 |---|---|
 | 캐시하는 것 | 분석 결과: HQL 템플릿과 파라미터 소스 목록. 실패도 캐시함 |
-| 캐시 키 | 람다의 구현 클래스와 메서드(이름, 시그니처, 종류), 람다의 타입, 엔티티 클래스, 그리고 **ClassLoader** |
+| 캐시 키 | 람다 표현식의 구현 클래스와 메서드(이름, 시그니처, 종류), 람다 표현식의 타입, 엔티티 클래스, 그리고 **ClassLoader** |
 | 크기 | 제한됨(LRU). 그래서 끝없이 커지지 않고 클래스 로더를 누수하지 않음 |
-| 캐시하지 않는 것 | 바이트코드 자체(다시 읽기는 싸고, 유지하기에는 큼) |
-| 캡처 값 | **절대 캐시하지 않음.** 쿼리가 실행될 때마다 읽어서 바인딩 |
+| 캐시하지 않는 것 | 바이트 opcode 자체(다시 읽기는 싸고, 유지하기에는 큼) |
+| 캡처 값 | **캐시하지 않음.** 쿼리가 실행될 때마다 읽어서 바인딩 |
 | 캡처한 객체에 대한 호출(`order.getDescription().trim()`, `this.field`, `LocalDateTime.of(...)`) | 쿼리가 실행될 **때마다** Java에서 실행한 뒤 파라미터 하나로 바인딩 |
 | 캡처 값만 쓰는 조건(`p != null && ...`) | 상수로 접지 않고 `:p1 is not null`로 유지. 그래서 캐시가 올바르게 유지됨 |
 | 캡처 값으로 쓴 `Direction` | 바인드 값, 매번 읽음(구조는 캐시된 채 유지) |
-| DML | 람다 클래스마다 한 번 분석. `set()` 호출 사이의 검사는 작은 요약을 사용 |
+| DML | 람다 표현식 클래스마다 한 번 분석. `set()` 호출 사이의 검사는 작은 요약을 사용 |
 
-프로토타입으로 측정한 결과(JDK 21): 새 람다의 첫 분석은 약 **0.2 ms**가 걸립니다.
+프로토타입으로 측정한 결과(JDK 21): 새 람다 표현식의 첫 분석은 약 **0.2 ms**가 걸립니다.
 그 이후에는 `set()` 호출이 두 번 있는 update가 캐시 조회, 값 추출, 검사에 약 **0.1 ~ 0.2 µs**가 듭니다.
-200만 번 실행한 뒤에도 마찬가지입니다. 목표: 같은 람다를 1,000번 호출해도 바이트코드는
+200만 번 실행한 뒤에도 마찬가지입니다. 목표: 같은 람다 표현식을 1,000번 호출해도 바이트 opcode는
 한 번만 읽습니다. Hibernate도 HQL 문자열 기준으로 쿼리 계획을 캐시합니다.
 
 사용자에게 이것이 뜻하는 바:
 
-[`ManualJavaRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaRulesTest.java), 영역 `cache-shape`:
-
+<!-- region: ManualJavaRulesTest.java#cache-shape -->
 ```java
 // good: one lambda; only the value changes
 int status = 1;
@@ -494,16 +497,18 @@ List<Order> list = flag
         : qb.from(Order.class).where(o -> o.isActive()).toList();
 ```
 
+예제 코드: [`ManualJavaRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaRulesTest.java)(`cache-shape`).
+
 <a id="109-tested-environment"></a>
-## 10.9 테스트한 환경
+## 10.9 지원 환경
 
 | 항목 | 버전 |
 |---|---|
 | Java | 21 (javac). ECJ는 보장하지 않음 |
-| Hibernate | 6.6 또는 7.4 (6.6.53, 7.4.13으로 테스트). HQL 확장(예: `function(...)`, `nulls first`)을 사용하므로 다른 JPA 구현체는 보장하지 않음 |
+| Hibernate | 6.6 또는 7.4. HQL 확장(예: `function(...)`, `nulls first`)을 사용하므로 다른 JPA 구현체는 보장하지 않음 |
 | 데이터베이스 | H2 2.3, MariaDB 10.11, MySQL 8.4, PostgreSQL 17, Oracle 23.26 (23ai) |
-| Spring | Spring Boot 3.5.16(Spring Data JPA 3.5.13)과 4.1.2(Spring Data JPA 4.1.2)(Spring 모듈, [12](12-spring-data-jpa.md), [13](../13-spring-boot-versions.md)) |
-| 테스트하지 않음 | SQL Server, Oracle 19c 이하(예: PL/SQL `BOOLEAN` 파라미터) |
+| Spring | Spring Boot 3.5(Spring Data JPA 3.5)와 4.1(Spring Data JPA 4.1)(Spring 모듈, [12](12-spring-data-jpa.md), [13](../13-spring-boot-versions.md)) |
+| 미확인 | SQL Server, Oracle 19c 이하(예: PL/SQL `BOOLEAN` 파라미터) |
 
 ---
 

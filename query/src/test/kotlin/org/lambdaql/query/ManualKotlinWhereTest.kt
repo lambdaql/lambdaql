@@ -128,17 +128,16 @@ class ManualKotlinWhereTest {
     fun valueBeforeLambda() {
         val flag = true
         // @start region="value-before"
-        val wanted: Short = if (flag) 1 else 2
-        val q = qb.from(Order::class.java).where { it.status == wanted }
+        // an if of captured values and constants: computed in Kotlin, bound as :p1
+        val q = qb.from(Order::class.java).where { it.status.toInt() == (if (flag) 1 else 2) }
         assertEquals("select e0 from Order e0 where e0.status = :p1", q.toHql().hql())
 
-        // an if that picks a value inside the lambda is rejected (KC6)
-        val e = assertThrows<LambdaQLException> {
-            qb.from(Order::class.java).where { it.status.toInt() == (if (flag) 1 else 2) }.toHql()
-        }
-        assertTrue(e.message!!.startsWith("[LQL-2021]"))
+        // an if that reads the entity becomes case when
+        val c = qb.from(Order::class.java).where { it.status.toInt() == (if (it.isActive) 1 else 2) }
+        assertEquals("select e0 from Order e0 where e0.status = case when e0.active = true then 1 else 2 end", c.toHql().hql())
         // @end
-        assertEquals(ids(orders.filter { it.status == wanted }), ids(q.toList()))
+        assertEquals(ids(orders.filter { it.status.toInt() == (if (flag) 1 else 2) }), ids(q.toList()))
+        assertEquals(ids(orders.filter { it.status.toInt() == (if (it.isActive) 1 else 2) }), ids(c.toList()))
     }
 
     @Test
@@ -224,7 +223,7 @@ class ManualKotlinWhereTest {
     fun writeNullChecks() {
         // @start region="null-check"
         val c: Int? = 3
-        // rows with a NULL cnt are left out (SQL meaning, D48); Kotlin would keep them
+        // rows with a NULL cnt are left out (SQL meaning); Kotlin would keep them
         val ne = qb.from(Order::class.java).where { it.cnt != c }
         assertEquals("select e0 from Order e0 where e0.cnt <> :p1", ne.toHql().hql())
 
@@ -310,9 +309,9 @@ class ManualKotlinWhereTest {
     @Test
     fun stringRejected() {
         // @start region="string-rejected"
-        // Kotlin string functions on a column are not translated yet
+        // string functions on a column other than startsWith, endsWith and contains are not translated
         val f = assertThrows<LambdaQLException> {
-            qb.from(Order::class.java).where { it.description.startsWith("a") }.toHql()
+            qb.from(Order::class.java).where { it.description.lowercase() == "a" }.toHql()
         }
         assertTrue(f.message!!.startsWith("[LQL-3008]"))
 
@@ -348,22 +347,21 @@ class ManualKotlinWhereTest {
     fun nullGuard() {
         val name = "Kim"
         // @start region="null-guard"
-        // ?. : orders without a customer stay (left join)
+        // the null guard keeps orders without a customer: a left join (?. or !! give the same)
         val safe = qb.from(Order::class.java).where { it.customer == null || it.customer?.name == name }
         assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1",
             safe.toHql().hql())
-
-        // !! : an inner join, so orders without a customer are left out (DEBUG LQL-5009)
         val sure = qb.from(Order::class.java).where { it.customer == null || it.customer!!.name == name }
-        assertEquals("select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name = :p1",
+        assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1",
             sure.toHql().hql())
 
+        // no order without a customer can match: an inner join
         val and = qb.from(Order::class.java).where { it.customer != null && it.customer?.name == name }
         assertEquals("select e0 from Order e0 join e0.customer j1 where e0.customer is not null and j1.name = :p1",
             and.toHql().hql())
         // @end
         assertEquals(ids(orders.filter { it.customer == null || it.customer.name == name }), ids(safe.toList()))
-        assertEquals(ids(orders.filter { it.customer != null && it.customer.name == name }), ids(sure.toList()))
+        assertEquals(ids(orders.filter { it.customer == null || it.customer.name == name }), ids(sure.toList()))
         assertEquals(ids(orders.filter { it.customer != null && it.customer.name == name }), ids(and.toList()))
     }
 
@@ -516,12 +514,6 @@ class ManualKotlinWhereTest {
         assertThrows<LambdaQLException> {
             qb.from(Order::class.java).where { when (it.kind) { Order.Kind.RUSH -> true; else -> false } }.toHql()
         }
-
-        // an if or when that picks a value is rejected (KC6)
-        val value = assertThrows<LambdaQLException> {
-            qb.from(Order::class.java).where { (if (it.isActive) it.price else 0.0) > 10.0 }.toHql()
-        }
-        assertTrue(value.message!!.startsWith("[LQL-2021]"))
         // @end
     }
 

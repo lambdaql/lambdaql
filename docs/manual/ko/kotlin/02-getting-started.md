@@ -13,12 +13,12 @@
 | 항목 | 버전 | 참고 |
 |---|---|---|
 | Kotlin | 2.x | 설계는 kotlinc 1.7.22, 2.1.10, 2.2.21, 2.3.0, 2.3.21로 확인했습니다. |
-| JVM | Java 21 | lambdaQL을 빌드하는 데 필요합니다. |
-| `-jvm-target` | 1.8, 11, 17 또는 21 | 네 가지 모두 쿼리 람다를 같은 방식으로 컴파일합니다. |
+| JVM | Java 21 이상 | lambdaQL을 빌드하고 실행하는 데 필요합니다. |
+| `-jvm-target` | 1.8, 11, 17 또는 21 | 네 가지 모두 쿼리 람다 표현식을 같은 방식으로 컴파일합니다. |
 | JPA 구현체 | Hibernate ORM 6.6 또는 7.4 | lambdaQL은 Hibernate HQL을 만듭니다. 6.6.53(Spring Boot 3.5.16)과 7.4.13(Spring Boot 4.1.2)으로 테스트했습니다. 다른 JPA 구현체는 지원하지 않습니다. [13. Spring Boot 3과 4](../13-spring-boot-versions.md)를 참고하십시오. |
 | Jakarta Persistence | 3.1 또는 3.2 | Hibernate 6.6은 3.1, 7.4는 3.2를 씁니다. |
-| 데이터베이스 | H2 2.3, MariaDB 10.11, MySQL 8.4, PostgreSQL 17, Oracle 23.26 (23ai) | 이 다섯 가지를 검증했습니다. 매뉴얼의 DB별 SQL은 H2, MariaDB, Oracle의 것입니다. 다른 데이터베이스도 동작할 수 있지만 테스트하지 않았습니다. |
-| Spring Boot | 3.5 또는 4.1 | 선택 사항입니다. 프로젝트 테스트는 Spring Boot 3.5.16과 4.1.2를 사용합니다. |
+| 데이터베이스 | H2 2.3, MariaDB 10.11, MySQL 8.4, PostgreSQL 17, Oracle 23.26 (23ai) | 해당 버전의 DB에서 테스트를 진행하였습니다. 다른 데이터베이스는 추가로 진행될 예정입니다. |
+| Spring Boot | 3.5 또는 4.1 | 선택 사항입니다. Spring Boot 3.5.16과 4.1.2로 테스트했습니다. |
 | Kotlin 런타임 | – | lambdaQL은 의존성에 `kotlin-stdlib`나 `kotlin-reflect`를 추가하지 않습니다. |
 
 <a id="build-from-source"></a>
@@ -30,10 +30,20 @@ cd lambdaql
 ./gradlew build
 ```
 
-- Gradle 래퍼는 9.9.1입니다. 저장소에 `gradle/gradle-daemon-jvm.properties`가 있으므로 Gradle 데몬은 Java 21을 사용합니다.
-- 빌드에는 JDK 21과 **JDK 24 이상** 하나가 필요합니다. JDK 24 이상은 `java.lang.classfile` 리더(`src/main/java24`)를 컴파일하고 그 리더로 테스트를 한 번 더 돌립니다. 기본 버전은 25이며 `-Plql.classfile.jdk=24`처럼 바꿀 수 있습니다. Gradle이 JDK를 찾지 못하면 `~/.gradle/gradle.properties`의 `org.gradle.java.installations.paths`에 경로를 적으십시오.
-- IntelliJ IDEA에서는 **Settings > Build Tools > Gradle > Gradle JVM**을 Java 21 JDK로 설정하십시오.
-- 빌드의 주요 모듈은 `query`(아티팩트 `lambdaql-core`), `spring-data-jpa`(`lambdaql-spring-data-jpa`), `spring-boot-starter-boot3`·`spring-boot-starter-boot4`(`lambdaql-spring-boot-starter-boot3`·`-boot4`)입니다. `lambdaql-core`와 `lambdaql-spring-data-jpa`는 Spring Boot 3·4 공통 jar이고, 스타터만 Boot 버전별로 나뉩니다([13. Spring Boot 3과 4](../13-spring-boot-versions.md)). Spring 모듈은 [12. Spring Data JPA](12-spring-data-jpa.md)에서 설명합니다.
+- Gradle 래퍼 버전은 9.9.1입니다.
+- 빌드에는 JDK 두 개가 필요합니다. 설치되어 있지 않으면 Gradle이 자동으로 내려받습니다.
+  - **JDK 21**: 컴파일과 기본 테스트에 씁니다. lambdaQL이 지원하는 가장 낮은 Java 버전에서 동작을 확인합니다.
+  - **JDK 25**: Gradle을 실행하고(`gradle/gradle-daemon-jvm.properties`), Java 24 이상에서만 쓰는 코드(`src/main/java24`)를 컴파일합니다. 같은 테스트를 Java 25에서 한 번 더 실행합니다. 이 코드의 JDK는 `-Plql.classfile.jdk=24`처럼 다른 버전(24 이상)으로 바꿀 수 있습니다.
+- 이미 설치한 JDK를 Gradle이 찾지 못하면 `~/.gradle/gradle.properties`의 `org.gradle.java.installations.paths`에 JDK 경로를 적으십시오.
+- IntelliJ IDEA에서는 **Settings > Build Tools > Gradle > Gradle JVM**을 JDK 25로 설정하십시오.
+
+빌드의 주요 모듈은 다음과 같습니다.
+
+| 모듈 | 아티팩트 | 설명 |
+|---|---|---|
+| `query` | `lambdaql-core` | 쿼리 엔진. Spring Boot 3·4 공통 |
+| `spring-data-jpa` | `lambdaql-spring-data-jpa` | Spring Data JPA 연동. Spring Boot 3·4 공통([12. Spring Data JPA](12-spring-data-jpa.md)) |
+| `spring-boot-starter-boot3`, `spring-boot-starter-boot4` | `lambdaql-spring-boot-starter-boot3`, `-boot4` | Spring Boot 버전별 스타터([13. Spring Boot 3과 4](../13-spring-boot-versions.md)) |
 
 단위 테스트를 실행합니다.
 
@@ -41,8 +51,7 @@ cd lambdaql
 ./gradlew :query:test
 ```
 
-[`SelectQueryTest.java`](../../../../query/src/test/java/org/lambdaql/query/SelectQueryTest.java)의 테스트는 lambdaQL이 현재 할 수 있는 일을 보여 줍니다: `qb.from(...).where(...)`, HQL, 파라미터, 그리고 데이터베이스에서 나온 행. [`ConditionDecodeTest.java`](../../../../query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java)는 내부 조건 디코더를 테스트합니다.
-Kotlin 테스트는 `query/src/test/kotlin`에 있으며 같은 `:query:test` 작업에서 실행됩니다. 이 트랙의 예제는 그 테스트에서 가져옵니다.
+이 트랙의 예제 원본은 `query/src/test/kotlin`에 있으며, 위 작업으로 함께 실행됩니다.
 
 <a id="use-the-local-build-in-your-project"></a>
 ### 로컬 빌드를 프로젝트에서 사용하기
@@ -87,7 +96,7 @@ Spring Boot를 사용하면 Boot 버전에 맞는 `lambdaql-spring-boot-starter-
 
 | 설정 | 할 일 | 이유 |
 |---|---|---|
-| `-Xsam-conversions` | 기본값(`indy`)을 유지하십시오. `-Xsam-conversions=class`를 설정하지 **마십시오**. | `class`로 설정하면 Kotlin은 직렬화 가능한 람다 대신 클래스를 만듭니다. lambdaQL은 이를 읽을 수 없습니다(제한 KC1). |
+| `-Xsam-conversions` | 기본값(`indy`)을 유지하십시오. `-Xsam-conversions=class`를 설정하지 **마십시오**. | `class`로 설정하면 Kotlin은 직렬화 가능한 람다 표현식 대신 클래스를 만듭니다. lambdaQL은 이를 읽을 수 없습니다(제한 KC1). |
 | `-java-parameters` | 저장 프로시저를 호출한다면 권장합니다. | 그러면 lambdaQL이 파라미터 이름을 데이터베이스와 비교할 수 있습니다([8.4](08-procedures-functions.md#84-warning-argument-order) 참고). |
 | JPA 플러그인 | `kotlin("plugin.jpa")`와 all-open(또는 `kotlin("plugin.spring")`)을 사용하십시오. | JPA에는 인자 없는 생성자와 open 클래스가 필요합니다. Kotlin JPA 엔티티에서는 일반적인 설정입니다. |
 
@@ -112,8 +121,8 @@ kotlin {
 <a id="example-entities"></a>
 ## 예제 엔티티
 
-Kotlin 트랙의 예제는 lambdaQL 저장소의 **테스트 엔티티**를 사용합니다. 예제가 모두 실행되는 테스트 코드이기 때문입니다.
-테스트 엔티티는 Java 클래스입니다([`query/src/test/java/org/lambdaql/query/`](https://github.com/codebit0/lambdaql/tree/main/query/src/test/java/org/lambdaql/query)). Kotlin 테스트는 사용자 프로젝트가 컴파일된 엔티티를 쓰는 것과 같은 방식으로 이 클래스를 사용합니다.
+Kotlin 트랙의 예제는 다음 **예제 엔티티**를 사용합니다.
+예제 엔티티는 Java 클래스입니다([`query/src/test/java/org/lambdaql/query/`](https://github.com/codebit0/lambdaql/tree/main/query/src/test/java/org/lambdaql/query)). Kotlin 예제는 사용자 프로젝트가 컴파일된 엔티티를 쓰는 것과 같은 방식으로 이 클래스를 사용합니다.
 
 | 엔티티 | 주요 속성(Java 타입) | Kotlin에서 |
 |---|---|---|
@@ -136,20 +145,19 @@ Java 엔티티를 Kotlin에서 쓸 때 알아 둘 점입니다.
 | 일반적인 public `var`나 `val` 속성을 사용하십시오. | lambdaQL은 getter를 읽고(`it.price`는 getter `getPrice()`) JPA 속성에 매핑합니다. |
 | NULL일 수 있는 컬럼에는 nullable 타입(`Double?`, `String?`)을 사용하십시오. | Kotlin의 non-null 타입은 데이터베이스에서 오는 NULL을 막지 못합니다. Hibernate는 검사 없이 컬럼 값을 필드에 씁니다. |
 | 쿼리에서 `@JvmField`, `internal` 속성, `value class` 속성, `@get:JvmName`을 사용하지 마십시오. | lambdaQL은 이들을 JPA 속성에 매핑할 수 없습니다(제한 KC15, KC16). |
-| `Boolean`, `Int`, `Long`, `Double`(nullable 아님)은 JVM 기본형입니다. | 절대 NULL을 담지 않습니다. lambdaQL은 이를 알고 더 단순한 SQL을 만들 수 있습니다. |
+| `Boolean`, `Int`, `Long`, `Double`(nullable 아님)은 JVM 기본형입니다. | NULL을 담을 수 없습니다. lambdaQL은 이를 알고 더 단순한 SQL을 만들 수 있습니다. |
 
 <a id="create-a-querybuilder"></a>
 ## QueryBuilder 만들기
 
 `QueryBuilder`는 진입점입니다. JPA `EntityManagerFactory` 또는 `EntityManager`가 필요합니다.
 
-[`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt), 영역 `create`:
-
+<!-- region: ManualKotlinStartTest.kt#create -->
 ```kotlin
 val qb = QueryBuilder(emf)
 ```
 
-`emf`는 테스트에 주입된 `EntityManagerFactory`입니다.
+`emf`는 애플리케이션의 `EntityManagerFactory`입니다.
 
 `QueryBuilder`는 하나만 만들어 재사용하십시오. 쿼리마다 새로 만들지 마십시오.
 
@@ -164,8 +172,7 @@ Spring 없이 JPA만 사용하면 `Persistence.createEntityManagerFactory("영�
 `lambdaql-spring-boot-starter-boot4`(`-boot3`)를 사용하면 Spring Boot가 `QueryBuilder` 빈을 만듭니다([12.8](12-spring-data-jpa.md#128-the-querybuilder-bean) 참고).
 스타터 없이 사용하면 빈을 직접 만드십시오. 자동 구성과 마찬가지로 Spring의 공유 `EntityManager`를 사용합니다.
 
-[`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt), 영역 `spring-config`:
-
+<!-- region: ManualKotlinStartTest.kt#spring-config -->
 ```kotlin
 @Configuration(proxyBeanMethods = false)
 class LambdaQlConfig {
@@ -178,8 +185,7 @@ class LambdaQlConfig {
 
 그다음 필요한 곳에 `QueryBuilder`를 주입합니다.
 
-[`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt), 영역 `spring-service`:
-
+<!-- region: ManualKotlinStartTest.kt#spring-service -->
 ```kotlin
 // open: this build has no kotlin("plugin.spring"), and @Transactional needs a proxy
 @Service
@@ -193,28 +199,27 @@ open class OrderService(private val qb: QueryBuilder) {
 }
 ```
 
-테스트(`springBeans`)는 두 클래스를 Spring 컨텍스트에 등록하고 `activeOrders()`가 반환한 행을 확인합니다.
-테스트 빌드에는 `kotlin("plugin.spring")`이 없으므로 클래스와 메서드를 `open`으로 선언했습니다. 플러그인을 쓰는 프로젝트에서는 `open`이 필요 없습니다.
+`kotlin("plugin.spring")`을 쓰지 않는 프로젝트에서는 `@Transactional` 프록시를 위해 클래스와 메서드를 `open`으로 선언하십시오. 플러그인을 쓰는 프로젝트에서는 `open`이 필요 없습니다.
 
 - 공유 `EntityManager`는 현재 트랜잭션에 연결됩니다. `@Transactional` 안에서 lambdaQL은 같은 트랜잭션으로 실행됩니다.
 - Spring 애플리케이션에서는 `EntityManagerFactory` 생성자를 사용하지 마십시오. 이 생성자로 만든 빌더는 쿼리마다 자체 `EntityManager`를 열며, 이 `EntityManager`는 Spring 트랜잭션에 참여하지 않습니다.
 - Spring Data 리포지토리 안에서 lambdaQL 쿼리를 작성하려면 [12. Spring Data JPA](12-spring-data-jpa.md)를 참고하십시오.
 
+예제 코드: [`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)(`create`, `spring-config`, `spring-service`).
+
 <a id="your-first-query"></a>
 ## 첫 쿼리
 
-[`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt), 영역 `first-query`:
-
+<!-- region: ManualKotlinStartTest.kt#first-query -->
 ```kotlin
 val q = qb.from(Order::class.java).where { it.status.toInt() == 1 && it.price > 100.0 }
 assertEquals("select e0 from Order e0 where e0.status = 1 and e0.price > 100.0", q.toHql().hql())
 val orders: List<Order> = q.toList()
 ```
 
-**SQL 블록 읽는 법.** `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다. 각 줄은 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)에서 나옵니다. 이 테스트는 각 쿼리를 Hibernate 7.4로 H2 2.3, MariaDB 10.11, Oracle 23.26에서 실행하며, Hibernate의 SQL이 바뀌면 실패합니다. 이 테스트는 Java 람다를 사용합니다. 의미가 같은 Kotlin 람다는 같은 HQL을 만들므로 SQL도 같습니다.
+**데이터베이스별 SQL**
 
-**데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `to-hql`:
-
+<!-- sql: to-hql -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
@@ -223,24 +228,23 @@ where o1_0.status=1 and o1_0.price>100.0
 ```
 
 - `qb.from(Order::class.java)`는 `Order`에 대한 쿼리를 시작합니다.
-- `where { ... }`는 조건 람다 하나를 받습니다. 후행 람다와 `it`을 사용하십시오.
-- `toHql()`은 쿼리를 실행하지 않고 lambdaQL이 만든 HQL을 반환합니다. 테스트는 이 값으로 HQL을 확인합니다.
+- `where { ... }`는 조건 람다 표현식 하나를 받습니다. 후행 람다 표현식과 `it`을 사용하십시오.
+- `toHql()`은 쿼리를 실행하지 않고 lambdaQL이 만든 HQL을 반환합니다. 예제의 `assertEquals` 문자열이 그 HQL입니다.
 - `toList()`는 쿼리를 실행하고 `List<Order>`를 반환합니다.
 - `toList()`는 모든 행을 반환합니다. 다른 결과 함수(`first()`, `one()`, `count()`, `exists()`, `toSet()`)는 [결과 가져오기](#getting-the-result)에 있습니다.
 
 `it.status.toInt()`는 `status`가 `Short`라서 쓴 것입니다([예제 엔티티](#example-entities) 참고). lambdaQL은 이 변환을 무시합니다.
 Kotlin 엔티티의 nullable 속성(`Double?`)이라면 `it.price!! > 100.0`처럼 `!!`가 있어야 컴파일됩니다. lambdaQL은 `!!`를 **무시합니다**. 값이 NULL인 행은 그냥 반환되지 않습니다(SQL 의미, [3.3](03-where.md#33-basic-form) 참고).
 
-왜 `1`과 `100.0`은 바인드 파라미터가 아니라 HQL에 그대로 쓰일까요? 둘 다 **람다에 직접 쓴 상수**이기 때문입니다. lambdaQL은 상수(숫자, 문자열, boolean, `null`, enum 상수, `const val`)를 HQL에 리터럴로 씁니다. 람다 밖에서 온 값은 다릅니다. 항상 바인드 파라미터가 됩니다(다음 절과 [3.3](03-where.md#33-basic-form) 참고).
+왜 `1`과 `100.0`은 바인드 파라미터가 아니라 HQL에 그대로 쓰일까요? 둘 다 **람다 표현식에 직접 쓴 상수**이기 때문입니다. lambdaQL은 상수(숫자, 문자열, boolean, `null`, enum 상수, `const val`)를 HQL에 리터럴로 씁니다. 람다 표현식 밖에서 온 값은 다릅니다. 항상 바인드 파라미터가 됩니다(다음 절과 [3.3](03-where.md#33-basic-form) 참고).
 
 <a id="use-values-from-outside-the-lambda"></a>
-### 람다 밖의 값 사용하기
+### 람다 표현식 밖의 값 사용하기
 
-람다는 지역 값, 속성, 함수 파라미터를 사용할 수 있습니다. 이를 **캡처 값**이라고 합니다.
+람다 표현식은 지역 값, 속성, 함수 파라미터를 사용할 수 있습니다. 이를 **캡처 값**이라고 합니다.
 lambdaQL은 캡처 값을 바인드 파라미터로 바꿉니다. 쿼리가 실행될 때마다 새 값을 읽습니다.
 
-[`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt), 영역 `captured`:
-
+<!-- region: ManualKotlinStartTest.kt#captured -->
 ```kotlin
 fun expensive(status: Short, minPrice: Double) =
     qb.from(Order::class.java).where { it.status == status && it.price >= minPrice }
@@ -251,8 +255,9 @@ assertEquals("select e0 from Order e0 where e0.status = :p1 and e0.price >= :p2"
 
 `status`와 `minPrice`는 함수 파라미터이므로 바인드 파라미터 `:p1`, `:p2`가 됩니다.
 
-**데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `start-captured`:
+**데이터베이스별 SQL**
 
+<!-- sql: start-captured -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
@@ -265,8 +270,7 @@ where o1_0.status=? and o1_0.price>=?
 
 `where`는 여러 번 호출할 수 있습니다. lambdaQL은 조건들을 `AND`로 결합합니다.
 
-[`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt), 영역 `many-where`:
-
+<!-- region: ManualKotlinStartTest.kt#many-where -->
 ```kotlin
 val q = qb.from(Order::class.java)
     .where { it.isActive }
@@ -274,8 +278,9 @@ val q = qb.from(Order::class.java)
 assertEquals("select e0 from Order e0 where e0.active = true and (e0.status = 1 or e0.status = 2)", q.toHql().hql())
 ```
 
-**데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `start-many-where`:
+**데이터베이스별 SQL**
 
+<!-- sql: start-many-where -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
@@ -285,8 +290,7 @@ where o1_0.active=true and (o1_0.status=1 or o1_0.status=2)
 
 조건을 단계별로 추가할 때 유용합니다.
 
-[`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt), 영역 `step-where`:
-
+<!-- region: ManualKotlinStartTest.kt#step-where -->
 ```kotlin
 val minPrice: Double? = 100.0
 var query = qb.from(Order::class.java).where { it.isActive }
@@ -301,10 +305,10 @@ val orders = query.toList()
 ### 다른 엔티티로 가는 경로
 
 `it.customer?.name` 같은 경로는 조인한 엔티티의 컬럼을 가리킵니다.
-`where`에서 lambdaQL은 기본적으로 inner `join`을 추가합니다. 아래 예제처럼 고객이 없는 주문이 조건을 참으로 만들 수 없으면 고객이 없는 주문은 결과에 **없습니다**.
+`where`에서 lambdaQL은 고객 테이블을 조인합니다. 고객이 없는 주문이 조건에 맞을 수 있으면 `left join`, 맞을 수 없으면 inner `join`입니다.
+아래 예제는 고객이 없는 주문이 조건에 맞을 수 없으므로 inner `join`이고, 고객이 없는 주문은 결과에 **없습니다**.
 
-[`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt), 영역 `join-path`:
-
+<!-- region: ManualKotlinStartTest.kt#join-path -->
 ```kotlin
 val name = "Kim"
 val q = qb.from(Order::class.java).where { it.customer?.name == name }
@@ -313,8 +317,9 @@ assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = :p1", 
 
 `name`은 non-null `String`이므로 lambdaQL은 단순한 `=`를 씁니다([3.6](03-where.md#36-null-rules) 참고).
 
-**데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `inner-join`:
+**데이터베이스별 SQL**
 
+<!-- sql: inner-join -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
@@ -323,15 +328,17 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.name=?
 ```
 
-`it.customer!!.name`도 이 예제에서는 같은 HQL을 만듭니다.
-두 형태는 조건에 따라 달라집니다(결정 D54). `!!`는 "연관이 반드시 있음"이라 항상 inner join입니다.
-`?.`는 "연관이 없을 수 있음"이라 고객이 없는 주문이 조건을 참으로 만들 수 있으면 `left join`입니다. 예를 들어 `it.status == 1 || it.customer?.name == name`과 `it.customer?.name == null`은 고객이 없는 주문도 반환합니다.
+`it.status == 1 || it.customer?.name == name`은 고객이 없어도 status가 1인 주문이 조건에 맞으므로 `left join`이고, 고객이 없는 주문도 반환합니다.
+`?.`로 쓴 `it.customer?.name == null`도 고객이 없는 주문에서 참이므로 `left join`입니다.
+`it.customer!!.name`처럼 `!!`로 써도 같은 규칙을 따릅니다. 다만 `!!`로 지난 비교는 고객이 있는 주문에서만 참이 됩니다.
 고객이 없는 주문만 찾으려면 연관을 비교하십시오. `it.customer == null`은 `e0.customer is null`이 됩니다(조인 없음). [3.10](03-where.md#310-association-paths)을 참고하십시오.
+
+예제 코드: [`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)(`first-query`, `captured`, `many-where`, `step-where`, `join-path`).
 
 <a id="getting-the-result"></a>
 ## 결과 가져오기
 
-쿼리를 실행하는 방법은 `toList()`만이 아닙니다. lambdaQL에는 결과 함수가 여섯 개 있습니다(결정 D38, D42).
+쿼리를 실행하는 방법은 `toList()`만이 아닙니다. lambdaQL에는 결과 함수가 여섯 개 있습니다.
 
 | 함수 | 반환 타입 | 호출할 수 있는 곳 | 하는 일 |
 |---|---|---|---|
@@ -345,7 +352,7 @@ where c1_0.name=?
 "`where` 뒤"는 `qb.from(...)`과 `where { }`로 얻은 쿼리(타입 `SelectQuery`)를 말합니다. 이 매뉴얼에서는 이를 **where 단계**라고 부릅니다. `where` 없이 `qb.from(...)` 바로 뒤에서도 이 함수들을 호출할 수 있습니다.
 
 `orderBy`, `limit`, `offset` 뒤의 쿼리 타입은 `OrderedSelectQuery`입니다. 여기의 결과 함수는 `toList()`, `toSet()`, `first()`뿐입니다. `one()`, `count()`, `exists()`는 여기서 컴파일되지 않습니다.
-이것은 의도된 것입니다(결정 D38). `limit(10).count()`는 "모든 행"으로도 "최대 10행"으로도 읽힐 수 있으므로 lambdaQL은 이를 허용하지 않습니다.
+이것은 의도된 것입니다. `limit(10).count()`는 "모든 행"으로도 "최대 10행"으로도 읽힐 수 있으므로 lambdaQL은 이를 허용하지 않습니다.
 
 `first()`와 `one()`은 Java `Optional`을 반환합니다. Kotlin에서는 `.orElse(null)`로 nullable 값(`Order?`)으로 바꿀 수 있습니다.
 
@@ -356,10 +363,9 @@ where c1_0.name=?
 순서를 정하려면 먼저 `orderBy { }`를 호출하십시오. 그러면 `first()`는 그 순서의 첫 행을 반환합니다. `offset`은 유지됩니다: `orderBy { ... }.offset(1).first()`는 두 번째 행을 반환합니다.
 맞는 행이 없으면 결과는 `Optional.empty()`입니다.
 
-[`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt), 영역 `first`:
-
+<!-- region: ManualKotlinStartTest.kt#first -->
 ```kotlin
-val byPrice = qb.from(Order::class.java).orderBy { o, by -> by.asc(o.price) }
+val byPrice = qb.from(Order::class.java).orderBy { o -> asc(o.price) }
 val cheapest: Order? = byPrice.first().orElse(null)
 // first() reads one row like limit(1); paging adds the id as the last sort key
 assertEquals("select e0 from Order e0 order by e0.price asc, e0.id asc", byPrice.limit(1).toHql().hql())
@@ -370,10 +376,11 @@ val firstActive: Order? = active.first().orElse(null)
 assertEquals("select e0 from Order e0 where e0.active = true order by e0.id asc", active.limit(1).toHql().hql())
 ```
 
-`first()`는 `limit(1)`과 같은 쿼리를 실행합니다. 그래서 테스트는 `limit(1)`의 HQL로 `first()`의 HQL을 확인합니다.
+`first()`는 `limit(1)`과 같은 쿼리를 실행합니다. 그래서 예제는 `limit(1)`의 HQL로 `first()`의 HQL을 보여 줍니다.
 
-**데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `first#2`(`firstActive`):
+**데이터베이스별 SQL**
 
+<!-- sql: first#2 -->
 ```sql
 -- H2, Oracle
 select …
@@ -391,7 +398,7 @@ limit ?
 ```
 
 `first()`는 한 행을 읽으므로 페이징 쿼리입니다. lambdaQL은 `id`를 마지막 정렬 키로 추가하고([4.8](04-order-paging.md#tie-breaker-automatic-id) 참고), Hibernate는 데이터베이스마다 페이징을 씁니다: H2와 Oracle은 `fetch first ? rows only`, MariaDB는 `limit ?`입니다. `?`는 1입니다.
-테스트 엔티티의 `price`는 NULL이 될 수 없으므로 HQL에 `nulls` 부분이 없습니다. NULL이 될 수 있는 정렬 키에는 `nulls first`나 `nulls last`가 붙습니다([4. 정렬과 페이징](04-order-paging.md) 참고).
+예제 엔티티의 `price`는 NULL이 될 수 없으므로 HQL에 `nulls` 부분이 없습니다. NULL이 될 수 있는 정렬 키에는 `nulls first`나 `nulls last`가 붙습니다([4. 정렬과 페이징](04-order-paging.md) 참고).
 
 <a id="one"></a>
 ### `one()`
@@ -399,8 +406,7 @@ limit ?
 조건에 맞는 행이 최대 하나일 때 `one()`을 쓰십시오. 예를 들어 유일 키로 찾을 때입니다.
 행이 없으면 `Optional.empty()`입니다. 2개 이상의 행은 `jakarta.persistence.NonUniqueResultException`을 던집니다. 맞는 행 아무거나 괜찮다면 `first()`를 쓰십시오.
 
-[`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt), 영역 `one`:
-
+<!-- region: ManualKotlinStartTest.kt#one -->
 ```kotlin
 val id: Long = knownId
 val byId = qb.from(Order::class.java).where { it.id == id }
@@ -411,8 +417,9 @@ val order: Order? = byId.one().orElse(null)
 assertThrows<NonUniqueResultException> { qb.from(Order::class.java).where { it.isActive }.one() }
 ```
 
-**데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `one`:
+**데이터베이스별 SQL**
 
+<!-- sql: one -->
 ```sql
 -- H2, Oracle
 select …
@@ -436,20 +443,20 @@ limit ?
 
 페이징 화면에서는 where 단계의 쿼리를 값에 담아 두십시오. 그 값에서 `count()`를 호출해 전체 수를 얻습니다. 그다음 같은 값에서 `orderBy { }.limit(...).toList()`를 호출해 페이지를 얻습니다.
 
-[`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt), 영역 `count`:
-
+<!-- region: ManualKotlinStartTest.kt#count -->
 ```kotlin
 val active = qb.from(Order::class.java).where { it.isActive }
 val total: Long = active.count()                       // every matching row
-val page = active.orderBy { o, by -> by.desc(o.price) }.limit(2)
+val page = active.orderBy { o -> desc(o.price) }.limit(2)
 assertEquals("select e0 from Order e0 where e0.active = true order by e0.price desc, e0.id asc", page.toHql().hql())
 val rows: List<Order> = page.toList()
 ```
 
-`count()`가 실행하는 HQL은 `select count(e0) from Order e0 where e0.active = true`입니다. 테스트는 이 HQL도 확인합니다.
+`count()`가 실행하는 HQL은 `select count(e0) from Order e0 where e0.active = true`입니다.
 
-**데이터베이스별 SQL (Java 테스트 실행 결과, Kotlin도 같은 HQL을 만듦)** — `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)의 예제 `count`:
+**데이터베이스별 SQL**
 
+<!-- sql: count -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select count(o1_0.id)
@@ -464,8 +471,7 @@ Hibernate는 `count(e0)`를 `select count(o1_0.id)`로 바꿉니다. 즉 id 열�
 
 `exists()`는 맞는 행이 하나라도 있으면 `true`를 반환합니다. `select 1`을 실행하고 최대 한 행만 읽습니다. 엔티티는 로드하지 않습니다.
 
-[`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt), 영역 `exists`:
-
+<!-- region: ManualKotlinStartTest.kt#exists -->
 ```kotlin
 val status3 = qb.from(Order::class.java).where { it.status.toInt() == 3 }
 assertEquals("select e0 from Order e0 where e0.status = 3", status3.toHql().hql())
@@ -473,18 +479,17 @@ val anyStatus3: Boolean = status3.exists()
 val anyStatus9: Boolean = qb.from(Order::class.java).where { it.status.toInt() == 9 }.exists()
 ```
 
-`exists()`가 실행하는 HQL은 `select 1 from Order e0 where e0.status = 3`입니다(테스트에서 확인). SQL은 H2와 Oracle에서 `select 1 from orders o1_0 where … fetch first ? rows only`, MariaDB에서 `… limit ?`의 모양이고, `?`는 1입니다.
+`exists()`가 실행하는 HQL은 `select 1 from Order e0 where e0.status = 3`입니다. SQL은 H2와 Oracle에서 `select 1 from orders o1_0 where … fetch first ? rows only`, MariaDB에서 `… limit ?`의 모양이고, `?`는 1입니다.
 
 <a id="toset"></a>
 ### `toSet()`
 
-`toSet()`은 `toList()`와 같은 방식으로 쿼리를 실행하고 `SequencedSet<T>`를 반환합니다(결정 D42).
+`toSet()`은 `toList()`와 같은 방식으로 쿼리를 실행하고 `SequencedSet<T>`를 반환합니다.
 반환 객체는 `LinkedHashSet`이므로 요소가 행 순서를 유지합니다. `orderBy { }`가 있으면 정렬 순서를 따릅니다.
 
-[`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt), 영역 `to-set`:
-
+<!-- region: ManualKotlinStartTest.kt#to-set -->
 ```kotlin
-val sorted = qb.from(Order::class.java).orderBy { o, by -> by.desc(o.price) }
+val sorted = qb.from(Order::class.java).orderBy { o -> desc(o.price) }
 assertEquals("select e0 from Order e0 order by e0.price desc", sorted.toHql().hql())
 val byPrice: java.util.SequencedSet<Order> = sorted.toSet()
 ```
@@ -505,10 +510,9 @@ SQL은 `toList()`와 같습니다. lambdaQL은 `distinct`를 **추가하지 않�
 검사가 없으면 행이 아무 표시 없이 유실됩니다. 이런 경우에는 `toList()`를 사용하십시오.
 Kotlin `data class`는 주 생성자의 속성만 비교합니다. `@Id`가 주 생성자에 없으면 서로 다른 두 행의 `equals` 결과가 true일 수 있습니다.
 
-테스트 엔티티 `Tag`의 `equals`는 이름만 비교합니다. 테스트는 이름이 같은 두 행을 넣고 확인합니다.
+예제 엔티티 `Tag`의 `equals`는 이름만 비교합니다. 이름이 같은 두 행이 있으면 `toSet()`은 예외를 던집니다.
 
-[`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt), 영역 `to-set-check`:
-
+<!-- region: ManualKotlinStartTest.kt#to-set-check -->
 ```kotlin
 // Tag.equals compares only the name: two different rows would become one element, so toSet() refuses
 assertThrows<IllegalStateException> { qb.from(Tag::class.java).toSet() }
@@ -516,16 +520,18 @@ val tags: List<Tag> = qb.from(Tag::class.java).toList()   // use toList() instea
 assertEquals(2, tags.size)
 ```
 
+예제 코드: [`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)(`first`, `one`, `count`, `exists`, `to-set`, `to-set-check`).
+
 <a id="things-to-know"></a>
 ## 알아 둘 점
 
 | 규칙 | 예 |
 |---|---|
-| 람다 리터럴을 전달하십시오. | `where { it.isActive }` |
-| 람다를 먼저 Kotlin 함수 타입에 저장하지 마십시오. | `val f: (Order) -> Boolean = { it.isActive }; where(f)`는 거부됩니다(KC4). |
-| 쿼리 람다를 `inline fun` 안에서 만들지 마십시오. | 거부됩니다(KC2). 헬퍼를 non-inline으로 만들거나, 호출하는 쪽에서 람다를 전달하십시오. |
-| 람다는 식 하나여야 합니다(조건, 정렬, 조회). | 람다 안의 반복문과 지역 `val`/`var`는 거부됩니다. |
-| 반드시 실행되어야 하는 코드를 람다에 넣지 마십시오. 람다는 실행되지 않습니다. | `println(...)`처럼 부수 효과가 있는 호출은 거부됩니다. |
+| 람다 표현식 리터럴을 전달하십시오. | `where { it.isActive }` |
+| 람다 표현식을 먼저 Kotlin 함수 타입에 저장하지 마십시오. | `val f: (Order) -> Boolean = { it.isActive }; where(f)`는 거부됩니다(KC4). |
+| 쿼리 람다 표현식을 `inline fun` 안에서 만들지 마십시오. | 거부됩니다(KC2). 헬퍼를 non-inline으로 만들거나, 호출하는 쪽에서 람다 표현식을 전달하십시오. |
+| 람다 표현식은 식 하나여야 합니다(조건, 정렬, 조회). | 람다 표현식 안의 반복문과 지역 `val`/`var`는 거부됩니다. |
+| 반드시 실행되어야 하는 코드를 람다 표현식에 넣지 마십시오. lambdaQL은 람다 표현식을 호출하지 않고 바이트 opcode를 분석합니다. | `println(...)`처럼 부수 효과가 있는 호출은 거부됩니다. |
 | Java 21~23에서 실행하면 새 JDK로 컴파일한 클래스에 맞는 ASM 버전이 필요합니다. | lambdaQL은 Java 21~23에서 ASM 9.11.1을 사용합니다(Java 28까지의 클래스 파일을 읽음). Java 24 이상에서는 실행 중인 JDK의 `java.lang.classfile`로 읽으므로 ASM 버전과 관계가 없습니다. |
 
 Kotlin의 모든 제한은 [9. Kotlin 노트](09-kotlin-notes.md#914-kotlin-limits-kc1-to-kc21)에 있습니다.

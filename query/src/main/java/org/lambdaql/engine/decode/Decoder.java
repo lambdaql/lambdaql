@@ -49,6 +49,10 @@ public final class Decoder implements Opcodes {
     private final AbstractInsnNode[] insns;
     private final Map<LabelNode, Integer> labelIndex = new HashMap<>();
     private final Map<State, Node> memo = new HashMap<>();
+    /** While a value region is decoded (D62): the index where the region ends and its value is on the stack. */
+    private int regionStop = -1;
+    /** The jumps that start a value region being decoded now (so the same region is not started again). */
+    private final java.util.Set<Integer> regionStarts = new java.util.HashSet<>();
     private final boolean predicate;
     private final List<Expr.Invoke> statements;
     private int uninitCounter;
@@ -195,6 +199,7 @@ public final class Decoder implements Opcodes {
         int i = pc;
         while (true) {
             if (i >= insns.length) throw error(line, LqlMessage.END_OF_METHOD);
+            if (i == regionStop) return new Node.Value(popExpr(stack, line));   // the end of a value region (D62)
             AbstractInsnNode n = insns[i];
             int op = n.getOpcode();
             if (n instanceof LineNumberNode ln) {
@@ -231,6 +236,9 @@ public final class Decoder implements Opcodes {
                 case LDC -> stack.add(ldc(((LdcInsnNode) n).cst, line));
 
                 // ---- local variables
+                case NOP -> {
+                    // Kotlin puts one before a when without a subject
+                }
                 case ILOAD, LLOAD, FLOAD, DLOAD, ALOAD -> {
                     int v = ((VarInsnNode) n).var;
                     Expr e = v < locals.size() ? locals.get(v) : null;
@@ -362,7 +370,19 @@ public final class Decoder implements Opcodes {
                 case IFEQ, IFNE, IFLT, IFGE, IFGT, IFLE, IF_ICMPEQ, IF_ICMPNE, IF_ICMPLT, IF_ICMPGE, IF_ICMPGT,
                      IF_ICMPLE, IF_ACMPEQ, IF_ACMPNE, IFNULL, IFNONNULL -> {
                     JumpInsnNode j = (JumpInsnNode) n;
-                    if (statements != null) {
+                    // flag ? 1 : 2 with captured values and constants only: one value, computed in Java (D61)
+                    Integer folded = hostTernary(i, j, op, stack, locals, line);
+                    if (folded != null) {
+                        i = folded;
+                        continue;
+                    }
+                    // cond ? a : b with the entity in it: one CASE WHEN value (D62)
+                    Integer region = valueRegion(i, op, stack, locals, line);
+                    if (region != null) {
+                        i = region;
+                        continue;
+                    }
+                    if (statements != null && regionStop < 0) {
                         throw error(line, LqlMessage.CONDITION_IN_ASSIGNMENT);
                     }
                     Pred atom = jumpAtom(op, stack, line);
@@ -431,6 +451,283 @@ public final class Decoder implements Opcodes {
             return new Node.Test(new Pred.Truth(v), Node.Leaf.TRUE, Node.Leaf.FALSE, line);
         }
         return new Node.Value(v);
+    }
+
+    // ------------------------------------------------------------------ value ternary of captured values (D61)
+
+    /**
+     * Folds {@code cond ? a : b} into one {@link Expr.Choose} when the condition and both values use only captured
+     * values and constants. The bytecode is {@code <jump X>; <a>; goto M; X: <b>; M:}.
+     *
+     * <p>Example: {@code o.getStatus() == (flag ? 1 : 2)} decodes to {@code status == (flag ? 1 : 2)}.
+     *
+     * @param i      index of the conditional jump
+     * @param j      the jump
+     * @param op     its opcode
+     * @param stack  current stack (the condition operands are popped and the value is pushed)
+     * @param locals current local variables
+     * @param line   source line
+     * @return the index to go on with ({@code M}), or {@code null} if this is not such a ternary
+     */
+    private Integer hostTernary(int i, JumpInsnNode j, int op, List<Object> stack, List<Expr> locals, int line) {
+        int arity = op >= IF_ICMPEQ && op <= IF_ACMPNE ? 2 : 1;
+        if (stack.size() < arity) return null;
+        boolean onlyConstants = true;
+        for (int k = 1; k <= arity; k++) {
+            if (!(stack.get(stack.size() - k) instanceof Expr e) || usesParam(e)) return null;
+            Expr bare = e;
+            while (bare instanceof Expr.Convert c) bare = c.operand();
+            if (!(bare instanceof Expr.Const)) onlyConstants = false;
+        }
+        // a test of constants (Kotlin keeps a computed boolean as 0/1 and tests it again) is resolved by constantTruth
+        if (onlyConstants) return null;
+        int target = labelIndex.get(j.label);
+        int a = nextReal(i + 1);
+        int g = a;
+        while (g >= 0 && g < target && insns[g].getOpcode() != GOTO) {
+            int o = insns[g].getOpcode();
+            if (insns[g] instanceof JumpInsnNode || (o >= IRETURN && o <= RETURN)) return null;
+            g = nextReal(g + 1);
+        }
+        if (g < 0 || g >= target || !onlyLabelsBetween(g + 1, target)) return null;
+        int m = labelIndex.get(((JumpInsnNode) insns[g]).label);
+        if (m <= target) return null;
+        Expr whenFalse = segmentValue(a, g, locals);
+        Expr whenTrue = segmentValue(target, m, locals);
+        if (whenFalse == null || whenTrue == null || usesParam(whenFalse) || usesParam(whenTrue)) return null;
+        Pred cond = jumpAtom(op, stack, line);     // true: the jump is taken, so the value after the target
+        stack.add(new Expr.Choose(cond, whenTrue, whenFalse, whenFalse.type()));
+        return m;
+    }
+
+    /**
+     * Decodes a value chosen by conditions ({@code cond ? a : b}, {@code a ? x : b ? y : z}, Kotlin
+     * {@code when { a -> x; else -> y }}) into one {@link Expr.Case} (ROADMAP D62).
+     * <p>
+     * The region starts at a conditional jump and ends at {@code M}, where every value block jumps to (or falls into).
+     * It is decoded as a small decision graph whose leaves are the values; the condition of each value is then
+     * reduced like a where condition. A region whose values are only {@code 0} and {@code 1} is a boolean expression,
+     * not a value, and is left to the normal condition reduction.
+     *
+     * <p>Example: {@code o.getStatus() == (o.isActive() ? 1 : 2)} decodes to
+     * {@code status == case when active then 1 else 2 end}.
+     *
+     * @param i      index of the first conditional jump of the region
+     * @param op     its opcode
+     * @param stack  current stack (the jump operands are popped and the value is pushed)
+     * @param locals current local variables
+     * @param line   source line
+     * @return the index to go on with ({@code M}), or {@code null} if there is no such region
+     */
+    private Integer valueRegion(int i, int op, List<Object> stack, List<Expr> locals, int line) {
+        if (regionStarts.contains(i)) return null;
+        int m = regionEnd(i);
+        if (m < 0 || m == regionStop) return null;    // a jump inside the region being decoded: part of it
+        Map<State, Node> saved = new HashMap<>(memo);
+        int savedStop = regionStop;
+        Node graph;
+        regionStarts.add(i);
+        regionStop = m;
+        memo.clear();
+        try {
+            graph = explore(i, snapshot(stack), snapshot(locals), line);
+        } catch (org.lambdaql.LambdaQLException e) {
+            return null;                              // not a value region after all: the normal path reports it
+        } finally {
+            regionStop = savedStop;
+            regionStarts.remove(i);
+            memo.clear();
+            memo.putAll(saved);
+        }
+        List<Node.Value> leaves = new ArrayList<>();
+        if (!valueLeaves(graph, leaves, new java.util.IdentityHashMap<>())) return null;
+        if (leaves.stream().allMatch(v -> isBooleanLike(v.value())) && usedAsBoolean(m)) return null;   // a boolean expression
+        Expr result;
+        if (leaves.size() == 1) {
+            result = leaves.get(0).value();
+        } else {
+            List<Pred> conds = new ArrayList<>();
+            List<Expr> values = new ArrayList<>();
+            for (int k = 0; k < leaves.size() - 1; k++) {
+                Node.Value leaf = leaves.get(k);
+                Node cond = asCondition(graph, leaf, leaves.subList(0, k), new java.util.IdentityHashMap<>());
+                conds.add(ConditionReducer.reduce(cond == null ? Node.Leaf.TRUE : cond, ref.describe()));
+                values.add(leaf.value());
+            }
+            Expr otherwise = leaves.get(leaves.size() - 1).value();
+            if (otherwise instanceof Expr.Case inner) {          // a ? x : b ? y : z: one case with more branches
+                conds.addAll(inner.conds());
+                values.addAll(inner.values());
+                otherwise = inner.otherwise();
+            }
+            result = new Expr.Case(conds, values, otherwise, otherwise.type());
+        }
+        int arity = op >= IF_ICMPEQ && op <= IF_ACMPNE ? 2 : (op == IFNULL || op == IFNONNULL || (op >= IFEQ && op <= IFLE) ? 1 : 0);
+        for (int k = 0; k < arity; k++) popExpr(stack, line);
+        stack.add(result);
+        return m;
+    }
+
+    /**
+     * Finds the end {@code M} of a value region that starts at a conditional jump: every {@code goto} in the region
+     * goes to {@code M}, every conditional jump stays inside, and there is no return.
+     *
+     * @param i the first jump
+     * @return {@code M}, or {@code -1}
+     */
+    private int regionEnd(int i) {
+        int m = -1;
+        for (int k = i; k >= 0 && k < insns.length; k = nextReal(k + 1)) {
+            int o = insns[k].getOpcode();
+            if (o == GOTO) {
+                m = labelIndex.get(((JumpInsnNode) insns[k]).label);
+                break;
+            }
+            if ((o >= IRETURN && o <= RETURN) || o == ATHROW || o == TABLESWITCH || o == LOOKUPSWITCH) return -1;
+        }
+        if (m <= i) return -1;
+        for (int k = i; k >= 0 && k < m; k = nextReal(k + 1)) {
+            AbstractInsnNode n = insns[k];
+            int o = n.getOpcode();
+            if ((o >= IRETURN && o <= RETURN) || o == ATHROW || o == TABLESWITCH || o == LOOKUPSWITCH) return -1;
+            if (n instanceof JumpInsnNode j) {
+                int t = labelIndex.get(j.label);
+                if (o == GOTO ? t != m : (t <= i || t >= m)) return -1;
+            }
+        }
+        return m;
+    }
+
+    /** Collects the value leaves of a region graph; {@code false} if a path ends in something else. */
+    private static boolean valueLeaves(Node n, List<Node.Value> out, java.util.Map<Node, Boolean> seen) {
+        if (seen.put(n, Boolean.TRUE) != null) return true;
+        return switch (n) {
+            case Node.Value v -> {
+                if (!out.contains(v)) out.add(v);
+                yield true;
+            }
+            case Node.Test t -> valueLeaves(t.onFalse, out, seen) && valueLeaves(t.onTrue, out, seen);   // source order
+            case Node.Leaf l -> false;
+        };
+    }
+
+    /**
+     * Makes a copy of the region graph as the condition of one value: the value is TRUE, the later values are FALSE.
+     * The earlier values do not matter, because {@code case} has already taken those rows: a test with such a branch
+     * is replaced by its other branch, so the condition stays as short as the source.
+     *
+     * <p>Example: for {@code when { p > 200 -> "big"; p > 100 -> "medium"; else -> "small" }} the condition of
+     * {@code "medium"} is {@code p > 100}, not {@code p <= 200 and p > 100}.
+     *
+     * @param n       a node of the region graph
+     * @param target  the value whose condition is made
+     * @param earlier the values before it (in source order)
+     * @param copies  nodes already copied
+     * @return the copy, or {@code null} when the node only leads to earlier values
+     */
+    private static Node asCondition(Node n, Node.Value target, List<Node.Value> earlier, java.util.Map<Node, Node> copies) {
+        if (copies.containsKey(n)) return copies.get(n);
+        Node out = switch (n) {
+            case Node.Value v -> v.equals(target) ? Node.Leaf.TRUE : earlier.contains(v) ? null : Node.Leaf.FALSE;
+            case Node.Test t -> {
+                Node onTrue = asCondition(t.onTrue, target, earlier, copies);
+                Node onFalse = asCondition(t.onFalse, target, earlier, copies);
+                if (onTrue == null) yield onFalse;
+                if (onFalse == null) yield onTrue;
+                yield new Node.Test(t.atom, onTrue, onFalse, t.line);
+            }
+            case Node.Leaf l -> l;
+        };
+        copies.put(n, out);
+        return out;
+    }
+
+    /** Tells whether the 0/1 value made at {@code m} is a boolean: it is tested, returned as a boolean, or boxed to Boolean. */
+    private boolean usedAsBoolean(int m) {
+        int k = nextReal(m);
+        if (k < 0) return true;
+        int o = insns[k].getOpcode();
+        if (o == IFEQ || o == IFNE || o == IRETURN || o == PUTFIELD) return true;
+        return insns[k] instanceof MethodInsnNode mi && mi.owner.equals("java/lang/Boolean") && mi.name.equals("valueOf");
+    }
+
+    private static boolean isZeroOrOne(Expr e) {
+        return e instanceof Expr.Const c && c.value() instanceof Integer x && (x == 0 || x == 1);
+    }
+
+    /**
+     * Tells whether a leaf of a region is a boolean: the constant 0 or 1, a boolean value (a boolean column),
+     * or a captured-value ternary of such values.
+     *
+     * <p>Example: in Kotlin {@code it.vip ?: false} the leaves are {@code vip} and {@code 0}: a boolean expression.
+     *
+     * @param e the leaf value
+     * @return {@code true} for a boolean leaf
+     */
+    private static boolean isBooleanLike(Expr e) {
+        if (isZeroOrOne(e)) return true;
+        if (e instanceof Expr.Choose c) return isBooleanLike(c.whenTrue()) && isBooleanLike(c.whenFalse());
+        org.objectweb.asm.Type t = e.type();
+        return t != null && (t.equals(org.objectweb.asm.Type.BOOLEAN_TYPE) || t.getDescriptor().equals("Ljava/lang/Boolean;"));
+    }
+
+    /**
+     * Reads a short run of instructions that pushes one value: a constant, a local variable, boxing, unboxing or a cast.
+     *
+     * <p>Example: {@code aload 2; invokevirtual Double.doubleValue} gives {@code captured.doubleValue()}.
+     *
+     * @param from   first instruction
+     * @param to     end (exclusive)
+     * @param locals current local variables
+     * @return the value, or {@code null} for anything else
+     */
+    private Expr segmentValue(int from, int to, List<Expr> locals) {
+        List<Expr> st = new ArrayList<>();
+        for (int k = from; k < to; k++) {
+            AbstractInsnNode n = insns[k];
+            int o = n.getOpcode();
+            if (o < 0) continue;
+            if (n instanceof VarInsnNode v && (o == ILOAD || o == LLOAD || o == FLOAD || o == DLOAD || o == ALOAD)) {
+                if (v.var >= locals.size() || locals.get(v.var) == null) return null;
+                st.add(locals.get(v.var));
+                continue;
+            }
+            Expr push = simplePush(n, locals);
+            if (push != null) {
+                st.add(push);
+                continue;
+            }
+            if (st.isEmpty()) return null;
+            if (o == CHECKCAST) continue;
+            if (n instanceof MethodInsnNode mi && (isBoxing(k) || isUnboxing(k))) {
+                Expr top = st.remove(st.size() - 1);
+                MethodRef ref = new MethodRef(mi.owner, mi.name, mi.desc, mi.getOpcode() == INVOKESTATIC, mi.itf);
+                st.add(mi.getOpcode() == INVOKESTATIC ? new Expr.Invoke(null, ref, List.of(top)) : new Expr.Invoke(top, ref, List.of()));
+                continue;
+            }
+            return null;
+        }
+        return st.size() == 1 ? st.get(0) : null;
+    }
+
+    /** Tells whether a value reads a lambda parameter (an entity); unknown kinds count as yes. */
+    private static boolean usesParam(Expr e) {
+        return switch (e) {
+            case Expr.Param p -> true;
+            case Expr.Captured c -> false;
+            case Expr.Const c -> false;
+            // a static call outside the JDK and Kotlin (Agg.count(), a DB function stub) is computed by the database
+            case Expr.Invoke inv -> (inv.method().isStatic() && !inv.method().owner().startsWith("java/") && !inv.method().owner().startsWith("kotlin/"))
+                    || (inv.receiver() != null && usesParam(inv.receiver())) || inv.args().stream().anyMatch(Decoder::usesParam);
+            case Expr.Convert c -> usesParam(c.operand());
+            case Expr.Arith a -> usesParam(a.left()) || usesParam(a.right());
+            case Expr.Neg n -> usesParam(n.operand());
+            case Expr.CmpResult c -> usesParam(c.left()) || usesParam(c.right());
+            case Expr.Coalesce c -> usesParam(c.first()) || usesParam(c.second());
+            case Expr.GetField f -> f.receiver() != null && usesParam(f.receiver());
+            case Expr.Choose c -> usesParam(c.whenTrue()) || usesParam(c.whenFalse());
+            default -> true;
+        };
     }
 
     // ------------------------------------------------------------------ Kotlin null patterns
