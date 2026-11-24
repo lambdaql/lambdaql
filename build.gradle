@@ -111,6 +111,7 @@ subprojects { subproject ->
                     }
                     java {
                         withSourcesJar()
+                        withJavadocJar()   // Maven Central needs a javadoc jar for every jar
                     }
                     // the information Maven Central requires in every POM
                     pom {
@@ -138,20 +139,98 @@ subprojects { subproject ->
                     }
                 }
             }
-            /*repositories {
+            // Maven Central (ROADMAP D65): the publications are written to one folder, zipped by centralBundle
+            // and uploaded to the Central Portal. Run it from main (.github/workflows/publish.yml).
+            repositories {
                 maven {
-                    name = "nexus"
-                    url = version.endsWith('-SNAPSHOT') ?
-                            project.properties.get("repository.snapshot.url"):
-                            project.properties.get("repository.release.url")
-                    def nexusId = project.properties.getOrDefault('nexus.id', System.getenv('NEXUS_ID'))
-                    def nexusPassword = project.properties.getOrDefault('nexus.password', System.getenv('NEXUS_PASSWORD'))
-                    credentials {
-                        username = nexusId
-                        password = nexusPassword
-                    }
+                    name = 'staging'
+                    url = rootProject.layout.buildDirectory.dir('staging-deploy')
                 }
-            }*/
+            }
         }
+
+        // GPG signature (.asc) of every published file, which Maven Central requires. The key is given in memory:
+        // ORG_GRADLE_PROJECT_signingKey (an ASCII-armored secret key) and ORG_GRADLE_PROJECT_signingPassword.
+        // Without a key nothing is signed, so publishToMavenLocal still works on a developer machine.
+        subproject.apply plugin: 'signing'
+        subproject.signing {
+            def signingKey = subproject.findProperty('signingKey')
+            def signingPassword = subproject.findProperty('signingPassword')
+            required = { signingKey != null }
+            if (signingKey != null) {
+                useInMemoryPgpKeys(signingKey as String, signingPassword as String)
+                sign subproject.publishing.publications.maven
+            }
+        }
+    }
+}
+// ------------------------------------------------------------------ Maven Central (ROADMAP D65)
+// ./gradlew centralBundle   writes every module to build/staging-deploy and zips it (build/central-bundle.zip)
+// ./gradlew centralUpload   uploads the zip to the Central Portal (https://central.sonatype.com)
+// The upload needs a Central Portal user token: ORG_GRADLE_PROJECT_centralUsername and _centralPassword.
+// -PcentralPublishing=AUTOMATIC releases right after validation; the default USER_MANAGED waits for the
+// "Publish" button on the portal, so a first release can be checked before it becomes public.
+def stagingDir = layout.buildDirectory.dir('staging-deploy')
+
+tasks.register('cleanStaging', Delete) {
+    delete stagingDir
+}
+
+tasks.register('centralBundle', Zip) {
+    group = 'publishing'
+    description = 'Writes all publications to build/staging-deploy and zips them for the Maven Central Portal.'
+    subprojects.each { p ->
+        p.plugins.withId('maven-publish') {
+            def publish = p.tasks.named('publishAllPublicationsToStagingRepository')
+            publish.configure { mustRunAfter rootProject.tasks.named('cleanStaging') }
+            dependsOn publish
+        }
+    }
+    dependsOn 'cleanStaging'
+    from stagingDir
+    // the portal builds its own maven-metadata.xml
+    exclude '**/maven-metadata*.xml*'
+    archiveFileName = 'central-bundle.zip'
+    destinationDirectory = layout.buildDirectory
+}
+
+tasks.register('centralUpload') {
+    group = 'publishing'
+    description = 'Uploads build/central-bundle.zip to the Maven Central Portal.'
+    dependsOn 'centralBundle'
+    def bundle = tasks.named('centralBundle').flatMap { it.archiveFile }
+    def user = providers.gradleProperty('centralUsername')
+    def password = providers.gradleProperty('centralPassword')
+    def publishing = providers.gradleProperty('centralPublishing').orElse('USER_MANAGED')
+    def signed = providers.gradleProperty('signingKey')
+    def name = "${project.group}:${project.version}"
+    doLast {
+        if (!user.isPresent() || !password.isPresent()) {
+            throw new GradleException('Set centralUsername and centralPassword (a Central Portal user token).')
+        }
+        if (!signed.isPresent()) {
+            throw new GradleException('Set signingKey and signingPassword: Maven Central rejects files without a GPG signature.')
+        }
+        def token = "${user.get()}:${password.get()}".bytes.encodeBase64().toString()
+        def file = bundle.get().asFile
+        def boundary = "lambdaql-${UUID.randomUUID()}"
+        def head = "--${boundary}\r\nContent-Disposition: form-data; name=\"bundle\"; filename=\"${file.name}\"\r\n" +
+                "Content-Type: application/octet-stream\r\n\r\n"
+        def body = new ByteArrayOutputStream()
+        body.write(head.getBytes('UTF-8'))
+        body.write(file.bytes)
+        body.write("\r\n--${boundary}--\r\n".getBytes('UTF-8'))
+        def query = "name=${URLEncoder.encode(name, 'UTF-8')}&publishingType=${publishing.get()}"
+        def request = java.net.http.HttpRequest.newBuilder(URI.create("https://central.sonatype.com/api/v1/publisher/upload?${query}"))
+                .header('Authorization', "Bearer ${token}")
+                .header('Content-Type', "multipart/form-data; boundary=${boundary}")
+                .POST(java.net.http.HttpRequest.BodyPublishers.ofByteArray(body.toByteArray()))
+                .build()
+        def response = java.net.http.HttpClient.newHttpClient().send(request, java.net.http.HttpResponse.BodyHandlers.ofString())
+        if (response.statusCode() >= 300) {
+            throw new GradleException("Central Portal upload failed (${response.statusCode()}): ${response.body()}")
+        }
+        // the body is the deployment id: its state is on https://central.sonatype.com/publishing/deployments
+        logger.lifecycle("Central Portal deployment ${response.body()} (${publishing.get()})")
     }
 }

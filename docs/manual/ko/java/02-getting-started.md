@@ -87,10 +87,6 @@ Maven:
 
 Spring Boot를 사용하면 Boot 버전에 맞는 `lambdaql-spring-boot-starter-boot4`(`-boot3`)를, Spring Boot 없이 Spring Data JPA만 사용하면 `lambdaql-spring-data-jpa`를 대신 추가하십시오. 두 아티팩트는 `lambdaql`을 함께 가져옵니다([12.2](12-spring-data-jpa.md#122-modules) 참고).
 
-> [!WARNING]
-> 버전 `1.0.0`은 저장소의 `gradle.properties`에 정의된 값이며, 첫 릴리스 전에 바뀔 수 있습니다.
-> lambdaQL이 Maven Central에 배포되면 이 페이지를 다시 확인하십시오.
-
 <a id="recommended-compiler-option--parameters"></a>
 ### 권장 컴파일러 옵션: `-parameters`
 

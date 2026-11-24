@@ -1,0 +1,55 @@
+# Publishes lambdaQL to Maven Central (ROADMAP D65). Run it by hand from main:
+#   GitHub > Actions > "Publish to Maven Central" > Run workflow (branch: main)
+#
+# Repository secrets:
+#   CENTRAL_USERNAME, CENTRAL_PASSWORD  a user token of the Central Portal (central.sonatype.com > Account > Generate User Token)
+#   SIGNING_KEY                         the ASCII-armored GPG secret key (gpg --armor --export-secret-keys <key id>)
+#   SIGNING_PASSWORD                    its passphrase
+name: Publish to Maven Central
+
+on:
+  workflow_dispatch:
+    inputs:
+      publishing:
+        description: 'USER_MANAGED waits for the Publish button on the portal; AUTOMATIC releases after validation'
+        type: choice
+        options: [USER_MANAGED, AUTOMATIC]
+        default: USER_MANAGED
+      skipTests:
+        description: 'Skip the tests (they run on H2 with JDK 21 and JDK 25)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    # releases are made from main only
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # JDK 21 compiles and runs the default tests; JDK 25 runs Gradle, compiles src/main/java24 and runs testClassFile
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            25
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Test
+        if: ${{ !inputs.skipTests }}
+        # testBoot3 (Spring Boot 3) is checked before a release on a developer machine
+        run: ./gradlew test -x testBoot3
+
+      - name: Build, sign and upload
+        env:
+          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
+          ORG_GRADLE_PROJECT_centralUsername: ${{ secrets.CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_centralPassword: ${{ secrets.CENTRAL_PASSWORD }}
+        run: ./gradlew centralUpload -PcentralPublishing=${{ inputs.publishing }}

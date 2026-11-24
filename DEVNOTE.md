@@ -153,6 +153,25 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 
 ---
 
+### 6.4 Maven Central 배포(D64, D65)
+
+배포는 `main`에서만 합니다. GitHub Actions의 "Publish to Maven Central" 작업을 `main` 브랜치로 직접 실행합니다(`.github/workflows/publish.yml`).
+
+| 단계 | 내용 | 상태 |
+|---|---|---|
+| 네임스페이스 | Central Portal의 `io.github.lambdaql`. GitHub 조직 인증은 포털이 준 키 이름으로 `github.com/lambdaql`에 공개 저장소를 만들어 확인 | 생성됨(2026-11-24, 작성자). 인증 여부는 포털에서 확인 |
+| 사용자 토큰 | central.sonatype.com > Account > Generate User Token. 저장소 Secrets `CENTRAL_USERNAME`, `CENTRAL_PASSWORD` | 미등록 |
+| GPG 키 | `gpg --full-generate-key`로 만든 키를 공개 키 서버에 올림(`gpg --keyserver keyserver.ubuntu.com --send-keys <키 ID>`). Secrets `SIGNING_KEY`(`gpg --armor --export-secret-keys <키 ID>`), `SIGNING_PASSWORD` | 미등록 |
+| 실행 | Actions > Publish to Maven Central > Run workflow(branch: `main`). 기본 `USER_MANAGED`는 검증 뒤 포털의 Publish 버튼을 기다림 | 미실행 |
+
+빌드 작업:
+
+- `./gradlew centralBundle`: 모든 모듈을 `build/staging-deploy`에 쓰고 `build/central-bundle.zip`으로 묶습니다. 모듈마다 jar, sources jar, javadoc jar, POM, Gradle 모듈 메타데이터와 체크섬이 들어갑니다. 서명 키가 있으면 `.asc`도 들어갑니다.
+- `./gradlew centralUpload`: 번들을 Central Portal API(`/api/v1/publisher/upload`)로 올립니다. 토큰이나 서명 키가 없으면 업로드 전에 실패합니다.
+- 서명 키가 없으면 서명하지 않으므로 `publishToMavenLocal`은 개발 PC에서 그대로 동작합니다.
+
+한 번 올린 버전은 Maven Central에서 지우거나 덮어쓸 수 없습니다. 첫 배포는 `USER_MANAGED`로 올려 포털에서 파일을 확인한 뒤 Publish를 누릅니다.
+
 ## 7. 메시지 카탈로그 생성기
 
 `LqlMessage.java`와 `LqlMessages{,_ja,_ko,_zh}.properties`는 생성 결과다. 원본은 로컬 전용 `.claude/tools/i18n/catalog.py`(항목: 키, 코드, 인자 수, en, ko, ja, zh)이고 `python3 .claude/tools/i18n/gen.py`로 다시 쓴다. 생성 결과를 직접 고치지 않는다.
