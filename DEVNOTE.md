@@ -57,7 +57,7 @@ Boot BOM은 모듈의 `gradle.properties`의 `lql.springBoot`로 고른다(루�
 
 테스트: 세 DB(H2 2.3.230, MariaDB 10.11.18, Oracle Free 23.26.3)에서 모듈 전체 통과(2026-11-19 실측). `main` 241개. `feature/unified-boot`는 다섯 DB(H2·MariaDB·Oracle·PostgreSQL·MySQL)에서 Boot 라인마다 250개, `test`(Boot 4, JDK 21) 250개, `testBoot3`(Boot 3, JDK 21) 250개, `testClassFile`(Boot 4, JDK 25) 250개(2026-11-23). 건너뜀은 DB별 H2 16·MariaDB 10·Oracle 9. Kotlin 람다 테스트는 `query/src/test/kotlin`에 별도 소스 세트로 있다.
 
-아직 Maven Central에 배포하지 않았다. 버전 `1.0.0`은 `gradle.properties`의 값이며 첫 릴리스 전에 바뀔 수 있다.
+아직 Maven Central에 배포하지 않았다. 버전은 `gradle.properties`의 `0.0.1`(2026-11-24 1.0.0에서 변경).
 
 ---
 
@@ -159,9 +159,9 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 
 | 단계 | 내용 | 상태 |
 |---|---|---|
-| 네임스페이스 | Central Portal의 `io.github.lambdaql`. GitHub 조직 인증은 포털이 준 키 이름으로 `github.com/lambdaql`에 공개 저장소를 만들어 확인 | 생성됨(2026-11-24, 작성자). 인증 여부는 포털에서 확인 |
-| 사용자 토큰 | central.sonatype.com > Account > Generate User Token. 저장소 Secrets `CENTRAL_USERNAME`, `CENTRAL_PASSWORD` | 미등록 |
-| GPG 키 | `gpg --full-generate-key`로 만든 키를 공개 키 서버에 올림(`gpg --keyserver keyserver.ubuntu.com --send-keys <키 ID>`). Secrets `SIGNING_KEY`(`gpg --armor --export-secret-keys <키 ID>`), `SIGNING_PASSWORD` | 미등록 |
+| 네임스페이스 | Central Portal의 `io.github.lambdaql`. GitHub 조직 인증은 포털이 준 키 이름으로 `github.com/lambdaql`에 공개 저장소를 만들어 확인 | 인증 완료(2026-11-24, 작성자) |
+| 사용자 토큰 | central.sonatype.com > Account > Generate User Token. 저장소 Secrets `CENTRAL_USERNAME`, `CENTRAL_PASSWORD`. 이 PC는 `~/.gradle/gradle.properties`의 `centralUsername`, `centralPassword` | 이 PC 등록, 인증 확인(읽기 API 200). Secrets 미등록 |
+| GPG 키 | ed25519 `F48A35D85635ED69`(작성자 생성, 2026-11-24), keyserver.ubuntu.com에 공개 키 등록. 이 PC는 `signing.gnupg.keyName`으로 로컬 gpg가 서명. Secrets `SIGNING_KEY`(`gpg --armor --export-secret-keys F48A35D85635ED69`), `SIGNING_PASSWORD` | 공개 키 등록 완료. Secrets 미등록. 이 PC는 암호 입력 창(pinentry) 설정 필요 |
 | 실행 | Actions > Publish to Maven Central > Run workflow(branch: `main`). 기본 `USER_MANAGED`는 검증 뒤 포털의 Publish 버튼을 기다림 | 미실행 |
 
 빌드 작업:

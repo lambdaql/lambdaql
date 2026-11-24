@@ -149,16 +149,23 @@ subprojects { subproject ->
             }
         }
 
-        // GPG signature (.asc) of every published file, which Maven Central requires. The key is given in memory:
-        // ORG_GRADLE_PROJECT_signingKey (an ASCII-armored secret key) and ORG_GRADLE_PROJECT_signingPassword.
+        // GPG signature (.asc) of every published file, which Maven Central requires. Two ways to give the key:
+        // - in memory (GitHub Actions): ORG_GRADLE_PROJECT_signingKey (an ASCII-armored secret key) and
+        //   ORG_GRADLE_PROJECT_signingPassword
+        // - the local gpg (a developer machine): signing.gnupg.keyName=<key id> in ~/.gradle/gradle.properties;
+        //   the secret key stays in the keyring and gpg asks for the passphrase
         // Without a key nothing is signed, so publishToMavenLocal still works on a developer machine.
         subproject.apply plugin: 'signing'
         subproject.signing {
             def signingKey = subproject.findProperty('signingKey')
             def signingPassword = subproject.findProperty('signingPassword')
-            required = { signingKey != null }
+            def gpgKeyName = subproject.findProperty('signing.gnupg.keyName')
+            required = { signingKey != null || gpgKeyName != null }
             if (signingKey != null) {
                 useInMemoryPgpKeys(signingKey as String, signingPassword as String)
+                sign subproject.publishing.publications.maven
+            } else if (gpgKeyName != null) {
+                useGpgCmd()
                 sign subproject.publishing.publications.maven
             }
         }
@@ -203,13 +210,14 @@ tasks.register('centralUpload') {
     def password = providers.gradleProperty('centralPassword')
     def publishing = providers.gradleProperty('centralPublishing').orElse('USER_MANAGED')
     def signed = providers.gradleProperty('signingKey')
+    def gpgSigned = providers.gradleProperty('signing.gnupg.keyName')
     def name = "${project.group}:${project.version}"
     doLast {
         if (!user.isPresent() || !password.isPresent()) {
             throw new GradleException('Set centralUsername and centralPassword (a Central Portal user token).')
         }
-        if (!signed.isPresent()) {
-            throw new GradleException('Set signingKey and signingPassword: Maven Central rejects files without a GPG signature.')
+        if (!signed.isPresent() && !gpgSigned.isPresent()) {
+            throw new GradleException('Set signingKey and signingPassword, or signing.gnupg.keyName: Maven Central rejects files without a GPG signature.')
         }
         def token = "${user.get()}:${password.get()}".bytes.encodeBase64().toString()
         def file = bundle.get().asFile
