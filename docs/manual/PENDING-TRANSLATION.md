@@ -58,6 +58,8 @@
 27. 02장 `count()` 절: `count(o -> o)`(Kotlin `count { it }`)는 `count(*)` 문단과 예제 `count-row` 추가(D69)
 28. 06장에 "엔티티 선택" 절 추가(앵커 `select-entities`, 예제 `select-joined`, `select-entities`, Java는 `select-self`, `select-entity-cte`), J1 행에 엔티티 값 문장 추가(D70)
 29. 06장: 조인 엔티티 수 3개 → 10개(D71), 절 제목 "엔티티 여러 개와 반복되는 행"(앵커 유지), 새 예제 `ten`, 메서드 표와 "지원하지 않는 것"의 개수
+30. 의존성 예제 버전 0.0.1 → 0.0.2(02, 12, 13장)
+31. 03장 3.1 제목 "한 문장으로 말하면" → "개요"(앵커 `31-the-idea-in-one-sentence` 유지)
 
 바뀐 페이지가 많아 페이지를 통째로 다시 옮기는 방식이 정확합니다.
 

@@ -36,7 +36,7 @@ Spring Boot 4, Gradle(Groovy DSL):
 
 ```groovy
 dependencies {
-    implementation 'io.github.lambdaql:lambdaql-spring-boot-starter-boot4:0.0.1'
+    implementation 'io.github.lambdaql:lambdaql-spring-boot-starter-boot4:0.0.2'
 }
 ```
 
@@ -44,7 +44,7 @@ Spring Boot 3, Gradle(Kotlin DSL):
 
 ```gradle-kts
 dependencies {
-    implementation("io.github.lambdaql:lambdaql-spring-boot-starter-boot3:0.0.1")
+    implementation("io.github.lambdaql:lambdaql-spring-boot-starter-boot3:0.0.2")
 }
 ```
 
@@ -54,7 +54,7 @@ Maven:
 <dependency>
   <groupId>io.github.lambdaql</groupId>
   <artifactId>lambdaql-spring-boot-starter-boot4</artifactId>
-  <version>0.0.1</version>
+  <version>0.0.2</version>
 </dependency>
 ```
 

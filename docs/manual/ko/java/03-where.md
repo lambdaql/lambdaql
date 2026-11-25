@@ -8,7 +8,7 @@
 ---
 
 <a id="31-the-idea-in-one-sentence"></a>
-## 3.1 한 문장으로 말하면
+## 3.1 개요
 
 **lambdaQL 람다 표현식은 코드가 아니라 쿼리 표현식입니다.** lambdaQL은 조건 람다 표현식을 호출하지 않고 람다 표현식의 바이트 opcode를 분석합니다.
 캡처 값만으로 된 식만 Java에서 먼저 계산합니다([3.11](#311-captured-values) 참고).

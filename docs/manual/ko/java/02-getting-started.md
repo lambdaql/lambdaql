@@ -71,7 +71,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.github.lambdaql:lambdaql:0.0.1'
+    implementation 'io.github.lambdaql:lambdaql:0.0.2'
 }
 ```
 
@@ -81,7 +81,7 @@ Maven:
 <dependency>
   <groupId>io.github.lambdaql</groupId>
   <artifactId>lambdaql</artifactId>
-  <version>0.0.1</version>
+  <version>0.0.2</version>
 </dependency>
 ```
 

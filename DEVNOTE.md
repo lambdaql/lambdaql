@@ -57,7 +57,7 @@ Boot BOM은 모듈의 `gradle.properties`의 `lql.springBoot`로 고른다(루�
 
 테스트: 세 DB(H2 2.3.230, MariaDB 10.11.18, Oracle Free 23.26.3)에서 모듈 전체 통과(2026-11-19 실측). `main` 241개. `feature/unified-boot`는 다섯 DB(H2·MariaDB·Oracle·PostgreSQL·MySQL)에서 Boot 라인마다 250개, `test`(Boot 4, JDK 21) 250개, `testBoot3`(Boot 3, JDK 21) 250개, `testClassFile`(Boot 4, JDK 25) 250개(2026-11-23). 건너뜀은 DB별 H2 16·MariaDB 10·Oracle 9. Kotlin 람다 테스트는 `query/src/test/kotlin`에 별도 소스 세트로 있다.
 
-0.0.1을 Maven Central에 배포했다(2026-11-24, `io.github.lambdaql`). 다음 버전은 `gradle.properties`의 `0.0.2`(2026-11-25, D67~D71 포함, 미배포). 매뉴얼의 의존성 예제는 배포된 버전(0.0.1)을 쓰고 배포 뒤에 바꾼다.
+Maven Central 배포: 0.0.1(2026-11-24), 0.0.2(2026-11-25, D67~D71, 커밋 `319bb9f`, 배포 `da3fd53b-95f7-447f-988a-81a80f21d546`). 매뉴얼의 의존성 예제는 배포된 최신 버전을 쓰고, 버전을 올리면 배포한 뒤에 바꾼다.
 
 ---
 
