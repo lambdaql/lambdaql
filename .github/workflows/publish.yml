@@ -1,13 +1,19 @@
-# Publishes lambdaQL to Maven Central (ROADMAP D65). Run it by hand from main:
-#   GitHub > Actions > "Publish to Maven Central" > Run workflow (branch: main)
+# Publishes lambdaQL to Maven Central (ROADMAP D65, D72).
 #
-# Repository secrets:
+# Automatic: a push to main that changes gradle.properties publishes its version when that version is not on Maven
+# Central yet (tests, signing, upload, then the portal publishes it after validation).
+# By hand: GitHub > Actions > "Publish to Maven Central" > Run workflow (branch: main).
+#
+# Repository secrets (bash .claude/tools/release/set-secrets.sh sets them from a developer machine):
 #   CENTRAL_USERNAME, CENTRAL_PASSWORD  a user token of the Central Portal (central.sonatype.com > Account > Generate User Token)
 #   SIGNING_KEY                         the ASCII-armored GPG secret key (gpg --armor --export-secret-keys <key id>)
 #   SIGNING_PASSWORD                    its passphrase
 name: Publish to Maven Central
 
 on:
+  push:
+    branches: [main]
+    paths: [gradle.properties]
   workflow_dispatch:
     inputs:
       publishing:
@@ -31,8 +37,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Version
+        id: version
+        run: |
+          version=$(sed -n 's/^version *= *//p' gradle.properties)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # a version on Maven Central cannot be published again
+          code=$(curl -s -o /dev/null -w '%{http_code}' "https://repo1.maven.org/maven2/io/github/lambdaql/lambdaql/$version/lambdaql-$version.pom")
+          if [ "$code" = 200 ]; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::lambdaql $version is already on Maven Central: nothing to publish"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # JDK 21 compiles and runs the default tests; JDK 25 runs Gradle, compiles src/main/java24 and runs testClassFile
       - uses: actions/setup-java@v4
+        if: steps.version.outputs.published == 'false'
         with:
           distribution: temurin
           java-version: |
@@ -40,16 +61,19 @@ jobs:
             25
 
       - uses: gradle/actions/setup-gradle@v4
+        if: steps.version.outputs.published == 'false'
 
       - name: Test
-        if: ${{ !inputs.skipTests }}
+        if: steps.version.outputs.published == 'false' && !inputs.skipTests
         # testBoot3 (Spring Boot 3) is checked before a release on a developer machine
         run: ./gradlew test -x testBoot3
 
       - name: Build, sign and upload
+        if: steps.version.outputs.published == 'false'
         env:
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
           ORG_GRADLE_PROJECT_centralUsername: ${{ secrets.CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_centralPassword: ${{ secrets.CENTRAL_PASSWORD }}
-        run: ./gradlew centralUpload -PcentralPublishing=${{ inputs.publishing }}
+        # a version change on main is released right away; a manual run uses the chosen mode
+        run: ./gradlew centralUpload -PcentralPublishing=${{ inputs.publishing || 'AUTOMATIC' }}

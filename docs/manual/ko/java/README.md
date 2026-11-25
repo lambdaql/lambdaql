@@ -13,6 +13,8 @@ lambdaQL은 JPA와 Hibernate 위에서 동작하는 Java·Kotlin용 쿼리 라�
 
 <!-- region: ManualJavaStartTest.java#readme -->
 ```java
+import static org.lambdaql.query.By.desc;
+
 double minPrice = 100;
 OrderedSelectQuery<Order> query = qb.from(Order.class)
         .where(o -> o.getStatus() == 1 && o.getPrice() > minPrice)
@@ -25,7 +27,7 @@ List<Order> orders = query.toList();
 
 `toHql()`은 쿼리를 실행하지 않고 HQL을 돌려줍니다. `assertEquals`의 문자열이 lambdaQL이 만드는 HQL입니다.
 `price`와 `id`는 NULL이 될 수 없는 컬럼이므로 정렬에 `nulls` 부분이 없습니다.
-`desc`와 `asc`는 클래스 `By`의 정렬 함수입니다(`import static org.lambdaql.query.By.*;`, [4.1](04-order-paging.md#41-one-lambda-for-the-whole-sort) 참고).
+`desc`와 `asc`는 클래스 `By`의 정렬 함수입니다([4.1](04-order-paging.md#41-one-lambda-for-the-whole-sort) 참고).
 
 > [!NOTE]
 > **예제에 대하여.**

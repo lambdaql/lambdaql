@@ -11,10 +11,12 @@
 ## 4.1 정렬 전체를 람다 표현식 하나로
 
 정렬은 **람다 표현식 하나**로 작성합니다. 람다 표현식은 엔티티를 받고, 클래스 `By`의 정렬 함수로 키와 방향을 기술합니다.
-`desc(...)`, `asc(...)`를 이어 붙여 키를 추가합니다. 정렬 함수는 `import org.lambdaql.query.By.desc`처럼 함수마다 import합니다.
+`desc(...)`, `asc(...)`를 이어 붙여 키를 추가합니다.
 
 <!-- region: KotlinQueryTest.kt#sort -->
 ```kotlin
+import org.lambdaql.query.By.desc
+
 val q = qb.from(Order::class.java)
     .where { it.isActive }
     .orderBy { o -> desc(o.price).asc(o.customer?.name) }

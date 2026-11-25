@@ -1,6 +1,7 @@
 package org.lambdaql.query;
 
-import static org.lambdaql.query.By.*;
+import static org.lambdaql.query.By.asc;
+import static org.lambdaql.query.By.desc;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;

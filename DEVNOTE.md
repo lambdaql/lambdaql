@@ -155,13 +155,13 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 
 ### 6.4 Maven Central 배포(D64, D65)
 
-배포는 `main`에서만 합니다. GitHub Actions의 "Publish to Maven Central" 작업을 `main` 브랜치로 직접 실행합니다(`.github/workflows/publish.yml`).
+배포는 `main`에서만 합니다. `main`에 `gradle.properties`의 버전 변경이 푸시되면 GitHub Actions의 "Publish to Maven Central" 작업이 그 버전을 자동으로 배포합니다. 이미 Maven Central에 있는 버전이면 건너뜁니다(D72). 손으로 실행할 수도 있습니다(`.github/workflows/publish.yml`).
 
 | 단계 | 내용 | 상태 |
 |---|---|---|
 | 네임스페이스 | Central Portal의 `io.github.lambdaql`. GitHub 조직 인증은 포털이 준 키 이름으로 `github.com/lambdaql`에 공개 저장소를 만들어 확인 | 인증 완료(2026-11-24, 작성자) |
-| 사용자 토큰 | central.sonatype.com > Account > Generate User Token. 저장소 Secrets `CENTRAL_USERNAME`, `CENTRAL_PASSWORD`. 이 PC는 `~/.gradle/gradle.properties`의 `centralUsername`, `centralPassword` | 이 PC 등록, 인증 확인(읽기 API 200). Secrets 미등록 |
-| GPG 키 | ed25519 `F48A35D85635ED69`(작성자 생성, 2026-11-24), keyserver.ubuntu.com과 keys.openpgp.org(이메일 인증)에 공개 키 등록. `gpg --send-keys`는 실패를 알리지 않으므로 Ubuntu는 `/pks/add`로 올리고 조회 결과의 본문까지 확인할 것(상태 200에 "Not Found" 본문이 옴). 이 PC는 `signing.gnupg.keyName`으로 로컬 gpg가 서명. Secrets `SIGNING_KEY`(`gpg --armor --export-secret-keys F48A35D85635ED69`), `SIGNING_PASSWORD` | 공개 키 등록 완료. 이 PC는 pinentry-mac. Secrets 미등록 |
+| 사용자 토큰 | central.sonatype.com > Account > Generate User Token. 저장소 Secrets `CENTRAL_USERNAME`, `CENTRAL_PASSWORD`. 이 PC는 `~/.gradle/gradle.properties`의 `centralUsername`, `centralPassword` | 이 PC 등록, 인증 확인(읽기 API 200). Secrets는 `bash .claude/tools/release/set-secrets.sh`로 등록(작성자 실행 대기) |
+| GPG 키 | ed25519 `F48A35D85635ED69`(작성자 생성, 2026-11-24), keyserver.ubuntu.com과 keys.openpgp.org(이메일 인증)에 공개 키 등록. `gpg --send-keys`는 실패를 알리지 않으므로 Ubuntu는 `/pks/add`로 올리고 조회 결과의 본문까지 확인할 것(상태 200에 "Not Found" 본문이 옴). 이 PC는 `signing.gnupg.keyName`으로 로컬 gpg가 서명. Secrets `SIGNING_KEY`(`gpg --armor --export-secret-keys F48A35D85635ED69`), `SIGNING_PASSWORD` | 공개 키 등록 완료. 이 PC는 pinentry-mac. Secrets는 같은 스크립트로 등록(작성자 실행 대기) |
 | 실행 | Actions > Publish to Maven Central > Run workflow(branch: `main`), 또는 이 PC에서 `main` 커밋으로 `./gradlew centralUpload`. 기본 `USER_MANAGED`는 검증 뒤 포털의 Publish 버튼을 기다림 | 0.0.1을 이 PC에서 업로드(커밋 `e369749`), 배포 `2741a474-e91e-42a2-9000-e430f364303e` 검증 통과(VALIDATED, 2026-11-24). 앞선 두 번은 공개 키를 찾지 못해 실패 후 삭제. Publish 후 2026-11-24 19:34 PUBLISHED, repo1.maven.org에서 네 모듈 확인 |
 
 빌드 작업:

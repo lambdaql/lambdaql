@@ -376,10 +376,10 @@ null 가드(`o.getCustomer() == null || ...`)를 쓰면 고객이 없는 주문�
 
 첫 행 하나를 반환합니다.
 
-`asc(...)`는 클래스 `By`의 정렬 함수이며 `import static org.lambdaql.query.By.*;`로 가져옵니다([4.1](04-order-paging.md#41-one-lambda-for-the-whole-sort) 참고).
-
 <!-- region: ResultQueryTest.java#first -->
 ```java
+import static org.lambdaql.query.By.asc;
+
 Optional<Order> cheapest = qb.from(Order.class)
         .orderBy(o -> asc(o.getPrice()))
         .first();
