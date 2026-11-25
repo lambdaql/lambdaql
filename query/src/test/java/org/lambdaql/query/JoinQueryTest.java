@@ -213,6 +213,41 @@ class JoinQueryTest {
     }
 
     @Test
+    void tenEntities() {
+        // @start region="ten"
+        // up to 10 entities: each lambda gets all of them in join order
+        SelectJoin10Query<Order, Customer, Item, Order, Order, Order, Order, Order, Order, Order> q = qb.from(Order.class)
+                .join(Customer.class, (o, c) -> o.getCustomer().getId() == c.getId())
+                .join(Item.class, (o, c, i) -> i.getOrder().getId() == o.getId())
+                .join(Order.class, (o, c, i, a) -> a.getId() == o.getId())
+                .join(Order.class, (o, c, i, a, b) -> b.getId() == a.getId())
+                .join(Order.class, (o, c, i, a, b, d) -> d.getId() == b.getId())
+                .join(Order.class, (o, c, i, a, b, d, e) -> e.getId() == d.getId())
+                .join(Order.class, (o, c, i, a, b, d, e, f) -> f.getId() == e.getId())
+                .join(Order.class, (o, c, i, a, b, d, e, f, g) -> g.getId() == f.getId())
+                .leftJoin(Order.class, (o, c, i, a, b, d, e, f, g, h) -> h.getId() == g.getId())
+                .where((o, c, i, a, b, d, e, f, g, h) -> i.getQty() > 10 && h.getPrice() > 0);
+        // @end
+        assertEquals("select e0 from Order e0 join Customer e1 on e0.customer.id = e1.id join Item e2 on e2.order.id = e0.id"
+                + " join Order e3 on e3.id = e0.id join Order e4 on e4.id = e3.id join Order e5 on e5.id = e4.id"
+                + " join Order e6 on e6.id = e5.id join Order e7 on e7.id = e6.id join Order e8 on e8.id = e7.id"
+                + " left join Order e9 on e9.id = e8.id where e2.qty > 10 and e9.price > 0.0", q.toHql().hql());
+        List<Long> expected = new ArrayList<>();
+        for (Order o : orders) {
+            for (long[] i : items) if (i[0] == o.getId() && i[1] > 10 && o.getCustomer() != null) expected.add(o.getId());
+        }
+        assertEquals(expected.stream().distinct().sorted().toList(), ids(q.toList()));
+        // sort and select reach the last entity too
+        ValueQuery<Long> lastIds = q.orderBy((o, c, i, a, b, d, e, f, g, h) -> asc(h.getId()))
+                .select((o, c, i, a, b, d, e, f, g, h) -> h.getId());
+        assertEquals("select e9.id from Order e0 join Customer e1 on e0.customer.id = e1.id join Item e2 on e2.order.id = e0.id"
+                + " join Order e3 on e3.id = e0.id join Order e4 on e4.id = e3.id join Order e5 on e5.id = e4.id"
+                + " join Order e6 on e6.id = e5.id join Order e7 on e7.id = e6.id join Order e8 on e8.id = e7.id"
+                + " left join Order e9 on e9.id = e8.id where e2.qty > 10 and e9.price > 0.0 order by e9.id asc", lastIds.toHql().hql());
+        assertEquals(expected.stream().sorted().toList(), lastIds.toList());
+    }
+
+    @Test
     void joinSet() {
         // @start region="join-set"
         SelectJoinQuery<Order, Item> joined = qb.from(Order.class)

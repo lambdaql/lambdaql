@@ -513,7 +513,15 @@ val customers = orders.distinct().count { it.customer?.id }
 두 예제는 HQL `select count(e0.description) from Order e0`와 `select count(distinct e0.customer.id) from Order e0`를 실행합니다.
 컬럼 경로의 조인은 `select`와 같습니다.
 
-예제 코드: [`KotlinCountColumnTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinCountColumnTest.kt)(`count-column`, `count-distinct`).
+엔티티 자체(`count { it }`)를 지정하면 행 전체를 셉니다. HQL은 `count(*)`입니다.
+
+<!-- region: KotlinCountColumnTest.kt#count-row -->
+```kotlin
+// { it } is the whole row: count(*)
+val all = qb.from(Order::class.java).count { it }
+```
+
+예제 코드: [`KotlinCountColumnTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinCountColumnTest.kt)(`count-column`, `count-distinct`, `count-row`).
 
 <a id="exists"></a>
 ### `exists()`

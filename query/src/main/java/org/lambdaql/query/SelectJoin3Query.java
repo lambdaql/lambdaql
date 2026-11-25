@@ -10,14 +10,15 @@ import java.util.Optional;
 import java.util.SequencedSet;
 
 /**
- * A query with explicit entity joins (ROADMAP D44): {@code qb.from(Order.class).leftJoin(Customer.class, (o, c) -> ...)}.
- * Every lambda gets all entities in join order. Without {@code select}, the result is the main entity only. When the
+ * A query with 3 explicitly joined entities (ROADMAP D44, D71): every lambda gets all entities in join order,
+ * {@code (o, c, i) -> ...}. Up to 10 entities can be joined (ROADMAP D71). Without {@code select}, the result is the main entity only. When the
  * join matches several rows, the SQL has one row per match: Hibernate returns each main entity once, but
- * {@code count()} and {@code limit} count the SQL rows; {@code distinct()} makes them count main rows. After {@code leftJoin}, a condition on a joined entity column has
- * the SQL meaning: with no match it is not true, so the row is left out.
+ * {@code count()} and {@code limit} count the SQL rows; {@code distinct()} makes them count main rows. After
+ * {@code leftJoin}, a condition on a joined entity column has the SQL meaning: with no match it is not true, so the
+ * row is left out.
  *
  * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
- * {@snippet class="org.lambdaql.query.JoinQueryTest" region="left-join"}
+ * {@snippet class="org.lambdaql.query.JoinQueryTest" region="three"}
  *
  * @param <T> the main entity type
  * @param <U> the joined entity type
@@ -66,7 +67,7 @@ public class SelectJoin3Query<T, U, V> {
     }
 
     /**
-     * A sort on all entities: {@code (o, c, i) -> asc(c.getName()).desc(i.getQty())}, or one key.
+     * A sort on all entities: {@code (o, c, i) -> asc(c.getName()).desc(i.getId())}, or one key.
      *
      * @param <T> the main entity type
      * @param <U> the joined entity type
@@ -173,7 +174,92 @@ public class SelectJoin3Query<T, U, V> {
     }
 
     /**
-     * Sorts by values of all entities: {@code orderBy((o, c, i, by) -> by.desc(c.getName()).asc(o.getId()))} (D18).
+     * Adds an inner join with a fourth entity: {@code join(Item.class, (o, c, i, e3) -> ...)}.
+     *
+     * @param entity    the joined entity class
+     * @param condition the join condition
+     * @param <W>       the joined entity type
+     * @return the join query with one more entity
+     */
+    public <W> SelectJoin4Query<T, U, V, W> join(Class<W> entity, SelectJoin4Query.JoinOn<T, U, V, W> condition) {
+        return new SelectJoin4Query<>(base, joined, joinBounds, entity, false, condition);
+    }
+
+    /**
+     * Adds a left join with a fourth entity: main rows without a match stay.
+     *
+     * @param entity    the joined entity class
+     * @param condition the join condition
+     * @param <W>       the joined entity type
+     * @return the join query with one more entity
+     */
+    public <W> SelectJoin4Query<T, U, V, W> leftJoin(Class<W> entity, SelectJoin4Query.JoinOn<T, U, V, W> condition) {
+        return new SelectJoin4Query<>(base, joined, joinBounds, entity, true, condition);
+    }
+
+    /**
+     * Adds a cross join with a fourth entity: every pair of rows (ROADMAP D45). Put the conditions in {@code where}.
+     *
+     * @param entity the joined entity class
+     * @param <W>    the joined entity type
+     * @return the join query with one more entity
+     */
+    public <W> SelectJoin4Query<T, U, V, W> crossJoin(Class<W> entity) {
+        return new SelectJoin4Query<>(base, joined, joinBounds, entity, false, null);
+    }
+
+    /**
+     * Joins the rows of a CTE as the fourth root (ROADMAP D44 extension).
+     *
+     * @param cte       the CTE
+     * @param condition the join condition
+     * @param <W>       the row type
+     * @return the join query
+     */
+    public <W> SelectJoin4Query<T, U, V, W> join(Cte<W> cte, SelectJoin4Query.JoinOn<T, U, V, W> condition) {
+        return new SelectJoin4Query<>(base, joined, joinBounds, cte.source.rowType, false, condition, cte.source.joinSource());
+    }
+
+    /**
+     * Left-joins the rows of a CTE as the fourth root (ROADMAP D44 extension).
+     *
+     * @param cte       the CTE
+     * @param condition the join condition
+     * @param <W>       the row type
+     * @return the join query
+     */
+    public <W> SelectJoin4Query<T, U, V, W> leftJoin(Cte<W> cte, SelectJoin4Query.JoinOn<T, U, V, W> condition) {
+        return new SelectJoin4Query<>(base, joined, joinBounds, cte.source.rowType, true, condition, cte.source.joinSource());
+    }
+
+    /**
+     * Joins the rows of a query as a derived table, as the fourth root (ROADMAP D44 extension).
+     *
+     * @param rows      the inner query
+     * @param condition the join condition
+     * @param <W>       the row type
+     * @return the join query
+     */
+    public <W> SelectJoin4Query<T, U, V, W> join(ValueQuery<W> rows, SelectJoin4Query.JoinOn<T, U, V, W> condition) {
+        DerivedSource d = new DerivedSource(rows, null);
+        return new SelectJoin4Query<>(base, joined, joinBounds, d.rowType, false, condition, d.joinSource());
+    }
+
+    /**
+     * Left-joins the rows of a query as a derived table, as the fourth root (ROADMAP D44 extension).
+     *
+     * @param rows      the inner query
+     * @param condition the join condition
+     * @param <W>       the row type
+     * @return the join query
+     */
+    public <W> SelectJoin4Query<T, U, V, W> leftJoin(ValueQuery<W> rows, SelectJoin4Query.JoinOn<T, U, V, W> condition) {
+        DerivedSource d = new DerivedSource(rows, null);
+        return new SelectJoin4Query<>(base, joined, joinBounds, d.rowType, true, condition, d.joinSource());
+    }
+
+    /**
+     * Sorts by values of all entities: {@code orderBy((o, c, i) -> desc(c.getName()).asc(o.getId()))} (D18, D59).
      * Paths use a left join, so rows are not lost.
      *
      * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
@@ -193,7 +279,8 @@ public class SelectJoin3Query<T, U, V> {
     }
 
     /**
-     * Selects values of all entities: {@code select((o, c, i) -> new OrderView(o.getId(), c.getName()))}.
+     * Selects values of all entities: {@code select((o, c, i) -> new OrderView(o.getId(), c.getName()))}. An entity
+     * itself is a value too: {@code select((o, c, i) -> i)} or a record of entities (ROADMAP D70).
      *
      * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
      * {@snippet class="org.lambdaql.query.JoinQueryTest" region="select"}

@@ -507,7 +507,15 @@ long customers = orders.distinct().count(o -> o.getCustomer().getId());
 두 예제는 HQL `select count(e0.description) from Order e0`와 `select count(distinct e0.customer.id) from Order e0`를 실행합니다.
 컬럼 경로의 조인은 `select`와 같습니다.
 
-예제 코드: [`CountColumnTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/CountColumnTest.java)(`count-column`, `count-distinct`).
+엔티티 자체(`count(o -> o)`)를 지정하면 행 전체를 셉니다. HQL은 `count(*)`입니다.
+
+<!-- region: CountColumnTest.java#count-row -->
+```java
+// o -> o is the whole row: count(*)
+long active = qb.from(Order.class).where(o -> o.isActive()).count(o -> o);
+```
+
+예제 코드: [`CountColumnTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/CountColumnTest.java)(`count-column`, `count-distinct`, `count-row`).
 
 <a id="exists"></a>
 ### `exists()`

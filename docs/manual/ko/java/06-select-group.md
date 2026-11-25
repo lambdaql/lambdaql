@@ -477,10 +477,61 @@ assertEquals("select e0.id, e1.name from Order e0 left join Customer e1 on e0.cu
 `Row`는 `record Row(Long orderId, String customerName)`입니다. 고객이 없는 주문은 `customerName`이 `null`입니다.
 `select`는 `ValueQuery`를 반환하므로 `distinct()`, `limit`, `offset`, [6.7](#67-distinct-paging-and-results)의 결과 메서드를 사용할 수 있습니다.
 
-<a id="three-entities-and-repeated-rows"></a>
-### 엔티티 3개와 반복되는 행
+<a id="select-entities"></a>
+### 엔티티 선택
 
-엔티티는 3개까지 조인할 수 있습니다. 세 번째 조인 람다 표현식은 세 엔티티를 모두 받습니다: `(o, c, i) -> ...`.
+`select`에는 엔티티 자체도 쓸 수 있습니다. 조인한 엔티티를 고르거나, 여러 엔티티를 record 하나에 담을 수 있습니다.
+
+<!-- region: SelectEntityTest.java#select-joined -->
+```java
+// the customers that have an order, through an explicit join; Hibernate returns each entity once
+ValueQuery<Customer> q = qb.from(Order.class)
+        .join(Customer.class, (o, c) -> o.getCustomer().getId() == c.getId())
+        .select((o, c) -> c);
+```
+
+엔티티 하나를 고르면 Hibernate가 같은 엔티티를 한 번만 돌려줍니다. HQL은 `select e1 from Order e0 join Customer e1 on e0.customer.id = e1.id`입니다.
+
+<!-- region: SelectEntityTest.java#select-entities -->
+```java
+// an order and its customer together; with leftJoin an order without a customer has null
+ValueQuery<OrderWithCustomer> q = qb.from(Order.class)
+        .leftJoin(Customer.class, (o, c) -> o.getCustomer().getId() == c.getId())
+        .select((o, c) -> new OrderWithCustomer(o, c));
+```
+
+`OrderWithCustomer`는 `record OrderWithCustomer(Order order, Customer customer)`입니다. HQL은 `select e0, e1 from Order e0 left join Customer e1 on e0.customer.id = e1.id`이고, 주문마다 한 행입니다.
+
+<!-- region: SelectEntityTest.java#select-self -->
+```java
+// o -> o selects the entity itself: the same rows as toList()
+ValueQuery<Order> q = qb.from(Order.class).where(o -> o.getPrice() > 150).select(o -> o);
+```
+
+- `select(o -> o)`는 `select` 없이 `toList()`를 부른 것과 결과가 같습니다.
+- 엔티티를 담은 행은 파생 테이블이나 CTE의 행으로 쓸 수 없습니다(`LQL-3071`). 엔티티의 id나 컬럼을 고르십시오.
+
+CTE에는 값만 담고, 바깥 쿼리에서 엔티티와 조인해 엔티티를 고르면 됩니다.
+
+<!-- region: SelectEntityTest.java#select-entity-cte -->
+```java
+// the CTE has values only (customer id, total); the outer query joins it to the entity and selects the entity
+Cte<Total> totals = qb.with(qb.from(Order.class)
+        .where(o -> o.getCustomer() != null)
+        .groupBy(o -> o.getCustomer().getId())
+        .select(o -> new Total(o.getCustomer().getId(), Agg.sum(o.getPrice()))));
+ValueQuery<Customer> big = qb.from(Customer.class)
+        .join(totals, (c, t) -> t.customerId().equals(c.getId()))
+        .where((c, t) -> t.total() > 250)
+        .select((c, t) -> c);
+```
+
+예제 코드: [`SelectEntityTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectEntityTest.java)(`select-joined`, `select-entities`, `select-self`, `select-entity-cte`).
+
+<a id="three-entities-and-repeated-rows"></a>
+### 엔티티 여러 개와 반복되는 행
+
+엔티티는 10개까지 조인할 수 있습니다(주 엔티티와 조인 엔티티 9개). 조인할 때마다 람다 표현식이 받는 엔티티가 하나씩 늘어납니다: `(o, c, i) -> ...`.
 
 <!-- region: JoinQueryTest.java#three -->
 ```java
@@ -491,6 +542,24 @@ SelectJoin3Query<Order, Customer, Item> q = qb.from(Order.class)
         .where((o, c, i) -> i.getQty() > 10);
 assertEquals("select e0 from Order e0 join Customer e1 on e0.customer.id = e1.id"
         + " join Item e2 on e2.order.id = e0.id where e2.qty > 10", q.toHql().hql());
+```
+
+엔티티 10개를 조인한 예입니다.
+
+<!-- region: JoinQueryTest.java#ten -->
+```java
+// up to 10 entities: each lambda gets all of them in join order
+SelectJoin10Query<Order, Customer, Item, Order, Order, Order, Order, Order, Order, Order> q = qb.from(Order.class)
+        .join(Customer.class, (o, c) -> o.getCustomer().getId() == c.getId())
+        .join(Item.class, (o, c, i) -> i.getOrder().getId() == o.getId())
+        .join(Order.class, (o, c, i, a) -> a.getId() == o.getId())
+        .join(Order.class, (o, c, i, a, b) -> b.getId() == a.getId())
+        .join(Order.class, (o, c, i, a, b, d) -> d.getId() == b.getId())
+        .join(Order.class, (o, c, i, a, b, d, e) -> e.getId() == d.getId())
+        .join(Order.class, (o, c, i, a, b, d, e, f) -> f.getId() == e.getId())
+        .join(Order.class, (o, c, i, a, b, d, e, f, g) -> g.getId() == f.getId())
+        .leftJoin(Order.class, (o, c, i, a, b, d, e, f, g, h) -> h.getId() == g.getId())
+        .where((o, c, i, a, b, d, e, f, g, h) -> i.getQty() > 10 && h.getPrice() > 0);
 ```
 
 > [!WARNING]
@@ -629,14 +698,14 @@ assertEquals("with t as (select d0.customer.id as customerId, sum(d0.price) as t
 
 | 호출 뒤 | 메서드 |
 |---|---|
-| `join`, `leftJoin`, `crossJoin` | `where`, `join` / `leftJoin` / `crossJoin`(엔티티 3개까지, 파생 테이블과 CTE 포함), `distinct`, `orderBy`, `select`, `limit`, `toList`, `toSet`, `first`, `count`, `exists`, `toHql` |
+| `join`, `leftJoin`, `crossJoin` | `where`, `join` / `leftJoin` / `crossJoin`(엔티티 10개까지, 파생 테이블과 CTE 포함), `distinct`, `orderBy`, `select`, `limit`, `toList`, `toSet`, `first`, `count`, `exists`, `toHql` |
 | `orderBy((o, c) -> ...)` | `select`, `limit`, `offset`, `toList`, `first`, 그 밖의 정렬된 쿼리 메서드([4. 정렬과 페이징](04-order-paging.md)) |
 
 서브쿼리 안의 조인은 [5. 서브쿼리](05-subquery.md#joins-inside-a-subquery)를 참고하십시오.
-지원하지 않는 것: insert의 조인, 엔티티 4개 이상, `SortSpec`의 조인 형태.
+지원하지 않는 것: insert의 조인, 엔티티 11개 이상, `SortSpec`의 조인 형태.
 update와 delete의 조인은 추가하지 않기로 했습니다. 연관 경로(U9)나 `sub`를 쓰십시오.
 
-예제 코드: [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)(`join`, `left-join`, `sort`, `select`, `three`, `cross-join`, `cross-join-paging`, `join-distinct`, `join-set`, `join-cte`, `join-derived`, `cte-reuse`).
+예제 코드: [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)(`join`, `left-join`, `sort`, `select`, `three`, `cross-join`, `cross-join-paging`, `join-distinct`, `join-set`, `join-cte`, `join-derived`, `cte-reuse`, `ten`).
 
 ---
 
@@ -760,7 +829,7 @@ MariaDB와 Oracle은 진짜 `with`를 실행합니다. 컬럼 목록은 Hibernat
 
 | # | 규칙 | 상태 |
 |---|---|---|
-| J1 | `select` 람다 표현식은 **값 식 하나**나 **생성자 호출 하나**를 반환합니다. 생성자의 각 인자는 값 식입니다([3. 조건(`where`)](03-where.md)의 규칙). 값을 고르는 삼항 연산자는 `case when`이 됩니다([3.5.1](03-where.md#351-values-chosen-by-a-condition)). `select`에만 쓰인 연관 경로는 `left join` 별칭이 되므로 행을 잃지 않습니다. 필수 연관(`optional = false`)은 inner join입니다(A4). 같은 경로를 `where`에서 쓰면 `select`는 `where`의 조인을 사용합니다(R24). | 구현됨 |
+| J1 | `select` 람다 표현식은 **값 식 하나**나 **생성자 호출 하나**를 반환합니다. 생성자의 각 인자는 값 식입니다([3. 조건(`where`)](03-where.md)의 규칙). 엔티티 자체도 값이 될 수 있습니다([엔티티 선택](#select-entities)). 값을 고르는 삼항 연산자는 `case when`이 됩니다([3.5.1](03-where.md#351-values-chosen-by-a-condition)). `select`에만 쓰인 연관 경로는 `left join` 별칭이 되므로 행을 잃지 않습니다. 필수 연관(`optional = false`)은 inner join입니다(A4). 같은 경로를 `where`에서 쓰면 `select`는 `where`의 조인을 사용합니다(R24). | 구현됨 |
 | J2 | 생성자의 경우 lambdaQL은 컬럼만 조회하고 생성자는 Java에서 호출합니다. `select new`는 쓰지 않습니다. | 구현됨 |
 | J3 | 집계가 있으면 `select`와 `having`(그리고 `insert ... select`의 값)에서 집계가 아닌 값은 모두 `groupBy` 키여야 합니다. 그렇지 않으면 분석 시점에 오류가 발생합니다. | 구현됨. 오류는 `TranslationException`(`LQL-3035`, [11](../11-errors-and-languages.md) 참고) |
 | J4 | `sum`/`avg`/`min`/`max`는 행이 없거나 모든 값이 NULL이면 NULL을 줍니다. `count`는 0을 줍니다. NULL이 될 수 있는 값에는 박싱 타입을 사용하십시오. 기본형 생성자 인자에 NULL이 오면 해당 인자를 알려 주는 `IllegalStateException`이 발생합니다. | 구현됨 |
@@ -802,7 +871,7 @@ assertThrows(IllegalStateException.class, () -> qb.from(Order.class)
 |---|---|
 | 집계 결과나 select 별칭으로 정렬(예: `orderBy(s -> desc(s.total()))`), 그룹 쿼리의 `orderBy` | 지원하지 않음 |
 | 사용자 집계 함수와 윈도 함수 | 지원하지 않음 |
-| insert의 조인, 엔티티 4개 이상, 서브쿼리 안의 엔티티 3개 이상 | 지원하지 않음 |
+| insert의 조인, 엔티티 11개 이상, 서브쿼리 안의 엔티티 3개 이상 | 지원하지 않음 |
 | update, delete의 조인 | 추가하지 않음. 연관 경로(U9)나 `sub` 사용 |
 | DML 안의 파생 테이블과 CTE | 지원하지 않음 |
 

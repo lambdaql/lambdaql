@@ -109,6 +109,20 @@ class CountColumnTest {
     }
 
     @Test
+    void countRow() {
+        // @start region="count-row"
+        // o -> o is the whole row: count(*)
+        long active = qb.from(Order.class).where(o -> o.isActive()).count(o -> o);
+        // @end
+        assertEquals("select count(*) from Order e0 where e0.active = true",
+                qb.from(Order.class).where(o -> o.isActive()).countHql(o -> o, false).hql());
+        assertEquals(all.stream().filter(Order::isActive).count(), active);
+        // after distinct() it counts each row once, like count()
+        assertEquals("select count(distinct e0) from Order e0", qb.from(Order.class).distinct().countHql(o -> o, true).hql());
+        assertEquals(all.size(), qb.from(Order.class).distinct().count(o -> o));
+    }
+
+    @Test
     void notOneValue() {
         // a constructor or an aggregate is not one column
         LambdaQLException made = assertThrows(LambdaQLException.class,

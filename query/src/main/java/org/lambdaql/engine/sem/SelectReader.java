@@ -75,7 +75,7 @@ public final class SelectReader {
         if (body instanceof Expr.Invoke inv && inv.method().isStatic() && inv.method().is("kotlin/TuplesKt", "to")) {
             return new Projection(columns(inv.args(), ref, roots, model, true), "kotlin/Pair", "(Ljava/lang/Object;Ljava/lang/Object;)V");
         }
-        return new Projection(List.of(Normalizer.normalizeValue(body, roots, model, ref.classLoader(), ref.describe(), true)), null, null);
+        return new Projection(List.of(Normalizer.normalizeSelected(body, roots, model, ref.classLoader(), ref.describe())), null, null);
     }
 
     /**
@@ -138,6 +138,24 @@ public final class SelectReader {
 
     // ------------------------------------------------------------------ helpers
 
+    /**
+     * Tells whether a lambda returns its first entity parameter itself ({@code o -> o}, Kotlin {@code { it }}): the
+     * whole row, which {@code count(o -> o)} counts as {@code count(*)} (ROADMAP D69).
+     *
+     * <p>Example: {@code o -> o} returns {@code true}; {@code o -> o.getId()} returns {@code false}.
+     *
+     * @param ref the lambda
+     * @return {@code true} if the body is the first parameter
+     */
+    public static boolean isWholeRow(LambdaRef ref) {
+        if (!ref.isLambdaBody()) return false;
+        Node node = Decoder.decodeValue(ref, BytecodeLoader.load(ref));
+        if (!(node instanceof Node.Value v)) return false;
+        Expr e = v.value();
+        while (e instanceof Expr.Convert c) e = c.operand();
+        return e instanceof Expr.Param p && p.index() == 0;
+    }
+
     private static Expr body(LambdaRef ref) {
         if (!ref.isLambdaBody()) {
             Expr getter = SortReader.getterReference(ref);
@@ -157,7 +175,8 @@ public final class SelectReader {
         List<Expr> out = new ArrayList<>();
         for (Expr e : raw) {
             if (e == null) throw LqlMessage.EMPTY_ARRAY_ELEMENT.exceptionAt(ref.describe());
-            out.add(Normalizer.normalizeValue(e, roots, model, ref.classLoader(), ref.describe(), aggregates));
+            out.add(aggregates ? Normalizer.normalizeSelected(e, roots, model, ref.classLoader(), ref.describe())   // select values (D70)
+                    : Normalizer.normalizeValue(e, roots, model, ref.classLoader(), ref.describe(), false));
         }
         return out;
     }

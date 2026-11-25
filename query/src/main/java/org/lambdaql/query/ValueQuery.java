@@ -168,6 +168,11 @@ public class ValueQuery<R> {
     private List<HqlRenderer.JoinBound> joins = List.of();
 
     /** Sets the entity joins of a join query; the joined entities are roots 1, 2 ... Not public API. */
+    /** Whether a selected value is an entity itself ({@code select((o, c) -> c)}, D70). Not public API. */
+    boolean selectsEntity() {
+        return select.exprs().stream().anyMatch(e -> e instanceof org.lambdaql.engine.ir.Expr.Root);
+    }
+
     ValueQuery<R> withJoins(List<HqlRenderer.JoinBound> joins) {
         this.joins = List.copyOf(joins);
         return this;

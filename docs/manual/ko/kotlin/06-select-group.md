@@ -520,10 +520,39 @@ assertEquals("select e0.id, e1.name from Order e0 left join Customer e1 on e0.cu
 고객이 없는 주문은 `customerName`이 `null`입니다.
 `select`는 `ValueQuery`를 반환하므로 `distinct()`, `limit`, `offset`, [6.7](#67-distinct-paging-and-results)의 결과 함수를 사용할 수 있습니다.
 
-<a id="three-entities-and-repeated-rows"></a>
-### 엔티티 3개와 반복되는 행
+<a id="select-entities"></a>
+### 엔티티 선택
 
-엔티티는 3개까지 조인할 수 있습니다. 세 번째 조인 람다 표현식은 세 엔티티를 모두 받습니다: `{ o, c, i -> ... }`.
+`select`에는 엔티티 자체도 쓸 수 있습니다. 조인한 엔티티를 고르거나, 여러 엔티티를 data class나 `Pair` 하나에 담을 수 있습니다.
+
+<!-- region: KotlinSelectEntityTest.kt#select-joined -->
+```kotlin
+// the customers that have an order, through an explicit join; Hibernate returns each entity once
+val q = qb.from(Order::class.java)
+    .join(Customer::class.java) { o, c -> o.customer?.id == c.id }
+    .select { _, c -> c }
+```
+
+엔티티 하나를 고르면 Hibernate가 같은 엔티티를 한 번만 돌려줍니다. HQL은 `select e1 from Order e0 join Customer e1 on e0.customer is not null and e0.customer.id = e1.id`입니다.
+
+<!-- region: KotlinSelectEntityTest.kt#select-entities -->
+```kotlin
+// an order and its customer together; with leftJoin an order without a customer has null
+val q = qb.from(Order::class.java)
+    .leftJoin(Customer::class.java) { o, c -> o.customer?.id == c.id }
+    .select { o, c -> OrderWithCustomer(o, c) }
+```
+
+`OrderWithCustomer`는 `data class OrderWithCustomer(val order: Order, val customer: Customer?)`입니다. HQL은 `select e0, e1 from Order e0 left join Customer e1 on ...`이고, 주문마다 한 행입니다. `select { o, c -> o to c }`처럼 `Pair`로 받아도 됩니다.
+
+엔티티를 담은 행은 파생 테이블이나 CTE의 행으로 쓸 수 없습니다(`LQL-3071`). 엔티티의 id나 컬럼을 고르십시오.
+
+예제 코드: [`KotlinSelectEntityTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectEntityTest.kt)(`select-joined`, `select-entities`).
+
+<a id="three-entities-and-repeated-rows"></a>
+### 엔티티 여러 개와 반복되는 행
+
+엔티티는 10개까지 조인할 수 있습니다(주 엔티티와 조인 엔티티 9개). 조인할 때마다 람다 표현식이 받는 엔티티가 하나씩 늘어납니다: `{ o, c, i -> ... }`.
 
 <!-- region: ManualKotlinSelectTest.kt#join-three -->
 ```kotlin
@@ -534,6 +563,25 @@ val q = qb.from(Order::class.java)
     .where { _, _, i -> i.qty > 10 }
 assertEquals("select e0 from Order e0 join Customer e1 on e0.customer is not null and e0.customer.id = e1.id"
     + " join Item e2 on e2.order.id = e0.id where e2.qty > 10", q.toHql().hql())
+```
+
+엔티티 10개를 조인한 예입니다.
+
+<!-- region: KotlinSelectEntityTest.kt#ten -->
+```kotlin
+// up to 10 entities: each lambda gets all of them in join order
+val q = qb.from(Order::class.java)
+    .join(Customer::class.java) { o, c -> o.customer?.id == c.id }
+    .join(Order::class.java) { o, _, a -> a.id == o.id }
+    .join(Order::class.java) { _, _, a, b -> b.id == a.id }
+    .join(Order::class.java) { _, _, _, b, d -> d.id == b.id }
+    .join(Order::class.java) { _, _, _, _, d, e -> e.id == d.id }
+    .join(Order::class.java) { _, _, _, _, _, e, f -> f.id == e.id }
+    .join(Order::class.java) { _, _, _, _, _, _, f, g -> g.id == f.id }
+    .join(Order::class.java) { _, _, _, _, _, _, _, g, h -> h.id == g.id }
+    .leftJoin(Order::class.java) { _, _, _, _, _, _, _, _, h, k -> k.id == h.id }
+    .where { _, c, _, _, _, _, _, _, _, k -> c.name == "Kim" && k.price > 0.0 }
+    .select { _, c, _, _, _, _, _, _, _, k -> c.name to k.id }
 ```
 
 > [!WARNING]
@@ -662,14 +710,14 @@ assertEquals("with t as (select d0.customer.id as customerId, count(*) as cnt, s
 
 | 호출 뒤 | 함수 |
 |---|---|
-| `join`, `leftJoin`, `crossJoin` | `where`, `join` / `leftJoin` / `crossJoin`(엔티티 3개까지, 파생 테이블과 CTE 포함), `distinct`, `orderBy`, `select`, `limit`, `toList`, `toSet`, `first`, `count`, `exists`, `toHql` |
+| `join`, `leftJoin`, `crossJoin` | `where`, `join` / `leftJoin` / `crossJoin`(엔티티 10개까지, 파생 테이블과 CTE 포함), `distinct`, `orderBy`, `select`, `limit`, `toList`, `toSet`, `first`, `count`, `exists`, `toHql` |
 | `orderBy { o, c -> ... }` | `select`, `limit`, `offset`, `toList`, `first`, 그 밖의 정렬된 쿼리 함수([4. 정렬과 페이징](04-order-paging.md)) |
 
 서브쿼리 안의 조인은 [5. 서브쿼리](05-subquery.md#joins-inside-a-subquery)를 참고하십시오.
-지원하지 않는 것: insert의 조인, 엔티티 4개 이상, `SortSpec`의 조인 형태.
+지원하지 않는 것: insert의 조인, 엔티티 11개 이상, `SortSpec`의 조인 형태.
 update와 delete의 조인은 추가하지 않기로 했습니다. 연관 경로(U9)나 `sub`를 쓰십시오.
 
-예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`join`, `left-join-null`, `row-type`, `join-sort-select`, `join-three`, `cross-join`, `join-paging`, `join-derived`, `cte-reuse`), [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`join-distinct`, `join-cte`).
+예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`join`, `left-join-null`, `row-type`, `join-sort-select`, `join-three`, `cross-join`, `join-paging`, `join-derived`, `cte-reuse`), [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`join-distinct`, `join-cte`), [`KotlinSelectEntityTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectEntityTest.kt)(`ten`).
 
 ---
 
@@ -787,7 +835,7 @@ MariaDB와 Oracle은 진짜 `with`를 실행합니다. 컬럼 목록은 Hibernat
 
 | # | 규칙 | 상태 |
 |---|---|---|
-| J1 | `select` 람다 표현식은 **값 식 하나**나 **생성자 호출 하나**를 반환합니다. 생성자의 각 인자는 값 식입니다([3. 조건(`where`)](03-where.md)의 규칙). 값을 고르는 `if`와 `when`은 `case when`이 됩니다([3.5.1](03-where.md#351-values-chosen-by-a-condition)). `select`에만 쓰인 연관 경로는 `left join` 별칭이 되므로 행을 잃지 않습니다. 필수 연관(`optional = false`)은 inner join입니다(A4). 같은 경로를 `where`에서 쓰면 `select`는 `where`의 조인을 사용합니다(R24). | 구현됨 |
+| J1 | `select` 람다 표현식은 **값 식 하나**나 **생성자 호출 하나**를 반환합니다. 생성자의 각 인자는 값 식입니다([3. 조건(`where`)](03-where.md)의 규칙). 엔티티 자체도 값이 될 수 있습니다([엔티티 선택](#select-entities)). 값을 고르는 `if`와 `when`은 `case when`이 됩니다([3.5.1](03-where.md#351-values-chosen-by-a-condition)). `select`에만 쓰인 연관 경로는 `left join` 별칭이 되므로 행을 잃지 않습니다. 필수 연관(`optional = false`)은 inner join입니다(A4). 같은 경로를 `where`에서 쓰면 `select`는 `where`의 조인을 사용합니다(R24). | 구현됨 |
 | J2 | 생성자의 경우 lambdaQL은 컬럼만 조회하고 생성자를 직접 호출합니다. `select new`는 쓰지 않습니다. `Pair`/`Triple`도 같은 방식으로 만듭니다. | 구현됨 |
 | J3 | 집계가 있으면 `select`와 `having`(그리고 `insert ... select`의 값)에서 집계가 아닌 값은 모두 `groupBy` 키여야 합니다. 그렇지 않으면 분석 시점에 오류가 발생합니다. | 구현됨. 오류는 `TranslationException`(`LQL-3035`, [11](../11-errors-and-languages.md) 참고) |
 | J4 | `sum`/`avg`/`min`/`max`는 행이 없거나 모든 값이 NULL이면 NULL을 냅니다. `count`는 0을 냅니다. 생성자 파라미터는 nullable로 쓰십시오. non-null 파라미터에 NULL이 오면 `IllegalStateException`이 발생합니다. | 구현됨 |
@@ -827,7 +875,7 @@ assertThrows(IllegalStateException::class.java) {
 |---|---|
 | 집계 결과나 select 별칭으로 정렬(예: `orderBy { s -> desc(s.total) }`), 그룹 쿼리의 `orderBy` | |
 | 사용자 집계 함수와 윈도 함수 | |
-| insert의 조인, 엔티티 4개 이상, 서브쿼리 안의 엔티티 3개 이상 | |
+| insert의 조인, 엔티티 11개 이상, 서브쿼리 안의 엔티티 3개 이상 | |
 | update, delete의 조인 | 추가하지 않기로 함. 연관 경로(U9)나 `sub` 사용 |
 | DML 안의 파생 테이블과 CTE | |
 

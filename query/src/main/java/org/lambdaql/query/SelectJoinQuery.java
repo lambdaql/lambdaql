@@ -269,7 +269,9 @@ public class SelectJoinQuery<T, U> {
     }
 
     /**
-     * Selects values of all entities: {@code select((o, c) -> new OrderView(o.getId(), c.getName()))}.
+     * Selects values of all entities: {@code select((o, c) -> new OrderView(o.getId(), c.getName()))}. An entity
+     * itself is a value too: {@code select((o, c) -> c)} or {@code select((o, c) -> new OrderWithCustomer(o, c))}
+     * (ROADMAP D70); one selected entity comes once per entity, as Hibernate returns it.
      *
      * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
      * {@snippet class="org.lambdaql.query.JoinQueryTest" region="select"}

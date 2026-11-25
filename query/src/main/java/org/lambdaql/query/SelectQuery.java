@@ -188,12 +188,15 @@ public class SelectQuery<T> {
     /**
      * Counts the rows whose value of one column is not NULL: {@code select count(e0.description) from ...}.
      * After {@link #distinct()} each different value is counted once: {@code count(distinct e0.customer.id)}.
+     * The entity itself, {@code o -> o}, is the whole row: {@code select count(*) from ...} (ROADMAP D69).
      *
      * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/CountColumnTest.java">CountColumnTest</a>):
      * {@snippet class="org.lambdaql.query.CountColumnTest" region="count-column"}
      * {@snippet class="org.lambdaql.query.CountColumnTest" region="count-distinct"}
+     * {@snippet class="org.lambdaql.query.CountColumnTest" region="count-row"}
      *
-     * @param column the column lambda, for example {@code o -> o.getDescription()} or {@code o -> o.getCustomer().getId()}
+     * @param column the column lambda, for example {@code o -> o.getDescription()} or {@code o -> o.getCustomer().getId()};
+     *               {@code o -> o} for every row
      * @return the number of non-NULL values, or of different non-NULL values after {@link #distinct()}
      * @throws org.lambdaql.LambdaAnalysisException if the lambda is not one value of the entity
      */
@@ -227,6 +230,9 @@ public class SelectQuery<T> {
      */
     RenderedQuery countHql(Select<T, ?> column, boolean distinct) {
         LambdaRef ref = QueryContext.read(column);
+        if (org.lambdaql.engine.sem.SelectReader.isWholeRow(ref)) {          // count(o -> o): every row, count(*)
+            return distinct ? renderer().count(entityClass, wheres) : renderer().countAll(entityClass, wheres);
+        }
         var projection = context.analyzeSelect(ref, List.of(entityClass));
         if (projection.constructs() || projection.columns().size() != 1
                 || projection.columns().get(0) instanceof org.lambdaql.engine.ir.Expr.Aggregate) {
@@ -362,7 +368,8 @@ public class SelectQuery<T> {
     /**
      * Selects values instead of entities: one value {@code o -> o.getPrice()}, or a record/DTO
      * {@code o -> new OrderView(o.getId(), o.getCustomer().getName())} (ROADMAP M9). Aggregates over all rows
-     * ({@code o -> new Total(Agg.count(), Agg.avg(o.getPrice()))}) are allowed.
+     * ({@code o -> new Total(Agg.count(), Agg.avg(o.getPrice()))}) are allowed. The entity itself is a value too:
+     * {@code o -> o} gives the same rows as {@code toList()} (ROADMAP D70).
      *
      * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
      * {@snippet class="org.lambdaql.query.ProjectionTest" region="record"}

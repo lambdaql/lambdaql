@@ -28,6 +28,10 @@ final class DerivedSource {
         if (row == null || !(row.isRecord() || isKotlinData(row))) {
             throw LqlMessage.DERIVED_ROW_TYPE.exception(row == null ? "a single value" : row.getName());
         }
+        if (inner.selectsEntity()) {
+            // a column of a derived table is a value: an entity (select((o, c) -> new Row(o, c)), D70) cannot be one
+            throw LqlMessage.DERIVED_ENTITY_COLUMN.exception(row.getName());
+        }
         this.rowType = row;
         inner.context().registerRow(row);
     }

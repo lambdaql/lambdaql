@@ -429,6 +429,18 @@ public final class HqlRenderer {
     }
 
     /**
+     * Renders {@code select count(*) from Entity e0 [join ...] [where ...]}: every row, for {@code count(o -> o)}
+     * (ROADMAP D69).
+     *
+     * @param root   the main entity class
+     * @param wheres the conditions; they are joined with AND
+     * @return the HQL and its parameters; the result is one {@code Long}
+     */
+    public RenderedQuery countAll(Class<?> root, List<Bound> wheres) {
+        return render("count(*)", root, wheres, List.of(), false);
+    }
+
+    /**
      * Renders {@code select 1 from Entity e0 [join ...] [where ...]}; the caller reads at most one row.
      *
      * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
@@ -1500,6 +1512,7 @@ public final class HqlRenderer {
     private String value(Expr e, Class<?> peer) {
         return switch (e) {
             case Expr.Column c -> path(c);
+            case Expr.Root r -> aliasOf(r.root());                       // an entity in a select: select e1 (D70)
             case Expr.Host h -> {
                 Object v = eval(h);
                 if (v == null) {

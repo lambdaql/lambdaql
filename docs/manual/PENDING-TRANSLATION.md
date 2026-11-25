@@ -55,6 +55,9 @@
 24. 02장 `count()` 절: count 설명과 SQL을 먼저, 페이징 화면 설명과 예제를 뒤로 재배치. "where 단계에만 있으므로" 문장 삭제
 25. 02장 `count()` 절 끝에 "컬럼 지정"(`count(컬럼)`, `distinct().count(컬럼)`) 문단과 예제 추가(D67). 번역 에이전트 작업 중에 추가되어 반영 여부 확인 필요
 26. 조인 결과 설명 수정(D68): 06장의 "반복되는 행" 경고와 "조인 결과의 `distinct()`" 절(`toList()`·`toSet()`은 반복 없음, `count()`·`limit`은 SQL 행), 예제 `three`, `join-three`, `join-distinct`, 새 예제 `join-set`(Java)
+27. 02장 `count()` 절: `count(o -> o)`(Kotlin `count { it }`)는 `count(*)` 문단과 예제 `count-row` 추가(D69)
+28. 06장에 "엔티티 선택" 절 추가(앵커 `select-entities`, 예제 `select-joined`, `select-entities`, Java는 `select-self`, `select-entity-cte`), J1 행에 엔티티 값 문장 추가(D70)
+29. 06장: 조인 엔티티 수 3개 → 10개(D71), 절 제목 "엔티티 여러 개와 반복되는 행"(앵커 유지), 새 예제 `ten`, 메서드 표와 "지원하지 않는 것"의 개수
 
 바뀐 페이지가 많아 페이지를 통째로 다시 옮기는 방식이 정확합니다.
 

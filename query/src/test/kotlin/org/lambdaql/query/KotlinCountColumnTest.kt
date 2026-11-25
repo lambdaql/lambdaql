@@ -61,6 +61,16 @@ class KotlinCountColumnTest {
     }
 
     @Test
+    fun countRow() {
+        // @start region="count-row"
+        // { it } is the whole row: count(*)
+        val all = qb.from(Order::class.java).count { it }
+        // @end
+        assertEquals("select count(*) from Order e0", qb.from(Order::class.java).countHql({ it }, false).hql())
+        assertEquals(all().size.toLong(), all)
+    }
+
+    @Test
     fun countDistinct() {
         // @start region="count-distinct"
         // the number of different customers that have an order

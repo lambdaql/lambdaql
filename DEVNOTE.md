@@ -57,7 +57,7 @@ Boot BOM은 모듈의 `gradle.properties`의 `lql.springBoot`로 고른다(루�
 
 테스트: 세 DB(H2 2.3.230, MariaDB 10.11.18, Oracle Free 23.26.3)에서 모듈 전체 통과(2026-11-19 실측). `main` 241개. `feature/unified-boot`는 다섯 DB(H2·MariaDB·Oracle·PostgreSQL·MySQL)에서 Boot 라인마다 250개, `test`(Boot 4, JDK 21) 250개, `testBoot3`(Boot 3, JDK 21) 250개, `testClassFile`(Boot 4, JDK 25) 250개(2026-11-23). 건너뜀은 DB별 H2 16·MariaDB 10·Oracle 9. Kotlin 람다 테스트는 `query/src/test/kotlin`에 별도 소스 세트로 있다.
 
-0.0.1을 Maven Central에 배포했다(2026-11-24, `io.github.lambdaql`). 버전은 `gradle.properties`의 값이다.
+0.0.1을 Maven Central에 배포했다(2026-11-24, `io.github.lambdaql`). 다음 버전은 `gradle.properties`의 `0.0.2`(2026-11-25, D67~D71 포함, 미배포). 매뉴얼의 의존성 예제는 배포된 버전(0.0.1)을 쓰고 배포 뒤에 바꾼다.
 
 ---
 
@@ -104,7 +104,7 @@ Javadoc 빌드는 `--snippet-path src/test/java`를 쓴다. Javadoc의 `{@snippe
 
 1. **번역**: `PENDING-TRANSLATION.md`의 항목을 en → ja → zh 순서로 반영한다(작성자 결정, 언어마다 순서대로). 31쪽이 한국어와 달라져 있어 바뀐 페이지를 통째로 다시 옮기는 방식이 정확하다. 2026-11-19에 en 작업을 시작했다가 작성자 요청으로 중지했다(변경 없음).
 2. **Spring Boot 4 지원**: `feature/boot4` 브랜치에서 진행 중(10절). 세 DB 테스트 통과, 남은 일은 jar 하나(D52) 구현과 매뉴얼 갱신.
-3. **남은 미구현·v0.2 후보**(9절과 ROADMAP 기준): MariaDB `lateral` 재작성(Q4), `SortSpec`의 조인 형태, 집계 기준 정렬, Oracle 오버로드 선택, CASE WHEN 2단계 이후, insert의 조인, 엔티티 4개 이상 조인, 복합 키 엔티티의 `limit`·`executeOne()`, U11·U12·U15 검사.
+3. **남은 미구현·v0.2 후보**(9절과 ROADMAP 기준): MariaDB `lateral` 재작성(Q4), `SortSpec`의 조인 형태, 집계 기준 정렬, Oracle 오버로드 선택, CASE WHEN 2단계 이후, insert의 조인, 엔티티 11개 이상 조인, 복합 키 엔티티의 `limit`·`executeOne()`, U11·U12·U15 검사.
 
 ---
 
@@ -289,7 +289,7 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 | 외부 정렬 정책(`SortRules`, `SortPolicy`, `@Sortable`, `lambdaql.sort.*`) | 구현됨, 세 DB 테스트 | 아니오 | D43 |
 | 서브쿼리(`exists`, `contains`, 스칼라, 상관, 서브쿼리 안 조인) | 구현됨, 세 DB 테스트 | `exists`, `in`, 스칼라, 서브쿼리 안 조인 | M8, Q1~Q5, D51 |
 | `select`, `groupBy`, `having`, `Agg`, `distinct()` | 구현됨, 세 DB 테스트 | data class, `Pair`, `groupBy` | M9, J1~J7 |
-| 명시적 조인(`join`, `leftJoin`, `crossJoin`, 엔티티 3개), 조인 결과 `distinct()` | 구현됨, 세 DB 테스트 | 조인 `distinct()` | D44, D45, D51 |
+| 명시적 조인(`join`, `leftJoin`, `crossJoin`, 엔티티 10개까지, D71), 조인 결과 `distinct()` | 구현됨, 세 DB 테스트 | 조인 `distinct()` | D44, D45, D51 |
 | 파생 테이블·CTE(`qb.from(valueQuery)`, `qb.with`), 엔티티 쿼리에 조인, CTE 재사용 | 구현됨, 세 DB 테스트 | CTE 조인 | M8-2, J5, J6, D51 |
 | update·insert·delete, `limit`, `executeOne()` | 구현됨, 세 DB 테스트 | 속성 대입, `Dml.value`, `set` 서브쿼리, insert values 서브쿼리, 자기 테이블 서브쿼리 delete | M10, U1~U21, D41 |
 | 대입 표기 `Dml.value`, 대입 람다의 `sub`(set 값, insert values·목록·select, upsert) | 구현됨, 세 DB 테스트. 값 타입 대조(LQL-3065) 포함 | 일부 | D49, U20 |
@@ -305,8 +305,9 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 | 정렬 API(`By.asc/desc/sort`, `Nulls`, `SortKeys`) | 2026-11-24 구현, H2 테스트 | 예 | D59 |
 | 텍스트 일치(`startsWith`, `endsWith`, `contains`를 `like ... escape '!'`로, Kotlin `ignoreCase`) | 2026-11-24 구현, H2 테스트 | 예(`KotlinLikeTest`) | D60 |
 | 값을 고르는 조건: 캡처 값만이면 바인드 파라미터, 엔티티 값이면 `case when`(where 비교, select, groupBy, 정렬 키, set 값) | 2026-11-24 구현(CASE WHEN 1단계), H2 테스트. 다른 DB SQL 답안 미검증 | 예(`KotlinCaseWhenTest`, `KotlinRegressionTest`) | D61, D62 |
-| 결과 함수 `count(컬럼)`, 엔티티 쿼리의 `distinct()`(`distinct().count(컬럼)`은 `count(distinct x)`) | 2026-11-25 구현, H2 테스트 | 예(`KotlinCountColumnTest`) | D67 |
+| 결과 함수 `count(컬럼)`, 엔티티 쿼리의 `distinct()`(`distinct().count(컬럼)`은 `count(distinct x)`), `count(o -> o)`는 `count(*)`(D69) | 2026-11-25 구현, H2 테스트 | 예(`KotlinCountColumnTest`) | D67 |
 | `toSet()` 크기 검사를 서로 다른 객체 수 기준으로(조인 반복은 하나로, `equals` 충돌만 예외). 조인 쿼리의 `count()`·`limit`은 SQL 행 기준 | 2026-11-25 구현, H2 테스트 | 예(`KotlinQueryTest`) | D68 |
+| `select`의 엔티티 값(`select(o -> o)`, `select((o, c) -> c)`, 엔티티를 담은 record·data class·`Pair`) | 2026-11-25 구현, H2 테스트 | 예(`KotlinSelectEntityTest`) | D70 |
 | 분석 캐시(EntityManagerFactory별 공유) | 구현됨 | – | D47 |
 | Spring Data JPA 모듈(`LambdaQlExecutor<T>`, `Sort`, `Pageable`, DML 단축 메서드, 자동 구성) | 구현됨, 다섯 DB·Spring Boot 3.5.16·4.1.2 테스트. DML에는 호출자 트랜잭션 필요 | 예(`spring-data-jpa/src/test/kotlin`, 2026-11-23) | D34, D39, M12 |
 
@@ -317,7 +318,7 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 | 모든 경고를 오류로 바꾸는 일반 엄격 모드 | 미구현(정렬 정책과 SARGable에는 STRICT가 있음) |
 | MariaDB `lateral` 쿼리의 `row_number()` 재작성 | 미구현(Q4). 오답 재현 테스트부터 필요 |
 | 집계 기준 정렬, Oracle 오버로드 선택, CASE WHEN 2단계 이후(boolean `c ? x : y`, 대상이 있는 `when`) | v0.2 후보 |
-| insert의 조인, 엔티티 4개 이상 조인, 서브쿼리 안 엔티티 3개 이상 | 이후 |
+| insert의 조인, 엔티티 11개 이상 조인, 서브쿼리 안 엔티티 3개 이상 | 이후 |
 | UPDATE·DELETE의 명시적 조인 | 추가하지 않음(D51, 연관 경로 U9와 `sub` 사용) |
 | 복합 키 엔티티의 `limit`·`executeOne()` | 미구현 |
 | U11, U12 검사 | 미구현(U15 `@Version` 대입 거부는 2026-11-23 구현, `LQL-3068`) |

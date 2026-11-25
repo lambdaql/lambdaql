@@ -332,6 +332,9 @@ public enum LqlMessage {
     /** LQL-3070: The lambda of count(column) must give one value of the entity, such as o -> o.getDescription(); not a constructor or an Agg function. */
     COUNT_COLUMN_NOT_VALUE("LQL-3070", 0),
 
+    /** LQL-3071: A column of a derived table or CTE cannot be an entity; select its id or columns instead (J5): &#123;0&#125; */
+    DERIVED_ENTITY_COLUMN("LQL-3071", 1),
+
     /** LQL-4001: limit and the one-row protection are not supported yet for an entity with a composite key: &#123;0&#125; */
     COMPOSITE_KEY_LIMIT("LQL-4001", 1),
 

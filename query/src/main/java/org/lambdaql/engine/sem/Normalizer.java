@@ -58,6 +58,8 @@ public final class Normalizer {
     private final int subParam;
     /** {@code true} in select and having lambdas: {@code Agg} calls are allowed (ROADMAP M9). */
     private boolean aggregates;
+    /** Whether an entity itself may be a value ({@code select((o, c) -> c)}, ROADMAP D70): only in a select lambda. */
+    private boolean entities;
     private final EntityModel model;
     private final ClassLoader loader;
     private final String where;
@@ -156,6 +158,27 @@ public final class Normalizer {
                                       boolean aggregates) {
         Normalizer n = new Normalizer(roots, model, loader, where);
         n.aggregates = aggregates;
+        return n.done(n.value(value));
+    }
+
+    /**
+     * Normalizes one value of a select lambda: aggregate functions are allowed, and an entity parameter itself is a
+     * value ({@code select((o, c) -> c)}, {@code select((o, c) -> new OrderWithCustomer(o, c))}, ROADMAP D70). Such a
+     * value becomes {@link Expr.Root} and is written as its alias ({@code select e1}).
+     *
+     * <p>Example: {@code (o, c) -> c} gives {@code root1}.
+     *
+     * @param value  the decoded value
+     * @param roots  entity class of each lambda parameter
+     * @param model  entity information
+     * @param loader class loader
+     * @param where  a name for error messages
+     * @return the normalized value
+     */
+    public static Expr normalizeSelected(Expr value, List<Class<?>> roots, EntityModel model, ClassLoader loader, String where) {
+        Normalizer n = new Normalizer(roots, model, loader, where);
+        n.aggregates = true;
+        n.entities = true;
         return n.done(n.value(value));
     }
 
@@ -654,6 +677,9 @@ public final class Normalizer {
     private Expr done(V v) {
         if (v instanceof Done d) return d.expr();
         Path p = (Path) v;
+        if (p.names().isEmpty() && entities && p.kind().equals("ROOT") && model.isEntity(p.type())) {
+            return new Expr.Root(p.root(), org.objectweb.asm.Type.getType(p.type()));     // select e1 (D70)
+        }
         if (p.names().isEmpty()) throw error(LqlMessage.ENTITY_COMPARE, String.join(".", p.names()));
         if (p.kind().equals("EMBEDDED")) throw error(LqlMessage.EMBEDDABLE_COMPARE, String.join(".", p.names()));
         // an association used as a value: its foreign key (o.customer), for IS NULL checks
