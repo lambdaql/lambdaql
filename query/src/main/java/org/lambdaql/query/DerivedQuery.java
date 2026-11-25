@@ -13,7 +13,7 @@ import java.util.Optional;
  * The lambdas get the row (a record or Kotlin data class); {@code r.total()} reads the column {@code total}.
  * The result is the row type, or the values of {@code select}.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java">DerivedQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java">DerivedQueryTest</a>):
  * {@snippet class="org.lambdaql.query.DerivedQueryTest" region="derived"}
  *
  * @param <R> the row type
@@ -38,7 +38,7 @@ public class DerivedQuery<R> {
     /**
      * Adds a condition on the row columns (joined with AND).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java">DerivedQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java">DerivedQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DerivedQueryTest" region="derived"}
      *
      * @param condition the condition, for example {@code r -> r.total() > 100}

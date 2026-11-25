@@ -33,7 +33,7 @@ List<Order> orders = query.toList();
 > 각 절 끝의 "예제 코드:" 줄에 원본 파일을 링크합니다.
 > 데이터베이스별 SQL 블록에서 `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다.
 
-예제 코드: [`ManualJavaStartTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java)(`readme`).
+예제 코드: [`ManualJavaStartTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java)(`readme`).
 
 <a id="contents"></a>
 ## 목차
@@ -82,7 +82,7 @@ List<Order> orders = query.toList();
 <a id="help-and-contributions"></a>
 ## 도움말과 기여
 
-- 소스 코드: <https://github.com/codebit0/lambdaql>
+- 소스 코드: <https://github.com/lambdaql/lambdaql>
 - 한국어 매뉴얼이 원본입니다. 영어, 일본어, 중국어 매뉴얼은 번역본입니다.
 - 잘못된 내용을 발견하면 이슈나 풀 리퀘스트를 열어 주십시오.
 - 설계 문서(한국어, 기여자용): [ROADMAP.md](../../../design/ROADMAP.md), [KOTLIN.md](../../../design/KOTLIN.md)

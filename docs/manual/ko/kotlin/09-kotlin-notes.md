@@ -104,7 +104,7 @@ Java 엔티티의 boolean 속성 `active`는 getter가 `isActive()`이므로 Kot
 | `inline fun` 본문 안에서 만든 람다 표현식 | **아니요**(KC2) |
 | `-Xsam-conversions=class`로 컴파일 | **아니요**(KC1) |
 
-예제 코드: [`ManualKotlinNotesTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)(`where-chain`, `named-params`).
+예제 코드: [`ManualKotlinNotesTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)(`where-chain`, `named-params`).
 
 <a id="93-only-your-null-checks-count"></a>
 ## 9.3 직접 작성한 null 검사와 컴파일러의 null 검사
@@ -216,7 +216,7 @@ assertEquals("select e0 from Order e0 where e0.active = false", inactive.toHql()
 엔티티가 Java 클래스이면 Kotlin은 그 getter를 플랫폼 타입(`Long!`)으로 봅니다.
 이 장의 예제가 모두 이 경우입니다. 경로 `it.customer?.name`은 조인한 컬럼입니다(`where`의 조인 종류는 [3.10](03-where.md#310-association-paths) 참고).
 
-예제 코드: [`ManualKotlinNotesTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)(`hidden-null-check`, `equality`, `booleans`).
+예제 코드: [`ManualKotlinNotesTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)(`hidden-null-check`, `equality`, `booleans`).
 
 <a id="95-null-operators---and-"></a>
 ## 9.5 null 연산자: `?.`, `?:`와 `!!`
@@ -345,7 +345,7 @@ assertEquals("select e0 from Coded e0 where e0.vip is null or e0.vip = false", n
 
 `set { }`과 `values { }`에서 `it.customer?.id = cid`는 **항상 대입합니다**. `?.`는 무시됩니다. 예제는 [7.2](07-2-update.md#change-an-association-foreign-key)에 있습니다.
 
-예제 코드: [`ManualKotlinNotesTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)(`path-forms`, `null-paths`, `elvis-value`, `boolean-elvis`).
+예제 코드: [`ManualKotlinNotesTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)(`path-forms`, `null-paths`, `elvis-value`, `boolean-elvis`).
 
 <a id="96-in-ranges-and-when"></a>
 ## 9.6 `in`, 범위와 `when`
@@ -393,7 +393,7 @@ NULL 행을 원하면 `it.cnt == null || it.cnt !in 1..5`라고 쓰십시오.
 
 캡처한 컬렉션에 대한 `!in`도 같습니다. 위 예제의 `x not in (:p1)`은 NULL 행을 반환하지 않습니다(SQL 의미).
 
-예제 코드: [`ManualKotlinNotesTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)(`ranges`).
+예제 코드: [`ManualKotlinNotesTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)(`ranges`).
 
 <a id="97-strings"></a>
 ## 9.7 문자열
@@ -461,7 +461,7 @@ val error = assertThrows(LambdaQLException::class.java) {
 assertEquals("LQL-3027", error.code())
 ```
 
-예제 코드: [`ManualKotlinNotesTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)(`order-repo`, `order-repo-use`, `captured-null`).
+예제 코드: [`ManualKotlinNotesTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)(`order-repo`, `order-repo-use`, `captured-null`).
 
 <a id="99-property-references-and-scope-functions"></a>
 ## 9.9 속성 참조와 스코프 함수
@@ -502,7 +502,7 @@ assertEquals("select e0 from Order e0 where e0.status = 1", inline.toHql().hql()
 
 수정과 삽입 람다 표현식에서 `apply`, `with`, `also`는 거부됩니다(`LQL-2003`, [9.12](#912-update-insert-delete-property-assignment-and-dmlvalue) 참고).
 
-예제 코드: [`ManualKotlinNotesTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)(`inline-fun`, `scope-functions`).
+예제 코드: [`ManualKotlinNotesTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)(`inline-fun`, `scope-functions`).
 
 <a id="910-kotlin-operators"></a>
 ## 9.10 Kotlin 연산자
@@ -593,7 +593,7 @@ assertEquals("select e0.customer.id, e0.status, count(*) from Order e0 where e0.
 
 자세한 내용: [6. 조회, 집계, 그룹화](06-select-group.md).
 
-예제 코드: [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`data-class`, `group-by`), [`ManualKotlinNotesTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)(`group-pair`).
+예제 코드: [`KotlinQueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`data-class`, `group-by`), [`ManualKotlinNotesTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)(`group-pair`).
 
 <a id="912-update-insert-delete-property-assignment-and-dmlvalue"></a>
 ## 9.12 수정, 삽입, 삭제: 속성 대입과 `Dml.value`
@@ -624,7 +624,7 @@ assertEquals("update Order e0 set e0.customer = :p1 where e0.id = :p2", entity.t
 
 자세한 내용: [7. 수정, 삽입, 삭제](07-dml.md).
 
-예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-fk`).
+예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-fk`).
 
 <a id="913-procedures-and-db-functions"></a>
 ## 9.13 프로시저와 DB 함수

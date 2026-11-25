@@ -17,7 +17,7 @@ import java.util.SequencedSet;
  * {@code leftJoin}, a condition on a joined entity column has the SQL meaning: with no match it is not true, so the
  * row is left out.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
  * {@snippet class="org.lambdaql.query.JoinQueryTest" region="ten"}
  *
  * @param <T> the main entity type
@@ -186,7 +186,7 @@ public class SelectJoin8Query<T, U, V, W, X, Y, Z, A> {
      * column of the main entity itself (J7). An {@code exists} subquery in {@code where} gives the same rows without
      * repeated SQL rows, often faster.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
      * {@snippet class="org.lambdaql.query.JoinQueryTest" region="join-distinct"}
      *
      * @return this
@@ -206,7 +206,7 @@ public class SelectJoin8Query<T, U, V, W, X, Y, Z, A> {
     /**
      * Adds a condition on all entities (joined with AND).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
      * {@snippet class="org.lambdaql.query.JoinQueryTest" region="left-join"}
      *
      * @param condition the condition
@@ -307,7 +307,7 @@ public class SelectJoin8Query<T, U, V, W, X, Y, Z, A> {
      * Sorts by values of all entities: {@code orderBy((o, c, i, e3, e4, e5, e6, e7) -> desc(c.getName()).asc(o.getId()))} (D18, D59).
      * Paths use a left join, so rows are not lost.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
      * {@snippet class="org.lambdaql.query.JoinQueryTest" region="sort"}
      *
      * @param spec the sort lambda
@@ -327,7 +327,7 @@ public class SelectJoin8Query<T, U, V, W, X, Y, Z, A> {
      * Selects values of all entities: {@code select((o, c, i, e3, e4, e5, e6, e7) -> new OrderView(o.getId(), c.getName()))}. An entity
      * itself is a value too: {@code select((o, c, i, e3, e4, e5, e6, e7) -> e7)} or a record of entities (ROADMAP D70).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
      * {@snippet class="org.lambdaql.query.JoinQueryTest" region="select"}
      *
      * @param clause the select lambda
@@ -399,7 +399,7 @@ public class SelectJoin8Query<T, U, V, W, X, Y, Z, A> {
      * (D68). Without {@code distinct()}, {@code limit} counts the SQL rows that the join repeats, so a page can have
      * fewer entities.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
      * {@snippet class="org.lambdaql.query.JoinQueryTest" region="join-set"}
      *
      * @return the rows

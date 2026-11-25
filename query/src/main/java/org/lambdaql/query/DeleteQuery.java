@@ -4,7 +4,7 @@ package org.lambdaql.query;
  * The start of a DELETE: {@code qb.delete(Order.class).where(...).execute()} (ROADMAP D28, M10).
  * {@code execute()} is not here, so deleting every row must say {@code all()} (U5).
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
  * {@snippet class="org.lambdaql.query.DmlQueryTest" region="delete"}
  *
  * @param <T> the entity type

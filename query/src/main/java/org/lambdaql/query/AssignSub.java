@@ -10,7 +10,7 @@ import java.io.Serializable;
  * The assignments follow {@link Assign}: setter calls, or {@link org.lambdaql.Dml#value Dml.value(column, value)} for
  * entities without setters. A subquery value gives NULL when it finds no row (an aggregate other than {@code count}).
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
  * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update-sub"}
  *
  * @param <T> the entity type

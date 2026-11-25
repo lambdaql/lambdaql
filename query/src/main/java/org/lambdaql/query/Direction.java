@@ -10,7 +10,7 @@ import java.util.Locale;
  * {@code ASC} puts NULL first, {@code DESC} puts NULL last. This is the same on every database.
  * Use it with {@code by.sort(key, direction)} when the direction is known only at run time.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
  * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-dynamic"}
  */
 public enum Direction {

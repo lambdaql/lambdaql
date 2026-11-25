@@ -66,7 +66,7 @@ where exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id and i1_0.qty>1
 
 이는 **상관** 서브쿼리입니다. 안쪽 람다 표현식이 바깥의 `o`를 사용합니다([5.6](#56-correlated-subqueries) 참고).
 
-예제 코드: [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)(`exists`).
+예제 코드: [`SubqueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)(`exists`).
 
 ## 5.3 NOT EXISTS
 
@@ -91,7 +91,7 @@ from orders o1_0
 where o1_0.status=1 or not exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id)
 ```
 
-예제 코드: [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)(`not-exists`).
+예제 코드: [`SubqueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)(`not-exists`).
 
 ## 5.4 IN
 
@@ -119,7 +119,7 @@ where o1_0.customer_id in (select c2_0.id from customers c2_0 where c2_0.grade i
 `o.getCustomer().getId()`는 고객의 `@Id`로 끝나므로 외래 키 컬럼 `e0.customer.id`입니다. 조인이 필요 없습니다.
 직접 작성한 null 검사(`c.getGrade() != null`)는 HQL에 `s1.grade is not null`로 남습니다.
 
-예제 코드: [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)(`in`).
+예제 코드: [`SubqueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)(`in`).
 
 <a id="55-not-in-is-written-as-not-exists"></a>
 ## 5.5 NOT IN과 NULL
@@ -154,7 +154,7 @@ where o1_0.status not in (select c2_0.grade from customers c2_0)
 - NULL을 건너뛰려면 예제의 두 번째 쿼리처럼 서브쿼리에 `where(c -> c.getGrade() != null)`을 쓰십시오. 그러면 NULL 등급을 뺀 Java의 `!grades.contains(status)`와 같은 결과가 나옵니다.
 - `!sub...exists()`는 여전히 `NOT EXISTS`로 작성됩니다.
 
-예제 코드: [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)(`not-in`).
+예제 코드: [`SubqueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)(`not-in`).
 
 <a id="56-correlated-subqueries"></a>
 ## 5.6 상관 서브쿼리
@@ -183,7 +183,7 @@ assertEquals(Map.of("p1", 10), q.toHql().parameters());
 **상관 조건의 `==`.** `i.getOrder().getId() == o.getId()`는 두 `Long` 객체를 비교합니다. 엔티티 값 두 개는 SQL 의미로 비교하므로([3.6](03-where.md#36-null-rules) 참고) lambdaQL은 단순한 `=`를 씁니다(`!=`는 `<>`).
 데이터베이스는 인덱스를 사용할 수 있습니다.
 
-예제 코드: [`ManualJavaSubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSubqueryTest.java)(`correlated`).
+예제 코드: [`ManualJavaSubqueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSubqueryTest.java)(`correlated`).
 
 <a id="57-scalar-subqueries"></a>
 ## 5.7 스칼라 서브쿼리
@@ -277,7 +277,7 @@ lambdaQL은 마지막 정렬 키로 `id`(`s1.id asc`)를 더하므로 맨 위 �
 
 집계의 NULL은 SQL을 따릅니다. `sum`, `avg`, `min`, `max`는 행이 없으면 NULL을 줍니다. `count`는 0을 줍니다.
 
-예제 코드: [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)(`scalar`, `count`, `top-one`).
+예제 코드: [`SubqueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)(`scalar`, `count`, `top-one`).
 
 <a id="58-nested-subqueries"></a>
 ## 5.8 중첩 서브쿼리
@@ -308,7 +308,7 @@ where exists(select 1 from orders o1_0 where o1_0.customer_id=c1_0.id and exists
 
 Java는 중첩된 람다 표현식에서 같은 이름을 두 번 쓰는 것을 허용하지 않습니다. 단계마다 새 이름(`sub2`, `o`, `i`)을 사용하십시오.
 
-예제 코드: [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)(`nested`).
+예제 코드: [`SubqueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)(`nested`).
 
 <a id="59-sorting-inside-a-subquery"></a>
 ## 5.9 서브쿼리 안의 정렬
@@ -377,7 +377,7 @@ assertEquals("select e0 from Customer e0 where (select sum(s2.qty) from Order s1
         + " where s1.customer.id = e0.id) > 30", total.toHql().hql());
 ```
 
-예제 코드: [`ManualJavaSubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSubqueryTest.java)(`collection-path`), [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)(`sub-join`).
+예제 코드: [`ManualJavaSubqueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSubqueryTest.java)(`collection-path`), [`SubqueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)(`sub-join`).
 
 <a id="511-subqueries-in-other-places"></a>
 ## 5.11 다른 위치의 서브쿼리

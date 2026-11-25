@@ -39,7 +39,7 @@ where o1_0.status=1
 
 Oracle은 `set`에 별칭을 씁니다(`set o1_0.status=?`). H2와 MariaDB는 쓰지 않습니다.
 
-예제 코드: [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`update`).
+예제 코드: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`update`).
 
 <a id="values-null-date-boolean"></a>
 ## 값: null, 날짜, boolean
@@ -56,7 +56,7 @@ int changed = u.execute();
 
 `null`, 람다 표현식에 적은 enum 상수와 boolean 상수는 리터럴이고, 캡처 값(`now`, `id`)은 바인드 파라미터입니다. 같은 값을 두 번 사용하더라도 각 캡처 값은 **자기 파라미터**를 받습니다(규칙 U7).
 
-예제 코드: [`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-values`).
+예제 코드: [`ManualJavaDmlTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-values`).
 
 <a id="add-to-a-value-default-for-null"></a>
 ## 값에 더하기, NULL의 기본값
@@ -76,7 +76,7 @@ assertEquals("update Order e0 set e0.total = (coalesce(e0.total, 0.0) + 1.0)", o
 
 `cnt`가 NULL인 행에서 `cnt + 1`은 NULL로 남습니다(SQL 의미). NULL을 다른 값으로 바꾸려면 `Objects.requireNonNullElse`를 쓰십시오.
 
-예제 코드: [`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-add`).
+예제 코드: [`ManualJavaDmlTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-add`).
 
 <a id="embedded-fields"></a>
 ## 임베디드 필드
@@ -94,7 +94,7 @@ assertEquals("update Order e0 set e0.address = :p1 where e0.id = :p2", whole.toH
 
 값 객체 전체를 할당하면 HQL은 `e0.address = :p1` 하나이고, Hibernate가 임베디드 값의 모든 컬럼(`city`, `zip`)을 SQL의 SET 목록에 씁니다.
 
-예제 코드: [`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-embedded`).
+예제 코드: [`ManualJavaDmlTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-embedded`).
 
 <a id="change-an-association-foreign-key"></a>
 ## 연관 변경(외래 키)
@@ -116,7 +116,7 @@ assertEquals("update Order e0 set e0.customer = :p1 where e0.id = :p2", entity.t
 연관 엔티티에서는 `@Id`(FK)만 설정할 수 있습니다.
 `o.getCustomer().setName(x)`는 오류입니다. 다른 테이블을 변경하게 되기 때문입니다(규칙 U6, [7.8](07-dml.md#rules-checked-at-analysis-time) 참고).
 
-예제 코드: [`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-fk`).
+예제 코드: [`ManualJavaDmlTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-fk`).
 
 <a id="a-value-from-another-table"></a>
 ## 다른 테이블의 값
@@ -177,7 +177,7 @@ set o1_0.cust_name=(select c1_0.name from customers c1_0 where c1_0.id=o1_0.cust
 주문에 고객이 없으면 `custName`은 NULL이 됩니다.
 `where`에서는 lambdaQL이 `e0.customer.id is not null`을 더합니다. 그래서 수정 대상 행은 `qb.from(Order.class).where(같은 람다 표현식)`의 결과와 같습니다.
 
-예제 코드: [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`update-path`).
+예제 코드: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`update-path`).
 
 <a id="an-aggregate-from-a-subquery"></a>
 ## 서브쿼리의 집계
@@ -205,7 +205,7 @@ assertEquals("update Order e0 set e0.price = coalesce((select sum(s1.price) from
 - 다른 테이블의 집계와 같은 테이블의 집계를 모두 쓸 수 있습니다(H2, MariaDB 10.11, Oracle 23.26에서 실측). `update`에서는 MariaDB도 오류 1093을 내지 않습니다.
 - 일치하는 행이 없으면 집계는 NULL입니다. NOT NULL 컬럼이면 DB 오류가 나므로 `Objects.requireNonNullElse(…, 0.0)`로 감싸 `coalesce(...)`로 만드십시오.
 
-예제 코드: [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`update-sub`).
+예제 코드: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`update-sub`).
 
 <a id="where-with-paths-and-subqueries"></a>
 ## 경로와 서브쿼리를 사용한 where
@@ -231,7 +231,7 @@ assertEquals("update Order e0 set e0.status = 9 where not exists (select 1 from 
 첫 번째 문장에서는 경로가 스칼라 서브쿼리가 되고, 고객이 있는 주문만 대상이 됩니다(규칙 U9).
 두 번째 문장은 [5. 서브쿼리](05-subquery.md)처럼 `sub`를 사용합니다.
 
-예제 코드: [`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-where`).
+예제 코드: [`ManualJavaDmlTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-where`).
 
 <a id="optimistic-locking-version"></a>
 ## 낙관적 잠금(`@Version`)
@@ -277,7 +277,7 @@ if (n == 0) throw new OptimisticLockException();   // checking the result is you
 
 `@Version` 필드에는 값을 할당할 수 없습니다(규칙 U15). 할당하면 `LQL-3068`로 거부됩니다.
 
-예제 코드: [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`update-versioned`), [`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-version`).
+예제 코드: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`update-versioned`), [`ManualJavaDmlTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-version`).
 
 <a id="many-set-calls-patch"></a>
 ## 여러 번의 `set()` 호출(PATCH)
@@ -304,7 +304,7 @@ assertThrows(LambdaQLException.class,
 
 `set()`은 `UpdateSet`을 반환합니다. 이 타입에는 `set`, `where`, `all`이 있고 `execute()`는 없습니다.
 
-예제 코드: [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`update-patch`).
+예제 코드: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`update-patch`).
 
 <a id="update-all-rows-all"></a>
 ## 모든 행 수정: `all()`
@@ -321,7 +321,7 @@ int changed = u.execute();
 
 update에는 트랜잭션이 필요합니다([7.8](07-dml.md#transactions) 참고).
 
-예제 코드: [`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-all`).
+예제 코드: [`ManualJavaDmlTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-all`).
 
 <a id="update-the-first-rows-limit"></a>
 ## 앞쪽 행 수정: `limit`
@@ -364,7 +364,7 @@ where o1_0.id in (select t1_0.c0 from (select o2_0.id c0 from orders o2_0 join c
 
 경로 `o.getCustomer().getName()`는 조회와 마찬가지로 안쪽 select에서 조인이 됩니다. update 문장 자체는 다른 테이블을 읽지 않습니다.
 
-예제 코드: [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`update-limit`).
+예제 코드: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`update-limit`).
 
 <a id="update-exactly-one-row-executeone"></a>
 ## 정확히 한 행 수정: `executeOne()`
@@ -394,5 +394,5 @@ Spring 리포지토리에서는 `updateOne(where, set)`이 같은 동작을 합�
 
 [7. 수정, 삽입, 삭제 (Java)](07-dml.md) | **7.2 수정(update)** | [7.4 삭제(delete)](07-4-delete.md) | [7.5 삽입(insert)](07-5-insert.md) | [7.6 업서트(upsert)](07-6-upsert.md) | [Kotlin](../kotlin/07-2-update.md)
 
-예제 코드: [`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-one`).
+예제 코드: [`ManualJavaDmlTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-one`).
 

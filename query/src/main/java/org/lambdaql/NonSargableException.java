@@ -7,7 +7,7 @@ import org.lambdaql.i18n.LqlMessage;
  * function on a column, or on MariaDB a non-deterministic function compared with a column. The message holds the
  * finding that {@code SargableMode.WARN} would log.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java">FunctionTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java">FunctionTest</a>):
  * {@snippet class="org.lambdaql.query.FunctionTest" region="sargable-strict"}
  */
 public class NonSargableException extends TranslationException {

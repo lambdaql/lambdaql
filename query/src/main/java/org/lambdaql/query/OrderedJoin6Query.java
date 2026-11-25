@@ -7,7 +7,7 @@ import java.util.List;
 /**
  * A sorted query with 6 joined entities (ROADMAP D44, D71): limit, offset, results, and a select on all entities.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
  * {@snippet class="org.lambdaql.query.JoinQueryTest" region="sort"}
  *
  * @param <T> the main entity type

@@ -24,7 +24,7 @@ import java.util.List;
  * Aggregates ({@code org.lambdaql.Agg}) are allowed in select; rule J3 (every value without an aggregate must be a group
  * key) is checked by {@link #checkGrouping}.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
  * {@snippet class="org.lambdaql.query.ProjectionTest" region="record"}
  */
 public final class SelectReader {
@@ -58,7 +58,7 @@ public final class SelectReader {
     /**
      * Reads a select lambda.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
      * {@snippet class="org.lambdaql.query.ProjectionTest" region="record"}
      *
      * @param ref   the lambda
@@ -81,7 +81,7 @@ public final class SelectReader {
     /**
      * Reads a groupBy lambda.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
      * {@snippet class="org.lambdaql.query.ProjectionTest" region="group-many"}
      *
      * @param ref   the lambda

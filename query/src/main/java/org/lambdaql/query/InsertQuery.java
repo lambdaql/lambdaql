@@ -14,7 +14,7 @@ import java.util.List;
  * or INSERT ... SELECT with {@code from(Source.class)}.
  * If the id is generated (IDENTITY, SEQUENCE), you can leave it out.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
  * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert"}
  *
  * @param <T> the entity type
@@ -43,7 +43,7 @@ public class InsertQuery<T> {
      * Inserts one row whose values may use subqueries: {@code (a, sub) -> a.setPrice(sub.from(Item.class).sum(...))}
      * (ROADMAP D49). A subquery can read captured values, not the new row.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert-values-sub"}
      *
      * @param assign the assignment lambda
@@ -56,7 +56,7 @@ public class InsertQuery<T> {
     /**
      * Inserts one row per list element.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert-list"}
      *
      * @param rows   the elements; an empty list inserts nothing
@@ -71,7 +71,7 @@ public class InsertQuery<T> {
     /**
      * Inserts one row per list element, with values that may use subqueries: {@code (a, l, sub) -> ...} (ROADMAP D49).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert-list-sub"}
      *
      * @param rows   the elements; an empty list inserts nothing
@@ -86,7 +86,7 @@ public class InsertQuery<T> {
     /**
      * Starts INSERT ... SELECT from another entity.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert-select"}
      *
      * @param source the source entity class
@@ -131,7 +131,7 @@ public class InsertQuery<T> {
         /**
          * Limits the source rows with a condition that may use subqueries: {@code (o, sub) -> ...} (ROADMAP D49).
          *
-         * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+         * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
          * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert-select-sub"}
          *
          * @param condition the condition on the source
@@ -146,7 +146,7 @@ public class InsertQuery<T> {
          * Groups the source rows (ROADMAP M9): one key, or many keys with {@code List.of(...)}.
          * The values in {@code select} may then use {@code Agg} functions.
          *
-         * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+         * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
          * {@snippet class="org.lambdaql.query.ProjectionTest" region="insert-group"}
          *
          * @param keys the key lambda on the source
@@ -187,7 +187,7 @@ public class InsertQuery<T> {
          * {@code (a, o, sub) -> a.setItemCount(sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).count())}
          * (ROADMAP D49). A subquery may read the source row {@code o}.
          *
-         * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+         * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
          * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert-select-sub"}
          *
          * @param assign the mapping

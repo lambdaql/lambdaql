@@ -8,7 +8,7 @@ import java.io.Serializable;
  * (ROADMAP D49). The element's getters are read in Java; the third parameter starts a subquery, which may use the
  * element's values but not the new row.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
  * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert-list-sub"}
  *
  * @param <T> the entity type

@@ -55,7 +55,7 @@
 - `record KeyCount(Integer customerId, short status, long count)`
 - `record Total(long count, Double average)`
 
-일부 예제([`ManualJavaSelectTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSelectTest.java))는 같은 이름의 `Stat`, `Total` 레코드를 따로 선언해 사용합니다.
+일부 예제([`ManualJavaSelectTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSelectTest.java))는 같은 이름의 `Stat`, `Total` 레코드를 따로 선언해 사용합니다.
 
 > [!TIP]
 > NULL이 될 수 있는 값에는 박싱 타입(`Double`, `Long`, `Integer`)을 사용하십시오.
@@ -104,7 +104,7 @@ assertEquals("select j1.name from Order e0 left join e0.customer j1", names.toHq
 경로가 연관 엔티티의 `@Id`로 끝나면 조인이 없습니다.
 `o.getCustomer().getId()`는 외래 키 컬럼 `customer_id`를 읽습니다.
 
-예제 코드: [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)(`value`), [`ManualJavaSelectTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSelectTest.java)(`select-path`).
+예제 코드: [`ProjectionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)(`value`), [`ManualJavaSelectTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSelectTest.java)(`select-path`).
 
 ---
 
@@ -146,7 +146,7 @@ lambdaQL은 각 값을 생성자 인자의 타입으로 변환합니다(예: Hib
 | Java 레코드 | 가능 | 가능 |
 | 일반 DTO 클래스(생성자) | 가능 | **불가**(J5) |
 
-예제 코드: [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)(`record`).
+예제 코드: [`ProjectionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)(`record`).
 
 ---
 
@@ -215,7 +215,7 @@ where o1_0.status=1
 이는 정상적인 SQL 동작입니다.
 NULL이 기본형 생성자 인자(`double`, `long`)에 들어가면 lambdaQL은 `IllegalStateException`을 던집니다. 메시지에는 해당 인자와 래퍼 타입(`Double`, `Long`)을 쓰라는 안내가 들어 있습니다. 예제는 [6.11](#611-rules-j1-to-j8)에 있습니다.
 
-예제 코드: [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)(`total`).
+예제 코드: [`ProjectionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)(`total`).
 
 ---
 
@@ -286,7 +286,7 @@ group by o1_0.customer_id,o1_0.status
 
 예제는 [6.11](#611-rules-j1-to-j8)에 있습니다.
 
-예제 코드: [`ManualJavaSelectTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSelectTest.java)(`group-one`), [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)(`group-many`).
+예제 코드: [`ManualJavaSelectTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSelectTest.java)(`group-one`), [`ProjectionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)(`group-many`).
 
 ---
 
@@ -319,7 +319,7 @@ having sum(o1_0.price)>200.0
 
 여기서 `Agg.sum(o.getPrice())`는 `double`이므로 javac는 이를 `200.0`과 비교합니다. 상수는 리터럴로 남습니다.
 
-예제 코드: [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)(`group-by`).
+예제 코드: [`ProjectionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)(`group-by`).
 
 ---
 
@@ -397,7 +397,7 @@ order by o1_0.price desc,o1_0.id
 limit ?,?
 ```
 
-예제 코드: [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)(`distinct`), [`ManualJavaSelectTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSelectTest.java)(`value-page`).
+예제 코드: [`ProjectionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)(`distinct`), [`ManualJavaSelectTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSelectTest.java)(`value-page`).
 
 ---
 
@@ -526,7 +526,7 @@ ValueQuery<Customer> big = qb.from(Customer.class)
         .select((c, t) -> c);
 ```
 
-예제 코드: [`SelectEntityTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectEntityTest.java)(`select-joined`, `select-entities`, `select-self`, `select-entity-cte`).
+예제 코드: [`SelectEntityTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectEntityTest.java)(`select-joined`, `select-entities`, `select-self`, `select-entity-cte`).
 
 <a id="three-entities-and-repeated-rows"></a>
 ### 엔티티 여러 개와 반복되는 행
@@ -705,7 +705,7 @@ assertEquals("with t as (select d0.customer.id as customerId, sum(d0.price) as t
 지원하지 않는 것: insert의 조인, 엔티티 11개 이상, `SortSpec`의 조인 형태.
 update와 delete의 조인은 추가하지 않기로 했습니다. 연관 경로(U9)나 `sub`를 쓰십시오.
 
-예제 코드: [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)(`join`, `left-join`, `sort`, `select`, `three`, `cross-join`, `cross-join-paging`, `join-distinct`, `join-set`, `join-cte`, `join-derived`, `cte-reuse`, `ten`).
+예제 코드: [`JoinQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)(`join`, `left-join`, `sort`, `select`, `three`, `cross-join`, `cross-join-paging`, `join-distinct`, `join-set`, `join-cte`, `join-derived`, `cte-reuse`, `ten`).
 
 ---
 
@@ -787,7 +787,7 @@ assertEquals("LQL-3064", assertThrows(LambdaQLException.class,
 
 엔티티의 `@SQLRestriction`과 `@SoftDelete` 조건은 엔티티 조인의 `on`과 파생 테이블 안에도 Hibernate가 붙입니다(MariaDB 10.11, Oracle 23.26에서 실측). lambdaQL은 이 조건을 따로 처리하지 않습니다.
 
-예제 코드: [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)(`derived`, `select`, `inner-limit`, `rules`).
+예제 코드: [`DerivedQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)(`derived`, `select`, `inner-limit`, `rules`).
 
 ---
 
@@ -820,7 +820,7 @@ MariaDB와 Oracle은 진짜 `with`를 실행합니다. 컬럼 목록은 Hibernat
 - 같은 CTE를 한 쿼리에서 두 번 읽을 수 있습니다. 정의는 한 번만 씁니다([파생 테이블과 CTE의 조인](#join-a-derived-table-or-cte) 참고).
 - update, delete, insert 안의 CTE는 지원하지 않습니다.
 
-예제 코드: [`DerivedQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)(`cte`).
+예제 코드: [`DerivedQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java)(`cte`).
 
 ---
 
@@ -860,7 +860,7 @@ assertThrows(IllegalStateException.class, () -> qb.from(Order.class)
 
 `Bad`는 `record Bad(Integer customerId, double total)`입니다. status가 9인 주문이 없으므로 `sum`은 NULL이고, 기본형 `double`은 이 값을 받을 수 없습니다.
 
-예제 코드: [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)(`rules`).
+예제 코드: [`ProjectionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)(`rules`).
 
 ---
 

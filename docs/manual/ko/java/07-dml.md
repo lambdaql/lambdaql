@@ -60,7 +60,7 @@ lambdaQL에는 진입점이 다섯 개 있습니다.
 
 다른 엔티티: `VOrder`(`@Version` 필드 `version`이 있는 주문), `IdOrder`(id가 생성되는 주문), `Archive`(`id`, `price`, `customerName`), `Summary`(`customerId`, `total`, `cnt`).
 
-예제 코드의 엔티티([`query/src/test/java/org/lambdaql/query`](https://github.com/codebit0/lambdaql/tree/main/query/src/test/java/org/lambdaql/query))는 위 표와 조금 다릅니다.
+예제 코드의 엔티티([`query/src/test/java/org/lambdaql/query`](https://github.com/lambdaql/lambdaql/tree/main/query/src/test/java/org/lambdaql/query))는 위 표와 조금 다릅니다.
 `Order`에서 `price`는 `double`, `status`는 `short`이고, `float` 필드 `tex`가 있습니다. `IdOrder`의 id는 IDENTITY 방식입니다.
 
 ---
@@ -185,7 +185,7 @@ assertEquals("update Order e0 set e0.price = coalesce((select sum(s1.price) from
 - 일치하는 행이 없으면 `sum` 등은 NULL을 돌려줍니다. NOT NULL 컬럼이면 DB 오류가 나므로 `Objects.requireNonNullElse(…, 0.0)`로 감싸십시오. `coalesce(...)`가 됩니다.
 - insert의 `values((a, sub) -> ...)`와 upsert(`onConflict(...).update((a, sub) -> ...)`)에서도 같은 방식으로 서브쿼리를 씁니다([7.5](07-5-insert.md#a-subquery-in-a-value) 참고). 리스트 형태는 `values(list, (a, l, sub) -> ...)`처럼 세 번째 인자가 `sub`입니다.
 
-예제 코드: [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`update-value`, `update-sub`), [`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`value-forms`), [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)(`value-type`, `read-value`).
+예제 코드: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`update-value`, `update-sub`), [`ManualJavaDmlTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`value-forms`), [`AssignmentReaderTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)(`value-type`, `read-value`).
 
 ---
 
@@ -398,7 +398,7 @@ Hibernate는 엔티티의 `@SQLRestriction` 조건과 `@SoftDelete` 조건을 la
 `@SoftDelete` 엔티티의 `delete`는 `update … set deleted = 1 where … and deleted = 0`이 됩니다. 행이 실제로 지워지지 않습니다.
 lambdaQL은 이 조건을 따로 처리하지 않습니다.
 
-예제 코드: [`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`old-value`), [`AssignmentReaderTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)(`rules`), [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`update-path`, `delete-limit`).
+예제 코드: [`ManualJavaDmlTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`old-value`), [`AssignmentReaderTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java)(`rules`), [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`update-path`, `delete-limit`).
 
 ---
 

@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
  * The {@code ConditionReducer} joins them back into {@link And}, {@link Or} and {@link Not},
  * so you get the same logic you wrote in the source code.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
  * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="and-or"}
  */
 public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In, Pred.Like, Pred.And, Pred.Or, Pred.Not, Pred.Bool {
@@ -19,7 +19,7 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
     /**
      * A compare: {@code left op right}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="null-safe"}
      *
      * @param op       the operator
@@ -38,7 +38,7 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
     /**
      * {@code operand IS NULL}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="is-null"}
      *
      * @param operand the value to test
@@ -50,7 +50,7 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
     /**
      * A boolean value used as a condition.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="boolean-getter"}
      *
      * @param operand a value of type {@code boolean} (or a call that returns boolean, like {@code equals})
@@ -63,7 +63,7 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
      * {@code value IN (values)}, made from {@code ids.contains(o.getId())} (Java) or {@code it.id in ids} (Kotlin).
      * The list comes from a captured collection and is bound as one parameter (ROADMAP D29).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="pred-in"}
      *
      * @param value  the tested value (usually a {@link Expr.Column})
@@ -105,7 +105,7 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
     /**
      * All items must be true.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="pred-and"}
      *
      * @param items the conditions (two or more)
@@ -123,7 +123,7 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
     /**
      * At least one item must be true.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="pred-or"}
      *
      * @param items the conditions (two or more)
@@ -141,7 +141,7 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
     /**
      * Logical NOT.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="not-composite"}
      *
      * @param operand the condition to negate
@@ -153,7 +153,7 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
     /**
      * A condition that is always true or always false.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="constants"}
      *
      * @param value the constant value
@@ -169,7 +169,7 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
     /**
      * Makes {@code a AND b}. Nested ANDs are made flat, and constants are folded.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="pred-and"}
      *
      * @param a first condition
@@ -188,7 +188,7 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
     /**
      * Makes {@code a OR b}. Nested ORs are made flat, and constants are folded.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="pred-or"}
      *
      * @param a first condition
@@ -209,7 +209,7 @@ public sealed interface Pred permits Pred.Cmp, Pred.IsNull, Pred.Truth, Pred.In,
      * Flipping the operator is safe with NULL values: {@code NOT (a < b)} and {@code a >= b}
      * are both UNKNOWN when a value is NULL, and a null-safe compare never gives UNKNOWN.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="pred-not"}
      *
      * @param p the condition

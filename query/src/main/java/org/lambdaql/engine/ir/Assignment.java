@@ -3,7 +3,7 @@ package org.lambdaql.engine.ir;
 /**
  * One {@code column = value} part of an UPDATE {@code SET}, or one column of an INSERT (ROADMAP M10).
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java">AssignmentReaderTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java">AssignmentReaderTest</a>):
  * {@snippet class="org.lambdaql.engine.sem.AssignmentReaderTest" region="read-assign"}
  *
  * @param target the column that gets the value: a basic column, an embedded field or value object,

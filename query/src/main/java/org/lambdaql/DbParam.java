@@ -11,7 +11,7 @@ import java.lang.annotation.Target;
  * the Java names follow another naming rule than the database, so that lambdaQL can still find arguments in the
  * wrong order. Without it, lambdaQL compares the Java argument names (compiled with {@code -parameters}).
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java">ProcedureTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java">ProcedureTest</a>):
  * {@snippet class="org.lambdaql.query.ProcedureTest" region="names"}
  */
 @Documented

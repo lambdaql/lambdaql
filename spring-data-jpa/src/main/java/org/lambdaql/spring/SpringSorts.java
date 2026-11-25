@@ -16,7 +16,7 @@ import org.springframework.data.domain.Sort;
  *   <li>{@code ignoreCase} is not supported yet (it needs the case-insensitive rules of ROADMAP D24).</li>
  * </ul>
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
  * {@snippet class="org.lambdaql.spring.ExecutorTest" region="find-all-spring-sort"}
  */
 public final class SpringSorts {

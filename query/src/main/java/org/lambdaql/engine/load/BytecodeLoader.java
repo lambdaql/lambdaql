@@ -22,7 +22,7 @@ import java.io.InputStream;
  * </ul>
  * The decoder reads the {@link MethodNode} the same way in both cases.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
  * {@snippet class="org.lambdaql.engine.load.LoadExamplesTest" region="load-body"}
  */
 public final class BytecodeLoader {
@@ -33,7 +33,7 @@ public final class BytecodeLoader {
     /**
      * Reads one method.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.load.LoadExamplesTest" region="load-missing"}
      *
      * @param loader            class loader that can see the class file
@@ -68,7 +68,7 @@ public final class BytecodeLoader {
     /**
      * Reads the body method of a lambda.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.load.LoadExamplesTest" region="load-body"}
      *
      * @param ref the lambda
@@ -82,7 +82,7 @@ public final class BytecodeLoader {
     /**
      * Tells which reader reads the class files in this JVM.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.load.LoadExamplesTest" region="reader-name"}
      *
      * @return {@code "asm"} on Java 21 to 23, {@code "classfile"} ({@code java.lang.classfile}) on Java 24 and later

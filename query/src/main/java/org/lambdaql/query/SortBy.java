@@ -8,7 +8,7 @@ import java.io.Serializable;
  * Both return {@code Comparable<?>}, so one {@code orderBy} takes both forms; lambdaQL tells them apart when it reads
  * the lambda. An entity is not {@code Comparable}, so {@code o -> o.getCustomer()} does not compile.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
  * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-basic"}
  *
  * @param <T> the entity type

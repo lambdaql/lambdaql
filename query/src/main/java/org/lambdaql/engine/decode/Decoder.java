@@ -37,7 +37,7 @@ import java.util.Map;
  * Not supported (an error is thrown): loops, {@code switch}, {@code throw}, string {@code +},
  * lambdas inside the lambda, and calls that return nothing.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
  * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="decode-pipeline"}
  */
 public final class Decoder implements Opcodes {
@@ -75,7 +75,7 @@ public final class Decoder implements Opcodes {
     /**
      * Decodes a condition lambda (one that returns {@code boolean}).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="decode-pipeline"}
      *
      * @param ref    the lambda
@@ -90,7 +90,7 @@ public final class Decoder implements Opcodes {
     /**
      * Decodes a value lambda (select, orderBy key and so on).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="value-lambda"}
      *
      * @param ref    the lambda
@@ -109,7 +109,7 @@ public final class Decoder implements Opcodes {
      * Conditions, loops and local variables are rejected. The Kotlin safe-call assignment
      * {@code it.customer?.id = x} is read as a plain assignment (ROADMAP D23).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java">AssignmentReaderTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java">AssignmentReaderTest</a>):
      * {@snippet class="org.lambdaql.engine.sem.AssignmentReaderTest" region="read-assign"}
      *
      * @param ref    the lambda
@@ -857,7 +857,7 @@ public final class Decoder implements Opcodes {
      * {@link Expr.SafeNav}, so the normalizer knows that step was written with {@code ?.} (ROADMAP D54).
      * Only a value that starts at a lambda parameter is marked; assignment lambdas are not marked.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="safe-nav"}
      *
      * @param stack the stack; its top is the checked value
@@ -918,7 +918,7 @@ public final class Decoder implements Opcodes {
     /**
      * Makes the "jump is taken" condition and pops its operands.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="simple-compare"}
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="boolean-getter"}
      *

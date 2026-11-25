@@ -26,7 +26,7 @@ import java.util.Set;
  * whole condition true (three-valued logic), the row must stay, so the join must be a left join.
  * When a missing parent association can keep rows, its child joins are left joins too.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
  * {@snippet class="org.lambdaql.query.SelectQueryTest" region="null-guard"}
  */
 final class JoinPlanner {

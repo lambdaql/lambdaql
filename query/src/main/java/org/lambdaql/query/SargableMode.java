@@ -5,7 +5,7 @@ package org.lambdaql.query;
  * Registered per persistence unit with {@link SargablePolicy#register}, or in Spring with
  * {@code lambdaql.sargable.mode}.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java">FunctionTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java">FunctionTest</a>):
  * {@snippet class="org.lambdaql.query.FunctionTest" region="sargable-strict"}
  */
 public enum SargableMode {

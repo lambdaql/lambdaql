@@ -25,7 +25,7 @@
 ## 소스에서 빌드
 
 ```bash
-git clone https://github.com/codebit0/lambdaql.git
+git clone https://github.com/lambdaql/lambdaql.git
 cd lambdaql
 ./gradlew build
 ```
@@ -118,7 +118,7 @@ kotlin {
 ## 예제 엔티티
 
 Kotlin 트랙의 예제는 다음 **예제 엔티티**를 사용합니다.
-예제 엔티티는 Java 클래스입니다([`query/src/test/java/org/lambdaql/query/`](https://github.com/codebit0/lambdaql/tree/main/query/src/test/java/org/lambdaql/query)). Kotlin 예제는 사용자 프로젝트가 컴파일된 엔티티를 쓰는 것과 같은 방식으로 이 클래스를 사용합니다.
+예제 엔티티는 Java 클래스입니다([`query/src/test/java/org/lambdaql/query/`](https://github.com/lambdaql/lambdaql/tree/main/query/src/test/java/org/lambdaql/query)). Kotlin 예제는 사용자 프로젝트가 컴파일된 엔티티를 쓰는 것과 같은 방식으로 이 클래스를 사용합니다.
 
 다음 다이어그램은 예제 엔티티와 연관을 보여 줍니다.
 
@@ -234,7 +234,7 @@ open class OrderRepository(private val qb: QueryBuilder) {
 - 공유 `EntityManager`는 현재 트랜잭션에 연결됩니다. `@Transactional` 안에서 lambdaQL은 같은 트랜잭션으로 실행됩니다.
 - Spring Data 리포지토리 안에서 lambdaQL 쿼리를 작성하려면 [12. Spring Data JPA](12-spring-data-jpa.md)를 참고하십시오.
 
-예제 코드: [`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)(`create`, `spring-config`, `spring-repository`).
+예제 코드: [`ManualKotlinStartTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)(`create`, `spring-config`, `spring-repository`).
 
 <a id="your-first-query"></a>
 ## 첫 쿼리
@@ -366,7 +366,7 @@ where c1_0.name=?
 고객이 없는 주문만 찾으려면 `it.customer == null`처럼 연관 자체를 비교하십시오. 조인 없이 `e0.customer is null`이 됩니다.
 자세한 규칙은 [3.10](03-where.md#310-association-paths)을 참고하십시오.
 
-예제 코드: [`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)(`first-query`, `captured`, `many-where`, `step-where`, `join-path`).
+예제 코드: [`ManualKotlinStartTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)(`first-query`, `captured`, `many-where`, `step-where`, `join-path`).
 
 <a id="getting-the-result"></a>
 ## 결과 가져오기
@@ -521,7 +521,7 @@ val customers = orders.distinct().count { it.customer?.id }
 val all = qb.from(Order::class.java).count { it }
 ```
 
-예제 코드: [`KotlinCountColumnTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinCountColumnTest.kt)(`count-column`, `count-distinct`, `count-row`).
+예제 코드: [`KotlinCountColumnTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinCountColumnTest.kt)(`count-column`, `count-distinct`, `count-row`).
 
 <a id="exists"></a>
 ### `exists()`
@@ -577,7 +577,7 @@ val tags: List<Tag> = qb.from(Tag::class.java).toList()   // use toList() instea
 assertEquals(2, tags.size)
 ```
 
-예제 코드: [`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)(`first`, `one`, `count`, `exists`, `to-set`, `to-set-check`).
+예제 코드: [`ManualKotlinStartTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)(`first`, `one`, `count`, `exists`, `to-set`, `to-set-check`).
 
 <a id="things-to-know"></a>
 ## 알아 둘 점

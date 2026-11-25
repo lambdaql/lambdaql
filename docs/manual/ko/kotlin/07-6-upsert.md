@@ -52,7 +52,7 @@ SQL은 데이터베이스마다 다릅니다. H2와 Oracle은 `merge` 문을 받
 
 행에는 `@Id` 대입이 있어야 합니다. `@Id`만 대입하면 수정할 컬럼이 없으므로, lambdaQL은 아래의 `ignore()` 형태로 씁니다.
 
-예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`upsert`).
+예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`upsert`).
 
 <a id="your-own-change-onconflictkeyupdate"></a>
 ## 직접 지정하는 변경: `onConflict(key).update(...)`
@@ -110,7 +110,7 @@ assertEquals("insert into Archive e0 (id, price) values (100L, (select sum(s1.pr
 
 이 문장을 두 번 실행하면 처음에는 품목 가격의 합을 삽입하고, 두 번째에는 키가 겹치므로 가장 큰 주문 가격으로 수정합니다.
 
-예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`on-conflict`, `upsert-sub`).
+예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`on-conflict`, `upsert-sub`).
 
 <a id="keep-the-existing-row-onconflictkeyignore"></a>
 ## 기존 행 유지: `onConflict(key).ignore()`
@@ -145,7 +145,7 @@ Hibernate 자체의 `on conflict ... do nothing`은 H2와 Oracle에서 일반 in
 > **`ignore()`는 원자적이지 않습니다.** 두 트랜잭션이 같은 키를 동시에 삽입하면 둘 다 `not exists` 검사를 통과할 수 있습니다.
 > 그러면 한쪽에서 키 중복 오류가 발생합니다. 애플리케이션에서 이런 상황이 생길 수 있다면 이 오류를 처리하십시오.
 
-예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`insert-ignore`).
+예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`insert-ignore`).
 
 <a id="the-row-count"></a>
 ## 영향 행 수
@@ -177,7 +177,7 @@ val second = qb.upsert(Archive::class.java).values(changed) { a, l -> a.id = l.i
 
 두 번째 호출은 `202`를 수정하고 `203`을 삽입합니다. 합계는 H2에서 2, MariaDB와 MySQL에서 3입니다(수정된 행을 2로 셈).
 
-예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`upsert-list`).
+예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`upsert-list`).
 
 <a id="rules"></a>
 ## 규칙

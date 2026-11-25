@@ -4,7 +4,7 @@ package org.lambdaql.query;
  * A subquery with an entity join: {@code sub.from(Order.class).join(Item.class, (o, i) -> ...)} (ROADMAP D51).
  * The lambdas take both rows. lambdaQL reads the calls; the subquery is never run in Java.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java">SubqueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java">SubqueryTest</a>):
  * {@snippet class="org.lambdaql.query.SubqueryTest" region="sub-join"}
  *
  * @param <X> the subquery entity

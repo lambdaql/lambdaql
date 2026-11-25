@@ -12,7 +12,7 @@ import java.util.Locale;
  * Code ranges: 1xxx input and lambda loading, 2xxx bytecode decoding, 3xxx meaning and values computed in Java,
  * 4xxx rendering and running, 5xxx warnings. A code is never reused after a release.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
  * {@snippet class="org.lambdaql.i18n.LqlMessagesTest" region="format"}
  */
 public enum LqlMessage {
@@ -548,7 +548,7 @@ public enum LqlMessage {
     /**
      * Makes the message in the current lambdaQL language ({@link LqlMessages#locale()}).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
      * {@snippet class="org.lambdaql.i18n.LqlMessagesTest" region="format"}
      *
      * @param args the values for {@code {0}}, {@code {1}} ...

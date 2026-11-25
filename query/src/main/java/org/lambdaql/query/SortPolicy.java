@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * The rules of an entity come from one place: the rules given here, else its {@link org.lambdaql.Sortable} fields.
  * Without a registered policy, lambdaQL uses {@link SortMode#INFO} with rules only from {@link org.lambdaql.Sortable}.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java">SortPolicyTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java">SortPolicyTest</a>):
  * {@snippet class="org.lambdaql.query.SortPolicyTest" region="strict"}
  */
 public final class SortPolicy {
@@ -44,7 +44,7 @@ public final class SortPolicy {
     /**
      * Makes a policy.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java">SortPolicyTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java">SortPolicyTest</a>):
      * {@snippet class="org.lambdaql.query.SortPolicyTest" region="strict"}
      *
      * @param mode  what to do with a sort that is not allowed

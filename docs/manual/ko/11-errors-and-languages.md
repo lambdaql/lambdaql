@@ -77,7 +77,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 - 코드는 릴리스 후 다시 사용하지 않습니다. 코드로 검색하거나 코드에서 코드 값을 검사해도 안전합니다.
 - 모든 코드는 `LQL-`와 네 자리 숫자로 이루어지며 중복되지 않습니다.
 
-예제 코드: [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)(`format`).
+예제 코드: [`LqlMessagesTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)(`format`).
 
 <a id="exceptions"></a>
 ## 예외
@@ -199,7 +199,7 @@ assertInstanceOf(UnsupportedLambdaShapeException::class.java, e)
 // assertEquals("Could not ...", e.message)                 // do not do this
 ```
 
-예제 코드: [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)(`exception`), [`ManualSharedTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java)(`catch`, `check-code`), [`ManualKotlinErrorsTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinErrorsTest.kt)(`catch`, `check-code`).
+예제 코드: [`LqlMessagesTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)(`exception`), [`ManualSharedTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java)(`catch`, `check-code`), [`ManualKotlinErrorsTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinErrorsTest.kt)(`catch`, `check-code`).
 
 <a id="when-errors-happen"></a>
 ## 오류가 발생하는 시점
@@ -293,7 +293,7 @@ assertEquals("LQL-4034", assertThrows(DbOnlyException.class, () -> OrderFns.disc
 assertEquals("LQL-4034", assertThrows<DbOnlyException> { OrderFns.discount(1.0) }.code())
 ```
 
-예제 코드: [`ManualSharedTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java)(`db-only`), [`ManualKotlinErrorsTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinErrorsTest.kt)(`db-only`).
+예제 코드: [`ManualSharedTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java)(`db-only`), [`ManualKotlinErrorsTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinErrorsTest.kt)(`db-only`).
 
 <a id="message-language"></a>
 ## 메시지 언어
@@ -397,7 +397,7 @@ assertEquals("a null b", LqlMessages.fill("a {0} b", (Object) null));
 assertEquals("{x} {9}", LqlMessages.fill("{x} {9}", "unused"));
 ```
 
-예제 코드: [`LqlMessagesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)(`locale`, `fill`), [`ManualSharedTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java)(`set-locale`), [`ManualKotlinErrorsTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinErrorsTest.kt)(`set-locale`).
+예제 코드: [`LqlMessagesTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java)(`locale`, `fill`), [`ManualSharedTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java)(`set-locale`), [`ManualKotlinErrorsTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinErrorsTest.kt)(`set-locale`).
 
 <a id="logging"></a>
 ## 로깅

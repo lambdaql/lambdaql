@@ -144,7 +144,7 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 - 인덱스가 있는지 조회해 경고를 줄이는 방식은 채택하지 않았습니다. 권한과 시노님 때문에 "인덱스 없음"과 "알 수 없음"이 섞이고, 컬럼 산술은 드문 형태이기 때문입니다.
 [8. 프로시저와 DB 함수](08-procedures-functions.md)를 참고하십시오.
 
-예제 코드: [`ManualKotlinNotesTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)(`equality`, `elvis-value`).
+예제 코드: [`ManualKotlinNotesTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)(`equality`, `elvis-value`).
 
 <a id="103-null-rules"></a>
 ## 10.3 NULL 규칙
@@ -529,7 +529,7 @@ val list = if (flag) {
 }
 ```
 
-예제 코드: [`ManualKotlinRulesTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinRulesTest.kt)(`cache-choose`).
+예제 코드: [`ManualKotlinRulesTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinRulesTest.kt)(`cache-choose`).
 
 <a id="109-tested-environment"></a>
 ## 10.9 지원 환경

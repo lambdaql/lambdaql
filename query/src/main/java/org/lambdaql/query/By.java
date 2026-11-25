@@ -9,7 +9,7 @@ import org.lambdaql.i18n.LqlMessage;
  * ({@code By.desc(o.getPrice())}). lambdaQL reads the calls from the lambda bytecode; the lambda is not run, so the
  * functions only describe the order. Called outside a sort lambda, they throw {@code IllegalStateException}.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
  * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-basic"}
  */
 public final class By {

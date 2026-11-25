@@ -85,7 +85,7 @@ interface OrderProcs {
 - 인터페이스와 결과 데이터 클래스는 DB 시그니처의 복사본입니다. 타입 안전성을 위한 대가입니다. lambdaQL은 그 일부를 데이터베이스와 대조하여 검사합니다(규칙 PR2).
 - 프로시저(추상 함수)와 DB 함수(`companion object` 안)를 **같은 인터페이스**에 둘 수 있습니다.
 
-예제 코드: [`ManualKotlinProcedureTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt)(`declare`).
+예제 코드: [`ManualKotlinProcedureTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt)(`declare`).
 
 ---
 
@@ -161,7 +161,7 @@ assertEquals("LQL-4037", assertThrows<LambdaQLException> {
 }.code())
 ```
 
-예제 코드: [`ManualKotlinProcedureTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt)(`call`, `exec`, `not-annotated`, `rules`).
+예제 코드: [`ManualKotlinProcedureTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt)(`call`, `exec`, `not-annotated`, `rules`).
 
 ---
 
@@ -229,7 +229,7 @@ MariaDB와 Oracle은 `SELECT *`의 컬럼을 서로 다른 순서로 반환하�
 프로시저에는 공통된 "영향받은 행 수" 결과가 없습니다(Oracle은 -1을 반환).
 그 수가 필요하면 OUT 파라미터로 반환하십시오.
 
-예제 코드: [`ManualKotlinProcedureTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt)(`inout`).
+예제 코드: [`ManualKotlinProcedureTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt)(`inout`).
 
 ---
 
@@ -342,7 +342,7 @@ assertEquals("LQL-4044", assertThrows<LambdaQLException> {
 - 조회는 성공했지만 프로시저가 없으면 여전히 `LQL-4035`입니다.
 - Oracle 오버로드 조회(`all_arguments`)만 실패하면 `LQL-5006`을 `INFO` 레벨로 기록하고, 오버로드 확인 없이 호출합니다.
 
-예제 코드: [`ManualKotlinProcedureTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt)(`names`, `name-check`, `package`, `overload`).
+예제 코드: [`ManualKotlinProcedureTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt)(`names`, `name-check`, `package`, `overload`).
 
 ---
 
@@ -431,7 +431,7 @@ assertEquals(inObject.toHql().hql(), topLevel.toHql().hql())
 
 함수는 **인터페이스 이름과 함께** 호출하십시오(`OrderFns.discount`). 함수를 import해도 동작하지만, 같은 이름의 멤버 함수가 그 함수를 가릴 수 있습니다.
 
-예제 코드: [`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt)(`declare`, `other-forms`).
+예제 코드: [`ManualKotlinFunctionTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt)(`declare`, `other-forms`).
 
 ---
 
@@ -537,7 +537,7 @@ spring.jpa.properties.lambdaql.functions.classes=com.acme.OrderFns
 
 이런 함수가 등록되어 있지 않으면 lambdaQL은 람다 표현식을 읽을 때 실패합니다(`LQL-3058`). [8.10](#810-function-rules-fn1-to-fn11-summary)의 `BadFns.unregistered`(`value = "SQ_TAX_KT"`, `sql = "SQ_FN_DISCOUNT"`)가 이 경우입니다. 등록 방법은 [등록](#registration-optional)을 참고하십시오.
 
-예제 코드: [`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt)(`where`, `boolean`, `captured`, `select`, `update`).
+예제 코드: [`ManualKotlinFunctionTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt)(`where`, `boolean`, `captured`, `select`, `update`).
 
 ---
 
@@ -567,7 +567,7 @@ lambdaQL이 실행하는 방법(규칙 PR6):
 
 lambdaQL은 먼저 대기 중인 변경을 플러시하므로(PR9와 같음) 함수는 최신 변경을 봅니다.
 
-예제 코드: [`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt)(`call`).
+예제 코드: [`ManualKotlinFunctionTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt)(`call`).
 
 ---
 
@@ -641,7 +641,7 @@ qb.from(Order::class.java).where { it.cnt!! * it.status > n }.toHql()
 - MariaDB에서는 함수가 실제로 결정적이면 `DETERMINISTIC`으로 선언하십시오.
 - Oracle에서는 같은 식의 함수 기반 인덱스가 있으면 경고가 사라집니다(이런 인덱스에는 `DETERMINISTIC` 함수가 필요합니다).
 
-예제 코드: [`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt)(`sargable`, `sargable-strict`).
+예제 코드: [`ManualKotlinFunctionTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt)(`sargable`, `sargable-strict`).
 
 ---
 
@@ -711,7 +711,7 @@ assertEquals("LQL-3058", assertThrows<LambdaQLException> {
 
 내장 함수와 같은 이름(`LQL-3054`, FN8)과 대응하지 않는 반환 타입(`LQL-3055`, FN6)도 람다 표현식을 읽을 때 거부됩니다.
 
-예제 코드: [`ManualKotlinFunctionTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt)(`bad-declare`, `rules`).
+예제 코드: [`ManualKotlinFunctionTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt)(`bad-declare`, `rules`).
 
 ---
 

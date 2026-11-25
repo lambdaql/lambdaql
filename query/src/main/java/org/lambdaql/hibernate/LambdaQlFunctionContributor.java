@@ -23,7 +23,7 @@ import java.util.Map;
  * and is needed for a function whose SQL name is not its query name ({@code @SqlFunction(sql = ...)}).
  * In Spring Boot: {@code spring.jpa.properties.lambdaql.functions.classes=com.acme.OrderFns}.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java">FunctionTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java">FunctionTest</a>):
  * {@snippet class="org.lambdaql.query.FunctionTest" region="declare"}
  */
 public class LambdaQlFunctionContributor implements FunctionContributor {

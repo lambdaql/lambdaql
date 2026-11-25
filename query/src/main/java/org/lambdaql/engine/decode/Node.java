@@ -16,7 +16,7 @@ import org.lambdaql.engine.ir.Pred;
  *                           --false-> FALSE
  * }</pre>
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
  * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="or-chain"}
  */
 public sealed interface Node permits Node.Leaf, Node.Test, Node.Value {
@@ -79,7 +79,7 @@ public sealed interface Node permits Node.Leaf, Node.Test, Node.Value {
     /**
      * An end of the graph for a value lambda (select, orderBy key and so on).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="value-lambda"}
      *
      * @param value the returned value

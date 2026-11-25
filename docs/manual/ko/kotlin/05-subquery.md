@@ -65,7 +65,7 @@ where exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id and i1_0.qty>1
 
 이는 **상관** 서브쿼리입니다. 안쪽 람다 표현식이 바깥의 `o`를 사용합니다([5.6](#56-correlated-subqueries) 참고).
 
-예제 코드: [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`exists`).
+예제 코드: [`KotlinQueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`exists`).
 
 ## 5.3 NOT EXISTS
 
@@ -90,7 +90,7 @@ from orders o1_0
 where o1_0.status=1 or not exists(select 1 from items i1_0 where i1_0.order_id=o1_0.id)
 ```
 
-예제 코드: [`ManualKotlinSubqueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSubqueryTest.kt)(`not-exists`).
+예제 코드: [`ManualKotlinSubqueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSubqueryTest.kt)(`not-exists`).
 
 ## 5.4 IN
 
@@ -107,7 +107,7 @@ assertEquals("select e0 from Order e0 where e0.customer.id in (select s1.id from
 `o.customer?.id`는 고객의 `@Id`로 끝나므로 외래 키 컬럼 `e0.customer.id`입니다. 조인이 필요 없습니다.
 `!!`는 무시됩니다. `c.grade!! > 3`은 `s1.grade > 3`입니다.
 
-예제 코드: [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`in`).
+예제 코드: [`KotlinQueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`in`).
 
 <a id="55-not-in-is-written-as-not-exists"></a>
 ## 5.5 NOT IN과 NULL
@@ -146,7 +146,7 @@ where o1_0.status not in (select c2_0.grade from customers c2_0)
   예제 데이터에는 NULL 등급이 있으므로 첫 번째 쿼리는 행을 반환하지 않습니다.
 - `!sub...exists()`는 여전히 `NOT EXISTS`로 작성됩니다.
 
-예제 코드: [`ManualKotlinSubqueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSubqueryTest.kt)(`not-in`).
+예제 코드: [`ManualKotlinSubqueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSubqueryTest.kt)(`not-in`).
 
 <a id="56-correlated-subqueries"></a>
 ## 5.6 상관 서브쿼리
@@ -174,7 +174,7 @@ assertEquals(mapOf("p1" to 10), q.toHql().parameters())
 **상관 조건의 `==`.** `i.order?.id == o.id`는 두 `Long?` 값을 비교합니다. 엔티티 값 두 개는 SQL 의미로 비교하므로([3.6](03-where.md#36-null-rules) 참고) lambdaQL은 단순한 `=`를 씁니다(`!=`는 `<>`).
 데이터베이스는 인덱스를 사용할 수 있습니다.
 
-예제 코드: [`ManualKotlinSubqueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSubqueryTest.kt)(`correlated-param`).
+예제 코드: [`ManualKotlinSubqueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSubqueryTest.kt)(`correlated-param`).
 
 <a id="57-scalar-subqueries"></a>
 ## 5.7 스칼라 서브쿼리
@@ -256,7 +256,7 @@ lambdaQL은 서브쿼리 안에서 마지막 정렬 키로 `id`를 더합니다.
 
 집계의 NULL은 SQL을 따릅니다. `sum`, `avg`, `min`, `max`는 행이 없으면 NULL을 냅니다. `count`는 0을 냅니다.
 
-예제 코드: [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`scalar`), [`ManualKotlinSubqueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSubqueryTest.kt)(`count`, `top-one`).
+예제 코드: [`KotlinQueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`scalar`), [`ManualKotlinSubqueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSubqueryTest.kt)(`count`, `top-one`).
 
 <a id="58-nested-subqueries"></a>
 ## 5.8 중첩 서브쿼리
@@ -285,7 +285,7 @@ Kotlin의 `o.customer?.id == c.id`는 `s1.customer is not null and ...`을 더�
 
 단계마다 새 이름(`sub2`, `o`, `i`)을 사용하십시오. Kotlin은 같은 이름을 다시 쓰는 것을 허용하지만 이름 가림(shadowing) 경고를 내고, 코드도 읽기 어려워집니다.
 
-예제 코드: [`ManualKotlinSubqueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSubqueryTest.kt)(`nested`).
+예제 코드: [`ManualKotlinSubqueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSubqueryTest.kt)(`nested`).
 
 <a id="59-sorting-inside-a-subquery"></a>
 ## 5.9 서브쿼리 안의 정렬
@@ -371,7 +371,7 @@ assertEquals("select e0 from Customer e0 where (select sum(s2.qty) from Order s1
     + " where s1.customer is not null and s1.customer.id = e0.id) > 30", q.toHql().hql())
 ```
 
-예제 코드: [`ManualKotlinSubqueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSubqueryTest.kt)(`rejected-paths`, `sub-join-sum`), [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`sub-join`).
+예제 코드: [`ManualKotlinSubqueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSubqueryTest.kt)(`rejected-paths`, `sub-join-sum`), [`KotlinQueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`sub-join`).
 
 <a id="511-subqueries-in-other-places"></a>
 ## 5.11 다른 곳의 서브쿼리

@@ -6,7 +6,7 @@ import org.lambdaql.i18n.LqlMessage;
  * The bytecode of the lambda has a shape that lambdaQL does not support (codes 2xxx): a loop, a value ternary, an instruction that lambdaQL does not know.
  * It is a {@link LambdaQLException}; check {@link #code()} in tests.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
  * {@snippet class="org.lambdaql.i18n.LqlMessagesTest" region="exception"}
  */
 public class UnsupportedLambdaShapeException extends LambdaQLException {

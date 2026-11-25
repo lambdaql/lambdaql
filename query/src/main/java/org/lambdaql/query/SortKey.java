@@ -5,7 +5,7 @@ import java.io.Serializable;
 /**
  * A sort lambda with one key and no builder: {@code o -> o.getPrice()}.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
  * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-key"}
  *
  * @param <T> the entity type

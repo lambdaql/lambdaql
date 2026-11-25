@@ -11,7 +11,7 @@ import java.util.List;
 /**
  * An INSERT with values that can run, or get an {@link #onConflict(ConflictKey)} part (upsert, ROADMAP D40).
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
  * {@snippet class="org.lambdaql.query.DmlQueryTest" region="on-conflict"}
  *
  * @param <T> the entity type
@@ -53,7 +53,7 @@ public class InsertValues<T> extends ExecutableInsert<T> {
     /**
      * Says what to do when a row with the same key already exists.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="on-conflict"}
      *
      * @param key the key column: {@code o -> o.getId()} or {@code Order::getCode}; it needs a primary key or
@@ -90,7 +90,7 @@ public class InsertValues<T> extends ExecutableInsert<T> {
          * On conflict, changes the existing row: {@code o -> o.setCnt(o.getCnt() + 1)}.
          * A getter here reads the existing row. Runs one statement per row.
          *
-         * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+         * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
          * {@snippet class="org.lambdaql.query.DmlQueryTest" region="on-conflict"}
          *
          * @param assign the assignments for the existing row
@@ -127,7 +127,7 @@ public class InsertValues<T> extends ExecutableInsert<T> {
          * {@code insert ... select ... where not exists (...)} (Hibernate's own form fails on H2 and Oracle, D40).
          * Not atomic: two sessions inserting the same key at the same moment can still get a duplicate key error.
          *
-         * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+         * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
          * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert-ignore"}
          *
          * @return the runnable INSERT

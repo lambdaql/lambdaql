@@ -6,7 +6,7 @@ import org.lambdaql.i18n.LqlMessage;
  * lambdaQL cannot load or read the lambda (codes 1xxx): a non-serializable lambda, an anonymous class, a class file that cannot be read.
  * It is a {@link LambdaQLException}; check {@link #code()} in tests.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
  * {@snippet class="org.lambdaql.i18n.LqlMessagesTest" region="exception"}
  */
 public class LambdaAnalysisException extends LambdaQLException {

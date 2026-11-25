@@ -11,7 +11,7 @@ import org.lambdaql.i18n.LqlMessage;
  * Calling them anywhere else throws {@link IllegalStateException}. Using them in {@code where} is an analysis error;
  * use {@code having} for conditions on aggregates.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
  * {@snippet class="org.lambdaql.query.ProjectionTest" region="group-by"}
  */
 public final class Agg {

@@ -29,7 +29,7 @@ import java.util.List;
  * The direction values ({@code nullsFirst}, {@code Direction}) stay as constants or host values;
  * the renderer reads them on every run.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/SortReaderTest.java">SortReaderTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/SortReaderTest.java">SortReaderTest</a>):
  * {@snippet class="org.lambdaql.engine.sem.SortReaderTest" region="read-sort"}
  */
 public final class SortReader {
@@ -50,7 +50,7 @@ public final class SortReader {
     /**
      * Reads a sort lambda with the builder: {@code (o, by) -> by.desc(o.getPrice()).asc(o.getId())}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/SortReaderTest.java">SortReaderTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/SortReaderTest.java">SortReaderTest</a>):
      * {@snippet class="org.lambdaql.engine.sem.SortReaderTest" region="read-sort"}
      *
      * @param ref   the lambda
@@ -106,7 +106,7 @@ public final class SortReader {
     /**
      * Reads a one-key sort lambda: {@code o -> o.getPrice()} or {@code Order::getPrice}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/SortReaderTest.java">SortReaderTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/SortReaderTest.java">SortReaderTest</a>):
      * {@snippet class="org.lambdaql.engine.sem.SortReaderTest" region="read-key"}
      *
      * @param ref   the lambda or getter reference
@@ -127,7 +127,7 @@ public final class SortReader {
      * Only unbound instance methods with no arguments are allowed (rule S13): static methods,
      * methods with arguments and references bound to an object are rejected.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/SortReaderTest.java">SortReaderTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/SortReaderTest.java">SortReaderTest</a>):
      * {@snippet class="org.lambdaql.engine.sem.SortReaderTest" region="read-key"}
      *
      * @param ref a method reference
@@ -153,7 +153,7 @@ public final class SortReader {
      * the parts before the last one must be to-one associations or embedded values, and the last part a basic value.
      * So the text can never become HQL that is not a column.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/SortReaderTest.java">SortReaderTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/SortReaderTest.java">SortReaderTest</a>):
      * {@snippet class="org.lambdaql.engine.sem.SortReaderTest" region="read-path"}
      *
      * @param path  property names joined with {@code .}, for example {@code customer.name}

@@ -45,7 +45,7 @@ import java.util.Objects;
  * </ul>
  * One renderer instance renders one query; it collects joins and parameters.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
  * {@snippet class="org.lambdaql.query.SelectQueryTest" region="to-hql"}
  */
 public final class HqlRenderer {
@@ -402,7 +402,7 @@ public final class HqlRenderer {
     /**
      * Renders {@code select e0 from Entity e0 [join ...] [where ...]}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SelectQueryTest" region="to-hql"}
      *
      * @param root   the main entity class
@@ -417,7 +417,7 @@ public final class HqlRenderer {
     /**
      * Renders {@code select count(e0) from Entity e0 [join ...] [where ...]}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
      * {@snippet class="org.lambdaql.query.ResultQueryTest" region="count"}
      *
      * @param root   the main entity class
@@ -443,7 +443,7 @@ public final class HqlRenderer {
     /**
      * Renders {@code select 1 from Entity e0 [join ...] [where ...]}; the caller reads at most one row.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
      * {@snippet class="org.lambdaql.query.ResultQueryTest" region="exists"}
      *
      * @param root   the main entity class
@@ -458,7 +458,7 @@ public final class HqlRenderer {
      * Renders {@code select e0 from Entity e0 [join ...] [where ...] [order by ...]}.
      * Paging values are not part of the HQL; the caller passes them to Hibernate.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-path"}
      *
      * @param root   the main entity class
@@ -551,7 +551,7 @@ public final class HqlRenderer {
      * so the rows are the same as {@code qb.from(...).where(same lambda)}.
      * An entity with {@code @Version} gets {@code update versioned}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update"}
      *
      * @param root   the entity class
@@ -574,7 +574,7 @@ public final class HqlRenderer {
      *   <li>With an id: {@code where e0.id = :p and (the conditions)}: exactly that row, if it still matches.</li>
      * </ul>
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update-limit"}
      *
      * @param root   the entity class
@@ -601,7 +601,7 @@ public final class HqlRenderer {
     /**
      * Renders {@code delete from Entity e0 [where ...]}, with the same path rules as {@link #update}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="delete"}
      *
      * @param root   the entity class
@@ -615,7 +615,7 @@ public final class HqlRenderer {
     /**
      * Renders a DELETE that removes only some of the matching rows (see {@link #update(Class, List, List, DmlScope)}).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="delete-limit"}
      *
      * @param root   the entity class
@@ -643,7 +643,7 @@ public final class HqlRenderer {
      * Renders {@code select e0.id from Entity e0 ... where ...}: the ids of the matching rows,
      * read first by the "one" protection (at most 2 are read).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="execute-one"}
      *
      * @param root   the entity class
@@ -721,7 +721,7 @@ public final class HqlRenderer {
     /**
      * Renders {@code insert into Entity (a, b) values (...), (...)}: one row per entry.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert"}
      *
      * @param root the entity class
@@ -739,7 +739,7 @@ public final class HqlRenderer {
      * Renders an upsert of one row: {@code insert into Entity e0 (...) values (...) on conflict(key) do update set ...}
      * (ROADMAP D40). Hibernate turns it into {@code merge} (H2, Oracle) or {@code on duplicate key update} (MariaDB).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="upsert"}
      *
      * @param root    the entity class
@@ -779,7 +779,7 @@ public final class HqlRenderer {
      * writes this form itself. It is not atomic: two sessions inserting the same key at the same time can still
      * get a duplicate key error.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert-ignore"}
      *
      * @param root the entity class
@@ -802,7 +802,7 @@ public final class HqlRenderer {
      * Renders {@code insert into Target (a, b) select e0.x, j1.y from Source e0 left join ... where ...}.
      * Paths in the select list use explicit left joins, so source rows without the association stay (ROADMAP U10).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert-select"}
      *
      * @param target  the target entity class
@@ -819,7 +819,7 @@ public final class HqlRenderer {
      * Renders INSERT ... SELECT with group keys and having conditions (ROADMAP M9):
      * {@code insert into Summary (customerId, total) select e0.customer.id, sum(e0.price) from Order e0 group by e0.customer.id}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
      * {@snippet class="org.lambdaql.query.ProjectionTest" region="insert-group"}
      *
      * @param target  the target entity class
@@ -994,7 +994,7 @@ public final class HqlRenderer {
      * Paths in select, group by and having use left joins (rule J1), so rows without the association stay.
      * The id tie-breaker for paging (S9) is added only without grouping and distinct.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
      * {@snippet class="org.lambdaql.query.ProjectionTest" region="group-by"}
      *
      * @param root     the entity class
@@ -1059,7 +1059,7 @@ public final class HqlRenderer {
      * (correlation). The order is kept only with a limit (S14); a subquery with a limit inside {@code in} is wrapped in
      * a derived table, because MariaDB cannot use {@code limit} directly there (error 1235).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java">SubqueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java">SubqueryTest</a>):
      * {@snippet class="org.lambdaql.query.SubqueryTest" region="exists"}
      *
      * @param q          the subquery

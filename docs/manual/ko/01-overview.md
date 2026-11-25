@@ -72,7 +72,7 @@ where (o1_0.status=1 or c1_0.name='Kim') and o1_0.price>?
 하지만 lambdaQL에서 람다 표현식은 Java나 Kotlin 문법으로 쓴 **쿼리 언어**입니다.
 `o.getCustomer().getName()`(Kotlin에서는 `it.customer?.name`)은 getter를 호출하지 않으며 **컬럼명으로 평가됩니다.**.
 
-예제 코드: [`ManualSharedTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java)(`overview-first`), [`ManualKotlinSharedTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSharedTest.kt)(`overview-first`).
+예제 코드: [`ManualSharedTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java)(`overview-first`), [`ManualKotlinSharedTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSharedTest.kt)(`overview-first`).
 
 <a id="why-lambdaql"></a>
 ## 왜 lambdaQL인가?
@@ -255,7 +255,7 @@ lambdaQL은 람다 표현식을 쿼리로 분석하지 못하면 `[LQL-2004]` �
 | 람다 표현식이 아닌 것 | 익명 클래스 | `object : ...` 식, 또는 Kotlin 함수 타입 값(`val f: (Order) -> Boolean`) |
 | SQL에서 의미가 없는 메서드 호출 | 예, 거부됨 | 예, 거부됨(직접 만든 non-inline 확장 함수도 포함) |
 
-예제 코드: [`ManualSharedTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java)(`one-lambda-per-clause`, `agg`), [`ManualKotlinSharedTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSharedTest.kt)(`one-lambda-per-clause`, `agg`).
+예제 코드: [`ManualSharedTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java)(`one-lambda-per-clause`, `agg`), [`ManualKotlinSharedTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSharedTest.kt)(`one-lambda-per-clause`, `agg`).
 
 <a id="comparison-with-other-approaches"></a>
 ## 다른 방식과의 비교

@@ -12,7 +12,7 @@ import java.util.List;
  * Like every JPA bulk statement, it changes the database directly: entities already loaded in the
  * {@code EntityManager} are not changed.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
  * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update"}
  *
  * @param <T> the entity type
@@ -81,7 +81,7 @@ public class ExecutableUpdate<T> {
     /**
      * Sets the order for {@link #limit(int)}. Without a limit it has no use, so it is an error then.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update-limit"}
      *
      * @param spec the sort lambda
@@ -108,7 +108,7 @@ public class ExecutableUpdate<T> {
      * Changes at most {@code count} rows: the first rows of {@code qb.from(X).where(same).orderBy(same)}
      * (by id when there is no order). Useful to work through many rows in small steps.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update-limit"}
      *
      * @param count the most rows (0 or more)
@@ -126,7 +126,7 @@ public class ExecutableUpdate<T> {
      * and {@link jakarta.persistence.NonUniqueResultException} is thrown. It reads the ids first (at most 2),
      * then changes the one row by its id and the same conditions, so it can never change more than one row.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="execute-one"}
      *
      * @return 0 or 1

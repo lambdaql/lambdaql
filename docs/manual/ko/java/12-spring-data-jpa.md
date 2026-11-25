@@ -147,7 +147,7 @@ public interface ManualMemberRepository extends JpaRepository<Member, Long>, Lam
 마지막 세 메서드는 수정, 삭제, 삽입 문장을 실행합니다. 이 메서드에는 트랜잭션이 필요합니다([12.6](#126-transactions-and-exceptions) 참고).
 
 이 리포지토리는 `JpaSpecificationExecutor<Member>`도 상속합니다. lambdaQL에는 필요하지 않으며, 함께 사용할 때의 동작을 보여 주기 위한 구성입니다.
-다른 예제 리포지토리 [`MemberRepository`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)는 같은 메서드에 직접 작성한 프래그먼트 `MemberRepositoryCustom`까지 상속합니다([12.7](#127-other-fragments-and-jpaspecificationexecutor) 참고).
+다른 예제 리포지토리 [`MemberRepository`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)는 같은 메서드에 직접 작성한 프래그먼트 `MemberRepositoryCustom`까지 상속합니다([12.7](#127-other-fragments-and-jpaspecificationexecutor) 참고).
 
 동작 방식:
 
@@ -164,7 +164,7 @@ public interface ManualMemberRepository extends JpaRepository<Member, Long>, Lam
 | 3 | lambdaQL 쿼리는 **default 메서드**나 서비스에 작성하십시오. 추상 메서드는 계속 Spring Data 쿼리 메서드(`findByName` 등)로 동작합니다. |
 | 4 | Spring Boot 없이도 리포지토리 부분은 일반 Spring Data이므로 동작합니다. `QueryBuilder` 빈만 자동으로 생성되지 않습니다([12.8](#128-the-querybuilder-bean) 참고). |
 
-예제 코드: [`ManualMemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualMemberRepository.java)(`repository`).
+예제 코드: [`ManualMemberRepository.java`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualMemberRepository.java)(`repository`).
 
 <a id="124-executor-methods"></a>
 ## 12.4 실행기 메서드
@@ -373,7 +373,7 @@ int changed = tx.execute(s -> teams.upsertQuery().values(t -> { t.setId(teamId);
 
 업서트는 데이터베이스가 보고한 행 수를 반환합니다. 삽입이면 1이고, 수정이면 H2와 Oracle은 1, MariaDB는 2입니다([7.6](07-6-upsert.md#the-row-count) 참고).
 
-예제 코드: [`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)(`query`, `dml`), [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)(`find-all-sort`, `find-first`, `find-one`, `count-exists`, `find-set`, `dml-shortcuts`, `dml-one`, `upsert`).
+예제 코드: [`MemberRepository.java`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java)(`query`, `dml`), [`ExecutorTest.java`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)(`find-all-sort`, `find-first`, `find-one`, `count-exists`, `find-set`, `dml-shortcuts`, `dml-one`, `upsert`).
 
 <a id="125-spring-sort-and-pageable"></a>
 ## 12.5 Spring `Sort`와 `Pageable`
@@ -516,7 +516,7 @@ try {
 
 메시지에는 엔티티 클래스와 정렬 이름이 들어 있습니다. 클라이언트에 엔티티 이름을 노출하지 않으려면 `e.code()`만 보내십시오.
 
-예제 코드: [`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)(`find-all-spring-sort`, `page`, `sort-policy`), [`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java)(`properties`, `properties-use`), [`ManualJavaSpringTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualJavaSpringTest.java)(`sort-policy-bean`).
+예제 코드: [`ExecutorTest.java`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java)(`find-all-spring-sort`, `page`, `sort-policy`), [`SortPropertiesTest.java`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java)(`properties`, `properties-use`), [`ManualJavaSpringTest.java`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualJavaSpringTest.java)(`sort-policy-bean`).
 
 <a id="126-transactions-and-exceptions"></a>
 ## 12.6 트랜잭션과 예외
@@ -559,7 +559,7 @@ DML을 자체 트랜잭션에서 실행하는 빌더는 `new QueryBuilder(entity
 
 `QueryBuilder` 빈(12.8)은 리포지토리가 아니므로 Spring의 예외 변환을 거치지 않습니다. 이 빈에서 `one()`과 `executeOne()`의 조건에 맞는 행이 2개 이상이면 `NonUniqueResultException`이 발생합니다.
 
-예제 코드: [`ManualJavaSpringTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualJavaSpringTest.java)(`detached`).
+예제 코드: [`ManualJavaSpringTest.java`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualJavaSpringTest.java)(`detached`).
 
 <a id="127-other-fragments-and-jpaspecificationexecutor"></a>
 ## 12.7 다른 프래그먼트와 `JpaSpecificationExecutor`
@@ -582,7 +582,7 @@ List<Member> byLambda = repository.findAll(m -> m.isActive());                  
 long total = repository.count();                                                      // Spring Data's own count()
 ```
 
-예제 코드: [`ManualJavaSpringTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualJavaSpringTest.java)(`fragments`).
+예제 코드: [`ManualJavaSpringTest.java`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualJavaSpringTest.java)(`fragments`).
 
 <a id="128-the-querybuilder-bean"></a>
 ## 12.8 `QueryBuilder` 빈
@@ -626,7 +626,7 @@ Spring 애플리케이션에서는 `new QueryBuilder(entityManagerFactory)`를 �
 **`@DataJpaTest` 테스트.** `@DataJpaTest` 슬라이스 테스트는 일부 자동 구성만 로드합니다. 리포지토리 메서드는 동작하지만 `QueryBuilder` 빈은 생성되지 않습니다.
 테스트에 이 빈이 필요하면 `@SpringBootTest`처럼 자동 구성 전체를 로드하는 테스트를 쓰십시오.
 
-예제 코드: [`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)(`query-builder-bean`), [`ManualJavaStartTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java)(`config`).
+예제 코드: [`AutoConfigurationTest.java`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)(`query-builder-bean`), [`ManualJavaStartTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java)(`config`).
 
 <a id="129-kotlin-repositories"></a>
 ## 12.9 Kotlin 리포지토리

@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Kotlin data classes. Their components are columns, so {@code r.total()} (Kotlin {@code r.total}) reads the column
  * {@code total} of the derived table. Everything else goes to the JPA model.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java">DerivedQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java">DerivedQueryTest</a>):
  * {@snippet class="org.lambdaql.query.DerivedQueryTest" region="derived"}
  */
 public final class RowModel implements EntityModel {

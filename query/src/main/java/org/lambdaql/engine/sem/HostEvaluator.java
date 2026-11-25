@@ -20,7 +20,7 @@ import java.math.BigInteger;
  * A host expression only uses captured values, constants, fields and method calls that do not touch
  * the entity. The result is bound as a query parameter.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/HostEvaluatorTest.java">HostEvaluatorTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/HostEvaluatorTest.java">HostEvaluatorTest</a>):
  * {@snippet class="org.lambdaql.engine.sem.HostEvaluatorTest" region="eval-call"}
  */
 public final class HostEvaluator {
@@ -39,7 +39,7 @@ public final class HostEvaluator {
     /**
      * Computes the value of an expression.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/HostEvaluatorTest.java">HostEvaluatorTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/HostEvaluatorTest.java">HostEvaluatorTest</a>):
      * {@snippet class="org.lambdaql.engine.sem.HostEvaluatorTest" region="eval-arith"}
      * {@snippet class="org.lambdaql.engine.sem.HostEvaluatorTest" region="eval-null-receiver"}
      *
@@ -137,7 +137,7 @@ public final class HostEvaluator {
     /**
      * Converts a number to the wanted wrapper type, so Hibernate gets the type it expects.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/HostEvaluatorTest.java">HostEvaluatorTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/HostEvaluatorTest.java">HostEvaluatorTest</a>):
      * {@snippet class="org.lambdaql.engine.sem.HostEvaluatorTest" region="convert"}
      *
      * @param value  the value (may be null)

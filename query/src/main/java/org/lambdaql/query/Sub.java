@@ -5,7 +5,7 @@ package org.lambdaql.query;
  * (ROADMAP M8, D19). lambdaQL reads the calls from the bytecode; the lambda is never run, so the return values
  * are only placeholders with the right type.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java">SubqueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java">SubqueryTest</a>):
  * {@snippet class="org.lambdaql.query.SubqueryTest" region="exists"}
  */
 public interface Sub {

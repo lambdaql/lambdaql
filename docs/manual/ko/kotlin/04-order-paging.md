@@ -33,7 +33,7 @@ assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.active =
 
 `orderBy`의 람다 표현식은 `Comparable<*>`을 반환합니다. 키 하나(`it.price`)와 `SortKeys`가 모두 `Comparable`이므로 `orderBy` 하나가 두 형태를 받습니다. lambdaQL은 람다 표현식을 읽을 때 둘을 구분합니다.
 
-예제 코드: [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`sort`).
+예제 코드: [`KotlinQueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`sort`).
 
 <a id="42-the-short-forms-one-key"></a>
 ## 4.2 짧은 형태(키 하나)
@@ -60,7 +60,7 @@ lambdaQL은 람다 표현식이 반환하는 값이 키 하나인지 `By`의 함
 
 `Direction`을 쓸 때는 람다 표현식이 첫 번째 인자이므로 괄호 안에 넣습니다: `orderBy({ it.updateAt }, Direction.DESC)`.
 
-예제 코드: [`ManualKotlinSortTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSortTest.kt)(`short-form`).
+예제 코드: [`ManualKotlinSortTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSortTest.kt)(`short-form`).
 
 ## 4.3 `Direction`
 
@@ -113,7 +113,7 @@ assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name 
 
 `dir`은 람다 표현식 **밖에서** 고르십시오. 정렬 람다 표현식 안의 `if`는 거부됩니다([4.6](#46-rules-for-the-lambda-body) 참고).
 
-예제 코드: [`ManualKotlinSortTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSortTest.kt)(`nulls-and-direction`).
+예제 코드: [`ManualKotlinSortTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSortTest.kt)(`nulls-and-direction`).
 
 <a id="44-null-ordering-is-the-same-on-every-database"></a>
 ## 4.4 NULL 정렬은 모든 데이터베이스에서 같음
@@ -257,7 +257,7 @@ assertEquals("select e0 from Order e0 order by e0.kind asc nulls first", q.toHql
 별칭은 `where`와 함께 사용합니다. `where`가 같은 경로를 이미 조인했다면 정렬은 그 조인을 사용합니다.
 `where`가 이 경로를 inner join으로 썼다면 고객 없는 주문은 이미 빠져 있습니다. `where`가 `left join`으로 쓴 경로라면 정렬도 그 `left join`을 사용합니다([3.10](03-where.md#310-association-paths) 참고).
 
-예제 코드: [`ManualKotlinSortTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSortTest.kt)(`sort-keys`, `sort-path`, `required-association`, `lob`, `enum-string-sort`).
+예제 코드: [`ManualKotlinSortTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSortTest.kt)(`sort-keys`, `sort-path`, `required-association`, `lob`, `enum-string-sort`).
 
 <a id="46-rules-for-the-lambda-body"></a>
 ## 4.6 람다 표현식 본문의 규칙
@@ -285,7 +285,7 @@ lambdaQL은 `orderBy`를 호출할 때 이를 확인하고 `LambdaQLException`�
 
 실행 중에 방향을 바꿔야 한다면 변수로 전달하십시오: `sort(key, dir)`. 키 자체를 바꿔야 한다면 일반 Kotlin 코드의 두 분기에서 각각 쿼리를 만드십시오.
 
-예제 코드: [`ManualKotlinSortTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSortTest.kt)(`lambda-rules`).
+예제 코드: [`ManualKotlinSortTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSortTest.kt)(`lambda-rules`).
 
 <a id="47-order-of-calls"></a>
 ## 4.7 호출 순서
@@ -403,7 +403,7 @@ assertEquals("select e0 from OrderLine e0 join e0.order j1 order by j1.price asc
     qb.from(OrderLine::class.java).orderBy { l -> asc(l.order.price) }.limit(2).toHql().hql())
 ```
 
-예제 코드: [`ManualKotlinSortTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSortTest.kt)(`page`, `page-only`, `first-and-count`, `unique-key`).
+예제 코드: [`ManualKotlinSortTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSortTest.kt)(`page`, `page-only`, `first-and-count`, `unique-key`).
 
 <a id="49-strings-and-special-values"></a>
 ## 4.9 문자열과 특수 값
@@ -634,7 +634,7 @@ assertThrows(SortNotAllowedException::class.java) {
   lambdaQL은 웹 의존성이 없습니다. HTTP 400 응답 예시는 [12.5](12-spring-data-jpa.md#sort-policy-with-spring)를 참고하십시오.
 - 요청에서 이름과 방향을 받으면 방향은 `Direction.parse`([4.3](#43-direction) 참고), 이름은 `SortSpec.ofPath`로 읽으십시오.
 
-예제 코드: [`ManualKotlinSortTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSortTest.kt)(`sort-spec`, `sort-spec-then`, `sort-spec-reversed`, `sort-spec-path`, `policy`, `annotation`, `string-paths`).
+예제 코드: [`ManualKotlinSortTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSortTest.kt)(`sort-spec`, `sort-spec-then`, `sort-spec-reversed`, `sort-spec-path`, `policy`, `annotation`, `string-paths`).
 
 <a id="411-sorting-inside-subqueries"></a>
 ## 4.11 서브쿼리 안의 정렬

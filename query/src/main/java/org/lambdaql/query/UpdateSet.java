@@ -9,7 +9,7 @@ import java.util.List;
  * An UPDATE with assignments. Call {@code set} again to add more (useful for PATCH: only the fields that have a value),
  * then {@code where} or {@code all}. {@code execute()} is not here, so an UPDATE of every row must say {@code all()} (U5).
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
  * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update-patch"}
  *
  * @param <T> the entity type

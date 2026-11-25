@@ -6,7 +6,7 @@ import java.io.Serializable;
  * A group key lambda: one key {@code o -> o.getCustomer().getId()}, or many keys
  * {@code o -> List.of(o.getCustomer().getId(), o.getStatus())} (Kotlin {@code listOf(...)}, {@code a to b}) (ROADMAP D27).
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
  * {@snippet class="org.lambdaql.query.ProjectionTest" region="group-many"}
  *
  * @param <T> the entity type

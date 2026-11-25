@@ -14,7 +14,7 @@ import java.util.Locale;
  * The message is made when the exception is made, in the language of {@link LqlMessages#locale()}.
  * {@link #getMessage(Locale)} gives it in another language.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
  * {@snippet class="org.lambdaql.i18n.LqlMessagesTest" region="exception"}
  */
 public class LambdaQLException extends RuntimeException {
@@ -113,7 +113,7 @@ public class LambdaQLException extends RuntimeException {
     /**
      * Returns the same message in another language.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
      * {@snippet class="org.lambdaql.i18n.LqlMessagesTest" region="exception"}
      *
      * @param locale the language, for example {@link Locale#ROOT} for English

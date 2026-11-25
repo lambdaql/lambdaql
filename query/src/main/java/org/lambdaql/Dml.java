@@ -13,7 +13,7 @@ import org.lambdaql.i18n.LqlMessage;
  * A class with its own {@code value(...)} method (a record with a {@code value} component, a wrapper type) hides the
  * static import inside its body; write {@code Dml.value(...)} there.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
  * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update-value"}
  */
 public final class Dml {
@@ -25,7 +25,7 @@ public final class Dml {
      * Assigns a new value to a column: {@code value(o.getStatus(), 2)} becomes {@code set e0.status = 2}.
      * The value may read the row (the value before the update), captured values and subqueries ({@code sub}).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update-value"}
      *
      * @param column   the column, written as a getter call on the target, for example {@code o.getStatus()}

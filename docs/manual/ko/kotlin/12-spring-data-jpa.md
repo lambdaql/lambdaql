@@ -145,7 +145,7 @@ interface KtMemberRepository : JpaRepository<Member, Long>, LambdaQlExecutor<Mem
 | 3 | lambdaQL 쿼리는 **본문이 있는 인터페이스 메서드**나 서비스에 작성하십시오. 본문이 없는 메서드는 계속 Spring Data 쿼리 메서드(`findByName` 등)로 동작합니다. |
 | 4 | Spring Boot 없이도 리포지토리 부분은 일반 Spring Data이므로 동작합니다. `QueryBuilder` 빈만 자동으로 생성되지 않습니다([12.8](#128-the-querybuilder-bean) 참고). |
 
-예제 코드: [`ManualKotlinRepositories.kt`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/kotlin/org/lambdaql/spring/ManualKotlinRepositories.kt)(`repository`).
+예제 코드: [`ManualKotlinRepositories.kt`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/kotlin/org/lambdaql/spring/ManualKotlinRepositories.kt)(`repository`).
 
 <a id="124-executor-methods"></a>
 ## 12.4 실행기 메서드
@@ -316,7 +316,7 @@ val changed = tx.execute { teams.upsertQuery().values { it.id = teamId; it.name 
 
 업서트는 데이터베이스가 보고한 행 수를 반환합니다. 삽입이면 1이고, 수정이면 H2와 Oracle은 1, MariaDB는 2입니다([7.6](07-6-upsert.md#the-row-count) 참고).
 
-예제 코드: [`ManualKotlinRepositoryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/kotlin/org/lambdaql/spring/ManualKotlinRepositoryTest.kt)(`executor`, `dml-one`, `upsert`), [`ManualKotlinRepositories.kt`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/kotlin/org/lambdaql/spring/ManualKotlinRepositories.kt)(`shortcuts`).
+예제 코드: [`ManualKotlinRepositoryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/kotlin/org/lambdaql/spring/ManualKotlinRepositoryTest.kt)(`executor`, `dml-one`, `upsert`), [`ManualKotlinRepositories.kt`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/kotlin/org/lambdaql/spring/ManualKotlinRepositories.kt)(`shortcuts`).
 
 <a id="125-spring-sort-and-pageable"></a>
 ## 12.5 Spring `Sort`와 `Pageable`
@@ -443,7 +443,7 @@ assertThrows<SortNotAllowedException> { repository.findAll({ it.isActive }, Sort
 **HTTP 400 응답.** lambdaQL은 웹 의존성이 없으므로 HTTP 상태를 정하지 않습니다. 웹 애플리케이션은 보통 `@RestControllerAdvice`의 `@ExceptionHandler(SortNotAllowedException::class)`에서 400 Bad Request로 응답합니다.
 예외의 메시지에는 엔티티 클래스와 정렬 이름이 들어 있습니다. 클라이언트에 엔티티 이름을 노출하지 않으려면 `e.code()`(`"LQL-4040"`)만 보내십시오.
 
-예제 코드: [`ManualKotlinRepositoryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/kotlin/org/lambdaql/spring/ManualKotlinRepositoryTest.kt)(`spring-sort`), [`ManualKotlinBeansTest.kt`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/kotlin/org/lambdaql/spring/ManualKotlinBeansTest.kt)(`beans`, `sort-policy`).
+예제 코드: [`ManualKotlinRepositoryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/kotlin/org/lambdaql/spring/ManualKotlinRepositoryTest.kt)(`spring-sort`), [`ManualKotlinBeansTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/kotlin/org/lambdaql/spring/ManualKotlinBeansTest.kt)(`beans`, `sort-policy`).
 
 <a id="126-transactions-and-exceptions"></a>
 ## 12.6 트랜잭션과 예외
@@ -508,7 +508,7 @@ class KtMemberRepositoryCustomImpl(private val em: EntityManager) : KtMemberRepo
 
 `findAll { it.isActive }`, `Specification`을 받는 `findAll`, `countByHand()`, `count()`를 같은 리포지토리에서 함께 호출할 수 있습니다.
 
-예제 코드: [`ManualKotlinRepositories.kt`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/kotlin/org/lambdaql/spring/ManualKotlinRepositories.kt)(`fragments`).
+예제 코드: [`ManualKotlinRepositories.kt`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/kotlin/org/lambdaql/spring/ManualKotlinRepositories.kt)(`fragments`).
 
 <a id="128-the-querybuilder-bean"></a>
 ## 12.8 `QueryBuilder` 빈
@@ -542,7 +542,7 @@ Spring 애플리케이션에서는 `QueryBuilder(entityManagerFactory)`를 사�
 
 **`@DataJpaTest` 테스트.** `@DataJpaTest` 슬라이스 테스트는 일부 자동 구성만 로드합니다. 리포지토리 메서드는 동작하지만 `QueryBuilder` 빈은 생성되지 않습니다.
 
-예제 코드: [`ManualKotlinRepositories.kt`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/kotlin/org/lambdaql/spring/ManualKotlinRepositories.kt)(`service`).
+예제 코드: [`ManualKotlinRepositories.kt`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/kotlin/org/lambdaql/spring/ManualKotlinRepositories.kt)(`service`).
 
 <a id="129-kotlin-compile-settings"></a>
 ## 12.9 Kotlin 컴파일 설정

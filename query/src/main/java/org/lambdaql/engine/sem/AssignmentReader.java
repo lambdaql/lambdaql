@@ -23,7 +23,7 @@ import java.util.List;
  * assignment wrote — the SQL meaning is the value before the update, and MariaDB differs), U4 (no column twice),
  * U6 ({@code null} into a column that can never be NULL).
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java">AssignmentReaderTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java">AssignmentReaderTest</a>):
  * {@snippet class="org.lambdaql.engine.sem.AssignmentReaderTest" region="read-assign"}
  */
 public final class AssignmentReader {
@@ -36,7 +36,7 @@ public final class AssignmentReader {
     /**
      * Reads a setter-form lambda.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java">AssignmentReaderTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java">AssignmentReaderTest</a>):
      * {@snippet class="org.lambdaql.engine.sem.AssignmentReaderTest" region="read-assign"}
      *
      * @param ref        the lambda
@@ -55,7 +55,7 @@ public final class AssignmentReader {
      * Reads a setter-form lambda, and allows aggregate functions ({@code Agg}) in the values when {@code aggregates}
      * is true (INSERT ... SELECT with groupBy, ROADMAP M9).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
      * {@snippet class="org.lambdaql.query.ProjectionTest" region="insert-group"}
      *
      * @param ref        the lambda
@@ -106,7 +106,7 @@ public final class AssignmentReader {
     /**
      * Checks the rules between all assignments of one statement (also across many {@code set()} calls).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java">AssignmentReaderTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java">AssignmentReaderTest</a>):
      * {@snippet class="org.lambdaql.engine.sem.AssignmentReaderTest" region="rules"}
      *
      * @param all   the assignments in order

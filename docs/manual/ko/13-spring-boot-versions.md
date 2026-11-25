@@ -89,8 +89,8 @@ Hibernate가 HQL을 SQL로 바꾸는 방식은 버전마다 조금 다릅니다.
 
 버전별 전체 SQL은 다음 위치에서 볼 수 있습니다.
 
-- Hibernate 7.4: [`query/src/test/resources/expected-sql/`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/)
-- Hibernate 6.6: [`query/src/test/resources/expected-sql/hibernate6/`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/hibernate6/)
+- Hibernate 7.4: [`query/src/test/resources/expected-sql/`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/resources/expected-sql/)
+- Hibernate 6.6: [`query/src/test/resources/expected-sql/hibernate6/`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/resources/expected-sql/hibernate6/)
 
 <a id="135-what-is-tested"></a>
 ## 13.5 검증 범위

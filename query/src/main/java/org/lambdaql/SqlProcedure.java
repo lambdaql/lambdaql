@@ -14,7 +14,7 @@ import java.lang.annotation.Target;
  * The result: one OUT value is the return value, more OUT values are a record (or Kotlin data class) in the database
  * order, a result set or REF CURSOR is a {@code List<T>}, and {@code void} means no result.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java">ProcedureTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java">ProcedureTest</a>):
  * {@snippet class="org.lambdaql.query.ProcedureTest" region="declare"}
  */
 @Documented

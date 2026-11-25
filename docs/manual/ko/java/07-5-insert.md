@@ -69,7 +69,7 @@ assertEquals("insert into Archive e0 (id, price) values (100L, (select sum(s1.pr
 - 리스트 형태에서도 서브쿼리를 쓸 수 있습니다([리스트에서 여러 행](#many-rows-from-a-list) 참고).
 - upsert의 삽입 값과 `do update set` 안의 서브쿼리도 동작합니다. Oracle에서는 Hibernate가 `merge`로 실행합니다(실측).
 
-예제 코드: [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`insert`, `insert-values-sub`), [`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`insert-value`).
+예제 코드: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`insert`, `insert-values-sub`), [`ManualJavaDmlTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`insert-value`).
 
 <a id="many-rows-from-a-list"></a>
 ## 리스트에서 여러 행
@@ -109,7 +109,7 @@ assertEquals("insert into Archive (id, price) values (:p1, (select sum(s1.price)
         + " (:p3, (select sum(s1.price) from Item s1 where s1.order.id = :p4))", i.toHql().get(0).hql());
 ```
 
-예제 코드: [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`insert-list`, `insert-list-sub`).
+예제 코드: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`insert-list`, `insert-list-sub`).
 
 <a id="generated-id"></a>
 ## 생성되는 id
@@ -173,7 +173,7 @@ assertEquals("insert into Archive (id, price) select e0.id, (select sum(s2.price
         + " from Order e0 where exists (select 1 from Item s1 where s1.order.id = e0.id)", i.toHql().get(0).hql());
 ```
 
-예제 코드: [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`insert-select`, `insert-select-sub`), [`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`insert-select-value`).
+예제 코드: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`insert-select`, `insert-select-sub`), [`ManualJavaDmlTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`insert-select-value`).
 
 <a id="insert--select-with-aggregates"></a>
 ## 집계를 사용한 insert ... select
@@ -215,5 +215,5 @@ having count(*)>=2
 
 [7. 수정, 삽입, 삭제 (Java)](07-dml.md) | [7.2 수정(update)](07-2-update.md) | [7.4 삭제(delete)](07-4-delete.md) | **7.5 삽입(insert)** | [7.6 업서트(upsert)](07-6-upsert.md) | [Kotlin](../kotlin/07-5-insert.md)
 
-예제 코드: [`ProjectionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)(`insert-group`).
+예제 코드: [`ProjectionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java)(`insert-group`).
 

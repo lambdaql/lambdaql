@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * {@link EntityModel} that reads the JPA {@link Metamodel}. Only standard JPA API is used
  * (no Hibernate internal classes). Results are cached.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java">JpaEntityModelTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java">JpaEntityModelTest</a>):
  * {@snippet class="org.lambdaql.engine.sem.JpaEntityModelTest" region="entity-model"}
  */
 public final class JpaEntityModel implements EntityModel {

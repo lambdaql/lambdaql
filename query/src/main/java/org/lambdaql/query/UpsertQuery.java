@@ -14,7 +14,7 @@ import java.util.List;
  * Hibernate writes {@code merge} on H2 and Oracle and {@code on duplicate key update} on MariaDB.
  * For another key or another change, use {@code qb.insert(X).values(...).onConflict(key).update(...)}.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
  * {@snippet class="org.lambdaql.query.DmlQueryTest" region="upsert"}
  *
  * @param <T> the entity type

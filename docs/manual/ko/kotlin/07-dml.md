@@ -46,7 +46,7 @@ lambdaQL의 진입점은 다섯 개입니다.
 ## 7.1 예제 엔티티
 
 이 장은 `Order`, `Customer`, `Item`을 사용합니다([2. 시작하기](02-getting-started.md#example-entities) 참고).
-예제는 [`query/src/test/java/org/lambdaql/query`](https://github.com/codebit0/lambdaql/tree/main/query/src/test/java/org/lambdaql/query)의 Java 예제 엔티티를 Kotlin에서 그대로 사용합니다.
+예제는 [`query/src/test/java/org/lambdaql/query`](https://github.com/lambdaql/lambdaql/tree/main/query/src/test/java/org/lambdaql/query)의 Java 예제 엔티티를 Kotlin에서 그대로 사용합니다.
 Kotlin은 Java getter와 setter를 속성으로 보므로 `it.status = st`처럼 대입합니다.
 
 | 클래스 | 이 장에서 쓰는 속성 |
@@ -152,7 +152,7 @@ assertEquals("update Order e0 set e0.price = (select sum(s1.price) from Item s1 
 - 일치하는 행이 없으면 `sum` 등은 NULL을 돌려줍니다. NOT NULL 컬럼이면 DB 오류가 나므로 `?: 0.0`을 붙이십시오. `coalesce(...)`가 됩니다([7.2](07-2-update.md#an-aggregate-from-a-subquery) 참고).
 - insert의 `values { a, sub -> ... }`와 upsert(`onConflict { ... }.update { a, sub -> ... }`)에서도 같은 방식으로 서브쿼리를 씁니다([7.5](07-5-insert.md#a-subquery-in-a-value) 참고). 리스트 형태는 `values(list) { a, l, sub -> ... }`처럼 세 번째 인자가 `sub`입니다.
 
-예제 코드: [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`update-value`, `update-sub`), [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`value-forms`).
+예제 코드: [`KotlinQueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`update-value`, `update-sub`), [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`value-forms`).
 
 ---
 
@@ -202,7 +202,7 @@ val e = assertThrows(LambdaQLException::class.java) {
 assertEquals("LQL-2009", e.code())
 ```
 
-예제 코드: [`KotlinCaseWhenTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinCaseWhenTest.kt)(`set-toggle`).
+예제 코드: [`KotlinCaseWhenTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinCaseWhenTest.kt)(`set-toggle`).
 
 Kotlin에 대한 자세한 내용: [9. Kotlin 노트](09-kotlin-notes.md).
 
@@ -368,7 +368,7 @@ Hibernate는 엔티티의 `@SQLRestriction` 조건과 `@SoftDelete` 조건을 la
 `@SoftDelete` 엔티티의 `delete`는 `update … set deleted = 1 where … and deleted = 0`이 됩니다. 행이 실제로 지워지지 않습니다.
 lambdaQL은 이 조건을 따로 처리하지 않습니다.
 
-예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`old-value`, `assign-rules`).
+예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`old-value`, `assign-rules`).
 
 ---
 

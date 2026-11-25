@@ -7,7 +7,7 @@ import java.io.Serializable;
  * {@code (a, o, sub) -> a.setItemCount(sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).count())}.
  * The third parameter starts a subquery; it may read the source row {@code o}, not the new row {@code a}.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
  * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert-select-sub"}
  *
  * @param <T> the target type

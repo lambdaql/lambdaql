@@ -16,7 +16,7 @@ import java.util.Map;
  * A path through an association ({@code o -> o.getCustomer().getName()}, name {@code customer.name}) is allowed only
  * when it is listed.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java">SortPolicyTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java">SortPolicyTest</a>):
  * {@snippet class="org.lambdaql.query.SortPolicyTest" region="rules"}
  *
  * @param <T> the entity type
@@ -48,7 +48,7 @@ public final class SortRules<T> {
     /**
      * Allows a column under its own path name: {@code allow(o -> o.getPrice())} allows {@code price}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java">SortPolicyTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java">SortPolicyTest</a>):
      * {@snippet class="org.lambdaql.query.SortPolicyTest" region="rules"}
      *
      * @param key the column

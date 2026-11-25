@@ -40,7 +40,7 @@ where e0.status = 1 and e0.price > :p1
 order by e0.price desc, e0.id asc
 ```
 
-예제 코드: [`ManualSharedTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java)(`readme-first`), [`ManualKotlinSharedTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSharedTest.kt)(`readme-first`).
+예제 코드: [`ManualSharedTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java)(`readme-first`), [`ManualKotlinSharedTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSharedTest.kt)(`readme-first`).
 
 <a id="choose-your-track"></a>
 ## 트랙 선택
@@ -109,6 +109,6 @@ order by e0.price desc, e0.id asc
 <a id="help-and-contributions"></a>
 ## 도움말과 기여
 
-- 소스 코드: <https://github.com/codebit0/lambdaql>
+- 소스 코드: <https://github.com/lambdaql/lambdaql>
 - 어느 언어에서든 잘못된 내용을 발견하면 이슈나 풀 리퀘스트를 열어 주십시오. 번역 도움도 환영합니다.
 - 설계 문서(한국어, 기여자용): [ROADMAP.md](../../design/ROADMAP.md), [KOTLIN.md](../../design/KOTLIN.md)

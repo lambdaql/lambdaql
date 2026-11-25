@@ -18,7 +18,7 @@ import java.util.SequencedSet;
  * lambdaQL selects only the columns and calls the constructor in Java (rule J2). Paths in select use a left join,
  * so rows without the association stay (J1).
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
  * {@snippet class="org.lambdaql.query.ProjectionTest" region="record"}
  *
  * @param <R> the value type
@@ -61,7 +61,7 @@ public class ValueQuery<R> {
      * Removes repeated rows in the database: {@code select distinct}. With a sort, the sort keys must be selected
      * values (rule J7).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
      * {@snippet class="org.lambdaql.query.ProjectionTest" region="distinct"}
      *
      * @return this query
@@ -115,7 +115,7 @@ public class ValueQuery<R> {
     /**
      * Runs the query.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
      * {@snippet class="org.lambdaql.query.ProjectionTest" region="value"}
      *
      * @return the values in order

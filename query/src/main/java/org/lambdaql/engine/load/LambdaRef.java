@@ -11,7 +11,7 @@ import java.lang.invoke.SerializedLambda;
  * The body location (class, method, descriptor) is the same for every call of the same lambda in your code.
  * The captured values can change on every call.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
  * {@snippet class="org.lambdaql.engine.load.LoadExamplesTest" region="extract"}
  *
  * @param lambdaClass the runtime class of the lambda object
@@ -99,7 +99,7 @@ public record LambdaRef(Class<?> lambdaClass, SerializedLambda serialized) {
     /**
      * Checks if the body method is an instance method. Then captured value 0 is {@code this}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.load.LoadExamplesTest" region="instance-lambda"}
      *
      * @return {@code true} for virtual, special or interface calls

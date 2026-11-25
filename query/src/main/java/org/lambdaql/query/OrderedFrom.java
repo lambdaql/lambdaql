@@ -3,7 +3,7 @@ package org.lambdaql.query;
 /**
  * A sorted subquery. Give a limit, then select the value: {@code orderBy(...).limit(1).select(x -> x.getId()).first()}.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java">SubqueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java">SubqueryTest</a>):
  * {@snippet class="org.lambdaql.query.SubqueryTest" region="top-one"}
  *
  * @param <X> the entity type

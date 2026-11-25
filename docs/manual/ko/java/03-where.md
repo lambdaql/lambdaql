@@ -142,7 +142,7 @@ from orders o1_0
 where o1_0.kind='RUSH'
 ```
 
-예제 코드: [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)(`to-list`, `to-hql`, `where-many`, `enum`).
+예제 코드: [`SelectQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)(`to-list`, `to-hql`, `where-many`, `enum`).
 
 <a id="34-comparisons"></a>
 ## 3.4 비교
@@ -199,7 +199,7 @@ assertEquals("select e0 from Order e0 where e0.cnt in (2.5BD, 3.0BD)", in.hql())
 **부동소수점:** `float`/`double` 컬럼에 대해 lambdaQL은 Java와 비트 단위까지 같은 결과를 약속하지 않습니다.
 캡처한 `NaN`이나 `Infinity` 값은 쿼리가 실행될 때 거부됩니다.
 
-예제 코드: [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)(`whole-number`).
+예제 코드: [`SqlMeaningTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)(`whole-number`).
 
 <a id="35-and-or-not"></a>
 ## 3.5 AND, OR, NOT
@@ -254,7 +254,7 @@ assertEquals("select e0 from Order e0 where e0.status = case when e0.active = tr
         byEntity.toHql().hql());
 ```
 
-예제 코드: [`ManualJavaWhereTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java)(`and-or-not`, `ternary-outside`).
+예제 코드: [`ManualJavaWhereTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java)(`and-or-not`, `ternary-outside`).
 
 <a id="351-values-chosen-by-a-condition"></a>
 ### 3.5.1 조건으로 고르는 값(`case when`)
@@ -307,7 +307,7 @@ assertEquals("update Order e0 set e0.price = case when e0.price > 100.0 then (e0
 - `where`에서 비교하는 `case`는 행마다 계산되므로, 데이터베이스는 그 안의 컬럼 인덱스를 쓰지 못합니다. lambdaQL은 이때 `WARN` 수준으로 `LQL-5013`을 기록합니다.
 - 정렬 함수 체인 자체를 조건으로 고르는 형태(`flag ? desc(o.getPrice()) : asc(o.getId())`)는 거부됩니다(`LQL-2023`). 조건은 키 값 안에 쓰십시오.
 
-예제 코드: [`CaseWhenTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/CaseWhenTest.java)(`case-where`, `case-select`, `case-group`, `case-sort`, `case-set`).
+예제 코드: [`CaseWhenTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/CaseWhenTest.java)(`case-where`, `case-select`, `case-group`, `case-sort`, `case-set`).
 
 <a id="36-null-rules"></a>
 ## 3.6 NULL 규칙
@@ -561,7 +561,7 @@ assertEquals("select e0 from Coded e0 where e0.code = 'abc'", literal.toHql().hq
 assertEquals(List.of("abc"), codes(literal.toList()));       // Hibernate converts the literal
 ```
 
-예제 코드: [`ManualJavaWhereTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java)(`boxed-equals`, `null-check`, `equals-forms`), [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)(`null-safe`, `never-null`, `captured-null-guard`), [`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)(`sql-meaning`), [`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java)(`convert`).
+예제 코드: [`ManualJavaWhereTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java)(`boxed-equals`, `null-check`, `equals-forms`), [`SelectQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)(`null-safe`, `never-null`, `captured-null-guard`), [`SqlMeaningTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)(`sql-meaning`), [`ConvertTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java)(`convert`).
 
 <a id="37-boolean-columns"></a>
 ## 3.7 boolean 컬럼
@@ -631,7 +631,7 @@ assertEquals("select e0 from Order e0 where (e0.active = true and e0.status > :p
         + " or (e0.active = false and e0.status <= :p2)", query.toHql().hql());
 ```
 
-예제 코드: [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)(`boolean`), [`ManualJavaWhereTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java)(`boolean-compare`).
+예제 코드: [`SelectQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)(`boolean`), [`ManualJavaWhereTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java)(`boolean-compare`).
 
 <a id="38-strings"></a>
 ## 3.8 문자열
@@ -696,7 +696,7 @@ assertEquals("LQL-2013", assertThrows(LambdaQLException.class,
         () -> qb.from(Order.class).where(o -> o.isActive() & o.getStatus() == 1)).code());
 ```
 
-예제 코드: [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)(`string-literal`), [`ManualJavaWhereTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java)(`rejected-forms`), [`LikeTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/LikeTest.java)(`like`).
+예제 코드: [`SelectQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)(`string-literal`), [`ManualJavaWhereTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java)(`rejected-forms`), [`LikeTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/LikeTest.java)(`like`).
 
 <a id="39-in-with-a-captured-collection"></a>
 ## 3.9 캡처한 컬렉션을 사용한 IN
@@ -765,7 +765,7 @@ where o1_0.description not in (?,?)
 | 수신 객체가 엔티티 컬렉션: `c.getOrders().contains(order)` | **거부됨**. `exists` 서브쿼리를 사용하십시오([5. 서브쿼리](05-subquery.md)) |
 | 람다 표현식 안에서 만든 컬렉션: `List.of(1, 2).contains(o.getStatus())` | **거부됨**. 밖에서 만들어 캡처하십시오 |
 
-예제 코드: [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)(`in`, `not-in`).
+예제 코드: [`SelectQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)(`in`, `not-in`).
 
 <a id="310-association-paths"></a>
 ## 3.10 연관 경로
@@ -924,7 +924,7 @@ where o1_0.customer_id=1
 - `orderBy`나 `select`에**만** 쓰인 경로는 `left join`이므로 그곳에서는 행을 잃지 않습니다(규칙 S8, J1). 같은 경로를 `where`에서도 쓰면 `orderBy`와 `select`는 `where`의 조인을 사용합니다.
 - 두 엔티티의 비교(`o.getCustomer() == c`)는 거부됩니다(`LQL-3011`). id를 비교하십시오: `o.getCustomer().getId() == c.getId()`(여기서 `c`는 캡처한 객체, [3.8](#38-strings)의 `rejected-forms` 예제 참고).
 
-예제 코드: [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)(`embedded-compare`), [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)(`inner-join`, `null-guard`, `no-association`, `fk-path`).
+예제 코드: [`MappingRulesTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)(`embedded-compare`), [`SelectQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)(`inner-join`, `null-guard`, `no-association`, `fk-path`).
 
 <a id="311-captured-values"></a>
 ## 3.11 캡처 값
@@ -954,7 +954,7 @@ assertEquals("select e0 from Order e0 where e0.updateAt > :p1 and e0.status = :p
 - Java에서 캡처한 지역 변수는 사실상 final이어야 합니다. 값이 바뀐다면 람다 표현식 전에 새 변수에 계산해 두십시오.
 - 필드를 사용하는 람다 표현식은 `this`를 캡처합니다. [9.8](09-java-notes.md#98-lambdas-in-instance-methods-capture-this)을 참고하십시오.
 
-예제 코드: [`ManualJavaWhereTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java)(`captured-forms`).
+예제 코드: [`ManualJavaWhereTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java)(`captured-forms`).
 
 <a id="312-errors-that-depend-on-order-of-evaluation"></a>
 ## 3.12 평가 순서에 따라 달라지는 오류
@@ -974,7 +974,7 @@ assertEquals("select e0 from Item e0 where e0.qty > 0 and e0.price > (2.0 * e0.q
 
 가드에 기대지 말고 나눗셈 없이 비교하십시오: `i.getQty() > 0 && i.getPrice() > 2 * i.getQty()`.
 
-예제 코드: [`ManualJavaWhereTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java)(`guard`).
+예제 코드: [`ManualJavaWhereTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java)(`guard`).
 
 <a id="313-what-is-rejected"></a>
 ## 3.13 거부되는 것

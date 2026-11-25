@@ -18,7 +18,7 @@ import java.util.List;
  * </ul>
  * The HQL renderer only accepts {@link Column}, {@link Host}, {@link Const}, {@link Arith}, {@link Neg} and {@link Coalesce}.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
  * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="arith"}
  */
 public sealed interface Expr permits
@@ -38,7 +38,7 @@ public sealed interface Expr permits
      * A lambda parameter, such as the entity {@code o} in {@code o -> ...}.
      * Captured values are not counted.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="simple-compare"}
      *
      * @param index position in the lambda parameter list (0 = first parameter)
@@ -51,7 +51,7 @@ public sealed interface Expr permits
     /**
      * A captured value: a local variable or field that the lambda uses from outside.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="captured"}
      *
      * @param index position in {@code SerializedLambda.getCapturedArg(index)};
@@ -68,9 +68,9 @@ public sealed interface Expr permits
      * {@code boolean}, {@code char}, {@code short} and {@code byte} constants come as {@link Integer},
      * because the JVM uses int for them.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="const-null"}
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="simple-compare"}
      *
      * @param value the value; {@code null} for the {@code null} literal; an ASM {@link Type} for a class literal
@@ -100,7 +100,7 @@ public sealed interface Expr permits
     /**
      * A method call.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="value-lambda"}
      *
      * @param receiver the object the method is called on; {@code null} for a static method
@@ -122,7 +122,7 @@ public sealed interface Expr permits
     /**
      * A field read.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="captured-field"}
      *
      * @param receiver the object; {@code null} for a static field
@@ -139,7 +139,7 @@ public sealed interface Expr permits
     /**
      * A math operation with two values.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="arith"}
      *
      * @param op    the operation ({@code +}, {@code -}, {@code *}, {@code /}, {@code %})
@@ -154,7 +154,7 @@ public sealed interface Expr permits
     /**
      * Unary minus.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="neg"}
      *
      * @param operand the value
@@ -168,7 +168,7 @@ public sealed interface Expr permits
      * A type change: a primitive conversion ({@code I2L} and so on) or a {@code CHECKCAST}.
      * It does not change the value, so later steps usually look through it.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="convert"}
      *
      * @param operand the value
@@ -182,7 +182,7 @@ public sealed interface Expr permits
      * The result (-1, 0 or 1) of {@code LCMP}, {@code FCMPL}, {@code FCMPG}, {@code DCMPL} or {@code DCMPG}.
      * The next {@code IFxx} jump turns it into a {@link Pred.Cmp}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="double-compare"}
      *
      * @param left       left value
@@ -196,7 +196,7 @@ public sealed interface Expr permits
     /**
      * A new object: {@code NEW}, {@code DUP}, arguments, then {@code INVOKESPECIAL <init>}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="new-object"}
      *
      * @param type        the class of the new object
@@ -213,7 +213,7 @@ public sealed interface Expr permits
     /**
      * The length of an array ({@code ARRAYLENGTH}).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="array-length"}
      *
      * @param array the array value
@@ -225,7 +225,7 @@ public sealed interface Expr permits
     /**
      * {@code coalesce(first, second)}: {@code first} if it is not null, else {@code second}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="coalesce"}
      *
      * @param first  the value to try first
@@ -334,7 +334,7 @@ public sealed interface Expr permits
     /**
      * Meaning node: an entity column path.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="column"}
      *
      * @param root        which FROM entity the path starts at (0 = main entity)
@@ -363,7 +363,7 @@ public sealed interface Expr permits
         /**
          * A column without Kotlin safe calls (Java, or Kotlin without {@code ?.}).
          *
-         * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+         * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
          * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="column"}
          *
          * @param root        which FROM entity the path starts at
@@ -415,7 +415,7 @@ public sealed interface Expr permits
      * call and marks the value with this node; the normalizer turns the mark into {@link Column#safeCall()} when the
      * value is an association (ROADMAP D54). Only values that start at a lambda parameter are marked.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="safe-nav"}
      *
      * @param value the value that was checked for null
@@ -429,7 +429,7 @@ public sealed interface Expr permits
      * Meaning node: a value that does not depend on any entity.
      * lambdaQL computes it in Java when the query runs and binds it as a parameter.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="host"}
      *
      * @param expr            the expression to compute (uses only captured values and constants)
@@ -603,7 +603,7 @@ public sealed interface Expr permits
     /**
      * Checks if a JVM type takes two stack slots.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="expr-wide"}
      *
      * @param t the type

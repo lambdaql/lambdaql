@@ -7,7 +7,7 @@ package org.lambdaql.engine.ir;
  * or known only at run time ({@code by.sort(key, dir)} with a captured {@code dir}).
  * Run-time parts are kept as expressions and read again on every execution, so the analysis can be cached.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/SortReaderTest.java">SortReaderTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/SortReaderTest.java">SortReaderTest</a>):
  * {@snippet class="org.lambdaql.engine.sem.SortReaderTest" region="read-sort"}
  *
  * @param key  the normalized key ({@link Expr.Column}, or math on columns)

@@ -18,7 +18,7 @@ import java.util.SequencedSet;
  * (S9), so rows do not move between pages. Paging values go to Hibernate
  * ({@code setFirstResult}/{@code setMaxResults}); they are not in the HQL text.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
  * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-page"}
  *
  * @param <T> the entity type
@@ -51,7 +51,7 @@ public class OrderedSelectQuery<T> {
     /**
      * Returns at most {@code count} rows.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-page"}
      *
      * @param count the most rows to return (0 or more)
@@ -67,7 +67,7 @@ public class OrderedSelectQuery<T> {
     /**
      * Skips the first {@code count} rows.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-page"}
      *
      * @param count rows to skip (0 or more)
@@ -83,7 +83,7 @@ public class OrderedSelectQuery<T> {
     /**
      * Builds the HQL and the parameter values with the current captured values (including run-time directions).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-basic"}
      *
      * @return the HQL and its parameters
@@ -96,7 +96,7 @@ public class OrderedSelectQuery<T> {
     /**
      * Runs the query and returns the rows in order.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-page"}
      *
      * @return the rows
@@ -109,7 +109,7 @@ public class OrderedSelectQuery<T> {
      * Returns the first row in this order (after {@code offset}), or empty if there is no row.
      * Only one row is read.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
      * {@snippet class="org.lambdaql.query.ResultQueryTest" region="first"}
      *
      * @return the first row, or {@link Optional#empty()}
@@ -130,7 +130,7 @@ public class OrderedSelectQuery<T> {
      * The set has the same rows as {@link #toList()}: Hibernate returns each entity once, also after an explicit join,
      * and a repeated object would keep its first place (D68).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
      * {@snippet class="org.lambdaql.query.ResultQueryTest" region="to-set"}
      *
      * @return the rows in order
@@ -144,7 +144,7 @@ public class OrderedSelectQuery<T> {
     /**
      * Selects values in this order: {@code orderBy(...).select(o -> o.getPrice())}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
      * {@snippet class="org.lambdaql.query.ProjectionTest" region="value"}
      *
      * @param clause the select lambda

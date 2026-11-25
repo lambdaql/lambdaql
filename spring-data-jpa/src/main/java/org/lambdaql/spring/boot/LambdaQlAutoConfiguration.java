@@ -38,7 +38,7 @@ import java.util.Set;
  * It runs after Hibernate JPA auto-configuration. Both class names (Spring Boot 3 and Spring Boot 4)
  * are given as text, so this class loads on both versions.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java">AutoConfigurationTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java">AutoConfigurationTest</a>):
  * {@snippet class="org.lambdaql.spring.AutoConfigurationTest" region="query-builder-bean"}
  */
 @AutoConfiguration(afterName = {

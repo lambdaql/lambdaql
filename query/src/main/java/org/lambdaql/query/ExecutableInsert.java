@@ -9,7 +9,7 @@ import java.util.function.Supplier;
  * An INSERT (or upsert) that can run. A list of rows can become more than one statement (ROADMAP U13),
  * so {@link #toHql()} returns a list.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
  * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert"}
  *
  * @param <T> the entity type

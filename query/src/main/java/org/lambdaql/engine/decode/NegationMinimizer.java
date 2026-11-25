@@ -21,7 +21,7 @@ import java.util.List;
  * {@code !(active && status > 1)} becomes {@code !active || status <= 1}. SQL then has no NOT around a group,
  * which keeps the conditions simple for the optimizer (SARGable rule, ROADMAP 3.9).
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/NegationMinimizerTest.java">NegationMinimizerTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/NegationMinimizerTest.java">NegationMinimizerTest</a>):
  * {@snippet class="org.lambdaql.engine.decode.NegationMinimizerTest" region="de-morgan"}
  */
 public final class NegationMinimizer {
@@ -50,7 +50,7 @@ public final class NegationMinimizer {
     /**
      * Returns the same logic with the fewest NOTs.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/NegationMinimizerTest.java">NegationMinimizerTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/NegationMinimizerTest.java">NegationMinimizerTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.NegationMinimizerTest" region="de-morgan"}
      * {@snippet class="org.lambdaql.engine.decode.NegationMinimizerTest" region="push-not"}
      *

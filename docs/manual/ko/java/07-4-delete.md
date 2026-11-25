@@ -93,7 +93,7 @@ where not exists(select 1 from items i1_0 where i1_0.order_id=orders.id)
 모든 JPA 벌크 문장과 마찬가지로, delete는 JPA `cascade`나 `orphanRemoval`을 실행하지 않고 이미 로드된 엔티티에도 반영되지 않습니다(규칙 U16).
 delete에는 트랜잭션이 필요합니다([7.8](07-dml.md#transactions) 참고).
 
-예제 코드: [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`delete`), [`ManualJavaDmlTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`delete-all`, `delete-in`), [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)(`dml-subquery`).
+예제 코드: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`delete`), [`ManualJavaDmlTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`delete-all`, `delete-in`), [`SubqueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)(`dml-subquery`).
 
 <a id="delete-with-a-subquery-on-the-same-table"></a>
 ## 같은 테이블을 읽는 서브쿼리
@@ -127,7 +127,7 @@ assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where
         unused.toHql().hql());
 ```
 
-예제 코드: [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`delete-self-subquery`).
+예제 코드: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`delete-self-subquery`).
 
 <a id="delete-the-first-rows-limit"></a>
 ## 앞쪽 행 삭제: `limit`
@@ -175,7 +175,7 @@ lambdaQL은 limit을 `e0.id in (select t.id from (select x0.id as id from X x0 .
 - 파생 테이블 `t`는 MariaDB를 위한 것입니다. 파생 테이블이 없으면 MariaDB는 `in` 서브쿼리의 `limit`(오류 1235)과 대상 테이블을 읽는 서브쿼리(오류 1093)를 거부합니다.
 - H2와 Oracle은 `fetch first 1 rows only`, MariaDB는 `limit 1`로 씁니다.
 
-예제 코드: [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`delete-limit`).
+예제 코드: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`delete-limit`).
 
 <a id="delete-exactly-one-row-executeone"></a>
 ## 정확히 한 행 삭제: `executeOne()`
@@ -206,5 +206,5 @@ assertThrows(jakarta.persistence.NonUniqueResultException.class,
 
 [7. 수정, 삽입, 삭제 (Java)](07-dml.md) | [7.2 수정(update)](07-2-update.md) | **7.4 삭제(delete)** | [7.5 삽입(insert)](07-5-insert.md) | [7.6 업서트(upsert)](07-6-upsert.md) | [Kotlin](../kotlin/07-4-delete.md)
 
-예제 코드: [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`execute-one`).
+예제 코드: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`execute-one`).
 

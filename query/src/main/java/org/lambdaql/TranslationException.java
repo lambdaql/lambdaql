@@ -6,7 +6,7 @@ import org.lambdaql.i18n.LqlMessage;
  * The lambda has no defined meaning in HQL (codes 3xxx): a method call with no SQL form, comparing two entities, a value that is not a {@code groupBy} key.
  * It is a {@link LambdaQLException}; check {@link #code()} in tests.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
  * {@snippet class="org.lambdaql.i18n.LqlMessagesTest" region="exception"}
  */
 public class TranslationException extends LambdaQLException {

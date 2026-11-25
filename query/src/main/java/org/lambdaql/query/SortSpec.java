@@ -20,7 +20,7 @@ import java.util.Objects;
  * The lambdas are checked when the spec is used in {@code orderBy}, and each lambda is analyzed only once.
  * Captured values are the values at the moment the lambda was made.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
  * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-spec"}
  *
  * @param <T> the entity type
@@ -52,7 +52,7 @@ public final class SortSpec<T> {
     /**
      * Makes a spec from a sort lambda.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-spec"}
      *
      * @param type the entity class
@@ -76,7 +76,7 @@ public final class SortSpec<T> {
      * become other HQL. But any property can be used, so if the text comes from a user (a request parameter),
      * check it against your own list of allowed names first.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-spec-path"}
      *
      * @param type      the entity class
@@ -96,7 +96,7 @@ public final class SortSpec<T> {
     /**
      * Returns a spec that sorts by this spec first, then by {@code next} for rows that are equal.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-spec-then"}
      *
      * @param next the keys to add after this spec's keys
@@ -111,7 +111,7 @@ public final class SortSpec<T> {
     /**
      * Returns a spec that sorts by this spec first, then by the keys of {@code next}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-spec-then"}
      *
      * @param next a sort lambda
@@ -125,7 +125,7 @@ public final class SortSpec<T> {
      * Returns a spec with every key in the opposite order. The NULL position is reversed too
      * ({@link Direction#reversed()}), so the whole row order is exactly backwards.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-spec-reversed"}
      *
      * @return a new spec

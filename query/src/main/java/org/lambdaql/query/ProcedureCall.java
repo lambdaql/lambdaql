@@ -9,7 +9,7 @@ import java.util.function.Supplier;
  * The procedure runs in the current transaction when there is one; changes in the persistence context are flushed
  * first (PR9). Without a transaction, a {@code QueryBuilder} made from an {@code EntityManagerFactory} uses its own.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java">ProcedureTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java">ProcedureTest</a>):
  * {@snippet class="org.lambdaql.query.ProcedureTest" region="call"}
  *
  * @param <R> the result type ({@code Void} for {@code exec})

@@ -34,7 +34,7 @@ import java.util.function.Function;
  * A lambda is analyzed only once per lambda class (one class per place in your code).
  * Later calls only read the captured values again.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
  * {@snippet class="org.lambdaql.query.SelectQueryTest" region="to-hql"}
  */
 public final class QueryContext {

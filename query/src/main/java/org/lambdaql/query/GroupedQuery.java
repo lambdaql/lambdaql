@@ -9,7 +9,7 @@ import java.util.List;
  * A query with group keys: {@code qb.from(Order.class).groupBy(o -> o.getCustomer().getId()).having(...).select(...)}
  * (ROADMAP M9, D27). Every select value without an aggregate must be a group key (rule J3).
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
  * {@snippet class="org.lambdaql.query.ProjectionTest" region="group-by"}
  *
  * @param <T> the entity type
@@ -32,7 +32,7 @@ public class GroupedQuery<T> {
     /**
      * Adds a condition on groups (joined with AND). Aggregates ({@code Agg.sum(...)}) are allowed here.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
      * {@snippet class="org.lambdaql.query.ProjectionTest" region="group-by"}
      *
      * @param condition the condition

@@ -27,7 +27,7 @@ import java.util.Set;
  * If the graph cannot be reduced to one node (for example a value ternary {@code c ? x : y}, where one
  * atom is needed on two paths), an error is thrown.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
  * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="and-or"}
  */
 public final class ConditionReducer {
@@ -38,7 +38,7 @@ public final class ConditionReducer {
     /**
      * Reduces the graph to one condition.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/decode/ConditionDecodeTest.java">ConditionDecodeTest</a>):
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="not-composite"}
      * {@snippet class="org.lambdaql.engine.decode.ConditionDecodeTest" region="value-ternary"}
      *

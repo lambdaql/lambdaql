@@ -4,7 +4,7 @@ package org.lambdaql.query;
  * The start of an UPDATE: {@code qb.update(Order.class).set(...).where(...).execute()} (ROADMAP D28, M10).
  * Only {@code set} is available here, so an UPDATE without assignments cannot be written (rule U5).
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
  * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update"}
  *
  * @param <T> the entity type
@@ -28,7 +28,7 @@ public class UpdateQuery<T> {
     /**
      * Adds assignments written with setters: {@code o -> { o.setStatus(2); }}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update"}
      *
      * @param assign the assignment lambda
@@ -42,7 +42,7 @@ public class UpdateQuery<T> {
     /**
      * Adds assignments whose values may use subqueries: {@code (o, sub) -> o.setTotal(sub.from(Item.class)...)}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update-sub"}
      *
      * @param assign the assignment lambda

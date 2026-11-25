@@ -58,7 +58,7 @@ order by o1_0.price desc,o1_0.id
 
 `toHql()`은 쿼리를 실행하지 않고 HQL을 돌려줍니다. `toList()`는 쿼리를 실행합니다.
 
-예제 코드: [`ManualJavaSortTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSortTest.java)(`sort-overview`), [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)(`sort-basic`).
+예제 코드: [`ManualJavaSortTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSortTest.java)(`sort-overview`), [`SortQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)(`sort-basic`).
 
 <a id="42-the-short-forms-one-key"></a>
 ## 4.2 짧은 형태(키 하나)
@@ -108,7 +108,7 @@ from orders o1_0
 order by o1_0.price desc
 ```
 
-예제 코드: [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)(`sort-key`).
+예제 코드: [`SortQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)(`sort-key`).
 
 <a id="43-direction"></a>
 ## 4.3 `Direction`
@@ -277,7 +277,7 @@ order by o1_0.description,o1_0.id
 `text`가 `"asc_nulls_last"`이면 `... order by e0.description asc nulls last, e0.id asc`입니다.
 람다 표현식은 한 번만 분석합니다. `dir`은 쿼리를 실행할 때마다 읽습니다(규칙 S10). 방향이 `null`이면 쿼리를 실행할 때 예외가 발생합니다.
 
-예제 코드: [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)(`sort-nulls`, `sort-dynamic`), [`ManualJavaSortTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSortTest.java)(`sort-direction`).
+예제 코드: [`SortQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)(`sort-nulls`, `sort-dynamic`), [`ManualJavaSortTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSortTest.java)(`sort-direction`).
 
 <a id="44-null-ordering-is-the-same-on-every-database"></a>
 ## 4.4 NULL 순서는 모든 데이터베이스에서 같음
@@ -454,7 +454,7 @@ where c1_0.name=?
 order by c1_0.name desc nulls last,o1_0.price desc
 ```
 
-예제 코드: [`ManualJavaSortTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSortTest.java)(`sort-arith`), [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)(`sort-path`, `sort-path-where`), [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)(`required-association`, `lob`, `enum-string-sort`).
+예제 코드: [`ManualJavaSortTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSortTest.java)(`sort-arith`), [`SortQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)(`sort-path`, `sort-path-where`), [`MappingRulesTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)(`required-association`, `lob`, `enum-string-sort`).
 
 <a id="46-rules-for-the-lambda-body"></a>
 ## 4.6 람다 표현식 본문의 규칙
@@ -482,7 +482,7 @@ lambdaQL은 `orderBy`를 호출할 때 이를 확인하고 `LambdaQLException`�
 
 실행 시점에 방향을 바꿔야 한다면 변수로 전달하십시오: `sort(key, dir)`. 키 자체를 바꿔야 한다면 일반 Java 코드의 두 분기에서 쿼리를 따로 만드십시오.
 
-예제 코드: [`ManualJavaSortTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSortTest.java)(`sort-body`).
+예제 코드: [`ManualJavaSortTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSortTest.java)(`sort-body`).
 
 <a id="47-order-of-calls"></a>
 ## 4.7 호출 순서
@@ -619,7 +619,7 @@ assertEquals("select e0 from OrderLine e0 join e0.order j1 order by j1.price asc
         qb.from(OrderLine.class).orderBy(l -> asc(l.getOrder().getPrice())).limit(2).toHql().hql());
 ```
 
-예제 코드: [`ManualJavaSortTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSortTest.java)(`page`), [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)(`sort-page`, `page-only`), [`MappingRulesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)(`unique-key`).
+예제 코드: [`ManualJavaSortTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSortTest.java)(`page`), [`SortQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)(`sort-page`, `page-only`), [`MappingRulesTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)(`unique-key`).
 
 <a id="49-strings-and-special-values"></a>
 ## 4.9 문자열과 특수한 값
@@ -894,7 +894,7 @@ assertThrows(SortNotAllowedException.class, () -> hql("description", Direction.A
 
 외부 문자열의 이름과 방향은 따로 읽으십시오. 방향은 `Direction.parse`([4.3](#43-direction) 참고), 이름은 `SortSpec.ofPath`로 읽습니다.
 
-예제 코드: [`SortQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)(`sort-spec`, `sort-spec-then`, `sort-spec-reversed`, `sort-spec-path`), [`ManualJavaSortTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSortTest.java)(`rule-not-column`), [`SortPolicyTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)(`rules`, `strict`, `allowed`, `rejected`, `warn`, `annotation`, `string-paths`).
+예제 코드: [`SortQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)(`sort-spec`, `sort-spec-then`, `sort-spec-reversed`, `sort-spec-path`), [`ManualJavaSortTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSortTest.java)(`rule-not-column`), [`SortPolicyTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java)(`rules`, `strict`, `allowed`, `rejected`, `warn`, `annotation`, `string-paths`).
 
 <a id="411-sorting-inside-subqueries"></a>
 ## 4.11 서브쿼리 안의 정렬

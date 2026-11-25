@@ -7,7 +7,7 @@ package org.lambdaql.query;
  * and these keys ({@code o -> desc(o.getPrice())}); a sort lambda returns {@code Comparable<?>}. lambdaQL reads the
  * calls from the lambda bytecode and never runs them, so {@link #compareTo} is never called.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
  * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-basic"}
  */
 public interface SortKeys extends Comparable<SortKeys> {

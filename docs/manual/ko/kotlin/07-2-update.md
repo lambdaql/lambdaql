@@ -40,7 +40,7 @@ where o1_0.status=1
 
 Oracle은 `set`에 별칭을 씁니다(`set o1_0.status=?`). H2와 MariaDB는 쓰지 않습니다.
 
-예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update`).
+예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update`).
 
 <a id="values-null-date-boolean"></a>
 ## 값: null, 날짜, boolean
@@ -59,7 +59,7 @@ assertEquals("update Order e0 set e0.description = null, e0.updateAt = :p1, e0.a
 boolean 속성 `active`의 Java getter는 `isActive()`이므로 Kotlin에서는 `it.isActive`로 대입합니다.
 캡처 값은 같은 값을 두 번 사용하더라도 각각 **자체 파라미터**를 받습니다(규칙 U7).
 
-예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-values`).
+예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-values`).
 
 <a id="add-to-a-value-default-for-null"></a>
 ## 값에 더하기, NULL의 기본값
@@ -77,7 +77,7 @@ assertEquals("update Order e0 set e0.custName = coalesce(e0.description, 'none')
 예제 엔티티의 `cnt`는 Java `Integer`이므로 Kotlin은 플랫폼 타입으로 보고 `+=`를 컴파일합니다. `cnt`가 NULL인 행은 SQL 규칙에 따라 NULL로 남습니다.
 `?:`는 문자열과 숫자 모두 `coalesce(...)`가 됩니다. `it.total = (it.total ?: 0.0) + 1`은 `set e0.total = (coalesce(e0.total, 0.0) + 1.0)`입니다.
 
-예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-add`).
+예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-add`).
 
 <a id="embedded-fields"></a>
 ## 임베디드 필드
@@ -94,7 +94,7 @@ assertEquals("update Order e0 set e0.address = :p1 where e0.status = 1", all.toH
 
 임베디드 값 전체를 대입하면 HQL은 `set e0.address = :p1`이고, Hibernate가 모든 컬럼(`city`, `zip`)을 씁니다.
 
-예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-embedded`).
+예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-embedded`).
 
 <a id="change-an-association-foreign-key"></a>
 ## 연관 변경(외래 키)
@@ -115,7 +115,7 @@ assertEquals("update Order e0 set e0.customer = :p1 where e0.id = :p2", entity.t
 연관 엔티티에서는 `@Id`(FK)만 설정할 수 있습니다.
 `it.customer?.name = x`는 오류(`LQL-3050`)입니다. 다른 테이블을 변경하게 되기 때문입니다(규칙 U6, [7.8](07-dml.md#rules-checked-at-analysis-time) 참고).
 
-예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-fk`).
+예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-fk`).
 
 <a id="a-value-from-another-table"></a>
 ## 다른 테이블의 값
@@ -210,7 +210,7 @@ set o1_0.status=?
 where o1_0.status=1 or (select c1_0.name from customers c1_0 where c1_0.id=o1_0.customer_id)='Kim'
 ```
 
-예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-path`), [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`update-safe-call`).
+예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-path`), [`KotlinQueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`update-safe-call`).
 
 <a id="an-aggregate-from-a-subquery"></a>
 ## 서브쿼리의 집계
@@ -247,7 +247,7 @@ assertEquals("update Order e0 set e0.price = coalesce((select sum(s1.price) from
 
 인자가 하나인 후행 람다 표현식(`set { it... }`)와 인자가 둘인 후행 람다 표현식(`set { o, sub -> ... }`)는 서로 다른 오버로드입니다. Kotlin은 알맞은 것을 고릅니다.
 
-예제 코드: [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`update-sub`), [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-sub-coalesce`).
+예제 코드: [`KotlinQueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`update-sub`), [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-sub-coalesce`).
 
 <a id="where-with-paths-and-subqueries"></a>
 ## 경로와 서브쿼리를 사용한 where
@@ -269,7 +269,7 @@ assertEquals("update Order e0 set e0.status = 9 where not exists (select 1 from 
 
 첫 번째 문장의 경로는 위의 규칙대로 스칼라 서브쿼리가 됩니다. 두 번째 문장은 [5. 서브쿼리](05-subquery.md)처럼 `sub`를 사용합니다.
 
-예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-where`).
+예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-where`).
 
 <a id="optimistic-locking-version"></a>
 ## 낙관적 잠금(`@Version`)
@@ -313,7 +313,7 @@ if (n == 0) throw OptimisticLockException()   // checking the result is your job
 
 `@Version` 속성에는 대입할 수 없습니다(규칙 U15). 대입하면 `LQL-3068`로 거부됩니다.
 
-예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-versioned`, `update-version-check`).
+예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-versioned`, `update-version-check`).
 
 <a id="many-set-calls-patch"></a>
 ## 여러 번의 `set()` 호출(PATCH)
@@ -344,7 +344,7 @@ assertEquals("LQL-3041", twice.code())
 
 `set()`은 `UpdateSet`을 반환합니다. 이 타입에는 `set`, `where`, `all`이 있고 `execute()`는 없습니다.
 
-예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-patch`).
+예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-patch`).
 
 <a id="update-all-rows-all"></a>
 ## 모든 행 수정: `all()`
@@ -363,7 +363,7 @@ val changed = u.execute()
 
 update에는 트랜잭션이 필요합니다([7.8](07-dml.md#transactions) 참고).
 
-예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-all`).
+예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-all`).
 
 <a id="update-the-first-rows-limit"></a>
 ## 앞쪽 행 수정: `limit`
@@ -406,7 +406,7 @@ where o1_0.id in (select t1_0.c0 from (select o2_0.id c0 from orders o2_0 join c
 
 경로 `it.customer?.name`는 조회와 마찬가지로 안쪽 select에서 조인이 됩니다. update 문장 자체는 다른 테이블을 읽지 않습니다.
 
-예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-limit`).
+예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-limit`).
 
 <a id="update-exactly-one-row-executeone"></a>
 ## 정확히 한 행 수정: `executeOne()`
@@ -436,5 +436,5 @@ Spring 리포지토리에서는 `updateOne({ ... }) { ... }`가 같은 동작을
 
 [7. 수정, 삽입, 삭제 (Kotlin)](07-dml.md) | **7.2 수정** | [7.4 삭제](07-4-delete.md) | [7.5 삽입](07-5-insert.md) | [7.6 업서트](07-6-upsert.md) | [Java](../java/07-2-update.md)
 
-예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-one`).
+예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-one`).
 

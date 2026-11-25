@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * lambdaQL reads the bundle files itself, so the {@code ResourceBundle} fallback to the JVM locale never applies
  * (a Korean JVM still gives English when English is asked for).
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
  * {@snippet class="org.lambdaql.i18n.LqlMessagesTest" region="locale"}
  */
 public final class LqlMessages {
@@ -38,7 +38,7 @@ public final class LqlMessages {
     /**
      * Sets the message language for the whole application.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
      * {@snippet class="org.lambdaql.i18n.LqlMessagesTest" region="locale"}
      *
      * @param locale the language, or {@code null} to use the system property and then the JVM default again
@@ -65,7 +65,7 @@ public final class LqlMessages {
      * Returns the bundle locale for a locale: {@link Locale#JAPANESE}, {@link Locale#CHINESE}, {@link Locale#KOREAN}
      * or {@link Locale#ROOT} (English).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
      * {@snippet class="org.lambdaql.i18n.LqlMessagesTest" region="locale"}
      *
      * @param locale any locale, or {@code null} for the current one
@@ -112,7 +112,7 @@ public final class LqlMessages {
      * Fills {@code {0}}, {@code {1}} ... with the arguments. Unlike {@code java.text.MessageFormat}, quotes and
      * numbers are left as they are ({@code can't} stays, 1234567 is not written as 1,234,567).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/i18n/LqlMessagesTest.java">LqlMessagesTest</a>):
      * {@snippet class="org.lambdaql.i18n.LqlMessagesTest" region="fill"}
      *
      * @param pattern the text

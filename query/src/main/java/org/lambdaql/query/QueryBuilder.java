@@ -6,7 +6,7 @@ import jakarta.persistence.EntityManagerFactory;
 /**
  * The entry point of lambdaQL: {@code qb.from(...)}, {@code qb.update(...)}, {@code qb.insert(...)}, {@code qb.delete(...)}.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
  * {@snippet class="org.lambdaql.query.SelectQueryTest" region="to-list"}
  */
 public class QueryBuilder {
@@ -34,7 +34,7 @@ public class QueryBuilder {
     /**
      * Starts a select query on an entity.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SelectQueryTest" region="to-list"}
      *
      * @param entityClass the entity class
@@ -49,7 +49,7 @@ public class QueryBuilder {
     /**
      * Starts an UPDATE (ROADMAP D28, M10).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update"}
      *
      * @param entityClass the entity class
@@ -63,7 +63,7 @@ public class QueryBuilder {
     /**
      * Starts a DELETE.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="delete"}
      *
      * @param entityClass the entity class
@@ -77,7 +77,7 @@ public class QueryBuilder {
     /**
      * Starts an INSERT.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="insert"}
      *
      * @param entityClass the entity class
@@ -91,7 +91,7 @@ public class QueryBuilder {
     /**
      * Starts an upsert keyed by the {@code @Id} (ROADMAP D40).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DmlQueryTest" region="upsert"}
      *
      * @param entityClass the entity class
@@ -106,7 +106,7 @@ public class QueryBuilder {
      * Calls a stored procedure that gives a result: {@code qb.call(OrderProcs.class, p -> p.calc(id, rate)).execute()}
      * (ROADMAP M11, D30). The stub method needs {@link org.lambdaql.SqlProcedure}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java">ProcedureTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java">ProcedureTest</a>):
      * {@snippet class="org.lambdaql.query.ProcedureTest" region="call"}
      *
      * @param procs the stub interface
@@ -124,7 +124,7 @@ public class QueryBuilder {
      * Calls a stored procedure without a result: {@code qb.exec(OrderProcs.class, p -> p.purge(30)).execute()}.
      * A procedure with OUT parameters is rejected, because their values would be lost (PR12).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java">ProcedureTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java">ProcedureTest</a>):
      * {@snippet class="org.lambdaql.query.ProcedureTest" region="exec"}
      *
      * @param procs the stub interface
@@ -142,7 +142,7 @@ public class QueryBuilder {
     /**
      * Calls a database function on its own: {@code qb.call(() -> OrderFns.discount(price)).execute()} (PR6).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java">ProcedureTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java">ProcedureTest</a>):
      * {@snippet class="org.lambdaql.query.ProcedureTest" region="function"}
      *
      * @param call one {@code @SqlFunction} call; the arguments are captured values or constants
@@ -159,7 +159,7 @@ public class QueryBuilder {
      * {@code qb.from(qb.from(Order.class).groupBy(...).select(o -> new Stat(...))).where(r -> r.total() > 100)}.
      * The row type must be a Java record or a Kotlin data class (J5); its components name the columns.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java">DerivedQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java">DerivedQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DerivedQueryTest" region="derived"}
      *
      * @param rows the inner query (a {@code select} that builds a record or data class)
@@ -174,7 +174,7 @@ public class QueryBuilder {
     /**
      * Makes a CTE handle from a query (ROADMAP M8-2, J6); read it with {@link #from(Cte)}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java">DerivedQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DerivedQueryTest.java">DerivedQueryTest</a>):
      * {@snippet class="org.lambdaql.query.DerivedQueryTest" region="cte"}
      *
      * @param rows the inner query (a {@code select} that builds a record or data class)

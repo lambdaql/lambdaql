@@ -20,7 +20,7 @@ import java.util.Set;
  * The body must be one call; the arguments are captured values, constants or a calculation of them,
  * which are computed in Java when the call runs.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java">ProcedureTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java">ProcedureTest</a>):
  * {@snippet class="org.lambdaql.query.ProcedureTest" region="call"}
  */
 public final class ProcedureReader {
@@ -72,7 +72,7 @@ public final class ProcedureReader {
     /**
      * Reads a procedure call lambda.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java">ProcedureTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java">ProcedureTest</a>):
      * {@snippet class="org.lambdaql.query.ProcedureTest" region="call"}
      *
      * @param ref     the lambda

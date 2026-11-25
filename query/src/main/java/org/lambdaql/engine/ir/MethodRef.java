@@ -6,7 +6,7 @@ import org.objectweb.asm.Type;
  * A reference to a method, as written in the bytecode.
  * lambdaQL does not load the class here; it only keeps the names.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
  * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="method-ref"}
  *
  * @param owner       internal name of the class (for example {@code java/lang/String})
@@ -47,7 +47,7 @@ public record MethodRef(String owner, String name, String descriptor, boolean is
     /**
      * Checks the owner and name.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="method-ref"}
      *
      * @param owner internal class name
@@ -61,7 +61,7 @@ public record MethodRef(String owner, String name, String descriptor, boolean is
     /**
      * Checks the owner, name and descriptor.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="method-ref"}
      *
      * @param owner      internal class name

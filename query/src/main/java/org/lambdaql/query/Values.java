@@ -3,7 +3,7 @@ package org.lambdaql.query;
 /**
  * The values of a subquery.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java">SubqueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java">SubqueryTest</a>):
  * {@snippet class="org.lambdaql.query.SubqueryTest" region="in"}
  *
  * @param <R> the value type

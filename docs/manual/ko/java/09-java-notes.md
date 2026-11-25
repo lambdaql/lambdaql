@@ -90,7 +90,7 @@ SelectQuery<Order> notOneOrNull = qb.from(Order.class).where(o -> o.getCnt() == 
 assertEquals("select e0 from Order e0 where e0.cnt is null or e0.cnt <> 1", notOneOrNull.toHql().hql());
 ```
 
-예제 코드: [`ManualJavaNotesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaNotesTest.java)(`unboxing`), [`ManualJavaWhereTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java)(`null-check`).
+예제 코드: [`ManualJavaNotesTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaNotesTest.java)(`unboxing`), [`ManualJavaWhereTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java)(`null-check`).
 
 <a id="93-equality-of-boxed-values"></a>
 ## 9.3 박싱된 값의 동등성
@@ -149,7 +149,7 @@ assertEquals("select e0 from Order e0 where e0.cnt is null", nullCnt.toHql().hql
 엔티티 값 두 개(`o.getDescription() == o.getCustName()`)는 `=`와 `<>`가 됩니다. 어느 한쪽이 NULL이면 일치하지 않으며, NULL과 NULL도 마찬가지입니다.
 결과가 Java와 다를 수 있으면 lambdaQL은 `LQL-5009`를 `DEBUG` 수준으로 기록합니다([3.6.3](03-where.md#363-write-your-null-checks-yourself) 참고).
 
-예제 코드: [`ManualJavaWhereTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java)(`boxed-equals`).
+예제 코드: [`ManualJavaWhereTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java)(`boxed-equals`).
 
 <a id="94-strings"></a>
 ## 9.4 문자열
@@ -180,7 +180,7 @@ SelectQuery<Order> q = qb.from(Order.class).where(o -> o.getDescription() == cod
 assertEquals("select e0 from Order e0 where e0.description = :p1", q.toHql().hql());
 ```
 
-예제 코드: [`ManualJavaNotesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaNotesTest.java)(`string-outside`).
+예제 코드: [`ManualJavaNotesTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaNotesTest.java)(`string-outside`).
 
 <a id="95-null-safe-helpers"></a>
 ## 9.5 null-safe 헬퍼
@@ -210,7 +210,7 @@ SelectQuery<Order> withNull = qb.from(Order.class)
 assertEquals("select e0 from Order e0 where e0.cnt is null or e0.cnt <> 1", withNull.toHql().hql());  // NULL rows too
 ```
 
-예제 코드: [`ManualJavaNotesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaNotesTest.java)(`not-equals`).
+예제 코드: [`ManualJavaNotesTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaNotesTest.java)(`not-equals`).
 
 <a id="96-small-types-char-short-byte-and-boolean"></a>
 ## 9.6 작은 타입: char, short, byte, boolean
@@ -292,7 +292,7 @@ assertEquals(q.toHql().hql(), qb.from(Order.class).where(o -> o.getStatus() == d
 
 두 형태 모두 같은 HQL을 만듭니다.
 
-예제 코드: [`ManualJavaNotesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaNotesTest.java)(`this-capture`, `local-copy`).
+예제 코드: [`ManualJavaNotesTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaNotesTest.java)(`this-capture`, `local-copy`).
 
 <a id="99-method-references"></a>
 ## 9.9 메서드 참조
@@ -325,7 +325,7 @@ assertEquals("LQL-1009", assertThrows(LambdaQLException.class,
 
 단순한 getter가 아니라면 람다 표현식을 사용하십시오.
 
-예제 코드: [`ManualJavaNotesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaNotesTest.java)(`method-ref`).
+예제 코드: [`ManualJavaNotesTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaNotesTest.java)(`method-ref`).
 
 <a id="910-static-helpers-you-should-not-expect"></a>
 ## 9.10 기대하지 말아야 할 static 헬퍼
@@ -358,7 +358,7 @@ assertEquals("LQL-3008", assertThrows(LambdaQLException.class,
         () -> qb.from(Order.class).where(o -> normalize(o.getDescription()) == text)).code());
 ```
 
-예제 코드: [`ManualJavaNotesTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaNotesTest.java)(`static-helper`).
+예제 코드: [`ManualJavaNotesTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaNotesTest.java)(`static-helper`).
 
 <a id="911-other-java-forms"></a>
 ## 9.11 그 밖의 Java 형태

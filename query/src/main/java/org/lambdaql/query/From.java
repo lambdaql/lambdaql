@@ -4,7 +4,7 @@ package org.lambdaql.query;
  * A subquery: {@code sub.from(Item.class).where(i -> ...).exists()}. A {@code where} lambda that uses the outer
  * entity makes a correlated subquery. The methods only describe the subquery; lambdaQL reads them from the bytecode.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java">SubqueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java">SubqueryTest</a>):
  * {@snippet class="org.lambdaql.query.SubqueryTest" region="exists"}
  *
  * @param <X> the entity type
@@ -54,7 +54,7 @@ public interface From<X> {
      * Joins another entity inside the subquery (ROADMAP D51): {@code sub.from(Order.class).join(Item.class,
      * (o, i) -> i.getOrder().getId() == o.getId())}. The next steps take both rows.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java">SubqueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java">SubqueryTest</a>):
      * {@snippet class="org.lambdaql.query.SubqueryTest" region="sub-join"}
      *
      * @param entity    the joined entity class

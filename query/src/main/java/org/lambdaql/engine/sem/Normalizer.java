@@ -31,7 +31,7 @@ import java.util.Set;
  * </ul>
  * Anything else that uses the entity is rejected with a clear error.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/NormalizerTest.java">NormalizerTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/NormalizerTest.java">NormalizerTest</a>):
  * {@snippet class="org.lambdaql.engine.sem.NormalizerTest" region="normalize"}
  */
 public final class Normalizer {
@@ -93,7 +93,7 @@ public final class Normalizer {
     /**
      * Normalizes a decoded condition.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/NormalizerTest.java">NormalizerTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/NormalizerTest.java">NormalizerTest</a>):
      * {@snippet class="org.lambdaql.engine.sem.NormalizerTest" region="normalize"}
      *
      * @param pred   the condition from {@code ConditionReducer}
@@ -192,7 +192,7 @@ public final class Normalizer {
      *       ({@code o.getCustomer().setName(x)}) change another table and are rejected.</li>
      * </ul>
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java">AssignmentReaderTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/AssignmentReaderTest.java">AssignmentReaderTest</a>):
      * {@snippet class="org.lambdaql.engine.sem.AssignmentReaderTest" region="read-assign"}
      *
      * @param receiver the object the setter is called on (from the decoded lambda)

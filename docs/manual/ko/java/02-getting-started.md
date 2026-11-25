@@ -23,7 +23,7 @@
 ## 소스에서 빌드
 
 ```bash
-git clone https://github.com/codebit0/lambdaql.git
+git clone https://github.com/lambdaql/lambdaql.git
 cd lambdaql
 ./gradlew build
 ```
@@ -111,7 +111,7 @@ Maven(`maven-compiler-plugin`):
 <a id="example-entities"></a>
 ## 예제 엔티티
 
-Java 트랙의 예제는 다음 예제 엔티티를 사용합니다. 전체 코드는 [`Order.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/Order.java), [`Customer.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/Customer.java), [`Item.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/Item.java)에 있습니다.
+Java 트랙의 예제는 다음 예제 엔티티를 사용합니다. 전체 코드는 [`Order.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/Order.java), [`Customer.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/Customer.java), [`Item.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/Item.java)에 있습니다.
 
 다음 다이어그램은 예제 엔티티와 연관을 보여 줍니다.
 
@@ -223,7 +223,7 @@ public static class OrderRepository {
 - 공유 `EntityManager`는 현재 트랜잭션에 연결됩니다. `@Transactional` 안에서 lambdaQL은 같은 트랜잭션으로 실행됩니다.
 - Spring Data 리포지토리 안에서 lambdaQL 쿼리를 작성하려면 [12. Spring Data JPA](12-spring-data-jpa.md)를 참고하십시오.
 
-예제 코드: [`ManualJavaStartTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java)(`create`, `config`, `repository`).
+예제 코드: [`ManualJavaStartTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java)(`create`, `config`, `repository`).
 
 <a id="your-first-query"></a>
 ## 첫 쿼리
@@ -350,7 +350,7 @@ where c1_0.name=?
 null 가드(`o.getCustomer() == null || ...`)를 쓰면 고객이 없는 주문도 조건에 맞으므로 `left join`이 되고, 그런 주문도 결과에 남습니다.
 [3.10](03-where.md#310-association-paths)을 참고하십시오.
 
-예제 코드: [`ManualJavaStartTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java)(`first-query`, `captured`, `many-where`, `step-by-step`), [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)(`inner-join`).
+예제 코드: [`ManualJavaStartTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java)(`first-query`, `captured`, `many-where`, `step-by-step`), [`SelectQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)(`inner-join`).
 
 <a id="getting-the-result"></a>
 ## 결과 가져오기
@@ -515,7 +515,7 @@ long customers = orders.distinct().count(o -> o.getCustomer().getId());
 long active = qb.from(Order.class).where(o -> o.isActive()).count(o -> o);
 ```
 
-예제 코드: [`CountColumnTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/CountColumnTest.java)(`count-column`, `count-distinct`, `count-row`).
+예제 코드: [`CountColumnTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/CountColumnTest.java)(`count-column`, `count-distinct`, `count-row`).
 
 <a id="exists"></a>
 ### `exists()`
@@ -584,7 +584,7 @@ assertThrows(IllegalStateException.class, () -> qb.from(Tag.class).toSet());
 assertEquals(2, qb.from(Tag.class).toList().size());
 ```
 
-예제 코드: [`ResultQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)(`first`, `one`, `count`, `exists`, `to-set`, `to-set-check`).
+예제 코드: [`ResultQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java)(`first`, `one`, `count`, `exists`, `to-set`, `to-set-check`).
 
 <a id="things-to-know"></a>
 ## 알아 둘 점

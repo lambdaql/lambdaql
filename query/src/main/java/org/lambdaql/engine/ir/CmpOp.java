@@ -3,7 +3,7 @@ package org.lambdaql.engine.ir;
 /**
  * Compare operators.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
  * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="cmpop-symbol"}
  */
 public enum CmpOp {
@@ -39,7 +39,7 @@ public enum CmpOp {
      * Returns the opposite operator.
      * This is safe in SQL too: {@code NOT (a < b)} and {@code a >= b} both give UNKNOWN when a value is NULL.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="cmpop-negate"}
      *
      * @return the opposite operator
@@ -58,7 +58,7 @@ public enum CmpOp {
     /**
      * Returns the operator to use when the two sides are swapped ({@code a op b} is the same as {@code b flip(op) a}).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/ir/IrExamplesTest.java">IrExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.ir.IrExamplesTest" region="cmpop-flip"}
      *
      * @return the operator for swapped sides

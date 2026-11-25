@@ -15,7 +15,7 @@ import org.objectweb.asm.tree.MethodNode;
  * <p>
  * Frames are skipped ({@code SKIP_FRAMES}); labels and line numbers are kept.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
  * {@snippet class="org.lambdaql.engine.load.LoadExamplesTest" region="reader-name"}
  */
 final class MethodReader {

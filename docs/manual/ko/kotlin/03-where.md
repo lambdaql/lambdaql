@@ -106,7 +106,7 @@ val q = qb.from(Order::class.java).where { it.cnt!! > 1 }
 assertEquals("select e0 from Order e0 where e0.cnt > 1", q.toHql().hql())
 ```
 
-예제 코드: [`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)(`first-query`), [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)(`captured`), [`ManualKotlinWhereTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`many-where`, `bang`).
+예제 코드: [`ManualKotlinStartTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)(`first-query`), [`KotlinSelectTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)(`captured`), [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`many-where`, `bang`).
 
 <a id="34-comparisons"></a>
 ## 3.4 비교
@@ -161,7 +161,7 @@ assertEquals("select e0 from Order e0 where e0.cnt >= 2.5BD", captured.toHql().h
 **부동소수점:** `Float`/`Double` 컬럼에 대해 lambdaQL은 Kotlin과 비트 단위까지 같은 결과를 약속하지 않습니다.
 캡처한 `NaN`이나 `Infinity` 값은 쿼리가 실행될 때 거부됩니다.
 
-예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`whole-number`).
+예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`whole-number`).
 
 <a id="35-and-or-not"></a>
 ## 3.5 AND, OR, NOT
@@ -225,7 +225,7 @@ val c = qb.from(Order::class.java).where { it.status.toInt() == (if (it.isActive
 assertEquals("select e0 from Order e0 where e0.status = case when e0.active = true then 1 else 2 end", c.toHql().hql())
 ```
 
-예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`and-or-not`, `if-when`, `value-before`).
+예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`and-or-not`, `if-when`, `value-before`).
 
 <a id="351-values-chosen-by-a-condition"></a>
 ### 3.5.1 조건으로 고르는 값(`case when`)
@@ -286,7 +286,7 @@ assertEquals("update Order e0 set e0.price = case when e0.price > 100.0 then (e0
 - 정렬 함수 체인 자체를 조건으로 고르는 형태(`if (flag) desc(o.price) else asc(o.id)`)는 거부됩니다(`LQL-2023`). 조건은 키 값 안에 쓰십시오.
 - 대상이 있는 `when (x)`는 [3.15](#315-when-kotlin-only)의 규칙을 따릅니다. `takeIf`는 지원하지 않습니다(KC6).
 
-예제 코드: [`KotlinCaseWhenTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinCaseWhenTest.kt)(`case-where`, `case-when-select`, `case-group`, `case-sort`, `case-set`).
+예제 코드: [`KotlinCaseWhenTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinCaseWhenTest.kt)(`case-where`, `case-when-select`, `case-group`, `case-sort`, `case-set`).
 
 <a id="36-null-rules"></a>
 ## 3.6 NULL 규칙
@@ -487,7 +487,7 @@ val q = qb.from(Coded::class.java).where { it.code == "abc" }
 assertEquals("select e0 from Coded e0 where e0.code = 'abc'", q.toHql().hql())
 ```
 
-예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`captured-eq`, `string-eq`, `never-null`, `null-check`, `sql-meaning`, `captured-null-guard`, `convert`).
+예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`captured-eq`, `string-eq`, `never-null`, `null-check`, `sql-meaning`, `captured-null-guard`, `convert`).
 
 <a id="37-boolean-columns"></a>
 ## 3.7 boolean 컬럼
@@ -526,7 +526,7 @@ val notElvis = qb.from(Coded::class.java).where { !(it.vip ?: false) }
 assertEquals("select e0 from Coded e0 where e0.vip is null or e0.vip = false", notElvis.toHql().hql())
 ```
 
-예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`nullable-boolean`).
+예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`nullable-boolean`).
 
 <a id="38-strings"></a>
 ## 3.8 문자열
@@ -571,7 +571,7 @@ val t = assertThrows<LambdaQLException> {
 assertTrue(t.message!!.startsWith("[LQL-2007]"))
 ```
 
-예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`string-rejected`), [`KotlinLikeTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinLikeTest.kt)(`like`).
+예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`string-rejected`), [`KotlinLikeTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinLikeTest.kt)(`like`).
 
 <a id="39-in-with-a-captured-collection"></a>
 ## 3.9 캡처한 컬렉션을 사용한 IN
@@ -623,7 +623,7 @@ assertEquals("select e0 from Order e0 where e0.status in (:p1)", q.toHql().hql()
 
 Kotlin에는 범위(`it.status in 1..5`)와 상수를 사용한 `when`도 있습니다. [3.14](#314-ranges-kotlin-only)와 [3.15](#315-when-kotlin-only)를 참고하십시오.
 
-예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`in-ids`), [`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)(`in`).
+예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`in-ids`), [`KotlinSelectTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)(`in`).
 
 <a id="310-association-paths"></a>
 ## 3.10 연관 경로
@@ -845,7 +845,7 @@ where o1_0.customer_id is null
 - 이 조인 규칙은 조회, `count`, 서브쿼리, 조인 쿼리의 `where`에 적용합니다. 명시적 조인의 `on` 안의 경로는 지금처럼 `left join`입니다. 필수 연관(`optional = false`)은 항상 inner join입니다.
 - 연관을 엔티티 객체와 비교하지 말고(`it.customer == c`, 제한 KC13) id를 비교하십시오: `it.customer?.id == c.id`(여기서 `c`는 캡처한 객체).
 
-예제 코드: [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`embedded-compare`, `safe-call-and`, `safe-call-or`, `safe-call-null`, `not-null-assert`, `safe-and-assert`), [`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)(`join-path`), [`ManualKotlinWhereTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`null-guard`, `no-customer`).
+예제 코드: [`KotlinQueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`embedded-compare`, `safe-call-and`, `safe-call-or`, `safe-call-null`, `not-null-assert`, `safe-and-assert`), [`ManualKotlinStartTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)(`join-path`), [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`null-guard`, `no-customer`).
 
 <a id="311-captured-values"></a>
 ## 3.11 캡처 값
@@ -885,7 +885,7 @@ assertEquals("select e0 from Order e0 where e0.updateAt > :p1", call.toHql().hql
 - 람다 표현식은 한 번 분석되고 결과는 캐시됩니다. 새 캡처 값은 호출할 때마다 읽습니다.
 - 엔티티 부분만 SQL이 됩니다.
 
-예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`captured-kinds`).
+예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`captured-kinds`).
 
 <a id="312-errors-that-depend-on-order-of-evaluation"></a>
 ## 3.12 평가 순서에 따라 달라지는 오류
@@ -906,7 +906,7 @@ assertEquals("select e0 from Item e0 where e0.qty > 0 and e0.price > (2.0 * e0.q
 
 나눗셈 없이 조건을 작성하십시오. 두 번째 쿼리는 `qty`가 양수일 때 첫 번째 쿼리와 같은 행을 반환합니다.
 
-예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`division-guard`).
+예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`division-guard`).
 
 <a id="313-what-is-rejected"></a>
 ## 3.13 거부되는 것
@@ -1005,7 +1005,7 @@ val q = qb.from(Order::class.java).where { it.updateAt >= from && it.updateAt <=
 assertEquals("select e0 from Order e0 where e0.updateAt >= :p1 and e0.updateAt <= :p2", q.toHql().hql())
 ```
 
-예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`ranges`, `range-rejected`).
+예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`ranges`, `range-rejected`).
 
 <a id="315-when-kotlin-only"></a>
 ## 3.15 `when`(Kotlin 전용)
@@ -1055,7 +1055,7 @@ assertThrows<LambdaQLException> {
 
 대신 `&&`와 `||`로 조건을 작성하십시오.
 
-예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`when`, `when-rejected`).
+예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`when`, `when-rejected`).
 
 ---
 

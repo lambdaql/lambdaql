@@ -26,7 +26,7 @@ import java.util.SequencedSet;
  * The HQL is built when the query runs, because captured values can change the HQL
  * (for example a null value gives {@code is null}).
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
  * {@snippet class="org.lambdaql.query.SelectQueryTest" region="to-list"}
  *
  * @param <T> the entity type
@@ -85,7 +85,7 @@ public class SelectQuery<T> {
     /**
      * Adds a condition. Several calls are joined with AND.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SelectQueryTest" region="where-many"}
      *
      * @param condition the condition lambda
@@ -103,7 +103,7 @@ public class SelectQuery<T> {
      * Adds a condition that can use subqueries: {@code (o, sub) -> sub.from(Item.class).where(i -> ...).exists()}
      * (ROADMAP M8). Several calls are joined with AND.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java">SubqueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java">SubqueryTest</a>):
      * {@snippet class="org.lambdaql.query.SubqueryTest" region="exists"}
      *
      * @param condition the condition lambda
@@ -120,7 +120,7 @@ public class SelectQuery<T> {
     /**
      * Builds the HQL and the parameter values with the current captured values. Useful for logs and tests.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SelectQueryTest" region="to-hql"}
      *
      * @return the HQL and its parameters
@@ -132,7 +132,7 @@ public class SelectQuery<T> {
     /**
      * Runs the query and returns all rows.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java">SelectQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SelectQueryTest" region="to-list"}
      *
      * @return the matching entities
@@ -146,7 +146,7 @@ public class SelectQuery<T> {
      * Without {@code orderBy}, "first" means the row with the smallest id (S9), so the result is always the same.
      * To choose the order, use {@code orderBy(...).first()}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
      * {@snippet class="org.lambdaql.query.ResultQueryTest" region="first"}
      *
      * @return the first row, or {@link Optional#empty()}
@@ -159,7 +159,7 @@ public class SelectQuery<T> {
      * Returns the only row, or empty if there is no row.
      * Use it when the condition can match at most one row, for example a unique key.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
      * {@snippet class="org.lambdaql.query.ResultQueryTest" region="one"}
      *
      * @return the row, or {@link Optional#empty()}
@@ -176,7 +176,7 @@ public class SelectQuery<T> {
     /**
      * Counts the rows that match. For a paged screen, count with this query, then add {@code orderBy} and paging.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
      * {@snippet class="org.lambdaql.query.ResultQueryTest" region="count"}
      *
      * @return the number of rows
@@ -190,7 +190,7 @@ public class SelectQuery<T> {
      * After {@link #distinct()} each different value is counted once: {@code count(distinct e0.customer.id)}.
      * The entity itself, {@code o -> o}, is the whole row: {@code select count(*) from ...} (ROADMAP D69).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/CountColumnTest.java">CountColumnTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/CountColumnTest.java">CountColumnTest</a>):
      * {@snippet class="org.lambdaql.query.CountColumnTest" region="count-column"}
      * {@snippet class="org.lambdaql.query.CountColumnTest" region="count-distinct"}
      * {@snippet class="org.lambdaql.query.CountColumnTest" region="count-row"}
@@ -209,7 +209,7 @@ public class SelectQuery<T> {
      * ({@code count(distinct x)}), and the rows are read with {@code select distinct e0}. Without a join the rows
      * of the entity are already different, so only {@code count(column)} changes.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/CountColumnTest.java">CountColumnTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/CountColumnTest.java">CountColumnTest</a>):
      * {@snippet class="org.lambdaql.query.CountColumnTest" region="count-distinct"}
      *
      * @return this
@@ -248,7 +248,7 @@ public class SelectQuery<T> {
     /**
      * Checks if at least one row matches. Only one row is read, and no entity is loaded.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
      * {@snippet class="org.lambdaql.query.ResultQueryTest" region="exists"}
      *
      * @return {@code true} if a row matches
@@ -280,7 +280,7 @@ public class SelectQuery<T> {
      * The lambda must be one straight chain of {@code by} calls (S4).
      * Association paths used only here become {@code LEFT JOIN}s, so rows without the association stay (S8).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-basic"}
      *
      * @param spec the sort lambda
@@ -297,7 +297,7 @@ public class SelectQuery<T> {
     /**
      * Sorts with a reusable {@link SortSpec}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-spec"}
      *
      * @param spec the spec
@@ -318,7 +318,7 @@ public class SelectQuery<T> {
      * Sorts by one key with a direction: {@code orderBy(o -> o.getPrice(), Direction.DESC)}.
      * The direction can be a value known only at run time.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SortQueryTest" region="sort-key"}
      *
      * @param key       the key lambda or a getter reference
@@ -339,7 +339,7 @@ public class SelectQuery<T> {
      * Returns at most {@code count} rows, without your own sort.
      * The rows are sorted by the id, so pages are stable (S9).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SortQueryTest" region="page-only"}
      *
      * @param count the most rows to return (0 or more)
@@ -354,7 +354,7 @@ public class SelectQuery<T> {
      * Skips the first {@code count} rows, without your own sort.
      * The rows are sorted by the id, so pages are stable (S9).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SortQueryTest" region="page-only"}
      *
      * @param count rows to skip (0 or more)
@@ -371,7 +371,7 @@ public class SelectQuery<T> {
      * ({@code o -> new Total(Agg.count(), Agg.avg(o.getPrice()))}) are allowed. The entity itself is a value too:
      * {@code o -> o} gives the same rows as {@code toList()} (ROADMAP D70).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
      * {@snippet class="org.lambdaql.query.ProjectionTest" region="record"}
      *
      * @param clause the select lambda
@@ -392,7 +392,7 @@ public class SelectQuery<T> {
      * Groups the rows: one key {@code o -> o.getCustomer().getId()} or many keys
      * {@code o -> List.of(o.getCustomer().getId(), o.getStatus())} (ROADMAP D27).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProjectionTest.java">ProjectionTest</a>):
      * {@snippet class="org.lambdaql.query.ProjectionTest" region="group-by"}
      *
      * @param keys the key lambda
@@ -408,7 +408,7 @@ public class SelectQuery<T> {
      * Adds an inner join with another entity: {@code join(Customer.class, (o, c) -> o.getCustomer().getId() == c.getId())}
      * (ROADMAP D44). Hibernate writes it as an entity join {@code join Customer e1 on ...}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
      * {@snippet class="org.lambdaql.query.JoinQueryTest" region="join"}
      *
      * @param entity    the joined entity class
@@ -423,7 +423,7 @@ public class SelectQuery<T> {
     /**
      * Adds a left join with another entity: rows of the main entity without a match stay (ROADMAP D44).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
      * {@snippet class="org.lambdaql.query.JoinQueryTest" region="left-join"}
      *
      * @param entity    the joined entity class
@@ -440,7 +440,7 @@ public class SelectQuery<T> {
      * (ROADMAP D45). The name says that the product of rows is meant; put the conditions in {@code where}.
      * To join on a condition, use {@link #join(Class, SelectJoinQuery.JoinOn)}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
      * {@snippet class="org.lambdaql.query.JoinQueryTest" region="cross-join"}
      *
      * @param entity the joined entity class
@@ -455,7 +455,7 @@ public class SelectQuery<T> {
      * Joins the rows of a CTE: {@code with t as (...) select e0 from X e0 join t e1 on ...} (ROADMAP D44 extension).
      * The row type of the CTE is the second lambda parameter; its accessors read the CTE columns.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
      * {@snippet class="org.lambdaql.query.JoinQueryTest" region="join-cte"}
      *
      * @param cte       the CTE from {@code qb.with(...)}
@@ -483,7 +483,7 @@ public class SelectQuery<T> {
      * Joins the rows of a query as a derived table: {@code join (select ...) e1 on ...} (ROADMAP D44 extension).
      * The query must select a record or a Kotlin data class (J5); its accessors read the columns.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
      * {@snippet class="org.lambdaql.query.JoinQueryTest" region="join-derived"}
      *
      * @param rows      the inner query
@@ -514,7 +514,7 @@ public class SelectQuery<T> {
      * The set has the same rows as {@link #toList()}: Hibernate returns each entity once, also after an explicit join,
      * and a repeated object would keep its first place (D68).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
      * {@snippet class="org.lambdaql.query.ResultQueryTest" region="to-set"}
      *
      * @return the rows in order

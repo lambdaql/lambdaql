@@ -99,7 +99,7 @@ interface MathFns {
 - 인터페이스와 결과 레코드는 DB 시그니처의 복사본입니다. 타입 안전성의 대가입니다. lambdaQL은 그 일부를 데이터베이스와 대조해 확인합니다(규칙 PR2).
 - 프로시저(추상 메서드)와 DB 함수(static 메서드)를 **같은 인터페이스**에 둘 수 있습니다.
 
-예제 코드: [`ManualJavaFunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaFunctionTest.java)(`declare-procs`).
+예제 코드: [`ManualJavaFunctionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaFunctionTest.java)(`declare-procs`).
 
 ---
 
@@ -151,7 +151,7 @@ void에 `call`이 아니라 `exec`를 쓰는 이유는 무엇일까요?
 - 파라미터의 데이터베이스 기본값은 사용할 수 없습니다. 모든 IN 파라미터를 전달하십시오.
 - IN 값으로 `null`을 넘겨도 됩니다.
 
-예제 코드: [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)(`call`, `exec`).
+예제 코드: [`ProcedureTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)(`call`, `exec`).
 
 ---
 
@@ -347,7 +347,7 @@ assertEquals("LQL-4044", assertThrows(LambdaQLException.class,
 
 이 대체 동작은 MariaDB와 Oracle에서 동작합니다.
 
-예제 코드: [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)(`rules`, `names`, `name-check`, `type-check`, `overload`).
+예제 코드: [`ProcedureTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)(`rules`, `names`, `name-check`, `type-check`, `overload`).
 
 ---
 
@@ -434,7 +434,7 @@ lambdaQL 람다 표현식 **밖에서** `OrderFns.discount(...)`를 호출하면
 
 함수는 **인터페이스 이름과 함께** 호출하십시오(`OrderFns.discount`). static import도 동작하지만, 같은 이름의 멤버 메서드가 그것을 가릴 수 있습니다.
 
-예제 코드: [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)(`declare`).
+예제 코드: [`FunctionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)(`declare`).
 
 ---
 
@@ -570,7 +570,7 @@ assertEquals("select e0 from Order e0 where function('SQ_TAX' as Double, e0.pric
 
 그런 함수가 등록되어 있지 않으면 lambdaQL은 람다 표현식을 읽을 때 실패합니다(`LQL-3058`, [8.10](#810-function-rules-fn1-to-fn11-summary) 참고).
 
-예제 코드: [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)(`registered`), [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)(`where`, `captured`, `boolean`, `select`, `update`), [`ManualJavaFunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaFunctionTest.java)(`function-group`, `function-sub`).
+예제 코드: [`FunctionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)(`registered`), [`FunctionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)(`where`, `captured`, `boolean`, `select`, `update`), [`ManualJavaFunctionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaFunctionTest.java)(`function-group`, `function-sub`).
 
 ---
 
@@ -601,7 +601,7 @@ lambdaQL이 실행하는 방법(규칙 PR6):
 
 lambdaQL은 먼저 대기 중인 변경 사항을 flush합니다(PR9와 같음). 그래서 함수는 최신 변경 사항을 봅니다.
 
-예제 코드: [`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)(`function`).
+예제 코드: [`ProcedureTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)(`function`).
 
 ---
 
@@ -672,7 +672,7 @@ qb.from(Order.class).where(o -> o.getCnt() * o.getStatus() > n).toHql();
 - MariaDB에서는 실제로 결정적인 함수라면 `DETERMINISTIC`으로 선언하십시오.
 - Oracle에서는 같은 식의 함수 기반 인덱스가 있으면 경고가 사라집니다(이런 인덱스에는 `DETERMINISTIC` 함수가 필요합니다).
 
-예제 코드: [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)(`sargable`, `sargable-strict`).
+예제 코드: [`FunctionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)(`sargable`, `sargable-strict`).
 
 ---
 
@@ -713,7 +713,7 @@ assertEquals("LQL-3055", assertThrows(LambdaQLException.class,
 
 `BadFns`는 경우마다 잘못된 함수를 하나씩 둔 예제 안의 인터페이스입니다. `price`를 반환하는 본문, 이름 `COALESCE`, 등록하지 않은 `value = "SQ_OTHER"`·`sql = "SQ_FN_DISCOUNT"`, 반환 타입 `Object`의 네 가지입니다.
 
-예제 코드: [`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)(`rules`).
+예제 코드: [`FunctionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)(`rules`).
 
 ---
 

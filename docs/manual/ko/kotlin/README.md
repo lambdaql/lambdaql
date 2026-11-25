@@ -22,7 +22,7 @@ val orders: List<Order> = q.toList()
 > [!NOTE]
 > **예제에 대하여.** 예제 코드는 모두 실행되는 Kotlin 코드의 한 구간을 그대로 옮긴 것입니다. 절 끝의 "예제 코드:" 줄에 원본 파일과 구간 이름을 적습니다. `assertEquals`의 문자열이 lambdaQL이 만드는 HQL입니다. 데이터베이스별 SQL 블록에서 `…`는 줄여 쓴 select 목록(엔티티의 모든 컬럼)이고, `?`는 바인드 파라미터입니다.
 
-예제 코드: [`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)(`readme`).
+예제 코드: [`ManualKotlinStartTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)(`readme`).
 
 <a id="contents"></a>
 ## 목차
@@ -96,7 +96,7 @@ val orders: List<Order> = q.toList()
 <a id="help-and-contributions"></a>
 ## 도움말과 기여
 
-- 소스 코드: <https://github.com/codebit0/lambdaql>
+- 소스 코드: <https://github.com/lambdaql/lambdaql>
 - 한국어 매뉴얼이 원본입니다. 다른 언어는 번역본입니다.
 - 잘못된 내용을 발견하면 이슈나 풀 리퀘스트를 열어 주십시오.
 - 설계 문서(한국어, 기여자용): [ROADMAP.md](../../../design/ROADMAP.md), [KOTLIN.md](../../../design/KOTLIN.md)

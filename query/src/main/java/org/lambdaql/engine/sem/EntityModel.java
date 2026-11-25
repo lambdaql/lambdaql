@@ -9,7 +9,7 @@ import java.util.Optional;
  * The main version is {@link JpaEntityModel} (it reads the JPA Metamodel).
  * Tests can use a small fake version.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java">JpaEntityModelTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java">JpaEntityModelTest</a>):
  * {@snippet class="org.lambdaql.engine.sem.JpaEntityModelTest" region="entity-model"}
  */
 public interface EntityModel {
@@ -31,7 +31,7 @@ public interface EntityModel {
     /**
      * One property of an entity or embeddable.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java">JpaEntityModelTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java">JpaEntityModelTest</a>):
      * {@snippet class="org.lambdaql.engine.sem.JpaEntityModelTest" region="entity-model"}
      * {@snippet class="org.lambdaql.engine.sem.JpaEntityModelTest" region="entity-model-id"}
      *
@@ -63,7 +63,7 @@ public interface EntityModel {
     /**
      * Checks if a class is a managed entity.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java">JpaEntityModelTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java">JpaEntityModelTest</a>):
      * {@snippet class="org.lambdaql.engine.sem.JpaEntityModelTest" region="entity-model"}
      *
      * @param type a class
@@ -83,7 +83,7 @@ public interface EntityModel {
     /**
      * Finds a property of an entity or embeddable class.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java">JpaEntityModelTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java">JpaEntityModelTest</a>):
      * {@snippet class="org.lambdaql.engine.sem.JpaEntityModelTest" region="entity-model"}
      *
      * @param owner the entity or embeddable class
@@ -122,7 +122,7 @@ public interface EntityModel {
      * Returns the name of the {@code @Id} property of an entity.
      * Used to add a tie-breaker key when a sorted query is paged (ROADMAP S9).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java">JpaEntityModelTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/sem/JpaEntityModelTest.java">JpaEntityModelTest</a>):
      * {@snippet class="org.lambdaql.engine.sem.JpaEntityModelTest" region="entity-model-id"}
      *
      * @param entity an entity class

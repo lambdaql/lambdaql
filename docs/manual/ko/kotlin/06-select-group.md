@@ -63,7 +63,7 @@ Kotlin은 타입을 엄격히 검사하므로 생성자 파라미터 타입은 �
 > 이런 파라미터에 NULL이 들어가면 lambdaQL은 `IllegalStateException`을 던집니다. 기본형이면 메시지에 해당 인자와 래퍼 타입을 쓰라는 안내가 들어 있습니다.
 > `count`는 NULL을 내지 않으므로 `count: Long`은 괜찮습니다.
 
-예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`result-types`).
+예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`result-types`).
 
 ---
 
@@ -127,7 +127,7 @@ val afterPath = assertThrows(LambdaQLException::class.java) {
 assertEquals("LQL-2022", afterPath.code())
 ```
 
-예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`value`, `value-path`, `value-elvis`).
+예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`value`, `value-path`, `value-elvis`).
 
 ---
 
@@ -172,7 +172,7 @@ lambdaQL은 `select new com.acme.OrderView(...)`를 쓰지 **않습니다**(규�
 | `Pair` / `Triple` | 예 | 아니요 |
 | Java record(Java 모듈에서) | 예 | 예 |
 
-예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`data-class`).
+예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`data-class`).
 
 ---
 
@@ -245,7 +245,7 @@ where o1_0.status=1
 
 이는 정상적인 SQL 동작입니다. 이런 결과에는 nullable 파라미터(`Double?`)를 사용하십시오([6.1](#61-example-entities-and-result-types)의 팁 참고).
 
-예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`total`).
+예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`total`).
 
 ---
 
@@ -335,7 +335,7 @@ assertEquals("LQL-3035", e.code())
 
 오류는 `select`를 호출할 때 발생합니다. 그 밖의 규칙 검사는 [6.11](#611-rules-j1-to-j8)을 참고하십시오.
 
-예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`group-one`, `group-many`, `group-key-error`).
+예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`group-one`, `group-many`, `group-key-error`).
 
 ---
 
@@ -359,7 +359,7 @@ assertEquals("select e0.customer.id, count(*), sum(e0.price) from Order e0 group
 
 `Agg.sum`은 Java 메서드이므로 결과가 플랫폼 타입입니다. 그래서 `sum(it.price) > 200`은 `!!` 없이 컴파일됩니다. `!!`를 붙여도 lambdaQL은 이를 무시합니다.
 
-예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`having`).
+예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`having`).
 
 ---
 
@@ -436,7 +436,7 @@ order by o1_0.price desc,o1_0.id
 limit ?,?
 ```
 
-예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`distinct`, `value-page`).
+예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`distinct`, `value-page`).
 
 ---
 
@@ -547,7 +547,7 @@ val q = qb.from(Order::class.java)
 
 엔티티를 담은 행은 파생 테이블이나 CTE의 행으로 쓸 수 없습니다(`LQL-3071`). 엔티티의 id나 컬럼을 고르십시오.
 
-예제 코드: [`KotlinSelectEntityTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectEntityTest.kt)(`select-joined`, `select-entities`).
+예제 코드: [`KotlinSelectEntityTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectEntityTest.kt)(`select-joined`, `select-entities`).
 
 <a id="three-entities-and-repeated-rows"></a>
 ### 엔티티 여러 개와 반복되는 행
@@ -717,7 +717,7 @@ assertEquals("with t as (select d0.customer.id as customerId, count(*) as cnt, s
 지원하지 않는 것: insert의 조인, 엔티티 11개 이상, `SortSpec`의 조인 형태.
 update와 delete의 조인은 추가하지 않기로 했습니다. 연관 경로(U9)나 `sub`를 쓰십시오.
 
-예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`join`, `left-join-null`, `row-type`, `join-sort-select`, `join-three`, `cross-join`, `join-paging`, `join-derived`, `cte-reuse`), [`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`join-distinct`, `join-cte`), [`KotlinSelectEntityTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectEntityTest.kt)(`ten`).
+예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`join`, `left-join-null`, `row-type`, `join-sort-select`, `join-three`, `cross-join`, `join-paging`, `join-derived`, `cte-reuse`), [`KotlinQueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`join-distinct`, `join-cte`), [`KotlinSelectEntityTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectEntityTest.kt)(`ten`).
 
 ---
 
@@ -791,7 +791,7 @@ assertEquals("LQL-3064", e.code())
 
 엔티티의 `@SQLRestriction`과 `@SoftDelete` 조건은 엔티티 조인의 `on`과 파생 테이블 안에도 Hibernate가 붙입니다(MariaDB 10.11, Oracle 23.26에서 실측). lambdaQL은 이 조건을 따로 처리하지 않습니다.
 
-예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`derived-types`, `derived`, `derived-limit`, `derived-row-type`).
+예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`derived-types`, `derived`, `derived-limit`, `derived-row-type`).
 
 ---
 
@@ -826,7 +826,7 @@ MariaDB와 Oracle은 진짜 `with`를 실행합니다. 컬럼 목록은 Hibernat
 - 같은 CTE를 한 쿼리에서 두 번 읽을 수 있습니다. 정의는 한 번만 씁니다([파생 테이블과 CTE의 조인](#join-a-derived-table-or-cte) 참고).
 - 지원하지 않는 것: update, delete, insert 안의 CTE.
 
-예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`cte`).
+예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`cte`).
 
 ---
 
@@ -862,7 +862,7 @@ assertThrows(IllegalStateException::class.java) {
 }
 ```
 
-예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`rules`).
+예제 코드: [`ManualKotlinSelectTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSelectTest.kt)(`rules`).
 
 ---
 

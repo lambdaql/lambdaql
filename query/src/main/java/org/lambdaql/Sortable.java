@@ -15,7 +15,7 @@ import java.lang.annotation.Target;
  *   <li>On an association field, {@code @Sortable(path = "name")} allows {@code customer.name}.</li>
  * </ul>
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java">SortPolicyTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortPolicyTest.java">SortPolicyTest</a>):
  * {@snippet class="org.lambdaql.query.SortPolicyTest" region="annotation"}
  */
 @Documented

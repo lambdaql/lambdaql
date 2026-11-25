@@ -13,7 +13,7 @@ import java.util.WeakHashMap;
  * The check runs once per condition lambda, when its analysis goes into the cache. Register the mode before the
  * first query; a lambda analyzed earlier is not checked again.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java">FunctionTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java">FunctionTest</a>):
  * {@snippet class="org.lambdaql.query.FunctionTest" region="sargable-strict"}
  */
 public final class SargablePolicy {

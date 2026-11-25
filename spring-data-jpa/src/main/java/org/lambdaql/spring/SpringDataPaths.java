@@ -12,7 +12,7 @@ import java.lang.reflect.Method;
  * it finds the class of the running Spring Data once and calls it by reflection. An unknown property still throws
  * Spring Data's own {@code PropertyReferenceException}, as Spring Data's repositories do.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
  * {@snippet class="org.lambdaql.spring.ExecutorTest" region="find-all-spring-sort"}
  */
 final class SpringDataPaths {
@@ -49,7 +49,7 @@ final class SpringDataPaths {
     /**
      * Reads a property name the way Spring Data's own repositories do.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
      * {@snippet class="org.lambdaql.spring.ExecutorTest" region="find-all-spring-sort"}
      *
      * @param name the property name of a {@code Sort.Order}, for example {@code team.name} or {@code teamName}

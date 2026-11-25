@@ -10,7 +10,7 @@ import java.io.Serializable;
  * are allowed (rule U1). A value means the value <b>before</b> the change, so a value must not read a column that an
  * earlier setter in the same statement wrote (U3).
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java">DmlQueryTest</a>):
  * {@snippet class="org.lambdaql.query.DmlQueryTest" region="update"}
  *
  * @param <T> the entity type

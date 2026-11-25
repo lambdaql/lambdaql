@@ -17,7 +17,7 @@ import java.lang.invoke.SerializedLambda;
  * and passes the result to {@link ObjectOutputStream#replaceObject}. We catch the {@code SerializedLambda}
  * there and stop. Because we stop early, the captured values do not need to be serializable.
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
  * {@snippet class="org.lambdaql.engine.load.LoadExamplesTest" region="extract"}
  */
 public final class SerializedLambdaExtractor {
@@ -28,7 +28,7 @@ public final class SerializedLambdaExtractor {
     /**
      * Gets the lambda information.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/engine/load/LoadExamplesTest.java">LoadExamplesTest</a>):
      * {@snippet class="org.lambdaql.engine.load.LoadExamplesTest" region="extract"}
      * {@snippet class="org.lambdaql.engine.load.LoadExamplesTest" region="not-serializable"}
      *

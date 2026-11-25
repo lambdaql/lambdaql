@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Finds the database functions declared with {@link SqlFunction} and checks their rules (ROADMAP M11, D31, FN1-FN10).
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java">FunctionTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java">FunctionTest</a>):
  * {@snippet class="org.lambdaql.query.FunctionTest" region="where"}
  */
 public final class SqlFunctions {
@@ -59,7 +59,7 @@ public final class SqlFunctions {
     /**
      * Finds the database function a call goes to.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java">FunctionTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java">FunctionTest</a>):
      * {@snippet class="org.lambdaql.query.FunctionTest" region="where"}
      *
      * @param m      the called method

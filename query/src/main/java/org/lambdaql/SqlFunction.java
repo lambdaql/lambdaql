@@ -14,7 +14,7 @@ import java.lang.annotation.Target;
  * lambdaQL writes the call as {@code function('<key>' as <type>, args...)}. The return type must be Double,
  * Integer, Long, BigDecimal, String, LocalDate, LocalDateTime or Boolean (primitive types become their wrapper).
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java">FunctionTest</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java">FunctionTest</a>):
  * {@snippet class="org.lambdaql.query.FunctionTest" region="declare"}
  */
 @Documented

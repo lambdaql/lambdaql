@@ -34,7 +34,7 @@ import java.util.SequencedSet;
  * {@link RepositoryMethodContext}, which Spring Data fills because this class implements
  * {@link RepositoryMetadataAccess} (ROADMAP SD5).
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java">MemberRepository</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java">MemberRepository</a>):
  * {@snippet class="org.lambdaql.spring.sample.MemberRepository" region="repository"}
  *
  * @param <T> the entity type

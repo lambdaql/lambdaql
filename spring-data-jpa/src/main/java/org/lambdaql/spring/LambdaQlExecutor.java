@@ -34,7 +34,7 @@ import java.util.SequencedSet;
  *       {@code Specification} lambdas have three.</li>
  * </ul>
  *
- * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java">MemberRepository</a>):
+ * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java">MemberRepository</a>):
  * {@snippet class="org.lambdaql.spring.sample.MemberRepository" region="repository"}
  *
  * @param <T> the entity type of the repository
@@ -45,7 +45,7 @@ public interface LambdaQlExecutor<T> {
      * Starts a query on the repository's entity, for everything the short methods cannot do
      * (many {@code where} calls, {@code limit}/{@code offset}, run-time sort directions).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java">MemberRepository</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java">MemberRepository</a>):
      * {@snippet class="org.lambdaql.spring.sample.MemberRepository" region="query"}
      *
      * @return a new select query on the repository's entity
@@ -64,7 +64,7 @@ public interface LambdaQlExecutor<T> {
     /**
      * Returns all rows that match.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java">MemberRepository</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java">MemberRepository</a>):
      * {@snippet class="org.lambdaql.spring.sample.MemberRepository" region="repository"}
      *
      * @param where the condition, for example {@code m -> m.isActive()}
@@ -75,7 +75,7 @@ public interface LambdaQlExecutor<T> {
     /**
      * Returns all rows that match, sorted.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
      * {@snippet class="org.lambdaql.spring.ExecutorTest" region="find-all-sort"}
      *
      * @param where the condition
@@ -90,7 +90,7 @@ public interface LambdaQlExecutor<T> {
      * {@code NullHandling.NATIVE} uses the lambdaQL default (NULL first for ascending, last for descending, ROADMAP D16).
      * {@code ignoreCase} is not supported yet.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
      * {@snippet class="org.lambdaql.spring.ExecutorTest" region="find-all-spring-sort"}
      *
      * @param where the condition
@@ -105,7 +105,7 @@ public interface LambdaQlExecutor<T> {
      * The total comes from a {@code count} query, which is skipped when the page alone shows the total.
      * When the keys do not contain the id, the id is added as the last key, so rows do not move between pages (S9).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
      * {@snippet class="org.lambdaql.spring.ExecutorTest" region="page"}
      *
      * @param where    the condition
@@ -120,7 +120,7 @@ public interface LambdaQlExecutor<T> {
      * Returns all rows that match as a set ({@code LinkedHashSet}). Like {@link #findAll(Where)}, the order is not fixed;
      * give a sort to fix it.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
      * {@snippet class="org.lambdaql.spring.ExecutorTest" region="find-set"}
      *
      * @param where the condition
@@ -140,7 +140,7 @@ public interface LambdaQlExecutor<T> {
     /**
      * Returns all rows that match as a set that keeps the order of a Spring {@link Sort}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
      * {@snippet class="org.lambdaql.spring.ExecutorTest" region="find-set"}
      *
      * @param where the condition
@@ -160,7 +160,7 @@ public interface LambdaQlExecutor<T> {
     /**
      * Returns the first row in the given order.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
      * {@snippet class="org.lambdaql.spring.ExecutorTest" region="find-first"}
      *
      * @param where the condition
@@ -182,7 +182,7 @@ public interface LambdaQlExecutor<T> {
     /**
      * Returns the only row that matches.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
      * {@snippet class="org.lambdaql.spring.ExecutorTest" region="find-one"}
      *
      * @param where the condition
@@ -194,7 +194,7 @@ public interface LambdaQlExecutor<T> {
     /**
      * Counts the rows that match.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
      * {@snippet class="org.lambdaql.spring.ExecutorTest" region="count-exists"}
      *
      * @param where the condition
@@ -205,7 +205,7 @@ public interface LambdaQlExecutor<T> {
     /**
      * Checks if a row matches. Reads one row at most and loads no entity.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
      * {@snippet class="org.lambdaql.spring.ExecutorTest" region="count-exists"}
      *
      * @param where the condition
@@ -222,7 +222,7 @@ public interface LambdaQlExecutor<T> {
      * inside a repository {@code default} method Spring turns it into {@code InvalidDataAccessApiUsageException}.
      * Like every JPA bulk statement, it does not change entities already loaded in the transaction.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java">MemberRepository</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java">MemberRepository</a>):
      * {@snippet class="org.lambdaql.spring.sample.MemberRepository" region="dml"}
      *
      * @return the start of the UPDATE
@@ -232,7 +232,7 @@ public interface LambdaQlExecutor<T> {
     /**
      * Starts a DELETE on the repository's entity. Needs a transaction, like {@link #updateQuery()}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java">MemberRepository</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java">MemberRepository</a>):
      * {@snippet class="org.lambdaql.spring.sample.MemberRepository" region="dml"}
      *
      * @return the start of the DELETE
@@ -242,7 +242,7 @@ public interface LambdaQlExecutor<T> {
     /**
      * Starts an INSERT on the repository's entity. Needs a transaction, like {@link #updateQuery()}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java">MemberRepository</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java">MemberRepository</a>):
      * {@snippet class="org.lambdaql.spring.sample.MemberRepository" region="dml"}
      *
      * @return the start of the INSERT
@@ -252,7 +252,7 @@ public interface LambdaQlExecutor<T> {
     /**
      * Starts an upsert keyed by the {@code @Id} (ROADMAP D40). Needs a transaction, like {@link #updateQuery()}.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
      * {@snippet class="org.lambdaql.spring.ExecutorTest" region="upsert"}
      *
      * @return the start of the upsert
@@ -269,7 +269,7 @@ public interface LambdaQlExecutor<T> {
      * Not the same as Spring Data's {@code deleteAll()} / {@code deleteAll(Iterable)}: those load the entities and
      * remove them one by one (cascade, {@code @PreRemove}). This one does neither and does not change loaded entities.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
      * {@snippet class="org.lambdaql.spring.ExecutorTest" region="dml-shortcuts"}
      *
      * @param where the condition
@@ -281,7 +281,7 @@ public interface LambdaQlExecutor<T> {
      * Deletes the only row that matches, with the "one row" protection: if two or more rows match,
      * nothing is deleted and {@code IncorrectResultSizeDataAccessException} is thrown.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
      * {@snippet class="org.lambdaql.spring.ExecutorTest" region="dml-one"}
      *
      * @param where the condition, for example a unique key
@@ -292,7 +292,7 @@ public interface LambdaQlExecutor<T> {
     /**
      * Changes every row that matches (bulk). The condition comes first, the assignments second.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
      * {@snippet class="org.lambdaql.spring.ExecutorTest" region="dml-shortcuts"}
      *
      * @param where the condition
@@ -304,7 +304,7 @@ public interface LambdaQlExecutor<T> {
     /**
      * Changes the only row that matches, with the "one row" protection (see {@link #deleteOne}).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
      * {@snippet class="org.lambdaql.spring.ExecutorTest" region="dml-one"}
      *
      * @param where the condition
@@ -316,7 +316,7 @@ public interface LambdaQlExecutor<T> {
     /**
      * Inserts one row.
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
      * {@snippet class="org.lambdaql.spring.ExecutorTest" region="dml-shortcuts"}
      *
      * @param values the assignments of the new row
@@ -327,7 +327,7 @@ public interface LambdaQlExecutor<T> {
     /**
      * Inserts one row per element (statements of at most about 500 values).
      *
-     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
+     * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java">ExecutorTest</a>):
      * {@snippet class="org.lambdaql.spring.ExecutorTest" region="dml-shortcuts"}
      *
      * @param rows   the elements
