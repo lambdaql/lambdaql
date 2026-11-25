@@ -81,13 +81,28 @@ final class DmlParts {
     }
 
     /**
-     * Makes an ordered set of entity rows and checks that no row was lost. Entity rows never repeat
-     * (only to-one joins), so a smaller set means {@code equals}/{@code hashCode} or the {@code @Id} is wrong.
+     * Makes an ordered set of entity rows and checks that no row was lost (ROADMAP D42, D68).
+     * <p>
+     * In one query result Hibernate gives the same object for the same row, so a row that a join repeats is the same
+     * object: it keeps its first place and is not counted as lost. Two different objects that {@code equals} treats as
+     * equal would make one row disappear without a sign, so that throws.
+     *
+     * <p>Example: orders joined to their items repeat once per item; the set has each order once. Two {@code Tag}
+     * rows whose {@code equals} compares only the name throw.
+     *
+     * @param rows the rows of one query, in order
+     * @param <T>  the entity type
+     * @return the rows as an ordered set
+     * @throws IllegalStateException if two different rows are equal by {@code equals}/{@code hashCode}
      */
     static <T> java.util.SequencedSet<T> toSet(List<T> rows) {
-        java.util.LinkedHashSet<T> set = new java.util.LinkedHashSet<>(rows);
-        if (set.size() < rows.size()) {
-            throw new IllegalStateException(LqlMessage.SET_SIZE_MISMATCH.format(rows.size(), set.size()));
+        java.util.Set<T> objects = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        java.util.LinkedHashSet<T> set = new java.util.LinkedHashSet<>();
+        for (T row : rows) {
+            if (objects.add(row)) set.add(row);   // a repeated row is the same object: only its first place counts
+        }
+        if (set.size() < objects.size()) {
+            throw new IllegalStateException(LqlMessage.SET_SIZE_MISMATCH.format(objects.size(), set.size()));
         }
         return set;
     }

@@ -113,6 +113,43 @@ Maven(`maven-compiler-plugin`):
 
 Java 트랙의 예제는 다음 예제 엔티티를 사용합니다. 전체 코드는 [`Order.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/Order.java), [`Customer.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/Customer.java), [`Item.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/Item.java)에 있습니다.
 
+다음 다이어그램은 예제 엔티티와 연관을 보여 줍니다.
+
+```mermaid
+classDiagram
+    direction LR
+    class Order {
+        Long id
+        double price
+        short status
+        boolean active
+        String description
+        Kind kind
+        LocalDateTime updateAt
+        Double total
+        Integer cnt
+        String custName
+    }
+    class Customer {
+        int id
+        String name
+        Integer grade
+    }
+    class Item {
+        Long id
+        Double price
+        int qty
+    }
+    class Address {
+        <<Embeddable>>
+        String city
+        String zip
+    }
+    Customer "0..1" -- "*" Order : customer / orders
+    Order "0..1" <-- "*" Item : order
+    Order *-- Address : address
+```
+
 | 엔티티 | 테이블 | 주요 속성 |
 |---|---|---|
 | `Order` | `orders` | `id`(`Long`, 자동 생성), `price`(`double`), `status`(`short`), `active`(`boolean`, getter `isActive()`), `description`(`String`), `kind`(enum `Order.Kind`: `NORMAL`, `RUSH`), `updateAt`(`LocalDateTime`), `customer`(`@ManyToOne` `Customer`), `total`(`Double`), `cnt`(`Integer`), `custName`(`String`), `address`(`@Embedded` `Address`: `city`, `zip`) |
@@ -140,19 +177,14 @@ QueryBuilder qb = new QueryBuilder(emf);
 QueryBuilder qbOnEm = new QueryBuilder(em);
 ```
 
-`QueryBuilder`는 하나만 만들어 재사용하십시오. 쿼리마다 새로 만들지 마십시오.
-
-<a id="with-plain-jpa"></a>
-### 일반 JPA에서
-
-`Persistence.createEntityManagerFactory("my-unit")`로 만든 `EntityManagerFactory`를 위 예제처럼 `new QueryBuilder(emf)`에 넘깁니다.
+`QueryBuilder`를 쿼리마다 만들지 않고 하나만 만들어 재사용하십시오.
 
 <a id="with-spring-boot"></a>
 ### Spring Boot에서
 
 `lambdaql-spring-boot-starter-boot4`(`-boot3`)를 사용하면 Spring Boot가 `QueryBuilder` 빈을 만듭니다([12.8](12-spring-data-jpa.md#128-the-querybuilder-bean) 참고).
-스타터 없이 사용하면 빈을 직접 만드십시오. 자동 구성과 마찬가지로 Spring의 공유 `EntityManager`를 사용합니다.
-예제의 설정 클래스와 서비스 클래스는 `static` 중첩 클래스입니다. 애플리케이션에서는 보통 최상위 클래스로 둡니다.
+스타터 없이 사용하려면 아래 예시처럼 빈을 선언하십시오.
+예제의 설정 클래스와 리포지토리 클래스는 `static` 중첩 클래스입니다. 애플리케이션에서는 보통 최상위 클래스로 둡니다.
 
 <!-- region: ManualJavaStartTest.java#config -->
 ```java
@@ -166,16 +198,16 @@ public static class LambdaQlConfig {
 }
 ```
 
-그다음 필요한 곳에 `QueryBuilder`를 주입합니다.
+그다음 리포지토리에 `QueryBuilder`를 주입합니다.
 
-<!-- region: ManualJavaStartTest.java#service -->
+<!-- region: ManualJavaStartTest.java#repository -->
 ```java
-@Service
-public static class OrderService {
+@Repository
+public static class OrderRepository {
 
     private final QueryBuilder qb;
 
-    public OrderService(QueryBuilder qb) {
+    public OrderRepository(QueryBuilder qb) {
         this.qb = qb;
     }
 
@@ -189,10 +221,9 @@ public static class OrderService {
 ```
 
 - 공유 `EntityManager`는 현재 트랜잭션에 연결됩니다. `@Transactional` 안에서 lambdaQL은 같은 트랜잭션으로 실행됩니다.
-- Spring 애플리케이션에서는 `EntityManagerFactory` 생성자를 사용하지 마십시오. 이 생성자로 만든 빌더는 쿼리마다 자체 `EntityManager`를 열며, 이 `EntityManager`는 Spring 트랜잭션에 참여하지 않습니다.
 - Spring Data 리포지토리 안에서 lambdaQL 쿼리를 작성하려면 [12. Spring Data JPA](12-spring-data-jpa.md)를 참고하십시오.
 
-예제 코드: [`ManualJavaStartTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java)(`create`, `config`, `service`).
+예제 코드: [`ManualJavaStartTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java)(`create`, `config`, `repository`).
 
 <a id="your-first-query"></a>
 ## 첫 쿼리
@@ -221,10 +252,9 @@ where o1_0.status=1 and o1_0.price>100.0
 - `toList()`는 쿼리를 실행하고 `List<Order>`를 반환합니다.
 - `toList()`는 모든 행을 반환합니다. 다른 결과 함수(`first()`, `one()`, `count()`, `exists()`, `toSet()`)는 [결과 가져오기](#getting-the-result)에 있습니다.
 
-왜 `1`과 `100.0`은 바인드 파라미터가 아니라 HQL에 그대로 쓰일까요?
-둘 다 **람다 표현식에 직접 쓴 상수**이기 때문입니다. lambdaQL은 상수(숫자, 문자열, boolean, `null`, enum 상수)를 HQL에 리터럴로 씁니다.
+람다 표현식에 직접 쓴 `1`과 `100.0` 같은 상수는 HQL에 직접 기록합니다. 숫자, 문자열, boolean, `null`, enum 상수가 이에 해당합니다.
 `price`는 `double`이므로 javac는 `100`을 소수 `100.0`으로 컴파일합니다.
-람다 표현식 밖에서 온 값은 다릅니다. 항상 바인드 파라미터가 됩니다(다음 절과 [3.3](03-where.md#33-basic-form) 참고).
+람다 표현식 밖에서 온 값은 바인드 파라미터가 됩니다(다음 절과 [3.3](03-where.md#33-basic-form) 참고).
 
 <a id="use-values-from-outside-the-lambda"></a>
 ### 람다 표현식 밖의 값 사용하기
@@ -292,10 +322,10 @@ List<Order> orders = query.toList();
 빌더 변수의 타입은 `SelectQuery<Order>`입니다(`var`도 사용할 수 있음). `where`는 같은 쿼리 객체에 조건을 더하고 그 객체를 반환합니다.
 
 <a id="paths-to-other-entities"></a>
-### 다른 엔티티로 가는 경로
+### 연관 엔티티
 
 `o.getCustomer().getName()` 같은 경로는 조인한 엔티티의 컬럼을 가리킵니다.
-`where`에서 lambdaQL은 고객 테이블을 조인합니다. 고객이 없는 주문이 조건에 맞을 수 있으면 `left join`, 맞을 수 없으면 inner `join`입니다.
+`where`에서 lambdaQL은 고객 테이블을 조인합니다. 고객이 없는 주문도 결과에 나올 수 있는 조건이면 `left join`, 나올 수 없는 조건이면 inner `join`입니다. 고객이 없어도 조건이 참이 될 수 있는지가 그 기준입니다.
 아래 조건은 고객이 있는 주문에서만 참이므로 inner `join`이고, 고객이 없는 주문은 결과에 **없습니다**.
 
 <!-- region: SelectQueryTest.java#inner-join -->
@@ -338,18 +368,14 @@ null 가드(`o.getCustomer() == null || ...`)를 쓰면 고객이 없는 주문�
 
 "`where` 뒤"는 `qb.from(...)`과 `where(...)`로 얻은 쿼리(타입 `SelectQuery`)를 말합니다. 이 매뉴얼에서는 이를 **where 단계**라고 부릅니다. `where` 없이 `qb.from(...)` 바로 뒤에서도 이 함수들을 호출할 수 있습니다.
 
-`orderBy`, `limit`, `offset` 뒤의 쿼리 타입은 `OrderedSelectQuery`입니다. 여기의 결과 함수는 `toList()`, `toSet()`, `first()`뿐입니다. `one()`, `count()`, `exists()`는 여기서 컴파일되지 않습니다.
-이것은 의도된 것입니다. `limit(10).count()`는 "모든 행"으로도 "최대 10행"으로도 읽힐 수 있으므로 lambdaQL은 이를 허용하지 않습니다.
-
 아래 예제는 [예제 엔티티](#example-entities)를 사용하며 H2, MariaDB, Oracle에서 같은 결과를 냅니다.
 `price`는 `double`이므로 정렬에 `nulls` 부분이 없고, `Order`에는 enum `kind`가 있습니다.
 
 <a id="first"></a>
 ### `first()`
 
-`orderBy`가 없으면 "첫 행"은 id가 가장 작은 행입니다(규칙 S9). 그래서 항상 같은 행을 얻습니다.
-순서를 정하려면 먼저 `orderBy(...)`를 호출하십시오. 그러면 `first()`는 그 순서의 첫 행을 반환합니다. `offset`은 유지됩니다: `orderBy(...).offset(1).first()`는 두 번째 행을 반환합니다.
-맞는 행이 없으면 결과는 `Optional.empty()`입니다.
+첫 행 하나를 반환합니다.
+
 `asc(...)`는 클래스 `By`의 정렬 함수이며 `import static org.lambdaql.query.By.*;`로 가져옵니다([4.1](04-order-paging.md#41-one-lambda-for-the-whole-sort) 참고).
 
 <!-- region: ResultQueryTest.java#first -->
@@ -437,9 +463,7 @@ limit ?
 <a id="count-and-a-paged-screen"></a>
 ### `count()`와 페이징 화면
 
-`count()`는 조건에 맞는 행의 수를 반환합니다. where 단계에만 있으므로 `limit`과 `offset`이 결과를 바꿀 수 없습니다.
-
-페이징 화면에서는 where 단계의 쿼리를 변수에 담아 두십시오. 그 변수에서 `count()`를 호출해 전체 수를 얻습니다. 그다음 같은 변수에서 `orderBy(...).limit(...).toList()`를 호출해 페이지를 얻습니다.
+`count()`는 조건에 맞는 행의 수를 반환합니다.
 
 <!-- region: ResultQueryTest.java#count -->
 ```java
@@ -447,6 +471,8 @@ SelectQuery<Order> active = qb.from(Order.class).where(o -> o.isActive());
 long total = active.count();                                   // every matching row
 List<Order> page = active.orderBy(o -> desc(o.getPrice())).limit(2).toList();
 ```
+
+예제의 `active.count()`는 HQL `select count(e0) from Order e0 where e0.active = true`를 실행합니다.
 
 **데이터베이스별 SQL**
 
@@ -458,7 +484,30 @@ from orders o1_0
 where o1_0.active=true
 ```
 
-HQL은 `select count(e0) from Order e0 where e0.active = true`입니다. Hibernate는 `count(e0)`를 `select count(o1_0.id)`로 바꿉니다. 즉 id 열을 셉니다. count 쿼리에는 페이징이 없습니다.
+Hibernate는 `count(e0)`를 `select count(o1_0.id)`로 바꿉니다. 즉 id 열을 셉니다. count 쿼리에는 페이징이 없습니다.
+
+페이징 화면에서는 where 단계의 쿼리를 변수에 담아 두십시오. 그 변수에서 `count()`를 호출해 전체 수를 얻습니다. 그다음 같은 변수에서 `orderBy(...).limit(...).toList()`를 호출해 페이지를 얻습니다.
+
+**컬럼 지정.** `count(컬럼)`은 그 컬럼이 NULL이 아닌 행의 수를 반환합니다. `distinct()` 뒤에서는 서로 다른 값의 수를 반환합니다.
+
+<!-- region: CountColumnTest.java#count-column -->
+```java
+// rows whose description is not NULL
+SelectQuery<Order> orders = qb.from(Order.class);
+long described = orders.count(o -> o.getDescription());
+```
+
+<!-- region: CountColumnTest.java#count-distinct -->
+```java
+// the number of different customers that have an order
+SelectQuery<Order> orders = qb.from(Order.class);
+long customers = orders.distinct().count(o -> o.getCustomer().getId());
+```
+
+두 예제는 HQL `select count(e0.description) from Order e0`와 `select count(distinct e0.customer.id) from Order e0`를 실행합니다.
+컬럼 경로의 조인은 `select`와 같습니다.
+
+예제 코드: [`CountColumnTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/CountColumnTest.java)(`count-column`, `count-distinct`).
 
 <a id="exists"></a>
 ### `exists()`

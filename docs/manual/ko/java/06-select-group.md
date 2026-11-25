@@ -364,7 +364,7 @@ order by o1_0.price desc
 - `@Lob` 컬럼을 `distinct`나 `groupBy` 키로 쓰면 Oracle은 거부합니다(ORA-22848, ORA-22849). H2와 MariaDB는 실행합니다. lambdaQL은 쿼리를 바꾸지 않고 `LQL-5010`을 `DEBUG` 수준으로 기록합니다([4.5](04-order-paging.md#45-what-a-sort-key-can-be) 참고).
 
 **페이징.** `limit`과 `offset`은 [4. 정렬과 페이징](04-order-paging.md)과 같게 동작합니다.
-페이징을 쓰면 lambdaQL이 마지막 정렬 키로 `id`를 더하므로 페이지가 겹치지 않습니다(규칙 S9). 정렬 키가 유일하고 NULL이 될 수 없는 컬럼이면 더하지 않습니다([4.8](04-order-paging.md#tie-breaker-automatic-id) 참고).
+페이징을 쓰면 lambdaQL이 마지막 정렬 키로 `id`를 더하므로 페이지가 겹치지 않습니다. 정렬 키가 유일하고 NULL이 될 수 없는 컬럼이면 더하지 않습니다([4.8](04-order-paging.md#tie-breaker-automatic-id) 참고).
 `first()`도 한 행만 읽으므로 같은 보조 정렬을 더합니다. 정렬 키 값이 같은 행이 여러 개이면 매번 `id`가 가장 작은 행의 값을 반환합니다.
 그룹 쿼리와 `distinct` 쿼리에는 더하지 않습니다. 이 쿼리들의 select 목록에는 `id`가 없기 때문입니다.
 
@@ -484,7 +484,7 @@ assertEquals("select e0.id, e1.name from Order e0 left join Customer e1 on e0.cu
 
 <!-- region: JoinQueryTest.java#three -->
 ```java
-// orders of a customer with an item of quantity > 10; an order repeats once per matching item
+// orders of a customer with an item of quantity > 10 (an order with two such items is two SQL rows)
 SelectJoin3Query<Order, Customer, Item> q = qb.from(Order.class)
         .join(Customer.class, (o, c) -> o.getCustomer().getId() == c.getId())
         .join(Item.class, (o, c, i) -> i.getOrder().getId() == o.getId())
@@ -494,8 +494,8 @@ assertEquals("select e0 from Order e0 join Customer e1 on e0.customer.id = e1.id
 ```
 
 > [!WARNING]
-> 조인 조건에 맞는 행이 여러 개이면 **주 엔티티의 행이 반복됩니다**. 짝 하나마다 한 번씩입니다. `toList()`와 `count()`는 반복된 행을 모두 셉니다.
-> 주문마다 한 번만 필요하면 조인 대신 `exists()` 서브쿼리([5. 서브쿼리](05-subquery.md))를 사용하거나, 조인 쿼리에 `distinct()`를 적용하십시오([조인 결과의 `distinct()`](#distinct-on-a-join) 참고).
+> 조인 조건에 맞는 행이 여러 개이면 SQL에서는 **주 엔티티의 행이 짝마다 반복됩니다**. `toList()`와 `toSet()`은 Hibernate가 같은 엔티티를 한 번만 돌려주므로 반복이 없습니다.
+> 하지만 `count()`와 `limit`은 반복된 SQL 행을 셉니다. 주문 수를 세거나 페이지를 정확히 채우려면 조인 대신 `exists()` 서브쿼리([5. 서브쿼리](05-subquery.md))를 사용하거나, 조인 쿼리에 `distinct()`를 적용하십시오([조인 결과의 `distinct()`](#distinct-on-a-join) 참고).
 
 <a id="cross-join"></a>
 ### cross join
@@ -517,11 +517,11 @@ lambdaQL에는 `from(Order.class, Customer.class)`(콤마 조인)가 없습니�
 <a id="paging"></a>
 ### 페이징
 
-페이징하면 lambdaQL은 **모든** 엔티티의 id를 마지막 정렬 키로 덧붙입니다. 그래서 페이지가 겹치지 않습니다(규칙 S9).
+페이징하면 lambdaQL은 **모든** 엔티티의 id를 마지막 정렬 키로 덧붙입니다. 그래서 페이지가 겹치지 않습니다.
 
 <!-- region: JoinQueryTest.java#cross-join-paging -->
 ```java
-// with paging, the id of every entity is added to the order, so pages never overlap (S9)
+// with paging, the id of every entity is added to the order, so pages never overlap
 ValueQuery<Row> pairs = qb.from(Order.class)
         .crossJoin(Customer.class)
         .orderBy((o, c) -> desc(o.getPrice()))
@@ -533,7 +533,8 @@ assertEquals("select e0.id, e1.name from Order e0 cross join Customer e1 order b
 <a id="distinct-on-a-join"></a>
 ### 조인 결과의 `distinct()`
 
-`SelectJoinQuery.distinct()`와 `SelectJoin3Query.distinct()`는 조인 때문에 반복되는 주 엔티티의 행을 한 번만 돌려줍니다. HQL은 `select distinct e0`이고, `count()`는 `count(distinct e0)`입니다.
+`SelectJoinQuery.distinct()`와 `SelectJoin3Query.distinct()`는 주 엔티티의 행마다 SQL 행을 하나로 만듭니다. HQL은 `select distinct e0`이고, `count()`는 `count(distinct e0)`입니다.
+`toList()`와 `toSet()`은 `distinct()` 없이도 주 엔티티를 한 번씩 돌려줍니다. `count()`와 `limit`이 주 엔티티 수를 세게 하려면 `distinct()`가 필요합니다.
 
 - 정렬 키는 주 엔티티 자신의 컬럼이어야 합니다(J7, `LQL-3046`). 조인한 엔티티의 컬럼이나 연관 경로로 정렬하면 오류입니다.
 - 페이징하면 주 엔티티의 id만 동순위 키로 덧붙입니다. 조인한 엔티티의 id는 붙이지 않습니다.
@@ -542,7 +543,7 @@ assertEquals("select e0.id, e1.name from Order e0 cross join Customer e1 order b
 
 <!-- region: JoinQueryTest.java#join-distinct -->
 ```java
-// an order with two matching items would come twice; distinct() returns it once
+// an order with two matching items is two SQL rows; distinct() makes it one row in SQL
 SelectJoinQuery<Order, Item> q = qb.from(Order.class)
         .join(Item.class, (o, i) -> i.getOrder().getId() == o.getId())
         .where((o, i) -> i.getQty() > 0)
@@ -552,6 +553,22 @@ assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.
 OrderedJoinQuery<Order, Item> sorted = q.orderBy((o, i) -> desc(o.getPrice()));
 assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.id where e1.qty > 0"
         + " order by e0.price desc", sorted.toHql().hql());
+```
+
+`distinct()` 없이 `toSet()`을 쓰면 조인한 엔티티의 컬럼으로도 정렬할 수 있습니다. 다만 `count()`는 SQL 행을 셉니다.
+
+<!-- region: JoinQueryTest.java#join-set -->
+```java
+SelectJoinQuery<Order, Item> joined = qb.from(Order.class)
+        .join(Item.class, (o, i) -> i.getOrder().getId() == o.getId());
+// the order with two items is two SQL rows, but Hibernate returns it once: toList() and toSet() have no repeats
+SequencedSet<Order> orders = joined.orderBy((o, i) -> desc(i.getQty()).asc(o.getId())).toSet();
+// count() and limit count the SQL rows; distinct() makes them count the orders
+long rows = joined.count();
+long distinctOrders = qb.from(Order.class)
+        .join(Item.class, (o, i) -> i.getOrder().getId() == o.getId())
+        .distinct()
+        .count();
 ```
 
 <a id="join-a-derived-table-or-cte"></a>
@@ -619,7 +636,7 @@ assertEquals("with t as (select d0.customer.id as customerId, sum(d0.price) as t
 지원하지 않는 것: insert의 조인, 엔티티 4개 이상, `SortSpec`의 조인 형태.
 update와 delete의 조인은 추가하지 않기로 했습니다. 연관 경로(U9)나 `sub`를 쓰십시오.
 
-예제 코드: [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)(`join`, `left-join`, `sort`, `select`, `three`, `cross-join`, `cross-join-paging`, `join-distinct`, `join-cte`, `join-derived`, `cte-reuse`).
+예제 코드: [`JoinQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java)(`join`, `left-join`, `sort`, `select`, `three`, `cross-join`, `cross-join-paging`, `join-distinct`, `join-set`, `join-cte`, `join-derived`, `cte-reuse`).
 
 ---
 

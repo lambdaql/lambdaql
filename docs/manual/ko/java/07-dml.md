@@ -349,7 +349,7 @@ int deleted = d.execute();
 
 | 항목 | 규칙 |
 |---|---|
-| 순서 | `orderBy` 키 다음에 id(규칙 S9). `orderBy`가 없으면 id 순서 |
+| 순서 | `orderBy` 키 다음에 id. `orderBy`가 없으면 id 순서 |
 | `limit` 없는 `orderBy` | 오류(`IllegalStateException`) |
 | 렌더링 | `e0.id in (select t.id from (select x0.id as id from X x0 ... order by ... limit n) t)` |
 | 대상 행 | 안쪽 select가 조인을 포함해 조회 규칙을 따르므로 조회와 같은 행 |

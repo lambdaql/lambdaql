@@ -31,13 +31,12 @@ Spring Data JPA에서는 리포지토리 인터페이스를 작성합니다. lam
 | `lambdaql-spring-data-jpa` | `LambdaQlExecutor<T>`, Spring Data 등록, Spring Boot 자동 구성(`QueryBuilder` 빈). Spring Data JPA 3.5·4.1 공통. Spring Data JPA는 프로젝트의 것을 씀 | Spring Boot 없이 Spring Data JPA를 사용할 때 |
 | `lambdaql-spring-boot-starter-boot4`, `lambdaql-spring-boot-starter-boot3` | 코드 없음. `lambdaql-spring-data-jpa`와 그 Boot 버전의 `spring-boot-starter-data-jpa`를 가져옴 | Spring Boot를 사용할 때(프로젝트의 Boot 버전에 맞춤) |
 
-아티팩트는 **아직 Maven Central에 배포되지 않았습니다**. 먼저 소스에서 빌드하여 로컬 Maven 저장소에 배포하십시오([2. 시작하기](02-getting-started.md#build-from-source) 참고). 버전은 `0.0.1`입니다.
+아티팩트는 Maven Central에 있습니다(groupId `io.github.lambdaql`, 버전 `0.0.1`).
 
 Spring Boot 4에서 사용할 때의 Gradle(Kotlin DSL). Spring Boot 3이면 이름 끝을 `-boot3`으로 바꾸십시오:
 
 ```gradle-kts
 repositories {
-    mavenLocal()
     mavenCentral()
 }
 
@@ -186,7 +185,7 @@ interface KtMemberRepository : JpaRepository<Member, Long>, LambdaQlExecutor<Mem
 
 짧은 메서드는 `query()`에 결과 함수를 붙인 형태와 같습니다. `findAll(w)`는 `query().where(w).toList()`, `findSet(w)`는 `query().where(w).toSet()`, `findFirst(w)`는 `query().where(w).first()`, `findOne(w)`는 `query().where(w).one()`에 해당합니다. 결과 함수는 [결과 가져오기](02-getting-started.md#getting-the-result)에서 설명합니다.
 `findAll { ... }`와 `count { ... }`는 인자 타입이 다르므로 `JpaRepository`의 `findAll(Sort)`, `findAll(Example)`, `count()`와 충돌하지 않습니다.
-메서드는 Java `Optional`을 반환합니다. nullable 값이 필요하면 `.orElse(null)`을 사용하십시오.
+메서드는 Java `Optional`을 반환합니다.
 
 **`query()`: 전체 쿼리.** 12.3의 `topGraded`가 이 메서드를 사용합니다.
 

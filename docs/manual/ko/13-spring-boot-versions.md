@@ -30,7 +30,7 @@ lambdaQL은 Spring Boot 3(Hibernate 6.6)과 Spring Boot 4(Hibernate 7.4)를 함�
 <a id="132-dependencies"></a>
 ## 13.2 의존성 추가
 
-아티팩트는 **아직 Maven Central에 배포되지 않았습니다**. 먼저 소스에서 빌드하여 로컬 Maven 저장소에 배포하십시오.
+아티팩트는 Maven Central에 있습니다(groupId `io.github.lambdaql`).
 
 Spring Boot 4, Gradle(Groovy DSL):
 

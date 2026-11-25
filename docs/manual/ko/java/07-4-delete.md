@@ -136,7 +136,7 @@ assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where
 많은 행을 작은 단위로 나누어 처리할 때 사용합니다.
 
 - `orderBy`가 없으면 id 순서입니다.
-- lambdaQL은 id를 마지막 정렬 키로 추가하므로 순서가 항상 같습니다(규칙 S9, [동순위 처리](04-order-paging.md#tie-breaker-automatic-id) 참고).
+- lambdaQL은 id를 마지막 정렬 키로 추가하므로 순서가 항상 같습니다([동순위 처리](04-order-paging.md#tie-breaker-automatic-id) 참고).
 - `orderBy`에는 조회와 마찬가지로 정렬 람다 표현식이나 `SortSpec`을 지정합니다([4. 정렬과 페이징](04-order-paging.md) 참고).
 - `limit` 없는 `orderBy`는 오류(`IllegalStateException`)입니다. 이 경우 순서가 아무 역할을 하지 않기 때문입니다.
 

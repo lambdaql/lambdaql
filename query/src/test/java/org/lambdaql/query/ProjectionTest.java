@@ -196,7 +196,7 @@ class ProjectionTest {
                 .thenComparing(Order::getId)).map(Order::getPrice).toList();
         assertEquals(sorted.get(0), q.first().orElseThrow());
         assertEquals(sorted.subList(1, 3), q.limit(2).offset(1).toList());
-        // paging adds the id tie-breaker (S9), so the pages do not overlap
+        // paging adds the id tie-breaker, so the pages do not overlap
         assertTrue(q.toHql().hql().endsWith("order by e0.price desc, e0.id asc"), q.toHql().hql());
         // first() reads one row, so it gets the same tie-breaker: of two orders with price 150, always the smaller id
         ch.qos.logback.classic.Logger sql = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger("org.hibernate.SQL");

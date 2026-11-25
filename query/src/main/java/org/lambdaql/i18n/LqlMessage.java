@@ -329,6 +329,9 @@ public enum LqlMessage {
     /** LQL-3069: With a Direction argument, the sort lambda must be one key, not the functions of By: write orderBy(o -> sort(o.getPrice(), direction)) instead. */
     SORT_KEYS_WITH_DIRECTION("LQL-3069", 0),
 
+    /** LQL-3070: The lambda of count(column) must give one value of the entity, such as o -> o.getDescription(); not a constructor or an Agg function. */
+    COUNT_COLUMN_NOT_VALUE("LQL-3070", 0),
+
     /** LQL-4001: limit and the one-row protection are not supported yet for an entity with a composite key: &#123;0&#125; */
     COMPOSITE_KEY_LIMIT("LQL-4001", 1),
 
@@ -383,7 +386,7 @@ public enum LqlMessage {
     /** LQL-4018: upsert of an entity with a composite key needs onConflict(key): &#123;0&#125; */
     UPSERT_COMPOSITE_KEY("LQL-4018", 1),
 
-    /** LQL-4019: toSet/findSet: &#123;0&#125; rows became &#123;1&#125; elements in the set. The entity equals/hashCode treats different rows as equal, or the &#64;Id is not unique. Use toList(). */
+    /** LQL-4019: toSet/findSet: &#123;0&#125; different rows became &#123;1&#125; elements in the set. The entity equals/hashCode treats different rows as equal. Use toList(). */
     SET_SIZE_MISMATCH("LQL-4019", 2),
 
     /** LQL-4020: The result constructor was not found: &#123;0&#125; */

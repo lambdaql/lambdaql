@@ -127,16 +127,15 @@ public class OrderedSelectQuery<T> {
 
     /**
      * Runs the query and returns the rows as a set that keeps the row order ({@link LinkedHashSet}).
-     * Entity rows never repeat (lambdaQL joins only to-one associations), so the set has the same rows as
-     * {@link #toList()}.
+     * The set has the same rows as {@link #toList()}: Hibernate returns each entity once, also after an explicit join,
+     * and a repeated object would keep its first place (D68).
      *
      * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
      * {@snippet class="org.lambdaql.query.ResultQueryTest" region="to-set"}
      *
      * @return the rows in order
-     * @throws IllegalStateException if the set is smaller than the number of rows: then the entity's
-     *                               {@code equals}/{@code hashCode} treat different rows as equal, or its {@code @Id} is
-     *                               not unique (for example a view), and rows would be lost without a sign
+     * @throws IllegalStateException if the entity's {@code equals}/{@code hashCode} treat two different rows as equal:
+     *                               one of them would be lost without a sign
      */
     public SequencedSet<T> toSet() {
         return DmlParts.toSet(toList());

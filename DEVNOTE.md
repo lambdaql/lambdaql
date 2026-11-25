@@ -57,7 +57,7 @@ Boot BOM은 모듈의 `gradle.properties`의 `lql.springBoot`로 고른다(루�
 
 테스트: 세 DB(H2 2.3.230, MariaDB 10.11.18, Oracle Free 23.26.3)에서 모듈 전체 통과(2026-11-19 실측). `main` 241개. `feature/unified-boot`는 다섯 DB(H2·MariaDB·Oracle·PostgreSQL·MySQL)에서 Boot 라인마다 250개, `test`(Boot 4, JDK 21) 250개, `testBoot3`(Boot 3, JDK 21) 250개, `testClassFile`(Boot 4, JDK 25) 250개(2026-11-23). 건너뜀은 DB별 H2 16·MariaDB 10·Oracle 9. Kotlin 람다 테스트는 `query/src/test/kotlin`에 별도 소스 세트로 있다.
 
-아직 Maven Central에 배포하지 않았다. 버전은 `gradle.properties`의 `0.0.1`(2026-11-24 1.0.0에서 변경).
+0.0.1을 Maven Central에 배포했다(2026-11-24, `io.github.lambdaql`). 버전은 `gradle.properties`의 값이다.
 
 ---
 
@@ -162,7 +162,7 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 | 네임스페이스 | Central Portal의 `io.github.lambdaql`. GitHub 조직 인증은 포털이 준 키 이름으로 `github.com/lambdaql`에 공개 저장소를 만들어 확인 | 인증 완료(2026-11-24, 작성자) |
 | 사용자 토큰 | central.sonatype.com > Account > Generate User Token. 저장소 Secrets `CENTRAL_USERNAME`, `CENTRAL_PASSWORD`. 이 PC는 `~/.gradle/gradle.properties`의 `centralUsername`, `centralPassword` | 이 PC 등록, 인증 확인(읽기 API 200). Secrets 미등록 |
 | GPG 키 | ed25519 `F48A35D85635ED69`(작성자 생성, 2026-11-24), keyserver.ubuntu.com과 keys.openpgp.org(이메일 인증)에 공개 키 등록. `gpg --send-keys`는 실패를 알리지 않으므로 Ubuntu는 `/pks/add`로 올리고 조회 결과의 본문까지 확인할 것(상태 200에 "Not Found" 본문이 옴). 이 PC는 `signing.gnupg.keyName`으로 로컬 gpg가 서명. Secrets `SIGNING_KEY`(`gpg --armor --export-secret-keys F48A35D85635ED69`), `SIGNING_PASSWORD` | 공개 키 등록 완료. 이 PC는 pinentry-mac. Secrets 미등록 |
-| 실행 | Actions > Publish to Maven Central > Run workflow(branch: `main`), 또는 이 PC에서 `main` 커밋으로 `./gradlew centralUpload`. 기본 `USER_MANAGED`는 검증 뒤 포털의 Publish 버튼을 기다림 | 0.0.1을 이 PC에서 업로드(커밋 `e369749`), 배포 `2741a474-e91e-42a2-9000-e430f364303e` 검증 통과(VALIDATED, 2026-11-24). 앞선 두 번은 공개 키를 찾지 못해 실패 후 삭제. Publish 대기 |
+| 실행 | Actions > Publish to Maven Central > Run workflow(branch: `main`), 또는 이 PC에서 `main` 커밋으로 `./gradlew centralUpload`. 기본 `USER_MANAGED`는 검증 뒤 포털의 Publish 버튼을 기다림 | 0.0.1을 이 PC에서 업로드(커밋 `e369749`), 배포 `2741a474-e91e-42a2-9000-e430f364303e` 검증 통과(VALIDATED, 2026-11-24). 앞선 두 번은 공개 키를 찾지 못해 실패 후 삭제. Publish 후 2026-11-24 19:34 PUBLISHED, repo1.maven.org에서 네 모듈 확인 |
 
 빌드 작업:
 
@@ -305,6 +305,8 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 | 정렬 API(`By.asc/desc/sort`, `Nulls`, `SortKeys`) | 2026-11-24 구현, H2 테스트 | 예 | D59 |
 | 텍스트 일치(`startsWith`, `endsWith`, `contains`를 `like ... escape '!'`로, Kotlin `ignoreCase`) | 2026-11-24 구현, H2 테스트 | 예(`KotlinLikeTest`) | D60 |
 | 값을 고르는 조건: 캡처 값만이면 바인드 파라미터, 엔티티 값이면 `case when`(where 비교, select, groupBy, 정렬 키, set 값) | 2026-11-24 구현(CASE WHEN 1단계), H2 테스트. 다른 DB SQL 답안 미검증 | 예(`KotlinCaseWhenTest`, `KotlinRegressionTest`) | D61, D62 |
+| 결과 함수 `count(컬럼)`, 엔티티 쿼리의 `distinct()`(`distinct().count(컬럼)`은 `count(distinct x)`) | 2026-11-25 구현, H2 테스트 | 예(`KotlinCountColumnTest`) | D67 |
+| `toSet()` 크기 검사를 서로 다른 객체 수 기준으로(조인 반복은 하나로, `equals` 충돌만 예외). 조인 쿼리의 `count()`·`limit`은 SQL 행 기준 | 2026-11-25 구현, H2 테스트 | 예(`KotlinQueryTest`) | D68 |
 | 분석 캐시(EntityManagerFactory별 공유) | 구현됨 | – | D47 |
 | Spring Data JPA 모듈(`LambdaQlExecutor<T>`, `Sort`, `Pageable`, DML 단축 메서드, 자동 구성) | 구현됨, 다섯 DB·Spring Boot 3.5.16·4.1.2 테스트. DML에는 호출자 트랜잭션 필요 | 예(`spring-data-jpa/src/test/kotlin`, 2026-11-23) | D34, D39, M12 |
 

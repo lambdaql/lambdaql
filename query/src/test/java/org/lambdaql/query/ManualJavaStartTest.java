@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.orm.jpa.SharedEntityManagerCreator;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Repository;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,7 +35,7 @@ class ManualJavaStartTest {
     private EntityManagerFactory emf;
 
     @Autowired
-    private OrderService orderService;
+    private OrderRepository orderRepository;
 
     private QueryBuilder qb;
     private List<Order> all;
@@ -106,13 +106,13 @@ class ManualJavaStartTest {
     }
     // @end
 
-    // @start region="service"
-    @Service
-    public static class OrderService {
+    // @start region="repository"
+    @Repository
+    public static class OrderRepository {
 
         private final QueryBuilder qb;
 
-        public OrderService(QueryBuilder qb) {
+        public OrderRepository(QueryBuilder qb) {
             this.qb = qb;
         }
 
@@ -126,8 +126,8 @@ class ManualJavaStartTest {
     // @end
 
     @Test
-    void serviceUsesTheBean() {
-        assertEquals(javaIds(Order::isActive), ids(orderService.activeOrders()));
+    void repositoryUsesTheBean() {
+        assertEquals(javaIds(Order::isActive), ids(orderRepository.activeOrders()));
     }
 
     @Test
@@ -201,7 +201,7 @@ class ManualJavaStartTest {
     /** Minimal Spring context: the datasource chosen by application-test.yaml, the test entities, and the manual's beans. */
     @EnableAutoConfiguration
     @AutoConfigurationPackage(basePackages = "org.lambdaql.query")
-    @Import({LambdaQlConfig.class, OrderService.class})
+    @Import({LambdaQlConfig.class, OrderRepository.class})
     static class Context {
     }
 }

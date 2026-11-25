@@ -272,7 +272,7 @@ where o1_0.id=(select o2_0.id from orders o2_0 where o2_0.customer_id=o1_0.custo
 ```
 
 서브쿼리 안의 정렬도 바깥 쿼리와 같이 `By`의 정렬 함수를 씁니다: `orderBy(x -> desc(x.getPrice()))`([4.1](04-order-paging.md#41-one-lambda-for-the-whole-sort) 참고).
-lambdaQL은 마지막 정렬 키로 `id`(`s1.id asc`)를 더하므로 맨 위 행이 항상 같습니다(규칙 S9).
+lambdaQL은 마지막 정렬 키로 `id`(`s1.id asc`)를 더하므로 맨 위 행이 항상 같습니다.
 상관 조건은 고객 엔티티가 아니라 외래 키(`getCustomer().getId()`)를 비교합니다. [5.10](#510-paths-and-null-inside-subqueries)을 참고하십시오.
 
 집계의 NULL은 SQL을 따릅니다. `sum`, `avg`, `min`, `max`는 행이 없으면 NULL을 줍니다. `count`는 0을 줍니다.

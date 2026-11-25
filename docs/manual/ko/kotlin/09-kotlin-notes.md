@@ -48,7 +48,7 @@ lambdaQL은 **같은 엔진**과 같은 API로 Kotlin과 Java를 지원합니다
 | 컴파일러 옵션 | 기본값 `-Xsam-conversions=indy`를 유지. `-Xsam-conversions=class`는 사용하지 **마십시오**(KC1) |
 | `-jvm-target` | 1.8, 11, 17, 21 모두 동작 |
 | Kotlin 런타임 | lambdaQL은 의존성에 `kotlin-stdlib`나 `kotlin-reflect`를 추가하지 않음 |
-| JPA 엔티티 | 일반적인 Kotlin JPA 엔티티(필드에 붙인 어노테이션도 괜찮음). `kotlin("plugin.jpa")`와 all-open 플러그인을 사용 |
+| JPA 엔티티 | 일반적인 Kotlin JPA 엔티티(필드에 붙인 어노테이션도 괜찮음) |
 
 자세한 내용: [2. 시작하기](02-getting-started.md#kotlin-compiler-settings).
 

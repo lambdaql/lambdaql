@@ -120,6 +120,48 @@ kotlin {
 Kotlin 트랙의 예제는 다음 **예제 엔티티**를 사용합니다.
 예제 엔티티는 Java 클래스입니다([`query/src/test/java/org/lambdaql/query/`](https://github.com/codebit0/lambdaql/tree/main/query/src/test/java/org/lambdaql/query)). Kotlin 예제는 사용자 프로젝트가 컴파일된 엔티티를 쓰는 것과 같은 방식으로 이 클래스를 사용합니다.
 
+다음 다이어그램은 예제 엔티티와 연관을 보여 줍니다.
+
+```mermaid
+classDiagram
+    direction LR
+    class Order {
+        Long id
+        double price
+        short status
+        boolean active
+        String description
+        Kind kind
+        LocalDateTime updateAt
+        Double total
+        Integer cnt
+        String custName
+    }
+    class Customer {
+        int id
+        String name
+        Integer grade
+    }
+    class Item {
+        Long id
+        Double price
+        int qty
+    }
+    class Address {
+        <<Embeddable>>
+        String city
+        String zip
+    }
+    class Coded {
+        Long id
+        String code
+        Boolean vip
+    }
+    Customer "0..1" -- "*" Order : customer / orders
+    Order "0..1" <-- "*" Item : order
+    Order *-- Address : address
+```
+
 | 엔티티 | 주요 속성(Java 타입) | Kotlin에서 |
 |---|---|---|
 | `Order`(테이블 `orders`) | `Long id`, `double price`, `short status`, `boolean active`, `String description`, `Integer cnt`, `String custName`, `LocalDateTime updateAt`, `Kind kind`(enum `NORMAL`, `RUSH`), `Customer customer`(`@ManyToOne`), `Address address`(`@Embedded`) | `it.price`, `it.status`, `it.isActive`, `it.cnt`, `it.customer?.name` |
@@ -155,18 +197,13 @@ val qb = QueryBuilder(emf)
 
 `emf`는 애플리케이션의 `EntityManagerFactory`입니다.
 
-`QueryBuilder`는 하나만 만들어 재사용하십시오. 쿼리마다 새로 만들지 마십시오.
-
-<a id="with-plain-jpa"></a>
-### 일반 JPA에서
-
-Spring 없이 JPA만 사용하면 `Persistence.createEntityManagerFactory("영속성 유닛 이름")`으로 만든 `EntityManagerFactory`를 `QueryBuilder` 생성자에 넘기십시오.
+`QueryBuilder`를 쿼리마다 만들지 않고 하나만 만들어 재사용하십시오.
 
 <a id="with-spring-boot"></a>
 ### Spring Boot에서
 
 `lambdaql-spring-boot-starter-boot4`(`-boot3`)를 사용하면 Spring Boot가 `QueryBuilder` 빈을 만듭니다([12.8](12-spring-data-jpa.md#128-the-querybuilder-bean) 참고).
-스타터 없이 사용하면 빈을 직접 만드십시오. 자동 구성과 마찬가지로 Spring의 공유 `EntityManager`를 사용합니다.
+스타터 없이 사용하려면 아래 예시처럼 빈을 선언하십시오.
 
 <!-- region: ManualKotlinStartTest.kt#spring-config -->
 ```kotlin
@@ -179,13 +216,12 @@ class LambdaQlConfig {
 }
 ```
 
-그다음 필요한 곳에 `QueryBuilder`를 주입합니다.
+그다음 리포지토리에 `QueryBuilder`를 주입합니다.
 
-<!-- region: ManualKotlinStartTest.kt#spring-service -->
+<!-- region: ManualKotlinStartTest.kt#spring-repository -->
 ```kotlin
-// open: this build has no kotlin("plugin.spring"), and @Transactional needs a proxy
-@Service
-open class OrderService(private val qb: QueryBuilder) {
+@Repository
+open class OrderRepository(private val qb: QueryBuilder) {
 
     @Transactional(readOnly = true)
     open fun activeOrders(): List<Order> =
@@ -195,13 +231,10 @@ open class OrderService(private val qb: QueryBuilder) {
 }
 ```
 
-`kotlin("plugin.spring")`을 쓰지 않는 프로젝트에서는 `@Transactional` 프록시를 위해 클래스와 메서드를 `open`으로 선언하십시오. 플러그인을 쓰는 프로젝트에서는 `open`이 필요 없습니다.
-
 - 공유 `EntityManager`는 현재 트랜잭션에 연결됩니다. `@Transactional` 안에서 lambdaQL은 같은 트랜잭션으로 실행됩니다.
-- Spring 애플리케이션에서는 `EntityManagerFactory` 생성자를 사용하지 마십시오. 이 생성자로 만든 빌더는 쿼리마다 자체 `EntityManager`를 열며, 이 `EntityManager`는 Spring 트랜잭션에 참여하지 않습니다.
 - Spring Data 리포지토리 안에서 lambdaQL 쿼리를 작성하려면 [12. Spring Data JPA](12-spring-data-jpa.md)를 참고하십시오.
 
-예제 코드: [`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)(`create`, `spring-config`, `spring-service`).
+예제 코드: [`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)(`create`, `spring-config`, `spring-repository`).
 
 <a id="your-first-query"></a>
 ## 첫 쿼리
@@ -230,9 +263,9 @@ where o1_0.status=1 and o1_0.price>100.0
 - `toList()`는 모든 행을 반환합니다. 다른 결과 함수(`first()`, `one()`, `count()`, `exists()`, `toSet()`)는 [결과 가져오기](#getting-the-result)에 있습니다.
 
 `it.status.toInt()`는 `status`가 `Short`라서 쓴 것입니다([예제 엔티티](#example-entities) 참고). lambdaQL은 이 변환을 무시합니다.
-Kotlin 엔티티의 nullable 속성(`Double?`)이라면 `it.price!! > 100.0`처럼 `!!`가 있어야 컴파일됩니다. lambdaQL은 `!!`를 **무시합니다**. 값이 NULL인 행은 그냥 반환되지 않습니다(SQL 의미, [3.3](03-where.md#33-basic-form) 참고).
 
-왜 `1`과 `100.0`은 바인드 파라미터가 아니라 HQL에 그대로 쓰일까요? 둘 다 **람다 표현식에 직접 쓴 상수**이기 때문입니다. lambdaQL은 상수(숫자, 문자열, boolean, `null`, enum 상수, `const val`)를 HQL에 리터럴로 씁니다. 람다 표현식 밖에서 온 값은 다릅니다. 항상 바인드 파라미터가 됩니다(다음 절과 [3.3](03-where.md#33-basic-form) 참고).
+람다 표현식에 직접 쓴 `1`과 `100.0` 같은 상수는 HQL에 직접 기록합니다. 숫자, 문자열, boolean, `null`, enum 상수, `const val`이 이에 해당합니다.
+람다 표현식 밖에서 온 값은 바인드 파라미터가 됩니다(다음 절과 [3.3](03-where.md#33-basic-form) 참고).
 
 <a id="use-values-from-outside-the-lambda"></a>
 ### 람다 표현식 밖의 값 사용하기
@@ -298,11 +331,11 @@ val orders = query.toList()
 ```
 
 <a id="paths-to-other-entities"></a>
-### 다른 엔티티로 가는 경로
+### 연관 엔티티
 
 `it.customer?.name` 같은 경로는 조인한 엔티티의 컬럼을 가리킵니다.
-`where`에서 lambdaQL은 고객 테이블을 조인합니다. 고객이 없는 주문이 조건에 맞을 수 있으면 `left join`, 맞을 수 없으면 inner `join`입니다.
-아래 예제는 고객이 없는 주문이 조건에 맞을 수 없으므로 inner `join`이고, 고객이 없는 주문은 결과에 **없습니다**.
+`where`에서 lambdaQL은 고객 테이블을 조인합니다. 고객이 없는 주문도 결과에 나올 수 있는 조건이면 `left join`, 나올 수 없는 조건이면 inner `join`입니다. 고객이 없어도 조건이 참이 될 수 있는지가 그 기준입니다.
+아래 조건은 고객이 있는 주문에서만 참이므로 inner `join`이고, 고객이 없는 주문은 결과에 **없습니다**.
 
 <!-- region: ManualKotlinStartTest.kt#join-path -->
 ```kotlin
@@ -324,10 +357,14 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.name=?
 ```
 
-`it.status == 1 || it.customer?.name == name`은 고객이 없어도 status가 1인 주문이 조건에 맞으므로 `left join`이고, 고객이 없는 주문도 반환합니다.
-`?.`로 쓴 `it.customer?.name == null`도 고객이 없는 주문에서 참이므로 `left join`입니다.
-`it.customer!!.name`처럼 `!!`로 써도 같은 규칙을 따릅니다. 다만 `!!`로 지난 비교는 고객이 있는 주문에서만 참이 됩니다.
-고객이 없는 주문만 찾으려면 연관을 비교하십시오. `it.customer == null`은 `e0.customer is null`이 됩니다(조인 없음). [3.10](03-where.md#310-association-paths)을 참고하십시오.
+다른 조건의 예입니다.
+
+- `it.status == 1 || it.customer?.name == name`: 고객이 없어도 `status`가 1이면 결과에 나오므로 `left join`입니다.
+- `it.customer?.name == null`: 고객이 없는 주문도 결과에 나오므로 `left join`입니다.
+- `it.customer!!.name == name`: 고객이 있는 주문만 결과에 나오므로 inner `join`입니다.
+
+고객이 없는 주문만 찾으려면 `it.customer == null`처럼 연관 자체를 비교하십시오. 조인 없이 `e0.customer is null`이 됩니다.
+자세한 규칙은 [3.10](03-where.md#310-association-paths)을 참고하십시오.
 
 예제 코드: [`ManualKotlinStartTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)(`first-query`, `captured`, `many-where`, `step-where`, `join-path`).
 
@@ -347,17 +384,12 @@ where c1_0.name=?
 
 "`where` 뒤"는 `qb.from(...)`과 `where { }`로 얻은 쿼리(타입 `SelectQuery`)를 말합니다. 이 매뉴얼에서는 이를 **where 단계**라고 부릅니다. `where` 없이 `qb.from(...)` 바로 뒤에서도 이 함수들을 호출할 수 있습니다.
 
-`orderBy`, `limit`, `offset` 뒤의 쿼리 타입은 `OrderedSelectQuery`입니다. 여기의 결과 함수는 `toList()`, `toSet()`, `first()`뿐입니다. `one()`, `count()`, `exists()`는 여기서 컴파일되지 않습니다.
-이것은 의도된 것입니다. `limit(10).count()`는 "모든 행"으로도 "최대 10행"으로도 읽힐 수 있으므로 lambdaQL은 이를 허용하지 않습니다.
-
-`first()`와 `one()`은 Java `Optional`을 반환합니다. Kotlin에서는 `.orElse(null)`로 nullable 값(`Order?`)으로 바꿀 수 있습니다.
+`first()`와 `one()`은 Java `Optional`을 반환합니다.
 
 <a id="first"></a>
 ### `first()`
 
-`orderBy`가 없으면 "첫 행"은 id가 가장 작은 행입니다(규칙 S9). 그래서 항상 같은 행을 얻습니다.
-순서를 정하려면 먼저 `orderBy { }`를 호출하십시오. 그러면 `first()`는 그 순서의 첫 행을 반환합니다. `offset`은 유지됩니다: `orderBy { ... }.offset(1).first()`는 두 번째 행을 반환합니다.
-맞는 행이 없으면 결과는 `Optional.empty()`입니다.
+첫 행 하나를 반환합니다.
 
 <!-- region: ManualKotlinStartTest.kt#first -->
 ```kotlin
@@ -435,9 +467,7 @@ limit ?
 <a id="count-and-a-paged-screen"></a>
 ### `count()`와 페이징 화면
 
-`count()`는 조건에 맞는 행의 수를 반환합니다. where 단계에만 있으므로 `limit`과 `offset`이 결과를 바꿀 수 없습니다.
-
-페이징 화면에서는 where 단계의 쿼리를 값에 담아 두십시오. 그 값에서 `count()`를 호출해 전체 수를 얻습니다. 그다음 같은 값에서 `orderBy { }.limit(...).toList()`를 호출해 페이지를 얻습니다.
+`count()`는 조건에 맞는 행의 수를 반환합니다.
 
 <!-- region: ManualKotlinStartTest.kt#count -->
 ```kotlin
@@ -448,7 +478,7 @@ assertEquals("select e0 from Order e0 where e0.active = true order by e0.price d
 val rows: List<Order> = page.toList()
 ```
 
-`count()`가 실행하는 HQL은 `select count(e0) from Order e0 where e0.active = true`입니다.
+예제의 `active.count()`는 HQL `select count(e0) from Order e0 where e0.active = true`를 실행합니다.
 
 **데이터베이스별 SQL**
 
@@ -461,6 +491,29 @@ where o1_0.active=true
 ```
 
 Hibernate는 `count(e0)`를 `select count(o1_0.id)`로 바꿉니다. 즉 id 열을 셉니다. count 쿼리에는 페이징이 없습니다.
+
+페이징 화면에서는 where 단계의 쿼리를 값에 담아 두십시오. 그 값에서 `count()`를 호출해 전체 수를 얻습니다. 그다음 같은 값에서 `orderBy { }.limit(...).toList()`를 호출해 페이지를 얻습니다.
+
+**컬럼 지정.** `count(컬럼)`은 그 컬럼이 NULL이 아닌 행의 수를 반환합니다. `distinct()` 뒤에서는 서로 다른 값의 수를 반환합니다.
+
+<!-- region: KotlinCountColumnTest.kt#count-column -->
+```kotlin
+// rows whose description is not NULL
+val orders = qb.from(Order::class.java)
+val described = orders.count { it.description }
+```
+
+<!-- region: KotlinCountColumnTest.kt#count-distinct -->
+```kotlin
+// the number of different customers that have an order
+val orders = qb.from(Order::class.java)
+val customers = orders.distinct().count { it.customer?.id }
+```
+
+두 예제는 HQL `select count(e0.description) from Order e0`와 `select count(distinct e0.customer.id) from Order e0`를 실행합니다.
+컬럼 경로의 조인은 `select`와 같습니다.
+
+예제 코드: [`KotlinCountColumnTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinCountColumnTest.kt)(`count-column`, `count-distinct`).
 
 <a id="exists"></a>
 ### `exists()`

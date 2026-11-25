@@ -398,7 +398,7 @@ val second = active.orderBy { o -> desc(o.price) }.offset(1).first()
 // code is @Column(unique = true, nullable = false): it orders every row, so paging adds no id tie-breaker
 assertEquals("select e0 from OrderLine e0 order by e0.code asc",
     qb.from(OrderLine::class.java).orderBy { l -> asc(l.code) }.limit(2).toHql().hql())
-// a key that is not unique still gets the id tie-breaker (S9)
+// a key that is not unique still gets the id tie-breaker
 assertEquals("select e0 from OrderLine e0 join e0.order j1 order by j1.price asc, e0.id asc",
     qb.from(OrderLine::class.java).orderBy { l -> asc(l.order.price) }.limit(2).toHql().hql())
 ```

@@ -17,6 +17,7 @@ import org.springframework.test.context.ActiveProfiles;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.SequencedSet;
 import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -149,7 +150,7 @@ class JoinQueryTest {
     @Test
     void threeEntities() {
         // @start region="three"
-        // orders of a customer with an item of quantity > 10; an order repeats once per matching item
+        // orders of a customer with an item of quantity > 10 (an order with two such items is two SQL rows)
         SelectJoin3Query<Order, Customer, Item> q = qb.from(Order.class)
                 .join(Customer.class, (o, c) -> o.getCustomer().getId() == c.getId())
                 .join(Item.class, (o, c, i) -> i.getOrder().getId() == o.getId())
@@ -185,7 +186,7 @@ class JoinQueryTest {
     @Test
     void distinctRows() {
         // @start region="join-distinct"
-        // an order with two matching items would come twice; distinct() returns it once
+        // an order with two matching items is two SQL rows; distinct() makes it one row in SQL
         SelectJoinQuery<Order, Item> q = qb.from(Order.class)
                 .join(Item.class, (o, i) -> i.getOrder().getId() == o.getId())
                 .where((o, i) -> i.getQty() > 0)
@@ -196,7 +197,10 @@ class JoinQueryTest {
         assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.id where e1.qty > 0"
                 + " order by e0.price desc", sorted.toHql().hql());
         // @end
+        SequencedSet<Order> set = sorted.toSet();
         List<Long> expected = items.stream().filter(i -> i[1] > 0).map(i -> i[0]).distinct().sorted().toList();
+        assertEquals(sorted.toList().stream().map(Order::getId).toList(), set.stream().map(Order::getId).toList());
+        assertEquals(expected, ids(new java.util.ArrayList<>(q.toSet())));
         assertEquals(expected, ids(q.toList()));
         assertEquals(expected.size(), q.count());
         assertEquals(orders.stream().filter(o -> expected.contains(o.getId()))
@@ -206,6 +210,27 @@ class JoinQueryTest {
         assertTrue(sorted.limit(1).toHql().hql().endsWith("order by e0.price desc, e0.id asc"));
         LambdaQLException j7 = assertThrows(LambdaQLException.class, () -> q.orderBy((o, i) -> desc(i.getQty())));
         assertEquals("LQL-3046", j7.code());
+    }
+
+    @Test
+    void joinSet() {
+        // @start region="join-set"
+        SelectJoinQuery<Order, Item> joined = qb.from(Order.class)
+                .join(Item.class, (o, i) -> i.getOrder().getId() == o.getId());
+        // the order with two items is two SQL rows, but Hibernate returns it once: toList() and toSet() have no repeats
+        SequencedSet<Order> orders = joined.orderBy((o, i) -> desc(i.getQty()).asc(o.getId())).toSet();
+        // count() and limit count the SQL rows; distinct() makes them count the orders
+        long rows = joined.count();
+        long distinctOrders = qb.from(Order.class)
+                .join(Item.class, (o, i) -> i.getOrder().getId() == o.getId())
+                .distinct()
+                .count();
+        // @end
+        List<Long> expected = items.stream().sorted((a, b) -> Long.compare(b[1], a[1])).map(i -> i[0]).distinct().toList();
+        assertEquals(expected, orders.stream().map(Order::getId).toList());
+        assertEquals(items.size(), rows);
+        assertEquals(items.stream().map(i -> i[0]).distinct().count(), distinctOrders);
+        assertTrue(rows > distinctOrders, "the join must repeat an order for this test");
     }
 
     @Test
@@ -282,7 +307,7 @@ class JoinQueryTest {
     @Test
     void crossJoinPaging() {
         // @start region="cross-join-paging"
-        // with paging, the id of every entity is added to the order, so pages never overlap (S9)
+        // with paging, the id of every entity is added to the order, so pages never overlap
         ValueQuery<Row> pairs = qb.from(Order.class)
                 .crossJoin(Customer.class)
                 .orderBy((o, c) -> desc(o.getPrice()))

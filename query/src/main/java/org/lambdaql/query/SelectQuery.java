@@ -186,6 +186,60 @@ public class SelectQuery<T> {
     }
 
     /**
+     * Counts the rows whose value of one column is not NULL: {@code select count(e0.description) from ...}.
+     * After {@link #distinct()} each different value is counted once: {@code count(distinct e0.customer.id)}.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/CountColumnTest.java">CountColumnTest</a>):
+     * {@snippet class="org.lambdaql.query.CountColumnTest" region="count-column"}
+     * {@snippet class="org.lambdaql.query.CountColumnTest" region="count-distinct"}
+     *
+     * @param column the column lambda, for example {@code o -> o.getDescription()} or {@code o -> o.getCustomer().getId()}
+     * @return the number of non-NULL values, or of different non-NULL values after {@link #distinct()}
+     * @throws org.lambdaql.LambdaAnalysisException if the lambda is not one value of the entity
+     */
+    public long count(Select<T, ?> column) {
+        return context.resultList(Long.class, countHql(column, distinct), 0, null).get(0);
+    }
+
+    /**
+     * Makes the query distinct: {@code count(column)} then counts each different value once
+     * ({@code count(distinct x)}), and the rows are read with {@code select distinct e0}. Without a join the rows
+     * of the entity are already different, so only {@code count(column)} changes.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/CountColumnTest.java">CountColumnTest</a>):
+     * {@snippet class="org.lambdaql.query.CountColumnTest" region="count-distinct"}
+     *
+     * @return this
+     */
+    public SelectQuery<T> distinct() {
+        this.distinct = true;
+        return this;
+    }
+
+    /**
+     * Builds the HQL used by {@link #count(Select)}. The column lambda is read like
+     * a {@code select} lambda and its value is put in {@code count(...)}, so paths join the same way as in
+     * {@code select}.
+     *
+     * @param column   the column lambda
+     * @param distinct {@code count(distinct x)} instead of {@code count(x)}
+     * @return {@code select count(x) from ...}
+     */
+    RenderedQuery countHql(Select<T, ?> column, boolean distinct) {
+        LambdaRef ref = QueryContext.read(column);
+        var projection = context.analyzeSelect(ref, List.of(entityClass));
+        if (projection.constructs() || projection.columns().size() != 1
+                || projection.columns().get(0) instanceof org.lambdaql.engine.ir.Expr.Aggregate) {
+            throw org.lambdaql.i18n.LqlMessage.COUNT_COLUMN_NOT_VALUE.exceptionAt(ref.describe());
+        }
+        var fn = distinct ? org.lambdaql.engine.ir.Expr.Aggregate.Fn.COUNT_DISTINCT : org.lambdaql.engine.ir.Expr.Aggregate.Fn.COUNT;
+        var counted = new org.lambdaql.engine.sem.SelectReader.Projection(
+                List.of(new org.lambdaql.engine.ir.Expr.Aggregate(fn, projection.columns().get(0), org.objectweb.asm.Type.LONG_TYPE)), null, null);
+        return new ValueQuery<Long>(entityClass, context, wheres, counted, ref.capturedArgs(), ref.classLoader(), null, List.of(),
+                List.of(), null, 0).withJoins(joins).toHql();
+    }
+
+    /**
      * Checks if at least one row matches. Only one row is read, and no entity is loaded.
      *
      * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
@@ -450,16 +504,15 @@ public class SelectQuery<T> {
 
     /**
      * Runs the query and returns the rows as a set that keeps the row order ({@link LinkedHashSet}).
-     * Entity rows never repeat (lambdaQL joins only to-one associations), so the set has the same rows as
-     * {@link #toList()}.
+     * The set has the same rows as {@link #toList()}: Hibernate returns each entity once, also after an explicit join,
+     * and a repeated object would keep its first place (D68).
      *
      * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
      * {@snippet class="org.lambdaql.query.ResultQueryTest" region="to-set"}
      *
      * @return the rows in order
-     * @throws IllegalStateException if the set is smaller than the number of rows: then the entity's
-     *                               {@code equals}/{@code hashCode} treat different rows as equal, or its {@code @Id} is
-     *                               not unique (for example a view), and rows would be lost without a sign
+     * @throws IllegalStateException if the entity's {@code equals}/{@code hashCode} treat two different rows as equal:
+     *                               one of them would be lost without a sign
      */
     public SequencedSet<T> toSet() {
         return DmlParts.toSet(toList());

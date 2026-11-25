@@ -18,7 +18,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
 import org.springframework.orm.jpa.SharedEntityManagerCreator
-import org.springframework.stereotype.Service
+import org.springframework.stereotype.Repository
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.transaction.annotation.Transactional
 
@@ -32,10 +32,9 @@ class LambdaQlConfig {
 }
 // @end
 
-// @start region="spring-service"
-// open: this build has no kotlin("plugin.spring"), and @Transactional needs a proxy
-@Service
-open class OrderService(private val qb: QueryBuilder) {
+// @start region="spring-repository"
+@Repository
+open class OrderRepository(private val qb: QueryBuilder) {
 
     @Transactional(readOnly = true)
     open fun activeOrders(): List<Order> =
@@ -58,7 +57,7 @@ class ManualKotlinStartTest {
     private lateinit var emf: EntityManagerFactory
 
     @Autowired
-    private lateinit var orderService: OrderService
+    private lateinit var orderRepository: OrderRepository
 
     private lateinit var qb: QueryBuilder
     private lateinit var orders: List<Order>
@@ -124,8 +123,8 @@ class ManualKotlinStartTest {
 
     @Test
     fun springBeans() {
-        // OrderService gets the QueryBuilder bean of LambdaQlConfig
-        assertEquals(ids(orders.filter { it.isActive }), ids(orderService.activeOrders()))
+        // OrderRepository gets the QueryBuilder bean of LambdaQlConfig
+        assertEquals(ids(orders.filter { it.isActive }), ids(orderRepository.activeOrders()))
     }
 
     @Test
@@ -266,6 +265,6 @@ class ManualKotlinStartTest {
     /** Spring context: the datasource chosen by application-test.yaml, the test entities, and the two classes above. */
     @EnableAutoConfiguration
     @AutoConfigurationPackage(basePackages = ["org.lambdaql.query"])
-    @Import(LambdaQlConfig::class, OrderService::class)
+    @Import(LambdaQlConfig::class, OrderRepository::class)
     class Context
 }

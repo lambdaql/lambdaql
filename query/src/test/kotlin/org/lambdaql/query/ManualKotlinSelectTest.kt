@@ -282,7 +282,7 @@ class ManualKotlinSelectTest {
     @Test
     fun valuePage() {
         // @start region="value-page"
-        // paging adds the id as the last key (S9), so the pages do not overlap
+        // paging adds the id as the last key, so the pages do not overlap
         val page = qb.from(Order::class.java)
             .orderBy { o -> desc(o.price) }
             .select { it.price }
@@ -346,7 +346,7 @@ class ManualKotlinSelectTest {
     @Test
     fun joinThree() {
         // @start region="join-three"
-        // orders of a customer with an item of quantity > 10; an order repeats once per matching item
+        // orders of a customer with an item of quantity > 10 (an order with two such items is two SQL rows)
         val q = qb.from(Order::class.java)
             .join(Customer::class.java) { o, c -> o.customer?.id == c.id }
             .join(Item::class.java) { o, _, i -> i.order?.id == o.id }
@@ -375,7 +375,7 @@ class ManualKotlinSelectTest {
     @Test
     fun joinPaging() {
         // @start region="join-paging"
-        // with paging, the id of every entity is added to the order, so the pages do not overlap (S9)
+        // with paging, the id of every entity is added to the order, so the pages do not overlap
         val pairs = qb.from(Order::class.java)
             .crossJoin(Customer::class.java)
             .orderBy { o, _ -> desc(o.price) }

@@ -251,7 +251,7 @@ val e = assertThrows(LambdaQLException::class.java) {
 assertEquals("LQL-3017", e.code())
 ```
 
-lambdaQL은 서브쿼리 안에서 마지막 정렬 키로 `id`를 더합니다(규칙 S9).
+lambdaQL은 서브쿼리 안에서 마지막 정렬 키로 `id`를 더합니다.
 상관 조건은 고객 엔티티가 아니라 외래 키(`customer?.id`)를 비교합니다. 고객이 없는 주문은 `s1.customer.id = e0.customer.id`가 참이 아니므로 결과에서 빠집니다. [5.10](#510-paths-and-null-inside-subqueries)을 참고하십시오.
 
 집계의 NULL은 SQL을 따릅니다. `sum`, `avg`, `min`, `max`는 행이 없으면 NULL을 냅니다. `count`는 0을 냅니다.

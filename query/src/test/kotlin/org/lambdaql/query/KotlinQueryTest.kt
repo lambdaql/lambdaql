@@ -350,14 +350,16 @@ class KotlinQueryTest {
     @Test
     fun joinDistinctAndCte() {
         // @start region="join-distinct"
-        // an order with two matching items would come twice; distinct() returns it once
+        // an order with two matching items is two SQL rows; distinct() makes it one row in SQL
         val q = qb.from(Order::class.java)
             .join(Item::class.java) { o, i -> i.order?.id == o.id }
             .where { _, i -> i.qty > 0 }
             .distinct()
         assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.id where e1.qty > 0", q.toHql().hql())
         // @end
+        val set = q.toSet()
         assertEquals(items.map { it.first }.distinct().sorted(), ids(q.toList()))
+        assertEquals(items.map { it.first }.distinct().sorted(), ids(set.toList()))
         // @start region="join-cte"
         // the total of each customer, joined to the customer row
         val t = qb.with(qb.from(Order::class.java)

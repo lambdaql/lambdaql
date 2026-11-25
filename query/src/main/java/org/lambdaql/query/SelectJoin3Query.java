@@ -11,8 +11,9 @@ import java.util.SequencedSet;
 
 /**
  * A query with explicit entity joins (ROADMAP D44): {@code qb.from(Order.class).leftJoin(Customer.class, (o, c) -> ...)}.
- * Every lambda gets all entities in join order. Without {@code select}, the result is the main entity only; when the
- * join matches several rows, the main row repeats. After {@code leftJoin}, a condition on a joined entity column has
+ * Every lambda gets all entities in join order. Without {@code select}, the result is the main entity only. When the
+ * join matches several rows, the SQL has one row per match: Hibernate returns each main entity once, but
+ * {@code count()} and {@code limit} count the SQL rows; {@code distinct()} makes them count main rows. After {@code leftJoin}, a condition on a joined entity column has
  * the SQL meaning: with no match it is not true, so the row is left out.
  *
  * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
@@ -133,9 +134,11 @@ public class SelectJoin3Query<T, U, V> {
     }
 
     /**
-     * Returns each row of the main entity once: {@code select distinct e0} (ROADMAP D44 extension). A join repeats a
-     * row once per match; {@code distinct()} removes the repeats. A sort key must then be a column of the main entity
-     * itself (J7). An {@code exists} subquery in {@code where} gives the same rows without repeats, often faster.
+     * Makes each main row one SQL row: {@code select distinct e0} (ROADMAP D44 extension). A join has one SQL row per
+     * match; Hibernate already returns each main entity once, but {@code count()} and {@code limit} count the SQL rows.
+     * With {@code distinct()} they count main rows, so a page of {@code limit} rows is full. A sort key must then be a
+     * column of the main entity itself (J7). An {@code exists} subquery in {@code where} gives the same rows without
+     * repeated SQL rows, often faster.
      *
      * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
      * {@snippet class="org.lambdaql.query.JoinQueryTest" region="join-distinct"}
@@ -214,7 +217,7 @@ public class SelectJoin3Query<T, U, V> {
     }
 
     /**
-     * Runs the query and returns the main entities (repeated when the join matches several rows).
+     * Runs the query and returns the main entities, each once (Hibernate removes the rows that the join repeats).
      *
      * @return the rows
      */
@@ -232,7 +235,7 @@ public class SelectJoin3Query<T, U, V> {
     }
 
     /**
-     * Counts the result rows.
+     * Counts the SQL rows: one per join match. After {@code distinct()} it counts main rows.
      *
      * @return the number of rows
      */
@@ -260,9 +263,15 @@ public class SelectJoin3Query<T, U, V> {
     }
 
     /**
-     * Runs the query and returns the main entities as a set in order.
+     * Runs the query and returns the main entities as a set in order: the same rows as {@link #toList()}, each once
+     * (D68). Without {@code distinct()}, {@code limit} counts the SQL rows that the join repeats, so a page can have
+     * fewer entities.
+     *
+     * <p>Example (from the test <a href="https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/JoinQueryTest.java">JoinQueryTest</a>):
+     * {@snippet class="org.lambdaql.query.JoinQueryTest" region="join-set"}
      *
      * @return the rows
+     * @throws IllegalStateException if the entity's {@code equals}/{@code hashCode} treat two different rows as equal
      */
     public SequencedSet<T> toSet() {
         return base.toSet();
