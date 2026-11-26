@@ -16,15 +16,15 @@
 
 | 언어 | 상태 |
 |---|---|
-| 영어(`en`) | 2026-11-25 반영 완료. D74·D75·D76 대기 |
-| 일본어(`ja`) | 2026-11-25 반영 완료. D74·D75·D76 대기 |
-| 중국어(`zh`) | 2026-11-25 반영 완료. D74·D75·D76 대기 |
+| 영어(`en`) | 2026-11-25 반영 완료. D74~D77 대기 |
+| 일본어(`ja`) | 2026-11-25 반영 완료. D74~D77 대기 |
+| 중국어(`zh`) | 2026-11-25 반영 완료. D74~D77 대기 |
 
 세 번역본 모두 34쪽 전체를 한국어 원본에 맞췄습니다. 검사는 `python3 .claude/tools/docs/check_translation.py <언어>`(문제 0)입니다.
 이전 대기 항목(D48~D51 등)은 모두 반영되어 지웠습니다. 내용은 git 기록에 있습니다.
 앞으로 한국어 원본이 바뀌면 이 문서에 다시 항목을 적습니다.
 
-## D74 문자열 함수, D75 날짜 비교 메서드, D76 람다 안 컬렉션의 IN(2026-11-26, 세 번역본 대기)
+## D74 문자열 함수, D75 날짜 비교 메서드, D76 람다 안 컬렉션의 IN, D77 범위(2026-11-26, 세 번역본 대기)
 
 엔티티 값에 대한 문자열 함수와 문자열 결합을 지원하면서 바뀐 한국어 원본입니다.
 
@@ -38,7 +38,9 @@ D75(`isAfter`·`isBefore`·`isEqual`)로 바뀐 곳: Java 03장 3.4 표와 새 �
 
 D76(람다 안에서 만든 컬렉션의 IN)으로 바뀐 곳: Java·Kotlin 03장 3.9 표와 새 예제(Kotlin은 배열 행과 예제 추가), Kotlin 03장 3.13 거부 표의 컬렉션 행 삭제, Kotlin 3.8.1 표의 `isNullOrBlank()` 행, Java 06장 `groupBy` 키 목록 아래 문장 삭제, Java 09장 연산자 표의 `List.of(...)` 행, Kotlin 09장 KC8·KC9 삭제 표기, Java·Kotlin 10장 지원하지 않는 표의 컬렉션 행 삭제.
 
-코드 블록은 새 테스트 구간(`StringFunctionTest`, `KotlinStringFunctionTest`, `TimeCompareTest`, `KotlinTimeCompareTest`, `InListTest`, `KotlinInListTest`)과 바뀐 구간(`ManualJavaWhereTest#rejected-forms`, `ManualKotlinWhereTest#string-rejected`)입니다.
+D77(범위)과 토글 문서 수정으로 바뀐 곳: Java 03장 3.4 표의 `between` 행과 "범위" 문단·예제, 3.5.1의 토글 예제, Java 07장 7.7 토글 행과 7.10 조건부 값 행 삭제, Java 10장 DML 미지원 표의 조건부 값 행 삭제, Kotlin 03장 3.14 범위 표·문장과 "날짜와 시간의 범위" 문단·예제 두 개, 3.13 거부 표의 범위 행, Kotlin 10장 R18.
+
+코드 블록은 새 테스트 구간(`StringFunctionTest`, `KotlinStringFunctionTest`, `TimeCompareTest`, `KotlinTimeCompareTest`, `InListTest`, `KotlinInListTest`, `CaseWhenTest#case-toggle`, `TimeCompareTest#between`, `KotlinTimeCompareTest#range`·`#own-extension`)과 바뀐 구간(`ManualJavaWhereTest#rejected-forms`, `ManualKotlinWhereTest#string-rejected`)입니다.
 
 ## D56 이후 한국어 원본 변경 반영(2026-11-25 네 언어에 반영 완료)
 

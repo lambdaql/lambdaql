@@ -132,7 +132,8 @@ class ManualKotlinSelectTest {
         }
         assertEquals("LQL-2022", afterPath.code())
         // @end
-        assertEquals(orders.map { it.description ?: "" }.sorted(), q.toList().sorted())
+        // Oracle stores "" as NULL, so coalesce(e0.description, '') gives NULL there
+        assertEquals(orders.map { it.description ?: "" }.sorted(), q.toList().map { it ?: "" }.sorted())
     }
 
     @Test

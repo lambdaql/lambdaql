@@ -212,7 +212,7 @@ assertEquals("update Order e0 set e0.price = coalesce((select sum(s1.price) from
 | `Objects.requireNonNullElse(a, b)` | `coalesce(a, b)` |
 | `o.setCnt(o.getCnt() + 1)` | 지원. javac가 값을 언박싱하고 박싱하지만 lambdaQL은 이를 무시함 |
 | `o.setStatus((short) 1)` | `short`나 `byte` 필드에 javac가 요구하는 캐스트. 상수는 리터럴로 유지됨 |
-| `o.setActive(!o.isActive())`(토글) | **지원하지 않음**(조건에 따른 값). `where`가 다른 update 두 개를 사용 |
+| `o.setActive(!o.isActive())`(토글), 값을 고르는 삼항 연산자 | `case when`([3.5.1](03-where.md#351-values-chosen-by-a-condition)) |
 | `o.setDescription(o.getDescription() + "_x")` | `concat(e0.description, '_x')`([3.8.1](03-where.md#381-string-functions)) |
 | 값으로 쓴 `LocalDateTime.now()` | 애플리케이션에서 계산해 바인딩 |
 | `UpdateSet<Order> u = qb.update(...).set(...)`(또는 `var`) | update를 단계별로 구성([PATCH](07-2-update.md#many-set-calls-patch) 참고) |
@@ -439,7 +439,6 @@ lambdaQL은 `@Version` 필드에 할당하면 거부합니다(`LQL-3068`). U11�
 
 | 항목 | 대신 할 수 있는 일 |
 |---|---|
-| 조건에 따른 값(`c ? a : b`, 값으로 쓴 `!o.isActive()`) | – |
 | 할당을 고르는 람다 표현식 안의 `if` | `set()`을 여러 번 호출 |
 | `insert ... select`의 명시적 조인 | many-to-one 경로 사용 |
 | `returning` | – |

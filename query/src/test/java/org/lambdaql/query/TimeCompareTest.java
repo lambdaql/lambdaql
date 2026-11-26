@@ -11,6 +11,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.time.LocalDateTime;
+
+import static org.lambdaql.Cond.between;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.Predicate;
@@ -92,6 +94,24 @@ class TimeCompareTest {
         SelectQuery<Order> valueFirst = qb.from(Order.class).where(o -> since.isBefore(o.getUpdateAt()));
         assertEquals("select e0 from Order e0 where :p1 < e0.updateAt", valueFirst.toHql().hql());
         assertEquals(javaIds(since::isBefore), ids(valueFirst.toList()));
+    }
+
+    @Test
+    void betweenBothEnds() {
+        LocalDateTime from = LocalDateTime.of(2026, 2, 1, 0, 0);
+        LocalDateTime to = LocalDateTime.of(2026, 3, 1, 0, 0);
+        // @start region="between"
+        // Cond.between(x, from, to): both ends included, like SQL between
+        SelectQuery<Order> q = qb.from(Order.class).where(o -> between(o.getUpdateAt(), from, to));
+        assertEquals("select e0 from Order e0 where :p1 <= e0.updateAt and e0.updateAt <= :p2", q.toHql().hql());
+        // @end
+        assertEquals(javaIds(t -> between(t, from, to)), ids(q.toList()));
+        // !between: outside the range (a NULL time matches neither)
+        SelectQuery<Order> outside = qb.from(Order.class).where(o -> !between(o.getUpdateAt(), from, to));
+        assertEquals("select e0 from Order e0 where :p1 > e0.updateAt or e0.updateAt > :p2", outside.toHql().hql());
+        assertEquals(javaIds(t -> !between(t, from, to)), ids(outside.toList()));
+        // the same method in Java: false for a null value
+        assertEquals(false, between(null, from, to));
     }
 
     /** Minimal Spring context: the datasource chosen by application-test.yaml and the test entities. */

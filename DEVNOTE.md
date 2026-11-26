@@ -55,7 +55,7 @@ Boot BOM은 모듈의 `gradle.properties`의 `lql.springBoot`로 고른다(루�
 - Spring Data JPA 모듈(M12): `main`은 Spring Boot 3.4.2, `feature/boot4`는 Spring Boot 4.1.2로 테스트
 - 클래스 파일 읽기(`feature/boot4`, D52): Java 21~23은 ASM, Java 24 이상은 `java.lang.classfile`(Multi-Release JAR)
 
-테스트: 세 DB(H2 2.3.230, MariaDB 10.11.18, Oracle Free 23.26.3)에서 모듈 전체 통과(2026-11-19 실측). `main` 241개. `feature/unified-boot`는 다섯 DB(H2·MariaDB·Oracle·PostgreSQL·MySQL)에서 Boot 라인마다 250개, `test`(Boot 4, JDK 21) 250개, `testBoot3`(Boot 3, JDK 21) 250개, `testClassFile`(Boot 4, JDK 25) 250개(2026-11-23). 건너뜀은 DB별 H2 16·MariaDB 10·Oracle 9. Kotlin 람다 테스트는 `query/src/test/kotlin`에 별도 소스 세트로 있다.
+테스트: 세 DB(H2 2.3.230, MariaDB 10.11.18, Oracle Free 23.26.3)에서 모듈 전체 통과(2026-11-19 실측). `main` 241개. `feature/unified-boot`는 다섯 DB(H2·MariaDB·Oracle·PostgreSQL·MySQL)에서 Boot 라인마다 250개, `test`(Boot 4, JDK 21) 250개, `testBoot3`(Boot 3, JDK 21) 250개, `testClassFile`(Boot 4, JDK 25) 250개(2026-11-23). 2026-11-26 다시 실측: 다섯 DB 모두 `test`·`testBoot3`·`testClassFile` 각 580개 통과(D74~D77 포함). 건너뜀은 DB별 H2 16·MariaDB 10·Oracle 9(2026-11-23 기준). Kotlin 람다 테스트는 `query/src/test/kotlin`에 별도 소스 세트로 있다.
 
 Maven Central 배포: 0.0.1(2026-11-24), 0.0.2(2026-11-25, D67~D71, 커밋 `319bb9f`, 배포 `da3fd53b-95f7-447f-988a-81a80f21d546`). 매뉴얼의 의존성 예제는 배포된 최신 버전을 쓰고, 버전을 올리면 배포한 뒤에 바꾼다.
 
@@ -128,6 +128,8 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 실측용으로 만드는 객체는 `SQ_` 접두를 붙이고 끝나면 지운다. 정리 확인: MariaDB `information_schema`의 `SQ\_%` 테이블·루틴 수, Oracle `user_objects`의 `SQ_%` 수가 0.
 
 **한 번에 한 세션만 테스트한다.** 빌드 폴더(`query/build`)와 두 DB 스키마를 공유하므로 두 세션이 동시에 돌리면 결과 파일이 지워지고 서로의 테이블을 지운다(2026-11-19 발생). 다른 세션이 작업 트리의 미커밋 파일을 함께 커밋한 일도 있었다.
+
+**테스트 컨텍스트 캐시**: 테스트 클래스마다 Spring 컨텍스트가 하나씩(약 64개) 생기고 모두 같은 `SQ_` 테이블을 `create-drop`으로 쓴다. Spring 기본 캐시(32개)를 넘으면 오래된 컨텍스트가 닫히면서 테이블을 지워, 다른 테스트의 `seed`가 실패하고 연결 풀(2개)이 바닥나 실행이 멈춘다(2026-11-26 Boot 3 + MariaDB). `query/src/test/resources/spring.properties`의 `spring.test.context.cache.maxSize=128`과 `lql-db-*.yaml`의 `idle-timeout: 10000`으로 막았다. 테스트 클래스가 128개 가까이 늘면 한도를 올리거나 컨텍스트를 합친다.
 
 ### 6.2 실측 근거의 위치(⚠️ `/tmp`, 재부팅하면 사라질 수 있음)
 
@@ -308,9 +310,10 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 | 결과 함수 `count(컬럼)`, 엔티티 쿼리의 `distinct()`(`distinct().count(컬럼)`은 `count(distinct x)`), `count(o -> o)`는 `count(*)`(D69) | 2026-11-25 구현, H2 테스트 | 예(`KotlinCountColumnTest`) | D67 |
 | `toSet()` 크기 검사를 서로 다른 객체 수 기준으로(조인 반복은 하나로, `equals` 충돌만 예외). 조인 쿼리의 `count()`·`limit`은 SQL 행 기준 | 2026-11-25 구현, H2 테스트 | 예(`KotlinQueryTest`) | D68 |
 | `select`의 엔티티 값(`select(o -> o)`, `select((o, c) -> c)`, 엔티티를 담은 record·data class·`Pair`) | 2026-11-25 구현, H2 테스트 | 예(`KotlinSelectEntityTest`) | D70 |
-| 문자열 함수(`lower`, `upper`, `trim`, `length`, `substring`, `locate`, `replace`, `concat`)와 문자열 조건(`isEmpty`, `isBlank`, `equalsIgnoreCase`), 람다 안 문자열 `+`·템플릿 | 2026-11-26 구현, H2 테스트. 다른 DB 미검증 | 예(`StringFunctionTest`, `KotlinStringFunctionTest`) | D74 |
-| `java.time`의 `isAfter`·`isBefore`·`isEqual`을 `>`·`<`·`=`로 | 2026-11-26 구현, H2 테스트 | 예(`TimeCompareTest`, `KotlinTimeCompareTest`) | D75 |
-| 람다 안에서 만든 컬렉션(`List.of`, `Arrays.asList`, Kotlin `listOf`·`setOf`·`arrayOf`)과 Kotlin 배열의 `in` | 2026-11-26 구현, H2 테스트 | 예(`InListTest`, `KotlinInListTest`) | D76 |
+| 문자열 함수(`lower`, `upper`, `trim`, `length`, `substring`, `locate`, `replace`, `concat`)와 문자열 조건(`isEmpty`, `isBlank`, `equalsIgnoreCase`), 람다 안 문자열 `+`·템플릿 | 2026-11-26 구현, 다섯 DB 테스트 | 예(`StringFunctionTest`, `KotlinStringFunctionTest`) | D74 |
+| `java.time`의 `isAfter`·`isBefore`·`isEqual`을 `>`·`<`·`=`로 | 2026-11-26 구현, 다섯 DB 테스트 | 예(`TimeCompareTest`, `KotlinTimeCompareTest`) | D75 |
+| 람다 안에서 만든 컬렉션(`List.of`, `Arrays.asList`, Kotlin `listOf`·`setOf`·`arrayOf`)과 Kotlin 배열의 `in` | 2026-11-26 구현, 다섯 DB 테스트 | 예(`InListTest`, `KotlinInListTest`) | D76 |
+| 범위: Java `Cond.between(x, from, to)`, Kotlin 날짜·`Comparable` 범위 `in from..to`·`from..<to`(캡처한 범위 포함) | 2026-11-26 구현, 다섯 DB 테스트 | 예(`TimeCompareTest`, `KotlinTimeCompareTest`) | D77 |
 | 분석 캐시(EntityManagerFactory별 공유) | 구현됨 | – | D47 |
 | Spring Data JPA 모듈(`LambdaQlExecutor<T>`, `Sort`, `Pageable`, DML 단축 메서드, 자동 구성) | 구현됨, 다섯 DB·Spring Boot 3.5.16·4.1.2 테스트. DML에는 호출자 트랜잭션 필요 | 예(`spring-data-jpa/src/test/kotlin`, 2026-11-23) | D34, D39, M12 |
 

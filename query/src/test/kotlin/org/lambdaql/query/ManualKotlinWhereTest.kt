@@ -446,25 +446,18 @@ class ManualKotlinWhereTest {
 
     @Test
     fun rangeRejected() {
-        val from = LocalDateTime.of(2026, 1, 1, 0, 0)
-        val to = LocalDateTime.of(2026, 6, 1, 0, 0)
         // @start region="range-rejected"
-        // a range object is not translated: a nullable subject, or a range of dates
+        // a range of a nullable subject is a range object: not translated
         val nullable = assertThrows<LambdaQLException> {
             qb.from(Order::class.java).where { it.customer?.grade in 1..5 }.toHql()
         }
         assertTrue(nullable.message!!.startsWith("[LQL-3008]"))
 
-        val dates = assertThrows<LambdaQLException> {
-            qb.from(Order::class.java).where { it.updateAt in from..to }.toHql()
-        }
-        assertTrue(dates.message!!.startsWith("[LQL-3008]"))
-
         // write the two comparisons instead
-        val q = qb.from(Order::class.java).where { it.updateAt >= from && it.updateAt <= to }
-        assertEquals("select e0 from Order e0 where e0.updateAt >= :p1 and e0.updateAt <= :p2", q.toHql().hql())
+        val q = qb.from(Order::class.java).where { it.customer?.grade != null && it.customer!!.grade!! >= 1 && it.customer!!.grade!! <= 5 }
+        assertEquals("select e0 from Order e0 join e0.customer j1 where j1.grade is not null and j1.grade >= 1 and j1.grade <= 5", q.toHql().hql())
         // @end
-        assertEquals(ids(orders.filter { it.updateAt != null && it.updateAt >= from && it.updateAt <= to }), ids(q.toList()))
+        assertEquals(ids(orders.filter { it.customer?.grade != null && it.customer!!.grade!! in 1..5 }), ids(q.toList()))
     }
 
     @Test

@@ -10,6 +10,8 @@ spring:
     hikari:
       maximum-pool-size: 2
       minimum-idle: 0
+      # close an idle connection after 10 s (the smallest value): many test contexts stay open (spring.properties)
+      idle-timeout: 10000
   jpa:
     properties:
       hibernate.physical_naming_strategy: org.lambdaql.query.SqPrefixNamingStrategy

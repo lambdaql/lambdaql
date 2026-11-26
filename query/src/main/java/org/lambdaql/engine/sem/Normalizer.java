@@ -356,6 +356,32 @@ public final class Normalizer {
                     && !usesEntity(inv.args().get(0))) {
                 return new Pred.In(done(value(inv.args().get(1))), host(inv.args().get(0), Object.class, true));
             }
+            // Cond.between(x, from, to): from <= x and x <= to (ROADMAP D77)
+            if (m.isStatic() && m.is("org/lambdaql/Cond", "between") && inv.args().size() == 3) {
+                List<Expr> a = inv.args();
+                return Pred.and(cmp(CmpOp.LE, a.get(1), a.get(0), false), cmp(CmpOp.LE, a.get(0), a.get(2), false));
+            }
+            // Kotlin x in from..to, x in from..<to on a range of Comparable values (dates, BigDecimal ...): from <= x
+            // and x <= to (x < to for ..<). A range made in the lambda gives its two ends; a captured range is read
+            // with getStart() and getEndInclusive() / getEndExclusive() when the query runs (ROADMAP D77)
+            if (!m.isStatic() && m.name().equals("contains") && inv.args().size() == 1 && !usesEntity(inv.receiver())
+                    && (m.owner().equals("kotlin/ranges/ClosedRange") || m.owner().equals("kotlin/ranges/OpenEndRange"))) {
+                boolean open = m.owner().equals("kotlin/ranges/OpenEndRange");
+                Expr range = inv.receiver();
+                while (range instanceof Expr.Convert c) range = c.operand();
+                Expr from, to;
+                if (range instanceof Expr.Invoke r && r.method().isStatic() && r.method().owner().startsWith("kotlin/ranges/RangesKt")
+                        && r.method().name().equals(open ? "rangeUntil" : "rangeTo") && r.args().size() == 2) {
+                    from = r.args().get(0);
+                    to = r.args().get(1);
+                } else {
+                    String end = open ? "getEndExclusive" : "getEndInclusive";
+                    from = new Expr.Invoke(range, new MethodRef(m.owner(), "getStart", "()Ljava/lang/Comparable;", false, true), List.of());
+                    to = new Expr.Invoke(range, new MethodRef(m.owner(), end, "()Ljava/lang/Comparable;", false, true), List.of());
+                }
+                Expr x = inv.args().get(0);
+                return Pred.and(cmp(CmpOp.LE, from, x, false), cmp(open ? CmpOp.LT : CmpOp.LE, x, to, false));
+            }
             // a.isAfter(b), a.isBefore(b), a.isEqual(b) on java.time values: a > b, a < b, a = b (ROADMAP D75)
             if (!m.isStatic() && inv.args().size() == 1 && m.owner().startsWith("java/time/")
                     && m.returnType() == Type.BOOLEAN_TYPE && (usesEntity(inv.receiver()) || usesEntity(inv.args().get(0)))) {

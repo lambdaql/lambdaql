@@ -75,6 +75,7 @@ class ManualKotlinNotesTest {
         for ((code, vip) in listOf("A" to true, "B" to false, "C" to null)) em.persist(Coded(code, vip))
         em.transaction.commit()
         items = its.map { it.first.id to it.second }
+        em.clear()          // read the rows back from the database (Oracle stores "" as NULL)
         orders = em.createQuery("select o from Order o left join fetch o.customer", Order::class.java).resultList
         codes = em.createQuery("select c from Coded c", Coded::class.java).resultList
         em.close()

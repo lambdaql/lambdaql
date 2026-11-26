@@ -33,6 +33,9 @@ class StringFunctionTest {
 
     private QueryBuilder qb;
 
+    /** Oracle stores '' as NULL, and trim('   ') gives NULL there: no text is empty or blank. */
+    private static final boolean ORACLE = "oracle".equals(System.getProperty("lql.db", "h2"));
+
     @BeforeEach
     void seed() {
         qb = new QueryBuilder(emf);
@@ -41,7 +44,7 @@ class StringFunctionTest {
         for (String e : List.of("Item", "Order", "Customer", "Archive", "VOrder", "IdOrder")) {
             em.createQuery("delete from " + e).executeUpdate();
         }
-        String[] texts = {" Kim ", "kim", "PARK", "", "   ", null, "lee-01"};
+        String[] texts = {" Kim ", "kimi", "PARK", "", "   ", null, "lee-01"};
         for (int i = 0; i < texts.length; i++) {
             Order o = new Order();
             o.setDescription(texts[i]);
@@ -79,9 +82,9 @@ class StringFunctionTest {
         assertEquals("select e0 from Order e0 where lower(e0.description) = 'park'", q.toHql().hql());
         // @end
         assertEquals(javaIds(d -> d.toLowerCase().equals("park")), ids(q.toList()));
-        SelectQuery<Order> upper = qb.from(Order.class).where(o -> o.getDescription().toUpperCase().equals("KIM"));
-        assertEquals("select e0 from Order e0 where upper(e0.description) = 'KIM'", upper.toHql().hql());
-        assertEquals(javaIds(d -> d.toUpperCase().equals("KIM")), ids(upper.toList()));
+        SelectQuery<Order> upper = qb.from(Order.class).where(o -> o.getDescription().toUpperCase().equals("KIMI"));
+        assertEquals("select e0 from Order e0 where upper(e0.description) = 'KIMI'", upper.toHql().hql());
+        assertEquals(javaIds(d -> d.toUpperCase().equals("KIMI")), ids(upper.toList()));
     }
 
     @Test
@@ -107,7 +110,7 @@ class StringFunctionTest {
         assertEquals("select e0 from Order e0 where length(trim(e0.description)) = 0", blank.toHql().hql());
         // @end
         assertEquals(javaIds(String::isEmpty), ids(empty.toList()));
-        assertEquals(javaIds(String::isBlank), ids(blank.toList()));
+        assertEquals(ORACLE ? List.of() : javaIds(String::isBlank), ids(blank.toList()));
         SelectQuery<Order> notBlank = qb.from(Order.class).where(o -> !o.getDescription().isBlank());
         assertEquals("select e0 from Order e0 where length(trim(e0.description)) <> 0", notBlank.toHql().hql());
         assertEquals(javaIds(d -> !d.isBlank()), ids(notBlank.toList()));
@@ -116,7 +119,7 @@ class StringFunctionTest {
     @Test
     void equalsIgnoreCase() {
         // @start region="ignore-case"
-        String name = "KIM";
+        String name = "Park";
         SelectQuery<Order> q = qb.from(Order.class).where(o -> o.getDescription().equalsIgnoreCase(name));
         assertEquals("select e0 from Order e0 where lower(e0.description) = lower(:p1)", q.toHql().hql());
         // @end
@@ -202,7 +205,7 @@ class StringFunctionTest {
         assertEquals(sorted.toList().size(), 7);
         trim.execute();
         assertEquals(all().stream().map(Order::getDescription).filter(Objects::nonNull).sorted().toList(),
-                List.of("", "", "Kim", "PARK", "kim", "lee-01"));
+                ORACLE ? List.of("Kim", "PARK", "kimi", "lee-01") : List.of("", "", "Kim", "PARK", "kimi", "lee-01"));
     }
 
     @Test
@@ -235,6 +238,37 @@ class StringFunctionTest {
                     .map(e -> e.getLevel() + " " + e.getFormattedMessage().substring(1, 9)).toList(), String.valueOf(appender.list));
         } finally {
             log.detachAppender(appender);
+        }
+    }
+
+    @Test
+    void functionIndexSkipsTheWarning() {
+        String db = System.getProperty("lql.db", "h2");
+        boolean expressionIndex = db.equals("oracle") || db.equals("postgresql");
+        ch.qos.logback.classic.Logger log = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(SargableCheck.class);
+        var appender = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        appender.start();
+        log.addAppender(appender);
+        EntityManager em = emf.createEntityManager();
+        try {
+            // Oracle and PostgreSQL: an index on the same expression. (The index check is cached per table and
+            // expression, so this test uses a column that no other test wraps in a function.)
+            if (expressionIndex) {
+                em.getTransaction().begin();
+                em.createNativeQuery("CREATE INDEX SQ_IX_LOWER_PRODUCT ON SQ_orders (LOWER(product_id))").executeUpdate();
+                em.getTransaction().commit();
+            }
+            qb.from(Order.class).where(o -> o.getProduct().toLowerCase().equals("p1")).toHql();
+            List<String> codes = appender.list.stream().map(e -> e.getFormattedMessage().substring(1, 9)).toList();
+            assertEquals(expressionIndex ? List.of() : List.of("LQL-5001"), codes, String.valueOf(appender.list));
+        } finally {
+            log.detachAppender(appender);
+            if (expressionIndex) {
+                em.getTransaction().begin();
+                em.createNativeQuery("DROP INDEX SQ_IX_LOWER_PRODUCT").executeUpdate();
+                em.getTransaction().commit();
+            }
+            em.close();
         }
     }
 

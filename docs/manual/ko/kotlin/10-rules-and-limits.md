@@ -212,7 +212,7 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 | R15 | `?:` | 값에서는 `coalesce(a, b)`. 조건 안의 boolean 엘비스는 `(x is not null and x = true)`가 됨. 값으로 쓰는 boolean 엘비스는 거부됨(KC21) |
 | R16 | 연관 조인 | R24로 대체됨 |
 | R17 | `===`, `!==` | `==`처럼 값 동등성 |
-| R18 | 범위 `in a..b`, `until`, `..<`, `!in` | `a <= x and x < b + 1`(상수), `:p1 <= x and x <= :p2`(캡처 값), `a > x or x >= b + 1`(`!in`). 자동 null 가드 없음 |
+| R18 | 범위 `in a..b`, `until`, `..<`, `!in` | `a <= x and x < b + 1`(상수), `:p1 <= x and x <= :p2`(캡처 값, 날짜·시간 범위, 캡처한 범위), `a > x or x >= b + 1`(`!in`). 자동 null 가드 없음. nullable 대상은 거부 |
 | R19 | 컬렉션 `x in c`, `x !in c`(캡처한 `c`) | `x in (:p)`, `x not in (:p)`(SQL 의미). null 요소: 오류. 빈 컬렉션: FALSE / TRUE |
 | R20 | `true`/`false`로 끝나는 분기를 가진 대상 없는 `when { }` | 조건의 `OR`. 대상이 있는 `when (subject)`는 거부(`LQL-2010`) |
 | R21 | Kotlin 문자열 함수 | `startsWith`, `endsWith`, `contains`(`ignoreCase` 포함)는 `like`. `lowercase`, `trim`, `length`, `substring`, `indexOf`, `replace`, 템플릿은 HQL 표준 함수(위치는 1씩 옮김). `isEmpty`, `isNullOrEmpty`, `isBlank`, `equals(ignoreCase = true)`는 조건. `equals(text)`는 `==`와 같음 |

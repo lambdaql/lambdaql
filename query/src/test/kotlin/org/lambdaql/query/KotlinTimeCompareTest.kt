@@ -11,6 +11,9 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
 import java.time.LocalDateTime
 
+/** An extension of your own: inline, so its body becomes part of the query lambda. */
+private inline fun <T : Comparable<T>> T.isBetween(from: T, to: T): Boolean = this in from..to
+
 /**
  * Kotlin `isAfter`, `isBefore` and `isEqual` on java.time values become comparisons (ROADMAP D75).
  * Each test checks the HQL and compares the rows with the same test run in Kotlin.
@@ -68,6 +71,47 @@ class KotlinTimeCompareTest {
         assertEquals(kotlinIds { it.isAfter(since) }, ids(after.toList()))
         assertEquals(kotlinIds { it.isBefore(since) }, ids(before.toList()))
         assertEquals(kotlinIds { it.isEqual(since) }, ids(same.toList()))
+    }
+
+    @Test
+    fun ranges() {
+        val from = LocalDateTime.of(2026, 2, 1, 0, 0)
+        val to = LocalDateTime.of(2026, 3, 1, 0, 0)
+        // @start region="range"
+        // a range of dates: two comparisons; ..< leaves out the end
+        val closed = qb.from(Order::class.java).where { it.updateAt in from..to }
+        assertEquals("select e0 from Order e0 where :p1 <= e0.updateAt and e0.updateAt <= :p2", closed.toHql().hql())
+
+        val halfOpen = qb.from(Order::class.java).where { it.updateAt in from..<to }
+        assertEquals("select e0 from Order e0 where :p1 <= e0.updateAt and e0.updateAt < :p2", halfOpen.toHql().hql())
+
+        // a captured range: its ends are read when the query runs
+        val period = from..to
+        val captured = qb.from(Order::class.java).where { it.updateAt in period }
+        assertEquals("select e0 from Order e0 where :p1 <= e0.updateAt and e0.updateAt <= :p2", captured.toHql().hql())
+        // @end
+        assertEquals(kotlinIds { it in from..to }, ids(closed.toList()))
+        assertEquals(kotlinIds { it in from..<to }, ids(halfOpen.toList()))
+        assertEquals(kotlinIds { it in period }, ids(captured.toList()))
+        val outside = qb.from(Order::class.java).where { it.updateAt !in from..to }
+        assertEquals("select e0 from Order e0 where :p1 > e0.updateAt or e0.updateAt > :p2", outside.toHql().hql())
+        assertEquals(kotlinIds { it !in from..to }, ids(outside.toList()))
+    }
+
+    @Test
+    fun betweenFromKotlin() {
+        val from = LocalDateTime.of(2026, 2, 1, 0, 0)
+        val to = LocalDateTime.of(2026, 3, 1, 0, 0)
+        // the Java helper works from Kotlin too
+        val q = qb.from(Order::class.java).where { org.lambdaql.Cond.between(it.updateAt, from, to) }
+        assertEquals("select e0 from Order e0 where :p1 <= e0.updateAt and e0.updateAt <= :p2", q.toHql().hql())
+        assertEquals(kotlinIds { it in from..to }, ids(q.toList()))
+        // @start region="own-extension"
+        // your own inline extension: its body is read as part of the lambda (the compiler writes two compareTo calls)
+        val own = qb.from(Order::class.java).where { it.updateAt.isBetween(from, to) }
+        assertEquals("select e0 from Order e0 where e0.updateAt >= :p1 and e0.updateAt <= :p2", own.toHql().hql())
+        // @end
+        assertEquals(kotlinIds { it in from..to }, ids(own.toList()))
     }
 
     /** Minimal Spring context: the datasource chosen by application-test.yaml and the test entities. */

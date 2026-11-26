@@ -628,7 +628,7 @@ assertEquals("select e0 from Order e0 where length(trim(e0.description)) = 0", b
 
 <!-- region: KotlinStringFunctionTest.kt#ignore-case -->
 ```kotlin
-val name = "KIM"
+val name = "Park"
 val q = qb.from(Order::class.java).where { it.description.equals(name, ignoreCase = true) }
 assertEquals("select e0 from Order e0 where lower(e0.description) = lower(:p1)", q.toHql().hql())
 ```
@@ -689,7 +689,7 @@ Kotlin과 결과가 다른 경우:
 - `equals(s, ignoreCase = true)`에서 양쪽이 모두 `null`이면 Kotlin은 `true`이지만, SQL에서는 맞는 행이 없습니다.
 - `substring`의 범위가 텍스트 길이를 넘으면 Kotlin은 예외를 던지지만, SQL은 있는 만큼만 돌려줍니다.
 - Kotlin의 `trim()`과 `isBlank()`는 유니코드 공백 문자를 모두 지우지만, SQL `trim`은 공백만 지웁니다.
-- 길이는 Kotlin에서 UTF-16 단위이고, DB에서는 DB가 세는 문자 수입니다. 이모지 같은 보충 문자에서 값이 다를 수 있습니다.
+- 길이는 Kotlin에서 UTF-16 단위이고, DB에서는 문자 수입니다(MySQL, MariaDB, PostgreSQL은 `character_length`, Oracle은 `length`로 실행됨). 이모지 같은 보충 문자에서 값이 다를 수 있습니다.
 - 대소문자 변환과 비교는 DB 규칙과 콜레이션을 따릅니다.
 - Oracle은 `''`를 NULL로 저장하므로 Oracle에서 `isEmpty()`와 `isBlank()`에 맞는 행이 없습니다.
 
@@ -1074,7 +1074,7 @@ lambdaQL은 분석에 실패하면 코드 `[LQL-xxxx]`와 소스 줄 번호가 �
 | 람다 표현식 안의 람다 표현식 | `ids.any { id -> id == it.id }` | `in`([3.9](#39-in-with-a-captured-collection))이나 서브쿼리 사용 |
 | 같은 의미의 SQL 함수가 없는 문자열 함수와 다른 stdlib 함수(`LQL-3008`). 지원하는 함수는 [3.8.1](#381-string-functions) | `it.description!!.padStart(5)`, `split(",")` | 직접 비교 |
 | `switch`로 컴파일되는 `when`(`LQL-2010`) | `when (it.status.toInt()) { 1, 2 -> true; else -> false }` | `\|\|`로 이은 비교([3.15](#315-when-kotlin-only)) |
-| 범위 객체가 필요한 범위(`LQL-3008`) | `it.customer?.grade in 1..5`, `LocalDateTime` 범위 | 두 비교로 작성([3.14](#314-ranges-kotlin-only)) |
+| nullable 대상의 범위(`LQL-3008`) | `it.customer?.grade in 1..5` | 두 비교로 작성([3.14](#314-ranges-kotlin-only)) |
 | 직접 만든 non-inline 확장 함수 | `it.isOpen()` | `inline fun`으로 만들거나 조건을 직접 작성 |
 | 엔티티의 다른 메서드 | `it.calcSomething()` | 속성만 사용 |
 | 엔티티 컬렉션 경로 | `it.items.size > 0` | `exists()` 서브쿼리 |
@@ -1130,31 +1130,56 @@ assertEquals("select e0 from Order e0 where e0.description >= 'a' and e0.descrip
 | `a..b`, `a until b`, `a..<b`(`Int`, `Double`, `String` 대상) | 예. 비교 두 개 |
 | `!in` | 예. 비교를 뒤집어 `or`로 이음 |
 | 캡처 값 경계(`lo..hi`) | 예. 바인드 파라미터 |
-| nullable 대상(`Int?`), `LocalDate`·`LocalDateTime` 범위 | 아니요(`LQL-3008`) |
+| 날짜·시간과 그 밖의 `Comparable` 범위(`LocalDate`, `LocalDateTime`, `BigDecimal`), 캡처한 범위(`val period = from..to`) | 예. 비교 두 개 |
+| nullable 대상(`Int?`) | 아니요(`LQL-3008`) |
 | `downTo`, `step` | 예. 값을 펼쳐 `in (:p1)`로 바인딩 |
 
 **NULL일 수 있는 대상.** Java 엔티티의 `Integer` 속성(`cnt`)은 플랫폼 타입이라 컴파일러가 비교 두 개로 컴파일합니다. lambdaQL은 null 가드를 추가하지 **않으므로** `cnt`가 NULL인 행은 반환되지 않습니다(SQL 의미).
-`?.`로 얻은 `Int?` 대상과 날짜 범위는 범위 객체로 컴파일되므로 거부됩니다. 비교 두 개로 쓰십시오.
+`?.`로 얻은 `Int?` 대상은 범위 객체로 컴파일되므로 거부됩니다. 비교 두 개로 쓰십시오.
 
 <!-- region: ManualKotlinWhereTest.kt#range-rejected -->
 ```kotlin
-// a range object is not translated: a nullable subject, or a range of dates
+// a range of a nullable subject is a range object: not translated
 val nullable = assertThrows<LambdaQLException> {
     qb.from(Order::class.java).where { it.customer?.grade in 1..5 }.toHql()
 }
 assertTrue(nullable.message!!.startsWith("[LQL-3008]"))
 
-val dates = assertThrows<LambdaQLException> {
-    qb.from(Order::class.java).where { it.updateAt in from..to }.toHql()
-}
-assertTrue(dates.message!!.startsWith("[LQL-3008]"))
-
 // write the two comparisons instead
-val q = qb.from(Order::class.java).where { it.updateAt >= from && it.updateAt <= to }
-assertEquals("select e0 from Order e0 where e0.updateAt >= :p1 and e0.updateAt <= :p2", q.toHql().hql())
+val q = qb.from(Order::class.java).where { it.customer?.grade != null && it.customer!!.grade!! >= 1 && it.customer!!.grade!! <= 5 }
+assertEquals("select e0 from Order e0 join e0.customer j1 where j1.grade is not null and j1.grade >= 1 and j1.grade <= 5", q.toHql().hql())
 ```
 
-예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`ranges`, `range-rejected`).
+**날짜와 시간의 범위.** `LocalDate`, `LocalDateTime` 같은 범위도 비교 두 개가 됩니다. `..<`는 끝을 뺍니다.
+캡처한 범위는 쿼리가 실행될 때 양 끝을 읽어 바인딩합니다.
+
+<!-- region: KotlinTimeCompareTest.kt#range -->
+```kotlin
+// a range of dates: two comparisons; ..< leaves out the end
+val closed = qb.from(Order::class.java).where { it.updateAt in from..to }
+assertEquals("select e0 from Order e0 where :p1 <= e0.updateAt and e0.updateAt <= :p2", closed.toHql().hql())
+
+val halfOpen = qb.from(Order::class.java).where { it.updateAt in from..<to }
+assertEquals("select e0 from Order e0 where :p1 <= e0.updateAt and e0.updateAt < :p2", halfOpen.toHql().hql())
+
+// a captured range: its ends are read when the query runs
+val period = from..to
+val captured = qb.from(Order::class.java).where { it.updateAt in period }
+assertEquals("select e0 from Order e0 where :p1 <= e0.updateAt and e0.updateAt <= :p2", captured.toHql().hql())
+```
+
+시간 범위는 끝을 빼는 `from..<to`를 권합니다. `from..to`로 하루나 한 달을 고르면 끝 시각의 소수 초가 빠질 수 있습니다.
+
+`it.updateAt.between(from, to)` 같은 확장 함수가 필요하면 `inline`으로 직접 만드십시오. `inline` 함수의 본문은 람다 표현식의 일부로 읽힙니다.
+
+<!-- region: KotlinTimeCompareTest.kt#own-extension -->
+```kotlin
+// your own inline extension: its body is read as part of the lambda (the compiler writes two compareTo calls)
+val own = qb.from(Order::class.java).where { it.updateAt.isBetween(from, to) }
+assertEquals("select e0 from Order e0 where e0.updateAt >= :p1 and e0.updateAt <= :p2", own.toHql().hql())
+```
+
+예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`ranges`, `range-rejected`), [`KotlinTimeCompareTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinTimeCompareTest.kt)(`range`, `own-extension`).
 
 <a id="315-when-kotlin-only"></a>
 ## 3.15 `when`(Kotlin 전용)

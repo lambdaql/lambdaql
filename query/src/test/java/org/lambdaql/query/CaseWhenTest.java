@@ -170,6 +170,19 @@ class CaseWhenTest {
         for (int i = 0; i < expected.size(); i++) assertEquals(expected.get(i), actual.get(i), 1e-9);
     }
 
+    @Test
+    void toggleInSet() {
+        // @start region="case-toggle"
+        // a toggle is a value chosen by a condition too
+        ExecutableUpdate<Order> u = qb.update(Order.class).set(o -> o.setActive(!o.isActive())).all();
+        assertEquals("update Order e0 set e0.active = case when e0.active = false then true else false end", u.toHql().hql());
+        // @end
+        java.util.Map<Long, Boolean> before = new java.util.HashMap<>();
+        all().forEach(o -> before.put(o.getId(), o.isActive()));
+        u.execute();
+        all().forEach(o -> assertEquals(!before.get(o.getId()), o.isActive()));
+    }
+
     /** Minimal Spring context: the datasource chosen by application-test.yaml and the test entities. */
     @EnableAutoConfiguration
     @AutoConfigurationPackage(basePackages = "org.lambdaql.query")

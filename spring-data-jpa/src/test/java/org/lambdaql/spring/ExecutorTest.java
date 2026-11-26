@@ -146,9 +146,10 @@ class ExecutorTest {
         assertEquals(ids(byName.subList(2, 4)), ids(page.getContent()));
         assertEquals(2, page.getTotalPages());
 
+        // without a sort there is no order by (D73): any 3 active members, in the order the database gives
         Page<Member> unsortedFirst = repository.findAll(m -> m.isActive(), PageRequest.of(0, 3));
-        assertEquals(all.stream().filter(Member::isActive).map(Member::getId).sorted().limit(3).toList(),
-                ids(unsortedFirst.getContent()));                                // without a sort: by id
+        assertEquals(3, unsortedFirst.getContent().size());
+        assertTrue(unsortedFirst.getContent().stream().allMatch(Member::isActive));
         assertEquals(byName.size(), repository.findAll(m -> m.isActive(), Pageable.unpaged()).getTotalElements());
     }
 
@@ -170,8 +171,8 @@ class ExecutorTest {
                 SortSpec.of(Member.class, m -> desc(m.getGrade())));
         // @end
         assertEquals("Lee", best.orElseThrow().getName());
-        assertEquals(all.stream().filter(Member::isActive).map(Member::getId).min(Comparator.naturalOrder()).orElseThrow(),
-                repository.findFirst(m -> m.isActive()).orElseThrow().getId());
+        // without a sort there is no order by (D73): any active member
+        assertTrue(repository.findFirst(m -> m.isActive()).orElseThrow().isActive());
         assertEquals("Lee", repository.findFirst(m -> m.isActive(), Sort.by(Sort.Order.desc("grade"))).orElseThrow().getName());
 
         // @start region="find-one"

@@ -154,6 +154,7 @@ where o1_0.kind='RUSH'
 | `o.getPrice() > p` | `e0.price > :p1` | `<`, `<=`, `>=`도 마찬가지 |
 | `o.getUpdateAt().compareTo(since) > 0` | `e0.updateAt > :p1` | 날짜와 시간도 `compareTo`로 비교 |
 | `o.getUpdateAt().isAfter(since)` | `e0.updateAt > :p1` | `isBefore`는 `<`, `isEqual`은 `=` |
+| `between(o.getUpdateAt(), from, to)` | `:p1 <= e0.updateAt and e0.updateAt <= :p2` | `org.lambdaql.Cond.between`. 양 끝 포함(SQL `between`과 같음) |
 | `o.getDescription().compareTo("m") < 0` | `e0.description < 'm'` | `compareTo(..) op 0`은 `op`가 됨 |
 
 <!-- region: TimeCompareTest.java#is-after -->
@@ -169,6 +170,17 @@ assertEquals("select e0 from Order e0 where e0.updateAt = :p1", same.toHql().hql
 ```
 
 `isAfter`, `isBefore`, `isEqual`은 `java.time`의 날짜와 시간 타입(`LocalDate`, `LocalDateTime`, `OffsetDateTime`, `Instant` 등)에서 비교가 됩니다.
+
+**범위.** `Cond.between(x, from, to)`는 양 끝을 포함하는 범위입니다. 날짜와 시간 말고도 숫자, 문자열 같은 `Comparable` 값에 쓸 수 있습니다.
+
+<!-- region: TimeCompareTest.java#between -->
+```java
+// Cond.between(x, from, to): both ends included, like SQL between
+SelectQuery<Order> q = qb.from(Order.class).where(o -> between(o.getUpdateAt(), from, to));
+assertEquals("select e0 from Order e0 where :p1 <= e0.updateAt and e0.updateAt <= :p2", q.toHql().hql());
+```
+
+시간 범위는 끝을 빼는 형태(`!o.getUpdateAt().isBefore(from) && o.getUpdateAt().isBefore(to)`)를 권합니다. `between`으로 하루나 한 달을 고르면 끝 시각의 소수 초가 빠질 수 있습니다.
 
 숫자와의 비교(`== 1`이나 `> 100.0`처럼 한쪽이 기본형)는 **SQL 의미**를 따릅니다.
 컬럼이 NULL인 행은 반환되지 않습니다.
@@ -214,7 +226,7 @@ assertEquals("select e0 from Order e0 where e0.cnt in (2.5BD, 3.0BD)", in.hql())
 **부동소수점:** `float`/`double` 컬럼에 대해 lambdaQL은 Java와 비트 단위까지 같은 결과를 약속하지 않습니다.
 캡처한 `NaN`이나 `Infinity` 값은 쿼리가 실행될 때 거부됩니다.
 
-예제 코드: [`SqlMeaningTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)(`whole-number`), [`TimeCompareTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/TimeCompareTest.java)(`is-after`).
+예제 코드: [`SqlMeaningTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)(`whole-number`), [`TimeCompareTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/TimeCompareTest.java)(`is-after`, `between`).
 
 <a id="35-and-or-not"></a>
 ## 3.5 AND, OR, NOT
@@ -316,13 +328,22 @@ ExecutableUpdate<Order> u = qb.update(Order.class).set(o -> o.setPrice(o.getPric
 assertEquals("update Order e0 set e0.price = case when e0.price > 100.0 then (e0.price * 0.9) else e0.price end", u.toHql().hql());
 ```
 
+토글(`!o.isActive()`)도 조건으로 고르는 값이므로 `case when`이 됩니다.
+
+<!-- region: CaseWhenTest.java#case-toggle -->
+```java
+// a toggle is a value chosen by a condition too
+ExecutableUpdate<Order> u = qb.update(Order.class).set(o -> o.setActive(!o.isActive())).all();
+assertEquals("update Order e0 set e0.active = case when e0.active = false then true else false end", u.toHql().hql());
+```
+
 규칙:
 
 - `case`는 분기를 위에서부터 차례로 검사합니다. 그래서 두 번째 이후 분기의 조건은 람다 표현식에 쓴 조건 그대로입니다.
 - `where`에서 비교하는 `case`는 행마다 계산되므로, 데이터베이스는 그 안의 컬럼 인덱스를 쓰지 못합니다. lambdaQL은 이때 `WARN` 수준으로 `LQL-5013`을 기록합니다.
 - 정렬 함수 체인 자체를 조건으로 고르는 형태(`flag ? desc(o.getPrice()) : asc(o.getId())`)는 거부됩니다(`LQL-2023`). 조건은 키 값 안에 쓰십시오.
 
-예제 코드: [`CaseWhenTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/CaseWhenTest.java)(`case-where`, `case-select`, `case-group`, `case-sort`, `case-set`).
+예제 코드: [`CaseWhenTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/CaseWhenTest.java)(`case-where`, `case-select`, `case-group`, `case-sort`, `case-set`, `case-toggle`).
 
 <a id="36-null-rules"></a>
 ## 3.6 NULL 규칙
@@ -754,7 +775,7 @@ assertEquals("select e0 from Order e0 where length(trim(e0.description)) = 0", b
 
 <!-- region: StringFunctionTest.java#ignore-case -->
 ```java
-String name = "KIM";
+String name = "Park";
 SelectQuery<Order> q = qb.from(Order.class).where(o -> o.getDescription().equalsIgnoreCase(name));
 assertEquals("select e0 from Order e0 where lower(e0.description) = lower(:p1)", q.toHql().hql());
 ```
@@ -824,7 +845,7 @@ Java와 결과가 다른 경우:
 - `+`로 NULL을 이어 붙이면 Java는 `"null"`을, SQL은 NULL을 냅니다. Oracle은 NULL을 빈 문자열처럼 이어 붙입니다.
 - `substring`의 범위가 텍스트 길이를 넘으면 Java는 예외를 던지지만, SQL은 있는 만큼만 돌려줍니다.
 - Java의 `trim()`은 코드 32 이하의 모든 문자를 지우지만, SQL `trim`은 공백만 지웁니다.
-- 길이는 Java에서 UTF-16 단위이고, DB에서는 DB가 세는 문자 수입니다. 이모지 같은 보충 문자에서 값이 다를 수 있습니다.
+- 길이는 Java에서 UTF-16 단위이고, DB에서는 문자 수입니다(MySQL, MariaDB, PostgreSQL은 `character_length`, Oracle은 `length`로 실행됨). 이모지 같은 보충 문자에서 값이 다를 수 있습니다.
 - `toLowerCase(Locale)`의 `Locale`은 쓰이지 않습니다. 대소문자 변환과 비교는 DB 규칙과 콜레이션을 따릅니다.
 - Oracle은 `''`를 NULL로 저장하므로 Oracle에서 `isEmpty()`와 `isBlank()`에 맞는 행이 없습니다.
 

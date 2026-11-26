@@ -418,7 +418,6 @@ lambdaQL은 이 목록의 형태에 대해 대부분 명확한 오류를 던집�
 | `where` 없는 `update` / `delete` | `.all()`을 추가 |
 | 같은 문장에서 설정한 뒤 컬럼을 읽기 | 의도적으로 이전 값을 사용하거나 update를 두 번 실행 |
 | 같은 컬럼을 두 번 설정 | 대입 하나 |
-| 조건부 값(`c ? a : b`, 토글 `!o.isActive()`) | `where`가 다른 update 두 개를 사용 |
 | `set` 람다 표현식 안에서 어떤 컬럼을 설정할지 고르는 `if` | `set()`을 여러 번 호출 |
 | 연관의 `@Id`가 아닌 속성 설정(`o.getCustomer().setName(x)`) | `Customer`를 직접 수정 |
 | 필수 컬럼(`@Id`, `nullable = false`, 기본형)에 `null` 넣기 | – |

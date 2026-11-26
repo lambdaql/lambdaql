@@ -26,13 +26,16 @@ class KotlinStringFunctionTest {
 
     private lateinit var qb: QueryBuilder
 
+    /** Oracle stores '' as NULL, and trim('   ') gives NULL there: no text is empty or blank. */
+    private val oracle = System.getProperty("lql.db", "h2") == "oracle"
+
     @BeforeEach
     fun seed() {
         qb = QueryBuilder(emf)
         val em = emf.createEntityManager()
         em.transaction.begin()
         for (e in listOf("Item", "Order", "Customer", "Archive", "VOrder", "IdOrder")) em.createQuery("delete from $e").executeUpdate()
-        for ((i, text) in listOf(" Kim ", "kim", "PARK", "", "   ", null, "lee-01").withIndex()) {
+        for ((i, text) in listOf(" Kim ", "kimi", "PARK", "", "   ", null, "lee-01").withIndex()) {
             em.persist(Order().apply {
                 description = text
                 status = i.toShort()
@@ -64,9 +67,9 @@ class KotlinStringFunctionTest {
         assertEquals("select e0 from Order e0 where lower(e0.description) = 'park'", q.toHql().hql())
         // @end
         assertEquals(kotlinIds { it.lowercase() == "park" }, ids(q.toList()))
-        val upper = qb.from(Order::class.java).where { it.description!!.uppercase() == "KIM" }
-        assertEquals("select e0 from Order e0 where upper(e0.description) = 'KIM'", upper.toHql().hql())
-        assertEquals(kotlinIds { it.uppercase() == "KIM" }, ids(upper.toList()))
+        val upper = qb.from(Order::class.java).where { it.description!!.uppercase() == "KIMI" }
+        assertEquals("select e0 from Order e0 where upper(e0.description) = 'KIMI'", upper.toHql().hql())
+        assertEquals(kotlinIds { it.uppercase() == "KIMI" }, ids(upper.toList()))
     }
 
     @Test
@@ -97,17 +100,17 @@ class KotlinStringFunctionTest {
         // @end
         assertEquals(kotlinIds { it.isEmpty() }, ids(empty.toList()))
         assertEquals(all().filter { it.description.isNullOrEmpty() }.map { it.id }.sorted(), ids(nullOrEmpty.toList()))
-        assertEquals(kotlinIds { it.isBlank() }, ids(blank.toList()))
+        assertEquals(if (oracle) emptyList() else kotlinIds { it.isBlank() }, ids(blank.toList()))
         // isNullOrBlank() is inline: a null check and isBlank()
         val nullOrBlank = qb.from(Order::class.java).where { it.description.isNullOrBlank() }
         assertEquals("select e0 from Order e0 where e0.description is null or length(trim(e0.description)) = 0", nullOrBlank.toHql().hql())
-        assertEquals(all().filter { it.description.isNullOrBlank() }.map { it.id }.sorted(), ids(nullOrBlank.toList()))
+        assertEquals(all().filter { if (oracle) it.description == null else it.description.isNullOrBlank() }.map { it.id }.sorted(), ids(nullOrBlank.toList()))
     }
 
     @Test
     fun equalsIgnoreCase() {
         // @start region="ignore-case"
-        val name = "KIM"
+        val name = "Park"
         val q = qb.from(Order::class.java).where { it.description.equals(name, ignoreCase = true) }
         assertEquals("select e0 from Order e0 where lower(e0.description) = lower(:p1)", q.toHql().hql())
         // @end
@@ -172,7 +175,8 @@ class KotlinStringFunctionTest {
         assertEquals(listOf("PARK"), upper.toList())
         assertEquals(7, sorted.toList().size)
         trim.execute()
-        assertEquals(listOf("", "", "Kim", "PARK", "kim", "lee-01"), all().mapNotNull { it.description }.sorted())
+        val trimmed = if (oracle) listOf("Kim", "PARK", "kimi", "lee-01") else listOf("", "", "Kim", "PARK", "kimi", "lee-01")
+        assertEquals(trimmed, all().mapNotNull { it.description }.sorted())
     }
 
     /** Minimal Spring context: the datasource chosen by application-test.yaml and the test entities. */
