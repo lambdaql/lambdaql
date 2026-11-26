@@ -5,66 +5,46 @@
 
 [マニュアルのホーム](../README.md) | [Kotlin トラック](../kotlin/README.md) | 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md) · [13. Spring Boot 3 と 4](../13-spring-boot-versions.md)
 
-これは lambdaQL マニュアルの **Java トラック** です。このトラックのページには **Java のコードだけ** が載っています。
-クエリを Kotlin で書く場合は、[Kotlin トラック](../kotlin/README.md) を読んでください。同じ番号の同じ章があります。
+lambdaQL マニュアルの **Java トラック** です。このトラックのすべてのページには **Java のコードだけ** があります。
+クエリを Kotlin で書く場合は [Kotlin トラック](../kotlin/README.md) を読んでください。同じ番号の同じ章で構成されています。
 
-lambdaQL は Java と Kotlin のためのクエリライブラリです。
-普通のラムダを書くと、lambdaQL がそのラムダのバイトコードを読み、Hibernate 7 の HQL クエリを組み立てます。
-ラムダが実行されることはありません。
+lambdaQL は JPA と Hibernate の上で動作する、Java・Kotlin 用のクエリライブラリです。
+クエリの条件とソートをラムダ式で書くと、lambdaQL がラムダ式のバイトコードを解析して HQL クエリを作ります。
 
+<!-- region: ManualJavaStartTest.java#readme -->
 ```java
-List<Order> orders = qb.from(Order.class)
-    .where(o -> o.getStatus() == 1 && o.getPrice() > minPrice)
-    .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId()))
-    .limit(20)
-    .toList();
-// HQL: select e0 from Order e0
-//      where e0.status = 1 and e0.price > :p1
-//      order by e0.price desc nulls last, e0.id asc
+import static org.lambdaql.query.By.desc;
+
+double minPrice = 100;
+OrderedSelectQuery<Order> query = qb.from(Order.class)
+        .where(o -> o.getStatus() == 1 && o.getPrice() > minPrice)
+        .orderBy(o -> desc(o.getPrice()).asc(o.getId()))
+        .limit(20);
+assertEquals("select e0 from Order e0 where e0.status = 1 and e0.price > :p1"
+        + " order by e0.price desc, e0.id asc", query.toHql().hql());
+List<Order> orders = query.toList();
 ```
 
-**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 7.4 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。
-
-**データベースごとの SQL（この HQL に対する Hibernate の SQL）** — マニュアルの `Order` には NULL になりうる `Double price` がありますが、テストの `Order` にはないので、`SqlByDatabaseTest` はこの HQL を Hibernate に直接渡します。`expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `readme-first`:
-
-```sql
--- H2
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.price>?
-order by o1_0.price desc,o1_0.id
-fetch first ? rows only
-
--- MariaDB
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.price>?
-order by o1_0.price desc,o1_0.id
-limit ?
-
--- Oracle
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.price>?
-order by o1_0.price desc nulls last,o1_0.id
-fetch first ? rows only
-```
+`toHql()` はクエリを実行せずに HQL を返します。`assertEquals` の文字列が、lambdaQL が作る HQL です。
+`price` と `id` は NULL になれないカラムなので、ソートに `nulls` の部分がありません。
+`desc` と `asc` はクラス `By` のソート関数です（[4.1](04-order-paging.md#41-one-lambda-for-the-whole-sort) を参照）。
 
 > [!NOTE]
 > **例について。**
-> コード例はすべて、Java のテストコードの一部分をそのまま写したものです。コードの上にテストファイルと部分の名前（領域 `name`）を書きます。テストは lambdaQL が作った HQL と、返した行を確認します。
+> コード例はすべて、リポジトリの実行可能な Java コードからそのまま写したものです。
+> 各節の末尾にある「コード例:」の行に、元のファイルへのリンクを載せます。
+> データベースごとの SQL ブロックでは、`…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。
+
+コード例: [`ManualJavaStartTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java)（`readme`）。
 
 <a id="contents"></a>
 ## 目次
 
-「共通」と書いたページは、Java トラックと Kotlin トラックで共有しています。両方の言語の小さな例が、別々のセクションに載っています。
+「共通」と書いたページは、Java トラックと Kotlin トラックで共有します。両方の言語の小さな例が、セクションごとに分かれています。
 
 | # | ページ | 学べること |
 |---|---|---|
-| 1 | [概要](../01-overview.md)（共通） | lambdaQL とは何か、なぜ作ったか、どう動くか |
+| 1 | [概要](../01-overview.md)（共通） | lambdaQL とは何か、なぜ必要か、どう動くか |
 | 2 | [はじめよう](02-getting-started.md) | 必要な環境、ソースからのビルド、エンティティ、`QueryBuilder`、最初のクエリ |
 | 3 | [条件（`where`）](03-where.md) | 演算子、NULL のルール、キャプチャした値、関連のパス |
 | 4 | [ソートとページング](04-order-paging.md) | `orderBy`、`Direction`、NULL の順序、`limit`、`offset` |
@@ -82,20 +62,20 @@ fetch first ? rows only
 <a id="example-entities"></a>
 ## 例で使うエンティティ
 
-例では、すべて次の 3 つのエンティティを使います。コード全体は [はじめよう](02-getting-started.md#example-entities) にあります。
+例では主に、次の 3 つのエンティティを使います。プロパティの型と元のファイルは [はじめよう](02-getting-started.md#example-entities) にあります。
 
 | エンティティ | フィールド |
 |---|---|
-| `Order` | `id`、`price`、`status`、`active`、`description`、`customer`（`Customer` へ）、`updateAt`、`items`（複数の `Item` へ） |
-| `Customer` | `id`、`name`、`grade` |
-| `Item` | `order`（`Order` へ）、`price`、`qty` |
+| `Order` | `id`、`price`、`status`、`active`、`description`、`kind`、`customer`（`Customer` へ）、`updateAt`、`total`、`cnt`、`custName`、`address` |
+| `Customer` | `id`、`name`、`grade`、`orders`（複数の `Order` へ） |
+| `Item` | `id`、`order`（`Order` へ）、`price`、`qty` |
 
 <a id="supported-environment"></a>
 ## 対応環境
 
 | 項目 | バージョン |
 |---|---|
-| Java | 21 |
+| Java | 21 以上 |
 | コンパイラー | javac（Eclipse のコンパイラーである ECJ は保証しません） |
 | Hibernate ORM | 6.6 または 7.4（6.6.53、7.4.13 でテスト済み） |
 | 検証したデータベース | H2 2.3、MariaDB 10.11、MySQL 8.4、PostgreSQL 17、Oracle 23.26 (23ai) |
@@ -104,7 +84,7 @@ fetch first ? rows only
 <a id="help-and-contributions"></a>
 ## ヘルプと貢献
 
-- ソースコード: <https://github.com/codebit0/lambdaql>
+- ソースコード: <https://github.com/lambdaql/lambdaql>
 - 韓国語のマニュアルが原本です。英語、日本語、中国語のマニュアルは翻訳です。
 - 間違いを見つけたら、issue か pull request を作成してください。
 - 設計ドキュメント（韓国語、コントリビューター向け）: [ROADMAP.md](../../../design/ROADMAP.md)、[KOTLIN.md](../../../design/KOTLIN.md)

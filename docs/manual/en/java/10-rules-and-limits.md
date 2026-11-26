@@ -10,93 +10,96 @@ Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../
 <a id="contents"></a>
 ## Contents
 
-- [10.1 The base rule: a lambda is a query](#101-the-base-rule-a-lambda-is-a-query)
-- [10.2 SARGable rule (index friendly SQL)](#102-sargable-rule-index-friendly-sql)
+- [10.1 The base rule: a lambda expression is a query](#101-the-base-rule-a-lambda-is-a-query)
+- [10.2 SARGable rule (index-friendly SQL)](#102-sargable-rule-index-friendly-sql)
 - [10.3 NULL rules](#103-null-rules)
 - [10.4 Operator rules (R1 to R24)](#104-operator-rules-r1-to-r24)
 - [10.5 Java and SQL differences](#105-java-and-sql-differences)
 - [10.6 Database differences](#106-database-differences)
 - [10.7 Not supported, and what to write instead](#107-not-supported-and-what-to-write-instead)
-- [10.8 Caching: a lambda is analyzed once](#108-caching-a-lambda-is-analyzed-once)
-- [10.9 Tested environment]
+- [10.8 Caching: a lambda expression is analyzed once](#108-caching-a-lambda-is-analyzed-once)
+- [10.9 Supported environment](#109-tested-environment)
 
 How to read the examples:
 
-- The comment under an example shows the HQL that lambdaQL makes, when the design states it.
-- Constants written in the lambda (numbers, strings, booleans, `null`, enum constants) are written into the HQL as literals.
-  Captured and computed values are always bind parameters (`:p1`, `:p2`, ...) (D37).
-- Entities: `Order` (`id`, `price`, `status`, `active`, `description`, `customer`, `updateAt`, `items`),
-  `Customer` (`id`, `name`, `grade`), `Item` (`order`, `price`, `qty`).
-  The rows in 10.3 also use these `Order` properties: `cnt` (`Integer`), `custName` (`String`) and `address` (`@Embedded`, `city` and `zip`).
-  In those rows `active` is a nullable `Boolean` with the getter `getActive()`.
+- The string in `assertEquals` is the HQL that lambdaQL builds.
+- Constants written directly in the lambda expression (numbers, strings, booleans, `null`, enum constants) are written into the HQL as literals.
+  Captured values and computed values are always bind parameters (`:p1`, `:p2`, ...).
+- Entities: `Order` (`id`, `price`, `status`, `active`, `description`, `customer`, `updateAt`),
+  `Customer` (`id`, `name`, `grade`, `orders`), `Item` (`order`, `price`, `qty`).
+  The rows of 10.3 also use the `Order` properties `cnt` (`Integer`), `custName` (`String`) and `address` (`@Embedded`, `city` and `zip`).
+  In these rows, `active` is a `Boolean` that can be NULL, and its getter is `getActive()`.
 
 ---
 
 <a id="101-the-base-rule-a-lambda-is-a-query"></a>
-## 10.1 The base rule: a lambda is a query
+## 10.1 The base rule: a lambda expression is a query
 
-lambdaQL **never runs your lambda**. It reads the bytecode and writes HQL.
-A lambda is a query written with Java syntax. So:
+lambdaQL **does not call** condition, sort and assignment lambda expressions. It analyzes their bytecode opcodes and writes HQL.
+Expressions made only of captured values, and constructor calls in `select`, are computed in Java.
+A lambda expression is a query written in Java syntax. So:
 
-1. A path like `o.getCustomer().getName()` **names a column**. It is not a chain of calls.
-   lambdaQL does not check if the customer is null (D20). In `where`, the path is an inner join by default, so an order without a customer is not selected (D36).
-   A null guard (`... == null || ...`) does not change this. The path stays an inner join (D48). Use `leftJoin` to keep orders without a customer.
-   To find those orders, compare the association itself: `o.getCustomer() == null`.
-2. NULL is handled **only where you wrote it** (`== null`, `!= null`) (D22).
-   Other NULLs follow SQL rules. The condition is UNKNOWN and the row is not selected.
-3. Java memory rules (object identity, boxing cache, string intern, NPE) do not apply.
-   `==` between objects means **value equality** (D12).
-4. **When there is no rule for a form, lambdaQL does not guess.** It throws a clear error
-   with a code `[LQL-xxxx]` and the source line. It never makes SQL that is "probably right".
+1. A path such as `o.getCustomer().getName()` **points to a column**. It is not a chain of calls.
+   No getter is called, so there is no `NullPointerException`. A comparison on this path is true only for orders that have a customer.
+   In `where`, if an order without a customer can match the condition, it is a `left join`. If it cannot, it is an inner join. The result is the same as running the lambda expression on a list.
+   With a null guard (`o.getCustomer() == null || ...`), orders without a customer are also selected.
+   To find such orders, compare the association itself: `o.getCustomer() == null`.
+2. NULL is handled **only where you write it** (`== null`, `!= null`).
+   Other NULLs follow the SQL rules. Rows where the compared value is NULL are not returned.
+3. Java memory rules (object identity, the boxing cache, string interning) do not apply.
+   `==` between objects means **value equality**.
+4. **A lambda expression that cannot be analyzed is an error.** If lambdaQL cannot analyze it into a query, it throws an exception with the code `[LQL-xxxx]` and the source line.
 
 <a id="102-sargable-rule-index-friendly-sql"></a>
-## 10.2 SARGable rule (index friendly SQL)
+## 10.2 SARGable rule (index-friendly SQL)
 
 "SARGable" means that the database can use an index for the condition.
 This is a base rule of lambdaQL (design section 3.9).
 
 | # | Rule |
 |---|---|
-| 1 | **Do not put a function, an operator or a `CASE` on the column side.** If a value must change, change the parameter in Java before binding (for example lowercase with `Locale.ROOT`) |
-| 2 | If two forms mean the same, choose the one with only simple comparisons and `AND` / `OR` / `NOT`. Correct 3-valued logic comes first. Inside that, choose the SARGable form |
-| 3 | If the meaning really needs a function on the column (for example ignore case), lambdaQL reads DB metadata at start and uses a path the DB already has: column collation, function index, linguistic index. If there is no path, it logs a WARN per column at start (strict mode: error) |
-| 4 | Each rendering rule is checked with `EXPLAIN` on H2, MariaDB and Oracle |
+| 1 | **No functions, operators or `CASE` on the column side.** If a value must be changed, change the parameter in Java before binding (for example, to lower case with `Locale.ROOT`) |
+| 2 | When two forms have the same meaning, choose the form with only simple comparisons and `AND` / `OR` / `NOT`. Correct three-valued logic comes first, and within that, the SARGable form is chosen |
+| 3 | The rendering rules are based on the `EXPLAIN` results of H2, MariaDB and Oracle |
 
 <a id="examples"></a>
 ### Examples
 
-**Ignore case** (D24). The design uses this rule for the Kotlin `ignoreCase` functions. Java string functions on columns are planned and will follow the same rule.
+**Equality comparisons with simple `=` and `<>`**
 
-| What the DB has | lambdaQL writes | Not this |
-|---|---|---|
-| Case-insensitive collation (MariaDB `_ci`) | `e0.name = :p1` | `lower(e0.name) = lower(:p1)` |
-| Oracle function index `LOWER(name)` | `lower(e0.name) = :p1` (`:p1` lowercased in Java) | `lower(e0.name) = lower(:p1)` |
-| Oracle linguistic index `NLSSORT(... BINARY_CI)` | `e0.name collate binary_ci = :p1` | |
-| No path | WARN at start (strict mode: error) | |
-
-**Equality with plain `=` and `<>`** (decision D48)
-
+<!-- region: ManualJavaRulesTest.java#plain-equals -->
 ```java
-.where(o -> o.getDescription() == text)   // text is not null when the query runs
-// e0.description = :p1
-.where(o -> o.getDescription() != text)
-// e0.description <> :p1                      (a NULL description does not match)
+// when the query runs, text is not null
+SelectQuery<Order> same = qb.from(Order.class).where(o -> o.getDescription() == text);
+assertEquals("select e0 from Order e0 where e0.description = :p1", same.toHql().hql());
+SelectQuery<Order> other = qb.from(Order.class).where(o -> o.getDescription() != text);
+// a NULL description matches neither
+assertEquals("select e0 from Order e0 where e0.description <> :p1", other.toHql().hql());
 ```
 
-lambdaQL never writes `is [not] distinct from`. On Oracle this form becomes `decode(...)`, which cannot use an index.
-Values of the entity follow the SQL meaning, so a plain `=` or `<>` is always correct. A captured `null` is bound as NULL and matches no row (`LQL-4045` at `WARN` level).
+lambdaQL does not write `is [not] distinct from`. On Oracle this form becomes `decode(...)`, which cannot use an index.
+Entity values follow SQL meaning, so a simple `=` or `<>` is always correct. A captured value `null` is bound as NULL and matches no row (`LQL-4045` at `WARN` level).
 
-**Comparing two boolean expressions** (D25)
+**In a comparison of a boolean column with a condition**, the condition side becomes `case when`, which cannot use an index (`LQL-5013` at `WARN` level). If you split the two cases with `&&` and `||`, it becomes `AND`/`OR`.
 
+<!-- region: ManualJavaWhereTest.java#boolean-compare -->
 ```java
-.where(o -> o.isActive() == (o.getStatus() > c))
-// (e0.active = true and e0.status > :p1) or (e0.active = false and e0.status <= :p1)
+int s = 1;
+// a boolean column compared with a condition: the condition becomes case when
+SelectQuery<Order> compared = qb.from(Order.class).where(o -> o.isActive() == (o.getStatus() > s));
+assertEquals("select e0 from Order e0 where e0.active = case when e0.status > :p1 then true else false end",
+        compared.toHql().hql());
+// the same rows with && and ||: plain comparisons that an index can serve
+SelectQuery<Order> query = qb.from(Order.class)
+        .where(o -> (o.isActive() && o.getStatus() > s) || (!o.isActive() && o.getStatus() <= s));
+assertEquals("select e0 from Order e0 where (e0.active = true and e0.status > :p1)"
+        + " or (e0.active = false and e0.status <= :p2)", query.toHql().hql());
 ```
 
-The `CASE` form (`e0.active = case when ... end`) gives the right rows but needs a full scan,
-so lambdaQL does not use it.
+The `CASE` form (`e0.active = case when ... end`) gives the correct rows but needs a full scan, so
+lambdaQL does not use it.
 
-**NOT IN with a subquery** is written as `NOT IN` (the SQL meaning, D48). A NULL in the subquery gives no rows. To skip NULLs, add a null check to the subquery (see 10.3).
+**NOT IN with a subquery** is written as `NOT IN` (SQL meaning). If the subquery has a NULL, no rows are returned. To skip NULLs, add a null check to the subquery (see 10.3).
 
 <a id="what-the-measurements-showed"></a>
 ### What the measurements showed
@@ -105,408 +108,405 @@ MariaDB 10.11 and Oracle 23ai, 20,000 to 50,000 rows:
 
 | Form | MariaDB | Oracle | OK? |
 |---|---|---|---|
-| `name = 'abc'` on a `_ci` column | index lookup | – | Yes |
-| `LOWER(name) = LOWER('abc')` | full index scan (19,791 rows) | full table scan (no function index) | **No** |
-| `lower(name) = :p_lowered` + function index | – | index range scan (also `LIKE 'ab%'`) | Yes |
-| `name COLLATE BINARY_CI = :p` + linguistic index | – | index range scan | Yes |
-| Boolean `==` as `AND`/`OR` | range (350 rows) | 2 index range scans + bitmap OR | Yes |
-| Boolean `==` as `CASE` | full index scan (49,648 rows) | full table scan | **No** |
-
-<a id="planned-items-under-the-same-rule"></a>
-### Planned items under the same rule
-
-| Form | Planned SQL |
-|---|---|
-| Date functions like "year of `updateAt` is 2024" | `e0.updateAt >= :from and e0.updateAt < :to` |
-| Sort by a function key (`lower(name)`) | Check the access path first, WARN if none |
+| `name = 'abc'` on a `_ci` column | Index lookup | – | Yes |
+| `LOWER(name) = LOWER('abc')` | Full index scan (19,791 rows) | Full table scan (no function index) | **No** |
+| `lower(name) = :p_lowered` + function index | – | Index range scan (also `LIKE 'ab%'`) | Yes |
+| `name COLLATE BINARY_CI = :p` + linguistic index | – | Index range scan | Yes |
+| Boolean `==` written with `AND`/`OR` | range (350 rows) | 2 index range scans + bitmap OR | Yes |
+| Boolean `==` written with `CASE` | Full index scan (49,648 rows) | Full table scan | **No** |
 
 <a id="db-functions-on-a-column"></a>
 ### DB functions on a column
 
 A DB function on the column side (`OrderFns.discount(o.getPrice()) > 10`) cannot use a normal index.
-lambdaQL logs a **WARN** (`LQL-5001`). Exception: on Oracle, there is no WARN when a function-based index with the same expression exists.
-On MariaDB, a function that is `NOT DETERMINISTIC` (the default) gives a full scan even when its arguments are only parameters (`o.getPrice() > OrderFns.discount(rate)`), so lambdaQL warns in this case too (`LQL-5007`).
-With `SargableMode.STRICT`, the analysis fails instead of warning (`LQL-3066`, decision D50).
+lambdaQL logs a **WARN** (`LQL-5001`). Exception: on Oracle, it is not logged when there is a function-based index on the same expression.
+On MariaDB, a `NOT DETERMINISTIC` (the default) function causes a full scan even when its arguments are only parameters (`o.getPrice() > OrderFns.discount(rate)`), so lambdaQL also warns in this case (`LQL-5007`).
+In `SargableMode.STRICT`, the analysis fails instead of warning (`LQL-3066`).
 
-**SARGable mode** (decision D50). `SargableMode` has three values.
+**SARGable mode**. `SargableMode` has three values.
 
-- `OFF`: no checks, and no metadata is read.
-- `WARN` (the default): warnings are logged.
+- `OFF`: no check, and no metadata query.
+- `WARN` (default): logs warnings.
 - `STRICT`: in the cases where `WARN` would log a warning (`LQL-5001`, `LQL-5007`, `LQL-5012`), the analysis fails with `org.lambdaql.NonSargableException` (`LQL-3066`).
 
-Set the mode per persistence unit with `SargablePolicy.register(emf, SargableMode.STRICT)`, and remove it with `SargablePolicy.unregister(emf)`. In Spring, use `lambdaql.sargable.mode=STRICT` (see [12](12-spring-data-jpa.md)).
-The check runs once per lambda, when the analysis result goes into the shared cache. So register the mode before the first query.
+Set it per persistence unit with `SargablePolicy.register(emf, SargableMode.STRICT)`, and remove it with `SargablePolicy.unregister(emf)`. In Spring, use `lambdaql.sargable.mode=STRICT` (see [12](12-spring-data-jpa.md)).
+The check runs once per lambda expression, when the analysis result is put into the shared cache. So register the mode before the first query.
 
-**Arithmetic on a column** (decision D50).
+**Arithmetic on a column**.
 
-- `+ - * /` with one column and values only (`o.getCnt() * 2 > n`) can be moved to the value side. lambdaQL logs `LQL-5012` at `WARN` level, and it is an error with `STRICT`.
-- Arithmetic between columns (`o.getPrice() * o.getCnt() > n`) and `%` cannot be moved, so lambdaQL only logs `LQL-5013` at `DEBUG` level. They are allowed with `STRICT` too.
-- The moved form must have the same meaning. Divide by a decimal, as in `o.getCnt() > n / 2.0`. The integer division `n / 2` gives different rows for `>=`, `=`, `<` and for a negative `n`. If you multiplied by a negative number, turn the compare around. The `LQL-5012` message explains this.
-- lambdaQL does not look up whether an index exists to reduce the warnings. Because of privileges and synonyms, "no index" and "unknown" get mixed up, and arithmetic on a column is a rare form.
-
+- `+ - * /` with only one column and values (`o.getCnt() * 2 > n`) can be moved to the value side. lambdaQL logs `LQL-5012` at `WARN` level, and it is an error in `STRICT`.
+- Arithmetic between columns (`o.getPrice() * o.getCnt() > n`) and `%` cannot be moved, so `LQL-5013` is logged only at `DEBUG` level. It is allowed also in `STRICT`.
+- The moved form must have the same meaning. Divide by a decimal, like `o.getCnt() > n / 2.0`. The integer division `n / 2` gives different rows for `>=`, `=`, `<` and a negative `n`. If you multiplied by a negative number, reverse the comparison. The `LQL-5012` message explains this.
+- Reducing warnings by looking up whether an index exists was not adopted. Because of permissions and synonyms, "no index" and "unknown" get mixed, and column arithmetic is a rare form.
 See [8. Procedures and DB functions](08-procedures-functions.md).
+
+Example code: [`ManualJavaRulesTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaRulesTest.java) (`plain-equals`), [`ManualJavaWhereTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java) (`boolean-compare`).
 
 <a id="103-null-rules"></a>
 ## 10.3 NULL rules
 
-| Lambda | SQL | NULL behavior |
+| Lambda expression | SQL | NULL behavior |
 |---|---|---|
-| `o.getId() == 10L` (unboxing, a primitive on one side) | `e0.id = 10` | NULL: UNKNOWN, row not selected (Java would throw NPE) |
-| `o.getId() == p` (two objects: `Long`, `String`, enum, ...) | `e0.id = :p1` | NULL column: not selected. A captured `null`: no matching row (`= NULL`, `LQL-4045` at `WARN` level) |
-| `o.getDescription() != p` | `e0.description <> :p1` | NULL column: **not** selected (SQL meaning, D48; Java would select it). A captured `null`: no matching row |
-| `o.getDescription() == o.getCustName()` (two values of the entity) | `e0.description = e0.custName` | NULL on either side: not selected, and NULL and NULL too (SQL meaning, D48) |
-| `o.getDescription().equals(p)` | `e0.description = :p1` | NULL description: UNKNOWN (Java would throw NPE) |
-| `Objects.equals(o.getDescription(), p)`, `"x".equals(o.getDescription())`, `Boolean.TRUE.equals(o.getActive())` | the same as `==` | the same as `==` |
+| `o.getId() == 10L` (unboxing, one side is a primitive type) | `e0.id = 10` | NULL: the row is not returned |
+| `o.getId() == p` (two objects: `Long`, `String`, enum, ...) | `e0.id = :p1` | Column is NULL: not selected. Captured value `null`: no row matches (`= NULL`, `LQL-4045` at `WARN` level) |
+| `o.getDescription() != p` | `e0.description <> :p1` | Column is NULL: **not** selected (SQL meaning. Java would select it). Captured value `null`: no row matches |
+| `o.getDescription() == o.getCustName()` (two entity values) | `e0.description = e0.custName` | Either side is NULL: not selected. Also for NULL and NULL (SQL meaning) |
+| `o.getDescription().equals(p)` | `e0.description = :p1` | description is NULL: the row is not returned |
+| `Objects.equals(o.getDescription(), p)`, `"x".equals(o.getDescription())`, `Boolean.TRUE.equals(o.getActive())` | Same as `==` | Same as `==` |
 | `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | NULL: not selected (SQL meaning) |
 | `!o.getActive()` (nullable `Boolean`) | `e0.active = false` | NULL: not selected (NULL is not false) |
-| `x == null`, `x != null` | `is null`, `is not null` | 2-valued |
-| `o.getCnt() >= 2.5` (integer column, decimal value) | compares the value as written: a constant is a literal (`e0.cnt >= 2.5`), a captured value and an IN list are also decimal literals (`e0.cnt >= 2.5BD`, `in (2.5BD, 3.0BD)`, D48 B8) | the index range scan stays (measured on MariaDB). The value is no longer cut, which returned wrong rows before |
-| A whole value object (`@Embedded`): `o.getAddress().equals(addr)`, `Objects.equals(o.getAddress(), addr)`, `!o.getAddress().equals(addr)` | expanded per column: `e0.address.city = :p1 and e0.address.zip = :p2`, the negation is `<> ... or ...`. `== null` is `is null` on every column (and), `!= null` is `is not null` (or) | SQL meaning per column (D48): a NULL column matches neither `=` nor `<>`. A captured object that is `null`: no matching row (`LQL-4045` at `WARN` level) |
-| `o.getId() == null` on a column that can never be NULL (the id, a primitive, `nullable = false`, no association step on the path) | `1=0`. Next to a compare, the check is dropped: `o.getId() != null && o.getId() == id` gives `e0.id = :p1` | The column has no NULL. A path through an association (`o.getCustomer().getId()`) keeps the check |
-| `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL 3-valued logic |
-| `o.getCustomer().getName()` in `where` | `j1.name` + `join e0.customer j1` (inner join by default) | No customer: the order is not selected |
-| `o.getCustomer() == null \|\| o.getCustomer().getName().equals(p)` | `e0.customer is null or j1.name = :p1` + `join e0.customer j1` | No customer: **not** selected (inner join, D48; `LQL-5009` at `DEBUG` level). Use `leftJoin` to keep them |
-| `o.getCustomer().getName()` only in `orderBy` or `select` | `j1.name` + `left join e0.customer j1`. A required association (`optional = false`) gives `join` | No customer: the column is NULL |
-| `o.getCustomer() == null`, `o.getCustomer() != null` | `e0.customer is null`, `e0.customer is not null` (FK column, no join) | Orders without a customer / with a customer |
-| `o.getCustomer().getId()` | `e0.customer.id` (FK column, no join) | No customer: NULL |
-| `ids.contains(o.getId())` | `e0.id in (:p1)` | NULL id: not selected |
-| `!ids.contains(o.getId())` | `e0.id not in (:p1)`. The same for a column that can be NULL | NULL value: **not** selected (SQL meaning, D48; `LQL-5009` at `DEBUG` level; Java would select it) |
-| A subquery with `!...contains(x)` | `x not in (select ...)` | A NULL in the subquery: no row is selected (SQL meaning, D48) |
+| `x == null`, `x != null` | `is null`, `is not null` | Two-valued |
+| `o.getCnt() >= 2.5` (integer column, decimal value) | Compared as written: constants are literals (`e0.cnt >= 2.5`), and captured values and IN lists are also decimal literals (`e0.cnt >= 2.5BD`, `in (2.5BD, 3.0BD)`) | Keeps the index range scan (measured on MariaDB). The value is no longer cut, which returned wrong rows before |
+| A whole value object (`@Embedded`): `o.getAddress().equals(addr)`, `Objects.equals(o.getAddress(), addr)`, `!o.getAddress().equals(addr)` | Expanded per column: `e0.address.city = :p1 and e0.address.zip = :p2`, and the negation is `<> ... or ...`. `== null` is `is null` on all columns (and), `!= null` is `is not null` (or) | SQL meaning per column: a NULL column matches neither `=` nor `<>`. If the captured object is `null`, no row matches (`LQL-4045` at `WARN` level) |
+| `o.getId() == null` on a column that cannot be NULL (id, primitive, `nullable = false`, no association step in the path) | `1=0`. Used with a comparison, the check is removed: `o.getId() != null && o.getId() == id` is `e0.id = :p1` | The column has no NULL. A path through an association (`o.getCustomer().getId()`) keeps the check |
+| `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR` | SQL three-valued logic |
+| `o.getCustomer().getName().equals(p)` in `where` | `j1.name = :p1` + `join e0.customer j1` | Without a customer, the order is not selected |
+| `o.getStatus() == 1 \|\| o.getCustomer().getName().equals(p)` | `e0.status = 1 or j1.name = :p1` + `left join e0.customer j1` | Selected when status is 1, even without a customer |
+| `o.getCustomer() == null \|\| o.getCustomer().getName().equals(p)` | `e0.customer is null or j1.name = :p1` + `left join e0.customer j1` | Selected without a customer (same as Java) |
+| `o.getCustomer() == null \|\| o.getCustomer().getName() == null` | `e0.customer is null or (e0.customer is not null and j1.name is null)` + `left join e0.customer j1` | `e0.customer is not null` is added to an `is null` comparison through a path |
+| `o.getCustomer().getName()` used only in `orderBy` or `select` | `j1.name` + `left join e0.customer j1`. A required association (`optional = false`) uses `join` | Without a customer, the column is NULL |
+| `o.getCustomer() == null`, `o.getCustomer() != null` | `e0.customer is null`, `e0.customer is not null` (FK column, no join) | Orders without a customer / orders with a customer |
+| `o.getCustomer().getId()` | `e0.customer.id` (FK column, no join) | NULL without a customer |
+| `ids.contains(o.getId())` | `e0.id in (:p1)` | id is NULL: not selected |
+| `!ids.contains(o.getId())` | `e0.id not in (:p1)`. The same for a column that can be NULL | NULL value: **not** selected (SQL meaning. `LQL-5009` at `DEBUG` level. Java would select it) |
+| A subquery with `!...contains(x)` | `x not in (select ...)` | If the subquery has a NULL, no row is selected (SQL meaning) |
 | `Agg.sum`, `avg`, `min`, `max` | `sum(...)` ... | NULL when there are no rows or all values are NULL |
 | `Agg.count()` | `count(*)` | 0 when there are no rows |
 
 <a id="captured-null-values"></a>
-### Captured null values
+### null captured values
 
 | Where the captured value is | `null` allowed? |
 |---|---|
-| `==` / `!=` between objects, `Objects.equals`, `col.equals(p)`, `p.equals(col)` | Yes, but no row matches (`= NULL`). `LQL-4045` at `WARN` level when the query runs |
-| Under a null guard on the same value: `p == null \|\| o.getStatus() > p` | Yes. The guard is decided in Java when the query runs: `p == null` gives no filter, any other value gives `e0.status > :p1`. A compare with only an unboxing to the value's own primitive type does not depend on where the guard is |
-| Unboxing compare (`o.getPrice() > p`, `Double p`) | Yes, but no row matches (`> NULL`). An unboxing to the value's own primitive type is not run. `LQL-4045` at `DEBUG` level when the query runs |
-| A method call on a captured value (`p.trim()`), an unboxing to a different primitive type (`p.intValue()`, `Double p`) | **No.** Error when the value is computed in Java (`LQL-4012`; Java would throw NPE) |
-| A collection with a `null` element in `in` | **No.** Error when bound |
+| `==` / `!=` between objects, `Objects.equals`, `col.equals(p)`, `p.equals(col)` | Yes. But no row matches (`= NULL`). `LQL-4045` is logged at `WARN` level when the query runs |
+| Under a null guard on the same value: `p == null \|\| o.getStatus() > p` | Yes. The guard is decided in Java when the query runs. If `p == null`, there is no filter. Otherwise it is `e0.status > :p1`. For a comparison with only an unboxing to its own primitive type, the position of the guard does not matter |
+| An unboxing comparison (`o.getPrice() > p`, `Double p`) | Yes. But no row matches (`> NULL`). The unboxing to its own primitive type is not run. `LQL-4045` is logged at `DEBUG` level when the query runs |
+| A method call on a captured value (`p.trim()`), an unboxing that converts to another primitive type (`p.intValue()`, `Double p`) | **No.** An error when the value is computed in Java (`LQL-4012`) |
+| A `null` element in a collection used for `in` | **No.** An error at binding |
 | `NaN`, `Infinity` | **No.** Always an error |
 
 <a id="104-operator-rules-r1-to-r24"></a>
 ## 10.4 Operator rules (R1 to R24)
 
-This is the short form of the rule table in the design (section 3.6).
+A short form of the rule table in the design (section 3.6).
 
-| # | Lambda form | Meaning |
+| # | Lambda expression form | Meaning |
 |---|---|---|
-| R1 | Primitive compare, or one side primitive (`o.getId() == 10L`, `o.getStatus() > p`) | `=`, `<>`, `<`, ... SQL NULL rules |
-| R2 | Object `==` / `!=` (`Long`, `String`, `Boolean`, enum) | Value equality, not object identity. `=` / `<>` with the SQL meaning (D48). A captured `null` matches no row |
+| R1 | Primitive comparison, or one side is a primitive type (`o.getId() == 10L`, `o.getStatus() > p`) | `=`, `<>`, `<`, ... SQL NULL rules |
+| R2 | Object `==` / `!=` (`Long`, `String`, `Boolean`, enum) | Value equality, not object identity. `=` / `<>` with SQL meaning. A captured value `null` matches no row |
 | R3 | `x == null`, `x != null` | `IS NULL`, `IS NOT NULL` |
 | R4 | `a.equals(b)` | `a = b`, SQL NULL rules |
-| R5 | `Objects.equals(a, b)`, `"x".equals(a)`, `Boolean.TRUE.equals(a)` | The same as R2 |
-| R6 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR`. SQL 3-valued logic |
-| R7 | String value compare | Follows the **DB collation** (case, trailing spaces). Oracle treats `''` as NULL |
-| R8 | Entity `==` entity | Planned: identifier equality. Not in v0.1 |
-| R9 | Captured value | Bind parameter with the value at run time |
-| R10 | Property access | Getter call, mapped to the JPA attribute |
+| R5 | `Objects.equals(a, b)`, `"x".equals(a)`, `Boolean.TRUE.equals(a)` | Same as R2 |
+| R6 | `!`, `&&`, `\|\|` | `NOT`, `AND`, `OR`. SQL three-valued logic |
+| R7 | String value comparison | Follows the **database collation** (case, trailing spaces). Oracle treats `''` as NULL |
+| R8 | Entity `==` entity | Rejected (`LQL-3011`). Compare the ids |
+| R9 | Captured value | A bind parameter with the value at run time |
+| R10 | Property access | Getter call, mapped to a JPA property |
 | R11 to R23 | Kotlin rules | See the [Kotlin version of this page](../kotlin/10-rules-and-limits.md) |
-| R24 | Association path (`o.getCustomer().getName()`) | A column. To-one association: an alias shared by where, order by and select. In `where` it is always an inner join (D48; use `leftJoin` to keep rows without the association). Used only in order by or select, it is a `left join` (a required association with `optional = false` is an inner join, A4). Embedded: the same table. Ends with the target `@Id`, or the association compared with `null`: FK column, no join. Collection: error |
+| R24 | Association path (`o.getCustomer().getName()`) | A column. To-one association: an alias shared by where, order by and select. In `where`, a `left join` if a row without the association can match the condition, otherwise an inner join (the result is the same as running the lambda expression on a list). Used only in order by or select: a `left join` (an inner join for a required association `optional = false`, A4). Embedded: the same table. Ending with the target `@Id`, or comparing the association with `null`: the FK column, no join. Collection: error |
 
 Other rules:
 
-- `x.compareTo(y) > 0`, `isBefore`, `isAfter` become `x > y` and so on.
-- Constants written in the lambda (also `static final` compile-time constants) are literals: `o.getPrice() > 100` is `e0.price > 100.0`, and `"O'Brien"` is `'O''Brien'`. Captured and computed values (`new BigDecimal("1.5")`) are bind parameters (D37). Exception: a decimal captured value compared with an integer column is a decimal literal (`2.5BD`, D48 B8).
-- javac sometimes moves `!` around (De Morgan, double negation). This never changes the result.
-  lambdaQL keeps each condition exactly once and never "simplifies" your logic.
-- A condition you wrote that is always true in Java (`x > 5 || !(x > 5)`) is not simplified.
-  In SQL it drops rows where `x` is NULL. This is the SQL rule.
-- IntelliJ warns "Number objects compared using `==`" for `o.getId() == p`. In a lambdaQL lambda this is
-  the intended form (value equality). Use `@SuppressWarnings("NumberEquality")` if you want.
+- `x.compareTo(y) > 0`, `isBefore` and `isAfter` become `x > y` and so on.
+- Constants written directly in the lambda expression (including compile-time `static final` constants) are literals: `o.getPrice() > 100` is `e0.price > 100.0`, and `"O'Brien"` is `'O''Brien'`. Captured values and computed values (`new BigDecimal("1.5")`) are bind parameters. Exception: a decimal captured value compared with an integer column is a decimal literal (`2.5BD`).
+- javac sometimes moves `!` (De Morgan, double negation). The result does not change.
+  lambdaQL keeps each condition exactly once and does not "simplify" the logic.
+- Even if you write a condition that is always true in Java (`x > 5 || !(x > 5)`), it is not simplified.
+  In SQL, rows where `x` is NULL are left out. This is the SQL rule.
+- IntelliJ warns "Number objects compared using `==`" on `o.getId() == p`. Inside a lambdaQL lambda expression,
+  this is the intended form (value equality). Declare `@SuppressWarnings("NumberEquality")` on the method to remove the warning.
 
-Which Java types give R1 and which give R2: see [9.3](09-java-notes.md#93-equality-of-boxed-values).
+For which Java types become R1 and which become R2, see [9.3](09-java-notes.md#93-equality-of-boxed-values).
 
 <a id="105-java-and-sql-differences"></a>
 ## 10.5 Java and SQL differences
 
 These differences come from SQL itself. They are not compiler problems.
-"G" numbers are the IDs in the design (section 2.7).
+The "G" numbers are IDs from the design (section 2.7).
 
 | # | Difference | What lambdaQL does |
 |---|---|---|
-| G1 | `!Objects.equals(status, 1)` is true in Java when `status` is NULL, but `status <> 1` is UNKNOWN in SQL | Renders `status <> 1`: the SQL meaning (D48). NULL rows are left out, and `LQL-5009` is logged at `DEBUG` level. Write `status == null \|\| ...` to keep them |
-| G2 | `!Boolean.TRUE.equals(active)`, `!active` (nullable) and Java | Renders `active <> :p1` and `active = false`: a NULL Boolean is not false (SQL meaning) |
-| G3 | `name = ?` with a NULL parameter returns 0 rows | Kept (SQL meaning, D48). lambdaQL logs `LQL-4045` at `WARN` level when it runs. Write `x == null` to find NULL |
-| G4 | `status NOT IN (1, NULL)` always returns 0 rows | A `null` in a captured collection is an error. A subquery `NOT IN` keeps the SQL meaning (D48): add a null check to the subquery |
-| G5 | Java throws NPE (unboxing, `o.getName().startsWith(...)`), but SQL just returns rows | Documented: an entity NULL follows SQL rules |
-| G6 | `NaN`: H2 sorts NaN as the largest value and `NaN = NaN` is true; MariaDB cannot store it; Oracle can store it only in `BINARY_DOUBLE` | A captured NaN or Infinity is an error. A stored NaN follows the DB |
-| G7 | `float` column compared with a `double` value: results differ by DB | **No bit-exact Java result is promised** for float/double. lambdaQL adds no `CAST`. Choose your column mapping yourself (for example Oracle `binary_float` / `binary_double`) |
-| G9 | `x > 5 \|\| !(x > 5)` drops NULL rows | Not simplified. Rendered as written |
-| G10 | SQL does not promise evaluation order: `qty != 0 && total / qty > 2` can still divide by zero | `/`, `%`, `CAST` under a guard are rejected in v0.1 (D13) |
-| G11 | Strings: MariaDB `_ci` ignores case and trailing spaces; Oracle stores `''` as NULL; Oracle `NLS_SORT` follows the JVM locale | Documented: string compare and sort follow the DB. On Oracle, set `NLS_SORT=BINARY` (session init or `-Duser.language=en`). `"".equals(x)` and `isEmpty()` behave differently on Oracle |
-| G12 | Java `==` on objects is identity (false for `Long` 128 and up, `new String`) | lambdaQL defines `==` as value equality |
-| G13 | Legacy boolean columns (MariaDB `TINYINT(1)`, Oracle `NUMBER(1)`) that hold values other than 0/1 are read differently | Hibernate's own DDL (`bit(1)`, Oracle 23 `boolean`) is fine. Take care with legacy schemas |
-| G14 | Oracle 23 bug: `WHERE (a AND b) = false` / `IS FALSE` / `IS NULL` on a compound condition loses rows | lambdaQL never wraps a compound condition in a boolean test. Negation is always `NOT(...)` |
-| G15 | Oracle `CHAR` columns do not match a `String` bind | Documented: take care with the entity mapping |
+| G1 | When `status` is NULL, `!Objects.equals(status, 1)` is true in Java, but SQL `status <> 1` does not return that row | Rendered as `status <> 1`: SQL meaning. NULL rows are left out, and `LQL-5009` is logged at `DEBUG` level. To keep these rows, write `status == null \|\| ...` |
+| G2 | `!Boolean.TRUE.equals(active)`, `!active` (nullable) and Java | Rendered as `active <> :p1`, `active = false`: a NULL Boolean is not false (SQL meaning) |
+| G3 | `name = ?` with a NULL parameter returns 0 rows | Kept as it is (SQL meaning). `LQL-4045` is logged at `WARN` level at run time. To find NULL, write `x == null` |
+| G4 | `status NOT IN (1, NULL)` always returns 0 rows | `null` in a captured collection is an error. A subquery `NOT IN` keeps the SQL meaning: add a null check to the subquery |
+| G5 | A column value of the entity is NULL | Documented: that row is not returned, by the SQL rules |
+| G6 | `NaN`: H2 sorts NaN as the largest value and `NaN = NaN` is true, MariaDB cannot store it, Oracle can store it only in `BINARY_DOUBLE` | A captured NaN or Infinity is an error. A stored NaN follows the database |
+| G7 | Comparing a `float` column with a `double` value: the result differs by database | For float/double, **results the same as Java down to the bit are not promised**. lambdaQL does not add `CAST`. Choose the column mapping yourself (for example, Oracle `binary_float` / `binary_double`) |
+| G9 | `x > 5 \|\| !(x > 5)` leaves out NULL rows | Rendered as written, without simplification |
+| G10 | SQL does not promise an evaluation order: even `qty != 0 && total / qty > 2` can divide by zero | Rendered as written. Do not rely on the guard; compare without division ([3.12](03-where.md#312-errors-that-depend-on-order-of-evaluation)) |
+| G11 | Strings: MariaDB `_ci` ignores case and trailing spaces, Oracle stores `''` as NULL, Oracle `NLS_SORT` follows the JVM locale | Documented: string comparison and sorting follow the database. On Oracle, set `NLS_SORT=BINARY` (session initialization or `-Duser.language=en`). On Oracle, `"".equals(x)` and `isEmpty()` behave differently |
+| G12 | Java `==` on objects is identity (false for `Long` 128 or more, and `new String`) | lambdaQL defines `==` as value equality |
+| G13 | Legacy boolean columns with values other than 0/1 (MariaDB `TINYINT(1)`, Oracle `NUMBER(1)`) are read differently | DDL built by Hibernate (`bit(1)`, Oracle 23 `boolean`) is fine. Take care with legacy schemas |
+| G14 | Oracle 23 bug: `WHERE (a AND b) = false` / `IS FALSE` / `IS NULL` on a compound condition loses rows | lambdaQL does not wrap compound conditions in boolean tests. Negation is always `NOT(...)` |
+| G15 | An Oracle `CHAR` column does not match a `String` bind | Documented: take care with the entity mapping |
 
 More differences:
 
 | Difference | Java | SQL | lambdaQL |
 |---|---|---|---|
-| `BigDecimal` equality | `equals` compares scale (`1.0` and `1.00` gives false) | `=` compares value | Value equality |
-| Integer division | `5 / 2` is `2` | MariaDB gives `2.5` | DB-dependent. The final rule is not decided. It may be rejected in v0.1 |
-| `BigDecimal` division and function results | Java scale rules | The DB decides the scale (for example 1 on H2, 0 on MariaDB and Oracle for a function result) | Documented |
-| Unicode ignore-case (`ſ`, `İ`) | Java rules | DB collation | Follows the DB |
-| String length | UTF-16 units | H2 UTF-16 units, MariaDB code points | Documented |
-| String concatenation with NULL | `"null"` text | NULL (Oracle: `NULL \|\| 'x'` is `'x'`) | String concatenation is planned, not in v0.1 |
-| `LocalDateTime.now()` in a lambda | App time | – | Bound as **app time**. DB time (`current_timestamp`) is not supported |
-| Equal elements in a `Set` | `equals` / `hashCode` decide | The primary key tells rows apart | `toSet()` and `findSet()` throw `IllegalStateException` if the set is smaller than the number of rows (the entity's `equals` / `hashCode` treats different rows as equal, or its `@Id` is not unique, for example a view). Use `toList()` (D42) |
+| `BigDecimal` equality | `equals` compares the scale (`1.0` and `1.00` is false) | `=` compares the value | Value equality |
+| Integer division | `5 / 2` is `2` | MariaDB gives `2.5` | Depends on the database. Avoid integer `/` with a column |
+| `BigDecimal` division and function results | Java scale rules | The database sets the scale (for example, for function results H2 gives 1, MariaDB and Oracle give 0) | Documented |
+| Unicode case-insensitivity (`ſ`, `İ`) | Java rules | Database collation | Follows the database |
+| String length | UTF-16 units | H2 uses UTF-16 units, MariaDB uses code points | Documented |
+| String concatenation with NULL | The text `"null"` | NULL (Oracle: `NULL \|\| 'x'` is `'x'`) | String concatenation in a lambda expression is rejected (`LQL-2007`) |
+| `LocalDateTime.now()` in a lambda expression | App time | – | Bound as **app time**. Database time (`current_timestamp`) is not supported |
+| Equal elements of a `Set` | Decided by `equals` / `hashCode` | Rows are told apart by the primary key | If the Set is smaller than the number of rows, `toSet()` and `findSet()` throw `IllegalStateException` (when the entity's `equals` / `hashCode` treats different rows as equal, or the `@Id` is not unique, for example a view). Use `toList()` |
 
 <a id="106-database-differences"></a>
 ## 10.6 Database differences
 
-lambdaQL hides many differences. Some you must know.
+lambdaQL hides many differences. Some you need to know.
 
 <a id="sorting-and-paging"></a>
 ### Sorting and paging
 
 | Item | H2 | MariaDB | Oracle | lambdaQL |
 |---|---|---|---|---|
-| NULL position, `ASC` | first | first | **last** | `ASC` means NULLS FIRST on all DBs (D16) |
-| NULL position, `DESC` | last | last | **first** | `DESC` means NULLS LAST on all DBs (D16) |
-| `NULLS FIRST/LAST` syntax | yes | **no** (syntax error) | yes | Hibernate emulates it with `CASE` on MariaDB: **no index** for the sort |
+| NULL position, `ASC` | First | First | **Last** | `ASC` is NULLS FIRST on all databases |
+| NULL position, `DESC` | Last | Last | **First** | `DESC` is NULLS LAST on all databases |
+| `NULLS FIRST/LAST` syntax | Yes | **No** (syntax error) | Yes | Hibernate emulates it with `CASE` on MariaDB: the sort **cannot use an index** |
 | Paging SQL | `offset ? rows fetch first ? rows only` | `limit ?,?` | `offset ? rows fetch first ? rows only` | Passed to Hibernate (`setFirstResult` / `setMaxResults`) |
-| Order of equal rows | – | – | random | With paging, lambdaQL adds the root `@Id asc` when the keys do not contain the id. It does not add it when there is a unique key that can never be NULL (`unique = true` and `nullable = false`, `@NaturalId`) (A5) |
-| String order | case-sensitive | `_ci` | `NLS_SORT` (JVM locale) | Follows the DB |
-| Implicit path in `order by` | inner join (rows lost) | same | same | lambdaQL uses `left join` (an inner join for a required association, or the `where` join of the same path) |
-| `@Lob` column in `order by`, `distinct`, `group by` | works | works | **ORA-22848 / ORA-22849** | The query is not changed. `LQL-5010` is logged at `DEBUG` level (B3) |
-| Sort on an `@Enumerated(EnumType.STRING)` enum column | name order | name order | name order | The query is not changed. `LQL-5011` is logged at `DEBUG` level (B2). Declaration order only with an `ORDINAL` mapping |
+| Order of rows with the same value | – | – | Random | When paging and the keys have no id, lambdaQL adds the root `@Id asc`. Not added when there is a unique key that cannot be NULL (`unique = true` and `nullable = false`, `@NaturalId`) |
+| String order | Case-sensitive | `_ci` | `NLS_SORT` (JVM locale) | Follows the database |
+| Implicit path in `order by` | Inner join (loses rows) | Same | Same | lambdaQL uses a `left join` (an inner join for a required association, or the `where` join of the same path) |
+| `@Lob` column in `order by`, `distinct`, `group by` | Works | Works | **ORA-22848 / ORA-22849** | Does not change the query and logs `LQL-5010` at `DEBUG` level |
+| Sorting by an enum column with `@Enumerated(EnumType.STRING)` | By name | By name | By name | Does not change the query and logs `LQL-5011` at `DEBUG` level. Declaration order only with the `ORDINAL` mapping |
 
-lambdaQL writes `nulls first` / `nulls last` into the HQL for every key that can be NULL. It does not write it for a path that goes only through required associations and can never be NULL. Hibernate drops it when it is the database default.
-The default (`ASC` = NULLS FIRST, `DESC` = NULLS LAST) is the same as H2 and MariaDB, so no extra SQL is
+lambdaQL writes `nulls first` / `nulls last` in the HQL for every key that can be NULL. It does not write it for a path that goes only through required associations and cannot be NULL. Hibernate leaves it out when it is the same as the database default.
+The defaults (`ASC` = NULLS FIRST, `DESC` = NULLS LAST) are the same as on H2 and MariaDB, so no extra SQL is
 needed there. Only Oracle gets a `NULLS` clause. To change the NULL position, use
-`by.asc(key, false)` (nulls last) or `by.desc(key, true)` (nulls first) (D35). On MariaDB these use the `CASE` emulation.
+`asc(key, Nulls.LAST)` (NULL last) or `desc(key, Nulls.FIRST)` (NULL first). On MariaDB, these use the `CASE` emulation.
 
 <a id="conditions-and-values"></a>
 ### Conditions and values
 
 | Item | H2 | MariaDB | Oracle |
 |---|---|---|---|
-| `is not distinct from` | native | `<=>` (uses an index) | `decode(...)` (no index). lambdaQL does not write this form (D48) |
-| `is [not] true`, `coalesce(boolean, false)` | works | works | **ORA-00932**. lambdaQL never writes them |
-| Empty string `''` | a value | a value | **NULL** |
-| Case and trailing spaces | exact | `_ci`: ignored | exact (`NLS_SORT` for sorting) |
-| `NaN` | stored, largest value | cannot be stored | `BINARY_DOUBLE` only |
-| `float` columns | REAL literal rules | widened to double | Hibernate maps `Float` to `float(24)` (decimal) |
-| Integer `/` | integer | **decimal** (`5/2 = 2.5`) | – |
-| Large `IN` list (1,500 values) | works | works | works on 23ai (the 1,000 limit of Oracle 22 and lower was not measured) |
+| `is not distinct from` | Native | `<=>` (uses an index) | `decode(...)` (no index). lambdaQL does not use this form |
+| `is [not] true`, `coalesce(boolean, false)` | Works | Works | **ORA-00932**. lambdaQL does not use them |
+| Empty string `''` | A value | A value | **NULL** |
+| Case and trailing spaces | Exact match | `_ci`: ignored | Exact match (sorting with `NLS_SORT`) |
+| `NaN` | Stored, the largest value | Cannot be stored | Only `BINARY_DOUBLE` |
+| `float` column | REAL literal rules | Widened to double | Hibernate maps `Float` to `float(24)` (decimal) |
+| Integer `/` | Integer | **Decimal** (`5/2 = 2.5`) | – |
+| Large `IN` list (1,500 values) | Works | Works | Works on 23ai (the 1,000 limit of Oracle 22 and earlier was not measured) |
 
 <a id="subqueries"></a>
 ### Subqueries
 
 | Item | What happens | lambdaQL |
 |---|---|---|
-| Subquery `order by` without `limit` | Oracle: syntax error (ORA-00907). MariaDB: ignored | Removed, with a WARN |
+| Subquery `order by` without `limit` | Oracle: syntax error (ORA-00907). MariaDB: ignored | Removed with a WARN |
 | MariaDB `IN (... limit n)` | Not supported (error 1235) | Wrapped automatically: `in (select x.id from (... limit n) x)` |
-| MariaDB `lateral` | Wrong results (emulation) | Rewritten with `row_number() over (...)` (not implemented yet) |
 
 <a id="update-insert-delete"></a>
 ### Update, insert, delete
 
 | Item | What happens | lambdaQL |
 |---|---|---|
-| `SET a = ..., b = a + 1` (read a column after you set it) | MariaDB reads the **new** value, H2 and Oracle read the old value | Error at analysis time (U3) |
-| Association path in DML (`o.getCustomer().getName()`) | Hibernate makes different joins per DB and **loses rows** with no customer | lambdaQL writes a correlated scalar subquery (in `where` and in SET). In `where`, a path that a select would inner join also gets `customer.id is not null`. So the DML changes the same rows as the query (U9) |
-| `DELETE` with a subquery on the same table | MariaDB error 1093 | The target ids are read first through a derived table: `d0.id in (select t.id from (select e0.id as id … where <condition>) t)` (U17). This works with correlated subqueries too, and it deletes the same rows on the three DBs (measured). `update` is not wrapped (it works on MariaDB too) |
-| The same enum value bound once for a STRING and an ORDINAL column | H2 and MariaDB store a **wrong value without error** | One parameter per place, never shared (U7) |
-| Many rows in `values(list, ...)` | Oracle: hard limit of 65,535 binds (ORA-01745), very slow long before that | Split into statements of at most 500 values, and all statements run in one transaction (U13) |
-| `update` / `delete` with `order by ... limit` | MariaDB rejects `limit` in an `in` subquery (error 1235) and a subquery that reads the target table (error 1093) | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: the derived table `t` works on all three databases. The inner select uses the joins of the query (D36), so it targets the same rows as the query |
-| `on conflict` / upsert | H2 and Oracle: `merge`. MariaDB: `insert ... on duplicate key update`, and an updated row counts as 2. Hibernate's `do nothing` fails on H2 and Oracle | `upsert` and `onConflict(...).update(...)` use Hibernate's form. `ignore()` is written as `insert ... select ... where not exists`. The row count is returned as it is (D40) |
+| `SET a = ..., b = a + 1` (reading a column after setting it) | MariaDB reads the **new** value, H2 and Oracle read the old value | Error at analysis time |
+| Association paths in DML (`o.getCustomer().getName()`) | Hibernate builds different joins for each database and **loses rows** without a customer | lambdaQL writes correlated scalar subqueries (`where` and SET). In `where`, it also adds `customer.id is not null` for a path that a select would inner join (not for a path it would `left join`). So DML applies to the same rows as the query |
+| `DELETE` with a subquery on the same table | MariaDB error 1093 | Reads the target ids first through a derived table: `d0.id in (select t.id from (select e0.id as id … where <condition>) t)`. It also works for correlated subqueries and deletes the same rows on three databases (measured). `update` is not wrapped (it works on MariaDB too) |
+| Binding the same enum value only once for a STRING column and an ORDINAL column | H2 and MariaDB store a **wrong value without an error** | One parameter per position, never shared |
+| Many rows in `values(list, ...)` | Oracle: a fixed limit of 65,535 binds (ORA-01745), and very slow long before that | Split into 500 values or fewer per statement, and all statements run in one transaction |
+| `update` / `delete` with `order by ... limit` | MariaDB rejects `limit` in an `in` subquery (error 1235) and a subquery that reads the target table (error 1093) | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: the derived table `t` makes it work on all three databases. The inner select uses the joins of select, so it targets the same rows as select |
+| `on conflict` / upsert | H2 and Oracle use `merge`. MariaDB uses `insert ... on duplicate key update` and counts an updated row as 2. Hibernate's `do nothing` fails on H2 and Oracle | `upsert` and `onConflict(...).update(...)` use Hibernate's form. `ignore()` is written as `insert ... select ... where not exists`. The row count is returned as it is |
 
 <a id="procedures-and-functions"></a>
 ### Procedures and functions
 
 | Item | H2 | MariaDB | Oracle |
 |---|---|---|---|
-| OUT / INOUT parameters | **no** | yes | yes |
-| Several result sets | no | yes | yes (REF CURSOR) |
-| Affected row count of a procedure | – | – | always -1, so lambdaQL does not offer it. Use an OUT parameter |
-| Boolean parameters and results | – | yes | 23ai and later |
-| Stored function in a virtual column / function index | – | not possible (error 1901) | possible (function-based index) |
+| OUT / INOUT parameters | **No** | Yes | Yes |
+| Multiple result sets | No | Yes | Yes (REF CURSOR) |
+| Affected row count of a procedure | – | – | Always -1. So lambdaQL does not provide it. Use an OUT parameter |
+| Boolean parameters and results | – | Yes | 23ai or later |
+| Stored functions in virtual columns / function indexes | – | Not possible (error 1901) | Possible (function-based index) |
 
-Because H2 has no OUT parameters, procedure features are checked on MariaDB and Oracle.
+H2 has no OUT parameters, so check procedure features on MariaDB or Oracle.
 
 <a id="107-not-supported-and-what-to-write-instead"></a>
 ## 10.7 Not supported, and what to write instead
 
-lambdaQL throws a clear error for every form in this list. "Planned" means a later version.
+For most forms in this list, lambdaQL throws a clear error.
 
 <a id="lambda-form-and-loading"></a>
-### Lambda form and loading
+### Lambda expression form and loading
 
-| Not supported | Write instead |
+| Not supported | Write this instead |
 |---|---|
-| Anonymous class, non-`Serializable` functional interface (`java.util.function.Predicate`) | A lambda literal or a method reference |
-| Block lambda with local variables, loops, `switch`, `try` | One expression. Compute values outside the lambda |
-| Writing a captured variable | Compute outside the lambda (Java also needs captured locals to be effectively final) |
-| Lambdas compiled by ECJ (Eclipse compiler) | Not guaranteed. Tested with javac only |
-| When running on Java 21–23, lambdas compiled for a newer JDK than the bundled ASM knows | Update ASM (lambdaQL does not shade ASM). Does not apply when running on Java 24 or later (`java.lang.classfile` is used) |
+| Anonymous classes, functional interfaces that are not `Serializable` (`java.util.function.Predicate`) | A lambda expression literal (getter method references are also possible for sort keys) |
+| A method reference as a condition (`where(Order::isActive)`, `LQL-1009`) | A lambda expression: `where(o -> o.isActive())` |
+| Block lambda expressions with local variables, loops, `switch` or `try` | One expression. Compute values outside the lambda expression |
+| Writing to captured variables | Compute outside the lambda expression (Java also requires captured local variables to be effectively final) |
+| Lambda expressions compiled with ECJ (the Eclipse compiler) | Not guaranteed. Use javac |
+| On Java 21 to 23, lambda expressions compiled for a newer JDK that the bundled ASM does not know | Update ASM (lambdaQL does not shade ASM). Not relevant when running on Java 24 or later (`java.lang.classfile` is used) |
 
 <a id="conditions"></a>
 ### Conditions
 
-| Not supported | Write instead |
+| Not supported | Write this instead |
 |---|---|
-| General ternary `c ? x : y`, value ternary `o.getId() == (c ? p1 : p2)` | `&&` / `\|\|`. Choose the value outside the lambda. `CASE WHEN` is planned |
-| (Supported: `c ? x : false`, `c ? true : x`, `c ? false : true`) | They mean `AND`, `OR`, `NOT` |
-| Non-short-circuit `&`, `\|`, `^` | `&&`, `\|\|` |
-| `/`, `%`, `CAST` under a guard (`qty != 0 && total / qty > 2`) | Compare without division: `qty > 0 && total > 2 * qty` |
-| Entity `==` entity (`o.getCustomer() == c`) | `o.getCustomer().getId() == c.getId()` (planned: identifier equality) |
-| Size compare of a value object (`@Embedded`), compare with a different type (`LQL-3012`) | Compare the fields. An equality compare with the same type (`equals`, `==`, `!=`, `null`) is supported |
-| Collection path (`o.getItems()...`, `@OneToMany`, `@ManyToMany`) | An `exists()` subquery, or a join |
-| `o.getItems().contains(x)` | An `exists()` subquery |
-| Collection built inside the lambda (`List.of(1, 2)`) | Build it outside and capture it. (`groupBy` keys are the exception) |
-| A `null` element in a captured collection | Remove nulls. Add `\|\| x == null` if you want NULL rows |
+| Boolean ternary operator `c ? x : y` | `&&` / `\|\|`. A ternary operator that chooses a value is supported: a bind parameter with only captured values and constants, and `case when` with entity values ([3.5.1](03-where.md#351-values-chosen-by-a-condition)) |
+| (Supported: `c ? x : false`, `c ? true : x`, `c ? false : true`) | They mean `AND`, `OR` and `NOT` |
+| `&`, `\|`, `^`, which do not short-circuit | `&&`, `\|\|` |
+| Entity `==` entity (`o.getCustomer() == c`) | `o.getCustomer().getId() == c.getId()` (`LQL-3011`) |
+| A size comparison of value objects (`@Embedded`), a comparison with another type (`LQL-3012`) | Compare the fields. Equality comparison with the same type (`equals`, `==`, `!=`, `null`) is supported |
+| Collection paths (`c.getOrders()...`, `@OneToMany`, `@ManyToMany`, `LQL-3010`) | An `exists()` subquery or a join |
+| `c.getOrders().contains(x)` | An `exists()` subquery |
+| A collection built inside the lambda expression (`List.of(1, 2)`) | Build it outside and capture it. (`groupBy` keys are the exception) |
+| `null` elements in a captured collection | Remove the nulls. If you want NULL rows, add `\|\| x == null` |
 | Captured `NaN` / `Infinity` | Check the value before the query |
 | `isNaN()` | – |
-| Any other method call on an entity value (`o.items(...)`, your own methods) | Write the condition from columns |
-| String concatenation (`o.getDescription() + "_x"`, also `"A" + code`) | Build the string outside the lambda. Concatenation with columns is planned |
-| Streams and other lambdas inside the lambda | `contains` on a captured collection, or a subquery |
+| Other method calls on entity values (`o.items(...)`, your own methods) | Write the condition with columns |
+| String concatenation (`o.getDescription() + "_x"`, also `"A" + code`) | Build the string outside the lambda expression (`LQL-2007`) |
+| Streams and other lambda expressions inside the lambda expression | `contains` on a captured collection, or a subquery |
 
 <a id="functions-and-strings"></a>
 ### Functions and strings
 
-| Not supported (v0.1) | Write instead |
+| Not supported | Write this instead |
 |---|---|
-| Java `String` methods on entity values (`startsWith`, `contains`, `trim`, `toUpperCase`) | Planned |
+| Java `String` methods on entity values (`trim`, `toUpperCase` and others, `LQL-3008`). `startsWith`, `endsWith` and `contains` are supported as `like` | – |
 | Date functions (`YEAR(col) == 2024`) | A range: `o.getUpdateAt() >= from && o.getUpdateAt() < to` |
-| `@SqlFunction` with a generic return type (`<X> X nvl(X, X)`), or an entity, collection or `void` return | One of: `Double`, `Integer`, `Long`, `BigDecimal`, `String`, `LocalDate`, `LocalDateTime`, `Boolean` |
+| `@SqlFunction` that returns a generic type (`<X> X nvl(X, X)`), an entity, a collection or `void` | One of: `Double`, `Integer`, `Long`, `BigDecimal`, `String`, `LocalDate`, `LocalDateTime`, `Boolean` |
 | `@SqlFunction` with the same name as a Hibernate built-in function (`COALESCE`, `ROUND`, `SYSDATE`, ...) | Use a prefix or a schema name (`PUBLIC.SQ_FN`) |
-| Functional interface constants as DB functions, mixins | Interface `static` method |
-| Your own static methods on entity values without `@SqlFunction` | A DB function with `@SqlFunction`, or a condition from columns |
-| User aggregate or window functions | Planned |
-| Calling `Agg.*` outside a query lambda, or in `where` | Use it in `select` / `having` |
+| Functional interface constants or mixins used as DB functions | Interface `static` methods |
+| Your own static methods on entity values without `@SqlFunction` | DB functions with `@SqlFunction`, or conditions built from columns |
+| User aggregate functions or window functions | – |
+| Calling `Agg.*` outside a query lambda expression or in `where` | Use it in `select` / `having` |
+| Calling a sort function of `By` outside a sort lambda expression (`IllegalStateException`, `LQL-4046`) | Use it inside the lambda expression of `orderBy`, `SortSpec.of` or `then` |
 
 <a id="sort-and-paging"></a>
-### Sort and paging
+### Sorting and paging
 
-| Not supported | Write instead |
+| Not supported | Write this instead |
 |---|---|
-| A condition or loop in the sort lambda (`if (x) by.asc(...)`) | Build two queries, or pass the `Direction` as a captured value: `by.sort(o.getPrice(), dir)` |
-| `orderBy` twice, `where` after `orderBy`, `orderBy` after `limit` | One `orderBy` with all keys (these forms do not compile) |
-| An entity as a sort key (`by.desc(o.getCustomer())`) | A column: `by.desc(o.getCustomer().getName())` (does not compile) |
-| Method references in join sort lambdas | A lambda |
-| One text with a sort name and a direction (`"price,desc_nulls_last"`), not implemented yet | `Direction.parse(text)` for the direction and `SortSpec.ofPath` for the name. The sort policy checks the name ([4.10](04-order-paging.md#sort-policy)) |
-| Sort by a column of the joined entity or by an association path in `distinct()` on a join result (J7, `LQL-3046`) | Sort by a column of the main entity itself, or use an `exists` subquery |
-| Collection fetch join with `limit` / `offset` | Page first, then load the collection |
-| `ignoreCase()` in a Spring `Sort` ([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)), not supported yet | A sort without `ignoreCase()` |
-| Function keys (`lower(name)`) | Planned |
-| Sort by an aggregate alias (`by.desc(s.total())`) | Planned |
+| Conditions or loops in a sort lambda expression (`if (x) asc(...)`) | Build two queries, or pass `Direction` as a captured value: `sort(o.getPrice(), dir)` |
+| A `Direction` argument used with sort functions (`orderBy(o -> desc(o.getPrice()), dir)`, `LQL-3069`) | `orderBy(o -> sort(o.getPrice(), dir))` or one key: `orderBy(o -> o.getPrice(), dir)` |
+| One string with both a sort name and a direction (`"price,desc_nulls_last"`) | `Direction.parse(text)` for the direction, `SortSpec.ofPath` for the name. The sort policy checks the name ([4.10](04-order-paging.md#sort-policy)) |
+| Sorting by a column of a joined entity or an association path with `distinct()` on a join result (`LQL-3046`) | Sort by a column of the main entity itself, or use an `exists` subquery |
+| A collection fetch join with `limit` / `offset` | Page first, then load the collection |
+| `ignoreCase()` of Spring `Sort` ([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)) | A sort without `ignoreCase()` |
+| Function keys (`lower(name)`) | – |
+| Sorting by an aggregate alias (`desc(s.total())`) | – |
 
 <a id="limits-subqueries"></a>
 ### Subqueries
 
-| Not supported | Write instead |
+| Not supported | Write this instead |
 |---|---|
-| `first()` in a scalar compare that is not one row | Use an aggregate (`max`, `min`, `avg`, `sum`, `count`) or `orderBy(...).limit(1)...first()` |
-| `orderBy` in a subquery without `limit` | It has no effect, so it is removed (WARN) |
+| `first()` in a scalar comparison that is not one row | Use an aggregate (`max`, `min`, `avg`, `sum`, `count`) or `orderBy(...).limit(1)...first()` |
+| `orderBy` in a subquery without `limit` | Removed because it has no effect (WARN) |
 
 <a id="select-and-group-by"></a>
 ### Select and group by
 
-| Not supported | Write instead |
+| Not supported | Write this instead |
 |---|---|
 | A non-aggregate value in `select` / `having` that is not a `groupBy` key | Add it to `groupBy` |
-| A plain DTO class as the row type of a derived table or CTE | A Java record |
+| A normal DTO class as the row type of a derived table or CTE | A Java record |
 | `Set.of(...)` as `groupBy` keys | `List.of(...)` |
 
 <a id="limits-update-insert-delete"></a>
 ### Update, insert, delete
 
-| Not supported (v0.1) | Write instead |
+| Not supported | Write this instead |
 |---|---|
-| `update` / `delete` without `where` | Add `.all()` (without it, `execute()` does not compile) |
-| Reading a column after you set it in the same statement | Use the old value on purpose, or run two updates |
+| `update` / `delete` without `where` | Add `.all()` |
+| Reading a column after setting it in the same statement | Use the old value on purpose, or run two updates |
 | Setting the same column twice | One assignment |
-| Conditional values (`c ? a : b`, toggle `!o.isActive()`) | Planned (`CASE WHEN`). Use two updates with different `where` |
-| `if` inside the `set` lambda to choose which column to set | Call `set()` several times |
-| Setting a non-`@Id` property of an association (`o.getCustomer().setName(x)`) | Update `Customer` directly |
-| `null` into a required column (`@Id`, `nullable = false`, primitive) | – |
-| Writing the `@Version` property yourself | lambdaQL uses `update versioned` for you |
-| String concatenation in values | Planned |
-| An explicit join in update or delete | Not added (D51). Use an association path (U9) or `sub` (D49) |
-| `insert ... select` with an explicit join | Planned. In v0.1, use many-to-one paths |
-| An atomic `onConflict(...).ignore()` under concurrent inserts | Handle the duplicate key error (`ignore()` uses `not exists`, see [7.6](07-6-upsert.md)) |
-| Upsert from `insert ... select` | Upsert row by row with `values(list, ...)` |
-| `orderBy(...)` on update or delete without `limit(n)` | Add `limit(n)`, or remove `orderBy` (`IllegalStateException` otherwise) |
-| An update or delete that must change one row, checked with `execute() == 1` and a rollback | `executeOne()`: it reads the ids first (at most 2). With 2 it changes nothing and throws `NonUniqueResultException`. With 1 it changes that row by `id = :p and (condition)`. It never changes more than one row (D41) |
-| `executeOne()` together with `orderBy` or `limit` | Use only one of them (`IllegalStateException` otherwise) |
-| `offset` on update or delete | Not planned (D42). DML has only `limit(n)`. Choose the target rows with `where`, `orderBy(...)` and `limit(n)` |
-| `limit` or `executeOne()` on an entity with a composite key | Not supported yet. Query the ids first, then `delete ... where ids.contains(id)` |
-| DML with a Spring shared `EntityManager` and no transaction (lambdaQL has no `@Transactional`, D41) | Call it inside `@Transactional` or a `TransactionTemplate` |
-| Cascade or `@PreRemove` expected from the repository method `deleteAll(where)` (a bulk delete) | Use Spring Data's `deleteAll(Iterable)` or `delete(entity)` (see [12.4](12-spring-data-jpa.md#deleteallwhere-is-not-spring-datas-deleteall)) |
-| `returning` | Query again after the DML |
-| DB time (`current_timestamp`) | Pass app time (`LocalDateTime.now()` is bound as a value) |
-| `insert ... select` with a `TABLE` id generator | Use `values(...)`, or IDENTITY / SEQUENCE |
-| `insert` into a JOINED or TABLE_PER_CLASS subclass | Not supported (Hibernate 6.6.5 fails, 7.4 not measured) |
+| Conditional values (`c ? a : b`, the toggle `!o.isActive()`) | Use two updates with different `where` |
+| An `if` in a `set` lambda expression that chooses which column to set | Call `set()` many times |
+| Setting a property of an association that is not its `@Id` (`o.getCustomer().setName(x)`) | Update `Customer` directly |
+| Putting `null` into a required column (`@Id`, `nullable = false`, primitive) | – |
+| Writing the `@Version` property directly | lambdaQL uses `update versioned` instead |
+| String concatenation in values | – |
+| Explicit joins in update or delete | Will not be added. Use association paths or `sub` |
+| `insert ... select` with explicit joins | Use many-to-one paths |
+| `onConflict(...).ignore()` that is atomic for concurrent inserts | Handle the duplicate key error (`ignore()` uses `not exists`. See [7.6](07-6-upsert.md)) |
+| Upsert with `insert ... select` | Upsert row by row with `values(list, ...)` |
+| `orderBy(...)` on an update or delete without `limit(n)` | Add `limit(n)` or remove `orderBy` (otherwise `IllegalStateException`) |
+| Checking an update or delete that must change one row with `execute() == 1` and a rollback | `executeOne()`: reads at most 2 ids first. With 2, it changes nothing and throws `NonUniqueResultException`. With 1, it changes that row with `id = :p and (condition)`. It never changes two or more rows |
+| `executeOne()` together with `orderBy` or `limit` | Use only one of them (otherwise `IllegalStateException`) |
+| `offset` on update or delete | Not planned. DML has only `limit(n)`. Choose the target rows with `where`, `orderBy(...)` and `limit(n)` |
+| `limit` or `executeOne()` on an entity with a composite key | Select the ids first, then `delete ... where ids.contains(id)` |
+| Running DML without a transaction with Spring's shared `EntityManager` (lambdaQL has no `@Transactional`) | Call it inside `@Transactional` or `TransactionTemplate` |
+| Expecting cascade or `@PreRemove` from the repository method `deleteAll(where)` (bulk delete) | Use Spring Data's `deleteAll(Iterable)` or `delete(entity)` (see [12.4](12-spring-data-jpa.md#deleteallwhere-is-not-spring-datas-deleteall)) |
+| `returning` | Select again after the DML |
+| Database time (`current_timestamp`) | Pass the app time (`LocalDateTime.now()` is bound as a value) |
+| `insert ... select` with a `TABLE` id generator | Use `values(...)` or IDENTITY / SEQUENCE |
+| `insert` into JOINED or TABLE_PER_CLASS subclasses | Not supported (Hibernate 6.6.5 fails; 7.4 not measured) |
 
-One more note for DML: bulk DML does not go through the persistence context. Hibernate flushes first, but
-managed entities in the same session keep their old values afterwards. Call `clear()` (or `refresh`).
+One more point about DML: bulk DML does not go through the persistence context. Hibernate flushes first, but
+managed entities in the same session keep their old values after that. Call `clear()` (or `refresh`).
 JPA cascade and `orphanRemoval` do not apply.
-A DML statement needs a transaction. `QueryBuilder(EntityManagerFactory)` opens its own transaction. A builder with an `EntityManager` (also Spring's shared `EntityManager`) uses the caller's transaction, and without one it fails before any SQL is sent.
+DML statements need a transaction. `QueryBuilder(EntityManagerFactory)` opens its own transaction. Builders that use an `EntityManager` (including Spring's shared `EntityManager`) use the caller's transaction, and without a transaction they fail before any SQL is sent.
 
 <a id="procedures"></a>
 ### Procedures
 
-| Not supported | Write instead |
+| Not supported | Write this instead |
 |---|---|
-| Anything except one stub method call in the lambda (logs, nested calls, branches) | One call. Compute the arguments before |
-| `exec` for a procedure that has OUT parameters | `call` |
-| DB default values for arguments | Pass every argument |
-| Calling one overload of an Oracle package procedure (an overloaded name is detected: `LQL-4044`), dynamic procedure names | Planned |
+| Anything other than one stub method call in the lambda expression (logs, nested calls, branches) | One call. Compute the arguments beforehand |
+| `exec` on a procedure with OUT parameters | `call` |
+| Database default values of arguments | Pass all arguments |
+| Choosing and calling one overload of an Oracle package procedure (names with overloads are detected: `LQL-4044`), dynamic procedure names | – |
 | Oracle implicit results (`DBMS_SQL.RETURN_RESULT`), MariaDB packages, paging of procedure results | Not supported |
 
 <a id="108-caching-a-lambda-is-analyzed-once"></a>
-## 10.8 Caching: a lambda is analyzed once
+## 10.8 Caching: a lambda expression is analyzed once
 
-Reading bytecode is the slow part, so lambdaQL does it **once per lambda**.
+Reading bytecode opcodes is the slow part, so lambdaQL does it **once per lambda expression**.
 
 | Item | Rule |
 |---|---|
-| What is cached | The analysis result: an HQL template and the list of parameter sources. Failures are cached too |
-| Cache key | The lambda's implementation class and method (name, signature, kind), the lambda's type, the entity classes, and the **ClassLoader** |
-| Size | Limited (LRU), so it cannot grow forever and does not leak class loaders |
-| Not cached | The bytecode itself (it is cheap to read again and large to keep) |
-| Captured values | **Never cached.** They are read and bound each time the query runs |
+| What is cached | The analysis result: the HQL template and the list of parameter sources. Failures are cached too |
+| Cache key | The implementation class and method of the lambda expression (name, signature, kind), the type of the lambda expression, the entity class, and the **ClassLoader** |
+| Size | Limited (LRU). So it does not grow without end and does not leak class loaders |
+| What is not cached | The bytecode opcodes themselves (reading them again is cheap, and keeping them is large) |
+| Captured values | **Not cached.** Read and bound each time the query runs |
 | Calls on captured objects (`order.getDescription().trim()`, `this.field`, `LocalDateTime.of(...)`) | Run in Java **each time** the query runs, then bound as one parameter |
-| Captured-only conditions (`p != null && ...`) | Kept as `:p1 is not null`, not folded into a constant, so the cache stays correct |
+| Conditions with only captured values (`p != null && ...`) | Not folded into a constant; kept as `:p1 is not null`. So the cache stays correct |
 | `Direction` as a captured value | A bind value, read each time (the structure stays cached) |
-| DML | Analyzed once per lambda class. Checks between `set()` calls use small summaries |
+| DML | Analyzed once per lambda expression class. Checks between `set()` calls use small summaries |
 
-Measured with prototypes (JDK 21): the first analysis of a new lambda takes about **0.2 ms**.
-After that, an update with two `set()` calls costs about **0.1 to 0.2 µs** for cache lookup, value extraction and checks.
-This stays the same after 2 million runs. The goal: 1,000 calls of the same lambda read the
-bytecode only once. Hibernate also caches its query plan by HQL string.
+Measured with a prototype (JDK 21): the first analysis of a new lambda expression takes about **0.2 ms**.
+After that, an update with two `set()` calls costs about **0.1 to 0.2 µs** for the cache lookup, value extraction and checks.
+This is the same even after 2 million runs. Goal: even if the same lambda expression is called 1,000 times, the bytecode opcodes are
+read only once. Hibernate also caches query plans by HQL string.
 
 What this means for you:
 
+<!-- region: ManualJavaRulesTest.java#cache-shape -->
 ```java
-// Good: one lambda, the value changes
-.where(o -> o.getStatus() == status)
-
-// Not possible in v0.1: the shape of the query changes inside the lambda
-.where(o -> flag ? o.getStatus() == 1 : o.isActive())
-
-// Instead: choose the lambda outside (two lambdas, each analyzed once)
+// good: one lambda; only the value changes
+int status = 1;
+SelectQuery<Order> one = qb.from(Order.class).where(o -> o.getStatus() == status);
+assertEquals("select e0 from Order e0 where e0.status = :p1", one.toHql().hql());
+// rejected: the shape of the query changes inside the lambda
+assertEquals("LQL-2021", assertThrows(LambdaQLException.class,
+        () -> qb.from(Order.class).where(o -> flag ? o.getStatus() == 1 : o.isActive())).code());
+// instead: choose the lambda outside (two lambdas, each analyzed once)
 List<Order> list = flag
-    ? qb.from(Order.class).where(o -> o.getStatus() == 1).toList()
-    : qb.from(Order.class).where(o -> o.isActive()).toList();
+        ? qb.from(Order.class).where(o -> o.getStatus() == 1).toList()
+        : qb.from(Order.class).where(o -> o.isActive()).toList();
 ```
 
+Example code: [`ManualJavaRulesTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaRulesTest.java) (`cache-shape`).
+
 <a id="109-tested-environment"></a>
-## 10.9 Tested environment
+## 10.9 Supported environment
 
 | Item | Version |
 |---|---|
 | Java | 21 (javac). ECJ is not guaranteed |
-| Hibernate | 6.6 or 7.4 (tested with 6.6.53 and 7.4.13). HQL extensions are used (for example `function(...)` and `nulls first`), so other JPA providers are not guaranteed |
-| Databases | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
-| Spring | Spring Boot 3.5.16 (Spring Data JPA 3.5.13) and 4.1.2 (Spring Data JPA 4.1.2) (the Spring modules, [12](12-spring-data-jpa.md), [13](../13-spring-boot-versions.md)) |
-| Not tested | PostgreSQL, SQL Server, Oracle 19c and older (for example PL/SQL `BOOLEAN` parameters) |
+| Hibernate | 6.6 or 7.4. lambdaQL uses HQL extensions (for example `function(...)`, `nulls first`), so other JPA implementations are not guaranteed |
+| Databases | H2 2.3, MariaDB 10.11, MySQL 8.4, PostgreSQL 17, Oracle 23.26 (23ai) |
+| Spring | Spring Boot 3.5 (Spring Data JPA 3.5) and 4.1 (Spring Data JPA 4.1) (Spring module, [12](12-spring-data-jpa.md), [13](../13-spring-boot-versions.md)) |
+| Not checked | SQL Server, Oracle 19c or earlier (for example, PL/SQL `BOOLEAN` parameters) |
 
 ---
 

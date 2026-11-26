@@ -8,333 +8,325 @@
 <a id="contents"></a>
 ## 目次
 
-- [10.1 基本ルール: ラムダはクエリである](#101-the-base-rule-a-lambda-is-a-query)
-- [10.2 SARGable のルール（インデックスを使える SQL）](#102-sargable-rule-index-friendly-sql)
+- [10.1 基本のルール: ラムダ式はクエリである](#101-the-base-rule-a-lambda-is-a-query)
+- [10.2 SARGable のルール（インデックスに優しい SQL）](#102-sargable-rule-index-friendly-sql)
 - [10.3 NULL のルール](#103-null-rules)
 - [10.4 演算子のルール（R1〜R24）](#104-operator-rules-r1-to-r24)
 - [10.5 Kotlin と SQL の違い](#105-kotlin-and-sql-differences)
 - [10.6 データベースごとの違い](#106-database-differences)
-- [10.7 サポートしないものと、代わりの書き方](#107-not-supported-and-what-to-write-instead)
-- [10.8 キャッシュ: ラムダの解析は 1 回だけ](#108-caching-a-lambda-is-analyzed-once)
-- [10.9 テストした環境](#109-tested-environment)
+- [10.7 サポートしていないものと代わりの書き方](#107-not-supported-and-what-to-write-instead)
+- [10.8 キャッシュ: ラムダ式は 1 回だけ解析される](#108-caching-a-lambda-is-analyzed-once)
+- [10.9 対応環境](#109-tested-environment)
 
 例の読み方:
 
-- 例の下のコメントは、設計で決まっている場合に、lambdaQL が作る HQL を示します。
-- ラムダの中に書いた定数（数値、文字列、boolean、`null`、enum 定数）は、リテラルとして HQL に書かれます。
-  キャプチャした値と計算した値は常にバインドパラメーター（`:p1`、`:p2`、...）になります（D37）。
+- 例の `assertEquals` の文字列が、lambdaQL の作る HQL です。
+- ラムダ式に直接書いた定数（数値、文字列、boolean、`null`、enum 定数）は、HQL にリテラルとして書きます。
+  キャプチャした値と計算した値は、常にバインドパラメーター（`:p1`、`:p2`、...）です。
 - エンティティ: `Order`（`id`、`price`、`status`、`active`、`description`、`customer`、`updateAt`、`items`）、
   `Customer`（`id`、`name`、`grade`）、`Item`（`order`、`price`、`qty`）。[2. はじめよう](02-getting-started.md#example-entities) を参照してください。
-  一部の行では、追加の nullable なプロパティ `flag: Boolean?` を使います。
-  10.3 の行では、`Order` の次のプロパティも使います。`cnt: Int?`、`custName: String?`、`address`（`@Embedded`、`city` と `zip`）。
+  10.3 の行は、`Order` のプロパティ `cnt`（`Integer`）、`custName`（`String`）、`address`（`@Embedded`、`city` と `zip`）も使います。
+  NULL になりうる Boolean の例は、例のエンティティ `Coded` の `vip` を使います。例のエンティティは Java クラスなので、boolean の `active` は Kotlin では `it.isActive` で読みます。
 
 ---
 
 <a id="101-the-base-rule-a-lambda-is-a-query"></a>
-## 10.1 基本ルール: ラムダはクエリである
+## 10.1 基本のルール: ラムダ式はクエリである
 
-lambdaQL は **ラムダを決して実行しません**。バイトコードを読み、HQL を書きます。
-ラムダは、Kotlin の構文で書いたクエリです。したがって、次のようになります。
+lambdaQL はラムダ式を呼び出さず、バイトコードの opcode を解析して HQL を作ります。
+ラムダ式は、Kotlin の書き方で書いたクエリです。そのため、次のようになります。
 
 1. `it.customer?.name` のようなパスは **カラムを指します**。呼び出しの連鎖ではありません。
-   lambdaQL は customer が null かどうかを確認しません（D20）。`where` の中で `!!` か印なしでたどった関連は内部結合なので、customer のない注文は返されません（D36）。
-   `?.` でたどった関連は、customer のない注文が条件を真にできるなら `left join` です（D54）。そのため `it.status == 1 || it.customer?.name == "Kim"`、`it.customer?.name == null`、`?.` で書いた null ガードは、Kotlin と同じように customer のない注文を残します。
-   customer のない注文だけを探すには、関連そのものを比較します: `it.customer == null`。
-2. NULL は **書いた場所でだけ** 扱われます（`== null`、`!= null`、`?.`、`?:`）（D22）。
-   Kotlin のコンパイラーが追加する null チェックは無視されます。それ以外の NULL は SQL のルールに従います。条件は UNKNOWN になり、その行は返されません。
-3. `!!` は無視されます（D23）。Kotlin のメモリのルール（オブジェクトの同一性、ボクシング）は当てはまりません。`==` と `===` は **値の等価** を意味します（D12、R17）。
-4. **ルールのない書き方について、lambdaQL は推測しません。** コード `[LQL-xxxx]` とソースの行番号を含む
-   分かりやすいエラーを投げます。「たぶん正しい」SQL を作ることはありません。
+   lambdaQL は顧客が null かどうかをチェックしません。`where` で、顧客のない注文が条件に一致しうるなら `left join`、一致しえないなら inner join です。
+   そのため、`it.status == 1 || it.customer?.name == "Kim"`、`it.customer?.name == null`、null ガードは、Kotlin と同じく顧客のない注文を残します。
+   `!!` か印なしで通った比較は、顧客のある注文でだけ真になります。`?.` と `!!` は混ぜて使ってもかまいません。
+   顧客のない注文だけを探すには、関連そのものを比較してください: `it.customer == null`。
+2. NULL は **自分で書いた場所でだけ** 扱われます（`== null`、`!= null`、`?.`、`?:`）。
+   Kotlin のコンパイラーが追加する null チェックは無視されます。その他の NULL は SQL のルールに従います。比較する値が NULL の行は返されません。
+3. `!!` は例外を投げません（関連の段階の `!!` は 1 を参照）。Kotlin のメモリのルール（オブジェクトの同一性、ボクシング）は適用されません。`==` と `===` は **値の等価性** を意味します。
+4. **解析できないラムダ式はエラーです。** lambdaQL はクエリとして解析できないと、コード `[LQL-xxxx]` とソースの行番号を含む例外を投げます。
 
 <a id="102-sargable-rule-index-friendly-sql"></a>
-## 10.2 SARGable のルール（インデックスを使える SQL）
+## 10.2 SARGable のルール（インデックスに優しい SQL）
 
-「SARGable」とは、データベースがその条件にインデックスを使えるという意味です。
-これは lambdaQL の基本ルールです（設計のセクション 3.9）。
+「SARGable」とは、データベースが条件にインデックスを使えるという意味です。
+これは lambdaQL の基本のルールです（設計の 3.9 節）。
 
 | # | ルール |
 |---|---|
-| 1 | **カラム側に関数、演算子、`CASE` を置かない。** 値を変える必要がある場合は、バインドする前にアプリケーションでパラメーターのほうを変えます（たとえば `Locale.ROOT` で小文字にする） |
-| 2 | 2 つの書き方が同じ意味なら、単純な比較と `AND` / `OR` / `NOT` だけを使うほうを選びます。正しい 3 値論理が最優先で、その範囲で SARGable な形を選びます |
-| 3 | 意味のうえでどうしてもカラムに関数が必要な場合（たとえば大文字と小文字を区別しない比較）、lambdaQL は起動時に DB のメタデータを読み、DB がすでに持っている経路を使います。カラムの照合順序（collation）、関数インデックス、言語インデックス（linguistic index）です。経路がない場合は、起動時にカラムごとに WARN をログに出します（strict モード: エラー） |
-| 4 | 各出力ルールは、H2、MariaDB、Oracle で `EXPLAIN` を使って確認します |
+| 1 | **カラムの側に関数、演算子、`CASE` を置きません。** 値を変える必要があるなら、バインドの前にアプリケーションでパラメーターを変えます（例: `Locale.ROOT` での小文字変換） |
+| 2 | 意味が同じ形が 2 つあるなら、単純な比較と `AND` / `OR` / `NOT` だけを使う形を選びます。正しい 3 値論理が先で、その中で SARGable な形を選びます |
+| 3 | 各出力のルールは、H2、MariaDB、Oracle で `EXPLAIN` によって確認します |
 
 <a id="examples"></a>
 ### 例
 
-**大文字と小文字を区別しない比較**（`equals(s, ignoreCase = true)`、`startsWith(s, ignoreCase = true)`。D24）
+**単純な `=` と `<>` を使う等値比較**
 
-| DB にあるもの | lambdaQL が書く SQL | こうは書かない |
-|---|---|---|
-| 大文字と小文字を区別しない照合順序（MariaDB の `_ci`） | `e0.description = :p1` | `lower(e0.description) = lower(:p1)` |
-| Oracle の関数インデックス `LOWER(description)` | `lower(e0.description) = :p1`（`:p1` はアプリケーションで小文字にする） | `lower(e0.description) = lower(:p1)` |
-| Oracle の言語インデックス `NLSSORT(... BINARY_CI)` | `e0.description collate binary_ci = :p1` | |
-| 経路がない | 起動時に WARN（strict モード: エラー） | |
+同じ例が [9.4](09-kotlin-notes.md#plain--and-) にあります。
 
-**普通の `=` と `<>` による等価比較**（決定 D48）
-
+<!-- region: ManualKotlinNotesTest.kt#equality -->
 ```kotlin
-.where { it.description == text }   // クエリの実行時に text は null ではない
-// e0.description = :p1
-.where { it.description != text }
-// e0.description <> :p1               (description が NULL の行は一致しない)
+// plain = and <>: a row whose description is NULL matches neither
+val same = qb.from(Order::class.java).where { it.description == text }
+assertEquals("select e0 from Order e0 where e0.description = :p1", same.toHql().hql())
+val other = qb.from(Order::class.java).where { it.description != "x" }
+assertEquals("select e0 from Order e0 where e0.description <> 'x'", other.toHql().hql())
+// NULL rows too: write the null check yourself
+val orNull = qb.from(Order::class.java).where { it.description == null || it.description != "x" }
+assertEquals("select e0 from Order e0 where e0.description is null or e0.description <> 'x'", orNull.toHql().hql())
 ```
 
-lambdaQL は `is [not] distinct from` を書きません。Oracle ではこれが `decode(...)` になり、インデックスを使えないからです。
-エンティティの値は SQL の意味に従うので、普通の `=` や `<>` が常に正しい形です。キャプチャした `null` は NULL としてバインドされ、どの行にも一致しません（`WARN` レベルの `LQL-4045`）。
+lambdaQL は `is [not] distinct from` を書きません。この形は Oracle で `decode(...)` になり、インデックスを使えません。
+エンティティの値は SQL の意味に従うので、単純な `=` や `<>` が常に正しいです。キャプチャした `null` は NULL としてバインドされ、どの行にも一致しません（`WARN` レベルの `LQL-4045`）。
 
-**2 つの boolean の式の比較**（D25）
+**エルビス**
 
+<!-- region: ManualKotlinNotesTest.kt#elvis-value -->
 ```kotlin
-.where { it.active == (it.status!! > c) }
-// (e0.active = true and e0.status > :p1) or (e0.active = false and e0.status <= :p1)
+// ?: in a select value: coalesce
+val text = qb.from(Order::class.java).select { it.description ?: "" }
+assertEquals("select coalesce(e0.description, '') from Order e0", text.toHql().hql())
+// ?: after ?. in a select value is rejected
+val error = assertThrows(LambdaQLException::class.java) {
+    qb.from(Order::class.java).select { it.customer?.name ?: "none" }
+}
+assertEquals("LQL-2022", error.code())
+// ?: with a number: coalesce too
+val number = qb.from(Order::class.java).where { (it.total ?: 0.0) > 3.0 }
+assertEquals("select e0 from Order e0 where coalesce(e0.total, 0.0) > 3.0", number.toHql().hql())
+// in a string condition, ?: is coalesce too
+val x = qb.from(Order::class.java).where { (it.description ?: "") == "x" }
+assertEquals("select e0 from Order e0 where coalesce(e0.description, '') = 'x'", x.toHql().hql())
 ```
 
-`CASE` の形（`e0.active = case when ... end`）は正しい行を返しますが、フルスキャンが必要になるため、
-lambdaQL は使いません。
+文字列の条件の `?:` は `coalesce(e0.description, '') = 'x'` になります。カラムに関数がかかるので、`description` の通常のインデックスは使われません。
+インデックスが必要なら、`it.description == "x"` のように直接比較してください。`"x"` と同じ行は NULL ではないので、結果は同じです。
 
-**エルビス演算子と空文字列**
-
-```kotlin
-.where { (it.description ?: "") == "x" }     // e0.description = :p1
-.where { (it.description ?: "") == "" }      // (e0.description = :p1 or o.description is null)
-.where { it.description.isNullOrEmpty() }    // (o.description is null or e0.description = :p1)
-```
-
-**サブクエリを使う NOT IN** は `NOT IN` として書かれます（SQL の意味、D48）。サブクエリに NULL があると、行は返りません。NULL を飛ばすには、サブクエリに null のチェックを加えてください（[10.3](#103-null-rules) を参照）。
+**サブクエリを使った NOT IN** は `NOT IN` として書きます（SQL の意味）。サブクエリに NULL があると、行は返されません。NULL を飛ばすには、サブクエリに null チェックを追加してください（[10.3](#103-null-rules) を参照）。
 
 <a id="what-the-measurements-showed"></a>
-### 測定で分かったこと
+### 測定の結果
 
 MariaDB 10.11 と Oracle 23ai、20,000〜50,000 行:
 
-| 形 | MariaDB | Oracle | 良いか |
+| 形 | MariaDB | Oracle | 問題ないか |
 |---|---|---|---|
-| `_ci` カラムでの `name = 'abc'` | インデックス検索 | – | はい |
-| `LOWER(name) = LOWER('abc')` | インデックスのフルスキャン（19,791 行） | テーブルのフルスキャン（関数インデックスなし） | **いいえ** |
-| `lower(name) = :p_lowered` + 関数インデックス | – | インデックスの範囲スキャン（`LIKE 'ab%'` も） | はい |
-| `name COLLATE BINARY_CI = :p` + 言語インデックス | – | インデックスの範囲スキャン | はい |
-| boolean の `==` を `AND`/`OR` で | 範囲（350 行） | インデックスの範囲スキャン 2 回 + ビットマップ OR | はい |
-| boolean の `==` を `CASE` で | インデックスのフルスキャン（49,648 行） | テーブルのフルスキャン | **いいえ** |
-
-<a id="planned-items-under-the-same-rule"></a>
-### 同じルールのもとで予定している項目
-
-| 形 | 予定の SQL |
-|---|---|
-| 「`updateAt` の年が 2024」のような日付関数 | `e0.updateAt >= :from and e0.updateAt < :to` |
-| 関数のキーによるソート（`lower(name)`） | まずアクセス経路を確認し、なければ WARN |
+| `_ci` のカラムに対する `name = 'abc'` | インデックスの検索 | – | はい |
+| `LOWER(name) = LOWER('abc')` | インデックス全体のスキャン（19,791 行） | テーブル全体のスキャン（関数インデックスなし） | **いいえ** |
+| `lower(name) = :p_lowered` + 関数インデックス | – | インデックスの範囲スキャン（`LIKE 'ab%'` も同じ） | はい |
+| `name COLLATE BINARY_CI = :p` + 言語別のインデックス | – | インデックスの範囲スキャン | はい |
+| `AND`/`OR` で書いた boolean の `==` | 範囲（350 行） | インデックスの範囲スキャン 2 回 + ビットマップ OR | はい |
+| `CASE` で書いた boolean の `==` | インデックス全体のスキャン（49,648 行） | テーブル全体のスキャン | **いいえ** |
 
 <a id="db-functions-on-a-column"></a>
 ### カラムに対する DB 関数
 
-カラム側の DB 関数（`OrderFns.discount(it.price)!! > 10`）は通常のインデックスを使えません。
-lambdaQL は **WARN**（`LQL-5001`）をログに出します。例外: Oracle では、同じ式の関数ベースのインデックスがあれば出しません。
-MariaDB では、`NOT DETERMINISTIC`（デフォルト）の関数は、引数がパラメーターだけでもフルスキャンになります（`it.price!! > OrderFns.discount(rate)!!`）。そのため、その場合も警告します（`LQL-5007`）。
-`SargableMode.STRICT` では、警告の代わりに解析が失敗します（`LQL-3066`、決定 D50）。
+カラムの側の DB 関数（`OrderFns.discount(it.price)!! > 10`）は、通常のインデックスを使えません。
+lambdaQL は **WARN**（`LQL-5001`）をログに出します。例外: Oracle で同じ式の関数ベースのインデックスがあれば、ログに出しません。
+MariaDB では、`NOT DETERMINISTIC`（デフォルト）の関数は引数がパラメーターだけでもフルスキャンになるので（`it.price!! > OrderFns.discount(rate)!!`）、この場合も警告します（`LQL-5007`）。
+`SargableMode.STRICT` では、警告の代わりに解析が失敗します（`LQL-3066`）。
 
-**SARGable モード**（決定 D50）。`SargableMode` には 3 つの値があります。
+**SARGable モード**。`SargableMode` には 3 つの値があります。
 
-- `OFF`: チェックせず、メタデータも読みません。
+- `OFF`: チェックせず、メタデータも照会しません。
 - `WARN`（デフォルト）: 警告をログに出します。
-- `STRICT`: `WARN` なら警告を出す場合（`LQL-5001`、`LQL-5007`、`LQL-5012`）に、解析が `org.lambdaql.NonSargableException`（`LQL-3066`）で失敗します。
+- `STRICT`: `WARN` なら警告をログに出す場合（`LQL-5001`、`LQL-5007`、`LQL-5012`）に、解析が `org.lambdaql.NonSargableException`（`LQL-3066`）で失敗します。
 
-persistence unit ごとに `SargablePolicy.register(emf, SargableMode.STRICT)` で指定し、`SargablePolicy.unregister(emf)` で解除します。Spring では `lambdaql.sargable.mode=STRICT` を使います（[12](12-spring-data-jpa.md) を参照）。
-チェックはラムダごとに 1 回、解析結果を共有キャッシュに入れるときに実行されます。そのため、最初のクエリの前にモードを登録してください。
+永続化ユニットごとに `SargablePolicy.register(emf, SargableMode.STRICT)` で指定し、`SargablePolicy.unregister(emf)` で解除します。Spring では `lambdaql.sargable.mode=STRICT` を使います（[12](12-spring-data-jpa.md) を参照）。
+チェックはラムダ式ごとに 1 回、解析の結果を共有キャッシュに入れるときに実行されます。そのため、最初のクエリの前にモードを登録してください。
 
-**カラムに対する算術**（決定 D50）。
+**カラムに対する算術**。
 
-- カラム 1 つと値だけの `+ - * /`（`it.cnt * 2 > n`）は、値の側に移せます。lambdaQL は `LQL-5012` を `WARN` レベルでログに出し、`STRICT` ではエラーになります。
-- カラム同士の算術（`it.price!! * it.cnt > n`）と `%` は移せないので、`LQL-5013` を `DEBUG` レベルでログに出すだけです。`STRICT` でも許可します。
-- 移した形は同じ意味でなければなりません。`it.cnt > n / 2.0` のように小数で割ってください。整数の除算 `n / 2` は、`>=`、`=`、`<` と負の `n` で違う行を返します。負の数を掛けた場合は、比較の向きを逆にしてください。`LQL-5012` のメッセージがこれを案内します。
-- インデックスの有無を調べて警告を減らす方式は採用していません。権限とシノニムのために「インデックスなし」と「不明」が混ざり、カラムの算術はまれな書き方だからです。
+- カラム 1 つと値だけからなる `+ - * /`（`it.cnt * 2 > n`）は、値の側に移せます。lambdaQL は `LQL-5012` を `WARN` レベルでログに出し、`STRICT` ではエラーです。
+- カラムどうしの算術（`it.price!! * it.cnt > n`）と `%` は移せないので、`LQL-5013` を `DEBUG` レベルでだけログに出します。`STRICT` でも許可します。
+- 移した形は意味が同じでなければなりません。`it.cnt > n / 2.0` のように小数で割ってください。整数の割り算 `n / 2` は、`>=`、`=`、`<` と負の `n` で別の行を返します。負の数を掛けたときは比較の向きを逆にしてください。`LQL-5012` のメッセージがこれを案内します。
+- インデックスがあるかを照会して警告を減らす方法は採用しませんでした。権限とシノニムのために「インデックスなし」と「不明」が混ざり、カラムの算術はまれな形だからです。
 [8. プロシージャと DB 関数](08-procedures-functions.md) を参照してください。
+
+コード例: [`ManualKotlinNotesTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)（`equality`、`elvis-value`）。
 
 <a id="103-null-rules"></a>
 ## 10.3 NULL のルール
 
-| ラムダ | SQL | NULL の動作 |
+| ラムダ式 | SQL | NULL の動作 |
 |---|---|---|
-| `it.status == 1`（`Int?` と定数） | `e0.status = 1` | NULL: UNKNOWN で、行は返されない。コンパイラーが隠れて追加する null チェックは無視される（D22） |
-| `it.status != 1` | `e0.status <> 1` | NULL: 行は返され **ない** |
-| `it.price!! > p` | `e0.price > :p1` | NULL: 行は返されない。`!!` は無視される（D23） |
-| `it.status == q`（両方 nullable: `q: Int?`、`String?`、enum） | `e0.status = :p1` | カラムが NULL: 返されない。キャプチャした `null`: 一致する行なし（`= NULL`、`WARN` レベルの `LQL-4045`） |
-| `it.status != q`（両方 nullable） | `e0.status <> :p1` | カラムが NULL: 返され **ない**（SQL の意味、D48。Kotlin なら返される）。キャプチャした `null`: 一致する行なし |
-| `it.description == it.custName`（エンティティの値どうし） | `e0.description = e0.custName` | どちらかが NULL: 返されない。NULL と NULL も同じ（SQL の意味、D48） |
+| `it.cnt == 1`（`Integer` と定数） | `e0.cnt = 1` | NULL: 行は返されない。コンパイラーが入れた null チェックは読まない |
+| `it.cnt != 1` | `e0.cnt <> 1` | NULL: 行は返されない（SQL の意味）。必要なら `it.cnt == null \|\|` を自分で書く |
+| `it.price!! > p` | `e0.price > :p1` | NULL: 行は返されない。`!!` は無視される |
+| `it.status == q`（両方 nullable: `q: Int?`、`String?`、enum） | `e0.status = :p1` | カラムが NULL: 返されない。キャプチャした値が `null`: 一致する行なし（`= NULL`、`WARN` レベルの `LQL-4045`） |
+| `it.status != q`（両方 nullable） | `e0.status <> :p1` | カラムが NULL: 返され **ない**（SQL の意味。Kotlin なら返される）。キャプチャした値が `null`: 一致する行なし |
+| `it.description == it.custName`（エンティティの値 2 つ） | `e0.description = e0.custName` | どちらかが NULL: 返されない。NULL と NULL も同じ（SQL の意味） |
 | `it.description.equals(text)`（`String?`） | `==` と同じ | `==` と同じ |
 | `x == null`、`x != null` | `is null`、`is not null` | 2 値 |
-| `it.cnt >= 2.5`（整数カラム、小数の値） | 書いた値のまま比較する: 定数はリテラル（`e0.cnt >= 2.5`）、キャプチャ値と IN リストも小数リテラル（`e0.cnt >= 2.5BD`、`in (2.5BD, 3.0BD)`、D48 B8） | インデックスの範囲スキャンを保つ（MariaDB で実測）。以前のように値を切り捨てて間違った行を返すことはない |
-| 値オブジェクト（`@Embedded`）全体: `it.address == addr`、`it.address != addr` | カラムごとに展開: `e0.address.city = :p1 and e0.address.zip = :p2`、否定は `<> ... or ...`。`== null` はすべてのカラムの `is null`（and）、`!= null` は `is not null`（or） | カラムごとに SQL の意味（D48）: NULL のカラムは `=` にも `<>` にも一致しない。キャプチャしたオブジェクトが `null` なら一致する行なし（`WARN` レベルの `LQL-4045`） |
-| `it.id == id`（`it.id` は `Long?`、`id` はキャプチャした `Long`）、`it.id == null`: NULL になれないカラム（id、プリミティブ、`nullable = false`、パスに関連のステップがない） | `not (e0.id is null or e0.id <> :p1)` の代わりに `e0.id = :p1`。`it.id == null` は `1=0` | カラムに NULL はない。関連を通るパス（`it.customer?.id`）ではチェックが残る |
+| `it.cnt >= 2.5`（整数のカラム、小数の値） | 書いた値のまま比較: 定数はリテラル（`e0.cnt >= 2.5`）、キャプチャした値と IN リストも小数リテラル（`e0.cnt >= 2.5BD`、`in (2.5BD, 3.0BD)`） | インデックスの範囲スキャンを維持（MariaDB で実測）。以前のように値を切り捨てて誤った行を返すことはない |
+| 値オブジェクト（`@Embedded`）全体: `it.address == addr`、`it.address != addr` | カラムごとに展開: `e0.address.city = :p1 and e0.address.zip = :p2`、否定は `<> ... or ...`。`== null` はすべてのカラムが `is null`（and）、`!= null` は `is not null`（or） | カラムごとに SQL の意味: NULL のカラムは `=` にも `<>` にも不一致。キャプチャしたオブジェクトが `null` なら一致する行なし（`WARN` レベルの `LQL-4045`） |
+| `it.id == id`（`it.id` は `Long?`、`id` はキャプチャした `Long`）、`it.id == null`: NULL になれないカラム（id、プリミティブ型、`nullable = false`、パスに関連の段階なし） | `not (e0.id is null or e0.id <> :p1)` の代わりに `e0.id = :p1`。`it.id == null` は `1=0` | カラムに NULL はない。関連を通るパス（`it.customer?.id`）はチェックを残す |
 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR` | SQL の 3 値論理 |
-| `it.flag == true` / `it.flag != true` | `e0.flag = true` / `e0.flag <> true` | NULL: 返されない（SQL の意味、D48） |
-| `it.flag ?: false`（条件） | `(e0.flag is not null and e0.flag = true)` | NULL は false として扱う |
-| `where` の中の `it.customer!!.name`（または印なしのパス） | `j1.name` + `join e0.customer j1` | customer がない: 注文は返されない |
-| `where` の中の `it.customer?.name` | `j1.name` + customer のない注文が条件を真にできるなら `left join e0.customer j1`、そうでなければ `join`（D54） | `it.customer?.name == "Kim"`: 返されない（`join`）。`it.status == 1 \|\| it.customer?.name == "Kim"`、`it.customer?.name == null`: 返される（`left join`） |
-| `it.customer == null \|\| it.customer?.name == p` | `e0.customer is null or j1.name = :p1` + `left join e0.customer j1` | customer がない: 返される（D54）。`!!` で書くと `join` なので返されない（D48、`DEBUG` レベルの `LQL-5009`） |
-| 同じ関連の段階を `?.` と `!!`（または印なし）で混ぜて書く | `join` | customer がない: 返されない。`WARN` レベルの `LQL-5014`（D54） |
-| 同じパスを `orderBy` か `select` だけで使う | `j1.name` + `left join e0.customer j1`。必須の関連（`optional = false`）は `join` | customer がない: カラムは NULL |
-| `it.customer == null`、`it.customer != null` | `e0.customer is null`、`e0.customer is not null`（FK カラム、結合なし） | customer のない注文 / customer がある注文 |
-| `it.customer?.id` | `e0.customer.id`（FK カラム、結合なし） | customer がない: NULL |
-| `a ?: b`（値） | 値では `coalesce(a, b)`。文字列の条件では SARGable な形 | [9.5](09-kotlin-notes.md#95-null-operators---and-) を参照 |
+| `it.vip ?: false`（条件） | `e0.vip is not null and e0.vip = true` | NULL は false として扱う |
+| `where` の中の `it.customer!!.name`（または印のないパス） | `j1.name`。`it.customer!!.name == "Kim"`、`it.customer!!.name == null` は `join e0.customer j1` | 顧客なし: 比較は真にならない。`it.status == 1 \|\| it.customer!!.name == "Kim"` は `left join` で、status 1 の注文は返される |
+| `where` の中の `it.customer?.name` | `j1.name`。`it.customer?.name == "Kim"` は `join`、`it.customer?.name == null` は `left join e0.customer j1` | `it.customer?.name == "Kim"`: 返されない（`j1.name` が NULL）。`it.status == 1 \|\| it.customer?.name == "Kim"`、`it.customer?.name == null`: 返される |
+| `it.customer == null \|\| it.customer?.name == p` | `e0.customer is null or j1.name = :p1` + `left join e0.customer j1` | 顧客なし: 返される。`!!` で書いても同じ |
+| `?.` と `!!` を混ぜる: `it.customer?.name == null \|\| it.customer!!.grade == null` | `j1.name is null or (e0.customer is not null and j1.grade is null)` + `left join e0.customer j1` | 顧客なし: `?.` の側の比較で返される。警告なし |
+| 同じパスを `orderBy` や `select` にだけ使う | `j1.name` + `left join e0.customer j1`。必須の関連（`optional = false`）は `join` | 顧客なし: カラムが NULL |
+| `it.customer == null`、`it.customer != null` | `e0.customer is null`、`e0.customer is not null`（外部キーのカラム、結合なし） | 顧客のない注文 / 顧客のある注文 |
+| `it.customer?.id` | `e0.customer.id`（外部キーのカラム、結合なし） | 顧客なし: NULL |
+| `a ?: b` | select の値、条件、`set` の値で `coalesce(a, b)`。Boolean の条件の `?: false` は null チェックとして読む | [9.5](09-kotlin-notes.md#95-null-operators---and-) を参照 |
 | `it.id in ids` | `e0.id in (:p1)` | NULL の id: 返されない |
-| `it.id !in ids` | `e0.id not in (:p1)`。NULL になりうるカラムも同じ | NULL の値: 返され **ない**（SQL の意味、D48。`DEBUG` レベルの `LQL-5009`。Kotlin なら返される） |
-| `it.status in 1..5`、`!in 1..5`、`when (it.status) { ... }` | `between`、`not (... between ...)`、`in (...)` | NULL の対象: 返されない。`NOT` の下でも同じ（ガードなし、D22） |
-| `x !in sub...` を使うサブクエリ | `x not in (select ...)` | サブクエリに NULL があると、どの行も返されない（SQL の意味、D48） |
-| `Agg.sum`、`avg`、`min`、`max` | `sum(...)` ... | 行がないか、すべての値が NULL のときは NULL |
-| `Agg.count()` | `count(*)` | 行がないときは 0 |
+| `it.id !in ids` | `e0.id not in (:p1)`。NULL になりうるカラムも同じ | NULL の値: 返され **ない**（SQL の意味。`DEBUG` レベルの `LQL-5009`。Kotlin なら返される） |
+| `it.cnt in 1..5`、`it.cnt !in 1..5` | `1 <= e0.cnt and e0.cnt < 6`、`1 > e0.cnt or e0.cnt >= 6` | 対象が NULL: 返されない。`!in` でも同じ（ガードなし） |
+| `x !in sub...` の形のサブクエリ | `x not in (select ...)` | サブクエリに NULL があると、どの行も返されない（SQL の意味） |
+| `Agg.sum`、`avg`、`min`、`max` | `sum(...)` ... | 行がないか、すべての値が NULL なら NULL |
+| `Agg.count()` | `count(*)` | 行がなければ 0 |
 
 <a id="captured-null-values"></a>
-### null のキャプチャ値
+### null のキャプチャした値
 
-| キャプチャ値がある場所 | `null` を使えるか |
+| キャプチャした値のある場所 | `null` を許可するか |
 |---|---|
 | 2 つの nullable な値の間の `==` / `!=` | はい。ただし一致する行はない（`= NULL`）。クエリの実行時に `LQL-4045` を `WARN` レベルでログに出す |
-| 同じ値に対する null ガードの下: `p == null \|\| it.status!! > p` | はい。ガードはクエリの実行時にアプリケーションの中で決まる: `p == null` なら絞り込みなし、それ以外の値なら `e0.status > :p1`。`!!` と自分のプリミティブ型へのアンボクシングだけの比較は、ガードの位置に関係しない |
-| `!!` 付き、または大小比較（`<` `<=` `>` `>=`）の中: `it.price!! > p!!` | はい。ただし一致する行はない（`> NULL`）。`!!`（D23）と自分のプリミティブ型へのアンボクシングは実行しない。クエリの実行時に `LQL-4045` を `DEBUG` レベルでログに出す |
-| キャプチャ値に対するメソッド呼び出し（`p.trim()`、別のプリミティブ型に変える `p.toInt()`） | **いいえ。** 値を計算するときにエラー（`LQL-4012`、Kotlin なら NPE） |
-| `in` の中の、`null` の要素を持つコレクション | **いいえ。** バインドするときにエラー |
-| `NaN`、`Infinity` | **いいえ。** 常にエラー |
+| 同じ値に対する null ガードの下: `p == null \|\| it.status!! > p` | はい。ガードはクエリの実行時にアプリケーションで決めます。`p == null` なら絞り込みなし、別の値なら `e0.status > :p1`。`!!` と自身のプリミティブ型へのアンボクシングだけの比較は、ガードの位置に関係ない |
+| `!!` と一緒に使うか、大小の比較（`<` `<=` `>` `>=`）に使う: `it.price!! > p!!` | はい。ただし一致する行はない（`> NULL`）。`!!` と自身のプリミティブ型へのアンボクシングは実行しない。クエリの実行時に `LQL-4045` を `DEBUG` レベルでログに出す |
+| キャプチャした値に対するメソッドの呼び出し（`p!!.trim()`） | **いいえ。** 値を計算するときにエラー（`LQL-3027`）。[9.8](09-kotlin-notes.md#98-captured-values) を参照 |
+| `in` に使うコレクションの中の `null` の要素 | **いいえ。** バインドするときにエラー（`LQL-4008`） |
 
 <a id="104-operator-rules-r1-to-r24"></a>
 ## 10.4 演算子のルール（R1〜R24）
 
-これは、設計のルール表（セクション 3.6 と KOTLIN.md のセクション 5）を、Kotlin の書き方で短くまとめたものです。
+設計（3.6 節と KOTLIN.md の 5 節）にあるルール表を、Kotlin の形で短くまとめたものです。
 
-| # | ラムダの書き方 | 意味 |
+| # | ラムダ式の形 | 意味 |
 |---|---|---|
-| R1 | null でないプリミティブの比較、または `!!` の後の比較（`it.qty > 5`、`it.price!! > p`） | `=`、`<>`、`<`、... SQL の NULL のルール |
-| R2 | 参照の比較にコンパイルされる `==` / `!=`（enum の `==`。`===` は R17 を参照） | 値の等価（オブジェクトの同一性ではない）。SQL の意味による `=` / `<>`（D48） |
+| R1 | non-null のプリミティブ型の比較、または `!!` の後の比較（`it.qty > 5`、`it.price!! > p`） | `=`、`<>`、`<`、... SQL の NULL のルール |
+| R2 | 参照の比較にコンパイルされる `==` / `!=`（enum の `==`。`===` は R17 を参照） | オブジェクトの同一性ではなく値の等価性。SQL の意味の `=` / `<>` |
 | R3 | `x == null`、`x != null` | `IS NULL`、`IS NOT NULL` |
 | R6 | `!`、`&&`、`\|\|` | `NOT`、`AND`、`OR`。SQL の 3 値論理 |
 | R7 | 文字列の値の比較 | **DB の照合順序** に従う（大文字と小文字、末尾の空白）。Oracle は `''` を NULL として扱う |
-| R8 | エンティティ `==` エンティティ | 予定: 識別子の等価。v0.1 にはない（KC13） |
-| R9 | キャプチャ値 | 実行時の値を持つバインドパラメーター |
+| R8 | エンティティ `==` エンティティ | サポートしない（KC13、`LQL-3011`） |
+| R9 | キャプチャした値 | 実行時の値を持つバインドパラメーター |
 | R10 | プロパティへのアクセス（`it.price`） | getter の呼び出し。JPA の属性にマッピングされる |
-| R11 | `Intrinsics.areEqual` にコンパイルされる Kotlin の `==`、`!=`（参照、または両側が nullable） | 値の等価: SQL の意味による `=` / `<>`（D48）。キャプチャした `null` はどの行にも一致しない |
-| R12 | nullable なプリミティブとプリミティブ（`it.id == 1L`、`id: Long?`） | 隠れた null チェックは無視される: `e0.id = 1`、`e0.id <> 1` |
-| R13 | `!!` とその他のコンパイラーの null チェック | 無視される（D23） |
+| R11 | `Intrinsics.areEqual` にコンパイルされる Kotlin の `==`、`!=`（参照型、または両側とも nullable） | 値の等価性: SQL の意味の `=` / `<>`。キャプチャした `null` はどの行にも一致しない |
+| R12 | nullable なプリミティブ型とプリミティブ型（`it.cnt == 1`、`cnt: Integer`） | コンパイラーが入れた null チェックは読まない: `e0.cnt = 1`、`e0.cnt <> 1` |
+| R13 | `!!` | 無視される |
 | R14 | `?.` | NULL が伝わるパスまたは値。`?.` がない場合と同じカラム |
-| R15 | `?:` | 値では `coalesce(a, b)`。条件の中の boolean のエルビスは `(x is not null and x = true)` になる。値としての boolean のエルビスは拒否される（KC21） |
-| R16 | 関連の結合 | R24 に置き換え |
-| R17 | `===`、`!==` | `==` と同じく値の等価 |
-| R18 | 範囲 `in a..b`、`until`、`..<`、`downTo`、`!in` | `between`、`>= and <`、`not (...)`。null ガードは自動で付かない |
-| R19 | コレクション `x in c`、`x !in c`（キャプチャした `c`） | `x in (:p)`、`x not in (:p)`（SQL の意味、D48）。null の要素: エラー。空のコレクション: FALSE / TRUE |
-| R20 | 定数の分岐が `true`/`false` で終わる `when (subject)` | `in (...)` または比較の `OR` |
-| R21 | Kotlin の文字列関数（`startsWith`、`endsWith`、`contains`、`equals(ignoreCase)`、`lowercase`、`length`、`isNullOrEmpty`） | `like ... escape '\'`、D24 の大文字小文字を区別しない経路、`lower`、`length`、`(x is null or x = :p)` |
-| R22 | Kotlin のホストの値（キャプチャした `var`、private プロパティ、`companion` の値） | 実行のたびに読む。書き込みは拒否される |
-| R23 | プロパティ参照 `Order::price` | getter と同じ。`orderBy`（`orderBy(Order::price)`）では **まだ実装されていません**。`orderBy { it.price }` を使ってください |
-| R24 | 関連のパス（`it.customer?.name`、`it.customer!!.name`、Java のエンティティの `it.customer.name`） | カラム。to-one の関連: where、order by、select で共有するエイリアス。`where` では `!!` と印なしのパスは内部結合（D48）、`?.` でたどった段階は関連のない行が条件を真にできるなら `left join`（D54。同じ段階を混ぜて書くと内部結合と `LQL-5014`）、order by か select だけで使うなら `left join`（必須の関連 `optional = false` は内部結合、A4）。Embedded: 同じテーブル。対象の `@Id` で終わる、または関連を `null` と比較する: FK カラム、結合なし。コレクション: エラー |
+| R15 | `?:` | 値では `coalesce(a, b)`。条件の中の boolean のエルビスは `(x is not null and x = true)` になる。値として使う boolean のエルビスは拒否される（KC21） |
+| R16 | 関連の結合 | R24 に置き換えられた |
+| R17 | `===`、`!==` | `==` と同じく値の等価性 |
+| R18 | 範囲 `in a..b`、`until`、`..<`、`!in` | `a <= x and x < b + 1`（定数）、`:p1 <= x and x <= :p2`（キャプチャした値）、`a > x or x >= b + 1`（`!in`）。自動の null ガードなし |
+| R19 | コレクション `x in c`、`x !in c`（キャプチャした `c`） | `x in (:p)`、`x not in (:p)`（SQL の意味）。null の要素: エラー。空のコレクション: FALSE / TRUE |
+| R20 | `true`/`false` で終わる分岐を持つ、対象のない `when { }` | 条件の `OR`。対象のある `when (subject)` は拒否（`LQL-2010`） |
+| R21 | Kotlin の文字列関数 | `startsWith`、`endsWith`、`contains`（`ignoreCase` を含む）は `like`。`equals(ignoreCase)`、`lowercase`、`length`、`isNullOrEmpty` は拒否（`LQL-3008`）。`equals(text)` は `==` と同じ |
+| R22 | Kotlin のホストの値（キャプチャした `var`、private プロパティ、`companion` の値） | 実行するたびに読む。書き込みは拒否される |
+| R23 | プロパティ参照 `Order::price` | 条件では拒否（`LQL-1009`）。ラムダ式 `{ it.price }` を使ってください |
+| R24 | 関連のパス（`it.customer?.name`、`it.customer!!.name`、Java のエンティティの `it.customer.name`） | カラム。to-one の関連: where、order by、select が共有する別名。`where` では、関連のない行が条件に一致しうるなら `left join`、一致しえないなら inner join（`!!` か印なしで通った比較は関連のある行でだけ真、`?.` と `!!` は混ぜて使ってよい）、order by や select にだけ使うと `left join`（必須の関連 `optional = false` は inner join、A4）。埋め込み: 同じテーブル。対象の `@Id` で終わるか、関連を `null` と比較: 外部キーのカラム、結合なし。コレクション: エラー |
 
-Java だけのルール R4（エンティティの値に対する `equals`）と R5（Java の null-safe なヘルパー）は [Java トラック](../java/10-rules-and-limits.md) にあります。Kotlin では、`==` が R5 と同じ意味になります。
+Java 専用のルール R4（エンティティの値に対する `equals`）と R5（Java の null 安全なヘルパー）は、[Java トラック](../java/10-rules-and-limits.md) にあります。Kotlin では `==` が R5 と同じ意味を持ちます。
 
 その他のルール:
 
-- `x.compareTo(y) > 0`、`isBefore`、`isAfter` は `x > y`、... になります。
-- ラムダの中に書いた定数（`const val` も）はリテラルです: `it.price!! > 100.0` は `e0.price > 100.0`、`"O'Brien"` は `'O''Brien'` になります。キャプチャした値と計算した値（`BigDecimal("1.5")`）はバインドパラメーターです（D37）。例外: 整数カラムと比べる小数のキャプチャ値は小数リテラル（`2.5BD`、D48 B8）。
-- コンパイラーは `!` の位置を動かすことがあります（ド・モルガンの法則、二重否定）。これで結果が変わることはありません。
-  lambdaQL は各条件を正確に 1 回ずつ保持し、書いたロジックを「単純化」することはありません。
-- Kotlin で常に true になる条件（`x > 5 || !(x > 5)`）を書いても、単純化されません。
-  SQL では `x` が NULL の行が除かれます。これは SQL のルールです。
+- `x.compareTo(y) > 0` は `x > y` になります。`isBefore`、`isAfter` は拒否されます（`LQL-3008`）。
+- ラムダ式に直接書いた定数（`const val` を含む）はリテラルです: `it.price > 100.0` は `e0.price > 100.0`、`"O'Brien"` は `'O''Brien'`。キャプチャした値と計算した値（`BigDecimal("1.5")`）はバインドパラメーターです。例外: 整数のカラムと比較する小数のキャプチャした値は小数リテラル（`2.5BD`）。
+- コンパイラーはときどき `!` の位置を動かします（ド・モルガン、二重否定）。それでも結果は変わりません。
+  lambdaQL は各条件をちょうど 1 回ずつ残し、書いた論理を「単純化」しません。
+- Kotlin で常に真になる条件（`x > 5 || !(x > 5)`）を書いても、単純化しません。
+  SQL では、`x` が NULL の行が抜けます。これが SQL のルールです。
 
 <a id="105-kotlin-and-sql-differences"></a>
 ## 10.5 Kotlin と SQL の違い
 
-これらの違いは SQL そのものから来ます。コンパイラーの問題ではありません。
-「G」の番号は設計での ID です（セクション 2.7）。
+この違いは SQL そのものから来ます。コンパイラーの問題ではありません。
+「G」の番号は設計（2.7 節）の ID です。
 
-| # | 違い | lambdaQL の動作 |
+| # | 違い | lambdaQL の扱い |
 |---|---|---|
-| G1 | Kotlin では `null != 3` は true。SQL の `status <> 3` は UNKNOWN | `!=` は `<>` を出力する: SQL の意味（D48）。NULL の行は除かれ、`LQL-5009` が `DEBUG` レベルでログに出る。残すには `it.status == null \|\| ...` と書く |
-| G2 | `it.flag != true` と Kotlin の違い | `e0.flag <> true` を出力する: NULL の Boolean は一致しない（SQL の意味） |
-| G3 | NULL のパラメーターを使う `name = ?` は 0 行を返す | そのまま保つ（SQL の意味、D48）。実行時に `LQL-4045` を `WARN` レベルでログに出す。NULL を探すには `x == null` と書く |
-| G4 | `status NOT IN (1, NULL)` は常に 0 行を返す | キャプチャしたコレクションの中の `null` はエラー。サブクエリの `!in` は SQL の意味を保つ（D48）: サブクエリに null のチェックを加える |
-| G5 | Kotlin は NPE を投げる（`!!`、アンボクシング）が、SQL は比較するだけ | ドキュメントに記載: エンティティの NULL は SQL のルールに従う |
-| G6 | `NaN`: H2 は NaN を最大の値としてソートし、`NaN = NaN` は true。MariaDB は保存できない。Oracle は `BINARY_DOUBLE` にだけ保存できる | キャプチャした NaN や Infinity はエラー。保存された NaN は DB に従う |
-| G7 | `Float` のカラムと `Double` の値の比較: 結果が DB によって違う | `Float`/`Double` について **Kotlin とビット単位で同じ結果は約束しない**。lambdaQL は `CAST` を追加しない。カラムのマッピングを選ぶ（たとえば Oracle の `binary_float` / `binary_double`） |
-| G9 | `x > 5 \|\| !(x > 5)` は NULL の行を除く | 単純化せず、書いたとおりに出力する |
-| G10 | SQL は評価の順序を約束しない: `qty != 0 && total / qty > 2` でもゼロ除算が起きうる | ガードの下の `/`、`%`、`CAST` は v0.1 では拒否される（D13） |
-| G11 | 文字列: MariaDB の `_ci` は大文字と小文字、末尾の空白を無視する。Oracle は `''` を NULL として保存する。Oracle の `NLS_SORT` は JVM のロケールに従う | ドキュメントに記載: 文字列の比較とソートは DB に従う。Oracle では `NLS_SORT=BINARY` を設定する（セッションの初期化、または `-Duser.language=en`）。Oracle では `it.description == ""` と `isEmpty()` の結果が違う |
-| G12 | Kotlin の `===` は同一性（1000 を持つ 2 つの `Long` のボックスでは false） | lambdaQL は `===` と `==` を値の等価として定義する |
-| G13 | 古い boolean のカラム（MariaDB の `TINYINT(1)`、Oracle の `NUMBER(1)`）に 0/1 以外の値が入っていると、読み方が違う | Hibernate 自身の DDL（`bit(1)`、Oracle 23 の `boolean`）なら問題ない。古いスキーマでは注意する |
-| G14 | Oracle 23 のバグ: 複合条件に対する `WHERE (a AND b) = false` / `IS FALSE` / `IS NULL` で行が失われる | lambdaQL は複合条件を boolean のテストで包まない。否定は常に `NOT(...)` |
-| G15 | Oracle の `CHAR` のカラムは `String` のバインドと一致しない | ドキュメントに記載: エンティティのマッピングに注意する |
+| G1 | Kotlin では `null != "x"` は true だが、SQL の `description <> 'x'` は description が NULL の行を返さない | `Intrinsics.areEqual` にコンパイルされる `!=` は `<>` として出力: SQL の意味。NULL の行は除かれ、`LQL-5009` を `DEBUG` レベルでログに出す。このような行を残すには `it.description == null \|\| ...` と書いてください。nullable な数値と定数の `!=`（`it.cnt != 1`）も `e0.cnt <> 1` になるので、NULL の行は除かれる |
+| G3 | NULL のパラメーターで `name = ?` を実行すると 0 行を返す | そのまま（SQL の意味）。実行時に `LQL-4045` を `WARN` レベルでログに出す。NULL を探すには `x == null` と書いてください |
+| G4 | `status NOT IN (1, NULL)` は常に 0 行を返す | キャプチャしたコレクションの中の `null` はエラー。サブクエリの `!in` は SQL の意味を保つ: サブクエリに null チェックを追加してください |
+| G5 | エンティティのカラムの値が NULL の場合（`!!`、アンボクシングを含む） | 文書化: その行は SQL のルールに従って返されない |
+| G6 | `NaN`: H2 は NaN をいちばん大きい値としてソートし `NaN = NaN` が true、MariaDB は保存できない、Oracle は `BINARY_DOUBLE` にだけ保存できる | 文書化: NaN を含む比較は DB に従う |
+| G7 | `Float` のカラムと `Double` の値の比較: DB によって結果が違う | `Float`/`Double` について、**Kotlin とビット単位で同じ結果は約束しない**。lambdaQL は `CAST` を追加しない。カラムのマッピングを自分で選ぶ（例: Oracle の `binary_float` / `binary_double`） |
+| G9 | `x > 5 \|\| !(x > 5)` で NULL の行が抜ける | 単純化せず、書いたとおりに出力 |
+| G10 | SQL は評価の順序を約束しない: `qty != 0 && total / qty > 2` でもゼロ除算が起こりうる | 文書化: ガードの下の割り算もそのまま書く。割り算なしで比較してください（`it.qty > 0 && it.price > 2.0 * it.qty`） |
+| G11 | 文字列: MariaDB の `_ci` は大文字と小文字と末尾の空白を無視、Oracle は `''` を NULL として保存、Oracle の `NLS_SORT` は JVM のロケールに従う | 文書化: 文字列の比較とソートは DB に従う。Oracle では `NLS_SORT=BINARY` に設定（セッションの初期化か `-Duser.language=en`）。Oracle では `it.description == ""` と `isEmpty()` が違う動きをする |
+| G12 | Kotlin の `===` は同一性（値が 1000 の 2 つの `Long` のボックスは false） | lambdaQL は `===` と `==` を値の等価性と定義 |
+| G13 | 0/1 以外の値を持つレガシーな boolean のカラム（MariaDB の `TINYINT(1)`、Oracle の `NUMBER(1)`）は違って読まれる | Hibernate 自身の DDL（`bit(1)`、Oracle 23 の `boolean`）は問題ない。レガシーなスキーマには注意 |
+| G14 | Oracle 23 のバグ: 複合条件に対する `WHERE (a AND b) = false` / `IS FALSE` / `IS NULL` で行が抜ける | lambdaQL は複合条件を boolean のテストで包まない。否定は常に `NOT(...)` |
+| G15 | Oracle の `CHAR` のカラムは `String` のバインドと一致しない | 文書化: エンティティのマッピングに注意 |
 
 その他の違い:
 
 | 違い | Kotlin | SQL | lambdaQL |
 |---|---|---|---|
-| `BigDecimal` の等価 | `==` はスケールも比較する（`1.0` と `1.00` は false） | `=` は値を比較する | 値の等価 |
-| 整数の除算 | `5 / 2` は `2` | MariaDB は `2.5` を返す | DB によって違う。最終的なルールは未定で、v0.1 では拒否されるかもしれない |
-| `BigDecimal` の除算と関数の結果 | Kotlin のスケールのルール（`HALF_EVEN`） | スケールは DB が決める（たとえば関数の結果では H2 は 1、MariaDB と Oracle は 0） | ドキュメントに記載 |
-| Unicode の大文字小文字を区別しない比較（`ſ`、`İ`） | Kotlin のルール | DB の照合順序 | DB に従う |
-| 文字列の長さ | UTF-16 の単位 | H2 は UTF-16 の単位、MariaDB はコードポイント | ドキュメントに記載 |
-| NULL を含む文字列テンプレート | `"null"` という文字列 | NULL（Oracle: `NULL \|\| 'x'` は `'x'`） | 文字列の連結は予定。v0.1 にはない |
-| nullable な `when` / 範囲の対象 | `else` に進む。`!in` は true | 返されない。`NOT` の下でも同じ | SQL の意味（D22） |
-| null にならない型 `String` | 決して null にならない | カラムは NULL になりうる | lambdaQL は JPA のメタデータを使う |
-| ラムダの中の `LocalDateTime.now()` | アプリの時刻 | – | **アプリの時刻** としてバインドされる。DB の時刻（`current_timestamp`）はサポートしない |
-| `Set` の中の等しい要素 | `equals` / `hashCode` が決める（`data class` ではプライマリコンストラクターのプロパティ） | 主キーで行を区別する | Set が行数より小さいと、`toSet()` と `findSet()` は `IllegalStateException` を投げる（エンティティの `equals` / `hashCode` が違う行を等しいと判断する場合や、`@Id` が一意でない場合。たとえばビュー）。`toList()` を使う（D42） |
+| `BigDecimal` の等価性 | `==` はスケールまで比較（`1.0` と `1.00` は false） | `=` は値を比較 | 値の等価性 |
+| 整数の割り算 | `5 / 2` は `2` | MariaDB は `2.5` | DB によって違う |
+| `BigDecimal` の割り算と関数の結果 | Kotlin のスケールのルール（`HALF_EVEN`） | スケールは DB が決める（例: 関数の結果に対して H2 は 1、MariaDB と Oracle は 0） | 文書化 |
+| Unicode の大文字と小文字の無視（`ſ`、`İ`） | Kotlin のルール | DB の照合順序 | DB に従う |
+| 文字列の長さ | UTF-16 の単位 | H2 は UTF-16 の単位、MariaDB はコードポイント | 文書化 |
+| NULL を含む文字列テンプレート | `"null"` というテキスト | NULL（Oracle: `NULL \|\| 'x'` は `'x'`） | 文字列の連結は拒否（`LQL-2007`） |
+| nullable な範囲の対象 | false。`!in` は true | 返されない。`!in` でも同じ | SQL の意味 |
+| non-null 型の `String` | null ではない | カラムは NULL になりうる | lambdaQL は JPA のメタデータを使う |
+| ラムダ式の中の `LocalDateTime.now()` | アプリケーションの時刻 | – | **アプリケーションの時刻** でバインド。DB の時刻（`current_timestamp`）はサポートしない |
+| `Set` の同じ要素 | `equals` / `hashCode` が決める（`data class` はプライマリコンストラクターのプロパティ） | 主キーで行を区別 | Set のサイズが行数より小さいと、`toSet()` と `findSet()` が `IllegalStateException` を投げる（エンティティの `equals` / `hashCode` が違う行を等しいと判断するか、`@Id` が一意でない場合、例: ビュー）。`toList()` を使う |
 
 <a id="106-database-differences"></a>
 ## 10.6 データベースごとの違い
 
-lambdaQL は多くの違いを隠します。知っておく必要があるものもあります。
+lambdaQL は多くの違いを隠します。いくつかは知っておく必要があります。
 
 <a id="sorting-and-paging"></a>
 ### ソートとページング
 
 | 項目 | H2 | MariaDB | Oracle | lambdaQL |
 |---|---|---|---|---|
-| NULL の位置、`ASC` | 先頭 | 先頭 | **末尾** | `ASC` はすべての DB で NULLS FIRST を意味する（D16） |
-| NULL の位置、`DESC` | 末尾 | 末尾 | **先頭** | `DESC` はすべての DB で NULLS LAST を意味する（D16） |
-| `NULLS FIRST/LAST` 構文 | あり | **なし**（構文エラー） | あり | MariaDB では Hibernate が `CASE` でエミュレートする: ソートに **インデックスを使えない** |
+| NULL の位置、`ASC` | 最初 | 最初 | **最後** | すべての DB で `ASC` は NULLS FIRST |
+| NULL の位置、`DESC` | 最後 | 最後 | **最初** | すべての DB で `DESC` は NULLS LAST |
+| `NULLS FIRST/LAST` の構文 | あり | **なし**（構文エラー） | あり | MariaDB では Hibernate が `CASE` でまねる: ソートに **インデックスを使えない** |
 | ページングの SQL | `offset ? rows fetch first ? rows only` | `limit ?,?` | `offset ? rows fetch first ? rows only` | Hibernate に渡す（`setFirstResult` / `setMaxResults`） |
-| 同じ値の行の順序 | – | – | ランダム | ページングでは、キーに id が含まれていない場合に lambdaQL がルートの `@Id asc` を追加する。一意で NULL になれないキー（`unique = true` かつ `nullable = false`、`@NaturalId`）があれば追加しない（A5） |
+| 同じ値を持つ行の順序 | – | – | ランダム | ページングするとき、キーに id がなければ lambdaQL がルートの `@Id asc` を追加。一意で NULL になれないキー（`unique = true` かつ `nullable = false`、`@NaturalId`）があれば追加しない |
 | 文字列の順序 | 大文字と小文字を区別 | `_ci` | `NLS_SORT`（JVM のロケール） | DB に従う |
-| `order by` の暗黙のパス | inner join（行が失われる） | 同じ | 同じ | lambdaQL は `left join` を使う（必須の関連は内部結合、または同じパスの `where` の結合） |
-| `order by`、`distinct`、`group by` での `@Lob` カラム | 動作する | 動作する | **ORA-22848 / ORA-22849** | クエリを変えずに `LQL-5010` を `DEBUG` レベルでログに出す（B3） |
-| `@Enumerated(EnumType.STRING)` の enum カラムのソート | 名前順 | 名前順 | 名前順 | クエリを変えずに `LQL-5011` を `DEBUG` レベルでログに出す（B2）。宣言順になるのは `ORDINAL` のマッピングだけ |
+| `order by` の暗黙のパス | inner join（行が抜ける） | 同じ | 同じ | lambdaQL は `left join` を使う（必須の関連は inner join、または同じパスの `where` の結合） |
+| `order by`、`distinct`、`group by` の `@Lob` のカラム | 動く | 動く | **ORA-22848 / ORA-22849** | クエリを変えず、`LQL-5010` を `DEBUG` レベルでログに出す |
+| `@Enumerated(EnumType.STRING)` の enum のカラムのソート | 名前の順 | 名前の順 | 名前の順 | クエリを変えず、`LQL-5011` を `DEBUG` レベルでログに出す。宣言の順は `ORDINAL` のマッピングでだけ |
 
-lambdaQL は、NULL になりうるすべてのキーについて HQL に `nulls first` / `nulls last` を書きます。必須の関連だけを通り、NULL になれないパスには書きません。それがデータベースのデフォルトと同じなら、Hibernate が省きます。
-デフォルト（`ASC` = NULLS FIRST、`DESC` = NULLS LAST）は H2 と MariaDB と同じなので、そこでは追加の SQL は
-必要ありません。`NULLS` 句が付くのは Oracle だけです。NULL の位置を変えるには、
-`by.asc(key, false)`（NULL が末尾）か `by.desc(key, true)`（NULL が先頭）を使います（D35）。MariaDB では、これらは `CASE` のエミュレーションを使います。
+lambdaQL は、NULL になりうるすべてのキーについて HQL に `nulls first` / `nulls last` を書きます。必須の関連だけを通り NULL になれないパスには書きません。データベースのデフォルトと同じなら、Hibernate がこれを省きます。
+デフォルト（`ASC` = NULLS FIRST、`DESC` = NULLS LAST）は H2、MariaDB と同じなので、これらの DB では追加の SQL は
+要りません。Oracle にだけ `NULLS` 句が付きます。NULL の位置を変えるには、
+`asc(key, Nulls.LAST)`（NULL が最後）や `desc(key, Nulls.FIRST)`（NULL が最初）を使ってください。MariaDB では、これらは `CASE` によるまねを使います。
 
 <a id="conditions-and-values"></a>
 ### 条件と値
 
 | 項目 | H2 | MariaDB | Oracle |
 |---|---|---|---|
-| `is not distinct from` | ネイティブ | `<=>`（インデックスを使う） | `decode(...)`（インデックスを使えない）。lambdaQL はこれを書かない（D48） |
-| `is [not] true`、`coalesce(boolean, false)` | 動作する | 動作する | **ORA-00932**。lambdaQL はこれらを書かない |
+| `is not distinct from` | 標準でサポート | `<=>`（インデックスを使う） | `decode(...)`（インデックスを使えない）。lambdaQL はこの形を書かない |
+| `is [not] true`、`coalesce(boolean, false)` | 動く | 動く | **ORA-00932**。lambdaQL は書かない |
 | 空文字列 `''` | 値 | 値 | **NULL** |
-| 大文字と小文字、末尾の空白 | 厳密 | `_ci`: 無視 | 厳密（ソートには `NLS_SORT`） |
-| `NaN` | 保存できる、最大の値 | 保存できない | `BINARY_DOUBLE` だけ |
-| `Float` のカラム | REAL のリテラルのルール | double に拡大 | Hibernate は `Float` を `float(24)`（10 進数）にマッピングする |
+| 大文字と小文字、末尾の空白 | 正確に比較 | `_ci`: 無視 | 正確に比較（ソートには `NLS_SORT`） |
+| `NaN` | 保存される、いちばん大きい値 | 保存できない | `BINARY_DOUBLE` にだけ |
+| `Float` のカラム | REAL のリテラルのルール | double に広げる | Hibernate は `Float` を `float(24)`（10 進）にマッピング |
 | 整数の `/` | 整数 | **小数**（`5/2 = 2.5`） | – |
-| 大きな `in` のリスト（1,500 個の値） | 動作する | 動作する | 23ai では動作する（古い Oracle の 1,000 個の制限は測定していない） |
+| 大きな `in` のリスト（値 1,500 個） | 動く | 動く | 23ai で動く（以前の Oracle のバージョンの 1,000 個の制限は測定していない） |
 
 <a id="subqueries"></a>
 ### サブクエリ
 
-| 項目 | 何が起きるか | lambdaQL |
+| 項目 | 起きること | lambdaQL |
 |---|---|---|
-| `limit` のないサブクエリの `order by` | Oracle: 構文エラー（ORA-00907）。MariaDB: 無視される | WARN を出して削除する |
-| MariaDB の `IN (... limit n)` | サポートされない（エラー 1235） | 自動で包む: `in (select x.id from (... limit n) x)` |
-| MariaDB の `lateral` | 結果が間違う（エミュレーション） | `row_number() over (...)` で書き換える（まだ実装されていない） |
+| `limit` のないサブクエリの `order by` | Oracle: 構文エラー（ORA-00907）。MariaDB: 無視される | WARN とともに取り除く |
+| MariaDB の `IN (... limit n)` | サポートしない（エラー 1235） | 自動で包む: `in (select x.id from (... limit n) x)` |
 
 <a id="update-insert-delete"></a>
 ### 更新、挿入、削除
 
-| 項目 | 何が起きるか | lambdaQL |
+| 項目 | 起きること | lambdaQL |
 |---|---|---|
-| `SET a = ..., b = a + 1`（設定した後でカラムを読む） | MariaDB は **新しい** 値を読み、H2 と Oracle は古い値を読む | 解析時にエラー（U3） |
-| DML の中の関連のパス（`it.customer?.name`） | Hibernate は DB ごとに違う結合を作り、customer のない **行が失われる** | lambdaQL は相関スカラーサブクエリ（`where` の中と SET の中）を書く。`where` では、選択が内部結合するパスに `customer.id is not null` も加えるので、DML はクエリと同じ行に当たる（U9） |
-| 同じテーブルに対するサブクエリを使う `DELETE` | MariaDB のエラー 1093 | 対象の id を先に派生テーブルで読む: `d0.id in (select t.id from (select e0.id as id … where <condition>) t)`（U17）。相関サブクエリでも動き、3 つの DB で同じ行を削除する（実測）。`update` は包まない（MariaDB でも動く） |
-| 同じ enum の値を STRING と ORDINAL のカラムに 1 回だけバインドする | H2 と MariaDB は **エラーなしで間違った値** を保存する | 場所ごとに 1 つのパラメーター。共有しない（U7） |
-| `values(list) { }` の多くの行 | Oracle: バインド数の上限は 65,535（ORA-01745）で、それよりずっと前からとても遅い | 分割する: 1 文あたり最大 500 個の値、すべて 1 つのトランザクションで実行（U13） |
-| `order by ... limit` を使う `update` / `delete` | MariaDB は `in` サブクエリの中の `limit`（エラー 1235）と、対象テーブルへのサブクエリ（エラー 1093）を拒否する | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: 派生テーブル `t` は 3 つのデータベースすべてで動く。内側の select は select の結合を使う（D36）ので、行は select と同じ |
-| `on conflict` / upsert | H2 と Oracle: `merge`。MariaDB: `insert ... on duplicate key update` で、更新した行は 2 と数える。Hibernate の `do nothing` は H2 と Oracle で失敗する | `upsert` と `onConflict(...).update(...)` は Hibernate の形を使う。`ignore()` は `insert ... select ... where not exists` として書く。行数はそのまま返す（D40） |
+| `SET a = ..., b = a + 1`（設定した後でそのカラムを読む） | MariaDB は **新しい** 値を、H2 と Oracle は古い値を読む | 解析するときにエラー |
+| DML の中の関連のパス（`it.customer?.name`） | Hibernate が DB ごとに違う結合を作り、顧客のない **行を取りこぼす** | lambdaQL は相関スカラーサブクエリを書く（`where` と SET）。`where` で、選択なら inner join するパスには `customer.id is not null` も加える。そのため、DML がクエリと同じ行に適用される |
+| 同じテーブルに対するサブクエリのある `DELETE` | MariaDB のエラー 1093 | 対象の id を派生テーブルで先に読む: `d0.id in (select t.id from (select e0.id as id … where <condition>) t)`。相関サブクエリでも動き、3 つの DB で同じ行を削除（実測）。`update` は包まない（MariaDB でも動く） |
+| 同じ enum の値を STRING のカラムと ORDINAL のカラムに 1 回だけバインド | H2 と MariaDB が **エラーなしで誤った値** を保存 | 場所ごとにパラメーター 1 つ。共有しない |
+| `values(list) { }` の多くの行 | Oracle: バインド 65,535 個の上限（ORA-01745）、そのずっと前からとても遅い | 1 文あたり値 500 個以下に分け、すべての文を 1 つのトランザクションで実行 |
+| `order by ... limit` のある `update` / `delete` | MariaDB は `in` サブクエリの `limit`（エラー 1235）と、対象のテーブルを読むサブクエリ（エラー 1093）を拒否 | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: 派生テーブル `t` で 3 つのデータベースすべてで動く。内側の select が選択の結合を使うので、選択と同じ行を対象にする |
+| `on conflict` / upsert | H2 と Oracle は `merge`。MariaDB は `insert ... on duplicate key update` で、更新した行を 2 と数える。Hibernate の `do nothing` は H2 と Oracle で失敗 | `upsert` と `onConflict(...).update(...)` は Hibernate の形を使う。`ignore()` は `insert ... select ... where not exists` で書く。行数はそのまま返す |
 
 <a id="procedures-and-functions"></a>
 ### プロシージャと関数
@@ -343,209 +335,211 @@ lambdaQL は、NULL になりうるすべてのキーについて HQL に `nulls
 |---|---|---|---|
 | OUT / INOUT パラメーター | **なし** | あり | あり |
 | 複数の結果セット | なし | あり | あり（REF CURSOR） |
-| プロシージャが影響した行数 | – | – | 常に -1 なので lambdaQL は提供しない。OUT パラメーターを使う |
-| boolean のパラメーターと結果 | – | あり | 23ai 以降 |
-| 仮想カラム / 関数インデックスの中のストアドファンクション | – | 不可（エラー 1901） | 可能（関数ベースのインデックス） |
+| プロシージャが影響を与えた行数 | – | – | 常に -1 なので lambdaQL は提供しない。OUT パラメーターを使う |
+| boolean のパラメーターと結果 | – | あり | 23ai 以上 |
+| 仮想カラム / 関数インデックスの中のストアド関数 | – | 不可能（エラー 1901） | 可能（関数ベースのインデックス） |
 
-H2 には OUT パラメーターがないので、プロシージャの機能は MariaDB と Oracle で確認しています。
+H2 には OUT パラメーターがないので、プロシージャの機能は MariaDB と Oracle で確認します。
 
 <a id="107-not-supported-and-what-to-write-instead"></a>
-## 10.7 サポートしないものと、代わりの書き方
+## 10.7 サポートしていないものと代わりの書き方
 
-このリストのすべての書き方について、lambdaQL は分かりやすいエラーを投げます。「予定」は、後のバージョンという意味です。
+lambdaQL は、このリストのすべての形について明確なエラーを投げます。
 
 <a id="lambda-form-and-loading"></a>
-### ラムダの形と読み込み
+### ラムダ式の形と読み込み
 
-| サポートしない | 代わりの書き方 |
+| サポートしていない | 代わりの書き方 |
 |---|---|
-| オブジェクト式（`object : ...`）、`Serializable` でない関数型インターフェース（KC5） | ラムダリテラル |
-| Kotlin の関数型として保存したラムダ（`val f: (Order) -> Boolean`）（KC4） | ラムダリテラルを渡す |
-| `-Xsam-conversions=class`（KC1）、`inline fun` の本体の中で作られたラムダ（KC2） | [9.14](09-kotlin-notes.md#914-kotlin-limits-kc1-to-kc21) を参照 |
-| 独自の Kotlin の `fun interface` への呼び出し可能参照（KC3） | ラムダリテラル |
-| 条件、ソート、select のラムダの中のローカルな `val`/`var`、ループ、複数の文 | 1 つの式。値はラムダの外で計算する |
-| キャプチャした変数への書き込み（`n++`）（KC12） | ラムダの外で計算する |
-| `@JvmField`、`internal`、`value class`、`@get:JvmName` のプロパティ（KC15、KC16） | public な通常のプロパティ |
-| Java 21〜23 で実行するとき、同梱の ASM が知らない、より新しい JDK 向けにコンパイルされたラムダ | ASM を更新する（lambdaQL は ASM をシェーディングしない）。Java 24 以上で実行する場合は該当しない（`java.lang.classfile` を使う） |
+| オブジェクト式（`object : ...`）、`Serializable` でない関数型インターフェース | ラムダ式のリテラル |
+| Kotlin の関数型として保存したラムダ式（`val f: (Order) -> Boolean`） | ラムダ式のリテラルを渡す |
+| `-Xsam-conversions=class`、`inline fun` の本体の中で作ったラムダ式 | [9.14](09-kotlin-notes.md#914-kotlin-limits-kc1-to-kc21) を参照 |
+| 自分で作った Kotlin の `fun interface` に対する呼び出し可能参照 | ラムダ式のリテラル |
+| 条件、ソート、select のラムダ式の中のローカルの `val`/`var`、ループ、複数の文 | 1 つの式。値はラムダ式の外で計算する |
+| キャプチャした変数への書き込み（`n++`） | ラムダ式の外で計算する |
+| `@JvmField`、`internal`、`value class`、`@get:JvmName` のプロパティ | public の普通のプロパティ |
+| Java 21〜23 で実行するとき、同梱の ASM が知らないより新しい JDK 向けにコンパイルされたラムダ式 | ASM を更新（lambdaQL は ASM をシェーディングしない）。Java 24 以上で実行するなら関係ない（`java.lang.classfile` を使う） |
 
 <a id="conditions"></a>
 ### 条件
 
-| サポートしない | 代わりの書き方 |
+| サポートしていない | 代わりの書き方 |
 |---|---|
-| 値の `if` / `when` / `takeIf`、一般的な `if (c) x else y`（KC6） | `&&` / `\|\|`。値はラムダの外で選ぶ。`CASE WHEN` は予定 |
-| （サポートする: `if (c) x else false`、`if (c) true else x`、`when { a -> true; ...; else -> false }`） | これらは `AND`、`OR` を意味する |
+| boolean の `if (c) x else y`、`takeIf`（`LQL-2021`）、対象のある `when (subject)`（`LQL-2010`） | `&&` / `\|\|`。値を選ぶ `if`/`when` はサポート: キャプチャした値と定数だけならバインドパラメーター、エンティティの値なら `case when`（[3.5.1](03-where.md#351-values-chosen-by-a-condition)） |
+| （サポート: `if (c) x else false`、`if (c) true else x`、`when { a -> true; ...; else -> false }`） | それぞれ `AND`、`OR` を意味する |
 | boolean の中置関数 `and`、`or`、`xor` | `&&`、`\|\|` |
-| ガードの下の `/`、`%`、`CAST`（`it.qty != 0 && it.price!! / it.qty > 2`） | 除算なしで比較する: `it.qty > 0 && it.price!! > 2.0 * it.qty` |
-| エンティティ `==` エンティティ（`it.customer == c`）（KC13） | `it.customer?.id == c.id`（予定: 識別子の等価） |
-| 値オブジェクト（`@Embedded`）の大小比較、別の型との比較（`LQL-3012`） | フィールドを比較する。同じ型との `==`、`!=`、`null` の比較はサポートする |
-| コレクションのパス（`it.items...`、`@OneToMany`、`@ManyToMany`） | `exists()` のサブクエリ、または結合 |
-| `item in it.items` | `exists()` のサブクエリ |
-| ラムダの中で作ったコレクション（`listOf(1, 2)`、`setOf(...)`）（KC8） | 外で作ってキャプチャする（`groupBy` のキーは例外） |
-| 範囲の `step` | 2 つの比較、またはキャプチャしたコレクション |
-| キャプチャしたコレクションの中の `null` の要素 | null を取り除く。NULL の行がほしい場合は `\|\| it.x == null` を追加する |
-| キャプチャした `NaN` / `Infinity` | クエリの前に値を確認する |
-| `isNaN()`（KC14） | – |
-| エンティティの値に対するその他の関数呼び出し（inline でない独自の関数、`operator` 関数）（KC11） | プロパティから条件を書く。または関数を `inline` にする |
-| エンティティの値を使う文字列テンプレートや `+`（KC17） | 予定 |
+| エンティティ `==` エンティティ（`it.customer == c`）（`LQL-3011`） | `it.customer?.id == c.id` |
+| 値オブジェクト（`@Embedded`）の大小の比較、別の型との比較（`LQL-3012`） | フィールドを比較する。同じ型との `==`、`!=`、`null` との比較はサポート |
+| コレクションのパス（`it.items...`、`@OneToMany`、`@ManyToMany`） | `exists()` サブクエリか結合 |
+| `item in it.items` | `exists()` サブクエリ |
+| ラムダ式の中で作ったコレクション（`listOf(1, 2)`、`setOf(...)`） | 外で作ってキャプチャする。（`groupBy` のキーは例外） |
+| 範囲の `step` | 2 つの比較か、キャプチャしたコレクション |
+| キャプチャしたコレクションの中の `null` の要素 | null を取り除く。NULL の行が必要なら `\|\| it.x == null` を追加 |
+| キャプチャした `NaN` / `Infinity` | クエリの前に値をチェックする |
+| `isNaN()` | – |
+| エンティティの値に対するその他の関数呼び出し（自分で作った inline でない関数、`operator` 関数） | プロパティで条件を書くか、関数を `inline` にする |
+| 文字列テンプレートや `+`（`LQL-2007`） | 文字列はラムダ式の外で作ってキャプチャする |
 | エンティティのパスに対する `it.tags["k"]`、`it.lines[0]` | – |
 
 <a id="functions-and-strings"></a>
 ### 関数と文字列
 
-| サポートしない（v0.1） | 代わりの書き方 |
+| サポートしていない | 代わりの書き方 |
 |---|---|
-| `isBlank`、`isNullOrBlank`（KC9） | `isNullOrEmpty()` または直接の比較 |
-| カラムに対する `trim`、`coerceAtLeast`、`toLocalDate` などの標準ライブラリの関数（KC20） | 直接の比較、または DB 関数（`@SqlFunction`）。関数のマッピングは予定 |
-| 日付関数（`YEAR(col) == 2024`） | 範囲: `it.updateAt!! >= from && it.updateAt!! < to` |
-| 戻り値の型がジェネリック（`fun <X> nvl(a: X, b: X): X`）、エンティティ、コレクション、`Unit` の `@SqlFunction` | 次のどれか: `Double`、`Integer`（`Int`）、`Long`、`BigDecimal`、`String`、`LocalDate`、`LocalDateTime`、`Boolean` |
+| エンティティの値に対する文字列関数: `lowercase`、`length`、`isNullOrEmpty`、`isBlank`、`equals(s, ignoreCase = true)`（`LQL-3008`） | 直接比較する。`startsWith`、`endsWith`、`contains` はサポート |
+| カラムに対する `trim`、`coerceAtLeast`、`toLocalDate` とその他の stdlib の関数 | 直接比較するか、DB 関数（`@SqlFunction`） |
+| 日付の関数（`YEAR(col) == 2024`） | 範囲: `it.updateAt!! >= from && it.updateAt!! < to` |
+| ジェネリックな戻り値の型（`fun <X> nvl(a: X, b: X): X`）、エンティティ、コレクション、`Unit` を返す `@SqlFunction` | 次のどれか: `Double`、`Integer`（`Int`）、`Long`、`BigDecimal`、`String`、`LocalDate`、`LocalDateTime`、`Boolean` |
 | Hibernate の組み込み関数と同じ名前の `@SqlFunction`（`COALESCE`、`ROUND`、`SYSDATE`、...） | 接頭辞かスキーマ名を使う（`PUBLIC.SQ_FN`） |
-| デフォルト引数、`inline`、`vararg` を持つ `@SqlFunction` | 固定のパラメーターを持つ普通の関数 |
+| デフォルト引数、`inline`、`vararg` のある `@SqlFunction` | パラメーターが固定の普通の関数 |
 | DB 関数としての拡張関数、関数型インターフェースの定数、関数型のプロパティ | インターフェースの `companion object` + `@JvmStatic` |
-| ユーザー定義の集約関数やウィンドウ関数 | 予定 |
-| クエリのラムダの外や `where` の中での `Agg.*` の呼び出し | `select` / `having` の中で使う |
+| ユーザー定義の集約関数やウィンドウ関数 | – |
+| クエリのラムダ式の外や `where` の中での `Agg.*` の呼び出し | `select` / `having` で使う |
 
 <a id="sort-and-paging"></a>
 ### ソートとページング
 
-| サポートしない | 代わりの書き方 |
+| サポートしていない | 代わりの書き方 |
 |---|---|
-| ソートのラムダの中の条件やループ（`if (x) by.asc(...)`） | クエリを 2 つ作る。または `Direction` をキャプチャ値として渡す: `by.sort(o.price, dir)` |
-| `orderBy` を 2 回、`orderBy` の後の `where`、`limit` の後の `orderBy` | すべてのキーを持つ 1 つの `orderBy`（これらはコンパイルできない） |
-| ソートのキーとしてのエンティティ（`by.desc(o.customer)`） | カラム: `by.desc(o.customer?.name)`（コンパイルできない） |
-| 結合のソートのラムダの中のプロパティ参照 | ラムダ |
-| `orderBy` でのプロパティ参照（`orderBy(Order::price)`、まだ実装されていない） | ラムダ: `orderBy { it.price }` |
-| 名前と方向を 1 つにまとめた文字列（`"price,desc_nulls_last"`）、まだ実装されていない | 方向は `Direction.parse(text)`、名前は `SortSpec.ofPath`。名前はソートポリシーがチェックする（[4.10](04-order-paging.md#sort-policy)） |
-| 結合結果の `distinct()` で、結合したエンティティのカラムや関連のパスでソートする（J7、`LQL-3046`） | 主エンティティ自身のカラムでソートするか、`exists` サブクエリを使う |
-| `limit` / `offset` と一緒のコレクションの fetch join | 先にページングし、その後でコレクションを読み込む |
-| Spring の `Sort` の `ignoreCase()`（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)）、まだサポートしていない | `ignoreCase()` を使わないソート |
-| 関数のキー（`lower(name)`） | 予定 |
-| 集約のエイリアスによるソート（`by.desc(s.total)`） | 予定 |
-| ソートのキーとしての boolean のエルビス（KC21） | キー `o.flag` に NULL の位置を指定する: `by.asc(o.flag, false)`（NULL が末尾） |
+| ソートのラムダ式の中の条件やループ（`if (x) asc(...)`） | クエリを 2 つ作るか、`Direction` をキャプチャした値として渡す: `sort(o.price, dir)` |
+| 結合のソートのラムダ式の中のプロパティ参照 | ラムダ式 |
+| `orderBy` のプロパティ参照（`orderBy(Order::price)`） | ラムダ式: `orderBy { it.price }` |
+| ソートの名前と方向を一緒に持つ 1 つの文字列（`"price,desc_nulls_last"`） | 方向は `Direction.parse(text)`、名前は `SortSpec.ofPath`。名前はソートポリシーがチェック（[4.10](04-order-paging.md#sort-policy)） |
+| 結合結果の `distinct()` で、結合したエンティティのカラムや関連のパスでソート（`LQL-3046`） | 主エンティティ自身のカラムでソートするか、`exists` サブクエリを使う |
+| `limit` / `offset` と一緒に使うコレクションの fetch join | 先にページングし、それからコレクションを読み込む |
+| Spring の `Sort` の `ignoreCase()`（[12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)） | `ignoreCase()` のないソート |
+| 関数のキー（`lower(name)`） | – |
+| 集約の別名でのソート（`desc(s.total)`） | – |
+| ソートキーとして使う boolean のエルビス | キー `o.flag` に NULL の位置を指定: `asc(o.flag, Nulls.LAST)`（NULL が最後） |
 
 <a id="limits-subqueries"></a>
 ### サブクエリ
 
-| サポートしない | 代わりの書き方 |
+| サポートしていない | 代わりの書き方 |
 |---|---|
-| 1 行にならないスカラー比較での `first()` | 集約（`max`、`min`、`avg`、`sum`、`count`）か、`orderBy { }.limit(1)...first()` を使う |
-| `limit` のないサブクエリの中の `orderBy` | 効果がないので削除される（WARN） |
+| 1 行でないスカラーの比較での `first()` | 集約（`max`、`min`、`avg`、`sum`、`count`）か `orderBy { }.limit(1)...first()` を使う |
+| `limit` のないサブクエリの中の `orderBy` | 効果がないので取り除かれる（WARN） |
 
 <a id="select-and-group-by"></a>
 ### 選択とグループ化
 
-| サポートしない | 代わりの書き方 |
+| サポートしていない | 代わりの書き方 |
 |---|---|
-| `select` / `having` の中の、`groupBy` のキーでない非集約の値 | `groupBy` に追加する |
-| 派生テーブルや CTE の行の型としての普通のクラス | Kotlin の data class（または Java の record） |
-| `groupBy` のキーとしての `arrayOf(...)` / `setOf(...)` | `listOf(...)`、`Pair`、`Triple` |
-| select の値としての boolean のエルビス（KC21） | `it.flag` を select して、NULL は Kotlin で扱う |
+| `select` / `having` の中で、`groupBy` のキーでない集約でない値 | `groupBy` に追加する |
+| 派生テーブルや CTE の行の型として使う普通のクラス | Kotlin の data class（または Java の record） |
+| `groupBy` のキーとして使う `arrayOf(...)` / `setOf(...)` | `listOf(...)`、`Pair`、`Triple` |
+| select の値として使う boolean のエルビス（`LQL-2022`） | `it.vip` を選択し、NULL は Kotlin で処理する |
 
 <a id="limits-update-insert-delete"></a>
 ### 更新、挿入、削除
 
-| サポートしない（v0.1） | 代わりの書き方 |
+| サポートしていない | 代わりの書き方 |
 |---|---|
-| `where` のない `update` / `delete` | `.all()` を追加する（これがないと `execute()` はコンパイルできない） |
-| 同じ文の中で設定した後でカラムを読む | 意図して古い値を使うか、update を 2 回実行する |
-| 同じカラムを 2 回設定する | 1 回の代入 |
-| 条件による値（`if (c) a else b`、`when`、値としてのトグル `!it.active`） | 予定（`CASE WHEN`）。`where` の違う update を 2 回使う |
-| どのカラムを設定するかを選ぶための `set` のラムダの中の `if` | `set()` を何回か呼ぶ |
+| `where` のない `update` / `delete` | `.all()` を追加する |
+| 同じ文で設定した後でそのカラムを読む | 意図して古い値を使うか、update を 2 回実行する |
+| 同じカラムを 2 回設定する | 代入は 1 つ |
+| 設定するカラムを選ぶための `set` のラムダ式の中の `if` | `set()` を何回も呼ぶ |
 | `set` の中の `++`、`--`、`apply`、`with`、`also` | `it.cnt += 1`、直接の代入 |
-| 代入のラムダの中のローカルな `val` | 式をそれぞれの場所に書く |
+| 代入のラムダ式の中のローカルの `val` | 各場所に式を書く |
 | 関連の `@Id` でないプロパティの設定（`it.customer?.name = x`） | `Customer` を直接更新する |
-| 省略できないカラム（`@Id`、`nullable = false`、プリミティブ）への `null` | – |
-| `@Version` のプロパティを自分で書く | lambdaQL が代わりに `update versioned` を使う |
-| 値の中の文字列テンプレート | 予定 |
-| update や delete での明示的な結合 | 追加しない（D51）。関連のパス（U9）か `sub`（D49）を使う |
-| 明示的な結合を使う `insert ... select` | 予定。v0.1 では many-to-one のパスを使う |
-| 同時の挿入に対してアトミックな `onConflict { ... }.ignore()` | キー重複のエラーを捕捉する（`ignore()` は `not exists` を使う。[7.6](07-6-upsert.md) を参照） |
-| `insert ... select` からの upsert | `values(list) { ... }` で 1 行ずつ upsert する |
-| `limit(n)` のない update や delete での `orderBy { ... }` | `limit(n)` を加えるか、`orderBy` を取り除く（そうしないと `IllegalStateException`） |
-| 1 行だけを変更すべき update や delete を、`execute() == 1` とロールバックで確認する | `executeOne()`: 先に id を読む（最大 2 つ）。2 つなら何も変更せずに `NonUniqueResultException` を投げる。1 つならその行を `id = :p and (条件)` で変更する。2 行以上を変更することはない（D41） |
-| `executeOne()` を `orderBy` や `limit` と一緒に使う | どちらか一方を使う（そうしないと `IllegalStateException`） |
-| update や delete での `offset` | 予定なし（D42）。DML にあるのは `limit(n)` だけ。`where { }`、`orderBy { }`、`limit(n)` で対象の行を選ぶ |
-| 複合キーのエンティティでの `limit` や `executeOne()` | まだ対応していない。先に id をクエリし、その後で `delete ... where { it.id in ids }` |
-| トランザクションなしで Spring の共有 `EntityManager` を使う DML（lambdaQL は `@Transactional` を付けない、D41） | `@Transactional` か `TransactionTemplate` の中で呼ぶ |
-| リポジトリのメソッド `deleteAll { ... }`（一括削除）での cascade や `@PreRemove` | Spring Data の `deleteAll(Iterable)` か `delete(entity)` を使う（[12.4](12-spring-data-jpa.md#deleteallwhere-is-not-spring-datas-deleteall) を参照） |
-| `returning` | DML の後でもう一度クエリする |
-| DB の時刻（`current_timestamp`） | アプリの時刻を渡す（`LocalDateTime.now()` は値としてバインドされる） |
-| `TABLE` の id ジェネレーターを使う `insert ... select` | `values { }`、または IDENTITY / SEQUENCE を使う |
-| JOINED または TABLE_PER_CLASS のサブクラスへの `insert` | サポートしない（Hibernate 6.6.5 が失敗する、7.4 は未測定） |
+| 任意でないカラム（`@Id`、`nullable = false`、プリミティブ型）に `null` | – |
+| `@Version` プロパティへの直接の書き込み | lambdaQL が代わりに `update versioned` を使う |
+| 値の中の文字列テンプレート（`LQL-2007`） | 文字列はラムダ式の外で作ってキャプチャする |
+| update や delete の明示的な結合 | 追加しない。関連のパスか `sub` を使う |
+| 明示的な結合のある `insert ... select` | 多対一のパスを使う |
+| 同時の挿入でアトミックな `onConflict { ... }.ignore()` | キーの重複エラーを処理する（`ignore()` は `not exists` を使う。[7.6](07-6-upsert.md) を参照） |
+| `insert ... select` で行う upsert | `values(list) { ... }` で行ごとに upsert |
+| `limit(n)` なしで update や delete に `orderBy { ... }` を指定 | `limit(n)` を追加するか、`orderBy` を取り除く（それ以外は `IllegalStateException`） |
+| 1 行だけ変更すべき update や delete を `execute() == 1` とロールバックでチェック | `executeOne()`: 先に id を最大 2 つ読む。2 つなら何も変更せず `NonUniqueResultException`。1 つなら `id = :p and (条件)` でその行を変更。2 行以上を変更しない |
+| `executeOne()` と `orderBy` または `limit` を一緒に使う | どちらか 1 つだけを使う（それ以外は `IllegalStateException`） |
+| update や delete の `offset` | 計画なし。DML には `limit(n)` しかない。`where { }`、`orderBy { }`、`limit(n)` で対象の行を指定する |
+| 複合キーのエンティティの `limit` または `executeOne()` | まだサポートしていない。先に id を選択してから `delete ... where { it.id in ids }` |
+| Spring の共有 `EntityManager` でトランザクションなしに DML を実行（lambdaQL には `@Transactional` がない） | `@Transactional` か `TransactionTemplate` の中で呼ぶ |
+| リポジトリーのメソッド `deleteAll { ... }`（一括削除）で cascade や `@PreRemove` を期待 | Spring Data の `deleteAll(Iterable)` か `delete(entity)` を使う（[12.4](12-spring-data-jpa.md#deleteallwhere-is-not-spring-datas-deleteall) を参照） |
+| `returning` | DML の後にもう一度選択する |
+| DB の時刻（`current_timestamp`） | アプリケーションの時刻を渡す（`LocalDateTime.now()` は値としてバインドされる） |
+| `TABLE` の id ジェネレーターを使う `insert ... select` | `values { }` か IDENTITY / SEQUENCE を使う |
+| JOINED または TABLE_PER_CLASS のサブクラスへの `insert` | サポートしていない（Hibernate 6.6.5 が失敗、7.4 は未測定） |
 
-DML について、もう 1 つ注意があります。バルク DML は永続化コンテキストを通りません。Hibernate は先に flush しますが、
-同じセッションの管理されているエンティティは、その後も古い値を持ったままです。`clear()`（または `refresh`）を呼んでください。
-JPA のカスケードと `orphanRemoval` は適用されません。
-DML の文にはトランザクションが必要です。`QueryBuilder(EntityManagerFactory)` は自分でトランザクションを開きます。`EntityManager` を使うビルダー（Spring の共有 `EntityManager` も含む）は呼び出し側のトランザクションを使い、トランザクションがなければ SQL を送る前に失敗します。
+DML についてもう 1 つ知っておくこと: 一括の DML は永続コンテキストを通りません。Hibernate が先に flush しますが、
+同じセッションの管理エンティティは、その後も古い値を持ち続けます。`clear()`（または `refresh`）を呼んでください。
+JPA の cascade と `orphanRemoval` は適用されません。
+DML の文にはトランザクションが必要です。`QueryBuilder(EntityManagerFactory)` は自分のトランザクションを開きます。`EntityManager` を使うビルダー（Spring の共有 `EntityManager` を含む）は呼び出し側のトランザクションを使い、トランザクションがなければ SQL を送る前に失敗します。
 
 <a id="procedures"></a>
 ### プロシージャ
 
-| サポートしない | 代わりの書き方 |
+| サポートしていない | 代わりの書き方 |
 |---|---|
-| ラムダの中の、スタブ関数の 1 回の呼び出し以外のもの（ログ、入れ子の呼び出し、分岐） | 1 回の呼び出し。引数は先に計算する |
+| ラムダ式の中で、スタブ関数の呼び出し 1 つ以外のすべて（ログ、入れ子の呼び出し、分岐） | 呼び出し 1 つ。引数は先に計算する |
 | 計算を含む名前付き引数（`calc(rate = r * 2, id = id)`） | 位置引数を使うか、値を先に計算する |
-| OUT パラメーターを持つプロシージャへの `exec` | `call` |
-| 引数の DB のデフォルト値 | すべての引数を渡す |
-| スタブ関数の Kotlin のデフォルト引数 | すべての引数を渡し、デフォルトを削除する |
-| Oracle のパッケージのプロシージャのオーバーロードを 1 つ選んで呼ぶこと（オーバーロードのある名前は検出します: `LQL-4044`）、動的なプロシージャ名 | 予定 |
-| Oracle の暗黙の結果（`DBMS_SQL.RETURN_RESULT`）、MariaDB のパッケージ、プロシージャの結果のページング | サポートしない |
+| OUT パラメーターのあるプロシージャに `exec` | `call` |
+| 引数に対する DB のデフォルト値 | すべての引数を渡す |
+| スタブ関数の Kotlin のデフォルト引数 | すべての引数を渡し、デフォルト値を取り除く |
+| Oracle のパッケージのプロシージャのオーバーロードを 1 つ選んで呼ぶ（オーバーロードのある名前は検出する: `LQL-4044`）、動的なプロシージャ名 | – |
+| Oracle の暗黙の結果（`DBMS_SQL.RETURN_RESULT`）、MariaDB のパッケージ、プロシージャの結果のページング | サポートしていない |
 
 <a id="108-caching-a-lambda-is-analyzed-once"></a>
-## 10.8 キャッシュ: ラムダの解析は 1 回だけ
+## 10.8 キャッシュ: ラムダ式は 1 回だけ解析される
 
-バイトコードを読むのは遅い部分なので、lambdaQL はそれを **ラムダごとに 1 回** だけ行います。
+バイトコードの opcode の読み取りは遅い部分なので、lambdaQL はこれを **ラムダ式ごとに 1 回だけ** 行います。
 
 | 項目 | ルール |
 |---|---|
-| キャッシュするもの | 解析の結果: HQL のテンプレートとパラメーターの取得元のリスト。失敗もキャッシュする |
-| キャッシュのキー | ラムダの実装クラスとメソッド（名前、シグネチャ、種類）、ラムダの型、エンティティのクラス、**ClassLoader** |
-| サイズ | 上限あり（LRU）。そのため無限に大きくならず、クラスローダーもリークしない |
-| キャッシュしないもの | バイトコードそのもの（もう一度読むのは安く、保持すると大きい） |
-| キャプチャ値 | **決してキャッシュしない。** クエリを実行するたびに読んでバインドする |
-| キャプチャしたオブジェクトに対する呼び出し（`filter.minPrice`、`this.minStatus`、`LocalDateTime.of(...)`） | クエリを実行する **たびに** アプリケーションで実行し、1 つのパラメーターとしてバインドする |
+| キャッシュするもの | 解析の結果: HQL のテンプレートとパラメーターの出所のリスト。失敗もキャッシュする |
+| キャッシュのキー | ラムダ式の実装クラスとメソッド（名前、シグネチャ、種類）、ラムダ式の型、エンティティクラス、**ClassLoader** |
+| サイズ | 制限あり（LRU）。そのため際限なく大きくならず、クラスローダーをリークしない |
+| キャッシュしないもの | バイトコードの opcode そのもの（読み直しは安く、保持するには大きい） |
+| キャプチャした値 | **キャッシュしない。** クエリを実行するたびに読んでバインドする |
+| キャプチャしたオブジェクトに対する呼び出し（`filter.minPrice`、`this.minStatus`、`LocalDateTime.of(...)`） | クエリを実行する **たびに** アプリケーションで実行してから、パラメーター 1 つとしてバインド |
 | キャプチャした `var` | クエリを実行するたびに読む |
-| キャプチャ値だけの条件（`p != null && ...`） | 定数に畳み込まず、`:p1 is not null` として残すので、キャッシュは正しいまま |
-| キャプチャ値としての `Direction` | バインド値で、毎回読む（構造はキャッシュされたまま） |
-| DML | ラムダのクラスごとに 1 回解析する。`set()` の呼び出しの間のチェックには小さな要約を使う |
+| キャプチャした値だけを使う null ガード（`lo == null \|\| ...`） | クエリを作るときに値で決める。そのため HQL が値によって変わる（[9.8](09-kotlin-notes.md#98-captured-values) を参照） |
+| キャプチャした値として使う `Direction` | バインドの値で、毎回読む（構造はキャッシュされたまま） |
+| DML | ラムダ式のクラスごとに 1 回解析。`set()` の呼び出しの間のチェックは小さな要約を使う |
 
-Kotlin のラムダの名前（`...$lambda$0`）は、コンパイラーのバージョンやソースの編集によって変わることがあります。
-これは問題ありません。キャッシュのキーにはクラス、シグネチャ、クラスローダーも含まれていて、lambdaQL は名前の形式に依存しません。
+Kotlin のラムダ式の名前（`...$lambda$0`）は、コンパイラーのバージョンやソースの修正で変わることがあります。
+問題ありません。キャッシュのキーにはクラス、シグネチャ、クラスローダーも入っていて、lambdaQL は名前の形式に依存しません。
 
-プロトタイプでの測定（JDK 21）: 新しいラムダの最初の解析は約 **0.2 ms** かかります。
-その後、`set()` を 2 回呼ぶ update のコストは、キャッシュの検索、値の取り出し、チェックを合わせて約 **0.1〜0.2 µs** で、
-200 万回実行した後でも同じです。目標: 同じラムダを 1,000 回呼んでも、バイトコードを読むのは 1 回だけにすることです。
-Hibernate も HQL の文字列をキーにクエリプランをキャッシュします。
+プロトタイプで測定した結果（JDK 21）: 新しいラムダ式の最初の解析には約 **0.2 ms** かかります。
+その後、`set()` の呼び出しが 2 つある update は、キャッシュの検索、値の取り出し、チェックに約 **0.1〜0.2 µs** かかり、
+200 万回実行した後も同じです。目標: 同じラムダ式を 1,000 回呼んでも、バイトコードの opcode は 1 回だけ読みます。
+Hibernate も、HQL の文字列をキーにしてクエリプランをキャッシュします。
 
-これが利用者にとって意味すること:
+利用者にとっての意味:
 
+<!-- region: ManualKotlinRulesTest.kt#cache-choose -->
 ```kotlin
-// 良い例: ラムダは 1 つで、値だけが変わる
-.where { it.status == status }
+// good: one lambda, only the value changes (the lambda is analyzed once)
+val byStatus = qb.from(Order::class.java).where { it.status.toInt() == status }
+assertEquals("select e0 from Order e0 where e0.status = :p1", byStatus.toHql().hql())
 
-// v0.1 ではできない: ラムダの中でクエリの形が変わる
-.where { if (flag) it.status == 1 else it.active }
+// not possible: the shape of the query changes inside the lambda
+val error = assertThrows(LambdaQLException::class.java) {
+    qb.from(Order::class.java).where { if (flag) it.status.toInt() == 1 else it.isActive }
+}
+assertEquals("LQL-2021", error.code())
 
-// 代わりに: ラムダを外で選ぶ（2 つのラムダは、それぞれ 1 回ずつ解析される）
+// instead: choose the lambda outside (two lambdas, each analyzed once)
 val list = if (flag) {
-    qb.from(Order::class.java).where { it.status == 1 }.toList()
+    qb.from(Order::class.java).where { it.status.toInt() == 1 }.toList()
 } else {
-    qb.from(Order::class.java).where { it.active }.toList()
+    qb.from(Order::class.java).where { it.isActive }.toList()
 }
 ```
 
+コード例: [`ManualKotlinRulesTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinRulesTest.kt)（`cache-choose`）。
+
 <a id="109-tested-environment"></a>
-## 10.9 テストした環境
+## 10.9 対応環境
 
 | 項目 | バージョン |
 |---|---|
 | Kotlin | 2.x（設計は kotlinc 1.7.22、2.1.10、2.2.21、2.3.0、2.3.21 で確認） |
-| Java（JVM） | 21 |
-| Hibernate | 6.6 または 7.4（6.6.53、7.4.13 でテスト済み）。HQL の拡張（たとえば `function(...)` や `nulls first`）を使うので、他の JPA 実装は保証しない |
-| データベース | H2 2.3、MariaDB 10.11、Oracle 23.26 (23ai) |
-| Spring | Spring Boot 3.5.16（Spring Data JPA 3.5.13）と 4.1.2（Spring Data JPA 4.1.2）（Spring モジュール、[12](12-spring-data-jpa.md)、[13](../13-spring-boot-versions.md)。Java のリポジトリのみ） |
-| Kotlin の 1 行ずつの確認 | 今のところ H2 だけ。Kotlin のケースを MariaDB と Oracle で実行することは予定 |
-| テストしていないもの | 2.3 より新しい Kotlin、Kotlin Multiplatform、PostgreSQL、SQL Server、Oracle 19c 以前（たとえば PL/SQL の `BOOLEAN` パラメーター） |
+| Java（JVM） | 21 以上 |
+| Hibernate | 6.6 または 7.4。HQL の拡張（例: `function(...)`、`nulls first`）を使うので、他の JPA 実装は保証しない |
+| データベース | H2 2.3、MariaDB 10.11、MySQL 8.4、PostgreSQL 17、Oracle 23.26 (23ai) |
+| Spring | Spring Boot 3.5（Spring Data JPA 3.5）と 4.1（Spring Data JPA 4.1）（Spring モジュール、[12](12-spring-data-jpa.md)、[13](../13-spring-boot-versions.md)） |
+| 未確認 | 2.3 より新しい Kotlin、Kotlin Multiplatform、SQL Server、Oracle 19c 以下（例: PL/SQL の `BOOLEAN` パラメーター） |
 
 ---
 

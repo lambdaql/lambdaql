@@ -3,71 +3,44 @@
 
 **他の言語:** [English](../en/README.md) | [한국어](../ko/README.md) | [日本語](../ja/README.md) | [简体中文](../zh/README.md)
 
-lambdaQL は Java と Kotlin のためのクエリライブラリです。
-普通のラムダを書くと、lambdaQL がそのラムダのバイトコードを読み、Hibernate 7 の HQL クエリを組み立てます。
-ラムダが実行されることはありません。
+lambdaQL は、JPA と Hibernate の上で動く Java・Kotlin 用のクエリライブラリです。
+クエリの条件とソートをラムダ式で書くと、lambdaQL がラムダ式のバイトコードを解析して HQL クエリを作ります。
 
 <a id="a-first-look"></a>
-## はじめに
+## 例
 
 ### Java
 
+<!-- region: ManualSharedTest.java#readme-first -->
 ```java
 List<Order> orders = qb.from(Order.class)
-    .where(o -> o.getStatus() == 1 && o.getPrice() > minPrice)
-    .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId()))
-    .limit(20)
-    .toList();
+        .where(o -> o.getStatus() == 1 && o.getPrice() > minPrice)
+        .orderBy(o -> desc(o.getPrice()).asc(o.getId()))
+        .limit(20)
+        .toList();
 ```
 
 ### Kotlin
 
+<!-- region: ManualKotlinSharedTest.kt#readme-first -->
 ```kotlin
 val orders = qb.from(Order::class.java)
-    .where { it.status == 1 && it.price!! > minPrice }
-    .orderBy { o, by -> by.desc(o.price).asc(o.id) }
+    .where { it.status.toInt() == 1 && it.price > minPrice }
+    .orderBy { o -> desc(o.price).asc(o.id) }
     .limit(20)
     .toList()
 ```
 
 <a id="hql-the-same-for-both"></a>
-### HQL（どちらも同じ）
+### HQL
 
 ```
 select e0 from Order e0
 where e0.status = 1 and e0.price > :p1
-order by e0.price desc nulls last, e0.id asc
+order by e0.price desc, e0.id asc
 ```
 
-**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 7.4 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。
-
-**データベースごとの SQL（この HQL に対する Hibernate の SQL）** — マニュアルの `Order` には NULL になりうる `Double price` がありますが、テストの `Order` にはないので、`SqlByDatabaseTest` はこの HQL を Hibernate に直接渡します。`expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `readme-first`:
-
-```sql
--- H2
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.price>?
-order by o1_0.price desc,o1_0.id
-fetch first ? rows only
-
--- MariaDB
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.price>?
-order by o1_0.price desc,o1_0.id
-limit ?
-
--- Oracle
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.price>?
-order by o1_0.price desc nulls last,o1_0.id
-fetch first ? rows only
-```
+コード例: [`ManualSharedTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java)（`readme-first`）、[`ManualKotlinSharedTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSharedTest.kt)（`readme-first`）。
 
 <a id="choose-your-track"></a>
 ## トラックを選ぶ
@@ -75,25 +48,12 @@ fetch first ? rows only
 このマニュアルには **2 つのトラック** があります。Java 用と Kotlin 用です。
 各トラックには、その言語のコードだけが載っています。クエリを書く言語を選んでください。
 
-| トラック | ここから始める | こんな人向け |
+| トラック | 開始ページ | こんな人向け |
 |---|---|---|
-| **Java** | [Java トラック](java/README.md) | クエリを Java で書く人 |
-| **Kotlin** | [Kotlin トラック](kotlin/README.md) | クエリを Kotlin で書く人 |
+| **Java** | [Java トラック](java/README.md) | クエリを Java で書きます。 |
+| **Kotlin** | [Kotlin トラック](kotlin/README.md) | クエリを Kotlin で書きます。 |
 
-どちらのトラックも同じエンジンを使います。そのため、同じクエリはどちらの言語でも同じ HQL になります。
-2 つのトラックは章番号とファイル名が同じです。違うのは 9 章だけです（Java の注意点、または Kotlin の注意点）。
-トラックのどのページにも、もう一方のトラックの同じページへのリンクがあります。いつでも切り替えられます。
-
-<a id="common-pages"></a>
-## 共通ページ
-
-次のページは両方の言語向けです。コードは Java と Kotlin の別々のセクションに分けて載せています。
-
-| ページ | 内容 |
-|---|---|
-| [1. 概要](01-overview.md) | lambdaQL とは何か、なぜ作ったか、どう動くか、設計方針 |
-| [11. エラーと言語](11-errors-and-languages.md) | エラーコード、例外、メッセージの言語、ログ |
-| [13. Spring Boot 3 と 4](13-spring-boot-versions.md) | バージョン表、アーティファクト、Hibernate 6.6 と 7.4 の SQL の違い、検証の範囲 |
+2 つのトラックは同じエンジンを使うので、同じクエリはどちらの言語でも同じ HQL になります。
 
 <a id="table-of-contents"></a>
 ## 目次
@@ -118,8 +78,9 @@ fetch first ? rows only
 <a id="about-the-examples"></a>
 ## 例について
 
-コード例はすべて、テストコードの一部分をそのまま写したものです。コードの上にテストファイルと部分の名前（領域 `name`）を書きます。テストは lambdaQL が作った HQL と、返した行を確認します。
-Java トラックの例は Java のテストから、Kotlin トラックの例は Kotlin のテストから取ります。まだ実装していない機能はマニュアルに載せず、[ROADMAP](../../design/ROADMAP.md) に置きます。
+コード例は、実行結果と HQL を比較する検証コードです。各節の末尾にある「コード例」のリンクからコード全体を見られます。
+
+**データベースごとの SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。
 
 <a id="example-entities"></a>
 ## 例で使うエンティティ
@@ -139,38 +100,15 @@ Java トラックの例は Java のテストから、Kotlin トラックの例�
 
 | 項目 | バージョン |
 |---|---|
-| Java | 21 |
-| Kotlin | 2.x |
-| Hibernate ORM | 6.6 または 7.4（6.6.53、7.4.13 でテスト済み） |
+| Java | 21 以上 |
+| Kotlin | 2.x 以上 |
+| Hibernate ORM | 6.6 または 7.4（6.6.53、7.4.13 でテスト） |
 | 検証したデータベース | H2 2.3、MariaDB 10.11、MySQL 8.4、PostgreSQL 17、Oracle 23.26 (23ai) |
-| Spring Boot（任意） | 3.5 または 4.1（3.5.16、4.1.2 でテスト済み）。[13. Spring Boot 3 と 4](13-spring-boot-versions.md) を参照 |
-
-<a id="folder-layout"></a>
-## フォルダー構成
-
-```
-manual/ja/
-├── README.md                      このページ
-├── 01-overview.md                 共通
-├── 11-errors-and-languages.md     共通
-├── java/                          Java トラック（Java のコードだけ）
-│   ├── README.md
-│   ├── 02-getting-started.md ... 08-procedures-functions.md
-│   ├── 09-java-notes.md
-│   └── 10-rules-and-limits.md
-└── kotlin/                        Kotlin トラック（Kotlin のコードだけ）
-    ├── README.md
-    ├── 02-getting-started.md ... 08-procedures-functions.md
-    ├── 09-kotlin-notes.md
-    └── 10-rules-and-limits.md
-```
-
-どの言語フォルダー（`en`、`ko`、`ja`、`zh`）も同じファイル名です。言語を切り替えるには、リンクのフォルダー名を変えてください。
+| Spring Boot（任意） | 3.5 または 4.1（3.5.16、4.1.2 でテスト）。[13. Spring Boot 3 と 4](13-spring-boot-versions.md) を参照 |
 
 <a id="help-and-contributions"></a>
 ## ヘルプと貢献
 
-- ソースコード: <https://github.com/codebit0/lambdaql>
-- 韓国語のマニュアルが原本です。英語、日本語、中国語のマニュアルは翻訳です。
+- ソースコード: <https://github.com/lambdaql/lambdaql>
 - どの言語でも、間違いを見つけたら issue か pull request を作成してください。翻訳の手伝いも歓迎します。
 - 設計ドキュメント（韓国語、コントリビューター向け）: [ROADMAP.md](../../design/ROADMAP.md)、[KOTLIN.md](../../design/KOTLIN.md)

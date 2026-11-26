@@ -5,35 +5,36 @@
 
 共通ページ: [1. 概要](../01-overview.md) · [11. エラーと言語](../11-errors-and-languages.md)
 
-lambdaQL は Kotlin と Java を **同じエンジン**、同じ API でサポートします。
-同じ意味の Kotlin のラムダと Java のラムダは、同じ HQL になります。
-この章では、Kotlin で特別なことを 1 か所にまとめます。
+lambdaQL は、**同じエンジン** と同じ API で Kotlin と Java をサポートします。
+意味が同じ Kotlin のラムダ式と Java のラムダ式は、同じ HQL を作ります。
+この章では、Kotlin で特別なことを 1 か所にまとめました。
 
 <a id="contents"></a>
 ## 目次
 
 - [9.1 設定](#91-setup)
-- [9.2 使えるラムダの形](#92-lambda-forms-that-work)
-- [9.3 意味を持つのは自分で書いた null チェックだけ](#93-only-your-null-checks-count)
-- [9.4 等価: `==`、`!=`、`===` と `areEqual`](#94-equality----and-areequal)
-- [9.5 null 演算子: `?.`、`?:`、`!!`](#95-null-operators---and-)
-- [9.6 `in`、範囲、`when`](#96-in-ranges-and-when)
+- [9.2 動くラムダ式の形](#92-lambda-forms-that-work)
+- [9.3 自分で書いた null チェックとコンパイラーの null チェック](#93-only-your-null-checks-count)
+- [9.4 等値比較: `==`、`!=`、`===` と `areEqual`](#94-equality----and-areequal)
+- [9.5 null 演算子: `?.`、`?:` と `!!`](#95-null-operators---and-)
+- [9.6 `in`、範囲と `when`](#96-in-ranges-and-when)
 - [9.7 文字列](#97-strings)
-- [9.8 キャプチャ値](#98-captured-values)
+- [9.8 キャプチャした値](#98-captured-values)
 - [9.9 プロパティ参照とスコープ関数](#99-property-references-and-scope-functions)
 - [9.10 Kotlin の演算子](#910-kotlin-operators)
-- [9.11 結果: data class、`Pair`、`Triple`](#911-results-data-classes-pair-and-triple)
+- [9.11 結果: data class、`Pair` と `Triple`](#911-results-data-classes-pair-and-triple)
 - [9.12 更新、挿入、削除: プロパティへの代入と `Dml.value`](#912-update-insert-delete-property-assignment-and-dmlvalue)
 - [9.13 プロシージャと DB 関数](#913-procedures-and-db-functions)
-- [9.14 Kotlin の制限（KC1 から KC21）](#914-kotlin-limits-kc1-to-kc21)
-- [9.15 lambdaQL と Kotlin コードの実行との違い](#915-where-lambdaql-differs-from-running-kotlin-code)
+- [9.14 Kotlin の制限（KC1〜KC21）](#914-kotlin-limits-kc1-to-kc21)
+- [9.15 lambdaQL が Kotlin のコードの実行と違う点](#915-where-lambdaql-differs-from-running-kotlin-code)
 
 例の読み方:
 
-- 例の下のコメントは、設計で決まっている場合に、lambdaQL が作る HQL を示します。
-- ラムダの中に書いた定数（数値、文字列、真偽値、`null`、enum 定数、`const val`）は、リテラルとして HQL に書き込まれます。キャプチャした値と計算した値は常にバインドパラメーター（`:p1`、`:p2`、...）になります（D37）。
-- `e0` はルートエンティティのエイリアス、`j1` は関連のパスのために lambdaQL が追加する結合のエイリアスです。`where` の中ではデフォルトで内部結合の `join`（D48）で、`?.` でたどった段階は必要なときに `left join`（D54）、パスを `orderBy` か `select` だけで使うときは `left join` です（D36）。サブクエリのルートは `s1`、`s2`、... です（[5. サブクエリ](05-subquery.md) を参照）。予定の機能（派生テーブル、CTE、プロシージャ）の例は、まだ予定のエイリアス `o` と `c1` を使います。
-- エンティティは [2. はじめよう](02-getting-started.md#example-entities) のものです。一部の例では `Order` に 2 つのプロパティを追加して使います: `var flag: Boolean? = null` と `var kind: OrderKind? = null`（`enum class OrderKind { NORMAL, EXPRESS, GIFT }`）。
+- 例の `assertEquals` の文字列が、lambdaQL の作る HQL です。
+- ラムダ式に直接書いた定数（数値、文字列、boolean、`null`、enum 定数、`const val`）は、HQL にリテラルとして書きます。キャプチャした値と計算した値は、常にバインドパラメーター（`:p1`、`:p2`、...）です。
+- `e0` はルートエンティティの別名で、`j1` は lambdaQL が関連のパスのために追加する結合の別名です。`where` では、関連のない行が条件に一致しうるなら `left join`、一致しえないなら内部結合の `join` です。パスを `orderBy` や `select` にだけ使うと `left join` です。サブクエリのルートは `s1`、`s2`、... です（[5. サブクエリ](05-subquery.md) を参照）。
+- エンティティは、Java で書いた例のエンティティ（`Order`、`Customer`、`Item`、`Coded`）です。Kotlin は Java の getter をプラットフォーム型のプロパティとして見ます。
+  `Order.status` は `short` なので条件は `it.status.toInt() == 1` と書き、boolean の `active` は `it.isActive` で読みます。NULL になりうる Boolean の例は `Coded.vip` を使います。
 
 ---
 
@@ -42,33 +43,32 @@ lambdaQL は Kotlin と Java を **同じエンジン**、同じ API でサポ�
 
 | 項目 | 値 |
 |---|---|
-| Kotlin | 2.x。設計は kotlinc 1.7.22、2.1.10、2.2.21、2.3.0、2.3.21 で確認しました |
-| JVM | Java 21 |
-| コンパイラーオプション | デフォルトの `-Xsam-conversions=indy` のままにしてください。`-Xsam-conversions=class` は使わ **ないで** ください（KC1） |
-| `-jvm-target` | 1.8、11、17、21 のどれでも動きます |
-| Kotlin ランタイム | lambdaQL は依存関係に `kotlin-stdlib` や `kotlin-reflect` を追加しません |
-| JPA エンティティ | 普通の Kotlin の JPA エンティティ（フィールドへのアノテーションも問題ありません）。いつもの `kotlin("plugin.jpa")` と all-open プラグインを使います |
+| Kotlin | 2.x。設計は kotlinc 1.7.22、2.1.10、2.2.21、2.3.0、2.3.21 で確認 |
+| JVM | Java 21 以上 |
+| コンパイラーのオプション | デフォルトの `-Xsam-conversions=indy` のままにする。`-Xsam-conversions=class` は使わ **ない** |
+| `-jvm-target` | 1.8、11、17、21 のどれでも動く |
+| Kotlin ランタイム | lambdaQL は `kotlin-stdlib` や `kotlin-reflect` を依存関係に追加しない |
+| JPA エンティティ | 普通の Kotlin の JPA エンティティ（フィールドに付けたアノテーションも問題ない） |
 
 詳細: [2. はじめよう](02-getting-started.md#kotlin-compiler-settings)。
 
 <a id="92-lambda-forms-that-work"></a>
-## 9.2 使えるラムダの形
+## 9.2 動くラムダ式の形
 
 lambdaQL の関数は、Java の `Serializable` な関数型インターフェースを受け取ります。
-Kotlin では **ラムダリテラル** を渡します。末尾のラムダと `it` を使ってください。
+Kotlin では **ラムダ式のリテラル** を渡します。末尾ラムダ式と `it` を使ってください。
 
+<!-- region: ManualKotlinNotesTest.kt#where-chain -->
 ```kotlin
-val list = qb.from(Order::class.java)
-    .where { it.status == 1 }
-    .where { it.price!! > 100.0 }        // 複数の where() 呼び出しは AND で結ばれる
-    .toList()
-// select e0 from Order e0 where e0.status = 1 and e0.price > 100.0
+val q = qb.from(Order::class.java)
+    .where { it.status.toInt() == 1 }
+    .where { it.price > 100.0 }        // more where() calls are joined with AND
+assertEquals("select e0 from Order e0 where e0.status = 1 and e0.price > 100.0", q.toHql().hql())
 ```
 
-**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 7.4 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。このテストは Java のラムダを使います。意味が同じ Kotlin のラムダは同じ HQL になるので、SQL も同じです。
+**データベースごとの SQL**
 
-**データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `to-hql`:
-
+<!-- sql: to-hql -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
@@ -76,159 +76,183 @@ from orders o1_0
 where o1_0.status=1 and o1_0.price>100.0
 ```
 
-パラメーターが 2 つ以上あるラムダでは名前を使います。使わないパラメーターには `_` を使ってください。
+パラメーターが 2 つ以上のラムダ式は名前を使います。使わないパラメーターには `_` を使ってください。
 
+<!-- region: ManualKotlinNotesTest.kt#named-params -->
 ```kotlin
-.where { o, sub -> sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
-.orderBy { o, by -> by.desc(o.price).asc(o.id) }
+// lambdas with two parameters use names
+val q = qb.from(Order::class.java)
+    .where { o, sub -> sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
+    .orderBy { o -> desc(o.price).asc(o.id) }
+assertEquals("select e0 from Order e0 where exists (select 1 from Item s1 where s1.order.id = e0.id)"
+    + " order by e0.price desc, e0.id asc", q.toHql().hql())
 ```
 
-Kotlin のプロパティは getter で読まれます。`it.price` は、Java の `getPrice()` 呼び出しと同じバイトコードです。
-lambdaQL は getter を JPA 属性にマッピングします（ルール R10）。
-真偽値のプロパティ `active` の getter は `getActive()` です。lambdaQL はこれを `active` にマッピングします。
+Kotlin のプロパティは getter で読みます。`it.price` は、Java の呼び出し `getPrice()` と同じバイトコードの opcode です。
+lambdaQL は getter を JPA の属性にマッピングします。
+Java のエンティティの boolean プロパティ `active` は getter が `isActive()` なので、Kotlin では `it.isActive` で読みます。lambdaQL はこれを `active` にマッピングします。
 
-| 形 | 使えるか |
+| 形 | 動くか |
 |---|---|
-| `where { it.active }`（ラムダリテラル） | はい |
-| `run { }`、`let { }`、`forEach { }`、inline でない関数、`suspend` 関数の中のラムダ | はい |
-| 呼び出し側から、lambdaQL の型を持つ `inline fun` のパラメーターに渡したラムダ | はい |
-| SAM コンストラクター（先に `val` に入れた場合も） | はい |
-| プロパティ参照: `where(Order::active)`、`orderBy(Order::price)` | はい（R23）。`orderBy` ではまだ実装されていません |
-| Java のエンティティに対する Java の getter 参照: `orderBy(JOrder::getPrice)` | はい |
-| `val f: (Order) -> Boolean = { it.active }; where(f)` | **いいえ**（KC4） |
-| `object : ...`（ラムダの代わりのオブジェクト式） | **いいえ**（KC5） |
-| `inline fun` の本体の中で作ったラムダ | **いいえ**（KC2） |
-| `-Xsam-conversions=class` でコンパイルしたもの | **いいえ**（KC1） |
+| `where { it.isActive }`（ラムダ式のリテラル） | はい |
+| `run { }`、`let { }`、`forEach { }`、inline でない関数、`suspend` 関数の中のラムダ式 | はい |
+| 呼び出し側が lambdaQL の型の `inline fun` パラメーターに渡したラムダ式 | はい |
+| SAM コンストラクター、先に `val` に保存した場合も含む | はい |
+| 条件に渡したプロパティ参照や Java の getter の参照: `where(Order::isActive)` | **いいえ**（`LQL-1009`）。ラムダ式を使う |
+| `val f: (Order) -> Boolean = { it.isActive }; where(f)` | **いいえ** |
+| `object : ...`（ラムダ式の代わりのオブジェクト式） | **いいえ** |
+| `inline fun` の本体の中で作ったラムダ式 | **いいえ** |
+| `-Xsam-conversions=class` でコンパイル | **いいえ** |
+
+コード例: [`ManualKotlinNotesTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)（`where-chain`、`named-params`）。
 
 <a id="93-only-your-null-checks-count"></a>
-## 9.3 意味を持つのは自分で書いた null チェックだけ
+## 9.3 自分で書いた null チェックとコンパイラーの null チェック
 
-lambdaQL は **ラムダを実行しません**。バイトコードを読んで HQL を書きます。
-そのため、Kotlin のいくつかのルールは違う動きになります。基本となるのは次の 5 つの決定です。
+lambdaQL はラムダ式を呼び出さず、バイトコードの opcode を解析して HQL を作ります。
+そのため、いくつかの Kotlin のルールは違う動きをします。
 
-| 決定 | ルール |
+| テーマ | ルール |
 |---|---|
-| D20、D36 | `it.customer?.name` のようなパスは、呼び出しの連鎖ではなく **カラム** です。`where` の中では、to-one の関連はデフォルトで内部結合です。customer のない注文だけを探すには `it.customer == null` と書きます。 |
-| D54 | `where` の中で `?.` でたどった関連の段階は、customer のない注文が条件を真にできるなら `left join` です（`it.status == 1 \|\| it.customer?.name == "Kim"`、`it.customer?.name == null`、`?.` で書いた null ガード）。`!!` でたどった段階は常に内部結合です。同じ段階を混ぜて書くと内部結合になり、`WARN` レベルの `LQL-5014` を出します。 |
-| D22 | lambdaQL は **自分で書いた null の扱いだけ** を使います: `== null`、`!= null`、`?.`、`?:`。Kotlin コンパイラーが自分で追加する null チェックは無視します。それ以外の NULL は SQL に従います。条件は UNKNOWN になり、その行は返されません。 |
-| D23 | `!!` は値を変えません。`it.customer!!.name` と `it.customer?.name` は同じカラムです。ただし `where` の中の関連の段階の `!!` は「関連が必ずある」とみなし、内部結合です（D54）。 |
-| D12 | オブジェクト同士の `==`（と `===`）は、オブジェクトの同一性ではなく **値の等価** を意味します。 |
+| 関連のパス | `it.customer?.name` のようなパスは、呼び出しのチェーンではなく **カラム** です。`where` では、to-one の関連は、顧客のない注文が条件に一致しうるなら `left join`、一致しえないなら inner join です。顧客のない注文だけを探すには、`it.customer == null` と書いてください。 |
+| `?.` と結合 | `?.` を通った比較は、顧客のない注文では顧客のカラムを NULL とみなして SQL の意味で評価します。`it.status.toInt() == 1 \|\| it.customer?.name == "Kim"`、`it.customer?.name == null`、null ガードは、顧客のない注文が条件に一致しうるので `left join` です。`?.` と `!!` は 1 つの条件の中で混ぜて使ってもかまいません。 |
+| `!!` | `!!` は値を変えません。`it.customer!!.name` と `it.customer?.name` は同じカラムです。ただし `where` で関連の段階を `!!` で通った比較は、顧客のある注文でだけ真になります（`it.customer!!.name == null` は inner join）。 |
+| `==`、`===` | オブジェクトどうしの `==`（と `===`）は、オブジェクトの同一性ではなく **値の比較** を意味します。 |
 
-lambdaQL は「自分で書いた」null チェックとコンパイラーのものをどう見分けるのでしょうか。バイトコードが違います。
+NULL になりうる数値のプロパティ（`Integer`）を定数と比較すると、Kotlin のコンパイラーはアンボクシングの前に null チェックを入れます。
+lambdaQL は、ソースに書いていないこのチェックを読みません。そのため、Java と同じ SQL の意味になります。
+`it.cnt == 1` は `e0.cnt = 1` で、`it.cnt != 1` は `e0.cnt <> 1` なので、`cnt` が NULL の行は返しません。NULL の行が必要なら、`it.cnt == null || it.cnt != 1` のように自分で書いてください。
 
-| ソース | バイトコードの形 | lambdaQL |
-|---|---|---|
-| `it.status == null` または `it.status != null` と書いた | `getStatus; ifnull / ifnonnull` | 使います: `is null`、`is not null` |
-| `status: Int?` で `it.status == 1` と書いた | コンパイラーが `dup; ifnonnull; pop; goto` を追加し、その後アンボクシングします | 隠れたチェックを無視します: `e0.status = 1` |
-| `it.price!!` と書いた | `Intrinsics.checkNotNull(...)` | 無視します |
-
-結果として、Kotlin と Java は同じ SQL になります。`it.status == 1` は `e0.status = 1` で、同じ条件を Java で書いても `e0.status = 1` です。
+この動作の例は [9.4](#94-equality----and-areequal) にあります。
 
 <a id="94-equality----and-areequal"></a>
-## 9.4 等価: `==`、`!=`、`===` と `areEqual`
+## 9.4 等値比較: `==`、`!=`、`===` と `areEqual`
 
 <a id="how-kotlin-compiles-"></a>
-### Kotlin が `==` をどうコンパイルするか
+### Kotlin が `==` をコンパイルする方法
 
-| Kotlin | コンパイル結果 | lambdaQL のルール | HQL |
-|---|---|---|---|
-| 2 つの non-null のプリミティブ: `it.qty == 5` | 比較の分岐（Java と同じ） | R1 | `i.qty = 5` |
-| nullable なプリミティブと定数: `it.status == 1`（`Int?`） | 隠れた null チェック + 比較 | R12（隠れたチェックは無視、D22） | `e0.status = 1` |
-| `it.status != 1`（`Int?`） | 同じ | R12 | `e0.status <> 1`（NULL の行は返され **ません**） |
-| 参照型、または両側が nullable: `it.description == text`、`it.status == q`（`q: Int?`） | `Intrinsics.areEqual(a, b)` の呼び出し | R11: 値の等価 | `e0.description = :p1`（キャプチャした `null`: 一致する行はない、`LQL-4045`） |
-| `it.description != text` | `!Intrinsics.areEqual(a, b)` | R11、SQL の意味 | `e0.description <> :p1`（NULL の行は返され **ません**） |
-| エンティティの値どうし: `it.description == it.custName` | `Intrinsics.areEqual(a, b)` | R11、SQL の意味 | `e0.description = e0.custName`（どちらかが NULL なら一致しない） |
-| `it.id === q`、`!==` | `if_acmpeq` / `if_acmpne` | R17: 値の等価 | `==` と同じ |
-| enum: `it.kind == OrderKind.GIFT` | `if_acmpne` | R2、R17 | `e0.kind = com.example.OrderKind.GIFT`（完全なクラス名を使ったリテラル） |
+| Kotlin | コンパイルの結果 | HQL |
+|---|---|---|
+| non-null のプリミティブ型 2 つ: `it.qty == 5` | 比較の分岐（Java と同じ） | `e0.qty = 5` |
+| nullable なプリミティブ型と定数: `it.cnt == 1`（`Integer`） | null チェック + 比較 | `e0.cnt = 1`（null チェックは読まない） |
+| `it.cnt != 1`（`Integer`） | null チェック + 比較 | `e0.cnt <> 1`（NULL の行は返され **ない**） |
+| 参照型か、両側とも nullable: `it.description == text`、`it.cnt == q`（`q: Int?`） | `Intrinsics.areEqual(a, b)` の呼び出し | `e0.description = :p1`（キャプチャした値が `null`: 一致する行なし） |
+| `it.description != "x"` | `!Intrinsics.areEqual(a, b)` | `e0.description <> 'x'`（NULL の行は返され **ない**） |
+| エンティティの値 2 つ: `it.description == it.custName` | `Intrinsics.areEqual(a, b)` | `e0.description = e0.custName`（どちらかが NULL なら不一致） |
+| `it.id === q`、`!==` | `if_acmpeq` / `if_acmpne` | `==` と同じ |
+| enum: `it.kind == Order.Kind.RUSH` | `if_acmpne` | `e0.kind = org.lambdaql.query.Order$Kind.RUSH`（完全なクラス名で書いたリテラル） |
 
-`Intrinsics.areEqual` は、`==` の裏にある Kotlin ランタイムの関数です。lambdaQL はこれを名前で見分け、**値の等価** として読みます。
-エンティティの値は SQL の意味に従います（決定 D48）。どちらかが NULL なら一致せず、NULL と NULL も一致しません。
+`Intrinsics.areEqual` は、`==` の裏にある Kotlin のランタイム関数です。lambdaQL はこれを名前で認識し、**値の比較** として読みます。
+エンティティの値は SQL の意味に従います。どちらかが NULL なら一致せず、NULL と NULL も同じです。
 キャプチャした `null` は NULL としてバインドされ、どの行にも一致しません（`WARN` レベルの `LQL-4045`）。NULL を探すには `x == null` と書いてください。
-結果が Kotlin と異なりうるとき、lambdaQL は `LQL-5009` を `DEBUG` レベルでログに出します。
+
+<!-- region: ManualKotlinNotesTest.kt#hidden-null-check -->
+```kotlin
+// cnt is a nullable Integer: the null check Kotlin adds before the unboxing is not read (SQL meaning)
+val one = qb.from(Order::class.java).where { it.cnt == 1 }
+assertEquals("select e0 from Order e0 where e0.cnt = 1", one.toHql().hql())
+val notOne = qb.from(Order::class.java).where { it.cnt != 1 }          // NULL rows are left out, as in SQL
+assertEquals("select e0 from Order e0 where e0.cnt <> 1", notOne.toHql().hql())
+// both sides nullable: Intrinsics.areEqual, a value comparison
+val same = qb.from(Order::class.java).where { it.cnt == q }
+assertEquals("select e0 from Order e0 where e0.cnt = :p1", same.toHql().hql())
+// two entity values: NULL on either side does not match
+val columns = qb.from(Order::class.java).where { it.description == it.custName }
+assertEquals("select e0 from Order e0 where e0.description = e0.custName", columns.toHql().hql())
+```
 
 <a id="plain--and-"></a>
-### 普通の `=` と `<>`
+### 単純な `=` と `<>`
 
-lambdaQL は常に普通の `=` と `<>` を書きます（決定 D48）。
-`is [not] distinct from` は書きません。これは Oracle では `decode(...)` になり、インデックスを使えないからです。
+`Intrinsics.areEqual` にコンパイルされる比較に、lambdaQL は単純な `=` と `<>` を書きます。
+`is [not] distinct from` は書きません。この形は Oracle で `decode(...)` になり、インデックスを使えません。
 
+<!-- region: ManualKotlinNotesTest.kt#equality -->
 ```kotlin
-.where { it.description == text }    // text が "abc" なら -> e0.description = :p1
-.where { it.description != "x" }     // e0.description <> 'x'   （description が NULL なら一致しない）
-.where { it.description == null || it.description != "x" }   // NULL の行も含む
+// plain = and <>: a row whose description is NULL matches neither
+val same = qb.from(Order::class.java).where { it.description == text }
+assertEquals("select e0 from Order e0 where e0.description = :p1", same.toHql().hql())
+val other = qb.from(Order::class.java).where { it.description != "x" }
+assertEquals("select e0 from Order e0 where e0.description <> 'x'", other.toHql().hql())
+// NULL rows too: write the null check yourself
+val orNull = qb.from(Order::class.java).where { it.description == null || it.description != "x" }
+assertEquals("select e0 from Order e0 where e0.description is null or e0.description <> 'x'", orNull.toHql().hql())
 ```
 
 > [!WARNING]
-> **Kotlin の non-null 型は証明になりません。** `var code: String` のプロパティにも、データベースから NULL が入ることがあります。
-> Hibernate はチェックせずにカラムの値をフィールドに書き込むからです。
-> lambdaQL は Kotlin の型ではなく、JPA のメタデータを見ます。
+> **Kotlin の non-null 型は証拠になりません。** `var code: String` というプロパティにも、データベースからの NULL が入っていることがあります。
+> Hibernate はチェックなしでカラムの値をフィールドに書き込むからです。
+> lambdaQL が見るのは Kotlin の型ではなく、JPA のメタデータです。
 
 <a id="-and-"></a>
 ### `===` と `!==`
 
-lambdaQL では、`===` は `==` と同じく **値の等価** を意味します（R17）。
-クエリにはオブジェクトの同一性がありません。Kotlin 自体は、値が 1000 の 2 つの異なる `Long` のボックスに対して `false` を返しますが、lambdaQL は `true` を返します。
+lambdaQL では、`===` は `==` と同じく **値の比較** を意味します。
+クエリにはオブジェクトの同一性がありません。Kotlin 自身は、値が 1000 の別々の 2 つの `Long` のボックスに対して `false` を返しますが、lambdaQL は `true` を返します。
 
+<a id="bigdecimal"></a>
 ### `BigDecimal`
 
-Kotlin では、`BigDecimal` の `==` は `equals` を呼び、スケールも比較します（`1.0 != 1.00`）。
-SQL の `=` は値だけを比較します。**lambdaQL は値の等価を使います。**
-`BigDecimal`、`String`、`LocalDate`、`BigInteger` の `<`、`>`、`<=`、`>=` はサポートしています（`compareTo` にコンパイルされます）。
+Kotlin では、`BigDecimal` に対する `==` は `equals` を呼び、これはスケールまで比較します（`1.0 != 1.00`）。
+SQL の `=` は値だけを比較します。**lambdaQL は値の比較を使います。**
+`BigDecimal`、`String`、`LocalDate`、`BigInteger` に対する `<`、`>`、`<=`、`>=` をサポートします（`compareTo` にコンパイルされる）。
 
 <a id="booleans"></a>
-### 真偽値
+### boolean
 
+<!-- region: ManualKotlinNotesTest.kt#booleans -->
 ```kotlin
-.where { it.active }                       // e0.active = true
-.where { !it.active }                      // not (e0.active = true)
-.where { it.flag == true }                 // e0.flag = true
-.where { it.flag != true }                 // e0.flag <> true   （NULL の行は返されない: SQL の意味）
-.where { it.active == (it.status!! > 1) }  // (e0.active = true and e0.status > 1) or (e0.active = false and e0.status <= 1)
+val active = qb.from(Order::class.java).where { it.isActive }
+assertEquals("select e0 from Order e0 where e0.active = true", active.toHql().hql())
+val inactive = qb.from(Order::class.java).where { !it.isActive }
+assertEquals("select e0 from Order e0 where e0.active = false", inactive.toHql().hql())
 ```
 
-2 つの真偽値の式の比較はサポートしています（D25）。lambdaQL はこれを `AND`/`OR` に展開する（`CASE` は使わない）ので、データベースはインデックスを使えます。
-両側が同じ条件を共有している場合（たとえば `it.active == it.active`）は拒否されます。
+`!it.isActive` は `e0.active = false` になります。
 
 <a id="java-entities-from-kotlin-platform-types"></a>
 ### Kotlin から使う Java のエンティティ（プラットフォーム型）
 
-エンティティが Java のクラスの場合、Kotlin はその getter をプラットフォーム型（`Long!`）として見ます。
-ルールは同じです。`j.id == 1L` は `e0.id = 1` で、`j.customer.name` は結合したカラムです（`where` の中ではデフォルトで内部結合）。
+エンティティが Java クラスなら、Kotlin はその getter をプラットフォーム型（`Long!`）として見ます。
+この章の例はすべてこの場合です。パス `it.customer?.name` は結合したカラムです（`where` の結合の種類は [3.10](03-where.md#310-association-paths) を参照）。
+
+コード例: [`ManualKotlinNotesTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)（`hidden-null-check`、`equality`、`booleans`）。
 
 <a id="95-null-operators---and-"></a>
-## 9.5 null 演算子: `?.`、`?:`、`!!`
+## 9.5 null 演算子: `?.`、`?:` と `!!`
 
 <a id="summary"></a>
 ### まとめ
 
 | Kotlin | lambdaQL での意味 | HQL の例 |
 |---|---|---|
-| `it.customer?.name` | カラム `customer.name`。`where` の中では、customer のない注文が条件を真にできるなら `left join`、そうでなければ内部結合（D54） | `j1.name` + `join e0.customer j1` または `left join e0.customer j1` |
-| `it.customer!!.name` | 同じカラム。`where` の中では常に内部結合（D23、D54） | `j1.name` + `join e0.customer j1` |
-| `it.customer?.id` | パスが対象の `@Id` で終わる: FK のカラムで、join なし | `e0.customer.id` |
-| `it.customer == null` | customer のない注文だけ | `e0.customer is null`（FK のカラム、join なし） |
-| `it.customer != null` | customer がある注文だけ | `e0.customer is not null`（FK のカラム、join なし） |
-| `it.price!! > 10.0` | `!!` は無視されます。コンパイラーのためだけのものです | `e0.price > 10.0` |
+| `it.customer?.name` | カラム `customer.name`。顧客のない注文では NULL のカラムとして比較（SQL の意味） | `j1.name` + `join` または `left join e0.customer j1` |
+| `it.customer!!.name` | 同じカラム。比較は顧客のある注文でだけ真 | `j1.name` + `join` または `left join e0.customer j1` |
+| `it.customer?.id == 1` | パスが対象の `@Id` で終わる: FK のカラム、結合なし | `e0.customer is not null and e0.customer.id = 1` |
+| `it.customer == null` | 顧客のない注文だけ | `e0.customer is null`（FK のカラム、結合なし） |
+| `it.customer != null` | 顧客のある注文だけ | `e0.customer is not null`（FK のカラム、結合なし） |
 | `it.description ?: ""`（値） | デフォルト値 | `coalesce(e0.description, '')` |
-| `it.flag ?: false`（条件） | NULL は false として扱われます | `(e0.flag is not null and e0.flag = true)` |
-| `lo!!`（キャプチャ値） | `!!` は無視されます。`lo` が null なら NULL をバインドするので、一致する行はありません（`DEBUG` レベルの `LQL-4045`、[9.8](#98-captured-values) を参照） | `:p1` |
+| `it.vip ?: false`（条件） | NULL は false として扱う | `e0.vip is not null and e0.vip = true` |
+| `lo!!`（キャプチャした値） | `!!` は無視される。`lo` が null なら NULL をバインドするので、一致する行はない（`DEBUG` レベルの `LQL-4045`、[9.8](#98-captured-values) を参照） | `:p1` |
 
 <a id="-and--on-association-paths"></a>
-### 関連のパスでの `?.` と `!!`
+### 関連のパスの `?.` と `!!`
 
+<!-- region: ManualKotlinNotesTest.kt#path-forms -->
 ```kotlin
-.where { it.customer?.name == "Kim" }
-// select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim'
-
-.where { it.customer!!.name == "Kim" }
-// 同じ HQL
-
-.where { it.customer?.id == 5L }
-// select e0 from Order e0 where e0.customer.id = 5      （FK のカラム、join なし）
+// ?. and !! on a path: the same column; no order without a customer can match, so both are an inner join
+val safe = qb.from(Order::class.java).where { it.customer?.name == "Kim" }
+assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim'", safe.toHql().hql())
+val sure = qb.from(Order::class.java).where { it.customer!!.name == "Kim" }
+assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim'", sure.toHql().hql())
+// a path that ends at the @Id of the target: the FK column, no join
+val fk = qb.from(Order::class.java).where { it.customer?.id == 1 }
+assertEquals("select e0 from Order e0 where e0.customer is not null and e0.customer.id = 1", fk.toHql().hql())
 ```
 
-**データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `path-literal`:
+**データベースごとの SQL**
 
+<!-- sql: path-literal -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
@@ -237,36 +261,29 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.name='Kim'
 ```
 
-**データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `fk-literal`:
-
-```sql
--- H2, MariaDB, Oracle (same)
-select …
-from orders o1_0
-where o1_0.customer_id=5
-```
-
-パスは呼び出しの連鎖ではなく **カラム** です（D20）。`where` の中では、lambdaQL はデフォルトで内部結合を使います（D36）。
+パスは呼び出しのチェーンではなく **カラム** です。上の条件は顧客のない注文が一致しえないので、`?.` も `!!` も inner join です。
 そのため、パスの前に `it.customer != null &&` を書く必要はありません。
+`it.customer?.id == 1` は、Kotlin が入れた null チェック（`e0.customer is not null`）をそのまま書きますが、結合はありません。
 
-**`?.` で書いた条件は、Kotlin と同じように customer のない注文を残します。** Kotlin では、customer がないとき `it.customer?.name == null` は `true` です。
-lambdaQL はこの条件を `left join` で書き、customer のない注文も返します（D54）。`!!` で書くと内部結合なので、customer に名前がない注文だけを返します。
+**`?.` で書いた条件は、Kotlin と同じく顧客のない注文を残します。** Kotlin では、`it.customer?.name == null` は顧客がないとき `true` です。
+lambdaQL はこの条件を `left join` で書き、顧客のない注文も返します。`!!` で書いた比較は顧客のある注文でだけ真になるので inner join で、顧客の名前がない注文だけを返します。
 
+<!-- region: ManualKotlinNotesTest.kt#null-paths -->
 ```kotlin
-.where { it.customer == null }
-// select e0 from Order e0 where e0.customer is null      （FK のカラム、join なし）
-
-.where { it.customer?.name == null }
-// customer のない注文と、名前のない customer の注文
-// select e0 from Order e0 left join e0.customer j1 where j1.name is null
-
-.where { it.customer!!.name == null }
-// 名前のない customer の注文だけ: 内部結合が customer のない注文を除く
-// select e0 from Order e0 join e0.customer j1 where j1.name is null
+// orders without a customer: the FK column, no join
+val none = qb.from(Order::class.java).where { it.customer == null }
+assertEquals("select e0 from Order e0 where e0.customer is null", none.toHql().hql())
+// orders without a customer, and orders of a customer without a name: a left join
+val safe = qb.from(Order::class.java).where { it.customer?.name == null }
+assertEquals("select e0 from Order e0 left join e0.customer j1 where j1.name is null", safe.toHql().hql())
+// only orders of a customer without a name: the inner join leaves out orders without a customer
+val sure = qb.from(Order::class.java).where { it.customer!!.name == null }
+assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name is null", sure.toHql().hql())
 ```
 
-**データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `no-association`:
+**データベースごとの SQL**
 
+<!-- sql: no-association -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
@@ -274,174 +291,177 @@ from orders o1_0
 where o1_0.customer_id is null
 ```
 
-**データベースごとの SQL（Java のテスト実行から。Kotlin も同じ HQL になります）** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `null-guard-name-null`:
-
-```sql
--- H2, MariaDB, Oracle (same)
-select …
-from orders o1_0
-join customers c1_0 on c1_0.id=o1_0.customer_id
-where c1_0.id is null or c1_0.name is null
-```
-
-`?.` は最後に関数があっても使えます。`it.description?.length` は `length(e0.description)` です。
-
 <a id="-is-just-for-the-compiler"></a>
-### `!!` はコンパイラーのためだけのもの
+### `!!` はコンパイラーのためのものにすぎない
 
-`price` が `Double?` の場合、Kotlin は `it.price > 10.0` をコンパイルしません。
-`it.price!! > 10.0` と書いてください。lambdaQL は `!!` を無視します。ラムダは実行されないので、NPE は起きません。
-`price` が NULL の行は返されません（SQL のルール）。
+プロパティが `Double?` なら、Kotlin は `it.total > 10.0` をコンパイルしません。
+`it.total!! > 10.0` と書いてください。lambdaQL は `!!` を無視します。lambdaQL はラムダ式を呼び出さないので、NPE は起きません。
+値が NULL の行は返されません（SQL のルール）。
 
 <a id="-elvis"></a>
 ### `?:`（エルビス）
 
-値（select、DML の `set`、ソートキー）では、`?:` は `coalesce` になります（ルール R15）。
+select の値と文字列の条件では、`?:` は `coalesce` になります。
 
+<!-- region: ManualKotlinNotesTest.kt#elvis-value -->
 ```kotlin
-.select { it.description ?: "" }                 // coalesce(o.description, '')
-.select { it.customer?.name ?: "none" }          // coalesce(c1.name, 'none') + left join
-.select { (it.price ?: 0.0) * 2 }                // coalesce(o.price, 0.0) * 2
-qb.update(Order::class.java).set { it.price = (it.price ?: 0.0) + 1 }.all().execute()
-// set o.price = coalesce(o.price, 0.0) + 1.0
+// ?: in a select value: coalesce
+val text = qb.from(Order::class.java).select { it.description ?: "" }
+assertEquals("select coalesce(e0.description, '') from Order e0", text.toHql().hql())
+// ?: after ?. in a select value is rejected
+val error = assertThrows(LambdaQLException::class.java) {
+    qb.from(Order::class.java).select { it.customer?.name ?: "none" }
+}
+assertEquals("LQL-2022", error.code())
+// ?: with a number: coalesce too
+val number = qb.from(Order::class.java).where { (it.total ?: 0.0) > 3.0 }
+assertEquals("select e0 from Order e0 where coalesce(e0.total, 0.0) > 3.0", number.toHql().hql())
+// in a string condition, ?: is coalesce too
+val x = qb.from(Order::class.java).where { (it.description ?: "") == "x" }
+assertEquals("select e0 from Order e0 where coalesce(e0.description, '') = 'x'", x.toHql().hql())
 ```
 
-**文字列** の条件では、lambdaQL はカラムに関数をかけません（SARGable のルール）。
+- 数値の条件の `?:` も `coalesce` です: `(it.total ?: 0.0) > 3.0` は `coalesce(e0.total, 0.0) > 3.0` です。
+- `?.` の後の `?:` を select の値として使うと拒否されます（`LQL-2022`）。
+- カラムに `coalesce` がかかるので、`description` の通常のインデックスは使われません。
+- DML の値の `?:` は [7.2](07-2-update.md#add-to-a-value-default-for-null) を参照してください。
 
+**boolean のエルビス** は **条件で** サポートします。
+
+<!-- region: ManualKotlinNotesTest.kt#boolean-elvis -->
 ```kotlin
-.where { (it.description ?: "") == "x" }   // e0.description = 'x'
-.where { (it.description ?: "") == "" }    // (e0.description = '' or e0.description is null)
+// Coded.vip is a nullable Boolean: in a condition, ?: false treats NULL as false
+val vip = qb.from(Coded::class.java).where { it.vip ?: false }
+assertEquals("select e0 from Coded e0 where e0.vip is not null and e0.vip = true", vip.toHql().hql())
+val notVip = qb.from(Coded::class.java).where { !(it.vip ?: false) }
+assertEquals("select e0 from Coded e0 where e0.vip is null or e0.vip = false", notVip.toHql().hql())
 ```
 
-**数値** の条件では、設計では `coalesce(column, default)` を書きます。
-
-```kotlin
-.where { (it.price ?: 0.0) > 3.0 }            // coalesce(e0.price, 0.0) > 3.0
-.where { (it.description?.length ?: 0) > 3 }  // coalesce(length(e0.description), 0) > 3
-```
-
-カラムに関数がかかると、`price` の普通のインデックスは使われません。
-ヒント: 最初の例では NULL は 0 になり、`0 > 3` は false です。そのため `it.price!! > 3.0` は同じ行を返し、
-インデックスを使える `e0.price > 3.0` になります。
-
-**真偽値のエルビス** は **条件の中で** サポートしています。
-
-```kotlin
-.where { it.flag ?: false }       // (e0.flag is not null and e0.flag = true)
-.where { !(it.flag ?: false) }    // (e0.flag is null or not (e0.flag = true))
-```
-
-**値やソートキー** としての真偽値のエルビス（`select { it.flag ?: false }`）はサポートしていません（KC21）。
-真偽値への `coalesce` は Oracle で失敗します（ORA-00932）。ソートには、キー `{ it.flag }` を使い、
-`by.asc(key, nullsFirst)` か `by.desc(key, nullsFirst)` で NULL の位置を選んでください（[4. ソートとページング](04-order-paging.md#43-direction)）。
-
-<a id="smart-casts-and-let"></a>
-### スマートキャストと `?.let`
-
-使う前の null チェックは普通の条件です。
-
-```kotlin
-.where { it.description != null && it.description!!.length > 3 }
-// (e0.description is not null and length(e0.description) > 3)
-
-.where { it.description?.let { d -> d.length > 3 } == true }
-// (e0.description is not null and length(e0.description) > 3)
-```
+**値やソートキー** として使う boolean のエルビス（`select { it.vip ?: false }`）はサポートしていません（`LQL-2022`）。
+ソートにはキー `it.vip` を使い、`asc(key, Nulls.LAST)` や `desc(key, Nulls.FIRST)` のように `Nulls` で NULL の位置を選んでください（[4. ソートとページング](04-order-paging.md#43-direction)）。
 
 <a id="-in-an-assignment"></a>
-### 代入の中の `?.`
+### 代入での `?.`
 
-`set { }` と `values { }` の中では、`it.customer?.id = cid` は **常に代入します**。`?.` は無視されます（D23）。
+`set { }` と `values { }` では、`it.customer?.id = cid` は **常に代入します**。`?.` は無視されます。例は [7.2](07-2-update.md#change-an-association-foreign-key) にあります。
+
+コード例: [`ManualKotlinNotesTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)（`path-forms`、`null-paths`、`elvis-value`、`boolean-elvis`）。
 
 <a id="96-in-ranges-and-when"></a>
-## 9.6 `in`、範囲、`when`
+## 9.6 `in`、範囲と `when`
 
-この節のすべての書き方は v0.1 でサポートしています（決定 D21、D29）。詳細とその他の例: [3.9](03-where.md#39-in-with-a-captured-collection)、[3.14](03-where.md#314-ranges-kotlin-only)、[3.15](03-where.md#315-when-kotlin-only)。
+詳細とさらに多くの例: [3.9](03-where.md#39-in-with-a-captured-collection)、[3.14](03-where.md#314-ranges-kotlin-only)、[3.15](03-where.md#315-when-kotlin-only)。
 
-| Kotlin | HQL | 注 |
+| Kotlin | HQL | 備考 |
 |---|---|---|
-| `it.id in ids`（キャプチャしたコレクション） | `e0.id in (:p1)` | 空: FALSE。`null` の要素: エラー |
-| `it.id !in ids` | `e0.id not in (:p1)`。NULL になりうるカラムも同じ（NULL の行は返されない） | 空: TRUE |
-| `it.status in 1..5` | `e0.status between 1 and 5` | |
-| `it.status !in 1..5` | `not (e0.status between 1 and 5)` | NULL の行は返されません |
-| `it.status in 1 until 5`、`in 1..<5` | `e0.status >= 1 and e0.status < 5` | |
-| `it.status in lo..hi` | `e0.status between :p1 and :p2` | |
-| `it.status in 5 downTo 1` | サポート | `1..5` と同じ行 |
-| `... step 2` | **拒否** | |
-| `when (it.status) { 1, 2 -> true; else -> false }` | `e0.status in (1, 2)` | `Int`、`String`、enum の対象 |
+| `it.id in ids`（キャプチャしたコレクション） | `e0.id in (:p1)` | 空なら一致する行なし。`null` の要素はエラー（`LQL-4008`） |
+| `it.id !in ids` | `e0.id not in (:p1)`。NULL になりうるカラムも同じ（NULL の行は返されない） | |
+| `it.status.toInt() in 1..5` | `1 <= e0.status and e0.status < 6` | |
+| `it.status.toInt() !in 1..5` | `1 > e0.status or e0.status >= 6` | NULL の行は返されない |
+| `in 1 until 5`、`in 1..<5` | `1 <= e0.status and e0.status < 5` | |
+| `it.status.toInt() in lo..hi` | `:p1 <= e0.status and e0.status <= :p2` | |
 | `when { a -> true; b -> true; else -> false }` | `a or b` | |
-| `it.customer?.id in sub.from(...).select { ... }` | `o.customer.id in (select ...)` | サブクエリ。[5.4](05-subquery.md#54-in) を参照 |
+| `when (it.status.toInt()) { 1, 2 -> true; else -> false }` | **拒否される**（`LQL-2010`） | `\|\|` で書く |
+| `it.customer?.id in sub.from(...).select { ... }` | `e0.customer.id in (select ...)` | サブクエリ、[5.4](05-subquery.md#54-in) を参照 |
 | `x !in sub.from(...).select { ... }` | `x not in (select ...)`（SQL の意味） | [5.5](05-subquery.md#55-not-in-is-written-as-not-exists) を参照 |
-| `it.status in listOf(1, 2)`（ラムダの中で作ったリスト） | **拒否**（KC8） | リストは外で作ってください |
+| `it.id in listOf(1L, 2L)`（ラムダ式の中で作ったリスト） | **拒否される**（`LQL-3025`） | リストは外で作る |
 
-**nullable な対象には null ガードが付きません**（D22）。Kotlin は `null in 1..5` を false、`null !in 1..5` を true と定義しています。
-lambdaQL はガードを追加しません。NULL の対象は `in` でも `!in` でも返され **ません**（SQL のルール）。
-NULL の行が欲しい場合は、`it.status == null || it.status !in 1..5` と書いてください。
+<!-- region: ManualKotlinNotesTest.kt#ranges -->
+```kotlin
+val closed = qb.from(Order::class.java).where { it.status.toInt() in 1..2 }
+assertEquals("select e0 from Order e0 where 1 <= e0.status and e0.status < 3", closed.toHql().hql())
+val outside = qb.from(Order::class.java).where { it.status.toInt() !in 1..2 }
+assertEquals("select e0 from Order e0 where 1 > e0.status or e0.status >= 3", outside.toHql().hql())
+val until = qb.from(Order::class.java).where { it.status.toInt() in 1 until 3 }
+assertEquals("select e0 from Order e0 where 1 <= e0.status and e0.status < 3", until.toHql().hql())
+val captured = qb.from(Order::class.java).where { it.status.toInt() in lo..hi }
+assertEquals("select e0 from Order e0 where :p1 <= e0.status and e0.status <= :p2", captured.toHql().hql())
+// a captured collection
+val inIds = qb.from(Order::class.java).where { it.id in ids }
+assertEquals("select e0 from Order e0 where e0.id in (:p1)", inIds.toHql().hql())
+// a nullable target gets no null guard: NULL rows are returned by neither in nor !in (SQL)
+val notIn = qb.from(Order::class.java).where { it.cnt !in counts }
+assertEquals("select e0 from Order e0 where e0.cnt not in (:p1)", notIn.toHql().hql())
+// when without a subject, with true / false branches: OR
+val anyOf = qb.from(Order::class.java).where { when { it.status.toInt() == 3 -> true; it.price > 200.0 -> true; else -> false } }
+assertEquals("select e0 from Order e0 where e0.status = 3 or e0.price > 200.0", anyOf.toHql().hql())
+```
 
-キャプチャしたコレクションに対する `!in` も同じです。`x not in (:p1)` は NULL の行を返しません（SQL の意味、決定 D48）。
-NULL の行が欲しい場合は、`it.status == null || it.status !in ids` と書いてください。
+**nullable な対象には null ガードが付きません**。Kotlin は `null in 1..5` を false、`null !in 1..5` を true と定義しています。
+lambdaQL はガードを追加しません。NULL の対象は、`in` でも返されず、`!in` でも返され **ません**（SQL のルール）。
+NULL の行が欲しいなら、`it.cnt == null || it.cnt !in 1..5` と書いてください。
+
+キャプチャしたコレクションに対する `!in` も同じです。上の例の `x not in (:p1)` は NULL の行を返しません（SQL の意味）。
+
+コード例: [`ManualKotlinNotesTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)（`ranges`）。
 
 <a id="97-strings"></a>
 ## 9.7 文字列
 
-次の Kotlin の文字列の書き方には設計があります（ルール R21）。可能な場合は SARGable のルールに従います。
+エンティティの値に対する `startsWith`、`endsWith`、`contains`（`ignoreCase` を含む）は `like` になります（[3.8](03-where.md#38-strings)）。
+その他の文字列関数は、lambdaQL がラムダ式を読むときに `TranslationException`（`LQL-3008`）で拒否します。`lowercase`、`length`、`isNullOrEmpty`、`isBlank`、`equals(s, ignoreCase = true)` がこれにあたります。
+条件は、値を直接比較する形で書いてください。
 
-| Kotlin | HQL | 注 |
-|---|---|---|
-| `it.description!!.startsWith("A")` | `e0.description like :p1 escape '\'` | lambdaQL は値の中の `%`、`_`、`\` をエスケープします |
-| `it.description!!.endsWith(s)` | `e0.description like :p1 escape '\'` | |
-| `it.description!!.contains(s)` | `e0.description like :p1 escape '\'` | |
-| `it.description?.startsWith("A") == true` | 同じ `like` | これもサポート |
-| `startsWith(s, ignoreCase = true)`、`equals(s, ignoreCase = true)` | カラムによって変わります（下を参照） | D24 |
-| `it.description.equals(text)` | `==` と同じ | |
-| `it.description!!.lowercase() == "abc"` | `lower(e0.description) = 'abc'` | カラムに関数がかかる: 普通のインデックスは使われません |
-| `it.description!!.length > 3` | `length(e0.description) > 3` | 長さの単位は DB によって違うことがあります |
-| `it.description.isNullOrEmpty()` | `(e0.description is null or e0.description = :p1)` | Oracle では `''` は NULL です |
-| `isBlank()`、`isNullOrBlank()` | **拒否**（KC9） | `isNullOrEmpty()` か直接の比較を使ってください |
-| カラムに対する `trim()`、`coerceAtLeast()`、`toLocalDate()` などの stdlib の呼び出し | **拒否**（KC20） | 予定（関数のマッピング） |
-| `"$a-$b" == it.description`（テンプレートの中はキャプチャ値だけ） | `:p1 = e0.description` | 設計済み: 文字列はアプリケーションで組み立てられます。現在の解析コアは文字列の連結をすべて拒否するので、文字列はラムダの前に組み立ててください |
-| `"${it.description}-x"`（テンプレートの中のエンティティの値） | **拒否**（KC17） | 予定 |
-
-**`ignoreCase = true`（D24）。** lambdaQL は、インデックスを使えない `lower(col) = lower(:p)` を書きません。
-起動時にそのカラムの DB メタデータを読み、DB が使える形を選びます。
-
-| DB にあるもの | HQL |
+| Kotlin | lambdaQL |
 |---|---|
-| 大文字と小文字を区別しない照合順序（MariaDB の `_ci`） | `col = :p` / `col like :p` |
-| `lower(col)` に対する Oracle の関数インデックス | `lower(col) = :p`（値はアプリケーションで小文字にします） |
-| Oracle の言語インデックス | `col collate binary_ci = :p` |
-| 何もない | 起動時に WARN（strict モード: エラー） |
-
-Unicode の大文字・小文字のルール（たとえば `ſ`、`İ`）は、Kotlin ではなく DB の照合順序に従います。
+| `it.description.equals(text)` | `==` と同じ: `e0.description = :p1` |
+| `(it.description ?: "") == "x"` | `coalesce(e0.description, '') = 'x'`（[9.5](#-elvis)） |
+| 上の文字列関数 | 拒否される（`LQL-3008`） |
+| 文字列の連結とテンプレート（`"${it.description}-x"`、`"$a-$b" == it.description`、`it.description + "x"`） | 拒否される（`LQL-2007`）。キャプチャした値だけを使うテンプレートも拒否されるので、文字列はラムダ式の外で作ってキャプチャする |
 
 <a id="98-captured-values"></a>
-## 9.8 キャプチャ値
+## 9.8 キャプチャした値
 
-| キャプチャしたもの | lambdaQL での使い方 |
+| キャプチャしたもの | lambdaQL の使い方 |
 |---|---|
-| `val`（`Long?`、`String`、... も） | バインドパラメーター |
-| `var` | バインドパラメーター。値は **クエリを実行するたびに** 読まれます |
-| 外側のクラスのプロパティ（`this.minStatus`、`private` も） | クエリを実行するたびに読まれます |
+| `val`（`Long?`、`String`、... も同じ） | バインドパラメーター |
+| `var` | バインドパラメーター。値は **クエリを実行するたびに** 読む |
+| 外側のクラスのプロパティ（`this.minStatus`、`private` も同じ） | クエリを実行するたびに読む |
 | `companion object` の `val`、トップレベルの `val`、`object` の `val` | バインドパラメーター |
-| `const val` | リテラルとして HQL に書き込まれます（D37） |
-| ラムダの中でキャプチャした変数に書き込む（`n++`） | **拒否**（KC12） |
+| `const val` | HQL にリテラルとして書く |
+| ラムダ式の中でのキャプチャした変数への書き込み（`n++`） | **拒否される** |
 
+<!-- region: ManualKotlinNotesTest.kt#order-repo -->
 ```kotlin
 class OrderRepo(private val qb: QueryBuilder) {
     private val minStatus = 2
 
     fun open(lo: Int?) = qb.from(Order::class.java)
-        .where { it.status!! >= minStatus }
-        .where { lo == null || it.status!! > lo }   // lo == null なら絞り込みなし、それ以外は e0.status > :p2
-        .toList()
+        .where { it.status >= minStatus }                // a private property: read each time the query runs
+        .where { lo == null || it.status > lo }          // lo == null: no filter
 }
 ```
 
-`==`、`!=` で使ったキャプチャした `null` は NULL としてバインドされるので、一致する行はありません（`WARN` レベルの `LQL-4045`）。
-キャプチャした `null` は、同じ値に対する null ガードの下（`lo == null || ...`）で使えます。ガードはクエリの実行時にアプリケーションの中で決まるので、`lo == null` ならこの `where` は絞り込みを追加しません。
-ガードなしで書いた大小比較（`lo == null` のときの `it.status!! > lo!!`）は NULL をバインドするので、一致する行はありません（`DEBUG` レベルの `LQL-4045`）。`lo!!` とアンボクシングは実行しません。
-キャプチャ値に対してメソッドを呼ぶ式（`text.trim()`、`lo.toLong()` など）だけが、`null` のときにエラー（`LQL-4012`）を投げます。
-キャプチャした `NaN` や `Infinity` は常にエラーです。
+<!-- region: ManualKotlinNotesTest.kt#order-repo-use -->
+```kotlin
+val all = repo.open(null)
+val above = repo.open(2)
+assertEquals("select e0 from Order e0 where e0.status >= :p1", all.toHql().hql())
+assertEquals("select e0 from Order e0 where e0.status >= :p1 and e0.status > :p2", above.toHql().hql())
+```
+
+キャプチャした `null` は、同じ値に対する null ガードの下（`lo == null || ...`）では許されます。ガードはクエリを作るときにアプリケーションで決めます。
+`lo == null` ならこの `where` は絞り込みを追加せず、値があれば `e0.status > :p2` になります。
+
+`==`、`!=` に使ったキャプチャした `null` は NULL としてバインドされるので、一致する行はありません（`WARN` レベルの `LQL-4045`）。
+ガードなしで書いた大小の比較（`lo == null` のときの `it.status > lo!!`）は NULL をバインドするので、一致する行はありません（`DEBUG` レベルの `LQL-4045`）。`lo!!` とアンボクシングは実行しません。
+キャプチャした値のメソッドを呼ぶ式（`text!!.trim()` など）は、値が `null` なら値を計算するときにエラー（`LQL-3027`）を投げます。
+
+<!-- region: ManualKotlinNotesTest.kt#captured-null -->
+```kotlin
+// a captured null in == is bound as NULL: no row matches
+val text: String? = null
+val none = qb.from(Order::class.java).where { it.description == text }
+assertEquals("select e0 from Order e0 where e0.description = :p1", none.toHql().hql())
+assertEquals(0, none.toList().size)
+// a method call on a captured null fails when the value is computed
+val error = assertThrows(LambdaQLException::class.java) {
+    qb.from(Order::class.java).where { it.description == text!!.trim() }.toList()
+}
+assertEquals("LQL-3027", error.code())
+```
+
+コード例: [`ManualKotlinNotesTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)（`order-repo`、`order-repo-use`、`captured-null`）。
 
 <a id="99-property-references-and-scope-functions"></a>
 ## 9.9 プロパティ参照とスコープ関数
@@ -449,254 +469,248 @@ class OrderRepo(private val qb: QueryBuilder) {
 <a id="property-references"></a>
 ### プロパティ参照
 
-```kotlin
-.orderBy(Order::price)       // orderBy { it.price } と同じ（まだ実装されていない）
-.where(Order::active)        // where { it.active } と同じ
-```
-
-| 形 | 使えるか |
+| 形 | 動くか |
 |---|---|
-| lambdaQL の関数に渡した Kotlin の `Order::price` | はい（R23）。`orderBy` では **まだ実装されていません**。今は `orderBy { it.price }` を使ってください |
-| Java の getter 参照 `JOrder::getPrice` | はい |
-| Java の合成プロパティ `JOrder::price` | いいえ。Kotlin 自体がコンパイルしません（KC18）。`JOrder::getPrice` を使ってください |
-| `Order::price.getter` などの `kotlin-reflect` の API | いいえ（KC19） |
-| 自分で作った Kotlin の `fun interface` に渡した参照 | いいえ（KC3）。ラムダリテラルを渡してください |
+| 条件に渡した Kotlin のプロパティ参照や Java の getter の参照（`where(Order::isActive)`） | いいえ（`LQL-1009`）。ラムダ式 `where { it.isActive }` を使う |
+| Java の合成プロパティ `JOrder::price` | いいえ。Kotlin 自身がコンパイルしない。 |
+| `Order::price.getter` とその他の `kotlin-reflect` の API | いいえ |
+| 自分で作った Kotlin の `fun interface` に渡した参照 | いいえ。ラムダ式のリテラルを渡す |
 
 <a id="scope-functions-and-inline-functions-in-conditions"></a>
 ### 条件の中のスコープ関数と inline 関数
 
-これらは条件の中でサポートしています。コンパイラーが本体をインラインで展開するので、lambdaQL には普通の条件に見えます。
+自分で作った `inline fun` は条件で動きます。コンパイラーが本体をラムダ式の中にコピーするので、lambdaQL は普通の条件として見ます。
 
+<!-- region: ManualKotlinNotesTest.kt#inline-fun -->
 ```kotlin
-.where { it.description?.let { d -> d.length > 3 } == true }
-.where { it.run { status == 1 && active } }
-.where { with(it) { status == 1 } }
-.where { it.isOpenInline() }   // 自分で作った関数: inline fun Order.isOpenInline() = status == 1
+/** Your own inline function: the compiler copies the body into the lambda, so lambdaQL reads a plain condition. */
+private inline fun Order.isOpenInline() = status.toInt() == 1
+```
+
+<!-- region: ManualKotlinNotesTest.kt#scope-functions -->
+```kotlin
+val inline = qb.from(Order::class.java).where { it.isOpenInline() }     // inline fun Order.isOpenInline()
+assertEquals("select e0 from Order e0 where e0.status = 1", inline.toHql().hql())
 ```
 
 | 形 | サポート |
 |---|---|
-| `?.let { }`、`run { }`、`with(it) { }`、`also { }` | はい、条件の中で |
 | 自分で作った `inline fun` | はい |
-| 自分で作った inline でない拡張関数や拡張プロパティ | いいえ（KC11）。`inline` にするか、条件を直接書いてください |
-| `takeIf { }` | いいえ（KC6） |
+| `?.let { }`、`run { }`、`with(it) { }`、`also { }` | いいえ（`LQL-2013`）。条件を直接書く |
+| 自分で作った inline でない拡張関数や拡張プロパティ | いいえ。`inline` にするか、条件を直接書く |
+| `takeIf { }` | いいえ（`LQL-2021`） |
 
-更新と挿入のラムダでは、`apply`、`with`、`also` は v0.1 ではサポートしていません（[9.12](#912-update-insert-delete-property-assignment-and-dmlvalue) を参照）。
+更新と挿入のラムダ式では、`apply`、`with`、`also` は拒否されます（`LQL-2003`、[9.12](#912-update-insert-delete-property-assignment-and-dmlvalue) を参照）。
+
+コード例: [`ManualKotlinNotesTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)（`inline-fun`、`scope-functions`）。
 
 <a id="910-kotlin-operators"></a>
 ## 9.10 Kotlin の演算子
 
-この表は、126 個の演算子の書き方をコンパイラーで確認した結果に基づいています（kotlinc 2.3.21、設計文書 KOTLIN.md の 9 節）。
+この表は、演算子の形 126 個についてのコンパイラーの確認結果から作りました（kotlinc 2.3.21、設計ドキュメント KOTLIN.md の 9 節）。
 
-| 演算子 | lambdaQL のラムダの中で |
+| 演算子 | lambdaQL のラムダ式の中で |
 |---|---|
-| 数値の `< > <= >=`（nullable には `!!` を付けて） | サポート |
-| `BigDecimal`、`String`、`LocalDate`、`BigInteger` の `< > <= >=` | サポート（`compareTo` にコンパイルされます） |
-| `x.compareTo(y) > 0` | サポート。`x > y` として読みます |
-| `==`、`!=` | サポート（SQL の意味による値の等価、[9.4](#94-equality----and-areequal)） |
-| `===`、`!==` | サポート。値の等価 |
+| 数値に対する `< > <= >=`（nullable には `!!` を使う） | サポート |
+| `BigDecimal`、`String`、`LocalDate`、`BigInteger` に対する `< > <= >=` | サポート（`compareTo` にコンパイルされる） |
+| `x.compareTo(y) > 0` | サポート、`x > y` として読む |
+| `==`、`!=` | サポート（[9.4](#94-equality----and-areequal)） |
+| `===`、`!==` | サポート、値の比較 |
 | enum の `==` | サポート |
-| enum の `<`、`>` | サポート。lambdaQL は enum 定数の `in (...)` に展開するので、ORDINAL と STRING のどちらのマッピングでも動きます |
-| エンティティ `==` エンティティ | **拒否**（KC13）。id を比較してください |
-| 値オブジェクト（`@Embedded`）の `==`、`!=` | サポート。カラムごとに展開します（B6、[3.10](03-where.md#310-association-paths) を参照）。大小比較は `LQL-3012` |
+| エンティティ `==` エンティティ | **拒否される**（`LQL-3011`）。id を比較する |
+| 値オブジェクト（`@Embedded`）の `==`、`!=` | サポート。カラムごとに展開（[3.10](03-where.md#310-association-paths) を参照）。大小の比較は `LQL-3012` |
 | `+ - *`、単項の `-` | サポート |
-| `%` | サポート。`mod` として出力します |
-| 整数の `/` | **注意してください。** データベースによって結果が違います（MariaDB の `5/2` は `2.5`、Kotlin は `2`）。最終的なルールは決まっていません。v0.1 では拒否されるかもしれません。ガードの下（`qty != 0 && total / qty > 2`）では常に拒否されます |
-| `BigDecimal` / `BigInteger` の `+ - * %`、単項の `-` | サポート。SQL の演算子として出力します |
-| `BigDecimal` の `/` | サポート（Kotlin は `divide(x, HALF_EVEN)` を使います）。結果のスケールは DB に従います。その他の `divide` の形は拒否されます |
-| `in a..b`、`until`、`..<`、`downTo` | サポート（[9.6](#96-in-ranges-and-when)）。`step` はサポートしません |
+| `%` | サポート、`mod` として出力 |
+| 整数の `/` | **注意。** データベースによって結果が違う（MariaDB は `5/2` が `2.5`、Kotlin は `2`）。lambdaQL は `(e0.cnt / 2)` のようにそのまま書く |
+| `BigDecimal` / `BigInteger` の `+ - * %`、単項の `-` | サポート、SQL の演算子として出力 |
+| `BigDecimal` の `/` | サポート（Kotlin は `divide(x, HALF_EVEN)` を使う）。結果のスケールは DB に従う。他の `divide` の形は拒否される |
+| `in a..b`、`until`、`..<` | サポート（[9.6](#96-in-ranges-and-when)） |
 | `x in list`、`x !in list` | サポート（[9.6](#96-in-ranges-and-when)） |
-| 文字列の `+`、エンティティの値を含む文字列テンプレート | サポートしていません（予定）。注: NULL に対して、Kotlin は `"null"` を、SQL は NULL を返します |
-| 真偽値の中置関数 `and`、`or`、`xor` | **拒否**。`&&` と `\|\|` を使ってください（これらは短絡評価します。`and`/`or` はしません） |
-| キャプチャした配列に対する `arr[0]` | キャプチャ値として扱うか、分かりやすいエラーになります |
-| エンティティのパスに対する `it.tags["k"]`、`it.lines[0]` | **拒否** |
-| エンティティの `operator` 関数（`plus`、`compareTo`）、自分で作った inline でない `infix` | **拒否**（KC11） |
-| `@JvmInline value class` のプロパティ | **拒否**（KC16） |
+| 文字列の `+`、文字列テンプレート | **拒否される**（`LQL-2007`）。備考: NULL に対して Kotlin は `"null"` を、SQL は NULL を返す |
+| boolean の中置関数 `and`、`or`、`xor` | **拒否される**（`LQL-2013`）。`&&` と `\|\|` を使う（短絡評価をする。`and`/`or` はしない） |
+| キャプチャした配列に対する `arr[0]` | キャプチャした値として扱うか、明確なエラー |
+| エンティティのパスに対する `it.tags["k"]`、`it.lines[0]` | **拒否される** |
+| エンティティの `operator` 関数（`plus`、`compareTo`）、自分で作った inline でない `infix` | **拒否される** |
+| `@JvmInline value class` のプロパティ | **拒否される** |
 
 <a id="no-kotlin-only-operator-api"></a>
-### Kotlin 専用の演算子 API はありません
+### Kotlin 専用の演算子 API はない
 
-lambdaQL には **Kotlin 専用の演算子 API はありません**（決定済み）。普通の Java のメソッド名が、そのまま Kotlin の演算子として使えます。
+lambdaQL には **Kotlin 専用の演算子 API はありません**（決定済み）。普通の Java のメソッド名が、すでに Kotlin の演算子として動きます。
 
-| Kotlin の書き方 | 使える理由 | 状況 |
+| Kotlin の形 | 動く理由 | 状態 |
 |---|---|---|
-| `x in sub.from(...).select { ... }` | Kotlin は `x in v` を `v.contains(x)` に変えます | 採用 |
-| `Agg.sum(x)!! + 1 > 3` | プレースホルダーの値に対する普通の算術 | 採用 |
-| ソートの演算子（`by + key`、`-key`） | Java のユーザーにとって奇妙なメソッドが増え、Kotlin 専用の拡張が必要になります | 不採用 |
-| DB 関数のための `invoke` 演算子 | D31（インターフェースの static 関数）と衝突します | 不採用 |
-| `o["price"]` | 文字列のパスで、型安全性がありません | 不採用 |
-| `infix` 関数 | Java のメソッドは `infix` にできません | 不可能 |
-| `between` | `x in a..b` と書きます（nullable には `!!`、`LocalDate?` にも `!!` が必要） | API は不要 |
+| `x in sub.from(...).select { ... }` | Kotlin は `x in v` を `v.contains(x)` に変える | 維持 |
+| `Agg.sum(x)!! + 1 > 3` | プレースホルダーの値に対する普通の算術 | 維持 |
+| ソートの演算子（`+key`、`-key`） | Java の利用者に奇妙なメソッドが増え、Kotlin 専用の拡張が必要 | 却下 |
+| DB 関数のための `invoke` 演算子 | DB 関数の宣言方法（インターフェースの static メソッド）と衝突 | 却下 |
+| `o["price"]` | 文字列のパス。型安全がない | 却下 |
+| `infix` 関数 | Java のメソッドは `infix` になれない | 不可能 |
+| `between` | `x in a..b` で書く（nullable には `!!`、`LocalDate?` には `!!` が必要） | API は不要 |
 
 <a id="911-results-data-classes-pair-and-triple"></a>
-## 9.11 結果: data class、`Pair`、`Triple`
+## 9.11 結果: data class、`Pair` と `Triple`
 
+下の例の data class は、`data class OrderRow(val id: Long?, val customerName: String?, val price: Double)`、`data class CustomerStat(val customerId: Int?, val count: Long, val total: Double?)` です。
+
+<!-- region: KotlinQueryTest.kt#data-class -->
 ```kotlin
-data class OrderView(val id: Long?, val customerName: String?, val price: Double?)
-data class Stat(val customerId: Long?, val cnt: Long, val total: Double?)
-
-qb.from(Order::class.java).select { o -> OrderView(o.id, o.customer?.name, o.price) }   // data class
-qb.from(Order::class.java).select { o -> o.customer?.name to o.price }                  // Pair
-
-qb.from(Order::class.java)
-    .groupBy { it.customer?.id }
-    .having { Agg.sum(it.price)!! > 1000 }
-    .select { Stat(it.customer?.id, Agg.count(), Agg.sum(it.price)) }
-
-qb.from(Order::class.java).groupBy { listOf(it.customer?.id, it.status) }   // 複数のキー
-qb.from(Order::class.java).groupBy { it.customer?.id to it.status }         // Pair でもよい
+val q = qb.from(Order::class.java).select { OrderRow(it.id, it.customer?.name, it.price) }
+assertEquals("select e0.id, j1.name, e0.price from Order e0 left join e0.customer j1", q.toHql().hql())
 ```
 
-| ルール | 注 |
+<!-- region: KotlinQueryTest.kt#group-by -->
+```kotlin
+val q = qb.from(Order::class.java)
+    .groupBy { it.customer?.id }
+    .having { Agg.sum(it.price) > 200 }
+    .select { CustomerStat(it.customer?.id, Agg.count(), Agg.sum(it.price)) }
+assertEquals("select e0.customer.id, count(*), sum(e0.price) from Order e0 group by e0.customer.id"
+    + " having sum(e0.price) > 200.0", q.toHql().hql())
+```
+
+<!-- region: ManualKotlinNotesTest.kt#group-pair -->
+```kotlin
+// a Pair as the group key: two keys
+val q = qb.from(Order::class.java)
+    .where { it.customer != null }
+    .groupBy { it.customer?.id to it.status }
+    .select { Triple(it.customer?.id, it.status, Agg.count()) }
+assertEquals("select e0.customer.id, e0.status, count(*) from Order e0 where e0.customer is not null"
+    + " group by e0.customer.id, e0.status", q.toHql().hql())
+```
+
+`Pair` の結果と `listOf(...)` のグループのキーの例は、[6 章](06-select-group.md) にあります。
+
+| ルール | 備考 |
 |---|---|
-| data class には nullable な型を使ってください | `sum`、`avg`、`min`、`max` は NULL になることがあります。non-null のパラメーターに NULL が来ると、オブジェクトを作るときに NPE が発生します（J4） |
-| `Pair`、`Triple` | 結果としても、グループのキーとしても使えます |
-| `groupBy` の中の `listOf(...)` | 使えます（ラムダの中で作ったリストが使える唯一の場所です） |
-| `groupBy` の中の `arrayOf(...)`、`setOf(...)` | 使えません |
-| 派生テーブルや CTE の行の型 | Kotlin の data class（または Java の record）だけ。カラムは `componentN` の順に従います（J5） |
-| `Agg` の関数 | `import org.lambdaql.Agg.sum` が使えます。コレクションに対する Kotlin の `sum()` / `count()` とは衝突しません |
+| data class には nullable な型を使う | `sum`、`avg`、`min`、`max` は NULL になりうる。non-null のパラメーターに NULL が入ると、オブジェクトを作るときに NPE が発生する |
+| `Pair`、`Triple` | 結果とグループのキーとして許可 |
+| `groupBy` の中の `listOf(...)` | 許可（ラムダ式の中で作ったリストが許される唯一の場所） |
+| `groupBy` の中の `arrayOf(...)`、`setOf(...)` | 不許可 |
+| 派生テーブルや CTE の行の型 | Kotlin の data class（または Java の record）だけ。カラムは `componentN` の順に従う |
+| `Agg` の関数 | `import org.lambdaql.Agg.sum` が動く。コレクションに対する Kotlin の `sum()` / `count()` と衝突しない |
 
 詳細: [6. 選択、集計、グループ化](06-select-group.md)。
+
+コード例: [`KotlinQueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)（`data-class`、`group-by`）、[`ManualKotlinNotesTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)（`group-pair`）。
 
 <a id="912-update-insert-delete-property-assignment-and-dmlvalue"></a>
 ## 9.12 更新、挿入、削除: プロパティへの代入と `Dml.value`
 
 Kotlin のプロパティへの代入は Java と同じ setter の呼び出しにコンパイルされるので、ルールも同じです。
 
+<!-- region: ManualKotlinDmlTest.kt#update-fk -->
 ```kotlin
-qb.update(Order::class.java).set { it.status = st; it.price = it.price!! * 1.1 }.where { it.status == 1 }.execute()
-qb.update(Order::class.java).set { o -> value(o.status, 1) }.where { it.id == id }.execute()     // val プロパティ用（Dml.value）
-qb.update(Order::class.java).set { it.customer?.id = cid }.where { it.id == id }.execute()       // ?. の代入 = 普通の代入
-qb.update(Order::class.java).set { it.price = (it.price ?: 0.0) + 1 }.all().execute()            // ?: -> coalesce
-
-qb.delete(Order::class.java).where { it.customer?.name == null }.execute()
-
-qb.insert(Order::class.java).values { it.id = id; it.price = p; it.status = 1 }.execute()
-qb.insert(Order::class.java).values(lines) { o, l -> o.id = l.id; o.price = l.price; o.status = 1 }.execute()
+// the FK column: the ?. assignment always assigns
+val fk = qb.update(Order::class.java).set { it.customer?.id = cid }.where { it.id == first }
+assertEquals("update Order e0 set e0.customer.id = :p1 where e0.id = :p2", fk.toHql().hql())
+// no customer
+val none = qb.update(Order::class.java).set { it.customer = null }.where { it.status.toInt() == 3 }
+assertEquals("update Order e0 set e0.customer = null where e0.status = 3", none.toHql().hql())
+// a captured entity: its @Id is bound
+val entity = qb.update(Order::class.java).set { it.customer = kim }.where { it.id == third }
+assertEquals("update Order e0 set e0.customer = :p1 where e0.id = :p2", entity.toHql().hql())
 ```
 
-| Kotlin の書き方 | 意味 |
+| Kotlin の形 | 意味 |
 |---|---|
-| `value(o.status, 1)` | `import org.lambdaql.Dml.value` でインポートした関数（D49）。`val` プロパティ（setter なし）を持つエンティティに使います。プロパティへの代入と同じラムダの中で混ぜられます |
-| `value(o.cnt, o.cnt + 1)` | サポート |
-| `it.cnt += 1` | サポート |
-| `it.cnt++`、`--` | v0.1 ではサポートしません。`it.cnt += 1` と書いてください |
-| `set` の中の `apply { }`、`with(it) { }`、`also { }` | v0.1 ではサポートしません。直接代入を書いてください |
-| `set { }` と `set { o, sub -> }` | 別のオーバーロードです。Kotlin はパラメーターの数で選びます。2 つ目の引数 `sub` はサブクエリの起点です（D49） |
+| `value(o.status, st)` | `import org.lambdaql.Dml.value` で取り込んだ関数。`val` プロパティ（setter なし）を持つエンティティに使う。プロパティへの代入と 1 つのラムダ式の中で混ぜられる（[7.3](07-dml.md#73-two-ways-to-assign-property-or-dmlvalue) を参照） |
+| `it.cnt += 1` | サポート（[7.2](07-2-update.md#add-to-a-value-default-for-null) を参照） |
+| `it.custName = it.description ?: "none"` | サポート: `coalesce(e0.description, 'none')` |
+| `it.cnt++`、`--` | 拒否される（`LQL-2003`）。`it.cnt += 1` と書く |
+| `set` の中の `apply { }`、`with(it) { }`、`also { }` | 拒否される（`LQL-2003`）。直接の代入で書く |
+| `set { }` と `set { o, sub -> }` | 別々のオーバーロード。Kotlin はパラメーターの数で選ぶ。2 つ目の引数 `sub` はサブクエリの起点 |
 
 詳細: [7. 更新、挿入、削除](07-dml.md)。
+
+コード例: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)（`update-fk`）。
 
 <a id="913-procedures-and-db-functions"></a>
 ## 9.13 プロシージャと DB 関数
 
+例は [8. プロシージャと DB 関数](08-procedures-functions.md) にあります。この節では、Kotlin で知っておくべきルールだけをまとめました。
+
 <a id="procedures"></a>
 ### プロシージャ
 
-```kotlin
-interface OrderProcs {
-    @SqlProcedure("SQ_CALC") fun calc(id: Long, rate: Double): Double?
-    @SqlProcedure("SP_RECENT") fun recent(custId: Long): List<OrderView>
-    @SqlProcedure("SP_PURGE") fun purge(days: Int)
-}
-
-val d = qb.call(OrderProcs::class.java) { it.calc(id, rate) }.execute()
-val d2 = qb.call(OrderProcs::class.java) { it.calc(rate = rate, id = id) }.execute()   // 名前付き引数
-qb.exec(OrderProcs::class.java) { it.purge(30) }.execute()                            // 戻り値なし
-```
-
 | ルール | 理由 |
 |---|---|
-| nullable な戻り値の型（`Double?`）を使ってください | non-null の型に NULL の OUT 値が来ると失敗します。lambdaQL は名前付きのエラーを投げます |
-| スタブ関数にデフォルト引数を付けないでください | Kotlin は呼び出しを `...$default` に変え、Kotlin のデフォルト値を埋めます。lambdaQL はエラーを報告します |
-| 名前付き引数は単純な値（変数、定数）でだけ使ってください | 式を使うと Kotlin が隠れたローカル変数を作りますが、v0.1 の lambdaQL はそれを受け付けません |
-| 戻り値のないプロシージャには（`call` ではなく）`exec` を使ってください | 両方に `call` を使うと Java で曖昧になり、`run` だと Kotlin の `run { }` と衝突します |
-| `-java-parameters` でコンパイルしてください | すると lambdaQL は、同じ型の引数の取り違えをチェックできます（[8.4](08-procedures-functions.md#84-warning-argument-order)） |
+| nullable な戻り値の型（`Double?`）を使う | non-null の型に NULL の OUT の値が入ると失敗する。lambdaQL は名前の付いたエラーを投げる |
+| スタブ関数にデフォルト引数を使わない | Kotlin は呼び出しを `...$default` に変え、Kotlin のデフォルト値を埋める。lambdaQL はエラーを報告する |
+| 名前付き引数は単純な値（変数、定数）だけ | 式を使うと Kotlin が隠れたローカル変数を作るが、lambdaQL はこれを受け付けない |
+| 戻り値のないプロシージャには（`call` ではなく）`exec` を使う | 両方とも `call` だと Java で曖昧になり、`run` は Kotlin の `run { }` と衝突する |
+| `-java-parameters` でコンパイルする | そうすると、lambdaQL が同じ型の入れ替わった引数をチェックできる（[8.4](08-procedures-functions.md#84-warning-argument-order)） |
 
 <a id="db-functions-interface-companion-object--jvmstatic"></a>
 ### DB 関数: インターフェースの `companion object` + `@JvmStatic`
 
 Kotlin のインターフェースには static 関数がありません。`companion object` と `@JvmStatic` を使ってください。
-
-```kotlin
-interface OrderFns {
-    companion object {
-        @JvmStatic @SqlFunction("FN_DISCOUNT")
-        fun discount(price: Double?): Double? = throw DbOnlyException()
-    }
-}
-
-qb.from(Order::class.java).where { OrderFns.discount(it.price)!! > 10 }
-// where function('FN_DISCOUNT' as Double, o.price) > 10
-val v = qb.call { OrderFns.discount(price) }.execute()     // 関数だけを呼び出す
-```
-
-本体が実行されることはありません。ラムダの外で誰かが呼び出したときに例外を投げるだけです。
-Kotlin が companion の関数を呼ぶとき、バイトコードは最初に `Companion` オブジェクトを読み込みます。lambdaQL はその手順を飛ばし、関数のアノテーションを読みます。
+本体は呼び出されません。ラムダ式の外で直接呼ぶと例外を投げます。
+Kotlin が companion の関数を呼ぶと、バイトコードの opcode はまず `Companion` オブジェクトを読み込みます。lambdaQL はその段階を飛ばし、関数のアノテーションを読みます。
 
 | 宣言 | サポート |
 |---|---|
 | インターフェースの `companion object` + `@JvmStatic` | **はい（推奨）** |
 | Kotlin の `object` + `@JvmStatic` | はい |
-| トップレベル関数 | はい。ただし推奨しません: import を忘れて、名前が stdlib の名前（`maxOf`）と同じ場合、Kotlin は黙って stdlib の関数を呼びます |
-| 拡張関数 | いいえ（KC11） |
+| トップレベル関数 | はい、ただし推奨しない: import を忘れ、その名前が stdlib の名前（`maxOf`）でもあると、Kotlin は黙って stdlib の関数を呼ぶ |
+| 拡張関数 | いいえ |
 | デフォルト引数のある `@SqlFunction` | いいえ |
-| `inline` の `@SqlFunction` | いいえ（呼び出しが消えます） |
-| `vararg` の `@SqlFunction` | v0.1 ではいいえ |
+| `inline` の `@SqlFunction` | いいえ（呼び出しが消える） |
+| `vararg` の `@SqlFunction` | いいえ |
 | 関数型のプロパティ / 関数型インターフェースの定数 | いいえ |
 
-カラムにかけた関数（`OrderFns.discount(it.price)!! > 10`）は、普通のインデックスを使えません。
-lambdaQL はこれに対して WARN をログに出します（[8.9](08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) を参照）。
+カラムに適用した関数（`OrderFns.discount(it.price)!! > 10`）は、通常のインデックスを使えません。
+lambdaQL はこれについて WARN をログに出します（[8.9](08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) を参照）。
 
 <a id="914-kotlin-limits-kc1-to-kc21"></a>
-## 9.14 Kotlin の制限（KC1 から KC21）
+## 9.14 Kotlin の制限（KC1〜KC21）
 
-lambdaQL は推測しません。ある書き方を解析できない場合は、コード
-`[LQL-xxxx]`、ソースの行、ヒントを含む分かりやすいエラーを投げます（[11. エラーと言語](../11-errors-and-languages.md) を参照）。
-KC1 から KC5 は、ラムダを読み込むときに見つかります。この場合、lambdaQL はすぐに止まります。
+lambdaQL はラムダ式をクエリとして解析できないと、コード
+`[LQL-xxxx]`、ソースの行、ヒントを含む例外を投げます（[11. エラーと言語](../11-errors-and-languages.md) を参照）。
+KC1〜KC5 は、ラムダ式を読み込むときに見つかります。この場合、lambdaQL はすぐに止まります。
 
-| # | 書いてはいけないもの | 理由 | 代わりに書くもの |
+| # | このように書かないでください | 理由 | 代わりにこう書いてください |
 |---|---|---|---|
-| KC1 | `-Xsam-conversions=class` でコンパイルする | `SerializedLambda` が作られず、ラムダがクラスになります | デフォルトの `-Xsam-conversions=indy` のままにする |
-| KC2 | `inline fun` の本体の中で作ったクエリのラムダ（普通、`reified`、`crossinline`） | ラムダがラムダではなくクラスになります | ヘルパーを inline でなくするか、呼び出し側からラムダリテラルを渡す |
-| KC3 | 自分で作った Kotlin の `fun interface` への呼び出し可能参照（`kkey(Order::price)`） | アダプタークラスになります | ラムダリテラル `{ it.price }`、または lambdaQL（Java）の関数に `Order::price` を渡す |
-| KC4 | Kotlin の関数型の値: `val f: (Order) -> Boolean = {...}; where(f)` | lambdaQL は `Function1` の中を読めません | リテラルで `where { ... }` |
-| KC5 | `object : ...`（オブジェクト式）、`Serializable` でない関数型インターフェース | シリアライズ可能なラムダではありません | ラムダリテラル |
-| KC6 | 値を選ぶ `if`/`when`/`takeIf`、一般的な `if (a) x else y` | 値の分岐は v0.1 にはありません | `&&` / `\|\|`。値の `CASE WHEN` は予定 |
-| KC7 | *（D25 で削除）* | 2 つの真偽値の式の比較は、いまはサポートしています | – |
-| KC8 | ラムダの中の `in listOf(1, 2, 3)` や `setOf(...)` | ラムダの中で作ったコレクション | 外で `val ids = listOf(1, 2, 3)` とし、`it.status in ids` |
-| KC9 | `isBlank()`、`isNullOrBlank()` | Unicode の空白には、移植性のある SQL の形がありません | `isNullOrEmpty()` か直接の比較 |
-| KC10 | *（D21 で削除）* | 範囲と `when` は、いまはサポートしています。これらの書き方が遅れた場合に限り、しばらくの間 `==` / `\|\|` の連鎖で書くようエラーが案内します | – |
-| KC11 | 自分で作った inline でない拡張関数や拡張プロパティ、エンティティの `operator` 関数 | lambdaQL は呼び出しの中を見られません | `inline fun` にするか、条件を直接書く |
-| KC12 | キャプチャした変数に対する `n++` | ラムダが変数に書き込みます | 値はラムダの外で計算する |
-| KC13 | エンティティ `==` エンティティ（`it.customer == c`） | v0.1 にはありません（予定: 識別子の等価） | `it.customer?.id == c.id` |
-| KC14 | `isNaN()` | サポートしていません | NaN を保存しない。[10.5](10-rules-and-limits.md#105-kotlin-and-sql-differences) を参照 |
-| KC15 | `@JvmField` のエンティティのプロパティ | getter ではなくフィールドアクセスになります | 普通の `var` / `val` |
-| KC16 | マングルされた getter 名: `internal` プロパティ、`value class`、`@get:JvmName` | getter を JPA 属性にマッピングできません | public な普通のプロパティ |
-| KC17 | 文字列テンプレートの中のエンティティの値 | 文字列の連結はまだサポートしていません | カラムを別々に比較する |
-| KC18 | Java の合成プロパティの参照 `JOrder::price` | Kotlin のコンパイルエラー | `JOrder::getPrice` |
-| KC19 | `Order::price.getter` などの `kotlin-reflect` の API | `kotlin-reflect` は使いません | `Order::price` |
-| KC20 | カラムに対するその他の stdlib 関数（`coerceAtLeast`、`trim`、`toLocalDate`、...） | 許可リストにありません | 予定（関数のマッピング）、または `@SqlFunction` の DB 関数 |
-| KC21 | 値やソートキーとしての真偽値のエルビス（`{ it.flag ?: false }`） | 真偽値への `coalesce` は Oracle で失敗します（ORA-00932） | `{ it.flag }` で NULL の位置を指定してソートする。条件の中の `it.flag ?: false` は問題ありません |
+| KC1 | `-Xsam-conversions=class` でコンパイル | `SerializedLambda` が作られない。ラムダ式がクラスになる | デフォルトの `-Xsam-conversions=indy` のままにする |
+| KC2 | `inline fun` の本体（普通、`reified`、`crossinline`）の中で作ったクエリのラムダ式 | ラムダ式がラムダ式ではなくクラスになる | ヘルパーを inline でない関数にするか、呼び出し側からラムダ式のリテラルを渡す |
+| KC3 | 自分で作った Kotlin の `fun interface` に対する呼び出し可能参照（`kkey(Order::price)`） | アダプターのクラスになる | ラムダ式のリテラル `{ it.price }` |
+| KC4 | Kotlin の関数型の値: `val f: (Order) -> Boolean = {...}; where(f)` | lambdaQL は `Function1` の中身を読めない | リテラルで `where { ... }` |
+| KC5 | `object : ...`（オブジェクト式）、`Serializable` でない関数型インターフェース | シリアライズ可能なラムダ式ではない | ラムダ式のリテラル |
+| KC6 | `takeIf`、一般的な boolean の `if (a) x else y` | サポートしない（`LQL-2021`）。値を選ぶ `if`/`when` はサポート（キャプチャした値だけならバインドパラメーター、エンティティの値なら `case when`） | `&&` / `\|\|` |
+| KC7 | *（D25 で削除）* | – | – |
+| KC8 | ラムダ式の中の `in listOf(1, 2, 3)` や `setOf(...)` | ラムダ式の中で作ったコレクション | 外で `val ids = listOf(1, 2, 3)`、それから `it.id in ids` |
+| KC9 | `isBlank()`、`isNullOrBlank()` | Unicode の空白には移植性のある SQL の形がない | 直接比較する |
+| KC10 | *（D21 で削除）* | – | – |
+| KC11 | 自分で作った inline でない拡張関数や拡張プロパティ、エンティティの `operator` 関数 | lambdaQL は呼び出しの中を見られない | `inline fun` にするか、条件を直接書く |
+| KC12 | キャプチャした変数に対する `n++` | ラムダ式が変数に書き込む | ラムダ式の外で値を計算する |
+| KC13 | エンティティ `==` エンティティ（`it.customer == c`） | サポートしない（`LQL-3011`） | `it.customer?.id == c.id` |
+| KC14 | `isNaN()` | サポートしない | NaN を保存しない。[10.5](10-rules-and-limits.md#105-kotlin-and-sql-differences) を参照 |
+| KC15 | `@JvmField` のエンティティのプロパティ | getter ではなくフィールドへのアクセス | 普通の `var` / `val` |
+| KC16 | 変形した getter の名前: `internal` プロパティ、`value class`、`@get:JvmName` | getter を JPA の属性にマッピングできない | public の普通のプロパティ |
+| KC17 | 文字列テンプレートの中のエンティティの値 | 文字列の連結はサポートしない（`LQL-2007`） | カラムを別々に比較する |
+| KC18 | Java の合成プロパティの参照 `JOrder::price` | Kotlin のコンパイルエラー | ラムダ式 `{ it.price }` |
+| KC19 | `Order::price.getter` とその他の `kotlin-reflect` の API | `kotlin-reflect` を使わない | ラムダ式 `{ it.price }` |
+| KC20 | カラムに対するその他の stdlib の関数（`coerceAtLeast`、`trim`、`toLocalDate`、...） | 許可リストにない（`LQL-3008`） | `@SqlFunction` を使った DB 関数 |
+| KC21 | 値やソートキーとして使う boolean のエルビス（`{ it.vip ?: false }`） | boolean に対する `coalesce` は Oracle で失敗する（ORA-00932） | NULL の位置を指定して `{ it.vip }` でソートする。条件では `it.vip ?: false` も問題ない |
 
 <a id="915-where-lambdaql-differs-from-running-kotlin-code"></a>
-## 9.15 lambdaQL と Kotlin コードの実行との違い
+## 9.15 lambdaQL が Kotlin のコードの実行と違う点
 
-これらの違いは設計の一部です。バグではありません。
+この違いは設計の一部です。バグではありません。
 
 | Kotlin のコード | lambdaQL（SQL） |
 |---|---|
-| `!!` は NPE を投げる | 値の `!!` は無視されます。NULL は SQL のルールに従います。`where` の中の関連の段階の `!!` は内部結合なので、関連のない行は除かれます（D54） |
-| `status == null` のとき `it.status != 1` は `true` | 隠れた null チェックは無視されます: NULL に対して `e0.status <> 1` は UNKNOWN なので、その行は返されません。含めるには `it.status == null \|\| ...` と書いてください |
-| customer がないとき `it.customer?.name == null` は `true` | 同じ: `?.` でたどった段階は `left join` になり、customer のない注文も返されます（D54）。`it.customer!!.name == null` は内部結合なので返されません |
-| 対象が NULL の `when` や範囲は `else` に進み、`!in` は `true` | その行は返されません。`NOT` の下でも同じです |
-| `===` はオブジェクトの同一性 | 値の等価 |
-| `BigDecimal` の `==` はスケールを比較する（`1.0 != 1.00`） | 値の等価 |
-| `ignoreCase` は Kotlin の Unicode のルールを使う | DB の照合順序を使います（`ſ`、`İ` は違うことがあります） |
-| `String.length` は UTF-16 の単位を数える | H2 は UTF-16 の単位を、MariaDB はコードポイントを数えます |
-| `Double.NaN` の比較 | キャプチャした NaN はエラーです。保存された NaN は DB に従います |
-| non-null 型の `String` は決して null にならない | カラムは NULL になることがあります。lambdaQL は JPA のメタデータを使います |
-| 整数の `/` は小数部を切り捨てる | DB によって違うことがあります（MariaDB の `5/2 = 2.5`） |
-| 文字列テンプレートは NULL を `"null"` にする | まだサポートしていません。SQL では NULL との連結は NULL になります |
+| `!!` は NPE を投げる | 値の `!!` は無視される。NULL は SQL のルールに従う。`where` で関連の段階を `!!` で通った比較は、関連のある行でだけ真 |
+| `it.description != "x"` は `description == null` のとき `true` | `e0.description <> 'x'` は NULL に対して UNKNOWN なので、行は返されない。含めるには `it.description == null \|\| ...` と書く |
+| 顧客がなければ `it.customer?.name == null` は `true` | 同じ: `?.` で通った段階は `left join` になり、顧客のない注文も返される。`it.customer!!.name == null` は顧客のある注文でだけ真なので、返されない |
+| 対象が NULL の範囲は false で、`!in` は `true` | 行は返されない |
+| `===` はオブジェクトの同一性 | 値の比較 |
+| `BigDecimal` の `==` はスケールを比較する（`1.0 != 1.00`） | 値の比較 |
+| non-null 型の `String` は null ではない | カラムは依然として NULL になりうる。lambdaQL は JPA のメタデータを使う |
+| 整数の `/` は小数部分を切り捨てる | DB によって違うことがある（MariaDB は `5/2 = 2.5`） |
+
+nullable な数値のプロパティと定数の比較（`it.cnt != 1`）も `e0.cnt <> 1` になるので、`cnt` が NULL の行は返しません。Kotlin と結果が違うことがあります（[9.3](#93-only-your-null-checks-count)）。
 
 その他のルール: [10. ルールと制限](10-rules-and-limits.md)。
 

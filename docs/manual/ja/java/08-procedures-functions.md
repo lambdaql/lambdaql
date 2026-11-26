@@ -9,13 +9,13 @@
 
 この章は 2 つの部分に分かれています。
 
-| 部分 | 内容 | アノテーション | 呼び出し方 |
+| 部分 | 対象 | アノテーション | 呼び出し方 |
 |---|---|---|---|
 | [8.1 から 8.5](#81-declare-procedures) | **ストアドプロシージャ** | インターフェースの抽象メソッドに `@SqlProcedure` | `qb.call(OrderProcs.class, p -> p.calc(id, rate)).execute()` |
-| [8.6 から 8.10](#86-declare-db-functions) | **DB 関数**（スカラー） | インターフェースの static メソッドに `@SqlFunction` | どのラムダの中でも直接: `where(o -> OrderFns.discount(o.getPrice()) > 10)` |
+| [8.6 から 8.10](#86-declare-db-functions) | **DB 関数**（スカラー） | インターフェースの static メソッドに `@SqlFunction` | どのラムダ式の中でも直接: `where(o -> OrderFns.discount(o.getPrice()) > 10)` |
 
 どちらの場合も、シグネチャは Java のインターフェースに **1 回だけ** 書きます。
-lambdaQL がこれらのメソッドを **実行することはありません**。ラムダのバイトコードにある呼び出しを読み、データベースを呼び出します。
+lambdaQL はこれらのメソッドを **Java から呼び出しません**。ラムダ式のバイトコードの opcode から呼び出しを読み、データベースのプロシージャや関数を呼び出します。
 
 <a id="contents"></a>
 ## 目次
@@ -40,8 +40,7 @@ lambdaQL がこれらのメソッドを **実行することはありません**
 インターフェースを書きます。各 **抽象** メソッドに `@SqlProcedure("NAME")` を付けてください。
 実装は書きません。lambdaQL も実装を作りません。
 
-[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)、リージョン `declare`:
-
+<!-- region: ManualJavaFunctionTest.java#declare-procs -->
 ```java
 /** One OUT value or more: a record in the database order. */
 record Stat(Double total, Integer cnt) {
@@ -85,24 +84,22 @@ interface MathFns {
 }
 ```
 
-テストは実行前に、MariaDB と Oracle にこれらのプロシージャを作ります。例（MariaDB）:
+下の `call`、`exec`、`rules` の例は、この宣言を使います。
+データベースには対応するプロシージャが必要です。たとえば MariaDB の `SQ_PROC_CALC(IN p_cust INT, IN p_rate DOUBLE, OUT p_total DOUBLE)` は、顧客の `price` の合計に `p_rate` を掛けて `p_total` に入れます。
 
-```sql
-CREATE OR REPLACE PROCEDURE SQ_PROC_CALC(IN p_cust INT, IN p_rate DOUBLE, OUT p_total DOUBLE)
-  BEGIN SELECT COALESCE(SUM(price), 0) * p_rate INTO p_total FROM SQ_orders WHERE customer_id = p_cust; END
-```
+`calcWrong` は、引数の順序の検査を示すためにわざと間違えて宣言したメソッドです（[8.4](#84-warning-argument-order) を参照）。
 
-`calcWrong` はわざと間違えて宣言したメソッドです。テストはこのメソッドでルール PR2 を確認します（[8.4](#84-warning-argument-order) を参照）。
+注意点:
 
-注意:
-
-- `@SqlProcedure`（または `@SqlFunction`）は **必須** です。そのメソッドが何であるかを lambdaQL に伝えます。
+- `@SqlProcedure`（または `@SqlFunction`）は **必須** です。このメソッドが何であるかを lambdaQL に伝えます。
   （`@Procedure` と `@Function` という名前は使いませんでした。`@Procedure` は Spring Data JPA のアノテーションでもあり、`@Function` は Kotlin の `kotlin.Function` と衝突するからです。）
-- 値が空の場合、名前はメソッド名から作られます: `calcTotal` → `CALC_TOTAL`。
-- `@SqlProcedure` には `schema` と `pkg`（Oracle のパッケージ）もあります: `@SqlProcedure(value = "CALC", schema = "LQL", pkg = "SQ_PKG")`。
-- 戻り値の型にはボクシング型（`Double`、`Integer`）を使ってください。プロシージャは NULL を返すことがあります。
-- インターフェースと結果の record は、DB のシグネチャのコピーです。これは型安全のための代価です。lambdaQL はその一部をデータベースと照合します（ルール PR2）。
-- プロシージャ（抽象メソッド）と DB 関数（static メソッド）は **同じインターフェース** に入れられます。
+- 値が空の場合、名前はメソッド名から作ります: `calcTotal` → `CALC_TOTAL`。
+- `@SqlProcedure` には `pkg`（Oracle のパッケージ）もあります: `@SqlProcedure(pkg = "SQ_PKG", value = "TWICE")`（[8.4](#84-warning-argument-order) を参照）。
+- 戻り値の型にはボックス型（`Double`、`Integer`）を使ってください。プロシージャは NULL を返すことがあります。
+- インターフェースと結果の record は、DB のシグネチャの複製です。これは型安全性の代価です。lambdaQL はその一部をデータベースと照合して確認します。
+- プロシージャ（抽象メソッド）と DB 関数（static メソッド）は **同じインターフェース** に置けます。
+
+コード例: [`ManualJavaFunctionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaFunctionTest.java)（`declare-procs`）。
 
 ---
 
@@ -111,8 +108,9 @@ CREATE OR REPLACE PROCEDURE SQ_PROC_CALC(IN p_cust INT, IN p_rate DOUBLE, OUT p_
 
 `qb.call(Interface.class, p -> p.method(args))` を使います。そのあと `execute()` を呼びます。
 
-[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)、リージョン `call`（MariaDB、Oracle）:
+MariaDB、Oracle:
 
+<!-- region: ProcedureTest.java#call -->
 ```java
 Double total = qb.call(OrderProcs.class, p -> p.calc(customerId, rate)).execute();
 Stat stat = qb.call(OrderProcs.class, p -> p.stat(customerId)).execute();
@@ -120,29 +118,29 @@ Adjusted adjusted = qb.call(OrderProcs.class, p -> p.adjust(5, 10)).execute();
 List<Line> recent = qb.call(OrderProcs.class, p -> p.recent(customerId)).execute();
 ```
 
-`customerId` と `rate` はキャプチャしたローカル値です。テストは各結果を Java で計算した値と比べます。たとえば `adjusted` は `new Adjusted(15, "ok")` です。
+`customerId` と `rate` はキャプチャしたローカル値です。たとえば `adjusted` は `new Adjusted(15, "ok")` です。
 
 結果のない（`void`）プロシージャは `exec` で呼び出します。
 
-[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)、リージョン `exec`（MariaDB、Oracle）:
+MariaDB、Oracle:
 
+<!-- region: ProcedureTest.java#exec -->
 ```java
 qb.exec(OrderProcs.class, p -> p.purge(9)).execute();
 ```
 
 なぜ void には `call` ではなく `exec` を使うのでしょうか。
 
-- Java では、両方に `call` を使うとオーバーロードがあいまいになります（コンパイルエラー）。
-- `run` は選びませんでした。Kotlin には同じ名前の標準ライブラリ関数があり、Kotlin から呼ぶときにエラーなしで間違ってそちらを呼んでしまう可能性があるからです。
+- `run` は選びませんでした。Kotlin には同じ名前の標準ライブラリ関数があり、Kotlin から呼ぶときにエラーなしで誤ってその関数を呼んでしまう可能性があるからです。
 
 <a id="what-the-lambda-may-contain-rule-pr12"></a>
-### ラムダに書けるもの（ルール PR12）
+### ラムダ式に書けるもの（ルール PR12）
 
-ラムダ本体は **スタブメソッドの呼び出し 1 つ** です。それ以外は書けません。
+ラムダ式の本体は **スタブメソッドの呼び出し 1 つ** です。それ以外には何も書けません。
 
 | 書けるもの | 書けないもの |
 |---|---|
-| `p -> p.calc(id, rate)` | ログ出力、2 つの呼び出し、`if`、ネストした呼び出し |
+| `p -> p.calc(id, rate)` | ログ出力、2 回の呼び出し、`if`、ネストした呼び出し |
 | 引数: キャプチャ値、定数、それらの計算（`rate * 2`） | エンティティのパス（ここにはエンティティがありません） |
 
 その他の点:
@@ -152,12 +150,14 @@ qb.exec(OrderProcs.class, p -> p.purge(9)).execute();
 - パラメーターに対するデータベースのデフォルト値は使えません。すべての IN パラメーターを渡してください。
 - IN の値として `null` を渡しても構いません。
 
+コード例: [`ProcedureTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)（`call`、`exec`）。
+
 ---
 
 <a id="83-out-inout-and-result-sets"></a>
 ## 8.3 OUT、INOUT、結果セット
 
-戻り値の型とプロシージャの対応（ルール PR3、PR4、PR5）:
+戻り値の型とプロシージャの対応:
 
 | プロシージャが持つもの | スタブメソッドの戻り値の型 |
 |---|---|
@@ -165,29 +165,20 @@ qb.exec(OrderProcs.class, p -> p.purge(9)).execute();
 | OUT パラメーター 1 つ | その値（`Double`、`Integer`、...） |
 | 複数の OUT / INOUT パラメーター | Java の record（Kotlin: data class） |
 | 結果セット 1 つ（MariaDB の `SELECT`、Oracle の `SYS_REFCURSOR` OUT、H2 の `ResultSet` 関数） | `List<T>` |
-| 複数の結果セット | `List` のコンポーネントを持つ record |
-| OUT の値と結果セット（MariaDB） | スカラーのコンポーネントと `List` のコンポーネントを持つ record |
 
 record のコンポーネントの埋め方:
 
 - **スカラーのコンポーネント** ← OUT と INOUT パラメーター（カーソルを除く）、DB の順序で。
-- **`List` のコンポーネント** ← 結果セット、順番に（Oracle: カーソル OUT パラメーターの順序、MariaDB: 返された結果セットの順序）。
 - 数が合わない場合、lambdaQL はエラーを投げます（`LQL-4038`）。
 - IN、OUT、IN、INOUT のように混ざった位置でも問題ありません。lambdaQL は位置を DB のメタデータから読みます。
 
 ### INOUT
 
-パラメーターに `@InOut` を付けてください。渡した値が **入力** になります。**出力** される値は、返される record のコンポーネントです。
+パラメーターに `@InOut` を付けてください。渡した値は **入る** 値です。**出てくる** 値は、返される record のコンポーネントです。
 
-テストの `SQ_PROC_ADJUST(p_add IN, p_balance IN OUT, p_msg OUT)` は、`p_balance` に `p_add` を足します。
+例の `SQ_PROC_ADJUST(p_add IN, p_balance IN OUT, p_msg OUT)` は、`p_balance` に `p_add` を足します。
 
-```java
-@SqlProcedure("SQ_PROC_ADJUST")
-Adjusted adjust(Integer add, @InOut Integer balance);         // IN, INOUT, OUT
-
-Adjusted adjusted = qb.call(OrderProcs.class, p -> p.adjust(5, 10)).execute();
-// adjusted.balance() は 15（新しい残高）、adjusted.msg() は "ok"
-```
+上の宣言の `adjust(Integer add, @InOut Integer balance)` がこの形です。8.2 の `call` の例で、`p.adjust(5, 10)` は `new Adjusted(15, "ok")` を返します。`balance()` は新しい残高 15 で、`msg()` は `"ok"` です。
 
 `@InOut` は、データベースで INOUT である引数にだけ正確に付けてください。そうでないと最初の呼び出しが失敗します（`LQL-4036`）。
 
@@ -210,7 +201,7 @@ MariaDB と Oracle では `SELECT *` のカラムの順序が異なるため、l
 - Oracle の暗黙の結果（`DBMS_SQL.RETURN_RESULT`）はサポートしません。`SYS_REFCURSOR` の OUT パラメーターを使ってください。
 
 <a id="transactions-rule-pr9"></a>
-### トランザクション（ルール PR9）
+### トランザクション
 
 - プロシージャの中の DML は、呼び出し元のトランザクションの一部です。一緒にロールバックされます。
 - 呼び出しの前に、lambdaQL は永続コンテキストをフラッシュします。ただし、トランザクションが有効で、変更がある場合だけです。
@@ -232,10 +223,10 @@ MariaDB と Oracle では `SELECT *` のカラムの順序が異なるため、l
 > [!WARNING]
 > **スタブメソッドのパラメーターの順序は、データベースでの順序と同じでなければなりません。**
 
-lambdaQL は引数を **位置で** バインドします（ルール PR2）。
+lambdaQL は引数を **位置で** バインドします。
 Hibernate 6.6.5 は、名前が登録されていても位置でバインドします（実測、7.4 は未測定）。
 MariaDB と H2 のドライバーは名前付きパラメーターをサポートしていません。
-そのため、順序が間違っていると、**エラーなしで間違った結果** が得られることがあります。
+そのため、順序が間違っていると、**何のエラーもなく間違った結果** が得られることがあります。
 
 最初の呼び出しで lambdaQL が JDBC のメタデータ（`getProcedureColumns`）で確認する項目です。結果はプロシージャ名ごとにキャッシュします。
 
@@ -249,10 +240,11 @@ MariaDB と H2 のドライバーは名前付きパラメーターをサポー�
 | 同じパラメーター名が別の順序で並ぶ | はい、エラー `LQL-4043`。スタブの引数名が分かるときだけ（下を参照） |
 | Oracle パッケージのプロシージャ名に複数のオーバーロードがある | はい、エラー `LQL-4044` |
 
-[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)、リージョン `rules`（MariaDB、Oracle）:
+MariaDB、Oracle:
 
+<!-- region: ProcedureTest.java#rules -->
 ```java
-// PR2: the stub is checked against the database parameters on the first call
+// the stub is checked against the database parameters on the first call
 assertEquals("LQL-4036", assertThrows(LambdaQLException.class,
         () -> qb.call(OrderProcs.class, p -> p.calcWrong(1)).execute()).code());
 // exec cannot drop OUT values
@@ -267,23 +259,21 @@ assertEquals("LQL-3060", assertThrows(LambdaQLException.class,
 
 危険なケースの例:
 
-```java
-// データベース: SP_TRANSFER(p_to NUMBER, p_from NUMBER)
-@SqlProcedure("SP_TRANSFER") void transfer(Long from, Long to);   // 入れ替わっている! 型は同じ
-```
+たとえばデータベースが `SP_TRANSFER(p_to NUMBER, p_from NUMBER)` なのに、スタブを `void transfer(Long from, Long to)` と宣言すると、順序が入れ替わります。2 つの引数の型は同じです。
 
 数、モード、型はすべて一致しています。間違いを示せるのは名前だけです。
 そこで lambdaQL は、最初の呼び出しで IN と INOUT の引数の名前を比べます。
 
-- スタブの引数名はクラスファイルから読みます。名前が残るのは `-parameters` でコンパイルしたときだけです（[2. はじめよう](02-getting-started.md#recommended-compiler-option--parameters) を参照）。スタブの引数に `@org.lambdaql.DbParam("p_to")` を付けると、データベースの名前を直接指定できます。
-- データベースの名前から、**すべて** の名前に共通で `_` で終わる接頭辞（`p_`、`in_`、`v_` など）を取り除きます。決まった接頭辞は仮定しません。そのあと、大文字と小文字、`_` を無視します。
+- スタブの引数名はクラスファイルから読みます。名前が残るのは `-parameters` でコンパイルしたときだけです（[2. はじめよう](02-getting-started.md#recommended-compiler-option--parameters) を参照）。スタブの引数に `@org.lambdaql.DbParam("p_to")` を付けると、DB の名前を直接指定します。
+- DB の名前から、**すべて** の名前に共通で `_` で終わる接頭辞（`p_`、`in_`、`v_` など）を取り除きます。決まった接頭辞は仮定しません。そのあと、大文字と小文字、`_` を無視します。
 - 名前が同じで順序だけが違う場合は、呼び出しの前に `LambdaQLException` `LQL-4043` が発生します。
-- 名前が違う場合（スタブが別の命名規則に従う）はエラーにしません。チェックが働くように `@DbParam` を付けてください。
+- 名前が違う場合（スタブが別の命名規則に従う）はエラーではありません。チェックが働くように `@DbParam` を付けてください。
 - クラスファイルに名前がなく、隣り合う 2 つの引数の型が同じ場合は、プロシージャごとに 1 回、`LQL-5004` を `INFO` レベルでログに出します。
 - 型は種類だけを照合します（下の「引数の型の照合」を参照）。同じ種類の引数 2 つが入れ替わった場合は、名前でしか見つけられません。
 
-[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)、リージョン `names`（データベースのプロシージャは `SQ_PROC_DIFF(p_to, p_from)`。テストのスタブは `-parameters` でコンパイルしています）:
+DB のプロシージャは `SQ_PROC_DIFF(p_to, p_from)`。例のスタブは `-parameters` でコンパイルしています:
 
+<!-- region: ProcedureTest.java#names -->
 ```java
 /** Argument names: with -parameters lambdaQL compares them with the database names (p_to, p_from). */
 interface DiffProcs {
@@ -301,8 +291,9 @@ interface DiffProcs {
 }
 ```
 
-[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)、リージョン `name-check`（MariaDB、Oracle）:
+MariaDB、Oracle:
 
+<!-- region: ProcedureTest.java#name-check -->
 ```java
 assertEquals(7, qb.call(DiffProcs.class, p -> p.diff(10, 3)).execute());
 assertEquals(7, qb.call(DiffProcs.class, p -> p.named(10, 3)).execute());
@@ -311,7 +302,7 @@ assertEquals("LQL-4043", assertThrows(LambdaQLException.class,
         () -> qb.call(DiffProcs.class, p -> p.swapped(3, 10)).execute()).code());
 ```
 
-**推奨:** `-parameters` でコンパイルしてデータベースと同じ名前を使う（共通の接頭辞は省略できます）か、`@DbParam` を付けてください。そうすれば、入れ替わった順序を検出します。
+**推奨:** `-parameters` でコンパイルして DB と同じ名前を使う（共通の接頭辞は省略できます）か、`@DbParam` を付けてください。そうすれば、入れ替わった順序を検出します。
 
 **引数の型の照合。** 最初の呼び出しで、各引数の Java の型と DB のパラメーターの型の種類を照合します。
 種類は数値、文字、日付・時刻、真偽値、バイナリの 5 つで、違う場合は呼び出しの前に `LQL-4036` で止まります。
@@ -320,8 +311,9 @@ assertEquals("LQL-4043", assertThrows(LambdaQLException.class,
 - 種類を決められない側（enum、オブジェクト型、カーソル）は照合しません。
 - 同じ種類の中の違い（`Integer` の引数と `NUMBER(10,2)` のパラメーターなど）は、ドライバーの変換に任せます。
 
-[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)、リージョン `type-check`（MariaDB、Oracle）:
+MariaDB、Oracle:
 
+<!-- region: ProcedureTest.java#type-check -->
 ```java
 // the kind of each argument is compared with the database parameter: a string for a number parameter stops
 LambdaQLException wrong = assertThrows(LambdaQLException.class,
@@ -330,10 +322,11 @@ assertEquals("LQL-4036", wrong.code(), wrong.getMessage());
 ```
 
 **Oracle パッケージのオーバーロード。** Oracle のパッケージには、同じ名前のプロシージャが複数あることがあります。
-lambdaQL はスタブがどれを指すのか区別できないので、そのような名前を呼ぶと `LQL-4044` で止まります。オーバーロードを 1 つ選んで呼ぶ機能は、今後の予定です。
+lambdaQL はスタブがどれを指すのかを区別できないため、そのような名前を呼び出すと `LQL-4044` で止まります。
 
-[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)、リージョン `overload`（Oracle のみ）。スタブ `PkgProcs` は `@SqlProcedure(pkg = "SQ_PKG", value = "TWICE")` と `@SqlProcedure(pkg = "SQ_PKG", value = "HALF")` を宣言しています:
+（Oracle のみ）。スタブ `PkgProcs` は `@SqlProcedure(pkg = "SQ_PKG", value = "TWICE")` と `@SqlProcedure(pkg = "SQ_PKG", value = "HALF")` を宣言しています:
 
+<!-- region: ProcedureTest.java#overload -->
 ```java
 assertEquals(5.0, qb.call(PkgProcs.class, p -> p.twice(2.5)).execute(), 1e-9);
 // HALF has two overloads in the package: lambdaQL cannot tell which one to call
@@ -342,18 +335,18 @@ assertEquals("LQL-4044", assertThrows(LambdaQLException.class,
 ```
 
 <a id="when-the-metadata-cannot-be-read"></a>
-**メタデータを読めない場合。** データベースのユーザーに、ディクショナリビューや `information_schema` を読む権限がないことがあります。
+**メタデータを読めない場合。** DB のユーザーに、ディクショナリビューや `information_schema` を読む権限がないことがあります。
 メタデータの取得そのものが失敗した場合（`SQLException`）、lambdaQL は呼び出しを止めません。
 
 - プロシージャごとに 1 回、`LQL-5005` を `INFO` レベルでログに出し、スタブは照合しません。
-- 引数の並びはスタブから取ります。IN と INOUT の引数はスタブの順、その後に OUT パラメーター（結果の構成要素の順）、Oracle ではさらに `List` の構成要素ごとに `REF CURSOR` を 1 つです。そのため、メタデータがないときは、データベースの宣言で OUT パラメーターを IN パラメーターの後に置く必要があります。
+- 引数の並びはスタブから取ります。IN と INOUT の引数はスタブの順、その後に OUT パラメーター（結果の構成要素の順）、Oracle ではさらにその後に `List` の構成要素ごとに `REF CURSOR` を 1 つです。そのため、メタデータがないときは、DB の宣言で OUT パラメーターが IN パラメーターの後になければなりません。
 - メタデータが必要なチェックは省きます: 数と `@InOut` のチェック（`LQL-4036`）、名前の順序のチェック（`LQL-4043`）。
-- 取得はできたがプロシージャが見つからない場合は、これまでどおり `LQL-4035` です。
-- Oracle のオーバーロードの取得（`all_arguments`）だけが失敗した場合は、`LQL-5006` を `INFO` レベルでログに出し、オーバーロードのチェックなしで呼び出します。
+- 取得はできたがプロシージャがない場合は、これまでどおり `LQL-4035` です。
+- Oracle のオーバーロードの取得（`all_arguments`）だけが失敗した場合は、`LQL-5006` を `INFO` レベルでログに出し、オーバーロードの確認なしで呼び出します。
 
-この代わりの動作は、MariaDB と Oracle でテスト済みです（`ProcedureTest` のテストメソッド `withoutMetadata`。失敗を模擬します）。
+この代わりの動作は、MariaDB と Oracle で動作します。
 
-Oracle での実際の名前によるバインド（`pass_procedure_paramater_names=true` とスタブのパラメーター名の組み合わせ）も予定しています。
+コード例: [`ProcedureTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)（`rules`、`names`、`name-check`、`type-check`、`overload`）。
 
 ---
 
@@ -362,21 +355,21 @@ Oracle での実際の名前によるバインド（`pass_procedure_paramater_na
 
 | # | ルール | 状況 |
 |---|---|---|
-| PR1 | 名前: アノテーションの値をそのまま使います。値が空の場合はメソッド名を UPPER_SNAKE にしたもの。パッケージ名やスキーマ名（`SQ_PKG.CALC`、`LQL.SQ_CALC`）も使えます。混乱を避けるために `@SqlProcedure(schema = ..., pkg = ..., value = ...)` と書くこともできます。 | 実装済み。スキーマ名とパッケージ名はテストで確認していません |
+| PR1 | 名前: アノテーションの値そのまま。値が空の場合はメソッド名を UPPER_SNAKE にしたもの。Oracle のパッケージのプロシージャは `@SqlProcedure(pkg = ..., value = ...)` と書きます。 | 実装済み。パッケージ名は Oracle で動作する |
 | PR2 | 引数は **位置で** バインドされます。最初の呼び出しで、IN/INOUT のパラメーターの数と `@InOut` の位置を DB のメタデータと照合します。名前が分かれば名前も照合し、同じ名前が別の順序ならエラーです。引数の型の種類（数値、文字、日付・時刻、真偽値、バイナリ）も照合し、違えばエラー（`LQL-4036`）です（[8.4](#84-warning-argument-order) を参照）。メタデータを読めない場合は、チェックを省き、引数の並びをスタブから取ります（[8.4](#when-the-metadata-cannot-be-read) を参照）。 | 数、`@InOut`、名前の照合は実装済み。Oracle パッケージのオーバーロードの検出も実装済み。型の照合も実装済み（MariaDB）。メタデータなしの代わりの動作（`LQL-5005`、`LQL-5006`）は実装済み（MariaDB）。 |
 | PR3 | OUT が 1 つ → 戻り値。OUT/INOUT が複数 → record。`@InOut` は INOUT パラメーターを示します。 | 実装済み |
 | PR4 | 結果セットが 1 つ → `List<T>`。エンティティは Hibernate で、record はラベルの対応付けで JDBC を通して読みます。ページングはありません。 | 実装済み |
-| PR5 | 複数の結果セット → record の `List` コンポーネントに順番に入ります。Oracle の暗黙の結果はサポートしません。 | 実装済み、テストでは確認していません |
+| PR5 | Oracle の暗黙の結果（`DBMS_SQL.RETURN_RESULT`）はサポートしません。`SYS_REFCURSOR` の OUT パラメーターを使ってください。 | – |
 | PR6 | 単独で呼び出す DB 関数は、データベースごとに異なる経路を使います（[8.8](#88-call-a-db-function-alone) を参照）。 | 実装済み |
 | PR7 | クエリの中の DB 関数: [8.6](#86-declare-db-functions) とルール FN1 から FN11 を参照してください。 | 実装済み |
-| PR8 | 条件の中でカラムに DB 関数を使うと、インデックスが使えないため WARN を出します（[8.9](#89-warning-functions-on-columns-and-indexes-sargable) を参照）。コードは `LQL-5001`。 | 実装済み。`SargableMode.STRICT` ではエラー（`LQL-3066`、D50） |
+| PR8 | 条件の中でカラムに DB 関数を使うと、インデックスが使えないため WARN を出します（[8.9](#89-warning-functions-on-columns-and-indexes-sargable) を参照）。コードは `LQL-5001`。 | 実装済み。`SargableMode.STRICT` ではエラー（`LQL-3066`） |
 | PR9 | プロシージャは呼び出し元のトランザクションの中で実行されます。lambdaQL は必要なときに呼び出しの前にフラッシュします。呼び出しのあと、読み込み済みのエンティティが古い状態になっていることがあります。 | 実装済み |
 | PR10 | 共通の影響行数はありません。OUT パラメーターを使ってください。 | – |
 | PR11 | IN の値に `null` を使えます。DB のパラメーターのデフォルト値は使えません。 | 実装済み |
-| PR12 | ラムダはスタブの呼び出し 1 つです。引数はキャプチャ値、定数、またはそれらの計算です。OUT パラメーターがあるときに `exec` を使うとエラーです。 | 実装済み |
-| PR13 | boolean のパラメーターは MariaDB と Oracle 23ai 以降で使えます。 | テストでは確認していません |
-| PR14 | 各ラムダは 1 回だけ解析します。プロシージャのメタデータは名前ごとに 1 回だけ読みます。 | 実装済み |
-| PR15 | H2 には OUT、INOUT、複数の結果セット、パッケージがありません。プロシージャは MariaDB か Oracle でテストしてください（たとえば Testcontainers を使って）。 | lambdaQL のテストもこの方式に従っています |
+| PR12 | ラムダ式はスタブの呼び出し 1 つです。引数はキャプチャ値、定数、またはそれらの計算です。OUT パラメーターがあるときに `exec` を使うとエラーです。 | 実装済み |
+| PR13 | 引数の型の照合では、真偽値の引数は数値のパラメーターにも合うものとみなします（[8.4](#84-warning-argument-order) の「引数の型の照合」）。 | 実装済み |
+| PR14 | 各ラムダ式は 1 回だけ解析します。プロシージャのメタデータは名前ごとに 1 回だけ読みます。 | 実装済み |
+| PR15 | H2 には OUT、INOUT、複数の結果セット、パッケージがありません。プロシージャは MariaDB か Oracle でテストしてください（たとえば Testcontainers を使って）。 | – |
 
 PR11、PR12、PR13 には Kotlin 用の追加部分（デフォルト引数、名前付き引数、null 許容型）があります。それらは [このページの Kotlin 版](../kotlin/08-procedures-functions.md) にあります。
 
@@ -387,10 +380,9 @@ PR11、PR12、PR13 には Kotlin 用の追加部分（デフォルト引数、�
 
 DB 関数は、データベースに直接作った関数です。たとえば `FN_DISCOUNT(price)` です。
 `@SqlFunction` を付けた **インターフェースの static メソッド** として宣言します。
-本体は例外を投げるだけにします。lambdaQL の中で実行されることはありません。
+本体は呼び出されません。本体では例外を投げるだけにしてください。
 
-[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)、リージョン `declare`:
-
+<!-- region: FunctionTest.java#declare -->
 ```java
 /** Database functions: static methods of your own interface. The bodies only throw. */
 public interface OrderFns {
@@ -406,6 +398,12 @@ public interface OrderFns {
         throw new DbOnlyException();
     }
 
+    /** {@code SQ_FN_NONDET(value)}: on MariaDB declared NOT DETERMINISTIC (SARGable test). */
+    @SqlFunction("SQ_FN_NONDET")
+    static Double nondet(Double value) {
+        throw new DbOnlyException();
+    }
+
     /** A query name with its own SQL name; registered with lambdaql.functions.classes. */
     @SqlFunction(value = "SQ_TAX", sql = "SQ_FN_DISCOUNT")
     static Double tax(Double price) {
@@ -414,9 +412,9 @@ public interface OrderFns {
 }
 ```
 
-テストは実行前に `SQ_FN_DISCOUNT` と `SQ_FN_IS_GOLD` をデータベースに作り、終わると削除します。Boolean の結果には Oracle 23ai 以降が必要です。
+データベースには `SQ_FN_DISCOUNT` と `SQ_FN_IS_GOLD` の関数があらかじめ必要です。Boolean の結果には Oracle 23ai 以降が必要です。
 
-lambdaQL のラムダの **外** で `OrderFns.discount(...)` を呼ぶと、`DbOnlyException`（`LQL-4034`）が発生します。これは意図した動作です。
+lambdaQL のラムダ式の **外** で `OrderFns.discount(...)` を呼ぶと、`DbOnlyException`（`LQL-4034`）が発生します。これは意図した動作です。
 
 `@SqlFunction` の値は 2 つです。
 
@@ -430,12 +428,12 @@ lambdaQL のラムダの **外** で `OrderFns.discount(...)` を呼ぶと、`Db
 | 宣言 | 状況 |
 |---|---|
 | インターフェースの static メソッド | **推奨** |
-| クラスの static メソッド | 設計済み、テストでは確認していません |
-| インターフェースの default メソッド + シングルトンの定数 | 設計済み、テストでは確認していません |
 | リポジトリが関数インターフェースを `implements` する（ミックスイン） | 拒否 |
 | 関数型インターフェースの定数（`DISCOUNT.apply(x)`） | 拒否 |
 
-関数は **インターフェース名を付けて** 呼び出してください（`OrderFns.discount`）。static import も使えますが、同じ名前のメンバーメソッドがあると隠れてしまうことがあります。
+関数は **インターフェース名を付けて** 呼び出してください（`OrderFns.discount`）。static import も動作しますが、同じ名前のメンバーメソッドがそれを隠すことがあります。
+
+コード例: [`FunctionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)（`declare`）。
 
 ---
 
@@ -443,18 +441,16 @@ lambdaQL のラムダの **外** で `OrderFns.discount(...)` を呼ぶと、`Db
 ## 8.7 クエリでの DB 関数の使用
 
 関数を直接呼び出してください。コンテキストの引数は必要ありません。
-`where`、`select`、`orderBy`、`set` で使えます。`groupBy`、`having`、サブクエリでも使えるように設計しましたが、テストでは確認していません。
+`where`、`select`、`orderBy`、`set`、`having`、集計関数の引数、サブクエリで動作します（下の `function-group`、`function-sub` の例を参照）。
 
-[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)、リージョン `where`:
-
+<!-- region: FunctionTest.java#where -->
 ```java
 // the function call is written as function('<name>' as <type>, ...); the column is its argument
 SelectQuery<Order> q = qb.from(Order.class).where(o -> OrderFns.discount(o.getPrice()) > 100);
 assertEquals("select e0 from Order e0 where function('SQ_FN_DISCOUNT' as Double, e0.price) > 100.0", q.toHql().hql());
 ```
 
-[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)、リージョン `captured`:
-
+<!-- region: FunctionTest.java#captured -->
 ```java
 // a function of captured values only is still computed by the database (the value is bound)
 SelectQuery<Order> q = qb.from(Order.class).where(o -> o.getPrice() > OrderFns.discount(base));
@@ -463,19 +459,19 @@ assertEquals("select e0 from Order e0 where e0.price > function('SQ_FN_DISCOUNT'
 
 Boolean の関数は、条件全体として使えます。lambdaQL が `= true` を付けます。
 
-[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)、リージョン `boolean`:
-
+<!-- region: FunctionTest.java#boolean -->
 ```java
 SelectQuery<Order> q = qb.from(Order.class).where(o -> OrderFns.isGold(o.getCustomer().getGrade()));
 assertEquals("select e0 from Order e0 join e0.customer j1 where function('SQ_FN_IS_GOLD' as Boolean, j1.grade) = true",
         q.toHql().hql());
 ```
 
-[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)、リージョン `select`（`select` と `orderBy`）:
+`select` と `orderBy`:
 
+<!-- region: FunctionTest.java#select -->
 ```java
 ValueQuery<Priced> q = qb.from(Order.class)
-        .orderBy((o, by) -> by.desc(OrderFns.discount(o.getPrice())))
+        .orderBy(o -> desc(OrderFns.discount(o.getPrice())))
         .select(o -> new Priced(o.getId(), OrderFns.discount(o.getPrice())));
 assertEquals("select e0.id, function('SQ_FN_DISCOUNT' as Double, e0.price) from Order e0"
         + " order by function('SQ_FN_DISCOUNT' as Double, e0.price) desc nulls last", q.toHql().hql());
@@ -483,8 +479,7 @@ assertEquals("select e0.id, function('SQ_FN_DISCOUNT' as Double, e0.price) from 
 
 `Priced` は `record Priced(Long id, Double discounted)` です。
 
-[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)、リージョン `update`:
-
+<!-- region: FunctionTest.java#update -->
 ```java
 ExecutableUpdate<Order> u = qb.update(Order.class)
         .set(o -> o.setPrice(OrderFns.discount(o.getPrice())))
@@ -493,115 +488,119 @@ assertEquals("update Order e0 set e0.price = function('SQ_FN_DISCOUNT' as Double
         u.toHql().hql());
 ```
 
-テストは各クエリを実行し、結果の行を Java で同じ計算（`price * 0.9`）をした結果と比べます。
+各クエリの結果の行は、Java で同じ計算（`price * 0.9`）をした結果と同じです。
 
-**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。[`PlannedSqlTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/PlannedSqlTest.java) は同じ形の HQL（名前は `FN_DISCOUNT`）を Hibernate に直接渡し、H2 2.3、MariaDB 10.11、Oracle 23.26（Hibernate 7.4）で出た SQL を記録します。Hibernate の SQL が変わるとテストは失敗します。
+集計関数の引数、`having`、サブクエリの中でも同じ形です。次の例の `Discounted` は `record Discounted(Integer customerId, Double total)` です。
 
-**データベースごとの SQL（この形の HQL に対する Hibernate の SQL）** — `PlannedSqlTest` が記録しました。`expected-sql/` の [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)、例 `08-function`:
-
-```sql
--- H2, MariaDB, Oracle (same)
--- HQL: select o from Order o where function('FN_DISCOUNT' as Double, o.price) > 10
-select …
-from orders o1_0
-where FN_DISCOUNT(o1_0.price)>10
+<!-- region: ManualJavaFunctionTest.java#function-group -->
+```java
+// a database function inside an aggregate, in having and in select
+ValueQuery<Discounted> q = qb.from(Order.class)
+        .where(o -> o.getCustomer() != null)
+        .groupBy(o -> o.getCustomer().getId())
+        .having(o -> Agg.sum(OrderFns.discount(o.getPrice())) > 200)
+        .select(o -> new Discounted(o.getCustomer().getId(), Agg.sum(OrderFns.discount(o.getPrice()))));
+assertEquals("select e0.customer.id, sum(function('SQ_FN_DISCOUNT' as Double, e0.price)) from Order e0"
+        + " where e0.customer is not null group by e0.customer.id"
+        + " having sum(function('SQ_FN_DISCOUNT' as Double, e0.price)) > 200.0", q.toHql().hql());
+List<Discounted> rows = q.toList();
 ```
 
-テストの設定には `lambdaql.functions.classes` があります。この設定があると、Hibernate は登録していない関数でも名前の大文字・小文字（`FN_DISCOUNT`）を保ちます（3 つのデータベースで観察。原因はまだ確認していません）。
-登録が何もない場合、Hibernate が名前を小文字で書くことがあります。引用符のない名前はどちらでも動きます。
+<!-- region: ManualJavaFunctionTest.java#function-sub -->
+```java
+SelectQuery<Customer> q = qb.from(Customer.class).where((c, sub) -> sub.from(Order.class)
+        .where(o -> o.getCustomer().getId() == c.getId() && OrderFns.discount(o.getPrice()) > 100)
+        .exists());
+assertEquals("select e0 from Customer e0 where exists (select 1 from Order s1"
+        + " where s1.customer.id = e0.id and function('SQ_FN_DISCOUNT' as Double, s1.price) > 100.0)", q.toHql().hql());
+```
+
+`lambdaql.functions.classes` を設定すると、Hibernate は登録していない関数でも名前の大文字・小文字（`FN_DISCOUNT`）を保ちます（3 つのデータベースで観察、原因はまだ確認していません）。
+登録がまったくない場合、Hibernate が名前を小文字で書くことがあります。引用符のない名前はどちらでも動作します。
 
 <a id="how-lambdaql-renders-it"></a>
-### lambdaQL の出力形式
+### lambdaQL のレンダリング方法
 
-lambdaQL は DB 関数を **常に** 次の形で出力します。
+lambdaQL は DB 関数を **常に** 次のようにレンダリングします。
 
-```sql
-function('<NAME>' as <Type>, arg1, arg2, ...)
-```
+`function('<NAME>' as <Type>, arg1, arg2, ...)`
 
-`<Type>` は宣言された戻り値の型から決まります。使える型は次のものだけです。
+`<Type>` は宣言された戻り値の型から来ます。使える型は次のものだけです。
 
 | 使える戻り値の型 |
 |---|
 | `Double`, `Integer`, `Long`, `BigDecimal`, `String`, `LocalDate`, `LocalDateTime`, `Boolean` |
 
-ジェネリックな戻り値（`<X> X nvl(X, X)`）、エンティティ、コレクション、`void` は解析時に拒否されます。
+ジェネリックな戻り値（`<X> X nvl(X, X)`）、エンティティ、コレクション、`void` は、解析の時点で拒否されます。
 
 <a id="registration-optional"></a>
 ### 登録（任意）
 
-`function('FN_DISCOUNT' as Double, ...)` の形では登録は必要ありません（3 つのデータベースで確認済み）。
+`function('FN_DISCOUNT' as Double, ...)` の形には登録は必要ありません（3 つのデータベースで確認）。
 関数インターフェースを登録すると、Hibernate は名前の大文字・小文字も保ち、引数の数と型も確認します。
 
 lambdaQL には Hibernate の `FunctionContributor` である `org.lambdaql.hibernate.LambdaQlFunctionContributor` があります（ServiceLoader で見つかります）。インターフェースは Hibernate のプロパティに列挙します。
 
 ```properties
-# Hibernate のみの場合
+# 通常の Hibernate
 lambdaql.functions.classes=com.acme.OrderFns,com.acme.CustomerFns
 
 # Spring Boot
 spring.jpa.properties.lambdaql.functions.classes=com.acme.OrderFns
 ```
 
-プロパティを設定しない場合、何も登録されません。パッケージのスキャンは v0.1 にはありません。
-ネストしたインターフェースには、`$` を含むバイナリ名を書きます。テストの設定は `lambdaql.functions.classes: org.lambdaql.query.FunctionTest$OrderFns` です。
+プロパティを設定しなければ、何も登録されません。パッケージのスキャンはサポートしていません。
+ネストしたインターフェースは `$` を含むバイナリ名で書きます。たとえば `com.acme.Fns` の中の `OrderFns` は `com.acme.Fns$OrderFns` と書きます。
 
 <a id="a-different-sql-name-needs-registration"></a>
 ### SQL の名前が違う関数の登録
 
-`value` はクエリの中の名前で、`sql` は SQL の中の名前です。2 つが違う場合、関数を登録しなければなりません。
-引用符で囲んで作った大文字・小文字混在の関数名（`"SQ_Fn_Mixed"`）に便利です。登録しないと、H2 と Oracle では名前が小文字になることがあります。
+`value` はクエリの名前で、`sql` は SQL の名前です。2 つの名前が違う場合は、関数を登録する必要があります。
+引用符で作った大文字・小文字混在の関数名（`"SQ_Fn_Mixed"`）に便利です。登録しないと、H2 と Oracle で名前が小文字になることがあります。
 
-```java
-@SqlFunction(value = "SQ_Fn_Mixed", sql = "\"SQ_Fn_Mixed\"")
-static Double mixed(Double v) { throw new DbOnlyException(); }
-```
+宣言は `@SqlFunction(value = "SQ_Fn_Mixed", sql = "\"SQ_Fn_Mixed\"")` のように書きます。上の宣言の `OrderFns.tax`（`value = "SQ_TAX"`、`sql = "SQ_FN_DISCOUNT"`）も同じ形です。
 
-[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)、リージョン `registered`:
-
+<!-- region: FunctionTest.java#registered -->
 ```java
 // SQ_TAX is registered at start-up (lambdaql.functions.classes) and runs SQ_FN_DISCOUNT in SQL
 SelectQuery<Order> q = qb.from(Order.class).where(o -> OrderFns.tax(o.getPrice()) > 100);
 assertEquals("select e0 from Order e0 where function('SQ_TAX' as Double, e0.price) > 100.0", q.toHql().hql());
 ```
 
-このような関数が登録されていない場合、lambdaQL はラムダを読むときに失敗します（`LQL-3058`、[8.10](#810-function-rules-fn1-to-fn11-summary) を参照）。
+そのような関数が登録されていない場合、lambdaQL はラムダ式を読むときに失敗します（`LQL-3058`、[8.10](#810-function-rules-fn1-to-fn11-summary) を参照）。
+
+コード例: [`FunctionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)（`registered`）、[`FunctionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)（`where`、`captured`、`boolean`、`select`、`update`）、[`ManualJavaFunctionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaFunctionTest.java)（`function-group`、`function-sub`）。
 
 ---
 
 <a id="88-call-a-db-function-alone"></a>
 ## 8.8 DB 関数の単独呼び出し
 
-**引数のないラムダ** で `qb.call(() -> ...)` を使ってください。
+**引数のないラムダ式** で `qb.call(() -> ...)` を使ってください。
 
-[`ProcedureTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)、リージョン `function`（H2、MariaDB、Oracle）:
+H2、MariaDB、Oracle:
 
+<!-- region: ProcedureTest.java#function -->
 ```java
 Double half = qb.call(() -> MathFns.half(price)).execute();
 ```
 
-`price` はキャプチャした `double`（150）で、`half` は 75.0 です。ラムダは `@SqlFunction` の呼び出し 1 つでなければなりません（`LQL-3063`）。
+`price` はキャプチャした `double`（150）で、`half` は 75.0 です。ラムダ式は `@SqlFunction` の呼び出し 1 つでなければなりません（`LQL-3063`）。
 
-**データベースごとの SQL（この形の HQL に対する Hibernate の SQL）** — `PlannedSqlTest` が名前 `FN_DISCOUNT` で記録しました。`expected-sql/` の [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)、例 `08-function-alone`:
+このクエリは FROM なしの `select FN_DISCOUNT(?)` として実行されます。Oracle がこれを受け付けるのは 23ai からです。Oracle では、lambdaQL は代わりに JDBC の関数呼び出しを使います（下の表を参照）。
 
-```sql
--- H2, MariaDB, Oracle (same)
--- HQL: select function('FN_DISCOUNT' as Double, :p1)
-select FN_DISCOUNT(?)
-```
+引数の数が違うので、`qb.call(OrderProcs.class, p -> ...)` とは衝突しません。
 
-このクエリは FROM のない `select FN_DISCOUNT(?)` として実行されます。Oracle がこれを受け付けるのは 23ai からです。Oracle では、lambdaQL は代わりに JDBC の関数呼び出しを使います（下の表を参照）。
-
-引数の数が異なるので、`qb.call(OrderProcs.class, p -> ...)` と衝突しません。
-
-lambdaQL の実行方法（ルール PR6）:
+lambdaQL の実行方法:
 
 | データベース | 経路 |
 |---|---|
-| Oracle | JDBC の関数呼び出し `{? = call FN(?)}`。DML を行う関数や、カーソルを返す関数でも使えます。 |
+| Oracle | JDBC の関数呼び出し `{? = call FN(?)}`。DML を行う関数やカーソルを返す関数でも動作します。 |
 | MariaDB、H2 | HQL の `select function('FN' as T, :p1)` |
 
-lambdaQL は先に保留中の変更をフラッシュします（PR9 と同じ）。そのため、関数は最新の変更を見ます。
+lambdaQL は先に保留中の変更をフラッシュします（プロシージャ呼び出しと同じ）。そのため、関数は最新の変更を参照します。
+
+コード例: [`ProcedureTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)（`function`）。
 
 ---
 
@@ -609,35 +608,24 @@ lambdaQL は先に保留中の変更をフラッシュします（PR9 と同じ�
 ## 8.9 注意: カラムに対する関数とインデックス（SARGable）
 
 lambdaQL は **インデックスを使える** SQL を作ろうとします（[10. ルールと制限](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql) を参照）。
-カラムを関数で囲むと、通常のインデックスは普通 **使えません**。
+カラムを包む関数は、通常のインデックスを普通は **使えません**。
 
-```java
-.where(o -> OrderFns.discount(o.getPrice()) > 10)
-// → function('FN_DISCOUNT' as Double, e0.price) > 10   -- price のインデックスは使われない
-```
+[8.7](#87-use-db-functions-in-queries) の `where` の例 `OrderFns.discount(o.getPrice()) > 100` は、`function('SQ_FN_DISCOUNT' as Double, e0.price) > 100.0` になります。この条件は `price` のインデックスを使いません。
 
-**データベースごとの SQL（この形の HQL に対する Hibernate の SQL）** — `PlannedSqlTest` が記録しました。`expected-sql/` の [`planned-h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-h2.sql)、[`planned-mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-mariadb.sql)、[`planned-oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/planned-oracle.sql)、例 `08-function`:
+そのため、lambdaQL はこの形に対して **WARN** をログに出します。
+チェックは `where` のラムダ式ごとに 1 回、解析結果をキャッシュするときに行います。`@SqlFunction` のない条件では DB に問い合わせません。
 
-```sql
--- H2, MariaDB, Oracle (same)
-select …
-from orders o1_0
-where FN_DISCOUNT(o1_0.price)>10
-```
-
-そのため、lambdaQL はこの形に **WARN** を出します。
-チェックは `where` のラムダごとに 1 回、解析結果をキャッシュするときに行います。`@SqlFunction` のない条件では、データベースを調べません。
-
-| 場合 | コード | H2 | MariaDB | Oracle |
+| ケース | コード | H2 | MariaDB | Oracle |
 |---|---|---|---|---|
-| ① 関数がカラムを包む: `fn(o.price) > 10`、カラムに対する Boolean の関数、`IN` や `IS NULL` の中の関数 | `LQL-5001`（WARN） | WARN | WARN（ストアド関数はインデックスに使えない） | WARN。**ただし**、`user_ind_expressions` に同じ式 `FN(COLUMN)` の関数ベースインデックスがそのテーブルにあれば出さない。カラムの型が関数の引数の型と違うために Oracle が入れた数値変換（`FN(TO_NUMBER(COLUMN))` など）も同じ式とみなす |
-| ② 値の側の関数をカラムと比べる: `o.price > fn(rate)` | `LQL-5007`（WARN） | 確認しない | `information_schema.routines.is_deterministic = 'NO'`（デフォルト!）なら WARN。このとき MariaDB はインデックス全体をスキャンする | 確認しない（Oracle はどちらでも範囲スキャン） |
+| ① 関数がカラムを包む: `fn(o.price) > 10`、カラムに適用した Boolean 関数、`IN` や `IS NULL` の中の関数 | `LQL-5001`（WARN） | WARN | WARN（ストアド関数はインデックスに使えない） | WARN。**ただし**、`user_ind_expressions` に同じ式 `FN(COLUMN)` の関数ベースのインデックスがそのテーブルにあれば出さない。カラムの型が関数の引数の型と違うために Oracle が入れた数値変換（`FN(TO_NUMBER(COLUMN))` など）も同じ式とみなす |
+| ② 値の側の関数をカラムと比較: `o.price > fn(rate)` | `LQL-5007`（WARN） | チェックしない | `information_schema.routines.is_deterministic = 'NO'`（デフォルト値！）なら WARN。このとき MariaDB はインデックス全体をスキャンする | チェックしない（Oracle はどちらでも範囲スキャン） |
 
-- Oracle のインデックスとの照合では、テーブル名とカラム名を Hibernate のマッピングから取ります。カラムの引数が 1 つの関数だけを照合します。
-- メタデータの取得が失敗した場合（たとえば権限がない）、`LQL-5008` を `INFO` レベルでログに出します。① はそのまま警告し、② は確認しません。
+- Oracle のインデックスの照合に使うテーブル名とカラム名は、Hibernate のマッピングから取ります。カラムの引数が 1 つの関数だけを照合します。
+- メタデータの取得が失敗した場合（たとえば権限がない）は、`LQL-5008` を `INFO` レベルでログに出します。① はそのまま警告し、② はチェックしません。
 
-[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)、リージョン `sargable`（テストはログを集めます: H2 は `LQL-5001`、MariaDB は `LQL-5001` と `LQL-5007`、`SQ_FN_DISCOUNT(price)` の関数ベースインデックスがある Oracle はなし）:
+ログに出る警告: H2 は `LQL-5001`、MariaDB は `LQL-5001` と `LQL-5007`、`SQ_FN_DISCOUNT(price)` の関数ベースのインデックスがある Oracle はなし:
 
+<!-- region: FunctionTest.java#sargable -->
 ```java
 // the function wraps the column: an index on price cannot be used (LQL-5001 at WARN),
 // unless Oracle has a function-based index on SQ_FN_DISCOUNT(price)
@@ -646,24 +634,23 @@ qb.from(Order.class).where(o -> OrderFns.discount(o.getPrice()) > 100).toHql();
 qb.from(Order.class).where(o -> o.getPrice() > OrderFns.nondet(base)).toHql();
 ```
 
-**SARGable モード**（決定 D50）。`SargableMode` には 3 つの値があります。
+**SARGable モード**。`SargableMode` には 3 つの値があります。
 
 - `OFF`: チェックせず、メタデータも取得しません。
 - `WARN`（デフォルト）: 警告をログに出します。
 - `STRICT`: `WARN` なら警告を出す場合（`LQL-5001`、`LQL-5007`、`LQL-5012`）に、解析が `org.lambdaql.NonSargableException`（`LQL-3066`）で失敗します。
 
 persistence unit ごとに `SargablePolicy.register(emf, SargableMode.STRICT)` で指定し、`SargablePolicy.unregister(emf)` で解除します。Spring では `lambdaql.sargable.mode=STRICT` を使います（[12](12-spring-data-jpa.md) を参照）。
-チェックはラムダごとに 1 回、解析結果を共有キャッシュに入れるときに実行されます。そのため、最初のクエリの前にモードを登録してください。
+チェックはラムダ式ごとに 1 回、解析結果を共有キャッシュに入れるときに実行されます。そのため、最初のクエリの前にモードを登録してください。
 
-**カラムに対する算術**（決定 D50）。
+**カラムに対する算術**。
 
-- カラム 1 つと値だけの `+ - * /`（`o.getCnt() * 2 > n`）は値の側に移せます。lambdaQL は `LQL-5012` を `WARN` レベルでログに出し、`STRICT` ではエラーです。
-- カラム同士の算術（`o.getPrice() * o.getCnt() > n`）と `%` は移せないので、`LQL-5013` を `DEBUG` レベルでログに出すだけです。`STRICT` でも許可します。
-- 移した形は意味が同じでなければなりません。`o.getCnt() > n / 2.0` のように小数で割ってください。整数の割り算 `n / 2` は、`>=`、`=`、`<` や負の `n` で違う行を返します。負の数を掛けていた場合は、比較の向きを逆にしてください。`LQL-5012` のメッセージがこれを案内します。
-- インデックスがあるかを調べて警告を減らす方式は採用しませんでした。権限とシノニムのせいで「インデックスなし」と「不明」が混ざり、カラムの算術はまれな形だからです。
+- カラム 1 つと値だけでできた `+ - * /`（`o.getCnt() * 2 > n`）は、値の側に移せます。lambdaQL は `LQL-5012` を `WARN` レベルでログに出し、`STRICT` ではエラーです。
+- カラム同士の算術（`o.getPrice() * o.getCnt() > n`）と `%` は移せないため、`LQL-5013` を `DEBUG` レベルでログに出すだけです。`STRICT` でも許可します。
+- 移した形は意味が同じでなければなりません。`o.getCnt() > n / 2.0` のように小数で割ってください。整数の割り算 `n / 2` は、`>=`、`=`、`<` と負の `n` で違う行を返します。負の数を掛けた場合は、比較の向きを変えてください。`LQL-5012` のメッセージがこれを案内します。
+- インデックスがあるかを問い合わせて警告を減らす方式は採用しませんでした。権限とシノニムのために「インデックスなし」と「不明」が混ざり、カラムの算術はまれな形だからです。
 
-[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)、リージョン `sargable-strict`:
-
+<!-- region: FunctionTest.java#sargable-strict -->
 ```java
 // STRICT: what WARN would log fails the analysis (NonSargableException, LQL-3066)
 SargablePolicy.register(emf, SargableMode.STRICT);
@@ -680,9 +667,11 @@ qb.from(Order.class).where(o -> o.getCnt() * o.getStatus() > n).toHql();
 
 **推奨:**
 
-- できるだけ関数を値の側に置いてください: `o.getPrice() > OrderFns.discount(base)`。
-- MariaDB では、実際に決定的な関数であれば `DETERMINISTIC` と宣言してください。
-- Oracle では、同じ式の関数ベースインデックスがあると警告が消えます（このようなインデックスには `DETERMINISTIC` な関数が必要です）。
+- できれば関数を値の側に置いてください: `o.getPrice() > OrderFns.discount(base)`。
+- MariaDB では、実際に決定的な関数なら `DETERMINISTIC` と宣言してください。
+- Oracle では、同じ式の関数ベースのインデックスがあれば警告は消えます（このようなインデックスには `DETERMINISTIC` の関数が必要です）。
+
+コード例: [`FunctionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)（`sargable`、`sargable-strict`）。
 
 ---
 
@@ -692,26 +681,25 @@ qb.from(Order.class).where(o -> o.getCnt() * o.getStatus() > n).toHql();
 | # | ルール | 状況 |
 |---|---|---|
 | FN1 | `@SqlFunction` はメソッドのアノテーションです。値が空の場合はメソッド名を UPPER_SNAKE にしたもの。 | 実装済み |
-| FN2 | lambdaQL は呼び出されたメソッドを見つけ、そのアノテーションを読みます。メソッドの本体は例外を投げるだけ（`throw new ...`）でなければなりません。本当の本体を持つメソッドは、Java とデータベースで異なる値になる可能性があるため、エラーです（`LQL-3052`）。 | 実装済み |
-| FN3 | 同じ名前のオーバーロードは、すべて同じ DB 関数に対応しなければなりません。そうでなければエラーです（`LQL-3053`）。 | 実装済み |
-| FN4 | アノテーションのない呼び出しや、lambdaQL が特定できない呼び出しはエラーです。黙って読み飛ばすことはありません。 | 実装済み |
-| FN5 | 引数は [3. 条件](03-where.md) の値のルールに従います。キャプチャ値だけで作った引数でも、バインドされて **データベースで** 評価されます。 | 実装済み |
-| FN6 | ボクシングの呼び出しは読み飛ばします。戻り値の型は宣言されたメソッドから決まります。`Double`、`Integer`、`Long`、`BigDecimal`、`String`、`LocalDate`、`LocalDateTime`、`Boolean` のいずれかでなければなりません（`LQL-3055`）。 | 実装済み |
-| FN7 | カラムに対する関数は WARN を出します（[8.9](#89-warning-functions-on-columns-and-indexes-sargable) を参照）。MariaDB では、値の側の `NOT DETERMINISTIC` な関数も WARN（`LQL-5007`）。 | 実装済み。`SargableMode.STRICT` ではエラー（`LQL-3066`、D50） |
-| FN8 | Hibernate の組み込み関数（`COALESCE`、`ROUND`、`SYSDATE`、...）と同じ名前はエラーです（`LQL-3054`）。Hibernate が黙って組み込み関数を使ってしまうからです。接頭辞かスキーマ名（`PUBLIC.SQ_FN`）を使ってください。 | 実装済み |
-| FN9 | Kotlin のみ（デフォルト引数、`inline`、`vararg`）。Kotlin トラックを参照してください。 | デフォルト引数と `vararg` は実装済み。`inline` は設計済み |
-| FN10 | v0.1 はスカラー関数だけです。ユーザー定義の集約関数とウィンドウ関数は v0.2 の予定です。引数のない関数は `fn()` として出力されます。 | スカラー関数は実装済み |
-| FN11 | 既知の DB の違い: MariaDB では、VARCHAR を返す関数が文字列リテラルと照合順序の衝突を起こすことがあります。`BigDecimal` の結果のスケールが異なります（MariaDB と Oracle は 0、H2 は 1）。boolean の結果には Oracle 23ai 以降が必要です。 | プロトタイプで実測 |
+| FN2 | lambdaQL は呼び出されたメソッドを見つけてアノテーションを読みます。メソッドの本体は例外を投げるだけにしなければなりません（`throw new ...`）。実際の本体を持つメソッドは、Java とデータベースが違う値を返すことがあるためエラーです（`LQL-3052`）。 | 実装済み |
+| FN3 | 同じ名前のすべてのオーバーロードは、同じ DB 関数に対応しなければなりません。そうでなければエラーです（`LQL-3053`）。 | 実装済み |
+| FN4 | アノテーションのない呼び出しや、lambdaQL が識別できない呼び出しはエラーです。黙って飛ばすことはしません。 | 実装済み |
+| FN5 | 引数は [3. 条件](03-where.md) の値のルールに従います。キャプチャ値だけで作った引数もバインドされ、**データベースで** 評価されます。 | 実装済み |
+| FN6 | ボクシングの呼び出しは飛ばします。戻り値の型は宣言されたメソッドから来ます。`Double`、`Integer`、`Long`、`BigDecimal`、`String`、`LocalDate`、`LocalDateTime`、`Boolean` のいずれかでなければなりません（`LQL-3055`）。 | 実装済み |
+| FN7 | カラムに対する関数は WARN を出します（[8.9](#89-warning-functions-on-columns-and-indexes-sargable) を参照）。MariaDB では、値の側の `NOT DETERMINISTIC` 関数も WARN（`LQL-5007`）。 | 実装済み。`SargableMode.STRICT` ではエラー（`LQL-3066`） |
+| FN8 | Hibernate の組み込み関数（`COALESCE`、`ROUND`、`SYSDATE`、...）と同じ名前はエラーです（`LQL-3054`）。Hibernate が黙って組み込み関数を使うからです。接頭辞かスキーマ名（`PUBLIC.SQ_FN`）を使ってください。 | 実装済み |
+| FN9 | Kotlin 専用（デフォルト引数、`vararg`）。Kotlin トラックを参照してください。 | デフォルト引数と `vararg` は実装済み |
+| FN10 | スカラー関数だけをサポートします。ユーザー定義の集計関数とウィンドウ関数はサポートしません。引数のない関数は `fn()` とレンダリングされます。 | スカラー関数は実装済み |
+| FN11 | 既知の DB の違い: MariaDB で VARCHAR を返す関数は、文字列リテラルと照合順序が衝突することがあります。`BigDecimal` の結果のスケールが違います（MariaDB と Oracle は 0、H2 は 1）。boolean の結果には Oracle 23ai 以降が必要です。 | プロトタイプで実測 |
 
-[`FunctionTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)、リージョン `rules`:
-
+<!-- region: FunctionTest.java#rules -->
 ```java
 // the body never runs in Java
 assertEquals("LQL-4034", assertThrows(DbOnlyException.class, () -> OrderFns.discount(1.0)).code());
-// FN2: a body that computes a value is rejected (Java and the database could give different values)
+// a body that computes a value is rejected (Java and the database could give different values)
 assertEquals("LQL-3052", assertThrows(LambdaQLException.class,
         () -> qb.from(Order.class).where(o -> BadFns.computes(o.getPrice()) > 1)).code());
-// FN8: a Hibernate built-in name would silently run the built-in function
+// a Hibernate built-in name would silently run the built-in function
 assertEquals("LQL-3054", assertThrows(LambdaQLException.class,
         () -> qb.from(Order.class).where(o -> BadFns.builtin(o.getPrice()) > 1)).code());
 // a function with its own SQL name must be registered
@@ -722,7 +710,9 @@ assertEquals("LQL-3055", assertThrows(LambdaQLException.class,
         () -> qb.from(Order.class).where(o -> BadFns.anything(o.getPrice()) != null)).code());
 ```
 
-`BadFns` は、ケースごとに誤った関数を 1 つずつ置いたテストの中のインターフェースです。`price` を返す本体、名前 `COALESCE`、登録していない `value = "SQ_OTHER"`・`sql = "SQ_FN_DISCOUNT"`、戻り値の型 `Object` の 4 つです。
+`BadFns` は、ケースごとに間違った関数を 1 つずつ置いた例の中のインターフェースです。`price` を返す本体、名前 `COALESCE`、登録していない `value = "SQ_OTHER"`・`sql = "SQ_FN_DISCOUNT"`、戻り値の型 `Object` の 4 つです。
+
+コード例: [`FunctionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/FunctionTest.java)（`rules`）。
 
 ---
 
@@ -733,18 +723,16 @@ assertEquals("LQL-3055", assertThrows(LambdaQLException.class,
 |---|---|---|---|
 | IN パラメーター | はい | はい | はい |
 | OUT / INOUT | **いいえ**（H2 の制限） | はい | はい |
-| 結果セット 1 つ | はい（`ResultSet` 関数） | はい（プロシージャ内の `SELECT`） | はい（`SYS_REFCURSOR` OUT） |
-| 複数の結果セット | いいえ | はい | はい（複数のカーソル OUT パラメーター） |
-| OUT の値と結果セットの組み合わせ | いいえ | はい | はい |
+| 結果セット 1 つ | はい（`ResultSet` 関数） | はい（プロシージャの中の `SELECT`） | はい（`SYS_REFCURSOR` OUT） |
 | パッケージ名（`PKG.PROC`） | いいえ | いいえ（`sql_mode=ORACLE` が必要） | はい |
 | クエリの中の DB 関数 | はい | はい | はい |
 | DB 関数の単独呼び出し | はい | はい | はい |
-| lambdaQL でのプロシージャ呼び出し | – | はい | はい |
-| boolean のパラメーター / 結果 | – | はい | はい（23ai 以降） |
+| lambdaQL のプロシージャ呼び出し | – | はい | はい |
+| boolean の結果の DB 関数 | はい | はい | はい（23ai 以降） |
 
-v0.1 では予定していないもの: 動的なプロシージャ名のための文字列ビルダー（v0.2 の候補）、Oracle パッケージのプロシージャのオーバーロードを 1 つ選んで呼ぶ機能（オーバーロードの検出は実装済み、`LQL-4044`）、テーブル値関数、プロシージャの結果のページング。
+サポートしないもの: 動的なプロシージャ名、Oracle のパッケージのプロシージャのオーバーロードを 1 つ選んで呼び出す機能（オーバーロードの検出は実装済み、`LQL-4044`）、テーブルを返す関数、プロシージャの結果のページング。
 
-この章のエラーは、`[LQL-xxxx]` コードを持つ `LambdaQLException`（またはそのサブクラス）です。ラムダを読むときは `LQL-3052`〜`LQL-3063` と、`SargableMode.STRICT` でインデックスを使えない条件に対する `LQL-3066`（`NonSargableException`、[8.9](#89-warning-functions-on-columns-and-indexes-sargable) を参照）です。呼び出しを実行するときは `LQL-4034`〜`LQL-4039`、`LQL-4043`、`LQL-4044` です。呼び出しの間に `LQL-5004`、`LQL-5005`、`LQL-5006` を `INFO` レベルでログに出すこともあります。条件の中の DB 関数については、`LQL-5001`、`LQL-5007`（`WARN`）と `LQL-5008`（`INFO`）をログに出すことがあります。[11. エラーと言語](../11-errors-and-languages.md) を参照してください。
+この章のエラーは、`[LQL-xxxx]` コードを持つ `LambdaQLException`（またはそのサブクラス）です。ラムダ式を読むときは `LQL-3052`～`LQL-3063` と、`SargableMode.STRICT` でインデックスを使えない条件に対する `LQL-3066`（`NonSargableException`、[8.9](#89-warning-functions-on-columns-and-indexes-sargable) を参照）です。呼び出しを実行するときは `LQL-4034`～`LQL-4039`、`LQL-4043`、`LQL-4044` です。呼び出し中に `LQL-5004`、`LQL-5005`、`LQL-5006` を `INFO` レベルでログに出すこともあります。条件の中の DB 関数については、`LQL-5001`、`LQL-5007`（`WARN`）と `LQL-5008`（`INFO`）をログに出すことがあります。[11. エラーと言語](../11-errors-and-languages.md) を参照してください。
 
 ---
 

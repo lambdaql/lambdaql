@@ -8,57 +8,29 @@
 This is the **Kotlin track** of the lambdaQL manual. Every page in this track has **only Kotlin code**.
 If you write your queries in Java, read the [Java track](../java/README.md). Both tracks have the same chapter numbers and file names (only chapter 9 is different), so you can switch at any time.
 
+<!-- region: ManualKotlinStartTest.kt#readme -->
 ```kotlin
-val orders = qb.from(Order::class.java)
-    .where { it.status == 1 && it.price!! > minPrice }
-    .orderBy { o, by -> by.desc(o.price).asc(o.id) }
+val q = qb.from(Order::class.java)
+    .where { it.status.toInt() == 1 && it.price > minPrice }
+    .orderBy { o -> desc(o.price).asc(o.id) }
     .limit(20)
-    .toList()
-// HQL: select e0 from Order e0
-//      where e0.status = 1 and e0.price > :p1
-//      order by e0.price desc nulls last, e0.id asc
-```
-
-**About the SQL blocks.** `…` is the shortened select list (all entity columns), and `?` is a bind parameter. The lines come from [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java). It runs each query on H2 2.3, MariaDB 10.11 and Oracle 23.26 with Hibernate 7.4, and it fails if Hibernate's SQL changes. The test uses Java lambdas. A Kotlin lambda with the same meaning gives the same HQL, so it gets the same SQL.
-
-**SQL by database (Hibernate's SQL for this HQL; Kotlin gives the same HQL)** — the manual's `Order` has a nullable `price`, but the test `Order` does not, so `SqlByDatabaseTest` gives this HQL to Hibernate directly. From `expected-sql/` [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql), [`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql), [`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql), example `readme-first`:
-
-```sql
--- H2
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.price>?
-order by o1_0.price desc,o1_0.id
-fetch first ? rows only
-
--- MariaDB
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.price>?
-order by o1_0.price desc,o1_0.id
-limit ?
-
--- Oracle
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.price>?
-order by o1_0.price desc nulls last,o1_0.id
-fetch first ? rows only
+assertEquals("select e0 from Order e0 where e0.status = 1 and e0.price > :p1"
+    + " order by e0.price desc, e0.id asc", q.toHql().hql())
+val orders: List<Order> = q.toList()
 ```
 
 > [!NOTE]
-> **About the examples.** Every code example is a part of the Kotlin test code, copied as it is. The test file and the part name (region `name`) are written above the code. The tests check the HQL that lambdaQL makes and the rows it returns.
+> **About the examples.** Every code example is a part of running Kotlin code, copied as it is. The "Example code:" line at the end of a section gives the source file and the part name. The string in `assertEquals` is the HQL that lambdaQL makes. In the SQL blocks per database, `…` is the shortened select list (all entity columns), and `?` is a bind parameter.
+
+Example code: [`ManualKotlinStartTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt) (`readme`).
 
 <a id="contents"></a>
 ## Contents
 
 | # | Page | What you learn |
 |---|---|---|
-| 1 | [Overview](../01-overview.md) (common) | What lambdaQL is, why, and how it works |
-| 2 | [Getting started](02-getting-started.md) | Requirements, Gradle setup, Kotlin entities, first query |
+| 1 | [Overview](../01-overview.md) (common) | What lambdaQL is, why it is needed, and how it works |
+| 2 | [Getting started](02-getting-started.md) | Requirements, Gradle setup, example entities, first query, result functions |
 | 3 | [Conditions (`where`)](03-where.md) | Operators, null rules, `?.` `?:` `!!`, ranges, `when`, captured values |
 | 4 | [Sorting and paging](04-order-paging.md) | `orderBy`, `Direction`, `limit`, `offset` |
 | 5 | [Subqueries](05-subquery.md) | `exists()`, `x in sub...`, scalar and correlated subqueries, joins inside a subquery |
@@ -75,7 +47,7 @@ fetch first ? rows only
 <a id="where-to-start"></a>
 ## Where to start
 
-1. Read the common [Overview](../01-overview.md) to understand the idea: a lambda is a **query**, not code. lambdaQL reads its bytecode and never runs it.
+1. Read the common [Overview](../01-overview.md) to understand the basic idea. A lambda is a **query**, not code. lambdaQL does not call the lambda. It reads the bytecode opcodes and makes HQL.
 2. Set up your project with [2. Getting started](02-getting-started.md).
 3. Learn conditions in [3. Conditions](03-where.md). This is the most important chapter.
 4. Read [9. Kotlin notes](09-kotlin-notes.md) once. It explains the Kotlin forms that work differently in a query (`!!`, `?.`, `?:`, `==`, `===`).
@@ -83,25 +55,25 @@ fetch first ? rows only
 <a id="example-entities"></a>
 ## Example entities
 
-All pages in this track use these Kotlin entities. The full code is in [2. Getting started](02-getting-started.md#example-entities).
+The examples in this track use example entities written as Java classes (`query/src/test/java/org/lambdaql/query/`). The details are in [2. Getting started](02-getting-started.md#example-entities).
 
-| Entity | Properties |
+| Entity | Main properties (Java types) |
 |---|---|
-| `Order` | `id: Long?`, `price: Double?`, `status: Int?`, `active: Boolean`, `description: String?`, `customer: Customer?`, `updateAt: LocalDateTime?`, `items: MutableList<Item>` |
-| `Customer` | `id: Long?`, `name: String?`, `grade: Int?` |
-| `Item` | `id: Long?`, `order: Order?`, `price: Double?`, `qty: Int` |
+| `Order` | `Long id`, `double price`, `short status`, `boolean active` (`isActive` in Kotlin), `String description`, `Integer cnt`, `String custName`, `LocalDateTime updateAt`, `Customer customer`, `Address address` |
+| `Customer` | `int id`, `String name`, `Integer grade` |
+| `Item` | `Long id`, `Order order`, `Double price`, `int qty` |
 
-Most properties are nullable `var` properties, because a database column can be NULL.
-`active` and `qty` are Kotlin `Boolean` and `Int`. These are JVM primitives, so they can never be NULL.
+`price`, `status`, `active` and `qty` are Java primitive types, so they can never be NULL.
+Properties of reference types can be NULL. In Kotlin they appear as platform types.
 
 <a id="three-things-to-know-first"></a>
 ## Three things to know first
 
 | Kotlin | In a lambdaQL lambda |
 |---|---|
-| `it.price!! > 100.0` | `!!` is ignored. It is only there so that the code compiles. There is no `NullPointerException`, because the lambda never runs. |
-| `it.customer?.name == "Kim"` | `it.customer?.name` names a column of the joined customer. This condition cannot match an order without a customer, so it is an inner `join`, and orders without a customer are not returned. `?.` becomes a `left join` when an order without a customer can make the condition true (`it.status == 1 \|\| ...`, `it.customer?.name == null`) (D54). `it.customer!!.name` is the same column, but it is always an inner join. |
-| `it.status == 1` with `status: Int?` | `e0.status = 1`. A NULL `status` does not match (SQL meaning). lambdaQL ignores the null checks that the Kotlin compiler adds. Only the null checks **you write** count. |
+| `it.price!! > 100.0` | `!!` is ignored. It is only there so that the code compiles. There is no `NullPointerException`, because lambdaQL does not call the lambda. It reads the bytecode opcodes. |
+| `it.customer?.name == "Kim"` | `it.customer?.name` names a column of the joined customer. This condition cannot match an order without a customer, so it is an inner `join`, and orders without a customer are not returned. It becomes a `left join` when an order without a customer can match the condition (`it.status == 1 \|\| ...`, `it.customer?.name == null`). `it.customer!!.name` is the same column and follows the same rule. But a comparison that passes through `!!` is true only for orders that have a customer. |
+| `it.cnt == n` with `n: Int?` | `e0.cnt = :p1`. A row with a NULL `cnt` does not match (SQL meaning). To find NULL rows, **write** the null check yourself, for example `it.cnt == null`. |
 
 Details: [9. Kotlin notes](09-kotlin-notes.md).
 
@@ -111,10 +83,10 @@ Details: [9. Kotlin notes](09-kotlin-notes.md).
 | Item | Version |
 |---|---|
 | Kotlin | 2.x (the design was checked with kotlinc 1.7.22, 2.1.10, 2.2.21, 2.3.0 and 2.3.21) |
-| Java (JVM) | 21 |
+| Java (JVM) | 21 or later |
 | Hibernate ORM | 6.6 or 7.4 (tested with 6.6.53 and 7.4.13) |
 | Databases verified in the design | H2 2.3, MariaDB 10.11, Oracle 23.26 (23ai) |
-| Spring Boot (optional) | 3.5 or 4.1 (tested with 3.5.16 and 4.1.2, Java tests). See [13. Spring Boot 3 and 4](../13-spring-boot-versions.md) |
+| Spring Boot (optional) | 3.5 or 4.1 (tested with 3.5.16 and 4.1.2). See [13. Spring Boot 3 and 4](../13-spring-boot-versions.md) |
 
 <a id="other-languages"></a>
 ## Other languages
@@ -124,7 +96,7 @@ Every language folder (`en`, `ko`, `ja`, `zh`) has the same layout. To read a pa
 <a id="help-and-contributions"></a>
 ## Help and contributions
 
-- Source code: <https://github.com/codebit0/lambdaql>
+- Source code: <https://github.com/lambdaql/lambdaql>
 - The Korean manual is the source. The other languages are translations.
 - If you find a mistake, please open an issue or a pull request.
 - Design documents (Korean, for contributors): [ROADMAP.md](../../../design/ROADMAP.md), [KOTLIN.md](../../../design/KOTLIN.md)

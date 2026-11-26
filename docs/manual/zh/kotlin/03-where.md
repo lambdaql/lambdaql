@@ -8,52 +8,45 @@
 ---
 
 <a id="31-the-idea-in-one-sentence"></a>
-## 3.1 一句话说明核心思想
+## 3.1 概述
 
-**lambdaQL 的 Lambda 是查询，不是代码。** lambdaQL 读取 Lambda 的字节码，从不执行它。
-因此 Kotlin 的运行时规则（`!!` 引发的 `NullPointerException`、`===` 的对象同一性、编译器添加的 null 检查）都不适用。
-lambdaQL 使用它自己的规则。本章将解释这些规则。
+**lambdaQL 的 Lambda 表达式不是代码，而是查询表达式。** lambdaQL 不调用 Lambda 表达式，而是分析其字节 opcode。
+因此，处理实体的部分不适用 Kotlin 的执行规则（`===` 的对象同一性、编译器添加的 null 检查）。
+只由捕获值构成的表达式先在 Kotlin 中计算（见 [3.11](#311-captured-values)）。
+lambdaQL 使用它自己的规则。本章解释这些规则。
 
-如果某种写法没有对应的规则，lambdaQL 不会猜测。它会抛出带有清晰消息的异常（见 [3.13](#313-what-is-rejected)）。
+如果 lambdaQL 无法把 Lambda 表达式分析为查询，会抛出带错误码的异常（见 [3.13](#313-what-is-rejected)）。
 
 <a id="32-example-entities"></a>
 ## 3.2 示例实体
 
-所有示例都使用这些实体（完整代码见 [2. 入门](02-getting-started.md#example-entities)）。
+所有示例都使用示例实体（Java 类）。详情见 [2. 入门](02-getting-started.md#example-entities)。
 
-```kotlin
-@Entity class Order(
-    @Id var id: Long? = null,
-    var price: Double? = null,
-    var status: Int? = null,
-    var active: Boolean = false,          // 基本类型：永远不为 NULL
-    var description: String? = null,
-    @ManyToOne var customer: Customer? = null,
-    var updateAt: LocalDateTime? = null,
-    @OneToMany(mappedBy = "order") var items: MutableList<Item> = mutableListOf(),
-)
-@Entity class Customer(@Id var id: Long? = null, var name: String? = null, var grade: Int? = null)
-@Entity class Item(@Id var id: Long? = null, @ManyToOne var order: Order? = null, var price: Double? = null, var qty: Int = 0)
-```
+| 实体 | 本章使用的属性（Java 类型） |
+|---|---|
+| `Order` | `Long id`、`double price`、`short status`、`boolean active`（在 Kotlin 中为 `isActive`）、`String description`、`Integer cnt`、`String custName`、`LocalDateTime updateAt`、`Kind kind`、`Customer customer`、`Address address` |
+| `Customer` | `int id`、`String name`、`Integer grade` |
+| `Item` | `Long id`、`Order order`、`Double price`、`int qty` |
+| `Coded` | `Long id`、`String code`（通过 `@Convert` 反转后存储）、`Boolean vip`（可为 NULL，`YesNoConverter`） |
 
-有几个示例还需要一个额外的属性。这些示例会注明，例如"`flag: Boolean?`"。
+`price`、`status`、`active`、`qty` 是基本类型，因此不会为 NULL。引用类型的属性可能为 NULL，在 Kotlin 中是平台类型。
+`status` 是 `Short`，因此示例写成 `it.status.toInt() == 1`。lambdaQL 会忽略这个转换。
 
 <a id="33-basic-form"></a>
 ## 3.3 基本形式
 
+<!-- region: ManualKotlinStartTest.kt#first-query -->
 ```kotlin
-val qb = QueryBuilder(entityManagerFactory)
-
-val list = qb.from(Order::class.java)
-    .where { it.status == 1 && it.price!! > 100.0 }
-    .toList()
-// HQL: select e0 from Order e0 where e0.status = 1 and e0.price > 100.0
+val q = qb.from(Order::class.java).where { it.status.toInt() == 1 && it.price > 100.0 }
+assertEquals("select e0 from Order e0 where e0.status = 1 and e0.price > 100.0", q.toHql().hql())
+val orders: List<Order> = q.toList()
 ```
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 7.4 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。该测试使用 Java Lambda。含义相同的 Kotlin Lambda 生成相同的 HQL，因此 SQL 也相同。
+`qb` 是 `QueryBuilder`（见 [2. 入门](02-getting-started.md#create-a-querybuilder)）。
 
-**各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `to-hql`：
+**各数据库的 SQL**
 
+<!-- sql: to-hql -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
@@ -61,28 +54,29 @@ from orders o1_0
 where o1_0.status=1 and o1_0.price>100.0
 ```
 
-[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)，region `captured`：
-
+<!-- region: KotlinSelectTest.kt#captured -->
 ```kotlin
+val min = 100.0
 val q = qb.from(Order::class.java).where { it.price > min && it.status.toInt() == 1 }
 assertEquals("select e0 from Order e0 where e0.price > :p1 and e0.status = 1", q.toHql().hql())
 ```
 
-`min` 是捕获的局部 `val`（`100.0`），所以它是绑定参数。Kotlin 测试使用 Java 测试实体：`price` 是基本类型 `double`，所以不需要 `!!`；`status` 是 `short`，所以测试写成 `it.status.toInt() == 1`。lambdaQL 会忽略这个转换。
-更多用 Java 写的查询在 [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java) 中测试（H2、MariaDB 和 Oracle）。这些示例见[本页的 Java 版本](../java/03-where.md)。
+`min` 是捕获的局部 `val`，因此成为绑定参数。`price` 是基本类型 `double`，因此不需要 `!!`。
+用 Java 编写的同一查询示例见[本页的 Java 版本](../java/03-where.md)。
 
 可以多次调用 `where()`。这些条件以 `AND` 连接。
 
+<!-- region: ManualKotlinWhereTest.kt#many-where -->
 ```kotlin
-qb.from(Order::class.java)
-    .where { it.status == 1 }
-    .where { it.active }
-    .toList()
-// HQL: select e0 from Order e0 where e0.status = 1 and e0.active = true
+val q = qb.from(Order::class.java)
+    .where { it.status.toInt() == 1 }
+    .where { it.isActive }
+assertEquals("select e0 from Order e0 where e0.status = 1 and e0.active = true", q.toHql().hql())
 ```
 
-**各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `many-where`：
+**各数据库的 SQL**
 
+<!-- sql: many-where -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
@@ -90,21 +84,30 @@ from orders o1_0
 where o1_0.status=1 and o1_0.active=true
 ```
 
-**HQL 中的值。** 规则取决于值的来源（决策 D37）。
+**HQL 中的值。** 规则取决于值的来源。
 
 | 值 | 在 HQL 中 | 示例 |
 |---|---|---|
-| 写在 Lambda 中的常量：数字（包括小数）、字符串、`true`/`false`、`null`、enum 常量、`const val` | **字面量** | `it.price!! > 100.0` → `e0.price > 100.0` |
-| 捕获的值：局部 `val` 或 `var`、属性、函数参数 | **绑定参数** | `it.price!! > minPrice` → `e0.price > :p1` |
+| 直接写在 Lambda 表达式中的常量：数字（包括小数）、字符串、`true`/`false`、`null`、enum 常量、`const val` | **字面量** | `it.price > 100.0` → `e0.price > 100.0` |
+| 捕获的值：局部 `val` 或 `var`、属性、函数参数 | **绑定参数** | `it.price > minPrice` → `e0.price > :p1` |
 | 计算出的值：`BigDecimal("1.5")`、`form.text.trim()`、`LocalDateTime.of(...)` | **绑定参数** | `:p1` |
 
-- 常量在每次调用时都相同。因此 SQL 文本不会改变，数据库在制定执行计划时也能看到这个值。
-- 字符串常量中的单引号会被转义：`"O'Brien"` 变为 `'O''Brien'`。该字符串是编译进类里的常量，而不是用户输入，因此没有 SQL 注入风险。
-- 捕获的值可能来自用户，因此它是绑定参数。每次调用只有值会变化。
-- 例外只有一个。与整数列比较的小数捕获值写成小数字面量（`2.5BD`）（参见 [3.4](#34-comparisons) 中的“整数列与小数值”）。只写入转换为数字后的值，因此没有 SQL 注入风险。
-- enum 常量会带着完整的类名写入，例如 `e0.kind = com.example.OrderKind.GIFT`。
+- 常量在每次调用时都相同。因此 SQL 语句不会改变，数据库在制定执行计划时也能看到这个值。
+- 字符串常量中的单引号会被转义：`"O'Brien"` 变为 `'O''Brien'`。该字符串不是用户输入，而是编译进类里的常量，因此没有 SQL 注入风险。
+- 捕获的值可能来自用户，因此是绑定参数。每次调用只有值会变化。
+- 例外只有一个。与整数列比较的小数捕获值写成小数字面量（`2.5BD`）（见 [3.4](#34-comparisons) 中的“整数列与小数值”）。只写入转换为数字后的值，因此没有 SQL 注入风险。
+- enum 常量带完整类名写入。例如：`e0.kind = org.lambdaql.query.Order$Kind.RUSH`。
 
-**`!!` 只是给编译器看的。** 当 `price` 是 `Double?` 时，Kotlin 无法编译 `it.price > 100.0`。请写 `it.price!! > 100.0`。lambdaQL 会忽略 `!!`（决策 D23）。`price` 为 NULL 的行不会被返回。
+**`!!` 是给编译器看的。** 如果 Kotlin 实体的属性像 `Double?` 这样可空，Kotlin 无法编译 `it.price > 100.0`，因此要写 `it.price!! > 100.0`。lambdaQL 会忽略 `!!`。值为 NULL 的行不会被返回。
+
+<!-- region: ManualKotlinWhereTest.kt#bang -->
+```kotlin
+// !! is only for the compiler: lambdaQL ignores it, and rows with a NULL cnt are not returned
+val q = qb.from(Order::class.java).where { it.cnt!! > 1 }
+assertEquals("select e0 from Order e0 where e0.cnt > 1", q.toHql().hql())
+```
+
+示例代码：[`ManualKotlinStartTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)（`first-query`）、[`KotlinSelectTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)（`captured`）、[`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)（`many-where`、`bang`）。
 
 <a id="34-comparisons"></a>
 ## 3.4 比较运算
@@ -120,35 +123,46 @@ where o1_0.status=1 and o1_0.active=true
 | `it.status!!.compareTo(3) > 0` | `e0.status > 3` | `compareTo(..) op 0` 变为 `op` |
 
 与可空列的比较遵循 **SQL 语义**。
-如果列为 NULL，结果为 UNKNOWN，该行不会被返回。（如果执行 Kotlin 代码，`!!` 会抛出 `NullPointerException`。）
+列为 NULL 的行不会被返回。
 
 **算术运算。** 支持 `+`、`-`、`*`、`/` 和一元 `-`。`%` 写作 `mod`。
 `/` 也可以使用，但请避免涉及列的整数 `/`。它在 SQL 中计算，因此各数据库的结果不同（MariaDB 给出 `5/2 = 2.5`，Kotlin 给出 `2`）。统一列侧 `/` 结果的规则尚未确定。
 捕获值之间的计算（下面的 `n / 2.0`）在查询之前完成，因此没有这种差异。
 
-下面示例中的 `cnt` 是测试实体 `Order`（Java）的整数列（`Integer cnt`）。[3.2](#32-example-entities) 的示例实体中没有它。
+下面示例中的 `cnt` 是 `Order` 的整数列（`Integer cnt`）。
 
-**列上的算术运算与索引**（决策 D50）。像 `it.cnt * 2 > n` 这样对列做算术运算时，数据库无法使用索引。lambdaQL 以 `WARN` 级别记录 `LQL-5012`，在 `SargableMode.STRICT` 下分析失败（`LQL-3066`）。
+**列上的算术运算与索引**。像 `it.cnt * 2 > n` 这样对列做算术运算时，无法使用索引。lambdaQL 以 `WARN` 级别记录 `LQL-5012`，在 `SargableMode.STRICT` 下分析失败（`LQL-3066`）。
 把运算移到值一侧时，请像 `it.cnt > n / 2.0` 这样用小数相除。整数除法 `n / 2` 会得到不同的行。如果乘的是负数，请反转比较方向。详见 [10.2](10-rules-and-limits.md#db-functions-on-a-column)。
 
-**整数列与小数值**（决策 D48 B8）。把整数列与小数值比较时，lambdaQL 按写出的值比较，不做舍入，也不排除值。
+**整数列与小数值**。把整数列与小数值比较时，lambdaQL 按写出的值比较，不做舍入，也不排除值。
 
-- 写在 Lambda 中的常量保持为字面量。`it.cnt >= 2.5` 变为 `e0.cnt >= 2.5`。
-- 捕获的值也写成小数字面量。HQL 为 `e0.cnt >= 2.5BD`，没有绑定参数。`BD` 是 HQL 中 `BigDecimal` 字面量的后缀。
+- 写在 Lambda 表达式中的常量保持为字面量。`it.cnt >= 2.5` 变为 `e0.cnt >= 2.5`。
+- 捕获的值也写成小数字面量。结果为 `e0.cnt >= 2.5BD`，没有绑定参数。`BD` 是 HQL 中 `BigDecimal` 字面量的后缀。
 - 含有这种元素的 IN 列表会把所有元素都写成小数字面量（`e0.cnt in (2.5BD, 3.0BD)`）。
 
-这是捕获值以绑定参数传递这一原则（D37）的例外。当与整数列比较的参数绑定了小数时，即使指定 `BigDecimal` 类型，Hibernate 7 也会拒绝（`QueryArgumentException`，实测）。
+这是捕获值以绑定参数传递这一原则的例外。当与整数列比较的参数绑定了小数时，即使指定 `BigDecimal` 类型，Hibernate 7 也会拒绝（`QueryArgumentException`，实测）。
 
 以前，值会被截断为列类型，`2.5` 变成 `2`，返回错误的行。Hibernate 6.6 会拒绝以整数列类型绑定的小数（`CoercionException`），并会静默截断 IN 列表中的元素（在三种数据库上实测）。
-没有采用改写为整数比较（`>= 3`）的方式。那样执行的 SQL 会与 Lambda 不同；当实体映射（`Integer`）与数据库列类型（例如带小数的 `DECIMAL`）不同时，还会返回错误的行。
+没有采用改写为整数比较（`>= 3`）的方式。那样执行的 SQL 会与 Lambda 表达式不同；当实体映射（`Integer`）与数据库列类型（例如带小数的 `DECIMAL`）不同时，还会返回错误的行。
 
 结果在 H2、MariaDB 10.11 和 Oracle 23.26 上正确（实测）。在三种数据库上，SQL 都像 `cnt>=2.5`、`cnt in (2.5,3.0)` 这样保持列不变，直接与小数比较。
 MariaDB 的 `EXPLAIN` 显示索引范围扫描（`type=range`）。在 Oracle 上，列没有附加转换，因此是可以使用索引的形式。给出索引提示时为 `INDEX RANGE SCAN`；在 3000 行的表上不加提示时，与整数字面量（`cnt >= 99`）一样选择全表扫描（均为实测）。
 
-这一点没有 Kotlin 测试。由 Java 测试（[`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)，region `whole-number`）验证。
+<!-- region: ManualKotlinWhereTest.kt#whole-number -->
+```kotlin
+// cnt is an integer column: a decimal value is compared as it is, not cut to 2
+val literal = qb.from(Order::class.java).where { it.cnt >= 2.5 }
+assertEquals("select e0 from Order e0 where e0.cnt >= 2.5", literal.toHql().hql())
 
-**浮点数：** 对于 `Float`/`Double` 列，lambdaQL 不保证与 Kotlin 完全一致到每一位的结果。
+val v = 2.5
+val captured = qb.from(Order::class.java).where { it.cnt >= v }
+assertEquals("select e0 from Order e0 where e0.cnt >= 2.5BD", captured.toHql().hql())
+```
+
+**浮点数：** 对于 `Float`/`Double` 列，lambdaQL 不保证与 Kotlin 逐位一致的结果。
 捕获的 `NaN` 或 `Infinity` 值会在查询执行时被拒绝。
+
+示例代码：[`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)（`whole-number`）。
 
 <a id="35-and-or-not"></a>
 ## 3.5 AND、OR、NOT
@@ -160,20 +174,22 @@ MariaDB 的 `EXPLAIN` 显示索引范围扫描（`type=range`）。在 Oracle �
 | `!a` | `not (a)` |
 | 括号 | 按需保留 |
 
+<!-- region: ManualKotlinWhereTest.kt#and-or-not -->
 ```kotlin
-.where { (it.status == 1 || it.active) && it.price!! > minPrice }
-// HQL: (e0.status = 1 or e0.active = true) and e0.price > :p1
+val both = qb.from(Order::class.java).where { (it.status.toInt() == 1 || it.isActive) && it.price > minPrice }
+assertEquals("select e0 from Order e0 where (e0.status = 1 or e0.active = true) and e0.price > :p1", both.toHql().hql())
 
-.where { !(it.status == 1 && it.price!! > minPrice) }
-// HQL: not (e0.status = 1 and e0.price > :p1)
+// the compiler moves the ! inside (De Morgan): the rows are the same
+val not = qb.from(Order::class.java).where { !(it.status.toInt() == 1 && it.price > minPrice) }
+assertEquals("select e0 from Order e0 where e0.status <> 1 or e0.price <= :p1", not.toHql().hql())
 ```
 
 规则：
 
-- 结果遵循 **SQL 三值逻辑**（TRUE / FALSE / UNKNOWN）。lambdaQL 已经验证，这在 H2、MariaDB 和 Oracle 上返回相同的行。
+- 结果遵循 **SQL 三值逻辑**（TRUE / FALSE / UNKNOWN）。lambdaQL 已经确认，这种方式在 H2、MariaDB 和 Oracle 上返回相同的行。
 - 编译器有时会移动 `!` 的位置（德摩根定律，`!(x > y)` 变为 `x <= y`）。这不会改变结果。
-- lambdaQL **不会简化条件**。写 `it.price!! > p || it.price!! <= p` 时，它会按原样发送。`price` 为 NULL 的行不会被返回。这是正常的 SQL 行为。
-- 请使用 `&&` 和 `||`。中缀函数 `and`、`or`、`xor` 会被拒绝（它们不会短路）。
+- lambdaQL **不会简化条件**。写 `it.price!! > p || it.price!! <= p` 时，按原样发送。`price` 为 NULL 的行不会被返回。这是正常的 SQL 行为。
+- 请使用 `&&` 和 `||`。中缀函数 `and`、`or`、`xor` 会被拒绝（它们不做短路求值）。
 
 **给出 `true`/`false` 的 `if` 和 `when`。** 只允许以下简短写法。它们分别等同于 `AND`、`OR`。
 
@@ -183,42 +199,122 @@ MariaDB 的 `EXPLAIN` 显示索引范围扫描（`type=range`）。在 Oracle �
 | `if (c) true else x` | `c \|\| x` |
 | `when { a -> true; b -> true; else -> false }` | `a \|\| b` |
 
-其他任何 `if (c) x else y`，以及任何用于选择**值**的 `if` 或 `when`（`it.status == (if (flag) 1 else 2)`），都会被拒绝（限制 KC6）。
-如果选择只取决于捕获的值，请在 Lambda 之前计算出该值。
-
+<!-- region: ManualKotlinWhereTest.kt#if-when -->
 ```kotlin
-val wanted = if (flag) 1 else 2
-.where { it.status == wanted }
+val ifAnd = qb.from(Order::class.java).where { if (it.isActive) it.price > 100.0 else false }
+assertEquals("select e0 from Order e0 where e0.active = true and e0.price > 100.0", ifAnd.toHql().hql())
+
+val ifOr = qb.from(Order::class.java).where { if (it.isActive) true else it.price > 100.0 }
+assertEquals("select e0 from Order e0 where e0.active = true or e0.price > 100.0", ifOr.toHql().hql())
+
+val whenOr = qb.from(Order::class.java).where { when { it.status.toInt() == 3 -> true; it.price > 200.0 -> true; else -> false } }
+assertEquals("select e0 from Order e0 where e0.status = 3 or e0.price > 200.0", whenOr.toHql().hql())
 ```
+
+只用捕获值和常量选择值的 `if`（`it.status.toInt() == (if (flag) 1 else 2)`）会在执行查询时于 Kotlin 中计算，并作为绑定参数传递。
+用实体值选择值的 `if` 和 `when` 会成为 SQL `case when … end`（见 [3.5.1](#351-values-chosen-by-a-condition)）。
+其他布尔 `if (c) x else y` 会被拒绝。
+
+<!-- region: ManualKotlinWhereTest.kt#value-before -->
+```kotlin
+// an if of captured values and constants: computed in Kotlin, bound as :p1
+val q = qb.from(Order::class.java).where { it.status.toInt() == (if (flag) 1 else 2) }
+assertEquals("select e0 from Order e0 where e0.status = :p1", q.toHql().hql())
+
+// an if that reads the entity becomes case when
+val c = qb.from(Order::class.java).where { it.status.toInt() == (if (it.isActive) 1 else 2) }
+assertEquals("select e0 from Order e0 where e0.status = case when e0.active = true then 1 else 2 end", c.toHql().hql())
+```
+
+示例代码：[`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)（`and-or-not`、`if-when`、`value-before`）。
+
+<a id="351-values-chosen-by-a-condition"></a>
+### 3.5.1 按条件选择的值（`case when`）
+
+用实体值选择值的 `if (c) x else y`、`if … else if … else` 以及没有主体的 `when { }` 会成为一个 SQL `case when … end` 表达式。
+条件中可以混用 `&&`、`||`、`!`。
+
+`case` 可以用于 `where` 的比较值、`select` 的查询值、`groupBy` 键、排序键以及 `update` 的赋值。
+
+<!-- region: KotlinCaseWhenTest.kt#case-where -->
+```kotlin
+val q = qb.from(Order::class.java).where { it.status.toInt() == if (it.isActive) 1 else 2 }
+assertEquals("select e0 from Order e0 where e0.status = case when e0.active = true then 1 else 2 end", q.toHql().hql())
+```
+
+<!-- region: KotlinCaseWhenTest.kt#case-when-select -->
+```kotlin
+val q = qb.from(Order::class.java).select {
+    when {
+        it.price > 200.0 -> "big"
+        it.price > 100.0 -> "medium"
+        else -> "small"
+    }
+}
+assertEquals("select case when e0.price > 200.0 then 'big' when e0.price > 100.0 then 'medium' else 'small' end from Order e0",
+    q.toHql().hql())
+```
+
+<!-- region: KotlinCaseWhenTest.kt#case-group -->
+```kotlin
+// orders per price band: the when is the group key and the selected value
+val q = qb.from(Order::class.java)
+    .groupBy { if (it.price > 100.0) "big" else "small" }
+    .select { if (it.price > 100.0) "big" else "small" }
+assertEquals("select case when e0.price > 100.0 then 'big' else 'small' end from Order e0"
+    + " group by case when e0.price > 100.0 then 'big' else 'small' end", q.toHql().hql())
+```
+
+<!-- region: KotlinCaseWhenTest.kt#case-sort -->
+```kotlin
+// active orders first, then by price
+val q = qb.from(Order::class.java).orderBy { o -> asc(if (o.isActive) 0 else 1).asc(o.price) }.limit(10)
+assertEquals("select e0 from Order e0 order by case when e0.active = true then 0 else 1 end asc, e0.price asc, e0.id asc",
+    q.toHql().hql())
+```
+
+<!-- region: KotlinCaseWhenTest.kt#case-set -->
+```kotlin
+// 10 % off the orders above 100
+val u = qb.update(Order::class.java).set { it.price = if (it.price > 100.0) it.price * 0.9 else it.price }.all()
+assertEquals("update Order e0 set e0.price = case when e0.price > 100.0 then (e0.price * 0.9) else e0.price end", u.toHql().hql())
+```
+
+规则：
+
+- `case` 从上到下依次检查分支。因此第二个及之后分支的条件就是 Lambda 表达式中写的条件本身。
+- 在 `where` 中参与比较的 `case` 按行计算，因此数据库无法使用其中列的索引。这时 lambdaQL 以 `WARN` 级别记录 `LQL-5013`。
+- 按条件选择排序函数链本身的写法（`if (flag) desc(o.price) else asc(o.id)`）会被拒绝（`LQL-2023`）。请把条件写在键值中。
+- 有主体的 `when (x)` 遵循 [3.15](#315-when-kotlin-only) 的规则。不支持 `takeIf`。
+
+示例代码：[`KotlinCaseWhenTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinCaseWhenTest.kt)（`case-where`、`case-when-select`、`case-group`、`case-sort`、`case-set`）。
 
 <a id="36-null-rules"></a>
 ## 3.6 NULL 规则
 
 这是最重要的部分。有三条简单的原则。
 
-1. **在写了 null 检查的地方，lambdaQL 使用它。**（`== null`、`!= null`、`?.`、`?:`）
+1. **在写了 null 检查的地方，lambdaQL 使用该检查。**（`== null`、`!= null`、`?.`、`?:`）
 2. **在没有写的地方，lambdaQL 使用 SQL 语义。** 列为 NULL 时，比较结果为 UNKNOWN，该行不会被返回。
-   实体值之间的 `==`、`!=` 也适用同样的规则（决策 D48）。
+   实体值之间的 `==`、`!=` 也适用同样的规则。
    当结果可能与 Kotlin 不同时，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`。
 3. **捕获的值先被计算，比较同样遵循 SQL 语义。** 捕获的 `null` 以 NULL 绑定，因此 `= :p1` 和 `<> :p1` 不匹配任何行。
    这时 lambdaQL 在执行时以 `WARN` 级别记录 `LQL-4045`。要查找 NULL，请写 `x == null`（变为 `is null`）。
    对捕获值调用方法的表达式（`text.trim()`、转换为其他基本类型的 `min.toInt()` 等）会先被计算，因此值为 `null` 时会像 Kotlin 一样抛出异常（`LQL-4012`）。
    捕获值的 `!!` 和拆箱为其自身基本类型（`min!!`）不会被执行。值为 `null` 时绑定 NULL，并以 `DEBUG` 级别记录 `LQL-4045`。
 
-Kotlin 编译器会在字节码中添加**隐藏的** null 检查（例如 `status` 为 `Int?` 时的 `it.status == 1`）。lambdaQL 会**忽略**它们（决策 D22）。只有源代码中的 null 检查才算数。
-因此，含义相同的 Kotlin Lambda 和 Java Lambda 会生成相同的 SQL。
+Kotlin 编译器会在字节 opcode 中添加**隐藏的** null 检查（例如与捕获的 `id: Long` 比较的 `it.id == id`）。只有源代码中的 null 检查才有意义。见 [3.6.2](#362--compares-values)。
 
 <a id="361-rule-table"></a>
 ### 3.6.1 规则表
 
 | # | Kotlin 写法 | HQL | NULL 行为 |
 |---|---|---|---|
-| R12 | 可空列与常量或非空值：`it.status == 1`、`it.id == id`（`id: Long`） | `e0.status = 1`、`e0.id = :p1` | SQL 语义。列为 NULL：该行不返回 |
-| R12 | `it.status != 1` | `e0.status <> 1` | SQL 语义。列为 NULL：该行**不**返回 |
-| R1 | 大小比较：`it.price!! > p`、`it.status!! <= 3` | `e0.price > :p1`、`e0.status <= 3` | SQL 语义 |
-| R11 | 可空列与可空的捕获值：`it.status == q`（`q: Int?`）、`it.description == text`（`String?`）、enum `==` | `e0.status = :p1` | 值比较。列为 NULL：该行不返回。捕获的 `null`：没有匹配的行（`LQL-4045`） |
-| R11 | `it.status != q` | `e0.status <> :p1` | SQL 语义（D48）。列为 NULL：该行**不**返回（Kotlin 会返回它）。捕获的 `null`：没有匹配的行（`LQL-4045`） |
-| R11 | 两个实体值：`it.description == it.custName` | `e0.description = e0.custName` | SQL 语义（D48）。任一侧为 NULL：该行不返回（NULL 与 NULL 也一样） |
+| R12 | 不可能为 NULL 的列与非空值：`it.id == id`（`id: Long`） | `e0.id = :p1` | 去掉编译器添加的 null 检查 |
+| R1 | 大小比较：`it.price > p`、`it.cnt!! > 1` | `e0.price > :p1`、`e0.cnt > 1` | SQL 语义 |
+| R11 | 可空列与可空的捕获值：`it.cnt == n`（`n: Int?`）、`it.description == text`（`String?`）、enum `==` | `e0.cnt = :p1` | 值比较。列为 NULL 时该行不返回。捕获的 `null`：没有匹配的行（`LQL-4045`） |
+| R11 | `it.cnt != c` | `e0.cnt <> :p1` | SQL 语义。列为 NULL 时该行**不**返回（Kotlin 会返回）。捕获的 `null`：没有匹配的行（`LQL-4045`） |
+| R11 | 两个实体值：`it.description == it.custName` | `e0.description = e0.custName` | SQL 语义。任一侧为 NULL 时该行不返回（NULL 与 NULL 也一样） |
 | R3 | `x == null`、`x != null` | `x is null`、`x is not null` | |
 | R17 | `===`、`!==` | 与 `==`、`!=` 相同 | 值比较，而不是对象同一性 |
 | R9 | 捕获的值 | 绑定参数 | 见 [3.6.4](#364-captured-null-values) |
@@ -226,96 +322,99 @@ Kotlin 编译器会在字节码中添加**隐藏的** null 检查（例如 `stat
 <a id="362--compares-values"></a>
 ### 3.6.2 `==` 比较的是值
 
-Kotlin 的 `==` 本来就比较值。在 lambdaQL 中，`===` 也比较**值**（规则 R17）。
+Kotlin 的 `==` 本来就比较值。在 lambdaQL 中，`===` 也比较**值**。
 查询中没有对象同一性。两个值相同的不同 `Long` 装箱对象是相等的。
 
+<!-- region: ManualKotlinWhereTest.kt#captured-eq -->
 ```kotlin
-val status: Int? = request.status    // 可能为 null
-.where { it.status == status }
-//   status = 3    -> HQL: e0.status = :p1    status 为 3 的行
-//   status = null -> HQL: e0.status = :p1    没有匹配的行：= NULL 永远不为真（WARN 级别 LQL-4045）
+val n: Int? = 3
+val q = qb.from(Order::class.java).where { it.cnt == n }
+assertEquals("select e0 from Order e0 where e0.cnt = :p1", q.toHql().hql())
+
+// a captured null matches no row: "= NULL" is never true (WARN LQL-4045)
+val none: Int? = null
+assertEquals(0, qb.from(Order::class.java).where { it.cnt == none }.toList().size)
 ```
 
-要查找 status 为 NULL 的行，请写出 null 检查。`it.status == null` 变为 `e0.status is null`。
+要查找 `cnt` 为 NULL 的行，请写出 null 检查。`it.cnt == null` 变为 `e0.cnt is null`。
 
-列永远不会被函数包裹，因此数据库可以使用索引（见 [10.2](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql)）。
+列不会被函数包裹，因此数据库可以使用索引（见 [10.2](10-rules-and-limits.md#102-sargable-rule-index-friendly-sql)）。
 
+<!-- region: ManualKotlinWhereTest.kt#string-eq -->
 ```kotlin
-.where { it.description == text }    // 查询执行时 text 不为 null
-// HQL: e0.description = :p1
-.where { it.description != text }
-// HQL: e0.description <> :p1          （description 为 NULL 时不匹配：SQL 语义）
+val eq = qb.from(Order::class.java).where { it.description == text }
+assertEquals("select e0 from Order e0 where e0.description = :p1", eq.toHql().hql())
+
+// a NULL description matches neither = nor <> (SQL meaning)
+val ne = qb.from(Order::class.java).where { it.description != text }
+assertEquals("select e0 from Order e0 where e0.description <> :p1", ne.toHql().hql())
 ```
 
-**永远不会是 NULL 的列：`it.id == id`。** 在示例实体中，`id` 是 `Long?`。Kotlin 把 `it.id == id`（捕获的 `id: Long`）编译为一个 null 检查加一个比较。
+**不可能为 NULL 的列：`it.id == id`。** 示例实体的 `id` 是 `Long`，在 Kotlin 中是平台类型。Kotlin 把 `it.id == id`（捕获的 `id: Long`）编译为一个 null 检查加一个比较。
 
-直接翻译这段字节码会得到 `not (e0.id is null or e0.id <> :p1)`。结果是正确的，但数据库难以很好地使用索引。
-id 永远不会是 NULL，因此对它的 `is null` 总是假。lambdaQL 去掉这个检查，写成 `e0.id = :p1`。
+直接翻译这段字节 opcode 会得到 `not (e0.id is null or e0.id <> :p1)`。结果是正确的，但数据库难以很好地使用索引。
+id 不可能为 NULL，因此对 id 的 `is null` 总是假。lambdaQL 去掉这个检查，写成 `e0.id = :p1`。
 
-同样的规则也适用于基本类型属性和 `nullable = false` 的列，但只在路径**没有关联步骤**时适用。订单可以没有客户，所以 `it.customer?.id` 可能是 NULL，这条路径的 null 检查会保留。
+同样的规则也适用于基本类型属性和 `nullable = false` 的列，但只在路径**没有关联步骤**时适用。存在没有客户的订单，所以 `it.customer?.id` 可能为 NULL，这条路径的 null 检查会保留。
 
+<!-- region: ManualKotlinWhereTest.kt#never-null -->
 ```kotlin
-.where { it.id == id }              // id: Long (captured)
-// HQL: e0.id = :p1
-.where { it.id == null }
-// HQL: 1=0
-.where { it.customer?.id == null }
-// HQL: e0.customer.id is null
-```
+// the id can never be NULL: the null check that Kotlin adds is dropped
+val byId = qb.from(Order::class.java).where { it.id == id }
+assertEquals("select e0 from Order e0 where e0.id = :p1", byId.toHql().hql())
 
-相同的 HQL 用 Java Lambda 在 [`SelectQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java) 中测试（region `never-null`，见[本页的 Java 版本](../java/03-where.md#362--on-objects-compares-values)）。Java 测试使用的条件正是 Kotlin 的 `it.id == id` 编译后的形式。
+val noId = qb.from(Order::class.java).where { it.id == null }
+assertEquals("select e0 from Order e0 where 1=0", noId.toHql().hql())
+
+// a path through an association can be NULL: the check stays
+val noCustomerId = qb.from(Order::class.java).where { it.customer?.id == null }
+assertEquals("select e0 from Order e0 where e0.customer.id is null", noCustomerId.toHql().hql())
+```
 
 > [!WARNING]
-> **Kotlin 的非空类型不能作为证明。** 属性 `var code: String` 中仍然可能有来自数据库的 NULL。
+> **Kotlin 的非空类型不能作为证据。** `var code: String` 属性中也可能有来自数据库的 NULL。
 > 因为 Hibernate 会不加检查地把列值写入字段。
 > lambdaQL 看的是 JPA 元数据，而不是 Kotlin 类型。
 
 <a id="363-write-your-null-checks-yourself"></a>
 ### 3.6.3 自己编写 null 检查
 
-```kotlin
-// 只返回 status 不为 NULL 且不等于 1 的行：
-.where { it.status != 1 }
-// HQL: e0.status <> 1
+在 Kotlin 中，`null != 3` 为 `true`。在 lambdaQL 中则不同。下面的 `it.cnt != c` **不会**返回 `cnt` 为 NULL 的行，因为没有写 null 检查。
 
-// 同时包含 status 为 NULL 的行：
-.where { it.status == null || it.status != 1 }
-// HQL: e0.status is null or e0.status <> 1
+<!-- region: ManualKotlinWhereTest.kt#null-check -->
+```kotlin
+val c: Int? = 3
+// rows with a NULL cnt are left out (SQL meaning); Kotlin would keep them
+val ne = qb.from(Order::class.java).where { it.cnt != c }
+assertEquals("select e0 from Order e0 where e0.cnt <> :p1", ne.toHql().hql())
+
+// to keep the NULL rows, write the null check
+val keep = qb.from(Order::class.java).where { it.cnt == null || it.cnt != c }
+assertEquals("select e0 from Order e0 where e0.cnt is null or e0.cnt <> :p1", keep.toHql().hql())
 ```
 
 > [!IMPORTANT]
-> 这与执行 Kotlin 代码不同。在 Kotlin 中，`null != 1` 为 `true`。
-> 在 lambdaQL 中，`it.status != 1` **不会**返回 NULL 行，因为没有写 null 检查。
-> 像 `1` 这样的常量不可空。用 Java 写的相同条件会生成相同的 SQL。
-
-比较常量和可空变量：
-
-```kotlin
-val q: Int? = 3
-.where { it.status != 3 }    // e0.status <> 3       不返回 NULL 行
-.where { it.status != q }    // e0.status <> :p1     同样不返回 NULL 行（SQL 语义，D48）
-```
-
-两种写法都不返回 NULL 行。在 Kotlin 中，`null != 3` 为 `true`，因此 Kotlin 会返回这些行。
+> 这与执行 Kotlin 代码不同。要保留 NULL 行，请像 `it.cnt == null || it.cnt != c` 这样自己写出 null 检查。
 
 可能出现这种差异时，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`（每个条件一次）。
-要保留 NULL 行，请像 `it.status == null || it.status != q` 这样写出 null 检查。
 
 对 `String?` 使用 `it.description.equals(text)` 与 `==` 相同。
 
-**实体值的 SQL 语义**（决策 D48）。这一点目前还没有 Kotlin 测试。
-相同的规则已用 Java 在 H2、MariaDB 和 Oracle 上测试（[`SqlMeaningTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)，region `sql-meaning`，见[本页的 Java 版本](../java/03-where.md#363-write-your-null-checks-yourself)）。
-以下是设计示例。
+**实体值的 SQL 语义**。两个实体值的比较以及可为 NULL 的 `Boolean` 比较也遵循 SQL 语义。
 
+<!-- region: ManualKotlinWhereTest.kt#sql-meaning -->
 ```kotlin
-// two entity values: = and <> as in SQL; a row with a NULL on either side matches neither
-qb.from(Order::class.java).where { it.description == it.custName }.toList()     // e0.description = e0.custName
-// an entity value and a value: a NULL column does not match <>
-qb.from(Order::class.java).where { it.description != text }.toList()           // e0.description <> :p1
+// two entity values: = as in SQL; a row with a NULL on either side does not match
+val same = qb.from(Order::class.java).where { it.description == it.custName }
+assertEquals("select e0 from Order e0 where e0.description = e0.custName", same.toHql().hql())
+
 // to keep the NULL rows, say so in the lambda
-qb.from(Order::class.java).where { it.description == null || it.description != text }.toList()
+val keep = qb.from(Order::class.java).where { it.description == null || it.description != text }
+assertEquals("select e0 from Order e0 where e0.description is null or e0.description <> :p1", keep.toHql().hql())
+
 // a NULL Boolean is not false
-qb.from(Coded::class.java).where { it.vip == false }.toList()                   // e0.vip = false
+val notVip = qb.from(Coded::class.java).where { it.vip == false }
+assertEquals("select e0 from Coded e0 where e0.vip = false", notVip.toHql().hql())
 ```
 
 关于 `?.`、`?:` 和 `!!` 的更多内容：[9. Kotlin 说明](09-kotlin-notes.md)。
@@ -325,37 +424,42 @@ qb.from(Coded::class.java).where { it.vip == false }.toList()                   
 
 | 写法 | 捕获的值为 `null` 时 |
 |---|---|
-| 与捕获的值进行 `==`、`!=` 比较：`it.status == q`、`it.description != text` | 执行：绑定 NULL 的 `= :p1` / `<> :p1`，因此**没有**匹配的行。`WARN` 级别 `LQL-4045` |
-| 大小比较：`it.price!! > min!!`，以及所有 `<`、`<=`、`>`、`>=` | 执行：`e0.price > :p1` 绑定 NULL，**没有**匹配的行。`DEBUG` 级别 `LQL-4045`。`min!!`（D23）和拆箱为其自身基本类型不会被执行 |
+| 与捕获的值进行 `==`、`!=` 比较：`it.cnt == n`、`it.description != text` | 执行：绑定 NULL 的 `= :p1` / `<> :p1`，因此**没有**匹配的行。`WARN` 级别 `LQL-4045` |
+| 大小比较：`it.price!! > min!!`，以及所有 `<`、`<=`、`>`、`>=` | 执行：`e0.price > :p1` 绑定 NULL，**没有**匹配的行。`DEBUG` 级别 `LQL-4045`。`min!!` 和拆箱为其自身基本类型不会被执行 |
 | 对捕获值调用方法：`text.trim()`、转换为其他基本类型的 `min.toInt()` | 查询执行时**抛出异常**（`LQL-4012`）。因为它们会先被计算 |
 | 与 `in` 一起使用的集合中有 null 元素 | 查询执行时**抛出异常** |
 
-原因：Lambda 中的比较遵循 SQL 语义（决策 D48）。在 SQL 中，与 NULL 的 `=`、`<>` 永远不为真。
+原因：Lambda 表达式中的比较遵循 SQL 语义。在 SQL 中，与 NULL 的 `=`、`<>` 不会为真。
 捕获的值是否为 null 只有在查询执行时才知道，因此 lambdaQL 在执行时记录警告。
 
 对捕获值调用方法的表达式是在查询之前计算的值。`text.trim()`、转换为其他基本类型的 `min.toInt()` 属于这种情况，值为 `null` 时会像 Kotlin 一样抛出异常（`LQL-4012`）。
-捕获值的 `!!`（D23）和拆箱为其自身基本类型不会被执行，lambdaQL 绑定装箱值。值为 `null` 时没有匹配的行，并以 `DEBUG` 级别记录 `LQL-4045`。
+捕获值的 `!!` 和拆箱为其自身基本类型不会被执行，而是绑定装箱值。值为 `null` 时没有匹配的行，并以 `DEBUG` 级别记录 `LQL-4045`。
 要查找 NULL 行，请写 `x == null`。
 
 **用 null 守卫省略过滤。** 对同一个捕获值做了 null 检查时，如果该值为 null，这个条件会消失，不做任何过滤。
 
+<!-- region: ManualKotlinWhereTest.kt#captured-null-guard -->
 ```kotlin
-val min: Double? = request.minPrice   // 可能为 null
-.where { min == null || it.price!! > min }
-// min == null:  select e0 from Order e0                        （不过滤）
-// min = 100.0:  select e0 from Order e0 where e0.price > :p1
+fun byMinPrice(min: Double?) = qb.from(Order::class.java).where { min == null || it.price > min }
+
+val all = byMinPrice(null)
+assertEquals("select e0 from Order e0", all.toHql().hql())               // no filter
+val some = byMinPrice(100.0)
+assertEquals("select e0 from Order e0 where e0.price > :p1", some.toHql().hql())
 ```
 
-**各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `captured-null-guard`：
+**各数据库的 SQL**
 
+<!-- sql: captured-null-guard -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
 ```
 
-**各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `captured-null-guard#2`：
+**各数据库的 SQL**
 
+<!-- sql: captured-null-guard#2 -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
@@ -365,59 +469,65 @@ where o1_0.price>?
 
 工作方式：
 
-- 只使用捕获值和常量的部分，会在查询执行时在应用程序中决定。与 Kotlin 一样，从左到右并以短路方式求值。
-- `min == null` 时，守卫为 true，所以整个条件为 true。不做任何过滤。与 `min` 的比较不会写入 HQL（Kotlin 也不会执行这个比较）。
-- `min = 100.0` 时，守卫为 false，所以只剩下 `e0.price > :p1`。
-- Lambda 仍然只分析一次。只有 HQL 文本取决于值。
-- 这种情况下守卫的位置不影响结果。`min == null` 时，`it.price!! > min!! || min == null` 同样不做过滤，因为 `min!!` 和拆箱不会被执行（Kotlin 会抛出 `NullPointerException`）。
+- 只使用捕获值和常量的部分，会在查询执行时在应用程序中决定。与 Kotlin 一样，从左到右并以短路方式（short-circuit）求值。
+- `min == null` 时，守卫为真，所以整个条件为真。没有过滤。与 `min` 的比较不会写入 HQL（Kotlin 也不会执行这个比较）。
+- `min = 100.0` 时，守卫为假，所以只剩下 `e0.price > :p1`。
+- Lambda 表达式仍然只分析一次。随值变化的只有 HQL 文本。
+- 这种情况下守卫的位置不影响结果。`min == null` 时，`it.price > min!! || min == null` 同样没有过滤，因为 `min!!` 和拆箱不会被执行（Kotlin 会抛出 `NullPointerException`）。
 - 对捕获值调用方法的比较（`it.description == text.trim()`）不同。守卫写在后面时，`text.trim()` 会先被计算，因此 `text == null` 时抛出异常（`LQL-4012`）。
 
-这一点目前还没有 Kotlin 测试。用 Java 写的同一个守卫已经测试过。见[本页的 Java 版本](../java/03-where.md#364-captured-null-values)。
-
 <a id="365-converted-attributes-convert"></a>
-### 3.6.5 转换的属性（`@Convert`）
+### 3.6.5 转换属性（`@Convert`）
 
-带有 JPA `AttributeConverter` 的属性按其 Kotlin 值比较。Hibernate（7.4，以前的 6.6 也是）会转换与这种属性比较的字面量，也会转换绑定参数（已在 H2、MariaDB 和 Oracle 上验证）。
+带有 JPA `AttributeConverter` 的属性按 Kotlin 值比较。Hibernate（7.4，以前的 6.6 也是）会转换与这种属性比较的字面量，也会转换绑定参数（已在 H2、MariaDB 和 Oracle 上确认）。
 
-测试用 Java 编写（[`ConvertTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ConvertTest.java)，region `convert`）。以下是设计示例。
-
+<!-- region: ManualKotlinWhereTest.kt#convert -->
 ```kotlin
-// code is stored reversed ("abc" as "cba"); vip is stored as 'Y'/'N' (YesNoConverter)
-qb.from(Coded::class.java).where { it.code == "abc" }.toList()   // e0.code = 'abc': Hibernate converts the literal
+// code is stored reversed ("abc" as "cba"): Hibernate converts the literal
+val q = qb.from(Coded::class.java).where { it.code == "abc" }
+assertEquals("select e0 from Coded e0 where e0.code = 'abc'", q.toHql().hql())
 ```
+
+示例代码：[`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)（`captured-eq`、`string-eq`、`never-null`、`null-check`、`sql-meaning`、`captured-null-guard`、`convert`）。
 
 <a id="37-boolean-columns"></a>
 ## 3.7 布尔列
 
-在示例实体中，`active` 是 Kotlin `Boolean`（JVM 基本类型，永远不为 NULL）。
-带有 `flag` 的行针对的是可空列 `var flag: Boolean? = null`。
+`Order` 的 `active` 是基本类型 `boolean`（不为 NULL，Kotlin 属性名为 `isActive`）。
+出现 `vip` 的行针对的是 `Coded` 中可为 NULL 的 `Boolean vip` 列。
 
 | Kotlin | HQL | NULL 行 |
 |---|---|---|
-| `it.active` | `e0.active = true` | –（永远不为 NULL） |
-| `!it.active` | `e0.active = false` | – |
-| `it.flag == true` | `e0.flag = true` | 不返回 |
-| `it.flag != true` | `e0.flag <> true` | **不返回**（SQL 语义，D48；Kotlin 会返回） |
-| `it.flag == false` | `e0.flag = false` | 不返回（NULL 不是 false） |
-| `it.flag ?: false` | `(e0.flag is not null and e0.flag = true)` | 不返回 |
-| `!(it.flag ?: false)` | `(e0.flag is null or not (e0.flag = true))` | **返回** |
-| `it.flag!!` | `e0.flag = true` | 不返回（`!!` 被忽略） |
+| `it.isActive` | `e0.active = true` | –（不为 NULL） |
+| `it.vip == true` | `e0.vip = true` | 不返回 |
+| `it.vip != true` | `e0.vip <> true` | **不返回**（SQL 语义；Kotlin 会返回） |
+| `it.vip == false` | `e0.vip = false` | 不返回（NULL 不是 false） |
+| `it.vip ?: false` | `e0.vip is not null and e0.vip = true` | 不返回 |
+| `!(it.vip ?: false)` | `e0.vip is null or e0.vip = false` | **返回** |
 
 说明：
 
 - lambdaQL 不使用 `is not true` 或 `coalesce(flag, false)`。它们在 Oracle 上会失败（ORA-00932）。
 - 对较大条件的取反总是写作 `not (...)`。lambdaQL 不会把条件包裹成 `(...) = false` 或 `(...) is null`，因为 Oracle 23 在 `WHERE` 中对它们的求值是错误的。
-- `it.flag ?: false` **在条件中**没有问题。作为值或排序键时，它会被拒绝（限制 KC21）。
+- `it.vip ?: false` **在条件中**没有问题。作为值或排序键时会被拒绝。
 
-**比较两个布尔值**（`==`/`!=`）是支持的（决策 D25）。
-
+<!-- region: ManualKotlinWhereTest.kt#nullable-boolean -->
 ```kotlin
-.where { it.active == (it.status!! > s) }
-// HQL: (e0.active = true and e0.status > :p1) or (e0.active = false and e0.status <= :p1)
+// vip is a Boolean column that can be NULL
+val yes = qb.from(Coded::class.java).where { it.vip == true }
+assertEquals("select e0 from Coded e0 where e0.vip = true", yes.toHql().hql())
+
+val notYes = qb.from(Coded::class.java).where { it.vip != true }
+assertEquals("select e0 from Coded e0 where e0.vip <> true", notYes.toHql().hql())
+
+val elvis = qb.from(Coded::class.java).where { it.vip ?: false }
+assertEquals("select e0 from Coded e0 where e0.vip is not null and e0.vip = true", elvis.toHql().hql())
+
+val notElvis = qb.from(Coded::class.java).where { !(it.vip ?: false) }
+assertEquals("select e0 from Coded e0 where e0.vip is null or e0.vip = false", notElvis.toHql().hql())
 ```
 
-lambdaQL 用 `AND`/`OR`（而不是 `CASE`）来写，这样数据库可以使用索引。
-如果两侧共用同一个条件（例如 `it.active == it.active`），该写法会被拒绝。
+示例代码：[`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)（`nullable-boolean`）。
 
 <a id="38-strings"></a>
 ## 3.8 字符串
@@ -425,28 +535,66 @@ lambdaQL 用 `AND`/`OR`（而不是 `CASE`）来写，这样数据库可以使�
 - 字符串上的 `==` 和 `equals` 使用**数据库的排序规则（collation）**。
   - MariaDB 的 `_ci` 排序规则会忽略大小写和尾随空格。
   - Oracle 把 `''`（空字符串）存储为 NULL。因此在 Oracle 上，`it.description == ""` 与 Kotlin 的行为不同。
-- 作用于列的 Kotlin 字符串函数（`startsWith`、`endsWith`、`contains`、`lowercase()`、`length`、`isNullOrEmpty()`、`ignoreCase = true`）已有 Kotlin 设计（规则 R21）。见 [9. Kotlin 说明](09-kotlin-notes.md#97-strings)。
-- 作用于列的 `isBlank()`、`isNullOrBlank()`、`trim()` 以及其他标准库函数会被拒绝（限制 KC9、KC20）。
-- **只使用捕获值**的字符串模板在设计上可以使用：`"$a-$b" == it.description` 生成 `:p1 = e0.description`，字符串在应用程序中构建。但目前分析核心会拒绝 Lambda 内部的所有字符串拼接，因此暂时请在 Lambda 之前构建字符串。
-- 使用**实体值**的字符串模板或 `+`（`"${it.description}-x"`）暂不支持（KC17，计划中）。
+**`startsWith`、`endsWith`、`contains`** 会变为 `like`。搜索词中的 `%` 和 `_` 不是通配符，而是按字面字符查找。
+
+<!-- region: KotlinLikeTest.kt#like -->
+```kotlin
+// % and _ in the text are not wildcards: only "50%_off sale" matches, not "50x off"
+val starts = qb.from(Order::class.java).where { it.description.startsWith(p) }
+assertEquals("select e0 from Order e0 where e0.description like :p1 escape '!'", starts.toHql().hql())
+// ignoreCase = true: both sides in lower case
+val any = qb.from(Order::class.java).where { it.description.contains("all", ignoreCase = true) }
+assertEquals("select e0 from Order e0 where lower(e0.description) like '%all%' escape '!'", any.toHql().hql())
+```
+
+- 常量按原样写入 HQL，捕获的值成为绑定参数。
+- `ignoreCase = true` 会把两侧改为 `lower(...)`。这样无法使用列上的普通索引，因此以 `WARN` 级别记录 `LQL-5013`。
+- `endsWith` 和 `contains` 的模式以 `%` 开头，因此无法使用列上的普通索引。
+- 在 MariaDB 和 MySQL 的默认排序规则下，`like` 不区分大小写。因此结果可能与 Kotlin 的 `startsWith` 不同。
+- 用作搜索词的捕获值为 `null` 时会报错（`LQL-4047`）。
+- 不支持 `lowercase()`、`isBlank()`、`trim()` 等其他字符串函数（`LQL-3008`）。
+- Lambda 表达式中的字符串模板和 `+` 会被拒绝（`LQL-2007`）。只使用捕获值的模板（`"$a-$b"`）也一样，因此请在 Lambda 表达式之前构建字符串并捕获它。
+
+<!-- region: ManualKotlinWhereTest.kt#string-rejected -->
+```kotlin
+// string functions on a column other than startsWith, endsWith and contains are not translated
+val f = assertThrows<LambdaQLException> {
+    qb.from(Order::class.java).where { it.description.lowercase() == "a" }.toHql()
+}
+assertTrue(f.message!!.startsWith("[LQL-3008]"))
+
+// string building in the lambda is rejected: build the string before the lambda
+val a = "x"
+val b = "y"
+val t = assertThrows<LambdaQLException> {
+    qb.from(Order::class.java).where { "$a-$b" == it.description }.toHql()
+}
+assertTrue(t.message!!.startsWith("[LQL-2007]"))
+```
+
+示例代码：[`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)（`string-rejected`）、[`KotlinLikeTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinLikeTest.kt)（`like`）。
 
 <a id="39-in-with-a-captured-collection"></a>
 ## 3.9 使用捕获集合的 IN
 
-在 Lambda **外部**构建集合，并使用 `in`。
+在 Lambda 表达式**外部**构建集合，并使用 `in`。
 
+<!-- region: ManualKotlinWhereTest.kt#in-ids -->
 ```kotlin
-val ids = listOf(1L, 2L, 3L)
+val ids = seeded.toList()        // two order ids, built outside the lambda
 
-qb.from(Order::class.java).where { it.id in ids }.toList()
-// HQL: e0.id in (:p1)
+val inList = qb.from(Order::class.java).where { it.id in ids }
+assertEquals("select e0 from Order e0 where e0.id in (:p1)", inList.toHql().hql())
 
-qb.from(Order::class.java).where { it.id !in ids }.toList()
-// HQL: e0.id not in (:p1)
+val notInList = qb.from(Order::class.java).where { it.id !in ids }
+assertEquals("select e0 from Order e0 where e0.id not in (:p1)", notInList.toHql().hql())
 ```
 
-**各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `not-in`：
+`seeded` 是预先保存的两个订单的 id。
 
+**各数据库的 SQL**
+
+<!-- sql: not-in -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
@@ -454,8 +602,7 @@ from orders o1_0
 where o1_0.id not in (?,?)
 ```
 
-[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)，region `in`：
-
+<!-- region: KotlinSelectTest.kt#in -->
 ```kotlin
 val q = qb.from(Order::class.java).where { it.status in statuses }
 assertEquals("select e0 from Order e0 where e0.status in (:p1)", q.toHql().hql())
@@ -463,7 +610,7 @@ assertEquals("select e0 from Order e0 where e0.status in (:p1)", q.toHql().hql()
 
 `statuses` 是捕获的 `listOf<Short>(1, 3)`。
 
-`!in` 变为 `not in`。可能为 NULL 的列也只生成简单的 `not in`（SQL 语义，决策 D48）。
+`!in` 变为 `not in`。可能为 NULL 的列也只生成简单的 `not in`（SQL 语义）。
 值为 NULL 的行不匹配 `not in`，lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`。Kotlin 的 `!in` 对 NULL 值为 true，因此要保留这些行，请像 `it.description == null || it.description !in descs` 这样写出 null 检查。
 
 | 情况 | 结果 |
@@ -471,40 +618,41 @@ assertEquals("select e0 from Order e0 where e0.status in (:p1)", q.toHql().hql()
 | 集合是捕获的 `List`、`Set` 或其他 `Collection` | 支持 |
 | 集合中有 `null` 元素 | 查询执行时抛出异常 |
 | 空集合 | `in` 为 FALSE，`!in` 为 TRUE（Hibernate 生成 `1=0` / `1=1`） |
-| 1,500 个元素 | 在 H2、MariaDB 和 Oracle 23ai 上用一条语句即可运行（较旧的 Oracle 版本有 1,000 的限制；未测试） |
+| 1,500 个元素 | 在 H2、MariaDB 和 Oracle 23ai 上用一条语句即可运行（较旧的 Oracle 版本有 1,000 个的限制；未验证） |
 | 集合是实体集合：`item in it.items` | **拒绝**。请使用 `exists()` 子查询（[5. 子查询](05-subquery.md)） |
-| 集合在 Lambda 内部创建：`it.status in listOf(1, 2)` | **拒绝**（KC8）。请在外部创建并捕获它 |
+| 在 Lambda 表达式内部创建的集合：`it.status in listOf(1, 2)` | **拒绝**。请在外部创建并捕获它 |
 
-Kotlin 还有区间（`it.status in 1..5`）和带常量的 `when`。见 [3.14](#314-ranges-kotlin-only) 和 [3.15](#315-when-kotlin-only)。
+Kotlin 还有区间（`it.status in 1..5`）和使用常量的 `when`。见 [3.14](#314-ranges-kotlin-only) 和 [3.15](#315-when-kotlin-only)。
+
+示例代码：[`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)（`in-ids`）、[`KotlinSelectTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)（`in`）。
 
 <a id="310-association-paths"></a>
 ## 3.10 关联路径
 
-`it.customer?.name` **不会被执行**。它只是指代一个列："关联客户的 `name` 列"。
-lambdaQL 用 JPA Metamodel 检查路径的每一步。
+lambdaQL 不执行 `it.customer?.name`。这条路径只是指代“关联客户的 `name` 列”。
+lambdaQL 用 JPA Metamodel 检查每一步。
 
 | 路径步骤 | HQL | 示例 |
 |---|---|---|
-| 对一关联（`@ManyToOne`、`@OneToOne`） | 带别名的 `join`（默认是内连接，见下文） | `it.customer?.name` -> `join e0.customer j1` ... `j1.name` |
-| 嵌入（`@Embedded`） | 同一张表，不需要 join。值对象整体的相等比较按列展开（见下文） | 如果 `Order` 有一个嵌入的 `address`：`it.address.city` -> `e0.address.city` |
+| 对一关联（`@ManyToOne`、`@OneToOne`） | 带别名的 `join` 或 `left join`（见下文） | `it.customer?.name` -> `join e0.customer j1` ... `j1.name` |
+| 嵌入（`@Embedded`） | 同一张表，不需要 join。值对象整体的相等比较按列展开（见下文） | 如果 `Order` 有嵌入的 `address`：`it.address.city` -> `e0.address.city` |
 | 以目标 `@Id` 结尾的路径 | 外键列，不需要 join | `it.customer?.id` -> `e0.customer.id` |
 | 关联本身与 `null` 比较 | 外键列，不需要 join | `it.customer == null` -> `e0.customer is null` |
 | 集合（`@OneToMany`、`@ManyToMany`） | **拒绝** | `it.items...` -> 请使用 `exists()` 子查询 |
 
-**值对象整体的比较。** 对嵌入的值对象（`@Embedded`）整体做相等比较时，lambdaQL 把它展开为每列一个比较（B6）。
+**值对象整体的比较。** 对嵌入的值对象（`@Embedded`）整体做相等比较时，lambdaQL 把它展开为每列一个比较。
 `it.address == addr` 变为 `e0.address.city = :p1 and e0.address.zip = :p2`。
 
 - 取反（`it.address != addr`）为 `e0.address.city <> :p1 or e0.address.zip <> :p2`。
 - `it.address == null` 为 `e0.address.city is null and e0.address.zip is null`，`!= null` 为 `e0.address.city is not null or e0.address.zip is not null`。
-- 每一列都遵循 SQL 语义（D48）。为 NULL 的列既不匹配 `=`，也不匹配 `<>`。例如 (Seoul, NULL) 行既不匹配相等比较，也不匹配取反（在三种数据库上实测）。
+- 每一列都遵循 SQL 语义。为 NULL 的列既不匹配 `=`，也不匹配 `<>`。例如 (Seoul, NULL) 行既不匹配相等比较，也不匹配取反（在三种数据库上实测）。
 - 捕获的值对象的每个属性都在查询执行时读取并绑定。捕获的对象为 `null` 时，所有列都绑定 NULL，因此没有匹配的行，并且每列都以 `WARN` 级别记录 `LQL-4045`。
 - 嵌套的值对象也会展开。
 - 大小比较（`<` 等）以及与其他类型的比较仍然是 `LQL-3012` 错误。请比较字段。
 
-[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `embedded-compare`：
-
+<!-- region: KotlinQueryTest.kt#embedded-compare -->
 ```kotlin
-// address is @Embedded (city, zip): == with a value object compares each column (D48)
+// address is @Embedded (city, zip): == with a value object compares each column
 val addr = Address("Seoul", "04524")
 val same = qb.from(Order::class.java).where { it.address == addr }
 assertEquals("select e0 from Order e0 where e0.address.city = :p1 and e0.address.zip = :p2", same.toHql().hql())
@@ -513,36 +661,31 @@ assertEquals("select e0 from Order e0 where e0.address.city is null and e0.addre
 ```
 
 `it.customer?.name`、`it.customer!!.name` 以及（对于 Java 实体）`it.customer.name` 都表示**同一个列** `j1.name`。
-不过在 `where` 中，连接类型取决于以何种方式经过关联步骤（决策 D54）。
+在 `where` 中，连接类型由整个条件决定。没有客户的订单可能满足条件时为 `left join`，不可能满足时为内连接 `join`。
+结果与对列表执行同一 Lambda 表达式的结果相同。`&&` 和 `||` 的短路求值也会被考虑。
 
-| 在 `where` 中经过关联步骤的方式 | 连接 | 没有客户的订单 |
-|---|---|---|
-| `!!`，或不加标记（非空类型 `customer: Customer`、Java 实体的平台类型） | 内连接 `join` | 不在结果中 |
-| `?.` | 没有客户的订单可能使整个条件为真时为 `left join`，否则为内连接 `join` | 在 Kotlin 中条件为真时保留在结果中 |
+对没有客户的订单，各比较按经过关联步骤的方式如下求值。
 
-`?.` 是在源码中写明“关联可能不存在”的语法。`!!` 被视为“关联一定存在”的声明。
-无论哪种情况，值的比较都遵循 SQL 语义（决策 D48）。例如 `it.customer?.name != "Kim"` 不匹配没有客户的订单。
+| 在 `where` 中经过关联步骤的方式 | 对没有客户的订单的比较 |
+|---|---|
+| `!!`，或不加标记（非空类型 `customer: Customer`、Java 实体的平台类型） | 不为真。只在有客户的订单上为真 |
+| `?.` | 把客户的列视为 NULL，按 SQL 语义比较。`j1.name = 'Kim'` 不为真，`j1.name is null` 为真 |
 
-**内连接已经足够的情况。** 在 `where` 中，关联路径默认是内连接（决策 D36）。
-即使是用 `?.` 经过的步骤，如果没有客户的订单无法使条件为真，也写成内连接。结果相同。
+无论哪种情况，值的比较都遵循 SQL 语义。例如 `it.customer?.name != "Kim"` 不匹配没有客户的订单。
+`?.` 和 `!!`（或不加标记）可以在同一个条件中混用。
 
+**成为内连接的情况。** 如果没有客户的订单不可能满足条件，即使用 `?.` 书写也是内连接。结果相同。
+
+<!-- region: ManualKotlinStartTest.kt#join-path -->
 ```kotlin
-qb.from(Order::class.java)
-    .where { it.customer?.name == name }
-    .toList()
-// HQL: select e0 from Order e0 join e0.customer j1 where j1.name = :p1
+val name = "Kim"
+val q = qb.from(Order::class.java).where { it.customer?.name == name }
+assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = :p1", q.toHql().hql())
 ```
 
-[`KotlinSelectTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)，region `safe-call`（用常量代替 `name`）：
+**各数据库的 SQL**
 
-```kotlin
-// it.customer?.name reads as the path customer.name (inner join: orders without a customer are left out)
-val q = qb.from(Order::class.java).where { it.customer?.name == "Kim" }
-assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim'", q.toHql().hql())
-```
-
-**各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `inner-join`：
-
+<!-- sql: inner-join -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
@@ -551,30 +694,29 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.name=?
 ```
 
-- **没有客户的**订单不在结果中。因为没有可以连接的客户行。
+- **没有客户的订单**不在结果中。因为没有可以连接的客户行。
 - lambdaQL 不会替你添加 null 检查。不需要在路径前面写 `it.customer != null &&`。
 
-[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `safe-call-and`：
-
+<!-- region: KotlinQueryTest.kt#safe-call-and -->
 ```kotlin
-// a row without a customer can never match: lambdaQL keeps the inner join (the same rows)
+// no order without a customer can match: an inner join, also with ?.
 val q = qb.from(Order::class.java).where { it.customer?.name == "Kim" && it.price > 100.0 }
 assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' and e0.price > 100.0", q.toHql().hql())
 ```
 
-**`?.` 与 `||`。** 如果没有客户的订单可能使条件为真，用 `?.` 经过的步骤就是 `left join`。
-状态为 1 且没有客户的订单也保留在结果中。这与在 Kotlin 中执行同一条件的结果相同。
+**`?.` 与 `||`。** status 为 1 的订单即使没有客户也满足条件，因此是 `left join`。
+status 为 1 且没有客户的订单也保留在结果中。这与在 Kotlin 中执行同一条件的结果相同。
 
-[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `safe-call-or`：
-
+<!-- region: KotlinQueryTest.kt#safe-call-or -->
 ```kotlin
 // ?. says the customer may be missing: an order without a customer stays when the rest of the OR is true
 val q = qb.from(Order::class.java).where { it.status.toInt() == 1 || it.customer?.name == "Kim" }
 assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", q.toHql().hql())
 ```
 
-**各数据库的 SQL（直接执行 Kotlin region 中 HQL 的结果）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `safe-call-or`：
+**各数据库的 SQL**
 
+<!-- sql: safe-call-or -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
@@ -584,17 +726,18 @@ where o1_0.status=1 or c1_0.name='Kim'
 ```
 
 **`?.` 与 `== null`。** `it.customer?.name == null` 与 Kotlin 一样，既查找没有客户的订单，也查找客户没有名字的订单。
+用 `!!` 写的 `it.customer!!.name == null` 只在有客户的订单上为真，因此是内连接，只查找客户没有名字的订单。
 
-[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `safe-call-null`：
-
+<!-- region: KotlinQueryTest.kt#safe-call-null -->
 ```kotlin
 // "no customer, or a customer without a name": a left join, as in Kotlin
 val q = qb.from(Order::class.java).where { it.customer?.name == null }
 assertEquals("select e0 from Order e0 left join e0.customer j1 where j1.name is null", q.toHql().hql())
 ```
 
-**各数据库的 SQL（直接执行 Kotlin region 中 HQL 的结果）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `safe-call-null`：
+**各数据库的 SQL**
 
+<!-- sql: safe-call-null -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
@@ -603,34 +746,41 @@ left join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.name is null
 ```
 
-**null 守卫。** 用 `?.` 写的 null 守卫也会成为 `left join`，没有客户的订单会被保留。
-写成 `!!` 则是内连接，不会保留。此时 lambdaQL 以 `DEBUG` 级别记录 `LQL-5009`。
+**null 守卫。** `it.customer == null || ...` 中没有客户的订单满足条件，因此是 `left join`，没有客户的订单会保留。用 `?.` 写还是用 `!!` 写都一样。
+`it.customer != null && ...` 中没有客户的订单不可能满足条件，因此是内连接。
 
+<!-- region: ManualKotlinWhereTest.kt#null-guard -->
 ```kotlin
-.where { it.customer == null || it.customer?.name == name }
-// HQL: select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1
+// the null guard keeps orders without a customer: a left join (?. or !! give the same)
+val safe = qb.from(Order::class.java).where { it.customer == null || it.customer?.name == name }
+assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1",
+    safe.toHql().hql())
+val sure = qb.from(Order::class.java).where { it.customer == null || it.customer!!.name == name }
+assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.customer is null or j1.name = :p1",
+    sure.toHql().hql())
 
-.where { it.customer == null || it.customer!!.name == name }
-// HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is null or j1.name = :p1
-
-.where { it.customer != null && it.customer?.name == name }
-// HQL: select e0 from Order e0 join e0.customer j1 where e0.customer is not null and j1.name = :p1
+// no order without a customer can match: an inner join
+val and = qb.from(Order::class.java).where { it.customer != null && it.customer?.name == name }
+assertEquals("select e0 from Order e0 join e0.customer j1 where e0.customer is not null and j1.name = :p1",
+    and.toHql().hql())
 ```
 
-下面的 SQL 是用 Java 写出同一条件的测试结果。在 Kotlin 中，用 `!!` 写的第二种形式和用 `&&` 写的第三种形式会生成这个 SQL。
+下面第一个 SQL 由用 `!!` 写的第二种形式生成，第二个 SQL 由用 `&&` 写的第三种形式生成。
 
-**各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `null-guard`：
+**各数据库的 SQL**
 
+<!-- sql: null-guard -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
 from orders o1_0
-join customers c1_0 on c1_0.id=o1_0.customer_id
+left join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is null or c1_0.name=?
 ```
 
-**各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `null-guard#2`：
+**各数据库的 SQL**
 
+<!-- sql: null-guard#2 -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
@@ -639,43 +789,48 @@ join customers c1_0 on c1_0.id=o1_0.customer_id
 where c1_0.id is not null and c1_0.name=?
 ```
 
-Hibernate 把 `e0.customer is null` 写成 `c1_0.id is null`。在内连接之后，这个条件永远不为真。
+Hibernate 把 `e0.customer is null` 写成 `c1_0.id is null`。在内连接之后，这个条件不会为真。
 
-**`!!`：关联一定存在的声明。** 用 `!!` 经过的步骤总是内连接。
-在 Kotlin 中，`||` 在到达 `!!` 之前就结束的行（状态为 1、没有客户）会保留，但 lambdaQL 会排除这样的行。要保留这样的行，请使用 `?.`。
+**`!!` 与 `||`。** 用 `!!` 经过的比较只在有客户的订单上为真。
+在 Kotlin 中，`||` 在到达 `!!` 之前就结束的行（status 1、没有客户）会保留。这一行满足条件，因此 lambdaQL 也使用 `left join` 并保留该行。
 
-[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `not-null-assert`：
-
+<!-- region: KotlinQueryTest.kt#not-null-assert -->
 ```kotlin
-// !! says the customer is always there: an inner join, so orders without a customer are left out
-// (Kotlin itself would keep the status 1 order without a customer, because || stops before the !!)
+// !! counts only for orders with a customer; || stops before it, so the status 1 order without a customer
+// stays, as in Kotlin: a left join
 val q = qb.from(Order::class.java).where { it.status.toInt() == 1 || it.customer!!.name == "Kim" }
-assertEquals("select e0 from Order e0 join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", q.toHql().hql())
+assertEquals("select e0 from Order e0 left join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", q.toHql().hql())
 ```
 
-**混用 `?.` 和 `!!` 的情况。** 在整个条件（同一查询的所有 `where`）中，如果同一关联步骤在一处用 `?.` 经过，在另一处用 `!!` 或不加标记经过，则为内连接。
-lambdaQL 以 `WARN` 级别记录 `LQL-5014`（每个条件一次）。要保留没有客户的订单，请全部写成 `?.`。
+**混用 `?.` 和 `!!` 的情况。** 同一关联步骤可以在一处用 `?.` 经过，在另一处用 `!!` 或不加标记经过。每个比较都适用上表的求值。
+第一个示例中，任何一侧都不可能在没有客户的订单上为真，因此是内连接。第二个示例中，`?.` 一侧在没有客户的订单上为真，因此是 `left join`。
+在 `left join` 中，如果用 `!!` 或不加标记写出像 `j1.grade is null` 这样在 NULL 列上可能为真的比较（`is null`、`coalesce`），lambdaQL 只给该比较加上 `e0.customer is not null`。
 
-[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `mixed-warn`：
-
+<!-- region: KotlinQueryTest.kt#safe-and-assert -->
 ```kotlin
-// the same association with ?. in one place and !! in another: an inner join, and WARN LQL-5014
+// the same association with ?. in one place and !! in another: neither side can match an order without
+// a customer, so an inner join (no warning)
 val q = qb.from(Order::class.java).where { it.customer?.name == "Kim" || it.customer!!.grade!! > 3 }
 assertEquals("select e0 from Order e0 join e0.customer j1 where j1.name = 'Kim' or j1.grade > 3", q.toHql().hql())
+// ?. side true without a customer: a left join, and the !! side counts only with a customer
+val keep = qb.from(Order::class.java).where { it.customer?.name == null || it.customer!!.grade == null }
+assertEquals("select e0 from Order e0 left join e0.customer j1"
+    + " where j1.name is null or (e0.customer is not null and j1.grade is null)", keep.toHql().hql())
 ```
 
-- 在一条路径中，如果后面的步骤是 `!!`，前面的步骤也是内连接。例如 `Item` 的 `it.order?.customer!!.name` 是 `join e0.order j1 join j1.customer j2`。这条路径在 Kotlin 中没有订单时也会抛出 `NullPointerException`，因此不记录 `LQL-5014`。
-- 两个步骤都用 `?.` 经过时（`it.order?.customer?.name`），需要时两个步骤都是 `left join`。
+- 路径有多个步骤时（`Item` 的 `it.order?.customer?.name`），每一步都按同样的规则决定连接类型。
 
 要查找**没有**客户的订单，请比较关联本身。这会检查外键列，不需要 join。
 
+<!-- region: ManualKotlinWhereTest.kt#no-customer -->
 ```kotlin
-.where { it.customer == null }
-// HQL: select e0 from Order e0 where e0.customer is null
+val q = qb.from(Order::class.java).where { it.customer == null }
+assertEquals("select e0 from Order e0 where e0.customer is null", q.toHql().hql())
 ```
 
-**各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `no-association`：
+**各数据库的 SQL**
 
+<!-- sql: no-association -->
 ```sql
 -- H2, MariaDB, Oracle (same)
 select …
@@ -685,161 +840,223 @@ where o1_0.customer_id is null
 
 补充说明：
 
-- 同一条路径只得到一个别名。`where`、`orderBy` 和 `select` 共享这个别名。
+- 同一条路径只得到一个别名。`where`、`orderBy` 和 `select` 共用这个别名。
 - `it.customer?.id == 5L` 使用外键列 `e0.customer.id`。不需要 join。
-- **只**在 `orderBy` 或 `select` 中使用的路径是 `left join`，因此那里不会丢失行（规则 S8、J1）。有 `!!` 时也一样。如果 `where` 也使用同一条路径，`orderBy` 和 `select` 会使用 `where` 的 join。
-- 按 `?.` 区分连接类型的规则适用于查询、`count`、子查询和连接查询的 `where`。显式连接的 `on` 中的路径仍像现在一样是 `left join`。必需关联（`optional = false`）总是内连接。
-- 比较两个实体（`it.customer == c`）在**计划中**（KC13）。目前请比较 id：`it.customer?.id == c.id`（这里 `c` 是一个捕获的对象）。
+- **只**在 `orderBy` 或 `select` 中使用的路径是 `left join`，因此那里不会丢失行。有 `!!` 时也一样。如果 `where` 也使用同一条路径，`orderBy` 和 `select` 会使用 `where` 的连接。
+- 这一连接规则适用于查询、`count`、子查询和连接查询的 `where`。显式连接的 `on` 中的路径仍像现在一样是 `left join`。必需关联（`optional = false`）总是内连接。
+- 不要把关联与实体对象比较（`it.customer == c`），请比较 id：`it.customer?.id == c.id`（这里 `c` 是捕获的对象）。
+
+示例代码：[`KotlinQueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)（`embedded-compare`、`safe-call-and`、`safe-call-or`、`safe-call-null`、`not-null-assert`、`safe-and-assert`）、[`ManualKotlinStartTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)（`join-path`）、[`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)（`null-guard`、`no-customer`）。
 
 <a id="311-captured-values"></a>
 ## 3.11 捕获的值
 
-Lambda 可以使用外部的值：局部值、属性，以及捕获对象的属性。
+Lambda 表达式可以使用外部的值：局部值、属性，以及捕获对象的属性。
 
+<!-- region: ManualKotlinWhereTest.kt#captured-kinds -->
 ```kotlin
 val since = LocalDateTime.of(2026, 1, 1, 0, 0)
-.where { it.updateAt!! > since }                 // 局部 val
-.where { it.status == defaultStatus }            // 外围类的属性
-.where { it.price!! > filter.minPrice!! }        // 捕获对象的属性
-.where { it.updateAt!! > LocalDateTime.of(2026, 1, 1, 0, 0) }   // 不使用实体的调用
+val local = qb.from(Order::class.java).where { it.updateAt > since }                     // a local val
+assertEquals("select e0 from Order e0 where e0.updateAt > :p1", local.toHql().hql())
+
+val property = qb.from(Order::class.java).where { it.status == defaultStatus }           // a property of this class
+assertEquals("select e0 from Order e0 where e0.status = :p1", property.toHql().hql())
+
+val objectProperty = qb.from(Order::class.java).where { it.price > filter.minPrice!! }   // a property of a captured object
+assertEquals("select e0 from Order e0 where e0.price > :p1", objectProperty.toHql().hql())
+
+val call = qb.from(Order::class.java).where { it.updateAt > LocalDateTime.of(2026, 1, 1, 0, 0) }   // a call without the entity
+assertEquals("select e0 from Order e0 where e0.updateAt > :p1", call.toHql().hql())
 ```
 
-| 捕获的内容 | lambdaQL 如何使用 |
+`defaultStatus` 是构建查询的类的属性（`Short`），`filter` 是捕获的 `PriceFilter` 对象。
+
+| 捕获的内容 | lambdaQL 的使用方式 |
 |---|---|
 | `val`（`Long?`、`String` 等也一样） | 绑定参数 |
-| `var` | 绑定参数。**每次执行查询时**都会读取其值 |
+| `var` | 绑定参数。**每次执行查询时**读取其值 |
 | 外围类的属性（`private` 也一样） | 每次执行查询时读取 |
 | `companion object` 的 `val`、顶层 `val`、`object` 的 `val` | 绑定参数 |
-| `const val` | 作为字面量写入 HQL（D37） |
-| 在 Lambda 内部修改捕获的变量（`n++`） | **拒绝**（KC12） |
+| `const val` | 作为字面量写入 HQL |
+| 在 Lambda 表达式内部写入捕获的变量（`n++`） | **拒绝** |
 
 规则：
 
 - 不使用实体的部分会在**每次执行查询时**在应用程序中计算。结果成为绑定参数。
-- Lambda 只分析一次，结果会被缓存。每次调用时都会读取新的捕获值。
+- Lambda 表达式只分析一次，结果会被缓存。每次调用时都会读取新的捕获值。
 - 只有实体部分会变成 SQL。
+
+示例代码：[`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)（`captured-kinds`）。
 
 <a id="312-errors-that-depend-on-order-of-evaluation"></a>
 ## 3.12 取决于求值顺序的错误
 
-SQL 不保证 `AND`/`OR` 从左到右求值。因此像下面这样的"守卫"在 SQL 中并不安全。
+SQL 不保证 `AND`/`OR` 从左到右求值。因此像下面这样的“守卫”在 SQL 中并不安全。
+lambdaQL 不拒绝这种守卫，而是按原样写入 HQL。如果数据库先计算除法再计算 `e0.qty <> 0`，可能出现除以零错误。
 
+<!-- region: ManualKotlinWhereTest.kt#division-guard -->
 ```kotlin
-qb.from(Item::class.java)
-    .where { it.qty != 0 && it.price!! / it.qty > 2 }   // 会被拒绝
+// lambdaQL sends the guard as written; SQL does not promise to check qty <> 0 first
+val q = qb.from(Item::class.java).where { it.qty != 0 && it.price!! / it.qty > 2 }
+assertEquals("select e0 from Item e0 where e0.qty <> 0 and (e0.price / e0.qty) > 2.0", q.toHql().hql())
+
+// the same rows when qty is positive, without a division
+val safe = qb.from(Item::class.java).where { it.qty > 0 && it.price!! > 2.0 * it.qty }
+assertEquals("select e0 from Item e0 where e0.qty > 0 and e0.price > (2.0 * e0.qty)", safe.toHql().hql())
 ```
 
-守卫之下的 `/`、`%` 和类型转换会被拒绝。请把条件改写为不用除法的形式，例如 `it.qty > 0 && it.price!! > 2.0 * it.qty`（当 `qty` 为正数时返回相同的行）。
+请不用除法来写条件。`qty` 为正数时，第二个查询返回与第一个查询相同的行。
+
+示例代码：[`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)（`division-guard`）。
 
 <a id="313-what-is-rejected"></a>
 ## 3.13 会被拒绝的内容
 
-lambdaQL 会抛出带有 `[LQL-xxxx]` 错误码和源代码行号的异常。它不会猜测。
-大多数结构问题会在分析 Lambda 时（首次使用时）被发现。有问题的捕获值（调用了方法的 `null`、NaN、含有 `null` 元素的集合）会在查询执行时被发现。
+分析失败时，lambdaQL 会抛出带有错误码 `[LQL-xxxx]` 和源代码行号的异常。
+大多数写法在分析 Lambda 表达式时（首次使用时）被发现。有问题的捕获值（调用了方法的 `null`、NaN、含有 `null` 元素的集合）在查询执行时被发现。
 见 [11. 错误与语言](../11-errors-and-languages.md)。
 
-| 写法 | 示例 | 怎么做 |
+| 写法 | 示例 | 解决方法 |
 |---|---|---|
 | 局部 `val`/`var`、循环、包含多条语句的代码块 | `{ val x = 1; it.status == x }` | 写成一个表达式 |
-| 作为值的 `if`/`when`（KC6） | `it.status == (if (flag) 1 else 2)` | 在 Lambda 之前计算出值 |
-| 一般的 `if (c) x else y`（KC6） | | 使用 [3.5](#35-and-or-not) 中允许的写法 |
-| 中缀 `and`、`or`、`xor` | `it.active and (it.status == 1)` | 使用 `&&`、`\|\|` |
-| 使用实体值的字符串模板或 `+`（KC17） | `it.description == "A" + it.status` | 分别比较各列（计划中） |
-| 在 Lambda 中创建的集合（KC8） | `it.status in listOf(1, 2)` | 在外部创建并捕获它 |
-| Lambda 内部的 Lambda | `ids.any { id -> id == it.id }` | 使用 `in`（[3.9](#39-in-with-a-captured-collection)）或子查询 |
-| 不支持的标准库函数（KC9、KC20） | `it.description?.trim()`、`isBlank()` | `isNullOrEmpty()` 或直接比较 |
-| 自己写的非 inline 扩展函数（KC11） | `it.isOpen()` | 改为 `inline fun`，或直接写出条件 |
+| 一般的 `if (c) x else y` | | 使用 [3.5](#35-and-or-not) 中允许的写法 |
+| 中缀 `and`、`or`、`xor` | `it.isActive and (it.price > 100.0)` | 使用 `&&`、`\|\|` |
+| Lambda 表达式中的字符串模板或 `+`（`LQL-2007`） | `it.description == "A" + it.status` | 在 Lambda 表达式之前构建字符串并捕获 |
+| 在 Lambda 表达式中创建的集合 | `it.status in listOf(1, 2)` | 在外部创建并捕获 |
+| Lambda 表达式中的 Lambda 表达式 | `ids.any { id -> id == it.id }` | 使用 `in`（[3.9](#39-in-with-a-captured-collection)）或子查询 |
+| Kotlin 字符串函数和其他标准库函数（`LQL-3008`）。支持 `startsWith`、`endsWith`、`contains`（[3.8](#38-strings)） | `it.description?.trim()`、`isBlank()`、`lowercase()` | 直接比较 |
+| 编译为 `switch` 的 `when`（`LQL-2010`） | `when (it.status.toInt()) { 1, 2 -> true; else -> false }` | 用 `\|\|` 连接的比较（[3.15](#315-when-kotlin-only)） |
+| 需要区间对象的区间（`LQL-3008`） | `it.customer?.grade in 1..5`、`LocalDateTime` 区间 | 写成两个比较（[3.14](#314-ranges-kotlin-only)） |
+| 自己写的非 inline 扩展函数 | `it.isOpen()` | 改为 `inline fun`，或直接写出条件 |
 | 实体上的其他方法 | `it.calcSomething()` | 只使用属性 |
 | 实体集合路径 | `it.items.size > 0` | `exists()` 子查询 |
-| 实体与实体比较（KC13） | `it.customer == c` | 比较 id（实体比较在计划中） |
+| 实体与实体比较 | `it.customer == c` | 比较 id |
 | 值对象的大小比较、与其他类型的比较（`LQL-3012`） | `it.address > a`（`Address` 为 `Comparable` 时） | 比较字段。支持 `==`、`!=` |
-| 守卫之下的 `/`、`%`、类型转换 | 见 [3.12](#312-errors-that-depend-on-order-of-evaluation) | 去掉守卫或修改条件 |
 | 捕获的 `NaN` / `Infinity` 值 | `it.price!! > Double.NaN` | 不要发送 NaN |
-| `isNaN()`（KC14） | `it.price!!.isNaN()` | – |
-| 修改捕获的变量（KC12） | `{ n++; it.active }` | 在 Lambda 外部计算 |
-| 匿名对象、函数类型的值（KC4、KC5） | 带有 `val f: (Order) -> Boolean` 的 `where(f)` | 传入 Lambda 字面量 |
+| `isNaN()` | `it.price!!.isNaN()` | – |
+| 写入捕获的变量 | `{ n++; it.isActive }` | 在 Lambda 表达式外部计算 |
+| 匿名对象、函数类型的值 | 用 `val f: (Order) -> Boolean` 调用 `where(f)` | 传入 Lambda 表达式字面量 |
 
 异常类型（都继承自 `LambdaQLException`）：
 
 | 异常 | 何时抛出 |
 |---|---|
-| `LambdaAnalysisException` | 无法读取 Lambda（不是可序列化的 Lambda、被编译为类等） |
-| `UnsupportedLambdaShapeException` | 不支持的结构（循环、作为值的 `if` 等） |
-| `TranslationException` | 无法翻译其含义（未知函数、集合路径等） |
+| `LambdaAnalysisException` | 无法读取 Lambda 表达式时（不是可序列化的 Lambda 表达式、被编译为类等） |
+| `UnsupportedLambdaShapeException` | 不支持的写法（循环、有主体的 `when` 的 `switch` 等） |
+| `TranslationException` | 无法翻译其含义时（未知函数、集合路径等） |
 
 所有 Kotlin 限制：[9. Kotlin 说明](09-kotlin-notes.md#914-kotlin-limits-kc1-to-kc21)。所有规则：[10. 规则与限制](10-rules-and-limits.md)。
 
 <a id="314-ranges-kotlin-only"></a>
 ## 3.14 区间（仅限 Kotlin）
 
-以下写法都受支持（决策 D21）。
+Kotlin 编译器把以不可为 NULL 的数字和字符串为主体的区间编译为两个比较。lambdaQL 按原样写出这些比较（不是 `between`）。
+对于上界为常量的 `a..b`，编译器会改写为 `< b+1`。例如 `in 1..2` 变为 `e0.status < 3`。
 
+<!-- region: ManualKotlinWhereTest.kt#ranges -->
 ```kotlin
-.where { it.status in 1..5 }          // e0.status between 1 and 5
-.where { it.status !in 1..5 }         // not (e0.status between 1 and 5)
-.where { it.status in 1 until 5 }     // e0.status >= 1 and e0.status < 5
-.where { it.status in 1..<5 }         // e0.status >= 1 and e0.status < 5
-.where { it.status in lo..hi }        // e0.status between :p1 and :p2   （lo、hi 为捕获的值）
-.where { it.price!! in 1.0..10.0 }    // e0.price between 1.0 and 10.0
-.where { it.status in 5 downTo 1 }    // 支持（与 1..5 返回相同的行）
+val closed = qb.from(Order::class.java).where { it.status.toInt() in 1..2 }
+assertEquals("select e0 from Order e0 where 1 <= e0.status and e0.status < 3", closed.toHql().hql())
+
+val outside = qb.from(Order::class.java).where { it.status.toInt() !in 1..2 }
+assertEquals("select e0 from Order e0 where 1 > e0.status or e0.status >= 3", outside.toHql().hql())
+
+val until = qb.from(Order::class.java).where { it.status.toInt() in 1 until 3 }
+assertEquals("select e0 from Order e0 where 1 <= e0.status and e0.status < 3", until.toHql().hql())
+
+val open = qb.from(Order::class.java).where { it.status.toInt() in 1..<3 }
+assertEquals("select e0 from Order e0 where 1 <= e0.status and e0.status < 3", open.toHql().hql())
+
+val captured = qb.from(Order::class.java).where { it.cnt in lo..hi }                  // lo, hi: captured values
+assertEquals("select e0 from Order e0 where :p1 <= e0.cnt and e0.cnt <= :p2", captured.toHql().hql())
+
+val prices = qb.from(Order::class.java).where { it.price in 100.0..200.0 }
+assertEquals("select e0 from Order e0 where 100.0 <= e0.price and e0.price <= 200.0", prices.toHql().hql())
+
+val texts = qb.from(Order::class.java).where { it.description in "a".."m" }
+assertEquals("select e0 from Order e0 where e0.description >= 'a' and e0.description <= 'm'", texts.toHql().hql())
 ```
 
 | 区间写法 | 是否支持 |
 |---|---|
-| `a..b`、`a until b`、`a..<b`、`a downTo b` | 是 |
-| `!in` | 是，`not (...)` |
-| `LocalDate`、`LocalDateTime`、`BigDecimal`、`String` 区间 | 是（它们被编译为 `compareTo`） |
-| `step` | 否 |
+| `a..b`、`a until b`、`a..<b`（主体为 `Int`、`Double`、`String`） | 是。两个比较 |
+| `!in` | 是。反转比较并用 `or` 连接 |
+| 捕获值作边界（`lo..hi`） | 是。绑定参数 |
+| 可空主体（`Int?`）、`LocalDate`·`LocalDateTime` 区间 | 否（`LQL-3008`） |
+| `downTo`、`step` | 是。展开值并以 `in (:p1)` 绑定 |
 
-**可空的主体。** Kotlin 允许对 `Int?` 和 `Long?` 使用 `in`。lambdaQL **不会**添加 null 守卫（D22）。
-值为 NULL 的行不会被返回，在 `!in` 下也同样不会被返回（SQL 规则）。
-对于其他可空类型（例如 `LocalDateTime?`），Kotlin 无法编译 `in`，请添加 `!!`。
+**可能为 NULL 的主体。** Java 实体的 `Integer` 属性（`cnt`）是平台类型，编译器把它编译为两个比较。lambdaQL **不会**添加 null 守卫，因此 `cnt` 为 NULL 的行不会被返回（SQL 语义）。
+通过 `?.` 得到的 `Int?` 主体和日期区间会被编译为区间对象，因此会被拒绝。请写成两个比较。
 
+<!-- region: ManualKotlinWhereTest.kt#range-rejected -->
 ```kotlin
-.where { it.updateAt!! in from..to }  // e0.updateAt between :p1 and :p2
+// a range object is not translated: a nullable subject, or a range of dates
+val nullable = assertThrows<LambdaQLException> {
+    qb.from(Order::class.java).where { it.customer?.grade in 1..5 }.toHql()
+}
+assertTrue(nullable.message!!.startsWith("[LQL-3008]"))
+
+val dates = assertThrows<LambdaQLException> {
+    qb.from(Order::class.java).where { it.updateAt in from..to }.toHql()
+}
+assertTrue(dates.message!!.startsWith("[LQL-3008]"))
+
+// write the two comparisons instead
+val q = qb.from(Order::class.java).where { it.updateAt >= from && it.updateAt <= to }
+assertEquals("select e0 from Order e0 where e0.updateAt >= :p1 and e0.updateAt <= :p2", q.toHql().hql())
 ```
+
+示例代码：[`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)（`ranges`、`range-rejected`）。
 
 <a id="315-when-kotlin-only"></a>
 ## 3.15 `when`（仅限 Kotlin）
 
 `when` **作为条件**时受支持。每个分支都必须以 `true` 或 `false`（或一个条件）结尾。
-lambdaQL 会把它转换为 `IN`、`OR` 或 `AND`。
+lambdaQL 会把它转换为比较、`OR` 和 `AND`。
 
+<!-- region: ManualKotlinWhereTest.kt#when -->
 ```kotlin
-.where { when (it.status) { 1, 2 -> true; else -> false } }
-// e0.status in (1, 2)
+val twoTexts = qb.from(Order::class.java).where { when (it.description) { "a", "b" -> true; else -> false } }
+assertEquals("select e0 from Order e0 where e0.description = 'a' or e0.description = 'b'", twoTexts.toHql().hql())
 
-.where { when (it.description) { "a", "b", "c" -> true; else -> false } }
-// e0.description in ('a', 'b', 'c')
+val oneValue = qb.from(Order::class.java).where { when (it.status.toInt()) { 1 -> true; else -> false } }
+assertEquals("select e0 from Order e0 where e0.status = 1", oneValue.toHql().hql())
 
-.where { when (it.status) { in 1..5 -> true; else -> false } }
-// e0.status between 1 and 5
+val range = qb.from(Order::class.java).where { when (it.status.toInt()) { in 1..2 -> true; else -> false } }
+assertEquals("select e0 from Order e0 where 1 <= e0.status and e0.status < 3", range.toHql().hql())
 
-.where { when { it.status == 1 -> true; it.active -> true; else -> false } }
-// e0.status = 1 or e0.active = true
-
-.where { when (it.status) { 1 -> it.active; else -> false } }
-// e0.status = 1 and e0.active = true
+val condition = qb.from(Order::class.java).where { when (it.status.toInt()) { 1 -> it.isActive; else -> false } }
+assertEquals("select e0 from Order e0 where e0.status = 1 and e0.active = true", condition.toHql().hql())
 ```
 
-enum 主体也可以使用（这里使用了一个额外的属性 `kind: OrderKind?`，`OrderKind` 位于包 `com.example` 中）。
+主体为 NULL 的行不会被返回。如果执行 Kotlin 代码，会进入 `else` 分支，但 lambdaQL 使用 SQL 语义。
 
+编译器把 `when` 编译为 `switch` 时，目前还不支持（`LQL-2010`）。常量有两个及以上的 `Int` 主体、常量有三个及以上的 `String` 主体属于这种情况。enum 主体也不支持。
+这类条件请写成用 `||` 连接的比较，或使用捕获集合的 `in`（[3.9](#39-in-with-a-captured-collection)）。
+用实体值选择值的无主体 `when { }` 会成为 `case when`（见 [3.5.1](#351-values-chosen-by-a-condition)）。
+
+<!-- region: ManualKotlinWhereTest.kt#when-rejected -->
 ```kotlin
-.where { when (it.kind) { OrderKind.EXPRESS, OrderKind.GIFT -> true; else -> false } }
-// e0.kind in (com.example.OrderKind.EXPRESS, com.example.OrderKind.GIFT)
-```
+// when compiled to a switch is not supported yet (LQL-2010): two or more Int values, three or more strings
+val ints = assertThrows<LambdaQLException> {
+    qb.from(Order::class.java).where { when (it.status.toInt()) { 1, 2 -> true; else -> false } }.toHql()
+}
+assertTrue(ints.message!!.startsWith("[LQL-2010]"))
 
-可空的主体不会得到 null 守卫（D22）。主体为 NULL 的行不会被返回，
-在 `NOT` 下也同样如此。如果执行 Kotlin 代码，会进入 `else` 分支，但 lambdaQL 使用 SQL 语义。这是有意设计的规则。
+val texts = assertThrows<LambdaQLException> {
+    qb.from(Order::class.java).where { when (it.description) { "a", "b", "c" -> true; else -> false } }.toHql()
+}
+assertTrue(texts.message!!.startsWith("[LQL-2010]"))
 
-**选择值**的 `when`（或 `if`）不受支持（KC6）。
-
-```kotlin
-// 不支持
-.where { (if (it.active) it.price else 0.0)!! > 10.0 }
+// an enum subject is not supported either
+assertThrows<LambdaQLException> {
+    qb.from(Order::class.java).where { when (it.kind) { Order.Kind.RUSH -> true; else -> false } }.toHql()
+}
 ```
 
 请改用 `&&` 和 `||` 来写条件。
+
+示例代码：[`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)（`when`、`when-rejected`）。
 
 ---
 

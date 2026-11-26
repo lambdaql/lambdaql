@@ -5,21 +5,21 @@
 
 ---
 
-
+<!-- region: ManualKotlinDmlTest.kt#delete -->
 ```kotlin
-val d = qb.delete(Order::class.java).where { it.status == 3 }
-// HQL: delete from Order e0 where e0.status = 3
+val d = qb.delete(Order::class.java).where { it.status.toInt() == 3 }
+assertEquals("delete from Order e0 where e0.status = 3", d.toHql().hql())
 val deleted = d.execute()
 
 // a path: the same rows as qb.from(Order::class.java).where { same lambda } - with !! orders without a customer stay
 val byName = qb.delete(Order::class.java).where { it.customer!!.name == null }
-// HQL: delete from Order e0 where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) is null and e0.customer.id is not null
+assertEquals("delete from Order e0 where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) is null"
+    + " and e0.customer.id is not null", byName.toHql().hql())
 ```
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 7.4 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。该测试使用 Java Lambda。含义相同的 Kotlin Lambda 生成相同的 HQL，因此 SQL 也相同。
+**各数据库的 SQL**
 
-**各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `delete`：
-
+<!-- sql: delete -->
 ```sql
 -- H2, Oracle
 delete from orders o1_0
@@ -30,8 +30,9 @@ delete o1_0 from orders o1_0
 where o1_0.status=3
 ```
 
-**各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `delete#2`：
+**各数据库的 SQL**
 
+<!-- sql: delete#2 -->
 ```sql
 -- H2, Oracle
 delete from orders o1_0
@@ -44,51 +45,50 @@ where (select c1_0.name from customers c1_0 where c1_0.id=orders.customer_id) is
 
 MariaDB 写成 `delete o1_0 from orders o1_0`。H2 和 Oracle 写成 `delete from orders o1_0`。
 
-[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `insert-delete`：
+第二条语句删除的行与 `qb.from(Order::class.java).where { it.customer!!.name == null }` 返回的**行相同**，即客户没有名字的订单。
+**没有**客户的订单不会被删除，因为经过 `!!` 的比较只在有客户的订单上为真。
 
+如果写成 `?.`（`it.customer?.name == null`），没有客户的订单也符合条件，因此查询成为 `left join`，DML 不会添加 `e0.customer.id is not null`。所以没有客户的订单也会被删除。
+<!-- region: ManualKotlinDmlTest.kt#delete-safe-call -->
 ```kotlin
-val i = qb.insert(Archive::class.java).values { it.id = 100L; it.price = 9.5; it.customerName = "Kim" }
-assertEquals(1, i.execute())
-val d = qb.delete(Order::class.java).where { o, sub -> !sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
-assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)", d.toHql().hql())
+// ?. : no "customer exists" check, so orders without a customer are deleted too, as the select returns them
+val d = qb.delete(Order::class.java).where { it.customer?.name == null }
+assertEquals("delete from Order e0 where (select s1.name from Customer s1 where s1.id = fk(e0.customer)) is null",
+    d.toHql().hql())
 ```
 
-测试先插入一行 `Archive`，然后删除没有商品的订单，并把剩下的行与用 Kotlin 进行的同样过滤作比较。
-更多用 Java 写的语句在 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中测试（H2、MariaDB 和 Oracle）。这些示例见[本页的 Java 版本](../java/07-4-delete.md)。
+同样方式的 UPDATE 示例见 [7.2](07-2-update.md)。只删除没有客户的订单时，请写 `it.customer == null`。
 
-第二条语句删除的行与 `qb.from(Order::class.java).where { it.customer!!.name == null }` 返回的**行相同**：客户没有名字的订单。Java 测试用 Java 写出相同的条件，并把删除的行与查询结果进行比较。
-**没有**客户的订单不会被删除（规则 U9，决策 D36），因为 `!!` 声明关联一定存在。
+删除所有行时需要 `all()`。
+按 id 列表删除时，使用捕获的集合。
 
-如果写成 `?.`（`it.customer?.name == null`），则与查询一样相当于 `left join`，不会添加 `e0.customer.id is not null`（决策 D54）。因此没有客户的订单也会被删除。
-同样方式的 UPDATE 示例见 [7.2](07-2-update.md) 中的 region `update-safe-call`。只删除没有客户的订单时，请写 `it.customer == null`。
-
-删除所有行时需要 `all()`（规则 U5）。
-
+<!-- region: ManualKotlinDmlTest.kt#delete-all -->
 ```kotlin
-qb.delete(Order::class.java).all().execute()     // delete all rows
-qb.delete(Order::class.java).execute()           // compile error: no execute()
+// ids in a captured collection
+val byIds = qb.delete(Item::class.java).where { it.id in ids }
+assertEquals("delete from Item e0 where e0.id in (:p1)", byIds.toHql().hql())
+byIds.execute()
+// every row: all() is required
+val all = qb.delete(Order::class.java).all()
+assertEquals("delete from Order e0", all.toHql().hql())
+all.execute()
 ```
 
-按 id 列表删除（捕获的集合，决策 D29）：
+`where` 中的子查询使用第二个 Lambda 表达式参数 `sub`，与 [5. 子查询](05-subquery.md) 相同。
+删除没有订单项的订单的示例：
 
+<!-- region: ManualKotlinDmlTest.kt#delete-not-exists -->
 ```kotlin
-qb.delete(Item::class.java).where { it.id in ids }.execute()
-```
-
-`where` 中的子查询使用第二个 Lambda 参数 `sub`，与 [5. 子查询](05-subquery.md) 相同。
-删除没有任何订单项的订单：
-
-```kotlin
-qb.delete(Order::class.java)
+// orders without items: the subquery starts with the second lambda parameter sub
+val d = qb.delete(Order::class.java)
     .where { o, sub -> !sub.from(Item::class.java).where { i -> i.order?.id == o.id }.exists() }
-    .execute()
-// HQL: delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)
+assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)", d.toHql().hql())
+val deleted = d.execute()
 ```
 
-同样的语句已在 [`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java) 中用 Java 测试（region `dml-subquery`）。
+**各数据库的 SQL**
 
-**各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `dml-subquery`：
-
+<!-- sql: dml-subquery -->
 ```sql
 -- H2, Oracle
 delete from orders o1_0
@@ -99,14 +99,16 @@ delete from orders
 where not exists(select 1 from items i1_0 where i1_0.order_id=orders.id)
 ```
 
-与所有 JPA 批量语句一样，删除不会执行 JPA 的 `cascade` 或 `orphanRemoval`，也不会修改已加载的实体（规则 U16）。
+与所有 JPA 批量语句一样，删除不会执行 JPA 的 `cascade` 或 `orphanRemoval`，也不会反映到已加载的实体上。
 删除需要事务（见 [7.8](07-dml.md#transactions)）。
+
+示例代码：[`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)（`delete`、`delete-safe-call`、`delete-all`、`delete-not-exists`）。
 
 <a id="delete-with-a-subquery-on-the-same-table"></a>
 ## 读取同一张表的子查询
 
 `where` 中的子查询可以读取要删除的实体（或同一继承层次中的实体）。子查询自己的 `from`、子查询中的连接、U9 的关联标量子查询都属于这种情况。
-这时 lambdaQL 先通过派生表读取目标 id，再按这些 id 删除（规则 U17）。
+这时 lambdaQL 先通过派生表读取目标 id，再按这些 id 删除。
 
 ```
 delete from Order d0 where d0.id in (select t.id from (select e0.id as id from Order e0 where <condition>) t)
@@ -119,8 +121,7 @@ delete from Order d0 where d0.id in (select t.id from (select e0.id as id from O
 - `update` 不做包装。带有读取自身表的子查询的 `update` 在三种数据库上都能工作（在 MariaDB 10.11 上实测）。
 - 复合 id 实体不做包装。带 `limit` 的删除本来就使用下面的包装形式（别名 `x0`）。
 
-[`KotlinQueryTest.kt`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)，region `delete-self-subquery`：
-
+<!-- region: KotlinQueryTest.kt#delete-self-subquery -->
 ```kotlin
 // the subquery reads the target table: the matching ids are read through a derived table first (U17, MariaDB 1093)
 val d = qb.delete(Order::class.java).where { o, sub -> o.price < sub.from(Order::class.java).avg { x -> x.price } }
@@ -128,31 +129,34 @@ assertEquals("delete from Order d0 where d0.id in (select t.id from (select e0.i
         + " where e0.price < (select avg(s1.price) from Order s1)) t)", d.toHql().hql())
 ```
 
+示例代码：[`KotlinQueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)（`delete-self-subquery`）。
+
 <a id="delete-the-first-rows-limit"></a>
 ## 删除前几行：`limit`
 
-在 `where { ... }` 或 `all()` 之后写 `orderBy { ... }` 和 `limit(n)`，最多删除 `n` 行：即 `qb.from(X::class.java).where { same }.orderBy { same }` 的前 `n` 行。
-可以用它把大量行分成小批逐步处理。
+在 `where { ... }` 或 `all()` 之后加上 `orderBy { ... }` 和 `limit(n)`，最多删除 `n` 行。删除对象是 `qb.from(X::class.java).where { same }.orderBy { same }` 的前 `n` 行。
+用于把大量行分成小批处理。
 
 - 没有 `orderBy` 时，按 id 排序。
-- lambdaQL 把 id 加为最后一个排序键，因此顺序总是相同（规则 S9，见[决胜键](04-order-paging.md#tie-breaker-automatic-id)）。
-- `orderBy` 接受排序 Lambda 或 `SortSpec`，与查询相同（见 [4. 排序与分页](04-order-paging.md)）。
-- 没有 `limit` 的 `orderBy` 是错误（`IllegalStateException`），因为这时排序没有作用。
+- lambdaQL 把 id 加为最后一个排序键，因此顺序总是相同（见[并列处理](04-order-paging.md#tie-breaker-automatic-id)）。
+- 与查询一样，`orderBy` 中指定排序 Lambda 表达式或 `SortSpec`（见 [4. 排序与分页](04-order-paging.md)）。
+- 没有 `limit` 的 `orderBy` 是错误（`IllegalStateException`），因为这时排序不起任何作用。
 
+<!-- region: ManualKotlinDmlTest.kt#delete-limit -->
 ```kotlin
 // the first rows of qb.from(Order::class.java).where { same }.orderBy { same }; the id is the last sort key
 val d = qb.delete(Order::class.java)
-    .where { it.status == 1 }
-    .orderBy { o, by -> by.asc(o.price) }
+    .where { it.status.toInt() == 1 }
+    .orderBy { o -> asc(o.price) }
     .limit(1)
-// HQL: delete from Order e0 where e0.id in (select t.id from (select x0.id as id from Order x0 where x0.status = 1 order by x0.price asc, x0.id asc limit 1) t)
+assertEquals("delete from Order e0 where e0.id in (select t.id from (select x0.id as id from Order x0"
+    + " where x0.status = 1 order by x0.price asc, x0.id asc limit 1) t)", d.toHql().hql())
 val deleted = d.execute()
 ```
 
-用 Java 写的相同语句在 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中测试（region `delete-limit`）。
+**各数据库的 SQL**
 
-**各数据库的 SQL（来自 Java 测试运行；Kotlin 生成相同的 HQL）** — 来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `delete-limit`：
-
+<!-- sql: delete-limit -->
 ```sql
 -- H2
 delete from orders o1_0
@@ -167,39 +171,45 @@ delete from orders o1_0
 where o1_0.id in (select t1_0.c0 from (select o2_0.id c0 from orders o2_0 where o2_0.status=1 order by o2_0.price,o2_0.id fetch first 1 rows only) t1_0)
 ```
 
-lambdaQL 把 limit 写成 `e0.id in (select t.id from (select x0.id as id from X x0 ... order by ... limit n) t)`：
+lambdaQL 把 limit 渲染为 `e0.id in (select t.id from (select x0.id as id from X x0 ... order by ... limit n) t)`。
 
-- 内层 select 遵循查询的规则，包括连接（决策 D36）。因此语句删除的正是查询返回的行。
-- 派生表 `t` 是为 MariaDB 准备的。没有它，MariaDB 会拒绝 `in` 子查询中的 `limit`（错误 1235）和读取目标表的子查询（错误 1093）。
-- H2 和 Oracle 写 `fetch first 1 rows only`，MariaDB 写 `limit 1`。
+- 内层 select 遵循查询的规则，包括连接。因此该语句删除的正是查询返回的行。
+- 派生表 `t` 是为 MariaDB 准备的。没有派生表时，MariaDB 会拒绝 `in` 子查询中的 `limit`（错误 1235）和读取目标表的子查询（错误 1093）。
+- H2 和 Oracle 写成 `fetch first 1 rows only`，MariaDB 写成 `limit 1`。
+
+示例代码：[`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)（`delete-limit`）。
 
 <a id="delete-exactly-one-row-executeone"></a>
 ## 只删除一行：`executeOne()`
 
-`executeOne()` 以**单行保护**执行删除。当条件应只匹配一行时（例如唯一键），用它代替 `execute()`。
+`executeOne()` 以**单行保护**执行删除。当条件应只匹配一行时（例如唯一键），请用它代替 `execute()`。
 
-1. lambdaQL 读取匹配行的 id，最多 2 个。
-2. 没有 id：什么都不改变。结果为 0。
-3. 2 个 id：什么都不改变。`executeOne()` 抛出 JPA 的 `NonUniqueResultException`。
-4. 1 个 id：lambdaQL 用 `id = :p and (你的条件)` 删除该行。结果为 1；如果该行在此期间不再匹配，则为 0。
+1. lambdaQL 读取匹配条件的行的 id，最多 2 个。
+2. 没有 id 时，什么都不改变，返回 0。
+3. 有 2 个 id 时，什么都不改变，抛出 JPA 的 `NonUniqueResultException`。
+4. 有 1 个 id 时，用 `id = :p and (条件)` 删除该行并返回 1。如果该行在此期间已不再符合条件，则返回 0。
 
-语句只指定一个 id，因此绝不会改变超过一行。这种保护不依赖回滚。
+语句只指定一个 id，因此不会改变两行以上。这种保护不依赖回滚。
 
+<!-- region: ManualKotlinDmlTest.kt#execute-one -->
 ```kotlin
 // one row matches: it is deleted
 val one = qb.delete(Order::class.java).where { it.id == id }.executeOne()
-// two or more rows match: nothing is deleted, NonUniqueResultException
-qb.delete(Order::class.java).where { it.price!! > 100.0 }.executeOne()
+// two or more rows match: nothing is deleted
+assertThrows(NonUniqueResultException::class.java) {
+    qb.delete(Order::class.java).where { it.price > 100.0 }.executeOne()
+}
 ```
 
-用 Java 写的相同语句在 [`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java) 中测试（region `execute-one`）。`it.id == id` 成为普通的 `e0.id = :p1`，因为 id 永远不会是 NULL（见 [3.6.2](03-where.md#362--compares-values)）。
+价格大于 100 的订单不止一个，因此第二条语句什么都不删除。
+id 不会是 NULL，因此 `it.id == id` 成为简单的 `e0.id = :p1`（见 [3.6.2](03-where.md#362--compares-values)）。
 
 - `executeOne()` 与 `orderBy` 或 `limit` 一起使用是错误（`IllegalStateException`）。
 - `limit` 和 `executeOne()` 目前还不支持复合键实体。
-- 在 Spring 仓库中，`deleteOne { ... }` 做同样的事，并抛出 `IncorrectResultSizeDataAccessException`（见 [12.4](12-spring-data-jpa.md#one-row-protection-deleteone-and-updateone)）。
-
----
+- 在 Spring 仓库中，`deleteOne { ... }` 执行同样的操作，并抛出 `IncorrectResultSizeDataAccessException`（见 [12.4](12-spring-data-jpa.md#one-row-protection-deleteone-and-updateone)）。
 
 ---
 
 [7. 更新、插入、删除（Kotlin）](07-dml.md) | [7.2 更新](07-2-update.md) | **7.4 删除** | [7.5 插入](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Java](../java/07-4-delete.md)
+
+示例代码：[`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)（`execute-one`）。

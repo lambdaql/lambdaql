@@ -3,97 +3,57 @@
 
 **其他语言：** [English](../en/README.md) | [한국어](../ko/README.md) | [日本語](../ja/README.md) | [简体中文](../zh/README.md)
 
-lambdaQL 是一个面向 Java 和 Kotlin 的查询库。
-你只需编写普通的 Lambda 表达式。lambdaQL 读取 Lambda 的字节码，并构建 Hibernate 7 HQL 查询。
-Lambda 永远不会被执行。
+lambdaQL 是运行在 JPA 和 Hibernate 之上、面向 Java 和 Kotlin 的查询库。
+用 Lambda 表达式编写查询的条件和排序后，lambdaQL 分析 Lambda 表达式的字节码 opcode 并生成 HQL 查询。
 
 <a id="a-first-look"></a>
-## 初步了解
+## 示例
 
 ### Java
 
+<!-- region: ManualSharedTest.java#readme-first -->
 ```java
 List<Order> orders = qb.from(Order.class)
-    .where(o -> o.getStatus() == 1 && o.getPrice() > minPrice)
-    .orderBy((o, by) -> by.desc(o.getPrice()).asc(o.getId()))
-    .limit(20)
-    .toList();
+        .where(o -> o.getStatus() == 1 && o.getPrice() > minPrice)
+        .orderBy(o -> desc(o.getPrice()).asc(o.getId()))
+        .limit(20)
+        .toList();
 ```
 
 ### Kotlin
 
+<!-- region: ManualKotlinSharedTest.kt#readme-first -->
 ```kotlin
 val orders = qb.from(Order::class.java)
-    .where { it.status == 1 && it.price!! > minPrice }
-    .orderBy { o, by -> by.desc(o.price).asc(o.id) }
+    .where { it.status.toInt() == 1 && it.price > minPrice }
+    .orderBy { o -> desc(o.price).asc(o.id) }
     .limit(20)
     .toList()
 ```
 
 <a id="hql-the-same-for-both"></a>
-### HQL（两种语言相同）
+### HQL
 
 ```
 select e0 from Order e0
 where e0.status = 1 and e0.price > :p1
-order by e0.price desc nulls last, e0.id asc
+order by e0.price desc, e0.id asc
 ```
 
-**关于 SQL 块。** `…` 是缩短的 select 列表（实体的所有列），`?` 是绑定参数。这些行来自 [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java)。该测试使用 Hibernate 7.4 在 H2 2.3、MariaDB 10.11 和 Oracle 23.26 上运行每个查询，如果 Hibernate 的 SQL 发生变化，测试就会失败。
-
-**各数据库的 SQL（Hibernate 为此 HQL 生成的 SQL）** — 手册中的 `Order` 有可为 NULL 的 `Double price`，而测试中的 `Order` 没有，所以 `SqlByDatabaseTest` 把这个 HQL 直接交给 Hibernate。来自 `expected-sql/` 的 [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)，示例 `readme-first`：
-
-```sql
--- H2
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.price>?
-order by o1_0.price desc,o1_0.id
-fetch first ? rows only
-
--- MariaDB
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.price>?
-order by o1_0.price desc,o1_0.id
-limit ?
-
--- Oracle
--- (this HQL is given to Hibernate directly)
-select …
-from orders o1_0
-where o1_0.status=1 and o1_0.price>?
-order by o1_0.price desc nulls last,o1_0.id
-fetch first ? rows only
-```
+示例代码：[`ManualSharedTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualSharedTest.java)（`readme-first`）、[`ManualKotlinSharedTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinSharedTest.kt)（`readme-first`）。
 
 <a id="choose-your-track"></a>
-## 选择你的路线
+## 选择路线
 
-本手册有**两条路线**：一条面向 Java，一条面向 Kotlin。
-每条路线只包含其自身语言的代码。请选择你编写查询时使用的语言。
+本手册有**两条路线**：一条面向 Java，一条面向 Kotlin。  
+每条路线只包含该语言的代码。请选择编写查询所用的语言。
 
-| 路线 | 从这里开始 | 适合你，如果 |
+| 路线 | 起始页面 | 适用对象 |
 |---|---|---|
-| **Java** | [Java 路线](java/README.md) | 你用 Java 编写查询。 |
-| **Kotlin** | [Kotlin 路线](kotlin/README.md) | 你用 Kotlin 编写查询。 |
+| **Java** | [Java 路线](java/README.md) | 用 Java 编写查询。 |
+| **Kotlin** | [Kotlin 路线](kotlin/README.md) | 用 Kotlin 编写查询。 |
 
 两条路线使用同一个引擎，所以同一个查询在两种语言中生成相同的 HQL。
-两条路线的章节编号和文件名相同。只有第 9 章不同（Java 说明或 Kotlin 说明）。
-每个路线页面都有指向另一条路线中同一页面的链接，你可以随时切换。
-
-<a id="common-pages"></a>
-## 公共页面
-
-这些页面适用于两种语言。代码分别展示在 Java 和 Kotlin 两个小节中。
-
-| 页面 | 内容 |
-|---|---|
-| [1. 概述](01-overview.md) | lambdaQL 是什么、为什么需要它、它如何工作、设计原则 |
-| [11. 错误与语言](11-errors-and-languages.md) | 错误码、异常、消息语言、日志 |
-| [13. Spring Boot 3 与 4](13-spring-boot-versions.md) | 版本表、构件、Hibernate 6.6 与 7.4 的 SQL 差异、验证范围 |
 
 <a id="table-of-contents"></a>
 ## 目录
@@ -105,7 +65,7 @@ fetch first ? rows only
 | 3 | 条件（`where`）：运算符、null 规则、捕获的值 | [Java](java/03-where.md) | [Kotlin](kotlin/03-where.md) |
 | 4 | 排序与分页：`orderBy`、`Direction`、`limit`、`offset` | [Java](java/04-order-paging.md) | [Kotlin](kotlin/04-order-paging.md) |
 | 5 | 子查询：`exists`、`contains`、标量子查询和关联子查询 | [Java](java/05-subquery.md) | [Kotlin](kotlin/05-subquery.md) |
-| 6 | 查询列、聚合与分组：`select`、`groupBy`、`having`、`Agg`、join（`join`、`leftJoin`、`crossJoin`）、派生表与 CTE（`with`） | [Java](java/06-select-group.md) | [Kotlin](kotlin/06-select-group.md) |
+| 6 | 查询、聚合与分组：`select`、`groupBy`、`having`、`Agg`、join（`join`、`leftJoin`、`crossJoin`）、派生表与 CTE（`with`） | [Java](java/06-select-group.md) | [Kotlin](kotlin/06-select-group.md) |
 | 7 | 更新、插入、删除：`set`、`values`、`all()`、`execute()`、`limit`、`executeOne()` | [Java](java/07-dml.md) | [Kotlin](kotlin/07-dml.md) |
 | 7.6 | Upsert：`upsert`、`onConflict(...).update(...)`、`onConflict(...).ignore()` | [Java](java/07-6-upsert.md) | [Kotlin](kotlin/07-6-upsert.md) |
 | 8 | 存储过程与数据库函数：`@SqlProcedure`、`@SqlFunction`、`qb.call`、`qb.exec` | [Java](java/08-procedures-functions.md) | [Kotlin](kotlin/08-procedures-functions.md) |
@@ -118,13 +78,14 @@ fetch first ? rows only
 <a id="about-the-examples"></a>
 ## 关于示例
 
-所有代码示例都是从测试代码中原样复制的一段。代码上方写有测试文件和片段名称（区域 `name`）。测试会检查 lambdaQL 生成的 HQL 和返回的行。
-Java 路线的示例来自 Java 测试，Kotlin 路线的示例来自 Kotlin 测试。尚未实现的功能不写进手册，而是放在 [ROADMAP](../../design/ROADMAP.md) 中。
+示例代码是比对执行结果和 HQL 的验证代码。各节末尾的"示例代码"链接可查看完整代码。
+
+**各数据库 SQL 块的读法。** `…` 是缩写的 select 列表（实体的所有列），`?` 是绑定参数。
 
 <a id="example-entities"></a>
 ## 示例实体
 
-本手册中的所有示例都使用以下三个实体。
+本手册的所有示例都使用以下三个实体。
 
 | 实体 | 字段 |
 |---|---|
@@ -139,38 +100,15 @@ Java 路线的示例来自 Java 测试，Kotlin 路线的示例来自 Kotlin 测
 
 | 项目 | 版本 |
 |---|---|
-| Java | 21 |
-| Kotlin | 2.x |
+| Java | 21 及以上 |
+| Kotlin | 2.x 及以上 |
 | Hibernate ORM | 6.6 或 7.4（已用 6.6.53、7.4.13 测试） |
 | 已验证的数据库 | H2 2.3、MariaDB 10.11、MySQL 8.4、PostgreSQL 17、Oracle 23.26 (23ai) |
 | Spring Boot（可选） | 3.5 或 4.1（已用 3.5.16、4.1.2 测试）。见 [13. Spring Boot 3 与 4](13-spring-boot-versions.md) |
 
-<a id="folder-layout"></a>
-## 目录结构
-
-```
-manual/zh/
-├── README.md                      本页面
-├── 01-overview.md                 公共
-├── 11-errors-and-languages.md     公共
-├── java/                          Java 路线（仅 Java 代码）
-│   ├── README.md
-│   ├── 02-getting-started.md ... 08-procedures-functions.md
-│   ├── 09-java-notes.md
-│   └── 10-rules-and-limits.md
-└── kotlin/                        Kotlin 路线（仅 Kotlin 代码）
-    ├── README.md
-    ├── 02-getting-started.md ... 08-procedures-functions.md
-    ├── 09-kotlin-notes.md
-    └── 10-rules-and-limits.md
-```
-
-每个语言文件夹（`en`、`ko`、`ja`、`zh`）中的文件名都相同。要切换语言，只需更改链接中的文件夹名。
-
 <a id="help-and-contributions"></a>
 ## 帮助与贡献
 
-- 源代码：<https://github.com/codebit0/lambdaql>
-- 韩文手册是原始版本。英文、日文和中文手册是翻译版本。
-- 如果你在任何语言版本中发现错误，请提交 issue 或 pull request。欢迎帮助翻译。
+- 源代码：<https://github.com/lambdaql/lambdaql>
+- 在任何语言版本中发现错误，请提交 issue 或 pull request。欢迎帮助翻译。
 - 设计文档（韩文，面向贡献者）：[ROADMAP.md](../../design/ROADMAP.md)、[KOTLIN.md](../../design/KOTLIN.md)

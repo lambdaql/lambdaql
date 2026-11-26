@@ -5,9 +5,7 @@
 
 ---
 
-
-[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `delete`:
-
+<!-- region: DmlQueryTest.java#delete -->
 ```java
 ExecutableDelete<Order> d = qb.delete(Order.class).where(o -> o.getStatus() == 3);
 assertEquals("delete from Order e0 where e0.status = 3", d.toHql().hql());
@@ -18,10 +16,9 @@ assertEquals("delete from Order e0 where (select s1.name from Customer s1 where 
         + " and e0.customer.id is not null", byName.toHql().hql());
 ```
 
-**SQL ブロックの読み方。** `…` は省略した select リスト（エンティティのすべてのカラム）で、`?` はバインドパラメーターです。各行は [`SqlByDatabaseTest`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlByDatabaseTest.java) から取っています。このテストは各クエリを Hibernate 7.4 で H2 2.3、MariaDB 10.11、Oracle 23.26 に対して実行し、Hibernate の SQL が変わると失敗します。
+**データベースごとの SQL**
 
-**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `delete`:
-
+<!-- sql: delete -->
 ```sql
 -- H2, Oracle
 delete from orders o1_0
@@ -32,8 +29,9 @@ delete o1_0 from orders o1_0
 where o1_0.status=3
 ```
 
-**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `delete#2`:
+**データベースごとの SQL**
 
+<!-- sql: delete#2 -->
 ```sql
 -- H2, Oracle
 delete from orders o1_0
@@ -46,36 +44,42 @@ where (select c1_0.name from customers c1_0 where c1_0.id=orders.customer_id) is
 
 MariaDB は `delete o1_0 from orders o1_0` と書きます。H2 と Oracle は `delete from orders o1_0` と書きます。
 
-2 つ目の文は、`qb.from(Order.class).where(o -> o.getCustomer().getName() == null)` が返すのと **同じ行**、つまり顧客に名前がない注文を削除します。テストでは、削除した行をこの選択の結果と比べています。
-顧客の **ない** 注文は削除されません（ルール U9、決定 D36）。null ガード（`o.getCustomer() == null || ...`）を書いても同じです。選択でもこのパスは inner join だからです（決定 D48）。
-顧客のない注文を削除するには、`o.getCustomer() == null` の条件で削除文をもう一度実行してください。
+2 つ目の文は、`qb.from(Order.class).where(o -> o.getCustomer().getName() == null)` が返すのと **同じ行**、つまり顧客の名前がない注文を削除します。
+顧客の **ない** 注文はこの条件に一致しないため、削除されません。select でもこのパスは inner join です。
+顧客のない注文も削除するには、null ガード（`o.getCustomer() == null || ...`）を一緒に書いてください。select と同じように、顧客のない注文も対象になります。
 
-すべての行を削除するには `all()` が必要です（ルール U5）。
+すべての行を削除するには `all()` が必要です。
 
+<!-- region: ManualJavaDmlTest.java#delete-all -->
 ```java
-qb.delete(Order.class).all().execute();     // delete all rows
-qb.delete(Order.class).execute();           // compile error: no execute()
+ExecutableDelete<Order> d = qb.delete(Order.class).all();
+assertEquals("delete from Order e0", d.toHql().hql());
+int deleted = d.execute();
 ```
 
-id のリストで削除する（キャプチャしたコレクション、決定 D29）:
+id のリストで削除する（キャプチャしたコレクション）:
 
+<!-- region: ManualJavaDmlTest.java#delete-in -->
 ```java
-qb.delete(Item.class).where(i -> ids.contains(i.getId())).execute();
+List<Long> ids = all;                               // ids read before, for example from a request
+ExecutableDelete<Item> d = qb.delete(Item.class).where(i -> ids.contains(i.getId()));
+assertEquals("delete from Item e0 where e0.id in (:p1)", d.toHql().hql());
+int deleted = d.execute();
 ```
 
-`where` の中のサブクエリは、[5. サブクエリ](05-subquery.md) と同じように 2 つ目のラムダ引数 `sub` を使います。
-品目を持たない注文を削除する例:
+`where` の中のサブクエリは、[5. サブクエリ](05-subquery.md) と同じように 2 つ目のラムダ式の引数 `sub` を使います。
+品目のない注文を削除する例:
 
-[`SubqueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)、リージョン `dml-subquery`:
-
+<!-- region: SubqueryTest.java#dml-subquery -->
 ```java
 ExecutableDelete<Order> d = qb.delete(Order.class)
         .where((o, sub) -> !sub.from(Item.class).where(i -> i.getOrder().getId() == o.getId()).exists());
 assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where s1.order.id = e0.id)", d.toHql().hql());
 ```
 
-**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `dml-subquery`:
+**データベースごとの SQL**
 
+<!-- sql: dml-subquery -->
 ```sql
 -- H2, Oracle
 delete from orders o1_0
@@ -86,30 +90,31 @@ delete from orders
 where not exists(select 1 from items i1_0 where i1_0.order_id=orders.id)
 ```
 
-すべての JPA の一括文と同じように、削除は JPA の `cascade` や `orphanRemoval` を実行せず、すでに読み込まれたエンティティにも反映されません（ルール U16）。
+すべての JPA の一括文と同じように、削除は JPA の `cascade` や `orphanRemoval` を実行せず、すでに読み込まれたエンティティにも反映されません。
 削除にはトランザクションが必要です（[7.8](07-dml.md#transactions) を参照）。
+
+コード例: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)（`delete`）、[`ManualJavaDmlTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)（`delete-all`、`delete-in`）、[`SubqueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)（`dml-subquery`）。
 
 <a id="delete-with-a-subquery-on-the-same-table"></a>
 ## 同じテーブルを読むサブクエリ
 
 `where` のサブクエリは、削除対象のエンティティ（または同じ継承階層のエンティティ）を読むことができます。サブクエリ自身の `from`、サブクエリの中の結合、U9 の相関スカラーサブクエリがこれに当たります。
-このとき lambdaQL は、まず対象の id を派生テーブルとして読み、その id で削除します（ルール U17）。
+このとき lambdaQL は、まず対象の id を派生テーブルとして読み、その id で削除します。
 
 ```
 delete from Order d0 where d0.id in (select t.id from (select e0.id as id from Order e0 where <condition>) t)
 ```
 
 - 理由: サブクエリが対象テーブルを読むと、MariaDB は Hibernate の `delete t from …` を拒否します（エラー 1093、"specified twice"）。
-- 相関サブクエリでも同じ形が動きます。サブクエリだけを囲む方法は、相関サブクエリには使えません。
+- 相関サブクエリでも同じ形が動作します。サブクエリだけを囲む方法は、相関サブクエリには使えません。
 - H2、MariaDB 10.11、Oracle 23.26 で実測しました（非相関の `avg`、相関の `exists`、`max`、サブクエリの中の結合）。3 つの DB で削除した行数は同じで、MariaDB も失敗しません。
 - 別のテーブルを読むサブクエリは、これまでの形のままです（上の `not exists` の例）。
-- `update` は囲みません。自分のテーブルを読むサブクエリを含む `update` は、3 つの DB すべてで動きます（MariaDB 10.11 で実測）。
+- `update` は囲みません。自分のテーブルを読むサブクエリを含む `update` は、3 つの DB すべてで動作します（MariaDB 10.11 で実測）。
 - 複合 id のエンティティは囲みません。`limit` 付きの削除は、もともと下の囲んだ形（エイリアス `x0`）を使います。
 
-[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `delete-self-subquery`:
-
+<!-- region: DmlQueryTest.java#delete-self-subquery -->
 ```java
-// the subquery reads the target table: lambdaQL reads the matching ids through a derived table first (U17),
+// the subquery reads the target table: lambdaQL reads the matching ids through a derived table first,
 // because MariaDB cannot delete from a table that a subquery reads (error 1093)
 ExecutableDelete<Order> d = qb.delete(Order.class)
         .where((o, sub) -> o.getPrice() < sub.from(Order.class).avg(x -> x.getPrice()));
@@ -122,32 +127,34 @@ assertEquals("delete from Order e0 where not exists (select 1 from Item s1 where
         unused.toHql().hql());
 ```
 
+コード例: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)（`delete-self-subquery`）。
+
 <a id="delete-the-first-rows-limit"></a>
 ## 先頭の行を削除する: `limit`
 
 `where(...)` または `all()` の後に `orderBy(...)` と `limit(n)` を付けると、最大 `n` 行を削除します。対象は `qb.from(X.class).where(同じ).orderBy(同じ)` の先頭 `n` 行です。
-多くの行を少しずつ処理するときに使います。
+多くの行を小さな単位に分けて処理するときに使います。
 
-- `orderBy` がない場合、順序は id 順です。
-- lambdaQL は id を最後のソートキーとして加えるので、順序は常に同じです（ルール S9、[タイブレーカー](04-order-paging.md#tie-breaker-automatic-id) を参照）。
-- `orderBy` には、select と同じようにソートのラムダか `SortSpec` を渡します（[4. ソートとページング](04-order-paging.md) を参照）。
-- `limit` のない `orderBy` はエラーです（`IllegalStateException`）。その場合、順序に意味がないからです。
+- `orderBy` がなければ id 順です。
+- lambdaQL は id を最後のソートキーとして加えるので、順序は常に同じです（[タイブレーカー](04-order-paging.md#tie-breaker-automatic-id) を参照）。
+- `orderBy` には、select と同じようにソートのラムダ式か `SortSpec` を指定します（[4. ソートとページング](04-order-paging.md) を参照）。
+- `limit` のない `orderBy` はエラー（`IllegalStateException`）です。この場合、順序が何の役割も果たさないからです。
 
-[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `delete-limit`:
-
+<!-- region: DmlQueryTest.java#delete-limit -->
 ```java
 // the first rows of qb.from(Order.class).where(same).orderBy(same); the id is the last sort key
 ExecutableDelete<Order> d = qb.delete(Order.class)
         .where(o -> o.getStatus() == 1)
-        .orderBy((o, by) -> by.asc(o.getPrice()))
+        .orderBy(o -> asc(o.getPrice()))
         .limit(1);
 assertEquals("delete from Order e0 where e0.id in (select t.id from (select x0.id as id from Order x0"
         + " where x0.status = 1 order by x0.price asc, x0.id asc limit 1) t)", d.toHql().hql());
 int deleted = d.execute();
 ```
 
-**データベースごとの SQL** — `expected-sql/` の [`h2.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/h2.sql)、[`mariadb.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/mariadb.sql)、[`oracle.sql`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/resources/expected-sql/oracle.sql)、例 `delete-limit`:
+**データベースごとの SQL**
 
+<!-- sql: delete-limit -->
 ```sql
 -- H2
 delete from orders o1_0
@@ -162,26 +169,27 @@ delete from orders o1_0
 where o1_0.id in (select t1_0.c0 from (select o2_0.id c0 from orders o2_0 where o2_0.status=1 order by o2_0.price,o2_0.id fetch first 1 rows only) t1_0)
 ```
 
-lambdaQL は limit を `e0.id in (select t.id from (select x0.id as id from X x0 ... order by ... limit n) t)` と書きます。
+lambdaQL は limit を `e0.id in (select t.id from (select x0.id as id from X x0 ... order by ... limit n) t)` とレンダリングします。
 
-- 内側の select は、結合も含めて select のルールに従います（決定 D36）。そのため、この文は select が返す行とちょうど同じ行を削除します。
-- 派生テーブル `t` は MariaDB のためのものです。これがないと、MariaDB は `in` サブクエリの中の `limit`（エラー 1235）と、対象テーブルを読むサブクエリ（エラー 1093）を拒否します。
+- 内側の select は、結合も含めて select のルールに従います。そのため、この文は select が返す行とちょうど同じ行を削除します。
+- 派生テーブル `t` は MariaDB のためのものです。派生テーブルがないと、MariaDB は `in` サブクエリの `limit`（エラー 1235）と、対象テーブルを読むサブクエリ（エラー 1093）を拒否します。
 - H2 と Oracle は `fetch first 1 rows only`、MariaDB は `limit 1` と書きます。
+
+コード例: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)（`delete-limit`）。
 
 <a id="delete-exactly-one-row-executeone"></a>
 ## ちょうど 1 行を削除する: `executeOne()`
 
-`executeOne()` は **1 行保護** 付きで削除を実行します。条件が 1 行だけに一致するはずのとき（たとえば一意キー）、`execute()` の代わりに使います。
+`executeOne()` は **1 行保護** を適用して削除を実行します。条件が 1 行に一致するはずのとき（たとえば一意キー）、`execute()` の代わりに使ってください。
 
 1. lambdaQL は条件に一致する行の id を最大 2 つ読みます。
 2. id がなければ、何も変更せず 0 を返します。
 3. id が 2 つなら、何も変更せず JPA の `NonUniqueResultException` を投げます。
-4. id が 1 つなら、その行を `id = :p and (条件)` で削除し、1 を返します。その間に行が条件に一致しなくなった場合は 0 を返します。
+4. id が 1 つなら、`id = :p and (条件)` でその行を削除し、1 を返します。その間にその行が条件から外れた場合は 0 を返します。
 
-文は 1 つの id を指定するので、2 行以上を変更することはありません。この保護はロールバックに頼りません。
+文に 1 つの id を指定するので、2 行以上を変更することはありません。この保護はロールバックに頼りません。
 
-[`DmlQueryTest.java`](https://github.com/codebit0/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)、リージョン `execute-one`:
-
+<!-- region: DmlQueryTest.java#execute-one -->
 ```java
 // one row matches: it is deleted
 int one = qb.delete(Order.class).where(o -> o.getId() == id).executeOne();
@@ -190,12 +198,12 @@ assertThrows(jakarta.persistence.NonUniqueResultException.class,
         () -> qb.delete(Order.class).where(o -> o.getPrice() > 100).executeOne());
 ```
 
-- `executeOne()` を `orderBy` や `limit` と一緒に使うとエラーです（`IllegalStateException`）。
-- `limit` と `executeOne()` は、複合キーのエンティティにはまだ対応していません。
-- Spring のリポジトリでは、`deleteOne(where)` が同じ動作をし、`IncorrectResultSizeDataAccessException` を投げます（[12.4](12-spring-data-jpa.md#one-row-protection-deleteone-and-updateone) を参照）。
-
----
+- `executeOne()` を `orderBy` や `limit` と一緒に使うとエラー（`IllegalStateException`）です。
+- `limit` と `executeOne()` は複合キーのエンティティをサポートしません。
+- Spring のリポジトリでは `deleteOne(where)` が同じ動作をし、`IncorrectResultSizeDataAccessException` を投げます（[12.4](12-spring-data-jpa.md#one-row-protection-deleteone-and-updateone) を参照）。
 
 ---
 
 [7. 更新、挿入、削除（Java）](07-dml.md) | [7.2 更新](07-2-update.md) | **7.4 削除** | [7.5 挿入](07-5-insert.md) | [7.6 Upsert](07-6-upsert.md) | [Kotlin](../kotlin/07-4-delete.md)
+
+コード例: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)（`execute-one`）。

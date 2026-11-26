@@ -8,41 +8,40 @@
 <a id="121-what-you-get"></a>
 ## 12.1 What you get
 
-With Spring Data JPA you write repository interfaces. lambdaQL adds one more interface, `LambdaQlExecutor<T>`.
+With Spring Data JPA, you write repository interfaces. lambdaQL adds one more interface to them: `LambdaQlExecutor<T>`.
 
 Your repository extends this interface, and you write your own query methods as **default methods** that use lambdaQL.
 You do not write a `...RepositoryImpl` class for these methods.
 
 | Part | What it does | Section |
 |---|---|---|
-| `LambdaQlExecutor<T>` | `findAll`, `findSet`, `findFirst`, `findOne`, `count`, `exists` and `query()` with a lambda condition, in every repository | [12.3](#123-repository-setup), [12.4](#124-executor-methods) |
-| Spring `Sort` and `Pageable` | `findAll(where, sort)`, `findSet(where, sort)` and `findAll(where, pageable)`, which returns a Spring `Page` | [12.5](#125-spring-sort-and-pageable) |
-| Update, delete, insert, upsert | Shortcuts such as `deleteAll(where)` and `updateOne(where, set)` run a statement in one call. `updateQuery()`, `deleteQuery()`, `insertQuery()`, `upsertQuery()` start the statements of [7. Update, insert, delete](07-dml.md) on the repository's entity. All need the caller's transaction | [12.4](#124-executor-methods), [12.6](#126-transactions-and-exceptions) |
-| `QueryBuilder` bean | Spring Boot makes a `QueryBuilder` bean for your services | [12.8](#128-the-querybuilder-bean) |
+| `LambdaQlExecutor<T>` | Runs `findAll`, `findSet`, `findFirst`, `findOne`, `count`, `exists` and `query()` with lambda expression conditions in every repository | [12.3](#123-repository-setup), [12.4](#124-executor-methods) |
+| Spring `Sort` and `Pageable` | `findAll(where, sort)`, `findSet(where, sort)`, and `findAll(where, pageable)` that returns a Spring `Page` | [12.5](#125-spring-sort-and-pageable) |
+| Update, delete, insert, upsert | Shortcut methods such as `deleteAll(where)` and `updateOne(where, set)` run a statement in one call. `updateQuery()`, `deleteQuery()`, `insertQuery()` and `upsertQuery()` start the statements of [7. Update, insert, delete](07-dml.md) on the repository entity. All need the caller's transaction | [12.4](#124-executor-methods), [12.6](#126-transactions-and-exceptions) |
+| `QueryBuilder` bean | Spring Boot creates a `QueryBuilder` bean for use in services | [12.8](#128-the-querybuilder-bean) |
 
 <a id="122-modules"></a>
 ## 12.2 Modules
 
-The core has no Spring dependency, so you can use it with plain JPA too. `lambdaql-core` and `lambdaql-spring-data-jpa` are the same for Spring Boot 3 and 4; only the starter has one artifact per Spring Boot version (the name ends with `-boot3` or `-boot4`, [13. Spring Boot 3 and 4](../13-spring-boot-versions.md)).
+The core does not depend on Spring, so you can also use it with plain JPA. `lambdaql` and `lambdaql-spring-data-jpa` are shared by Spring Boot 3 and 4, and only the starter is separate for each Spring Boot version (the name ends with `-boot3` or `-boot4`, [13. Spring Boot 3 and 4](../13-spring-boot-versions.md)).
 
-| Artifact | What it has | You need it when |
+| Artifact | What it has | When you need it |
 |---|---|---|
-| `lambdaql-core` | The engine and `QueryBuilder`. No Spring dependency. The same for Spring Boot 3 and 4 | Always. The artifacts below bring it |
-| `lambdaql-spring-data-jpa` | `LambdaQlExecutor<T>`, its Spring Data registration, the Spring Boot auto-configuration (`QueryBuilder` bean). The same for Spring Data JPA 3.5 and 4.1. It uses the Spring Data JPA of your project | You use Spring Data JPA without Spring Boot |
-| `lambdaql-spring-boot-starter-boot4`, `lambdaql-spring-boot-starter-boot3` | No code. It brings `lambdaql-spring-data-jpa` and the `spring-boot-starter-data-jpa` of that Boot version | You use Spring Boot (pick the one for your Boot version) |
+| `lambdaql` | The engine and `QueryBuilder`. No Spring dependency. Shared by Spring Boot 3 and 4 | Always. The artifacts below bring it in |
+| `lambdaql-spring-data-jpa` | `LambdaQlExecutor<T>`, Spring Data registration, Spring Boot auto-configuration (`QueryBuilder` bean). Shared by Spring Data JPA 3.5 and 4.1. Uses the Spring Data JPA of your project | When you use Spring Data JPA without Spring Boot |
+| `lambdaql-spring-boot-starter-boot4`, `lambdaql-spring-boot-starter-boot3` | No code. Brings in `lambdaql-spring-data-jpa` and the `spring-boot-starter-data-jpa` of that Boot version | When you use Spring Boot (match the Boot version of your project) |
 
-The artifacts are **not published to Maven Central yet**. Build them from source and publish them to your local Maven repository first (see [2. Getting started](02-getting-started.md#build-from-source)). The version is `1.0.0`.
+The artifacts are on Maven Central (groupId `io.github.lambdaql`, version `0.0.2`).
 
-With Spring Boot 4, Gradle (Groovy DSL). For Spring Boot 3, change the end of the name to `-boot3`:
+Gradle (Groovy DSL) for Spring Boot 4. For Spring Boot 3, change the end of the name to `-boot3`:
 
 ```groovy
 repositories {
-    mavenLocal()
     mavenCentral()
 }
 
 dependencies {
-    implementation 'org.lambdaql:lambdaql-spring-boot-starter-boot4:1.0.0'
+    implementation 'io.github.lambdaql:lambdaql-spring-boot-starter-boot4:0.0.2'
 }
 ```
 
@@ -50,25 +49,25 @@ Maven:
 
 ```xml
 <dependency>
-  <groupId>org.lambdaql</groupId>
+  <groupId>io.github.lambdaql</groupId>
   <artifactId>lambdaql-spring-boot-starter-boot4</artifactId>
-  <version>1.0.0</version>
+  <version>0.0.2</version>
 </dependency>
 ```
 
-Without Spring Boot, add `lambdaql-spring-data-jpa` next to your own Spring Data JPA setup (Spring Data JPA, Hibernate and a JDBC driver). It brings `lambdaql-core`, and it uses the Spring Data JPA that your project has (3.5 or 4.1).
+Without Spring Boot, add `lambdaql-spring-data-jpa` to your existing Spring Data JPA setup (Spring Data JPA, Hibernate, JDBC driver). This artifact brings in `lambdaql`, and it uses the Spring Data JPA that your project has (3.5 or 4.1).
 
 ```groovy
 dependencies {
-    implementation 'org.lambdaql:lambdaql-spring-data-jpa:1.0.0'
+    implementation 'io.github.lambdaql:lambdaql-spring-data-jpa:0.0.2'
 }
 ```
 
 ```xml
 <dependency>
-  <groupId>org.lambdaql</groupId>
+  <groupId>io.github.lambdaql</groupId>
   <artifactId>lambdaql-spring-data-jpa</artifactId>
-  <version>1.0.0</version>
+  <version>0.0.2</version>
 </dependency>
 ```
 
@@ -76,27 +75,26 @@ Requirements:
 
 | Item | Version |
 |---|---|
-| Java | 21 |
-| Spring Boot | 3.5 or 4.1 (tested with 3.5.16 and 4.1.2) |
-| Spring Data JPA | 3.5 or 4.1 (tested with 3.5.13 and 4.1.2) |
-| Hibernate | 6.6 or 7.4 (Spring Boot already brings it) |
+| Java | 21 or later |
+| Spring Boot | 3.5 or 4.1 |
+| Spring Data JPA | 3.5 or 4.1 |
+| Hibernate | 6.6 or 7.4 (included in Spring Boot) |
 
-Spring Data JPA 3.3 and older are **not supported**. lambdaQL registers its executor in `META-INF/spring.factories`, and Spring Data reads repository fragments from this file only from 3.4.
+Spring Data JPA 3.3 or earlier is **not supported**. lambdaQL registers its executor in `META-INF/spring.factories`, and Spring Data reads repository fragments from this file since 3.4.
 
 <a id="123-repository-setup"></a>
 ## 12.3 Repository setup
 
 Add `LambdaQlExecutor<T>` to the `extends` list of your repository. `T` is the entity of the repository.
-You write no configuration and no `Impl` class.
+You do not write any extra configuration or `Impl` class.
 
-The examples in this chapter use the test entities `Member` (`id`, `name`, `active`, `grade`, `team`) and `Team` (`id`, `name`). `grade` is an `Integer`, so it can be NULL.
+The examples in this chapter use the example entities `Member` (`id`, `name`, `active`, `grade`, `team`) and `Team` (`id`, `name`). `grade` is an `Integer`, so it can be NULL.
 
-[`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java), region `repository`:
-
+<!-- region: ManualMemberRepository.java#repository -->
 ```java
 /** No Impl class: Spring Data finds the LambdaQlExecutor implementation by itself. */
-public interface MemberRepository extends JpaRepository<Member, Long>, LambdaQlExecutor<Member>,
-        JpaSpecificationExecutor<Member>, MemberRepositoryCustom {
+public interface ManualMemberRepository extends JpaRepository<Member, Long>, LambdaQlExecutor<Member>,
+        JpaSpecificationExecutor<Member> {
 
     /** @return the active members */
     default List<Member> activeMembers() {
@@ -118,7 +116,7 @@ public interface MemberRepository extends JpaRepository<Member, Long>, LambdaQlE
     default List<Member> topGraded(int n) {
         return query()
                 .where(m -> m.isActive())
-                .orderBy((m, by) -> by.desc(m.getGrade()).asc(m.getId()))
+                .orderBy(m -> desc(m.getGrade()).asc(m.getId()))
                 .limit(n)
                 .toList();
     }
@@ -146,67 +144,71 @@ public interface MemberRepository extends JpaRepository<Member, Long>, LambdaQlE
 }
 ```
 
-The last three methods run update, delete and insert statements. They need a transaction (see [12.6](#126-transactions-and-exceptions)).
+The last three methods run update, delete and insert statements. These methods need a transaction (see [12.6](#126-transactions-and-exceptions)).
 
-This repository also extends `JpaSpecificationExecutor<Member>` and a hand-written fragment, `MemberRepositoryCustom`.
-lambdaQL does not need either of them. They are there to check that everything works together (see [12.7](#127-other-fragments-and-jpaspecificationexecutor)).
+This repository also extends `JpaSpecificationExecutor<Member>`. lambdaQL does not need it. It is there to show how the two work together.
+Another example repository, [`MemberRepository`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java), also extends a hand-written fragment `MemberRepositoryCustom` with the same methods (see [12.7](#127-other-fragments-and-jpaspecificationexecutor)).
 
 How it works:
 
-- **Spring Data runs default methods by itself.** It does not try to make a query from a default method. It just calls the method body. lambdaQL does not change this.
-- **`LambdaQlExecutor<T>` is a Spring Data repository fragment.** Its implementation is listed in `META-INF/spring.factories` of `lambdaql-spring-data-jpa`. Spring Data reads this file and adds the implementation to every repository that extends `LambdaQlExecutor<T>`.
-- **One executor object is shared by all repositories.** Each call still uses the entity of its own repository. For example, `teams.count(t -> ...)` on a `TeamRepository` counts `Team` rows (see [`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java)).
+- **Spring Data runs default methods directly.** Spring Data does not build a query from a default method. It calls the method body. lambdaQL does not change this behavior.
+- **`LambdaQlExecutor<T>` is a Spring Data repository fragment.** Its implementation class is registered in `META-INF/spring.factories` of `lambdaql-spring-data-jpa`. Spring Data reads this file and adds the implementation to every repository that extends `LambdaQlExecutor<T>`.
+- **All repositories share one executor object.** Each call uses the entity of its repository. For example, `teams.count(t -> ...)` in `TeamRepository` returns the number of `Team` rows.
 
 Rules:
 
 | # | Rule |
 |---|---|
-| 1 | Your repository must extend `LambdaQlExecutor<T>` **directly** (in its own `extends` list). |
-| 2 | Do not put `@NoRepositoryBean` on an interface that extends `LambdaQlExecutor<T>` for this purpose. Spring Data then does not add the lambdaQL implementation. |
-| 3 | Write your lambdaQL queries in **default methods** or in services. Abstract methods are still Spring Data query methods (`findByName` and so on). |
-| 4 | Without Spring Boot, the repository part still works, because it is plain Spring Data. Only the `QueryBuilder` bean is not made for you (see [12.8](#128-the-querybuilder-bean)). |
+| 1 | The repository must extend `LambdaQlExecutor<T>` **directly** (in its own `extends` list). |
+| 2 | Do not put `@NoRepositoryBean` on an interface that extends `LambdaQlExecutor<T>` for this purpose. If you do, Spring Data does not add the lambdaQL implementation. |
+| 3 | Write lambdaQL queries in **default methods** or in services. Abstract methods keep working as Spring Data query methods (`findByName` and others). |
+| 4 | Without Spring Boot, the repository part still works, because it is plain Spring Data. Only the `QueryBuilder` bean is not created automatically (see [12.8](#128-the-querybuilder-bean)). |
+
+Example code: [`ManualMemberRepository.java`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualMemberRepository.java) (`repository`).
 
 <a id="124-executor-methods"></a>
 ## 12.4 Executor methods
 
-`Where<T>` is the same condition lambda as in `where(...)` (see [3. Conditions](03-where.md)). `SortSpec<T>` is a lambdaQL sort (see [4.10](04-order-paging.md#410-reusable-and-external-sorts)).
-`Sort`, `Pageable` and `Page` are the Spring Data types.
+`Where<T>` is the same condition lambda expression as in `where(...)` (see [3. Conditions](03-where.md)). `SortSpec<T>` is a lambdaQL sort (see [4.10](04-order-paging.md#410-reusable-and-external-sorts)).
+`Sort`, `Pageable` and `Page` are Spring Data types.
 
-| Method | Returns | Notes |
+| Method | Returns | Description |
 |---|---|---|
-| `query()` | `SelectQuery<T>` | Starts a query on the repository's entity. Use it for everything the short methods cannot do: more `where` calls, `limit`, `offset`, a run-time `Direction` |
+| `query()` | `SelectQuery<T>` | Starts a query on the repository entity. Use it for queries that the short methods cannot express (many `where` calls, `limit`, `offset`, a `Direction` chosen at run time) |
 | `from(Class<E>)` | `SelectQuery<E>` | Starts a query on another entity of the same persistence unit |
-| `findAll(Where<T>)` | `List<T>` | All rows that match, in no fixed order |
-| `findAll(Where<T>, SortSpec<T>)` | `List<T>` | All rows that match, sorted |
-| `findAll(Where<T>, Sort)` | `List<T>` | Sorted with a Spring `Sort` (see [12.5](#125-spring-sort-and-pageable)). `Sort.unsorted()` gives no order |
-| `findAll(Where<T>, Pageable)` | `Page<T>` | One page. The count query runs only when it is needed. `Pageable.unpaged()` gives all rows |
-| `findSet(Where<T>)` | `SequencedSet<T>` | All rows that match, as a set, in no fixed order (like `findAll(Where<T>)`). No `distinct`. If the set is smaller than the number of rows: `IllegalStateException` (see [`toSet()`](02-getting-started.md#toset)) |
-| `findSet(Where<T>, SortSpec<T>)` | `SequencedSet<T>` | All rows that match, as a set in the sort order |
-| `findSet(Where<T>, Sort)` | `SequencedSet<T>` | The same, sorted with a Spring `Sort` (see [12.5](#125-spring-sort-and-pageable)) |
-| `findFirst(Where<T>)` | `Optional<T>` | The matching row with the smallest id |
-| `findFirst(Where<T>, SortSpec<T>)` | `Optional<T>` | The first row in that order. Reads one row |
-| `findFirst(Where<T>, Sort)` | `Optional<T>` | The first row in the order of a Spring `Sort` |
-| `findOne(Where<T>)` | `Optional<T>` | The only row that matches. 2 or more rows: `IncorrectResultSizeDataAccessException` |
-| `count(Where<T>)` | `long` | The number of rows that match |
-| `exists(Where<T>)` | `boolean` | `true` if a row matches. Reads one row at most and loads no entity |
-| `deleteAll(Where<T>)` | `int` | Deletes every row that matches, with one SQL statement (bulk). Not the same as Spring Data's `deleteAll()` (see [below](#deleteallwhere-is-not-spring-datas-deleteall)). Needs a transaction |
-| `deleteOne(Where<T>)` | `int` | Deletes the only row that matches, with the [one-row protection](#one-row-protection-deleteone-and-updateone). Returns 0 or 1. Needs a transaction |
-| `updateAll(Where<T>, Assign<T>)` | `int` | Changes every row that matches. The condition comes first. Needs a transaction |
-| `updateOne(Where<T>, Assign<T>)` | `int` | Changes the only row that matches, with the one-row protection. Returns 0 or 1. Needs a transaction |
+| `findAll(Where<T>)` | `List<T>` | All rows that match the condition. The order is not defined |
+| `findAll(Where<T>, SortSpec<T>)` | `List<T>` | All rows that match the condition, sorted |
+| `findAll(Where<T>, Sort)` | `List<T>` | Sorted with a Spring `Sort` (see [12.5](#125-spring-sort-and-pageable)). `Sort.unsorted()` means no sort |
+| `findAll(Where<T>, Pageable)` | `Page<T>` | One page. The count query runs only when needed. `Pageable.unpaged()` gives all rows |
+| `findSet(Where<T>)` | `SequencedSet<T>` | All rows that match the condition, as a Set. The order is not defined (same as `findAll(Where<T>)`). No `distinct`. `IllegalStateException` if the Set is smaller than the number of rows (see [`toSet()`](02-getting-started.md#toset)) |
+| `findSet(Where<T>, SortSpec<T>)` | `SequencedSet<T>` | All rows that match the condition, as a Set in sort order |
+| `findSet(Where<T>, Sort)` | `SequencedSet<T>` | Same as above. Sorted with a Spring `Sort` (see [12.5](#125-spring-sort-and-pageable)) |
+| `findFirst(Where<T>)` | `Optional<T>` | One of the rows that match the condition. Not sorted |
+| `findFirst(Where<T>, SortSpec<T>)` | `Optional<T>` | The first row in the given order. Reads only one row |
+| `findFirst(Where<T>, Sort)` | `Optional<T>` | The first row in the order of the Spring `Sort` |
+| `findOne(Where<T>)` | `Optional<T>` | The only row that matches the condition. `IncorrectResultSizeDataAccessException` if there are two or more rows |
+| `count(Where<T>)` | `long` | The number of rows that match the condition |
+| `exists(Where<T>)` | `boolean` | `true` if a row matches the condition. Reads at most one row and does not load entities |
+| `deleteAll(Where<T>)` | `int` | Deletes all rows that match the condition with one SQL statement (bulk). Different from Spring Data's `deleteAll()` (see [below](#deleteallwhere-is-not-spring-datas-deleteall)). Needs a transaction |
+| `deleteOne(Where<T>)` | `int` | Deletes the only row that matches the condition, with [one-row protection](#one-row-protection-deleteone-and-updateone). Returns 0 or 1. Needs a transaction |
+| `updateAll(Where<T>, Assign<T>)` | `int` | Updates all rows that match the condition. The condition comes first. Needs a transaction |
+| `updateOne(Where<T>, Assign<T>)` | `int` | Updates the only row that matches the condition, with one-row protection. Returns 0 or 1. Needs a transaction |
 | `insertOne(Assign<T>)` | `int` | Inserts one row. Returns 1. Needs a transaction |
-| `insertAll(Collection<L>, AssignEach<T, L>)` | `int` | Inserts one row per element (at most 500 values per statement, rule U13). Needs a transaction |
-| `upsertOne(Assign<T>)` | `int` | Inserts one row, or changes it if a row with the same `@Id` exists. Returns the row count of the database. Needs a transaction |
+| `insertAll(Collection<L>, AssignEach<T, L>)` | `int` | Inserts one row per element (500 values or fewer per statement). Needs a transaction |
+| `upsertOne(Assign<T>)` | `int` | Inserts one row. If a row with the same `@Id` exists, updates that row. Returns the row count that the database reports. Needs a transaction |
 | `upsertAll(Collection<L>, AssignEach<T, L>)` | `int` | Upserts one row per element (one statement per row). Needs a transaction |
 | `updateQuery()` | `UpdateQuery<T>` | Starts an update: `updateQuery().set(...).where(...).execute()` (see [7.2](07-2-update.md)). Needs a transaction |
 | `deleteQuery()` | `DeleteQuery<T>` | Starts a delete: `deleteQuery().where(...).execute()` (see [7.4](07-4-delete.md)). Needs a transaction |
 | `insertQuery()` | `InsertQuery<T>` | Starts an insert: `insertQuery().values(...).execute()` (see [7.5](07-5-insert.md)). Needs a transaction |
-| `upsertQuery()` | `UpsertQuery<T>` | Starts an upsert keyed by the `@Id` (see [7.6](07-6-upsert.md)). Needs a transaction |
+| `upsertQuery()` | `UpsertQuery<T>` | Starts an upsert with the `@Id` as the key (see [7.6](07-6-upsert.md)). Needs a transaction |
 
-The short methods are the same as `query()` with a result function: `findAll(w)` is `query().where(w).toList()`, `findSet(w)` is `query().where(w).toSet()`, `findFirst(w)` is `query().where(w).first()`, and `findOne(w)` is `query().where(w).one()`. The result functions are explained in [Getting the result](02-getting-started.md#getting-the-result).
-`findAll(Where<T>)` and `count(Where<T>)` do not clash with `findAll(Sort)`, `findAll(Example)` or `count()` from `JpaRepository`, because the argument types are different.
+The short methods are the same as `query()` with a result function. `findAll(w)` is `query().where(w).toList()`, `findSet(w)` is `query().where(w).toSet()`, `findFirst(w)` is `query().where(w).first()`, and `findOne(w)` is `query().where(w).one()`. The result functions are explained in [Getting the result](02-getting-started.md#getting-the-result).
+`findAll(Where<T>)` and `count(Where<T>)` have different argument types, so they do not clash with `findAll(Sort)`, `findAll(Example)` and `count()` of `JpaRepository`.
 
-**`query()`: the full query.** [`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java), region `query` (a part of the repository in 12.3):
+**`query()`: the full query.**
+Part of the repository of 12.3:
 
+<!-- region: MemberRepository.java#query -->
 ```java
 /**
  * @param n how many
@@ -215,7 +217,7 @@ The short methods are the same as `query()` with a result function: `findAll(w)`
 default List<Member> topGraded(int n) {
     return query()
             .where(m -> m.isActive())
-            .orderBy((m, by) -> by.desc(m.getGrade()).asc(m.getId()))
+            .orderBy(m -> desc(m.getGrade()).asc(m.getId()))
             .limit(n)
             .toList();
 }
@@ -223,50 +225,47 @@ default List<Member> topGraded(int n) {
 
 In the next examples, `repository` is a `MemberRepository`.
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `find-all-sort`:
-
+<!-- region: ExecutorTest.java#find-all-sort -->
 ```java
-SortSpec<Member> byGrade = SortSpec.of(Member.class, (m, by) -> by.desc(m.getGrade()).asc(m.getId()));
+SortSpec<Member> byGrade = SortSpec.of(Member.class, m -> desc(m.getGrade()).asc(m.getId()));
 List<Member> active = repository.findAll(m -> m.isActive(), byGrade);
 ```
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `find-first` (the active member with the highest grade):
+The active member with the highest grade:
 
+<!-- region: ExecutorTest.java#find-first -->
 ```java
 Optional<Member> best = repository.findFirst(m -> m.isActive(),
-        SortSpec.of(Member.class, (m, by) -> by.desc(m.getGrade())));
+        SortSpec.of(Member.class, m -> desc(m.getGrade())));
 ```
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `find-one`:
-
+<!-- region: ExecutorTest.java#find-one -->
 ```java
 Optional<Member> kim = repository.findOne(m -> m.getName().equals("Kim"));
 // two or more rows: Spring's IncorrectResultSizeDataAccessException
 assertThrows(IncorrectResultSizeDataAccessException.class, () -> repository.findOne(m -> m.isActive()));
 ```
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `count-exists`:
-
+<!-- region: ExecutorTest.java#count-exists -->
 ```java
 long active = repository.count(m -> m.isActive());
 boolean anyInTeamB = repository.exists(m -> m.getTeam().getName().equals("B"));
 ```
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `find-set`:
-
+<!-- region: ExecutorTest.java#find-set -->
 ```java
 java.util.SequencedSet<Member> active = repository.findSet(m -> m.isActive(), Sort.by(Sort.Order.desc("grade"), Sort.Order.asc("id")));
 java.util.SequencedSet<Member> any = repository.findSet(m -> m.isActive());
 ```
 
-`active` keeps the order of the `Sort`. `any` has no fixed order, like `findAll(where)`.
+`active` keeps the order of the `Sort`. The order of `any` is not defined, as with `findAll(where)`.
 
 <a id="dml-shortcuts"></a>
 ### DML shortcuts
 
 These 8 methods run an update, delete, insert or upsert in one call.
 
-| Shortcut | Same as |
+| Shortcut | Same statement |
 |---|---|
 | `deleteAll(where)` | `deleteQuery().where(where).execute()` |
 | `deleteOne(where)` | `deleteQuery().where(where).executeOne()` |
@@ -277,13 +276,12 @@ These 8 methods run an update, delete, insert or upsert in one call.
 | `upsertOne(values)` | `upsertQuery().values(values).execute()` |
 | `upsertAll(rows, values)` | `upsertQuery().values(rows, values).execute()` |
 
-- **The condition comes first**, the assignments second: `updateAll(m -> !m.isActive(), m -> m.setGrade(7))`.
-- **`All`** means every row that matches (delete, update), or every element of the list (insert, upsert).
-- **`One`** means the one-row protection for delete and update (see the next part), and one row for insert and upsert.
-- They need the caller's transaction (see [12.6](#126-transactions-and-exceptions)). The test runs them in a `TransactionTemplate`.
+- **The condition comes first**, then the assignment: `updateAll(m -> !m.isActive(), m -> m.setGrade(7))`.
+- **`All`** means all rows that match the condition (delete, update) or all elements of the list (insert, upsert).
+- **`One`** means one-row protection for delete and update (see the next section), and one row for insert and upsert.
+- They need the caller's transaction (see [12.6](#126-transactions-and-exceptions)). The example calls them inside a `TransactionTemplate`.
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `dml-shortcuts`:
-
+<!-- region: ExecutorTest.java#dml-shortcuts -->
 ```java
 int changed = repository.updateAll(m -> !m.isActive(), m -> m.setGrade(7));      // condition first
 int deleted = repository.deleteAll(m -> m.getTeam() == null);                     // bulk: no cascade
@@ -292,24 +290,23 @@ int many = repository.insertAll(List.of(new NewMember("A", 1), new NewMember("B"
         (m, r) -> { m.setName(r.name()); m.setGrade(r.grade()); m.setActive(true); });
 ```
 
-`NewMember` is a record in the test: `record NewMember(String name, int grade)`.
+`NewMember` is the record `record NewMember(String name, int grade)` of the example.
 
 <a id="one-row-protection-deleteone-and-updateone"></a>
 ### One-row protection: `deleteOne` and `updateOne`
 
-`deleteOne(where)` and `updateOne(where, set)` never change more than one row.
+`deleteOne(where)` and `updateOne(where, set)` never change two or more rows.
 
-1. lambdaQL reads the ids of the rows that match, at most 2.
-2. No id: nothing changes. The result is 0.
-3. 2 ids: nothing changes. The method throws `IncorrectResultSizeDataAccessException`.
-4. 1 id: lambdaQL changes that row with `id = :p and (your condition)`. The result is 1, or 0 if the row stopped matching in the meantime.
+1. lambdaQL reads at most 2 ids of the rows that match the condition.
+2. If there is no id, it changes nothing and returns 0.
+3. If there are 2 ids, it changes nothing and throws `IncorrectResultSizeDataAccessException`.
+4. If there is 1 id, it changes only that row with `id = :p and (condition)` and returns 1. If the row stopped matching the condition in the meantime, it returns 0.
 
-The statement itself names one id, so it cannot change a second row, even if another transaction adds a matching row in the meantime. The protection does not rely on a rollback.
+The statement itself names one id, so even if another transaction adds a matching row in the meantime, a second row is not changed. This protection does not rely on a rollback.
 
 The core API has the same protection: `executeOne()` (see [7.4](07-4-delete.md#delete-exactly-one-row-executeone)).
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `dml-one`:
-
+<!-- region: ExecutorTest.java#dml-one -->
 ```java
 int renamed = repository.updateOne(m -> m.getId() == kimId, m -> m.setName("Kim2"));   // exactly one row
 // two or more rows match: nothing changes
@@ -320,29 +317,30 @@ assertThrows(org.springframework.dao.IncorrectResultSizeDataAccessException.clas
 <a id="deleteallwhere-is-not-spring-datas-deleteall"></a>
 ### `deleteAll(where)` is not Spring Data's `deleteAll()`
 
-| Method | From | How it deletes | Cascade, `@PreRemove` |
+| Method | Belongs to | How it deletes | cascade, `@PreRemove` |
 |---|---|---|---|
-| `deleteAll()` | `CrudRepository` | Loads every entity, then removes them one by one | run |
-| `deleteAll(Iterable)` | `CrudRepository` | Removes the given entities one by one | run |
-| `deleteAll(Where<T>)` | `LambdaQlExecutor<T>` | One SQL `delete` statement (bulk) | **not run** |
+| `deleteAll()` | `CrudRepository` | Loads all entities, then deletes them one by one | Run |
+| `deleteAll(Iterable)` | `CrudRepository` | Deletes the given entities one by one | Run |
+| `deleteAll(Where<T>)` | `LambdaQlExecutor<T>` | One SQL `delete` statement (bulk) | **Not run** |
 
-`deleteAll(where)` does not load the entities. Like every bulk statement, it does not change entities already loaded (rule U16).
+`deleteAll(where)` does not load entities. Like other bulk statements, it is not reflected in entities that are already loaded.
 
-Use it to delete many rows quickly. Use Spring Data's methods when you need cascade or `@PreRemove`.
+Use it to delete many rows fast. If you need cascade or `@PreRemove`, use the Spring Data methods.
 
-The compiler picks the method by the argument: no argument, an `Iterable`, or a lambda. This was checked in the bytecode from javac and kotlinc 2.3.21 (measured).
+The compiler chooses the method by the argument (no argument, `Iterable`, lambda expression). This was checked in the bytecode opcodes of javac and kotlinc 2.3.21 (measured).
 
 <a id="builders-for-complex-statements"></a>
 ### Builders for complex statements
 
-`updateQuery()`, `deleteQuery()`, `insertQuery()` and `upsertQuery()` start a full statement. Use them for what the shortcuts cannot do: many `set()` calls, `all()`, `orderBy(...).limit(n)` (see [7.4](07-4-delete.md#delete-the-first-rows-limit)), `toHql()`, or `onConflict(...)`.
+`updateQuery()`, `deleteQuery()`, `insertQuery()` and `upsertQuery()` start a full statement. Use them when the shortcut methods cannot express it: many `set()` calls, `all()`, `orderBy(...).limit(n)` (see [7.4](07-4-delete.md#delete-the-first-rows-limit)), `toHql()`, `onConflict(...)`.
 
-The names end with `Query`, so they do not clash with `JpaRepository` methods such as `delete(...)`. The statements are the same as with `QueryBuilder` (see [7. Update, insert, delete](07-dml.md)). The rows are the same as a select with the same `where` lambda.
+The method names end with `Query`, so they do not clash with `JpaRepository` methods such as `delete(...)`. The statements are the same as the statements built with `QueryBuilder` (see [7. Update, insert, delete](07-dml.md)). The target rows are the same as the rows selected with the same `where` lambda expression.
 
-They need the caller's transaction, like the shortcuts. Like every JPA bulk statement, they do not change entities already loaded in the transaction.
+Like the shortcut methods, they need the caller's transaction. Like every JPA bulk statement, they are not reflected in entities already loaded in the transaction.
 
-[`MemberRepository.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java), region `dml` (a part of the repository in 12.3):
+Part of the repository of 12.3:
 
+<!-- region: MemberRepository.java#dml -->
 ```java
 /**
  * @param grade the new grade
@@ -366,35 +364,35 @@ default int addGuest(String name) {
 }
 ```
 
-The upsert runs in a transaction too. `teams` is a `TeamRepository`, and `tx` is a Spring `TransactionTemplate`.
+An upsert also runs inside a transaction. `teams` is a `TeamRepository`, and `tx` is a Spring `TransactionTemplate`.
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `upsert`:
-
+<!-- region: ExecutorTest.java#upsert -->
 ```java
 int changed = tx.execute(s -> teams.upsertQuery().values(t -> { t.setId(teamId); t.setName("A2"); }).execute());
 ```
 
-The upsert returns the row count of the database: 1 for an insert, and for an update 1 on H2 and Oracle but 2 on MariaDB (see [7.6](07-6-upsert.md#the-row-count)).
+An upsert returns the row count that the database reports. For an insert it is 1. For an update it is 1 on H2 and Oracle, and 2 on MariaDB (see [7.6](07-6-upsert.md#the-row-count)).
+
+Example code: [`MemberRepository.java`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/sample/MemberRepository.java) (`query`, `dml`), [`ExecutorTest.java`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java) (`find-all-sort`, `find-first`, `find-one`, `count-exists`, `find-set`, `dml-shortcuts`, `dml-one`, `upsert`).
 
 <a id="125-spring-sort-and-pageable"></a>
 ## 12.5 Spring `Sort` and `Pageable`
 
-`findAll(where, sort)`, `findSet(where, sort)`, `findFirst(where, sort)` and `findAll(where, pageable)` take the Spring Data types.
-lambdaQL turns each `Sort.Order` into one sort key with `SortSpec.ofPath` (see [4.10](04-order-paging.md#410-reusable-and-external-sorts)).
+`findAll(where, sort)`, `findSet(where, sort)`, `findFirst(where, sort)` and `findAll(where, pageable)` take Spring Data types.
+lambdaQL converts each `Sort.Order` into one sort key with `SortSpec.ofPath` (see [4.10](04-order-paging.md#410-reusable-and-external-sorts)).
 
-| Spring | In lambdaQL |
+| Spring | What lambdaQL does |
 |---|---|
-| A property name (`"grade"`, `"team.name"`) | Checked with Spring Data `PropertyPath`, the same as in Spring Data's own repositories. An unknown name gives `PropertyReferenceException` (package: `org.springframework.data.mapping` in Spring Data 3, `org.springframework.data.core` in 4). The path must end at a basic value, not at an entity. A to-one path such as `team.name` uses a `left join`, so rows without a team are kept. Then the sort policy checks the name (see [below](#sort-policy-with-spring)) |
-| An alias of the sort policy (`"level"`) | Passed on as it is, without the `PropertyPath` check. The sort policy turns it into its path |
-| `ASC` / `DESC` with `NullHandling.NATIVE` (the default) | The lambdaQL NULL rule: NULLs first for ascending, NULLs last for descending. The order is the same on every database (see [4.4](04-order-paging.md#44-null-ordering-is-the-same-on-every-database)) |
-| `NullHandling.NULLS_FIRST` / `NULLS_LAST` | Used as written (`ASC_NULLS_FIRST`, `DESC_NULLS_LAST` and so on) |
-| `ignoreCase()` | Not supported yet. It throws `UnsupportedOperationException` |
+| Property names (`"grade"`, `"team.name"`) | Checked with Spring Data `PropertyPath`, as in Spring Data repositories. An unknown name gives `PropertyReferenceException` (package: `org.springframework.data.mapping` in Spring Data 3, `org.springframework.data.core` in 4). The end of the path must be a basic value, not an entity. A to-one path such as `team.name` uses a `left join`, so rows without a team are also in the result. Then the sort policy checks the name (see [below](#sort-policy-with-spring)) |
+| An alias of the sort policy (`"level"`) | Passed as it is, without the `PropertyPath` check. The sort policy turns it into a path |
+| `ASC` / `DESC` with `NullHandling.NATIVE` (the default) | The lambdaQL NULL rule applies. NULL first for ascending, NULL last for descending. The same order on every database (see [4.4](04-order-paging.md#44-null-ordering-is-the-same-on-every-database)) |
+| `NullHandling.NULLS_FIRST` / `NULLS_LAST` | Used as given (`ASC_NULLS_FIRST`, `DESC_NULLS_LAST` and so on) |
+| `ignoreCase()` | Not supported. Throws `UnsupportedOperationException` |
 | `Sort.unsorted()` | No `order by` |
 
-Spring Data JPA's own repositories leave the NULL position of `NATIVE` to the database, so the order there can be different on each database. lambdaQL uses its own rule instead.
+Spring Data JPA's own repositories leave the NULL position of `NATIVE` to the database, so the order can differ by database. lambdaQL applies its own rule.
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `find-all-spring-sort`:
-
+<!-- region: ExecutorTest.java#find-all-spring-sort -->
 ```java
 List<Member> rows = repository.findAll(m -> m.isActive(),
         Sort.by(Sort.Order.desc("grade"), Sort.Order.asc("team.name"), Sort.Order.asc("id")));
@@ -407,58 +405,58 @@ assertEquals("PropertyReferenceException", unknown.getClass().getSimpleName());
 Paging with `findAll(where, pageable)`:
 
 - Page numbers start at 0, as in Spring Data. lambdaQL reads the page with `limit` and `offset`.
-- The total comes from a `count` query. Spring skips it when the page alone shows the total (for example, the first page has fewer rows than the page size).
-- When the sort keys do not contain the id, lambdaQL adds the id as the last key, so a row does not move between pages (see [Tie-breaker](04-order-paging.md#tie-breaker-automatic-id)). A page without a sort is ordered by the id.
-- `Pageable.unpaged()` returns all rows in one page.
+- The total count comes from a `count` query. When the page alone fixes the total (for example, the first page has fewer rows than the page size), Spring skips the count query.
+- If the sort keys have no id, lambdaQL adds the id as the last key, so rows do not move between pages (see [Tie-breaker](04-order-paging.md#tie-breaker-automatic-id)). A page without a sort gets no `order by`, so give a `Sort` to split pages in a stable way.
+- `Pageable.unpaged()` returns all rows as one page.
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `page`:
-
+<!-- region: ExecutorTest.java#page -->
 ```java
 Page<Member> page = repository.findAll(m -> m.isActive(), PageRequest.of(1, 2, Sort.by("name")));
 // page 1 (the second page) of the active members by name; the total comes from a count query
 ```
 
-**Sort from request parameters.** Spring MVC can make a `Pageable` from request parameters such as `?page=1&size=20&sort=name,desc`.
-Without a sort policy and without `@Sortable` fields, every persistent property is accepted, so a user can sort by any column. lambdaQL then logs `LQL-5003` at `INFO` level once for each entity and name.
+**Sorts from request parameters.** Spring MVC can build a `Pageable` from request parameters such as `?page=1&size=20&sort=name,desc`.
+With no sort policy and no `@Sortable` fields, every persistent property is accepted, so a user can sort by any column. In this case lambdaQL logs `LQL-5003` at `INFO` level, once per entity and name.
 To allow only some names, use the sort policy below.
 
 <a id="sort-policy-with-spring"></a>
-### The sort policy with Spring
+### Sort policy with Spring
 
-The sort policy (decision D43) decides which outside sort names are allowed. `SortRules`, `SortMode` and the rules are explained in [4.10](04-order-paging.md#sort-policy).
-A Spring `Sort` or `Pageable` is always an outside sort, so the policy checks every name in it. A sort lambda is never checked.
+The sort policy decides which outside sort names are allowed. `SortRules`, `SortMode` and the rules are explained in [4.10](04-order-paging.md#sort-policy).
+A Spring `Sort` or `Pageable` is always an outside sort, so the policy checks every name in it. Sort lambda expressions are not checked.
 
-**Where the rules come from.** With Spring Boot, the auto-configuration builds the policy of the `EntityManagerFactory` and registers it after all singleton beans are made.
+**Where the rules come from.** In Spring Boot, the auto-configuration builds the policy of the `EntityManagerFactory` and registers it after all singleton beans are created.
 The auto-configuration reads three places.
 
-| Place | What it gives |
+| Source | What it gives |
 |---|---|
-| A `SortPolicy` bean | A mode and `SortRules` written with lambdas |
+| A `SortPolicy` bean | A mode and `SortRules` written with lambda expressions |
 | The properties `lambdaql.sort.*` | A mode and rules written as strings |
-| `@Sortable` fields ([4.10](04-order-paging.md#rules-from-sortable)) | Rules for an entity that has no rules from the bean or the properties |
+| `@Sortable` fields ([4.10](04-order-paging.md#rules-from-sortable)) | Rules for entities that have no rules in the bean or the properties |
 
 - The rules of one entity come from one place only, in the order of the table. Rules from two places are not merged.
-- `lambdaql.sort.mode` wins over the mode of the bean. Without both, the mode is `INFO`.
-- This works when there is exactly one `EntityManagerFactory`, the same condition as for the `QueryBuilder` bean (see [12.8](#128-the-querybuilder-bean)). Otherwise call `SortPolicy.register(emf, policy)` yourself.
-- Without a bean and without properties, nothing is registered, so the default applies: `INFO`, with rules only from `@Sortable`.
+- `lambdaql.sort.mode` takes priority over the mode of the bean. If neither is set, the mode is `INFO`.
+- It is registered when there is exactly one `EntityManagerFactory`, the same as for the `QueryBuilder` bean (see [12.8](#128-the-querybuilder-bean)). In other cases, call `SortPolicy.register(emf, policy)` yourself.
+- If there is neither a bean nor properties, nothing is registered, so the default is used: `INFO`, with rules only from `@Sortable`.
 
 **Properties.**
 
 | Property | Meaning |
 |---|---|
-| `lambdaql.sort.mode` | `OFF`, `INFO` (the default), `WARN` or `STRICT` |
-| `lambdaql.sort.allow.<Entity>` | The allowed paths, separated by commas, for example `name,team.name` |
-| `lambdaql.sort.alias.<Entity>.<outside name>` | The path of an alias, for example `lambdaql.sort.alias.Member.level=grade` |
+| `lambdaql.sort.mode` | `OFF`, `INFO` (default), `WARN`, `STRICT` |
+| `lambdaql.sort.allow.<Entity>` | Allowed paths, separated by commas. Example: `name,team.name` |
+| `lambdaql.sort.alias.<Entity>.<outside name>` | The path of an alias. Example: `lambdaql.sort.alias.Member.level=grade` |
 
-**The SARGable mode property.** `lambdaql.sargable.mode` is one of `OFF`, `WARN` (the default) and `STRICT` (decision D50). The auto-configuration registers it in the same way as `lambdaql.sort.mode`. With `STRICT`, the analysis of a condition that cannot use an index fails with `NonSargableException` (`LQL-3066`) (see [8.9](08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable)).
+**SARGable mode property.** `lambdaql.sargable.mode` is one of `OFF`, `WARN` (default) and `STRICT`. The auto-configuration registers it in the same way as `lambdaql.sort.mode`. With `STRICT`, the analysis of a condition that cannot use an index fails with `NonSargableException` (`LQL-3066`) (see [8.9](08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable)).
 
-`<Entity>` is the JPA entity name. By default it is the simple class name, and you can change it with `@Entity(name = ...)`.
+For `<Entity>`, write the JPA entity name. The default is the simple class name, and you can change it with `@Entity(name = ...)`.
 
-The entity name is unique in a persistence unit (Hibernate stops at start-up when two entities have the same name). So two classes with the same name in different packages are never mixed up. An unknown name stops the application start with `IllegalStateException` (LQL-4042).
-The paths are checked against the entity the first time the rules are used (see [Rules as strings](04-order-paging.md#rules-as-strings) in 4.10).
+An entity name is unique in a persistence unit (if two have the same name, Hibernate stops at startup). So classes with the same name in different packages do not get mixed. If the name does not exist, the application startup stops with `IllegalStateException` (LQL-4042).
+The paths are checked against the entity when the rule is first used (see [Rules as strings](04-order-paging.md#rules-as-strings) in 4.10).
 
-[`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java), region `properties` (the properties of the test; in an application they go into `application.properties` or `application.yaml`):
+In an application, write them in `application.properties` or `application.yaml`:
 
+<!-- region: SortPropertiesTest.java#properties -->
 ```java
 @SpringBootTest(classes = SampleApplication.class, properties = {
         "lambdaql.sort.mode=STRICT",
@@ -466,31 +464,36 @@ The paths are checked against the entity the first time the rules are used (see 
         "lambdaql.sort.alias.Member.level=grade"})
 ```
 
-[`SortPropertiesTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java), region `properties-use`:
-
+<!-- region: SortPropertiesTest.java#properties-use -->
 ```java
 List<Member> byLevel = repository.findAll(m -> m.isActive(), Sort.by(Sort.Order.desc("level")));
 List<Member> byTeam = repository.findAll(m -> m.isActive(), Sort.by("team.name", "name"));
 assertThrows(SortNotAllowedException.class, () -> repository.findAll(m -> m.isActive(), Sort.by("grade")));
 ```
 
-This test also checks that the auto-configuration registers the policy.
+The auto-configuration registers the sort policy from these properties.
 
-**A `SortPolicy` bean.** For rules that the compiler checks, define a `SortPolicy` bean. The same auto-configuration step registers it.
-This bean is a design example. The test below registers the same policy by hand.
+**A `SortPolicy` bean.** To use rules that the compiler checks, define a `SortPolicy` bean. The same auto-configuration step registers this bean.
+With this bean, `Sort.Order.desc("level")` sorts by `grade`, and `Sort.by("grade")` is rejected with `SortNotAllowedException`. The example after it registers the same policy directly.
 
+<!-- region: ManualJavaSpringTest.java#sort-policy-bean -->
 ```java
-@Bean
-public SortPolicy sortPolicy() {
-    return SortPolicy.of(SortMode.STRICT,
-            SortRules.of(Member.class)
-                    .allow(m -> m.getName())
-                    .alias("level", m -> m.getGrade()));
+@Configuration
+static class SortConfig {
+
+    @Bean
+    public SortPolicy sortPolicy() {
+        return SortPolicy.of(SortMode.STRICT,
+                SortRules.of(Member.class)
+                        .allow(m -> m.getName())
+                        .alias("level", m -> m.getGrade()));
+    }
 }
 ```
 
-[`ExecutorTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java), region `sort-policy` (the region ends inside a `try`; the `finally` block calls `SortPolicy.unregister(emf)`):
+The code below is the part inside a `try` block. The `finally` block calls `SortPolicy.unregister(emf)` to remove the policy.
 
+<!-- region: ExecutorTest.java#sort-policy -->
 ```java
 // usually a @Bean SortPolicy; the Boot auto-configuration registers it for the EntityManagerFactory
 org.lambdaql.query.SortPolicy.register(emf, org.lambdaql.query.SortPolicy.of(org.lambdaql.query.SortMode.STRICT,
@@ -505,93 +508,95 @@ try {
             () -> repository.findAll(m -> m.isActive(), Sort.by("grade")));
 ```
 
-- An alias such as `level` is not a property of `Member`. lambdaQL passes it on without the Spring `PropertyPath` check, and the policy turns it into `grade`.
-- A name that is neither an alias nor a property still gives `PropertyReferenceException` first, before the policy is asked.
-- In `STRICT` mode, a property that is not in the rules gives `SortNotAllowedException` (`LQL-4040`). Spring does not translate it (see [12.6](#126-transactions-and-exceptions)).
+- An alias such as `level` is not a property of `Member`. lambdaQL passes it as it is, without the Spring `PropertyPath` check, and the policy turns it into `grade`.
+- A name that is neither an alias nor a property gives `PropertyReferenceException` before the policy check.
+- In `STRICT` mode, a property that is not in the rules gives `SortNotAllowedException` (`LQL-4040`). Spring does not translate this exception (see [12.6](#126-transactions-and-exceptions)).
 
-**HTTP 400.** lambdaQL has no web dependency, so it does not choose the HTTP status. A web application usually answers `SortNotAllowedException` with 400 Bad Request.
-This handler is an example only (not tested).
+**HTTP 400 response.** lambdaQL has no web dependency, so it does not decide the HTTP status. A web application usually answers with 400 Bad Request in `@ExceptionHandler(SortNotAllowedException.class)` and reads the error code with `e.code()` (`"LQL-4040"`).
 
-```java
-@RestControllerAdvice
-public class SortErrorHandler {
+The message has the entity class and the sort name. To avoid showing the entity name to clients, send only `e.code()`.
 
-    @ExceptionHandler(SortNotAllowedException.class)
-    public ProblemDetail sortNotAllowed(SortNotAllowedException e) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
-        problem.setProperty("code", e.code());      // "LQL-4040"
-        return problem;
-    }
-}
-```
-
-The message names the entity class and the sort name. If clients must not see the entity name, send only `e.code()`.
+Example code: [`ExecutorTest.java`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ExecutorTest.java) (`find-all-spring-sort`, `page`, `sort-policy`), [`SortPropertiesTest.java`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/SortPropertiesTest.java) (`properties`, `properties-use`), [`ManualJavaSpringTest.java`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualJavaSpringTest.java) (`sort-policy-bean`).
 
 <a id="126-transactions-and-exceptions"></a>
 ## 12.6 Transactions and exceptions
 
 The executor uses Spring's shared `EntityManager`, which is bound to the current transaction.
 
-**lambdaQL puts no `@Transactional` on its methods, on purpose** (decision D41).
-An update, delete, insert or upsert needs the caller's transaction. This is true for the shortcuts (`deleteAll`, `updateOne`, ...), the builders (`updateQuery()`, ...) and the `QueryBuilder` bean.
+**lambdaQL does not put `@Transactional` on its methods.** This is by design.
+Update, delete, insert and upsert need the caller's transaction. This is the same for the shortcut methods (`deleteAll`, `updateOne` and others), the builders (`updateQuery()` and others) and the `QueryBuilder` bean.
 
-Put `@Transactional` on your service method, or use a `TransactionTemplate`. Without a transaction, the call fails before any SQL is sent.
+Put `@Transactional` on your service method, or use `TransactionTemplate`. Without a transaction, the call fails before any SQL is sent.
 
-| Case | What happens |
+| Case | Behavior |
 |---|---|
-| A select inside `@Transactional` | lambdaQL runs in the same transaction. It sees changes that are not flushed yet. After a rollback, these changes are gone for lambdaQL too |
-| A select outside a transaction | Spring uses a new `EntityManager` for the call and closes it after the call, so the returned entities are detached. This is Spring's normal behavior; it is not tested by lambdaQL |
-| An update, delete, insert or upsert inside `@Transactional` or a `TransactionTemplate` | It runs in that transaction and rolls back with it |
-| An update, delete, insert or upsert outside a transaction | It fails before any SQL is sent. Nothing changes (see the next table) |
+| A select inside `@Transactional` | lambdaQL runs in the same transaction and also sees changes that are not flushed yet. After a rollback, lambdaQL does not see those changes either |
+| A select outside a transaction | Spring uses a new `EntityManager` for each call and closes it when the call ends, so the returned entities are detached (the `detached` example below) |
+| Update, delete, insert, upsert inside `@Transactional` or `TransactionTemplate` | Runs in that transaction and is rolled back with it |
+| Update, delete, insert, upsert outside a transaction | Fails before any SQL is sent. Nothing is changed (see the next table) |
 
-Only `new QueryBuilder(entityManagerFactory)` runs DML in its own transaction (see [7.8](07-dml.md#transactions)). Do not use it in a Spring application (see [12.8](#128-the-querybuilder-bean)).
+<!-- region: ManualJavaSpringTest.java#detached -->
+```java
+// outside a transaction each call uses a new EntityManager: the returned entity is detached
+Member kim = repository.findOne(m -> m.getName().equals("Kim")).orElseThrow();
+boolean managed = new TransactionTemplate(txManager).execute(s -> entityManager.contains(kim));
+assertFalse(managed);
+```
 
-Errors go through Spring's exception translation, the same as for other repository methods.
+The only builder that runs DML in its own transaction is `new QueryBuilder(entityManagerFactory)` (see [7.8](07-dml.md#transactions)). Do not use this builder in a Spring application (see [12.8](#128-the-querybuilder-bean)).
+
+Errors go through Spring's exception translation, like other repository methods.
 
 | Case | Exception |
 |---|---|
-| `findOne` matches 2 or more rows | `IncorrectResultSizeDataAccessException` (Spring), instead of JPA's `NonUniqueResultException` |
-| `deleteOne` or `updateOne` matches 2 or more rows | `IncorrectResultSizeDataAccessException`. Nothing is changed |
-| An unknown property in a Spring `Sort` | `PropertyReferenceException` |
-| `ignoreCase()` in a Spring `Sort` | `UnsupportedOperationException` |
-| A sort name that the sort policy does not allow, in `STRICT` mode ([12.5](#sort-policy-with-spring)) | `SortNotAllowedException` (`LQL-4040`), not translated |
-| An update, delete, insert or upsert without a transaction, in a repository call (a shortcut, or `execute()` inside a default method) | `InvalidDataAccessApiUsageException`, made by Spring from JPA's `TransactionRequiredException`. Outside a repository method (the `QueryBuilder` bean), JPA's `TransactionRequiredException` |
-| An assignment lambda that breaks a rule (U1, U3, U4, U6) | `LambdaQLException` (for example `TranslationException`, `LQL-3042`), not translated (see [7.8](07-dml.md#rules-checked-at-analysis-time)) |
+| Two or more rows match the condition of `findOne` | Spring `IncorrectResultSizeDataAccessException` instead of JPA `NonUniqueResultException` |
+| Two or more rows match the condition of `deleteOne` or `updateOne` | `IncorrectResultSizeDataAccessException`. Nothing is changed |
+| A property that does not exist in a Spring `Sort` | `PropertyReferenceException` |
+| `ignoreCase()` of a Spring `Sort` | `UnsupportedOperationException` |
+| A sort name that the sort policy does not allow in `STRICT` mode ([12.5](#sort-policy-with-spring)) | `SortNotAllowedException` (`LQL-4040`), not translated |
+| Running an update, delete, insert or upsert without a transaction from a repository call (a shortcut method, or `execute()` inside a default method) | `InvalidDataAccessApiUsageException`. Spring translated the JPA `TransactionRequiredException` into it. Outside repository methods (the `QueryBuilder` bean), it is the JPA `TransactionRequiredException` |
+| An assignment lambda expression that breaks a rule | `LambdaQLException` (for example `TranslationException`, `LQL-3042`). Not translated (see [7.8](07-dml.md#rules-checked-at-analysis-time)) |
 
-The `QueryBuilder` bean (12.8) is not a repository, so Spring does not translate its errors. There, `one()` and `executeOne()` with 2 or more rows throw `NonUniqueResultException`.
+The `QueryBuilder` bean (12.8) is not a repository, so it does not go through Spring's exception translation. With this bean, if two or more rows match the condition of `one()` or `executeOne()`, you get `NonUniqueResultException`.
+
+Example code: [`ManualJavaSpringTest.java`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualJavaSpringTest.java) (`detached`).
 
 <a id="127-other-fragments-and-jpaspecificationexecutor"></a>
 ## 12.7 Other fragments and `JpaSpecificationExecutor`
 
-`LambdaQlExecutor<T>` is one fragment among others. The repository in 12.3 uses all of these at the same time.
+`LambdaQlExecutor<T>` is one of many fragments. The repository of 12.3 uses all of the following together.
 
-| Used together with | Works | Notes |
+| Used together with | Works | Description |
 |---|---|---|
-| A hand-written fragment (`MemberRepositoryCustom` with `MemberRepositoryImpl`) | Yes | Spring Data finds the `Impl` class as usual |
-| `JpaSpecificationExecutor<T>` | Yes | A lambdaQL lambda has one argument, a `Specification` lambda has three, so Java always picks the right `findAll` |
-| The `JpaRepository` methods (`findAll()`, `count()`, `save(...)`) | Yes | Their argument types are different |
+| A hand-written fragment (`MemberRepositoryCustom` and `MemberRepositoryImpl`) | Yes | Spring Data finds the `Impl` class in the usual way |
+| `JpaSpecificationExecutor<T>` | Yes | A lambdaQL lambda expression has one argument and a `Specification` lambda expression has three, so Java always chooses the correct `findAll` |
+| `JpaRepository` methods (`findAll()`, `count()`, `save(...)`) | Yes | The argument types are different |
 
-These calls come from the test method `worksWithOtherFragments` in `ExecutorTest`.
+In the next example, `repository` is a `MemberRepository`.
 
+<!-- region: ManualJavaSpringTest.java#fragments -->
 ```java
-repository.countByHand();                                                  // hand-written fragment
-repository.findAll((root, query, cb) -> cb.isTrue(root.get("active")));    // Specification: three arguments
-repository.findAll(m -> m.isActive());                                     // lambdaQL Where: one argument
-repository.count();                                                        // Spring Data's own count()
+long byHand = repository.countByHand();                                               // hand-written fragment
+List<Member> bySpec = repository.findAll((root, query, cb) -> cb.isTrue(root.get("active")));   // Specification: three arguments
+List<Member> byLambda = repository.findAll(m -> m.isActive());                        // lambdaQL Where: one argument
+long total = repository.count();                                                      // Spring Data's own count()
 ```
+
+Example code: [`ManualJavaSpringTest.java`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/ManualJavaSpringTest.java) (`fragments`).
 
 <a id="128-the-querybuilder-bean"></a>
 ## 12.8 The `QueryBuilder` bean
 
-With Spring Boot, the auto-configuration `org.lambdaql.spring.boot.LambdaQlAutoConfiguration` makes a `QueryBuilder` bean. Inject it into your services for queries that do not belong to one repository.
+In Spring Boot, the auto-configuration `org.lambdaql.spring.boot.LambdaQlAutoConfiguration` creates a `QueryBuilder` bean. For queries that do not belong to one repository, inject this bean into a service.
 
-- The bean uses Spring's shared, transaction-bound `EntityManager`. Its queries join the current transaction, the same as the repository methods.
-- The bean is made only when there is exactly one `EntityManagerFactory` and you did not define your own `QueryBuilder` bean.
-- The repository methods (`LambdaQlExecutor<T>`) do not need this bean.
-- Its update, delete, insert and upsert statements need the caller's transaction, the same as the repository methods. Without one, they throw `TransactionRequiredException` before any SQL is sent.
+- The bean uses Spring's shared `EntityManager`, which is bound to the transaction. So, like repository methods, its queries join the current transaction.
+- The bean is created only when there is exactly one `EntityManagerFactory` and you did not define your own `QueryBuilder` bean.
+- Repository methods (`LambdaQlExecutor<T>`) do not need this bean.
+- Update, delete, insert and upsert statements built with this bean also need the caller's transaction, like repository methods. Without a transaction, `TransactionRequiredException` is raised before any SQL is sent.
 
-[`AutoConfigurationTest.java`](https://github.com/codebit0/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java), region `query-builder-bean` (`qb` is the injected bean):
+`qb` is the injected bean:
 
+<!-- region: AutoConfigurationTest.java#query-builder-bean -->
 ```java
 // inject it into a service: it joins the current transaction
 TransactionTemplate tx = new TransactionTemplate(txManager);
@@ -601,34 +606,38 @@ long seen = tx.execute(status -> {
 });
 ```
 
-Without Spring Boot, or with two or more `EntityManagerFactory` beans, make the bean yourself. Use a shared `EntityManager`, as the auto-configuration does.
+Without Spring Boot, or when there are two or more `EntityManagerFactory` beans, create the bean yourself. Like the auto-configuration, use the shared `EntityManager`.
 
+<!-- region: ManualJavaStartTest.java#config -->
 ```java
-@Bean
-public QueryBuilder queryBuilder(EntityManagerFactory entityManagerFactory) {
-    // the same as the auto-configuration: a shared, transaction-bound EntityManager
-    return new QueryBuilder(SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory));
+@Configuration
+public static class LambdaQlConfig {
+
+    @Bean
+    public QueryBuilder queryBuilder(EntityManagerFactory entityManagerFactory) {
+        return new QueryBuilder(SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory));
+    }
 }
 ```
 
 `SharedEntityManagerCreator` is a Spring class (`org.springframework.orm.jpa`).
-Do not use `new QueryBuilder(entityManagerFactory)` in a Spring application. That builder opens its own `EntityManager` for each query, and this `EntityManager` does not join the Spring transaction.
+Do not use `new QueryBuilder(entityManagerFactory)` in a Spring application. This builder opens its own `EntityManager` for each query, and this `EntityManager` does not join Spring transactions.
 
-**Tests with `@DataJpaTest`.** A `@DataJpaTest` slice test loads only some auto-configurations. The repository methods work there, but the `QueryBuilder` bean is not made.
-If a test needs it, add `@ImportAutoConfiguration(LambdaQlAutoConfiguration.class)` to the test class (not tested yet).
+**`@DataJpaTest` tests.** A `@DataJpaTest` slice test loads only some auto-configurations. Repository methods work, but the `QueryBuilder` bean is not created.
+If your test needs this bean, use a test that loads the full auto-configuration, such as `@SpringBootTest`.
+
+Example code: [`AutoConfigurationTest.java`](https://github.com/lambdaql/lambdaql/blob/main/spring-data-jpa/src/test/java/org/lambdaql/spring/AutoConfigurationTest.java) (`query-builder-bean`), [`ManualJavaStartTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaStartTest.java) (`config`).
 
 <a id="129-kotlin-repositories"></a>
 ## 12.9 Kotlin repositories
 
-Repositories written in Kotlin need compiler settings. Kotlin 2.2 or newer works with the default settings, and older Kotlin needs `-Xjvm-default=all`. Spring Data also needs `kotlin-reflect`.
-For details, see [the Kotlin version of this page](../kotlin/12-spring-data-jpa.md#129-kotlin-compile-settings).
+Repositories written in Kotlin need a compiler setting. Kotlin 2.2 or later works with the default settings, and versions before 2.2 need `-Xjvm-default=all`. Spring Data also needs `kotlin-reflect`.
+For details, see the [Kotlin version of this page](../kotlin/12-spring-data-jpa.md#129-kotlin-compile-settings).
 
 <a id="1210-not-implemented-yet"></a>
-## 12.10 Not implemented yet
+## 12.10 What is not supported
 
-- **Spring Boot version.** Tested with Spring Boot 3.5.16 and 4.1.2. The same tests run on both versions ([13. Spring Boot 3 and 4](../13-spring-boot-versions.md)).
-- **`ignoreCase()`** in a Spring `Sort`.
-- **Kotlin repositories** are not tested yet.
+- **`ignoreCase()`** of Spring `Sort`. Calling it throws `UnsupportedOperationException` (see [12.6](#126-transactions-and-exceptions)).
 
 ---
 
