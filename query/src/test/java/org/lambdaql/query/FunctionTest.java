@@ -69,12 +69,12 @@ class FunctionTest {
     interface BadFns {
         @SqlFunction("SQ_FN_DISCOUNT")
         static Double computes(Double price) {
-            return price;                                   // FN2: a body that computes a value
+            return price;                                   // a body that computes a value
         }
 
         @SqlFunction("COALESCE")
         static Double builtin(Double price) {
-            throw new DbOnlyException();                    // FN8: a Hibernate built-in name
+            throw new DbOnlyException();                    // a Hibernate built-in name
         }
 
         @SqlFunction(value = "SQ_OTHER", sql = "SQ_FN_DISCOUNT")
@@ -336,10 +336,10 @@ class FunctionTest {
         // @start region="rules"
         // the body never runs in Java
         assertEquals("LQL-4034", assertThrows(DbOnlyException.class, () -> OrderFns.discount(1.0)).code());
-        // FN2: a body that computes a value is rejected (Java and the database could give different values)
+        // a body that computes a value is rejected (Java and the database could give different values)
         assertEquals("LQL-3052", assertThrows(LambdaQLException.class,
                 () -> qb.from(Order.class).where(o -> BadFns.computes(o.getPrice()) > 1)).code());
-        // FN8: a Hibernate built-in name would silently run the built-in function
+        // a Hibernate built-in name would silently run the built-in function
         assertEquals("LQL-3054", assertThrows(LambdaQLException.class,
                 () -> qb.from(Order.class).where(o -> BadFns.builtin(o.getPrice()) > 1)).code());
         // a function with its own SQL name must be registered

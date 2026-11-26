@@ -150,7 +150,8 @@ public interface LambdaQlExecutor<T> {
     SequencedSet<T> findSet(Where<T> where, Sort sort);
 
     /**
-     * Returns the row with the smallest id among the rows that match.
+     * Returns one row among the rows that match. There is no order by, so it is any matching row (ROADMAP D73);
+     * give a {@code SortSpec} or a {@code Sort} to choose the first row.
      *
      * @param where the condition
      * @return the row, or empty

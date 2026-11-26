@@ -123,7 +123,7 @@ ExecutableUpdate<Order> fk = qb.update(Order.class)
 assertEquals("update Order e0 set e0.customer.id = :p1 where e0.id = :p2", fk.toHql().hql());
 ```
 
-`value`의 규칙(규칙 U20):
+`value`의 규칙:
 
 - 첫 번째 인자는 **대상에서 시작하는 getter 호출**이어야 합니다: 필드, 임베디드 경로, 연관의 `@Id`.
   캡처 값, 계산식, 원본 엔티티의 경로는 분석 시점 오류(`LQL-3039`)입니다.
@@ -133,11 +133,10 @@ assertEquals("update Order e0 set e0.customer.id = :p1 where e0.id = :p2", fk.to
   lambdaQL은 분석 시점에 컬럼 타입과 값 타입을 대조하고, 맞지 않으면 `LQL-3065` 오류를 냅니다.
   숫자는 숫자 컬럼에 맞습니다. 다만 소수는 정수 컬럼에 맞지 않습니다(소수 부분이 사라지므로). 타입을 알 수 없는 값(`Object`, 제네릭 집계의 `Number`)은 대조하지 않습니다.
 - 자기 `value(...)` 메서드가 있는 클래스(예: `value` 컴포넌트가 있는 레코드) 안에서는 정적 import가 가려집니다. 그곳에서는 `Dml.value(...)`라고 쓰십시오.
-- `o.getTotal() = 1` 같은 표기는 Java에서 컴파일 오류이므로 쓸 수 없습니다.
 
 <!-- region: AssignmentReaderTest.java#value-type -->
 ```java
-// value(V, V) compiles with any two types, so lambdaQL checks the value type against the column (U20)
+// value(V, V) compiles with any two types, so lambdaQL checks the value type against the column
 assertEquals("[col0.status := 2, col0.price := 1]", setters(o -> { value(o.getStatus(), 2); value(o.getPrice(), 1); }));
 String text = "abc";
 LambdaQLException wrong = assertThrows(LambdaQLException.class, () -> setters(o -> value(o.getStatus(), text)));
@@ -209,13 +208,13 @@ assertEquals("update Order e0 set e0.price = coalesce((select sum(s1.price) from
 
 | Java 형태 | 의미 |
 |---|---|
-| 블록 람다 표현식 `o -> { o.setA(...); o.setB(...); }` | `set`, `values`, `insert ... select`, `onConflict(...).update(...)`에서 허용되지만 **setter 호출만** 가능. 지역 변수, `if`, 반복문은 불가(규칙 U1) |
-| `Objects.requireNonNullElse(a, b)` | `coalesce(a, b)`(규칙 U2) |
+| 블록 람다 표현식 `o -> { o.setA(...); o.setB(...); }` | `set`, `values`, `insert ... select`, `onConflict(...).update(...)`에서 허용되지만 **setter 호출만** 가능. 지역 변수, `if`, 반복문은 불가 |
+| `Objects.requireNonNullElse(a, b)` | `coalesce(a, b)` |
 | `o.setCnt(o.getCnt() + 1)` | 지원. javac가 값을 언박싱하고 박싱하지만 lambdaQL은 이를 무시함 |
 | `o.setStatus((short) 1)` | `short`나 `byte` 필드에 javac가 요구하는 캐스트. 상수는 리터럴로 유지됨 |
 | `o.setActive(!o.isActive())`(토글) | **지원하지 않음**(조건에 따른 값). `where`가 다른 update 두 개를 사용 |
 | `o.setDescription(o.getDescription() + "_x")` | **지원하지 않음**(문자열 연결) |
-| 값으로 쓴 `LocalDateTime.now()` | 애플리케이션에서 계산해 바인딩(규칙 U8) |
+| 값으로 쓴 `LocalDateTime.now()` | 애플리케이션에서 계산해 바인딩 |
 | `UpdateSet<Order> u = qb.update(...).set(...)`(또는 `var`) | update를 단계별로 구성([PATCH](07-2-update.md#many-set-calls-patch) 참고) |
 
 ---
@@ -241,7 +240,7 @@ ExecutableUpdate<Order> u = qb.update(Order.class)
 assertEquals("update Order e0 set e0.total = e0.price, e0.price = 0.0 where e0.status = 3", u.toHql().hql());
 ```
 
-**같은 문장에서 컬럼에 할당한 뒤 나중에 그 컬럼을 읽으면** lambdaQL은 `set(...)`을 호출하는 시점에 `TranslationException`(`LQL-3042`)을 던집니다(규칙 U3).
+**같은 문장에서 컬럼에 할당한 뒤 나중에 그 컬럼을 읽으면** lambdaQL은 `set(...)`을 호출하는 시점에 `TranslationException`(`LQL-3042`)을 던집니다.
 이유: 이 경우 MariaDB는 **새** 값을 사용하고, H2와 Oracle은 이전 값을 사용합니다. 결과가 다릅니다(실측: MariaDB 200, H2와 Oracle 100).
 
 다음 경우는 세 데이터베이스의 결과가 같으므로 허용합니다.
@@ -257,21 +256,21 @@ assertEquals("update Order e0 set e0.total = e0.price, e0.price = 0.0 where e0.s
 <a id="assign-a-column-only-once"></a>
 ### 컬럼당 한 번의 할당
 
-같은 컬럼에 두 번 할당하면 오류입니다(규칙 U4). `setAddress(...)` 뒤의 `getAddress().setCity(...)`,
+같은 컬럼에 두 번 할당하면 오류입니다. `setAddress(...)` 뒤의 `getAddress().setCity(...)`,
 또는 `setCustomer(...)` 뒤의 `getCustomer().setId(...)`도 포함됩니다.
 
 <a id="rules-checked-at-analysis-time"></a>
 ### 분석 시점의 규칙 검사
 
-lambdaQL은 람다 표현식을 읽을 때 규칙 U1, U3, U4, U6을 검사합니다. 아래 예제는 사용자 API가 아니라 내부 클래스 `AssignmentReader`를 호출합니다. 사용자 API에서는 `set(...)`과 `values(...)`가 같은 `LambdaQLException`을 던집니다(예: U1은 `LQL-3037`, U3은 `LQL-3042`, U4는 `LQL-3041`).
+lambdaQL은 람다 표현식을 읽을 때 대입 규칙을 검사합니다. 아래 예제는 사용자 API가 아니라 내부 클래스 `AssignmentReader`를 호출합니다. 사용자 API에서는 `set(...)`과 `values(...)`가 같은 `LambdaQLException`을 던집니다(예: `LQL-3037`, `LQL-3042`, `LQL-3041`).
 
 <!-- region: AssignmentReaderTest.java#rules -->
 ```java
-// U1: only setters; no condition, no local variable
+// only setters; no condition, no local variable
 assertThrows(LambdaQLException.class, () -> setters(o -> { if (o.isActive()) o.setStatus((short) 1); }));
-// U6: an association's other properties belong to another table
+// an association's other properties belong to another table
 assertThrows(LambdaQLException.class, () -> setters(o -> o.getCustomer().setName("x")));
-// U3: a value reads a column written before
+// a value reads a column written before
 assertThrows(LambdaQLException.class, () -> AssignmentReader.checkRules(
         AssignmentReader.readSetters(SerializedLambdaExtractor.extract((Assign<Order>) o -> {
             o.setPrice(1);
@@ -282,13 +281,12 @@ assertThrows(LambdaQLException.class, () -> AssignmentReader.checkRules(
 <a id="where-or-all-is-required"></a>
 ### `where`나 `all()`의 필수 지정
 
-`set()`은 `execute()`가 **없는** 타입(`UpdateSet`)을 반환합니다. `where()`와 `all()`만 `execute()`가 있는 타입(`ExecutableUpdate`)을 반환합니다.
-그래서 `where`를 빠뜨리면 컴파일 오류가 납니다(규칙 U5). `delete`도 마찬가지입니다.
+update와 delete를 실행하려면 `where(...)`나 `all()`을 지정해야 합니다.
 
 <a id="association-paths-same-rows-as-select"></a>
 ### 연관 경로: 조회와 같은 행
 
-lambdaQL은 DML에서 FK가 아닌 연관 경로를 **상관 스칼라 서브쿼리**로 씁니다. `where`와 SET 오른쪽 모두 같습니다(규칙 U9). 아래 예제는 `where`와 SET 오른쪽의 경로를 보여 줍니다.
+lambdaQL은 DML에서 FK가 아닌 연관 경로를 **상관 스칼라 서브쿼리**로 씁니다. `where`와 SET 오른쪽 모두 같습니다. 아래 예제는 `where`와 SET 오른쪽의 경로를 보여 줍니다.
 
 <!-- region: DmlQueryTest.java#update-path -->
 ```java
@@ -317,7 +315,7 @@ lambdaQL은 서브쿼리를 직접 씁니다. 그러면 문장이 자기 테이�
 <a id="batching-for-many-rows"></a>
 ### 여러 행의 배치 처리
 
-`values(list, ...)`는 VALUES 행이 여러 개인 문장 하나를 씁니다(규칙 U13).
+`values(list, ...)`는 VALUES 행이 여러 개인 문장 하나를 씁니다.
 
 | 항목 | 규칙 |
 |---|---|
@@ -383,7 +381,7 @@ int deleted = d.execute();
 <a id="the-persistence-context-is-not-updated"></a>
 ### 영속성 컨텍스트 미반영
 
-벌크 DML은 JPA 영속성 컨텍스트를 거치지 않습니다(규칙 U16).
+벌크 DML은 JPA 영속성 컨텍스트를 거치지 않습니다.
 
 - Hibernate는 문장 실행 전에 대기 중인 변경을 flush합니다.
 - 문장 실행 후, 같은 `EntityManager`에 이미 로드된 엔티티는 **이전 값**을 가집니다. 그 엔티티를 다시 사용한다면 `entityManager.clear()`를 호출하십시오.
@@ -405,8 +403,8 @@ lambdaQL은 이 조건을 따로 처리하지 않습니다.
 <a id="79-all-rules-u1-to-u21-summary"></a>
 ## 7.9 전체 규칙 U1~U21(요약)
 
-lambdaQL이 람다 표현식을 읽을 때 검사하는 규칙: U1, U3, U4, U6, U15. 컴파일러가 검사하는 규칙: U5.
-lambdaQL은 `@Version` 필드에 할당하면 거부합니다(U15, `LQL-3068`). U11과 U12는 따로 검사하지 않습니다.
+lambdaQL이 람다 표현식을 읽을 때 검사하는 규칙: U1, U3, U4, U6, U15.
+lambdaQL은 `@Version` 필드에 할당하면 거부합니다(`LQL-3068`). U11과 U12는 따로 검사하지 않습니다.
 
 | # | 규칙 |
 |---|---|
@@ -442,11 +440,11 @@ lambdaQL은 `@Version` 필드에 할당하면 거부합니다(U15, `LQL-3068`). 
 | 항목 | 대신 할 수 있는 일 |
 |---|---|
 | 조건에 따른 값(`c ? a : b`, 값으로 쓴 `!o.isActive()`) | – |
-| 할당을 고르는 람다 표현식 안의 `if` | `set()`을 여러 번 호출(U14) |
+| 할당을 고르는 람다 표현식 안의 `if` | `set()`을 여러 번 호출 |
 | 문자열 연결(`o.getDescription() + "_x"`) | – |
 | `insert ... select`의 명시적 조인 | many-to-one 경로 사용 |
 | `returning` | – |
-| 데이터베이스 시간(`current_timestamp`) | 애플리케이션 시간을 바인딩(U8) |
+| 데이터베이스 시간(`current_timestamp`) | 애플리케이션 시간을 바인딩 |
 
 규칙을 어기면 코드 `[LQL-xxxx]`가 붙은 `LambdaQLException`이 발생합니다. 대부분의 규칙은 `TranslationException`, 대입 람다 표현식 안의 조건이나 지역 변수는 `UnsupportedLambdaShapeException`입니다. [11. 오류와 언어](../11-errors-and-languages.md)를 참고하십시오.
 모든 규칙을 한곳에서 보려면: [10. 규칙과 제한](10-rules-and-limits.md).

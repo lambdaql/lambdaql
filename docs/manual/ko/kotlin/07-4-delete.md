@@ -46,7 +46,7 @@ where (select c1_0.name from customers c1_0 where c1_0.id=orders.customer_id) is
 MariaDB는 `delete o1_0 from orders o1_0`로 씁니다. H2와 Oracle은 `delete from orders o1_0`로 씁니다.
 
 두 번째 문장은 `qb.from(Order::class.java).where { it.customer!!.name == null }`이 반환하는 것과 **같은 행**, 즉 고객의 이름이 없는 주문을 삭제합니다.
-고객이 **없는** 주문은 삭제되지 않습니다(규칙 U9). `!!`로 지난 비교는 고객이 있는 주문에서만 참이기 때문입니다.
+고객이 **없는** 주문은 삭제되지 않습니다. `!!`로 지난 비교는 고객이 있는 주문에서만 참이기 때문입니다.
 
 `?.`로 쓰면(`it.customer?.name == null`) 고객이 없는 주문도 조건에 맞으므로 조회는 `left join`이 되고, DML은 `e0.customer.id is not null`을 더하지 않습니다. 그래서 고객이 없는 주문도 삭제됩니다.
 <!-- region: ManualKotlinDmlTest.kt#delete-safe-call -->
@@ -59,7 +59,7 @@ assertEquals("delete from Order e0 where (select s1.name from Customer s1 where 
 
 같은 방식의 UPDATE 예제는 [7.2](07-2-update.md)를 참고하십시오. 고객이 없는 주문만 삭제하려면 `it.customer == null`이라고 쓰십시오.
 
-모든 행을 삭제할 때는 `all()`이 필요합니다(규칙 U5). `qb.delete(Order::class.java).execute()`처럼 `all()` 없이 쓰면 `execute()`가 없으므로 컴파일 오류입니다.
+모든 행을 삭제할 때는 `all()`이 필요합니다.
 id 목록으로 삭제할 때는 캡처한 컬렉션을 씁니다.
 
 <!-- region: ManualKotlinDmlTest.kt#delete-all -->
@@ -68,7 +68,7 @@ id 목록으로 삭제할 때는 캡처한 컬렉션을 씁니다.
 val byIds = qb.delete(Item::class.java).where { it.id in ids }
 assertEquals("delete from Item e0 where e0.id in (:p1)", byIds.toHql().hql())
 byIds.execute()
-// every row: all() is required (U5)
+// every row: all() is required
 val all = qb.delete(Order::class.java).all()
 assertEquals("delete from Order e0", all.toHql().hql())
 all.execute()
@@ -99,7 +99,7 @@ delete from orders
 where not exists(select 1 from items i1_0 where i1_0.order_id=orders.id)
 ```
 
-모든 JPA 벌크 문장과 마찬가지로, delete는 JPA `cascade`나 `orphanRemoval`을 실행하지 않고 이미 로드된 엔티티에도 반영되지 않습니다(규칙 U16).
+모든 JPA 벌크 문장과 마찬가지로, delete는 JPA `cascade`나 `orphanRemoval`을 실행하지 않고 이미 로드된 엔티티에도 반영되지 않습니다.
 delete에는 트랜잭션이 필요합니다([7.8](07-dml.md#transactions) 참고).
 
 예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`delete`, `delete-safe-call`, `delete-all`, `delete-not-exists`).
@@ -108,7 +108,7 @@ delete에는 트랜잭션이 필요합니다([7.8](07-dml.md#transactions) 참�
 ## 같은 테이블을 읽는 서브쿼리
 
 `where`의 서브쿼리가 삭제 대상 엔티티(또는 같은 상속 계층의 엔티티)를 읽을 수 있습니다. 서브쿼리 자신의 `from`, 서브쿼리 안의 조인, U9의 상관 스칼라 서브쿼리가 이에 해당합니다.
-이때 lambdaQL은 먼저 대상 id를 파생 테이블로 읽고 그 id로 삭제합니다(규칙 U17).
+이때 lambdaQL은 먼저 대상 id를 파생 테이블로 읽고 그 id로 삭제합니다.
 
 ```
 delete from Order d0 where d0.id in (select t.id from (select e0.id as id from Order e0 where <condition>) t)

@@ -327,7 +327,7 @@ class ProcedureTest {
     void rules() {
         assumeFalse(DB.equals("h2"), "H2 has no OUT parameters (PR15)");
         // @start region="rules"
-        // PR2: the stub is checked against the database parameters on the first call
+        // the stub is checked against the database parameters on the first call
         assertEquals("LQL-4036", assertThrows(LambdaQLException.class,
                 () -> qb.call(OrderProcs.class, p -> p.calcWrong(1)).execute()).code());
         // exec cannot drop OUT values

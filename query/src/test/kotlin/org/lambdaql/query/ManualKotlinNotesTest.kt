@@ -185,7 +185,7 @@ class ManualKotlinNotesTest {
         // ?: in a select value: coalesce
         val text = qb.from(Order::class.java).select { it.description ?: "" }
         assertEquals("select coalesce(e0.description, '') from Order e0", text.toHql().hql())
-        // ?: after ?. in a select value is rejected (J1)
+        // ?: after ?. in a select value is rejected
         val error = assertThrows(LambdaQLException::class.java) {
             qb.from(Order::class.java).select { it.customer?.name ?: "none" }
         }

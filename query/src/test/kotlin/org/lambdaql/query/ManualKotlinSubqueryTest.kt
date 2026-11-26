@@ -123,7 +123,7 @@ class ManualKotlinSubqueryTest {
     @Test
     fun topOne() {
         // @start region="top-one"
-        // the most expensive order of each customer: a correlated scalar subquery with orderBy and limit(1) (rule Q3)
+        // the most expensive order of each customer: a correlated scalar subquery with orderBy and limit(1)
         val q = qb.from(Order::class.java)
             .where { o, sub ->
                 o.id == sub.from(Order::class.java)

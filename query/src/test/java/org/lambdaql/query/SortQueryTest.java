@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -226,11 +227,13 @@ class SortQueryTest {
     @Test
     void pagingWithoutSort() {
         // @start region="page-only"
+        // paging without orderBy: no order by, so which rows come is up to the database; use orderBy for stable pages
         RenderedQuery q = qb.from(Order.class).where(o -> o.isActive()).limit(2).toHql();
-        assertEquals("select e0 from Order e0 where e0.active = true order by e0.id asc", q.hql());
+        assertEquals("select e0 from Order e0 where e0.active = true", q.hql());
         // @end
-        assertEquals(all.stream().filter(Order::isActive).map(Order::getId).sorted().limit(2).toList(),
-                ids(qb.from(Order.class).where(o -> o.isActive()).limit(2).toList()));
+        List<Long> rows = ids(qb.from(Order.class).where(o -> o.isActive()).limit(2).toList());
+        assertEquals(2, rows.size());
+        assertTrue(all.stream().filter(Order::isActive).map(Order::getId).toList().containsAll(rows));
     }
 
     @Test
@@ -297,7 +300,7 @@ class SortQueryTest {
     @Test
     void rejected() {
         // @start region="sort-rejected"
-        // a condition inside the sort lambda (rule S4)
+        // a condition inside the sort lambda
         assertThrows(LambdaQLException.class, () -> qb.from(Order.class)
                 .orderBy(o -> o.isActive() ? asc(o.getPrice()) : desc(o.getPrice())));
         // a key without the entity

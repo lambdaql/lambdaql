@@ -323,7 +323,7 @@ public class SelectJoinQuery<T, U> {
     }
 
     /**
-     * Returns the first main entity (smallest id), or empty.
+     * Returns the first main entity, or empty. Without {@code orderBy} there is no order by, so it is any matching row (D73).
      *
      * @return the first row
      */
@@ -350,7 +350,7 @@ public class SelectJoinQuery<T, U> {
     }
 
     /**
-     * Returns at most {@code count} rows, sorted by the id of every entity (main first, then the joined ones).
+     * Returns at most {@code count} rows. Without {@code orderBy} there is no order by, so which rows come is up to the database (D73).
      *
      * @param count the most rows
      * @return the ordered query

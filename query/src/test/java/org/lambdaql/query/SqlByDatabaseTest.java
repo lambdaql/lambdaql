@@ -191,7 +191,7 @@ class SqlByDatabaseTest {
                 .onConflict(a -> a.getId()).ignore();
         record("insert-ignore", ignore.toHql().get(0), () -> List.of(ignore.execute()), false);
 
-        // ---- KotlinQueryTest, safe call ?. and !! in where (D54): Java cannot write ?., so the HQL that those regions
+        // ---- KotlinQueryTest, safe call ?. and !! in where: Java cannot write ?., so the HQL that those regions
         // assert is run as it is
         kotlinHql("safe-call-or", "select e0 from Order e0 left join e0.customer j1 where e0.status = 1 or j1.name = 'Kim'", false);
         kotlinHql("safe-call-null", "select e0 from Order e0 left join e0.customer j1 where j1.name is null", false);

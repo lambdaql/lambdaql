@@ -62,8 +62,8 @@ class KotlinSelectTest {
 
     @Test
     fun capturedAndRange() {
-        val min = 100.0
         // @start region="captured"
+        val min = 100.0
         val q = qb.from(Order::class.java).where { it.price > min && it.status.toInt() == 1 }
         assertEquals("select e0 from Order e0 where e0.price > :p1 and e0.status = 1", q.toHql().hql())
         // @end

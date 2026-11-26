@@ -67,7 +67,7 @@ class KotlinRegressionTest {
 
     @Test
     fun nullableColumnAndConstant() {
-        // cnt is a nullable Integer; the null check Kotlin adds before the unboxing is not part of the query (D22)
+        // cnt is a nullable Integer; the null check Kotlin adds before the unboxing is not part of the query
         val one = qb.from(Order::class.java).where { it.cnt == 1 }
         assertEquals("select e0 from Order e0 where e0.cnt = 1", one.toHql().hql())
         val notOne = qb.from(Order::class.java).where { it.cnt != 1 }

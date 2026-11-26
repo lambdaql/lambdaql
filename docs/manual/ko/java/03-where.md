@@ -574,7 +574,7 @@ assertEquals(List.of("abc"), codes(literal.toList()));       // Hibernate conver
 | `o.isActive()` | `e0.active = true` | –(기본형 `boolean`은 NULL이 될 수 없음) |
 | `!o.isActive()` | `e0.active = false` | –(기본형 `boolean`은 NULL이 될 수 없음) |
 | `Boolean.TRUE.equals(o.getActive())`(nullable `Boolean`) | `e0.active = :p1`(`:p1`은 `true`) | 반환 안 됨 |
-| `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | **반환 안 됨**(SQL 의미, . Java라면 반환) |
+| `!Boolean.TRUE.equals(o.getActive())` | `e0.active <> :p1` | **반환 안 됨**(SQL 의미. Java라면 반환) |
 | `!o.getActive()`(nullable `Boolean`) | `e0.active = false` | **반환 안 됨**(SQL 의미: NULL은 false가 아님) |
 
 <!-- region: SelectQueryTest.java#boolean -->
@@ -639,7 +639,7 @@ assertEquals("select e0 from Order e0 where (e0.active = true and e0.status > :p
 - 문자열에 대한 `equals`, `Objects.equals`, `==`는 **데이터베이스 콜레이션**을 사용합니다.
   - MariaDB의 `_ci` 콜레이션은 대소문자와 끝의 공백을 무시합니다.
   - Oracle은 `''`(빈 문자열)을 NULL로 저장합니다. 그래서 Oracle에서 `"".equals(o.getDescription())`는 Java와 다르게 동작합니다.
-- 두 문자열에 대한 `==`는 동일성 비교가 아니라 값 비교입니다(규칙 R2). [9.4](09-java-notes.md#94-strings)를 참고하십시오.
+- 두 문자열에 대한 `==`는 동일성 비교가 아니라 값 비교입니다. [9.4](09-java-notes.md#94-strings)를 참고하십시오.
 - 람다 표현식 안의 문자열 상수는 리터럴로 씁니다. 작은따옴표는 escape됩니다(`''`).
 
 <!-- region: SelectQueryTest.java#string-literal -->
@@ -781,7 +781,7 @@ lambdaQL은 JPA Metamodel로 각 단계를 확인합니다.
 | 연관 자체를 `null`과 비교 | 외래 키 컬럼, 조인 없음 | `o.getCustomer() == null` -> `e0.customer is null` |
 | 컬렉션(`@OneToMany`, `@ManyToMany`) | **거부됨** | `c.getOrders()...` -> `exists` 서브쿼리 사용 |
 
-**값 객체 전체의 비교.** 임베디드 값 객체(`@Embedded`) 전체를 같음으로 비교하면 lambdaQL은 컬럼마다 비교 하나로 펼칩니다(B6).
+**값 객체 전체의 비교.** 임베디드 값 객체(`@Embedded`) 전체를 같음으로 비교하면 lambdaQL은 컬럼마다 비교 하나로 펼칩니다.
 `o.getAddress().equals(addr)`, `Objects.equals(o.getAddress(), addr)`, `addr.equals(o.getAddress())`는 모두 `e0.address.city = :p1 and e0.address.zip = :p2`가 됩니다.
 
 - 부정(`!o.getAddress().equals(addr)`)은 `e0.address.city <> :p1 or e0.address.zip <> :p2`입니다.
@@ -882,7 +882,7 @@ Hibernate는 `e0.customer is null`을 `c1_0.id is null`로 씁니다.
 - NULL 컬럼에서 참이 될 수 있는 비교(`is null`, `coalesce`)가 경로를 거치면, lambdaQL은 그 비교에만 `e0.customer is not null`을 더합니다. 그래서 이 비교도 고객이 있는 주문에서만 참입니다.
   `o.getCustomer() == null || o.getCustomer().getName() == null`은 `left join ... where e0.customer is null or (e0.customer is not null and j1.name is null)`이 됩니다.
 - 값과의 비교는 SQL 의미를 따릅니다. `!o.getCustomer().getName().equals(name)`은 고객이 없는 주문을 반환하지 않습니다.
-- `optional = false`로 매핑한 필수 연관은 항상 inner join입니다(A4).
+- `optional = false`로 매핑한 필수 연관은 항상 inner join입니다.
 
 고객이 **없는** 주문을 찾으려면 연관 자체를 비교하십시오. 조인 없이 외래 키 컬럼을 검사합니다.
 <!-- region: SelectQueryTest.java#no-association -->
@@ -921,7 +921,7 @@ where o1_0.customer_id=1
 추가 사항:
 
 - 같은 경로는 별칭 하나를 받습니다. 이 별칭은 `where`, `orderBy`, `select`가 함께 사용합니다.
-- `orderBy`나 `select`에**만** 쓰인 경로는 `left join`이므로 그곳에서는 행을 잃지 않습니다(규칙 S8, J1). 같은 경로를 `where`에서도 쓰면 `orderBy`와 `select`는 `where`의 조인을 사용합니다.
+- `orderBy`나 `select`에**만** 쓰인 경로는 `left join`이므로 그곳에서는 행을 잃지 않습니다. 같은 경로를 `where`에서도 쓰면 `orderBy`와 `select`는 `where`의 조인을 사용합니다.
 - 두 엔티티의 비교(`o.getCustomer() == c`)는 거부됩니다(`LQL-3011`). id를 비교하십시오: `o.getCustomer().getId() == c.getId()`(여기서 `c`는 캡처한 객체, [3.8](#38-strings)의 `rejected-forms` 예제 참고).
 
 예제 코드: [`MappingRulesTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/MappingRulesTest.java)(`embedded-compare`), [`SelectQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)(`inner-join`, `null-guard`, `no-association`, `fk-path`).

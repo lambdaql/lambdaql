@@ -170,7 +170,7 @@ class SubqueryTest {
     @Test
     void topOne() {
         // @start region="top-one"
-        // the most expensive order of each customer: a correlated scalar subquery with order + limit 1 (rule Q3)
+        // the most expensive order of each customer: a correlated scalar subquery with order + limit 1
         SelectQuery<Order> q = qb.from(Order.class)
                 .where((o, sub) -> o.getId().equals(sub.from(Order.class)
                         .where(x -> x.getCustomer().getId() == o.getCustomer().getId())

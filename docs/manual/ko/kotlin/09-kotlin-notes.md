@@ -45,7 +45,7 @@ lambdaQL은 **같은 엔진**과 같은 API로 Kotlin과 Java를 지원합니다
 |---|---|
 | Kotlin | 2.x. 설계는 kotlinc 1.7.22, 2.1.10, 2.2.21, 2.3.0, 2.3.21로 확인함 |
 | JVM | Java 21 이상 |
-| 컴파일러 옵션 | 기본값 `-Xsam-conversions=indy`를 유지. `-Xsam-conversions=class`는 사용하지 **마십시오**(KC1) |
+| 컴파일러 옵션 | 기본값 `-Xsam-conversions=indy`를 유지. `-Xsam-conversions=class`는 사용하지 **마십시오** |
 | `-jvm-target` | 1.8, 11, 17, 21 모두 동작 |
 | Kotlin 런타임 | lambdaQL은 의존성에 `kotlin-stdlib`나 `kotlin-reflect`를 추가하지 않음 |
 | JPA 엔티티 | 일반적인 Kotlin JPA 엔티티(필드에 붙인 어노테이션도 괜찮음) |
@@ -89,7 +89,7 @@ assertEquals("select e0 from Order e0 where exists (select 1 from Item s1 where 
 ```
 
 Kotlin 속성은 getter로 읽습니다. `it.price`는 Java 호출 `getPrice()`와 같은 바이트 opcode입니다.
-lambdaQL은 getter를 JPA 속성에 매핑합니다(규칙 R10).
+lambdaQL은 getter를 JPA 속성에 매핑합니다.
 Java 엔티티의 boolean 속성 `active`는 getter가 `isActive()`이므로 Kotlin에서는 `it.isActive`로 읽습니다. lambdaQL은 이를 `active`에 매핑합니다.
 
 | 형태 | 동작하는가? |
@@ -99,10 +99,10 @@ Java 엔티티의 boolean 속성 `active`는 getter가 `isActive()`이므로 Kot
 | 호출자가 lambdaQL 타입의 `inline fun` 파라미터로 전달한 람다 표현식 | 예 |
 | SAM 생성자, 먼저 `val`에 저장한 경우도 포함 | 예 |
 | 조건에 전달한 속성 참조나 Java getter 참조: `where(Order::isActive)` | **아니요**(`LQL-1009`). 람다 표현식을 사용 |
-| `val f: (Order) -> Boolean = { it.isActive }; where(f)` | **아니요**(KC4) |
-| `object : ...`(람다 표현식 대신 객체 식) | **아니요**(KC5) |
-| `inline fun` 본문 안에서 만든 람다 표현식 | **아니요**(KC2) |
-| `-Xsam-conversions=class`로 컴파일 | **아니요**(KC1) |
+| `val f: (Order) -> Boolean = { it.isActive }; where(f)` | **아니요** |
+| `object : ...`(람다 표현식 대신 객체 식) | **아니요** |
+| `inline fun` 본문 안에서 만든 람다 표현식 | **아니요** |
+| `-Xsam-conversions=class`로 컴파일 | **아니요** |
 
 예제 코드: [`ManualKotlinNotesTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinNotesTest.kt)(`where-chain`, `named-params`).
 
@@ -142,7 +142,7 @@ lambdaQL은 소스에 쓰지 않은 이 검사를 읽지 않습니다. 그래서
 | `it.id === q`, `!==` | `if_acmpeq` / `if_acmpne` | `==`와 같음 |
 | enum: `it.kind == Order.Kind.RUSH` | `if_acmpne` | `e0.kind = org.lambdaql.query.Order$Kind.RUSH`(전체 클래스 이름을 쓴 리터럴) |
 
-`Intrinsics.areEqual`은 `==` 뒤에 있는 Kotlin 런타임 함수입니다. lambdaQL은 이를 이름으로 인식하고 **값 비교**로 읽습니다(R11).
+`Intrinsics.areEqual`은 `==` 뒤에 있는 Kotlin 런타임 함수입니다. lambdaQL은 이를 이름으로 인식하고 **값 비교**로 읽습니다.
 엔티티 값은 SQL 의미를 따릅니다. 어느 한쪽이 NULL이면 일치하지 않으며, NULL과 NULL도 마찬가지입니다.
 캡처 값 `null`은 NULL로 바인딩되어 어떤 행에도 일치하지 않습니다(`WARN` 수준 `LQL-4045`). NULL을 찾으려면 `x == null`이라고 쓰십시오.
 
@@ -187,7 +187,7 @@ assertEquals("select e0 from Order e0 where e0.description is null or e0.descrip
 <a id="-and-"></a>
 ### `===`와 `!==`
 
-lambdaQL에서 `===`는 `==`와 마찬가지로 **값 비교**를 뜻합니다(R17).
+lambdaQL에서 `===`는 `==`와 마찬가지로 **값 비교**를 뜻합니다.
 쿼리에는 객체 동일성이 없습니다. Kotlin 자체는 값이 1000인 서로 다른 두 `Long` 박스에 대해 `false`를 내지만, lambdaQL은 `true`를 냅니다.
 
 <a id="bigdecimal"></a>
@@ -301,14 +301,14 @@ where o1_0.customer_id is null
 <a id="-elvis"></a>
 ### `?:`(엘비스)
 
-select 값과 문자열 조건에서 `?:`는 `coalesce`가 됩니다(규칙 R15).
+select 값과 문자열 조건에서 `?:`는 `coalesce`가 됩니다.
 
 <!-- region: ManualKotlinNotesTest.kt#elvis-value -->
 ```kotlin
 // ?: in a select value: coalesce
 val text = qb.from(Order::class.java).select { it.description ?: "" }
 assertEquals("select coalesce(e0.description, '') from Order e0", text.toHql().hql())
-// ?: after ?. in a select value is rejected (J1)
+// ?: after ?. in a select value is rejected
 val error = assertThrows(LambdaQLException::class.java) {
     qb.from(Order::class.java).select { it.customer?.name ?: "none" }
 }
@@ -322,7 +322,7 @@ assertEquals("select e0 from Order e0 where coalesce(e0.description, '') = 'x'",
 ```
 
 - 숫자 조건의 `?:`도 `coalesce`입니다: `(it.total ?: 0.0) > 3.0`은 `coalesce(e0.total, 0.0) > 3.0`입니다.
-- `?.` 뒤의 `?:`를 select 값으로 쓰면 거부됩니다(`LQL-2022`, J1).
+- `?.` 뒤의 `?:`를 select 값으로 쓰면 거부됩니다(`LQL-2022`).
 - 컬럼에 `coalesce`가 씌워지므로 `description`의 일반 인덱스는 사용되지 않습니다.
 - DML 값의 `?:`는 [7.2](07-2-update.md#add-to-a-value-default-for-null)를 참고하십시오.
 
@@ -337,7 +337,7 @@ val notVip = qb.from(Coded::class.java).where { !(it.vip ?: false) }
 assertEquals("select e0 from Coded e0 where e0.vip is null or e0.vip = false", notVip.toHql().hql())
 ```
 
-**값이나 정렬 키**로 쓰는 boolean 엘비스(`select { it.vip ?: false }`)는 지원하지 않습니다(KC21, `LQL-2022`).
+**값이나 정렬 키**로 쓰는 boolean 엘비스(`select { it.vip ?: false }`)는 지원하지 않습니다(`LQL-2022`).
 정렬에는 키 `it.vip`를 사용하고 `asc(key, Nulls.LAST)`나 `desc(key, Nulls.FIRST)`처럼 `Nulls`로 NULL 위치를 고르십시오([4. 정렬과 페이징](04-order-paging.md#43-direction)).
 
 <a id="-in-an-assignment"></a>
@@ -364,7 +364,7 @@ assertEquals("select e0 from Coded e0 where e0.vip is null or e0.vip = false", n
 | `when (it.status.toInt()) { 1, 2 -> true; else -> false }` | **거부됨**(`LQL-2010`) | `\|\|`로 작성 |
 | `it.customer?.id in sub.from(...).select { ... }` | `e0.customer.id in (select ...)` | 서브쿼리, [5.4](05-subquery.md#54-in) 참고 |
 | `x !in sub.from(...).select { ... }` | `x not in (select ...)`(SQL 의미) | [5.5](05-subquery.md#55-not-in-is-written-as-not-exists) 참고 |
-| `it.id in listOf(1L, 2L)`(람다 표현식 안에서 만든 리스트) | **거부됨**(KC8, `LQL-3025`) | 리스트는 밖에서 만들 것 |
+| `it.id in listOf(1L, 2L)`(람다 표현식 안에서 만든 리스트) | **거부됨**(`LQL-3025`) | 리스트는 밖에서 만들 것 |
 
 <!-- region: ManualKotlinNotesTest.kt#ranges -->
 ```kotlin
@@ -407,7 +407,7 @@ NULL 행을 원하면 `it.cnt == null || it.cnt !in 1..5`라고 쓰십시오.
 | `it.description.equals(text)` | `==`와 같음: `e0.description = :p1` |
 | `(it.description ?: "") == "x"` | `coalesce(e0.description, '') = 'x'`([9.5](#-elvis)) |
 | 위의 문자열 함수 | 거부됨(`LQL-3008`) |
-| 문자열 결합과 템플릿(`"${it.description}-x"`, `"$a-$b" == it.description`, `it.description + "x"`) | 거부됨(`LQL-2007`, KC17). 캡처 값만 쓰는 템플릿도 거부되므로 문자열은 람다 표현식 밖에서 만들어 캡처 |
+| 문자열 결합과 템플릿(`"${it.description}-x"`, `"$a-$b" == it.description`, `it.description + "x"`) | 거부됨(`LQL-2007`). 캡처 값만 쓰는 템플릿도 거부되므로 문자열은 람다 표현식 밖에서 만들어 캡처 |
 
 <a id="98-captured-values"></a>
 ## 9.8 캡처 값
@@ -419,7 +419,7 @@ NULL 행을 원하면 `it.cnt == null || it.cnt !in 1..5`라고 쓰십시오.
 | 바깥 클래스의 속성(`this.minStatus`, `private`도 마찬가지) | 쿼리가 실행될 때마다 읽음 |
 | `companion object`의 `val`, 최상위 `val`, `object`의 `val` | 바인드 파라미터 |
 | `const val` | HQL에 리터럴로 씀 |
-| 람다 표현식 안에서 캡처 변수에 쓰기(`n++`) | **거부됨**(KC12) |
+| 람다 표현식 안에서 캡처 변수에 쓰기(`n++`) | **거부됨** |
 
 <!-- region: ManualKotlinNotesTest.kt#order-repo -->
 ```kotlin
@@ -472,9 +472,9 @@ assertEquals("LQL-3027", error.code())
 | 형태 | 동작하는가? |
 |---|---|
 | 조건에 전달한 Kotlin 속성 참조나 Java getter 참조(`where(Order::isActive)`) | 아니요(`LQL-1009`). 람다 표현식 `where { it.isActive }`를 사용 |
-| Java 합성 속성 `JOrder::price` | 아니요. Kotlin 자체가 컴파일하지 않음(KC18). |
-| `Order::price.getter` 및 다른 `kotlin-reflect` API | 아니요(KC19) |
-| 직접 만든 Kotlin `fun interface`에 전달한 참조 | 아니요(KC3). 람다 표현식 리터럴을 전달 |
+| Java 합성 속성 `JOrder::price` | 아니요. Kotlin 자체가 컴파일하지 않음. |
+| `Order::price.getter` 및 다른 `kotlin-reflect` API | 아니요 |
+| 직접 만든 Kotlin `fun interface`에 전달한 참조 | 아니요. 람다 표현식 리터럴을 전달 |
 
 <a id="scope-functions-and-inline-functions-in-conditions"></a>
 ### 조건 안의 스코프 함수와 inline 함수
@@ -497,8 +497,8 @@ assertEquals("select e0 from Order e0 where e0.status = 1", inline.toHql().hql()
 |---|---|
 | 직접 만든 `inline fun` | 예 |
 | `?.let { }`, `run { }`, `with(it) { }`, `also { }` | 아니요(`LQL-2013`). 조건을 직접 작성 |
-| 직접 만든 inline이 아닌 확장 함수나 확장 속성 | 아니요(KC11). `inline`으로 만들거나 조건을 직접 작성 |
-| `takeIf { }` | 아니요(KC6, `LQL-2021`) |
+| 직접 만든 inline이 아닌 확장 함수나 확장 속성 | 아니요. `inline`으로 만들거나 조건을 직접 작성 |
+| `takeIf { }` | 아니요(`LQL-2021`) |
 
 수정과 삽입 람다 표현식에서 `apply`, `with`, `also`는 거부됩니다(`LQL-2003`, [9.12](#912-update-insert-delete-property-assignment-and-dmlvalue) 참고).
 
@@ -517,8 +517,8 @@ assertEquals("select e0 from Order e0 where e0.status = 1", inline.toHql().hql()
 | `==`, `!=` | 지원([9.4](#94-equality----and-areequal)) |
 | `===`, `!==` | 지원, 값 비교 |
 | enum `==` | 지원 |
-| 엔티티 `==` 엔티티 | **거부됨**(KC13, `LQL-3011`). id를 비교할 것 |
-| 값 객체(`@Embedded`) `==`, `!=` | 지원. 컬럼마다 펼침(B6, [3.10](03-where.md#310-association-paths) 참고). 크기 비교는 `LQL-3012` |
+| 엔티티 `==` 엔티티 | **거부됨**(`LQL-3011`). id를 비교할 것 |
+| 값 객체(`@Embedded`) `==`, `!=` | 지원. 컬럼마다 펼침([3.10](03-where.md#310-association-paths) 참고). 크기 비교는 `LQL-3012` |
 | `+ - *`, 단항 `-` | 지원 |
 | `%` | 지원, `mod`로 출력 |
 | 정수 `/` | **주의.** 데이터베이스마다 결과가 다름(MariaDB는 `5/2`가 `2.5`, Kotlin은 `2`). lambdaQL은 `(e0.cnt / 2)`처럼 그대로 씀 |
@@ -530,8 +530,8 @@ assertEquals("select e0 from Order e0 where e0.status = 1", inline.toHql().hql()
 | boolean 중위 함수 `and`, `or`, `xor` | **거부됨**(`LQL-2013`). `&&`와 `\|\|`를 사용(단락 평가를 함. `and`/`or`는 하지 않음) |
 | 캡처한 배열에 대한 `arr[0]` | 캡처 값으로 취급하거나 명확한 오류 |
 | 엔티티 경로에 대한 `it.tags["k"]`, `it.lines[0]` | **거부됨** |
-| 엔티티의 `operator` 함수(`plus`, `compareTo`), 직접 만든 inline이 아닌 `infix` | **거부됨**(KC11) |
-| `@JvmInline value class` 속성 | **거부됨**(KC16) |
+| 엔티티의 `operator` 함수(`plus`, `compareTo`), 직접 만든 inline이 아닌 `infix` | **거부됨** |
+| `@JvmInline value class` 속성 | **거부됨** |
 
 <a id="no-kotlin-only-operator-api"></a>
 ### Kotlin 전용 연산자 API는 없음
@@ -584,11 +584,11 @@ assertEquals("select e0.customer.id, e0.status, count(*) from Order e0 where e0.
 
 | 규칙 | 참고 |
 |---|---|
-| 데이터 클래스에는 nullable 타입을 사용 | `sum`, `avg`, `min`, `max`는 NULL일 수 있음. non-null 파라미터에 NULL이 들어가면 객체를 만들 때 NPE가 발생함(J4) |
+| 데이터 클래스에는 nullable 타입을 사용 | `sum`, `avg`, `min`, `max`는 NULL일 수 있음. non-null 파라미터에 NULL이 들어가면 객체를 만들 때 NPE가 발생함 |
 | `Pair`, `Triple` | 결과와 그룹 키로 허용 |
 | `groupBy` 안의 `listOf(...)` | 허용(람다 표현식 안에서 만든 리스트가 허용되는 유일한 곳) |
 | `groupBy` 안의 `arrayOf(...)`, `setOf(...)` | 허용 안 됨 |
-| 파생 테이블이나 CTE의 행 타입 | Kotlin 데이터 클래스(또는 Java record)만. 컬럼은 `componentN` 순서를 따름(J5) |
+| 파생 테이블이나 CTE의 행 타입 | Kotlin 데이터 클래스(또는 Java record)만. 컬럼은 `componentN` 순서를 따름 |
 | `Agg` 함수 | `import org.lambdaql.Agg.sum`이 동작함. 컬렉션에 대한 Kotlin `sum()` / `count()`와 충돌하지 않음 |
 
 자세한 내용: [6. 조회, 집계, 그룹화](06-select-group.md).
@@ -608,7 +608,7 @@ assertEquals("update Order e0 set e0.customer.id = :p1 where e0.id = :p2", fk.to
 // no customer
 val none = qb.update(Order::class.java).set { it.customer = null }.where { it.status.toInt() == 3 }
 assertEquals("update Order e0 set e0.customer = null where e0.status = 3", none.toHql().hql())
-// a captured entity: its @Id is bound (U11)
+// a captured entity: its @Id is bound
 val entity = qb.update(Order::class.java).set { it.customer = kim }.where { it.id == third }
 assertEquals("update Order e0 set e0.customer = :p1 where e0.id = :p2", entity.toHql().hql())
 ```
@@ -654,7 +654,7 @@ Kotlin이 companion 함수를 호출하면 바이트 opcode는 먼저 `Companion
 | 인터페이스 `companion object` + `@JvmStatic` | **예(권장)** |
 | Kotlin `object` + `@JvmStatic` | 예 |
 | 최상위 함수 | 예, 하지만 권장하지 않음: import를 잊었고 그 이름이 stdlib 이름(`maxOf`)이기도 하면 Kotlin은 조용히 stdlib 함수를 호출함 |
-| 확장 함수 | 아니요(KC11) |
+| 확장 함수 | 아니요 |
 | 기본 인자가 있는 `@SqlFunction` | 아니요 |
 | `inline` `@SqlFunction` | 아니요(호출이 사라짐) |
 | `vararg` `@SqlFunction` | 아니요 |
@@ -710,7 +710,7 @@ KC1 ~ KC5는 람다 표현식을 로드할 때 발견됩니다. 이 경우 lambd
 | non-null 타입 `String`은 null이 아님 | 컬럼은 여전히 NULL일 수 있음. lambdaQL은 JPA 메타데이터를 사용 |
 | 정수 `/`는 소수 부분을 버림 | DB마다 다를 수 있음(MariaDB는 `5/2 = 2.5`) |
 
-nullable 숫자 속성과 상수의 비교(`it.cnt != 1`)는 Kotlin이 넣은 null 검사를 그대로 쓰므로 Kotlin과 같은 행을 반환합니다([9.3](#93-only-your-null-checks-count)).
+nullable 숫자 속성과 상수의 비교(`it.cnt != 1`)도 `e0.cnt <> 1`이 되므로 `cnt`가 NULL인 행은 반환하지 않습니다. Kotlin과 결과가 다를 수 있습니다([9.3](#93-only-your-null-checks-count)).
 
 더 많은 규칙: [10. 규칙과 제한](10-rules-and-limits.md).
 

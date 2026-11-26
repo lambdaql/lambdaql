@@ -54,7 +54,7 @@ assertEquals("update Order e0 set e0.description = null, e0.updateAt = :p1,"
 int changed = u.execute();
 ```
 
-`null`, 람다 표현식에 적은 enum 상수와 boolean 상수는 리터럴이고, 캡처 값(`now`, `id`)은 바인드 파라미터입니다. 같은 값을 두 번 사용하더라도 각 캡처 값은 **자기 파라미터**를 받습니다(규칙 U7).
+`null`, 람다 표현식에 적은 enum 상수와 boolean 상수는 리터럴이고, 캡처 값(`now`, `id`)은 바인드 파라미터입니다. 같은 값을 두 번 사용하더라도 각 캡처 값은 **자기 파라미터**를 받습니다.
 
 예제 코드: [`ManualJavaDmlTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-values`).
 
@@ -107,21 +107,21 @@ assertEquals("update Order e0 set e0.customer.id = :p1 where e0.id = :p2", byId.
 ExecutableUpdate<Order> none = qb.update(Order.class)
         .set(o -> o.setCustomer(null)).where(o -> o.getId() == id);
 assertEquals("update Order e0 set e0.customer = null where e0.id = :p1", none.toHql().hql());
-// a captured entity: its @Id is bound (rule U11)
+// a captured entity: its @Id is bound
 ExecutableUpdate<Order> entity = qb.update(Order.class)
         .set(o -> o.setCustomer(customer)).where(o -> o.getId() == other);
 assertEquals("update Order e0 set e0.customer = :p1 where e0.id = :p2", entity.toHql().hql());
 ```
 
 연관 엔티티에서는 `@Id`(FK)만 설정할 수 있습니다.
-`o.getCustomer().setName(x)`는 오류입니다. 다른 테이블을 변경하게 되기 때문입니다(규칙 U6, [7.8](07-dml.md#rules-checked-at-analysis-time) 참고).
+`o.getCustomer().setName(x)`는 오류입니다. 다른 테이블을 변경하게 되기 때문입니다([7.8](07-dml.md#rules-checked-at-analysis-time) 참고).
 
 예제 코드: [`ManualJavaDmlTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-fk`).
 
 <a id="a-value-from-another-table"></a>
 ## 다른 테이블의 값
 
-연관 경로로 값을 읽으십시오. lambdaQL은 이를 **상관 스칼라 서브쿼리**로 렌더링합니다(규칙 U9).
+연관 경로로 값을 읽으십시오. lambdaQL은 이를 **상관 스칼라 서브쿼리**로 렌더링합니다.
 `where`의 경로도 같은 형태의 서브쿼리가 됩니다.
 
 <!-- region: DmlQueryTest.java#update-path -->
@@ -214,7 +214,7 @@ assertEquals("update Order e0 set e0.price = coalesce((select sum(s1.price) from
 
 <!-- region: ManualJavaDmlTest.java#update-where -->
 ```java
-// a path in the condition: a scalar subquery (U9)
+// a path in the condition: a scalar subquery
 ExecutableUpdate<Order> byGrade = qb.update(Order.class)
         .set(o -> o.setStatus((short) 0))
         .where(o -> o.getCustomer().getGrade() > 3);
@@ -228,7 +228,7 @@ assertEquals("update Order e0 set e0.status = 9 where not exists (select 1 from 
         noItems.toHql().hql());
 ```
 
-첫 번째 문장에서는 경로가 스칼라 서브쿼리가 되고, 고객이 있는 주문만 대상이 됩니다(규칙 U9).
+첫 번째 문장에서는 경로가 스칼라 서브쿼리가 되고, 고객이 있는 주문만 대상이 됩니다.
 두 번째 문장은 [5. 서브쿼리](05-subquery.md)처럼 `sub`를 사용합니다.
 
 예제 코드: [`ManualJavaDmlTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-where`).
@@ -275,15 +275,15 @@ if (n == 0) throw new OptimisticLockException();   // checking the result is you
 
 같은 문장을 다시 실행하면 버전이 맞지 않아 0을 돌려줍니다. 첫 실행에서 버전이 올라갔으므로 이전 버전과 일치하는 행이 없습니다.
 
-`@Version` 필드에는 값을 할당할 수 없습니다(규칙 U15). 할당하면 `LQL-3068`로 거부됩니다.
+`@Version` 필드에는 값을 할당할 수 없습니다. 할당하면 `LQL-3068`로 거부됩니다.
 
 예제 코드: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`update-versioned`), [`ManualJavaDmlTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`update-version`).
 
 <a id="many-set-calls-patch"></a>
 ## 여러 번의 `set()` 호출(PATCH)
 
-`set()`은 여러 번 호출할 수 있습니다. 모든 할당은 호출 순서대로 SET 목록 하나로 합쳐집니다(규칙 U14).
-규칙 U3과 U4는 여러 `set()` 호출 사이에도 적용됩니다.
+`set()`은 여러 번 호출할 수 있습니다. 모든 할당은 호출 순서대로 SET 목록 하나로 합쳐집니다.
+앞에서 대입한 컬럼을 다시 읽을 수 없다는 규칙과 같은 컬럼을 두 번 대입할 수 없다는 규칙은 여러 `set()` 호출 사이에도 적용됩니다.
 
 <!-- region: DmlQueryTest.java#update-patch -->
 ```java
@@ -294,10 +294,10 @@ UpdateSet<Order> u = qb.update(Order.class).set(o -> o.setDescription(memo));
 if (newStatus != null) u = u.set(o -> o.setStatus(newStatus));
 int changed = u.where(o -> o.getId() == id).execute();
 
-// reading a column that an earlier assignment wrote is an error (U3): the databases disagree on its value
+// reading a column that an earlier assignment wrote is an error: the databases disagree on its value
 assertThrows(LambdaQLException.class,
         () -> qb.update(Order.class).set(o -> { o.setPrice(1); o.setTex((float) o.getPrice()); }));
-// the same column twice is an error (U4), also across set() calls
+// the same column twice is an error, also across set() calls
 assertThrows(LambdaQLException.class,
         () -> qb.update(Order.class).set(o -> o.setStatus((short) 1)).set(o -> o.setStatus((short) 2)));
 ```
@@ -309,7 +309,7 @@ assertThrows(LambdaQLException.class,
 <a id="update-all-rows-all"></a>
 ## 모든 행 수정: `all()`
 
-`where`가 없는 update는 `all()`을 명시해야 합니다. `where`나 `all()`이 없으면 코드가 **컴파일되지 않습니다**(규칙 U5).
+`where`가 없는 update는 `all()`을 명시해야 합니다.
 
 <!-- region: ManualJavaDmlTest.java#update-all -->
 ```java

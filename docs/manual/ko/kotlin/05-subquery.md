@@ -199,7 +199,7 @@ from orders o1_0
 where o1_0.price>(select avg(o2_0.price) from orders o2_0)
 ```
 
-스칼라 서브쿼리는 **항상 행 하나를 내야** 합니다. 허용되는 형태는 두 가지입니다(규칙 Q3).
+스칼라 서브쿼리는 **항상 행 하나를 내야** 합니다. 허용되는 형태는 두 가지입니다.
 
 | 형태 | 예 |
 |---|---|
@@ -232,7 +232,7 @@ top-1 예: 같은 고객의 가장 비싼 주문.
 
 <!-- region: ManualKotlinSubqueryTest.kt#top-one -->
 ```kotlin
-// the most expensive order of each customer: a correlated scalar subquery with orderBy and limit(1) (rule Q3)
+// the most expensive order of each customer: a correlated scalar subquery with orderBy and limit(1)
 val q = qb.from(Order::class.java)
     .where { o, sub ->
         o.id == sub.from(Order::class.java)
@@ -378,7 +378,7 @@ assertEquals("select e0 from Customer e0 where (select sum(s2.qty) from Order s1
 
 - **update / delete의 서브쿼리**: `where`에서 같은 `sub` 문법을 사용합니다. [7.4 삭제(delete)](07-4-delete.md)와 [7.2 수정(update)](07-2-update.md)을 참고하십시오.
 - **`set` 값 안의 서브쿼리**(`o.total = sub.from(...).sum { ... }`): 대입 람다 표현식의 두 번째 인자 `sub`로 씁니다. [7.2 수정(update)](07-2-update.md#an-aggregate-from-a-subquery)을 참고하십시오.
-- **`from`의 서브쿼리(파생 테이블)와 CTE**: 구현됨(마일스톤 M8-2). `sub`를 쓰지 않고 값 쿼리를 `qb.from(...)`이나 `qb.with(...)`에 전달합니다. [6.9 파생 테이블](06-select-group.md#69-derived-table-subquery-in-from)과 [6.10 CTE](06-select-group.md#610-cte-with)를 참고하십시오.
+- **`from`의 서브쿼리(파생 테이블)와 CTE**: 구현됨. `sub`를 쓰지 않고 값 쿼리를 `qb.from(...)`이나 `qb.with(...)`에 전달합니다. [6.9 파생 테이블](06-select-group.md#69-derived-table-subquery-in-from)과 [6.10 CTE](06-select-group.md#610-cte-with)를 참고하십시오.
 
 <a id="512-rules-summary-q1-to-q6"></a>
 ## 5.12 규칙 요약(Q1 ~ Q6)

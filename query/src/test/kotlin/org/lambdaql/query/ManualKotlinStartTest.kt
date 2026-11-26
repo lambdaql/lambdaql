@@ -6,6 +6,7 @@ import org.lambdaql.query.By.desc
 import jakarta.persistence.EntityManagerFactory
 import jakarta.persistence.NonUniqueResultException
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -182,13 +183,13 @@ class ManualKotlinStartTest {
         // first() reads one row like limit(1); paging adds the id as the last sort key
         assertEquals("select e0 from Order e0 order by e0.price asc, e0.id asc", byPrice.limit(1).toHql().hql())
 
-        // without orderBy, "first" is the row with the smallest id
+        // without orderBy there is no order by: "first" is any matching row
         val active = qb.from(Order::class.java).where { it.isActive }
         val firstActive: Order? = active.first().orElse(null)
-        assertEquals("select e0 from Order e0 where e0.active = true order by e0.id asc", active.limit(1).toHql().hql())
+        assertEquals("select e0 from Order e0 where e0.active = true", active.limit(1).toHql().hql())
         // @end
         assertEquals(orders.minBy { it.price }.id, cheapest!!.id)
-        assertEquals(orders.filter { it.isActive }.minOf { it.id }, firstActive!!.id)
+        assertTrue(firstActive!!.isActive)
         // offset is kept: the second cheapest
         assertEquals(orders.sortedBy { it.price }[1].id, byPrice.offset(1).first().orElseThrow().id)
         assertNull(qb.from(Order::class.java).where { it.status.toInt() == 9 }.first().orElse(null))

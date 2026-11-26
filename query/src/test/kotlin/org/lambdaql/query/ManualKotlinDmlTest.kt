@@ -228,7 +228,7 @@ class ManualKotlinDmlTest {
         // no customer
         val none = qb.update(Order::class.java).set { it.customer = null }.where { it.status.toInt() == 3 }
         assertEquals("update Order e0 set e0.customer = null where e0.status = 3", none.toHql().hql())
-        // a captured entity: its @Id is bound (U11)
+        // a captured entity: its @Id is bound
         val entity = qb.update(Order::class.java).set { it.customer = kim }.where { it.id == third }
         assertEquals("update Order e0 set e0.customer = :p1 where e0.id = :p2", entity.toHql().hql())
         // @end
@@ -347,12 +347,12 @@ class ManualKotlinDmlTest {
         if (newStatus != null) u = u.set { it.status = newStatus }
         val changed = u.where { it.id == id }.execute()
 
-        // reading a column that an earlier assignment wrote is an error (U3)
+        // reading a column that an earlier assignment wrote is an error
         val read = assertThrows(LambdaQLException::class.java) {
             qb.update(Order::class.java).set { it.price = 1.0; it.total = it.price }
         }
         assertEquals("LQL-3042", read.code())
-        // the same column twice is an error (U4), also across set() calls
+        // the same column twice is an error, also across set() calls
         val twice = assertThrows(LambdaQLException::class.java) {
             qb.update(Order::class.java).set { it.status = 1 }.set { it.status = 2 }
         }
@@ -366,7 +366,7 @@ class ManualKotlinDmlTest {
     @Test
     fun updateAll() {
         // @start region="update-all"
-        // no where: all() is required, without it there is no execute() (U5)
+        // no where: all() is required, without it there is no execute()
         val u = qb.update(Order::class.java).set { it.status = 0 }.all()
         assertEquals("update Order e0 set e0.status = 0", u.toHql().hql())
         val changed = u.execute()
@@ -450,7 +450,7 @@ class ManualKotlinDmlTest {
         val self = qb.update(Order::class.java).set { it.price = it.price * 1.1 }.all()             // reads itself: allowed
         val readFirst = qb.update(Order::class.java).set { it.total = it.price; it.price = 0.0 }.all() // read, then assign: allowed
         assertEquals("update Order e0 set e0.total = e0.price, e0.price = 0.0", readFirst.toHql().hql())
-        // assign, then read again: an error at set() (U3), because MariaDB would read the new value
+        // assign, then read again: an error at set(), because MariaDB would read the new value
         val error = assertThrows(LambdaQLException::class.java) {
             qb.update(Order::class.java).set { it.price = it.price * 2; it.total = it.price }
         }
@@ -468,7 +468,7 @@ class ManualKotlinDmlTest {
     @Test
     fun assignRules() {
         // @start region="assign-rules"
-        // forms that the assignment rules reject when the lambda is read (U1, U6)
+        // forms that the assignment rules reject when the lambda is read
         val increment = assertThrows(LambdaQLException::class.java) {
             qb.update(Order::class.java).set { it.cnt++ }                       // ++: write += 1
         }
@@ -535,7 +535,7 @@ class ManualKotlinDmlTest {
         val byIds = qb.delete(Item::class.java).where { it.id in ids }
         assertEquals("delete from Item e0 where e0.id in (:p1)", byIds.toHql().hql())
         byIds.execute()
-        // every row: all() is required (U5)
+        // every row: all() is required
         val all = qb.delete(Order::class.java).all()
         assertEquals("delete from Order e0", all.toHql().hql())
         all.execute()
@@ -665,7 +665,7 @@ class ManualKotlinDmlTest {
             .from(Order::class.java)
             .where { it.status.toInt() == 1 }
             .select { a, o -> a.id = o.id; a.price = o.price; a.customerName = o.customer?.name }
-        // a path in the select list: left join, so orders without a customer stay (U10)
+        // a path in the select list: left join, so orders without a customer stay
         assertEquals("insert into Archive (id, price, customerName) select e0.id, e0.price, j1.name"
             + " from Order e0 left join e0.customer j1 where e0.status = 1", i.toHql()[0].hql())
         // @end

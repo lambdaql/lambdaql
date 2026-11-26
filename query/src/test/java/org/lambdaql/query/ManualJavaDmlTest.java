@@ -241,7 +241,7 @@ class ManualJavaDmlTest {
         ExecutableUpdate<Order> none = qb.update(Order.class)
                 .set(o -> o.setCustomer(null)).where(o -> o.getId() == id);
         assertEquals("update Order e0 set e0.customer = null where e0.id = :p1", none.toHql().hql());
-        // a captured entity: its @Id is bound (rule U11)
+        // a captured entity: its @Id is bound
         ExecutableUpdate<Order> entity = qb.update(Order.class)
                 .set(o -> o.setCustomer(customer)).where(o -> o.getId() == other);
         assertEquals("update Order e0 set e0.customer = :p1 where e0.id = :p2", entity.toHql().hql());
@@ -257,7 +257,7 @@ class ManualJavaDmlTest {
     @Test
     void updateWhere() {
         // @start region="update-where"
-        // a path in the condition: a scalar subquery (U9)
+        // a path in the condition: a scalar subquery
         ExecutableUpdate<Order> byGrade = qb.update(Order.class)
                 .set(o -> o.setStatus((short) 0))
                 .where(o -> o.getCustomer().getGrade() > 3);

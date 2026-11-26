@@ -62,7 +62,7 @@ class AssignmentReaderTest {
         assertEquals("[col0.status := 2, col0.customer.id := 1]",
                 setters(o -> { o.setStatus((short) 2); value(o.getCustomer().getId(), 1); }));
         // @end
-        // the column follows the setter rules: only the id of an association (U6), and a getter call on the target
+        // the column follows the setter rules: only the id of an association, and a getter call on the target
         LambdaQLException other = assertThrows(LambdaQLException.class, () -> setters(o -> value(o.getCustomer().getName(), "x")));
         assertEquals("LQL-3050", other.code(), other.getMessage());
         String name = "x";
@@ -73,7 +73,7 @@ class AssignmentReaderTest {
     @Test
     void valueTypes() {
         // @start region="value-type"
-        // value(V, V) compiles with any two types, so lambdaQL checks the value type against the column (U20)
+        // value(V, V) compiles with any two types, so lambdaQL checks the value type against the column
         assertEquals("[col0.status := 2, col0.price := 1]", setters(o -> { value(o.getStatus(), 2); value(o.getPrice(), 1); }));
         String text = "abc";
         LambdaQLException wrong = assertThrows(LambdaQLException.class, () -> setters(o -> value(o.getStatus(), text)));
@@ -87,11 +87,11 @@ class AssignmentReaderTest {
     @Test
     void rules() {
         // @start region="rules"
-        // U1: only setters; no condition, no local variable
+        // only setters; no condition, no local variable
         assertThrows(LambdaQLException.class, () -> setters(o -> { if (o.isActive()) o.setStatus((short) 1); }));
-        // U6: an association's other properties belong to another table
+        // an association's other properties belong to another table
         assertThrows(LambdaQLException.class, () -> setters(o -> o.getCustomer().setName("x")));
-        // U3: a value reads a column written before
+        // a value reads a column written before
         assertThrows(LambdaQLException.class, () -> AssignmentReader.checkRules(
                 AssignmentReader.readSetters(SerializedLambdaExtractor.extract((Assign<Order>) o -> {
                     o.setPrice(1);

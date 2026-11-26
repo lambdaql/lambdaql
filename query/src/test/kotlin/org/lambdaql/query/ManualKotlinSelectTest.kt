@@ -214,7 +214,7 @@ class ManualKotlinSelectTest {
     @Test
     fun groupKeyError() {
         // @start region="group-key-error"
-        // J3: status is not a group key
+        // status is not a group key
         val e = assertThrows(LambdaQLException::class.java) {
             qb.from(Order::class.java)
                 .groupBy { it.customer?.id }
@@ -249,12 +249,12 @@ class ManualKotlinSelectTest {
         // aggregates belong in having, not in where
         val where = assertThrows(LambdaQLException::class.java) { qb.from(Order::class.java).where { Agg.count() > 1 } }
         assertEquals("LQL-3005", where.code())
-        // J7: with distinct, the sort key must be selected
+        // with distinct, the sort key must be selected
         val j7 = assertThrows(LambdaQLException::class.java) {
             qb.from(Order::class.java).orderBy { o -> asc(o.id) }.select { it.price }.distinct().toHql()
         }
         assertEquals("LQL-3046", j7.code())
-        // J4: sum over no rows is NULL; the non-null parameter of StrictTotal(val total: Double) cannot take it
+        // sum over no rows is NULL; the non-null parameter of StrictTotal(val total: Double) cannot take it
         assertThrows(IllegalStateException::class.java) {
             qb.from(Order::class.java).where { it.status.toInt() == 9 }.select { StrictTotal(Agg.sum(it.price)) }.toList()
         }
@@ -476,7 +476,7 @@ class ManualKotlinSelectTest {
     @Test
     fun derivedRowType() {
         // @start region="derived-row-type"
-        // J5: a single value (or a Pair, or a class that is not a data class) has no column names
+        // a single value (or a Pair, or a class that is not a data class) has no column names
         val e = assertThrows(LambdaQLException::class.java) { qb.from(qb.from(Order::class.java).select { it.price }) }
         assertEquals("LQL-3064", e.code())
         // @end

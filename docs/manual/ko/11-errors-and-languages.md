@@ -35,14 +35,14 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 |---|---|---|
 | `LQL-1002` | `LambdaAnalysisException` | Serializable 람다 표현식만 분석할 수 있습니다. java.util.function 대신 lambdaQL 람다 표현식 타입을 쓰세요: {0} |
 | `LQL-2004` | `UnsupportedLambdaShapeException` | 람다 표현식 안의 반복문은 지원하지 않습니다. 목록은 람다 표현식 밖에서 만들고 캡처하세요. |
-| `LQL-3005` | `TranslationException` | Agg 집계 함수는 where에 쓸 수 없습니다. having을 쓰세요(J3): Agg.{0} |
-| `LQL-3035` | `TranslationException` | 집계와 함께 쓰는 값은 groupBy 키여야 합니다(J3): {0} |
+| `LQL-3005` | `TranslationException` | Agg 집계 함수는 where에 쓸 수 없습니다. having을 쓰세요: Agg.{0} |
+| `LQL-3035` | `TranslationException` | 집계와 함께 쓰는 값은 groupBy 키여야 합니다: {0} |
 | `LQL-3058` | `TranslationException` | DB 함수 {0}은 SQL 이름이 따로 있어 등록이 필요합니다. 클래스를 lambdaql.functions.classes 설정에 넣으세요. |
-| `LQL-3064` | `TranslationException` | 파생 테이블·CTE의 행 타입은 Java record나 Kotlin data class여야 합니다(J5): {0} |
-| `LQL-3065` | `TranslationException` | Dml.value: 값의 타입 {2}가 열 {0}({1})에 맞지 않습니다(U20) |
+| `LQL-3064` | `TranslationException` | 파생 테이블·CTE의 행 타입은 Java record나 Kotlin data class여야 합니다: {0} |
+| `LQL-3065` | `TranslationException` | Dml.value: 값의 타입 {2}가 열 {0}({1})에 맞지 않습니다 |
 | `LQL-3066` | `NonSargableException` | 인덱스를 쓸 수 없는 조건이며 SARGable 모드가 STRICT입니다: {0} |
 | `LQL-3067` | `TranslationException` | 파생 테이블·CTE의 행에는 id가 없어 null과 비교할 수 없습니다. 열을 비교하세요(예: x.customerId() == null): {0} |
-| `LQL-3068` | `TranslationException` | @Version 컬럼에는 대입할 수 없습니다. Hibernate가 update마다 1씩 올립니다(U15): {0} |
+| `LQL-3068` | `TranslationException` | @Version 컬럼에는 대입할 수 없습니다. Hibernate가 update마다 1씩 올립니다: {0} |
 | `LQL-3069` | `TranslationException` | Direction 인자를 함께 쓰면 정렬 람다 표현식은 키 하나여야 합니다. By의 정렬 함수를 쓰려면 orderBy(o -> sort(o.getPrice(), direction))처럼 쓰세요. |
 | `LQL-4009` | `LambdaQLException` | null 값은 <, <=, >, >=로 비교할 수 없습니다(Java에서는 NullPointerException): {0} |
 | `LQL-4014` | `IllegalArgumentException` | limit은 0 이상이어야 합니다: {0} |
@@ -56,7 +56,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | `LQL-4046` | `IllegalStateException` | By의 정렬 함수 {0}는 정렬 람다 표현식 안에서만 씁니다. lambdaQL은 이 함수를 읽기만 하고 실행하지 않습니다. |
 | `LQL-4047` | `LambdaQLException` | startsWith, endsWith, contains에 쓸 문자열이 null입니다(Java에서는 NullPointerException): {0} |
 | `LQL-5001` | –(`WARN` 로그) | 함수 {0}가 열 {1}에 씌워져 있어 열의 일반 인덱스를 쓸 수 없고 전체 스캔이 될 수 있습니다. 열을 값과 비교하도록 바꾸거나 (Oracle, PostgreSQL) 같은 식의 함수 기반 인덱스를 만드세요: {2} |
-| `LQL-5002` | –(`WARN` 로그) | limit 없는 서브쿼리 정렬은 결과에 영향이 없어 제거했습니다(Q4): {0} |
+| `LQL-5002` | –(`WARN` 로그) | limit 없는 서브쿼리 정렬은 결과에 영향이 없어 제거했습니다: {0} |
 | `LQL-5003` | –(`INFO` 또는 `WARN` 로그) | 외부 정렬이 {0}의 정렬 규칙에 없습니다: {1}. 지금은 실행하지만 SortMode.STRICT에서는 거부됩니다. |
 | `LQL-5004` | –(`INFO` 로그) | 클래스 파일에 스텁 인자 이름이 없어 {0}의 인자 순서를 확인하지 않습니다. -parameters(Kotlin: -java-parameters)로 컴파일하거나 @DbParam을 쓰세요. |
 | `LQL-5005` | –(`INFO` 로그) | DB 메타데이터에서 {0}의 인자 정보를 읽지 못했습니다({1}). 스텁을 대조하지 않으며, IN·INOUT은 스텁 순서대로, 그 뒤에 OUT 인자가 온다고 봅니다. |
@@ -102,7 +102,7 @@ assertEquals("[LQL-4014] limit은 0 이상이어야 합니다: -1", LqlMessage.L
 | 예외 | 예 | 코드 |
 |---|---|---|
 | `IllegalArgumentException` | `limit(-1)` | `LQL-4014` |
-| `IllegalStateException` | primitive 생성자 인자에 들어가는 NULL 값(규칙 J4). 람다 표현식 밖에서 호출한 `Agg.sum(...)`. 정렬 람다 표현식 밖에서 호출한 `By`의 정렬 함수(`desc(...)` 등). 행 수보다 요소 수가 적은 `toSet()` | `LQL-4021`, `LQL-4032`, `LQL-4046`, `LQL-4019` |
+| `IllegalStateException` | primitive 생성자 인자에 들어가는 NULL 값. 람다 표현식 밖에서 호출한 `Agg.sum(...)`. 정렬 람다 표현식 밖에서 호출한 `By`의 정렬 함수(`desc(...)` 등). 행 수보다 요소 수가 적은 `toSet()` | `LQL-4021`, `LQL-4032`, `LQL-4046`, `LQL-4019` |
 | `jakarta.persistence.NonUniqueResultException` | `one()`의 결과가 2행 이상. `executeOne()`의 조건에 맞는 행이 2행 이상 | `LQL-4025`, `LQL-4023` |
 | `jakarta.persistence.TransactionRequiredException` | 트랜잭션 없는 update, insert, delete | `LQL-4024` |
 
@@ -204,21 +204,15 @@ assertInstanceOf(UnsupportedLambdaShapeException::class.java, e)
 <a id="when-errors-happen"></a>
 ## 오류가 발생하는 시점
 
-lambdaQL은 세 시점에 문제를 찾습니다.
+lambdaQL은 두 시점에 문제를 찾습니다.
 
 | 시점 | 검사하는 것 | 예 |
 |---|---|---|
-| **컴파일 시점** | Java나 Kotlin 컴파일러가 lambdaQL API의 타입을 검사합니다. | 엔티티를 정렬 키로 사용. `orderBy`를 두 번 호출. `orderBy` 뒤의 `where`. `where(...)`나 `all()` 없이 update나 delete에서 `execute()` 호출. |
 | **분석 시점** | SQL이 데이터베이스로 가기 전에 lambdaQL이 람다 표현식 바이트 opcode를 읽습니다. | 반복문, `switch`, 지원하지 않는 메서드 호출, 키 하나나 `By` 함수의 단순한 체인이 아닌 정렬 람다 표현식, 정렬 함수와 함께 쓴 `Direction` 인자(`LQL-3069`), `groupBy` 키가 아닌 `select` 값. |
 | **실행 시점(바인딩)** | 쿼리가 실행될 때마다 lambdaQL이 캡처 값을 바인딩합니다. | 규칙상 null을 허용하지 않는 곳의 `null` 캡처 값(아래 참고). `NaN`이나 `Infinity` 파라미터. `IN`에 사용하는 캡처 컬렉션 안의 `null` 요소. |
 
 분석 시점의 오류는 데이터와 상관없습니다. 같은 람다 표현식은 항상 같은 방식으로 실패합니다.
 lambdaQL은 실패한 결과도 캐시하므로, 잘못된 람다 표현식은 다음번에 빠르게 실패합니다.
-
-<a id="compile-time-examples"></a>
-### 컴파일 시점의 예
-
-엔티티는 `Comparable`이 아니므로 정렬 키가 될 수 없습니다. Java의 `.orderBy(o -> desc(o.getCustomer()))`, `.orderBy(o -> o.getCustomer())`와 Kotlin의 `.orderBy { desc(it.customer) }`는 컴파일되지 않습니다.
 
 <a id="analysis-time-errors-that-only-kotlin-has"></a>
 ### Kotlin에만 있는 분석 시점 오류
@@ -416,7 +410,7 @@ lambdaQL은 **SLF4J API**로 로그를 남깁니다.
 |---|---|
 | `LQL-4045` | `=`·`<>`(`==`, `!=`, `equals`, `Objects.equals`)의 캡처 값이 `null`이라 맞는 행이 없을 때(SQL 의미). 실행할 때만 알 수 있음. `WARN` 레벨로 기록. 크기 비교처럼 자기 기본형 언박싱(`min.doubleValue()`)을 거친 경우에는 `DEBUG` 레벨. NULL을 찾으려면 `x == null`(3.6 참고: [Java](java/03-where.md#36-null-rules) \| [Kotlin](kotlin/03-where.md#36-null-rules)) |
 | `LQL-5001` | 조건에서 DB 함수가 열을 감쌀 때(`OrderFns.discount(o.getPrice()) > 10`, 열에 적용한 Boolean 함수, `IN`이나 `IS NULL` 안의 함수). 일반 인덱스를 쓸 수 없음. `where` 람다 표현식마다 한 번 `WARN` 레벨로 기록. Oracle이나 PostgreSQL에서 같은 식의 함수 기반(식) 인덱스가 있으면 기록하지 않음([8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) 참고) |
-| `LQL-5002` | 서브쿼리에 `orderBy`는 있지만 `limit`이 없어 lambdaQL이 정렬을 제거할 때(정렬은 결과에 영향이 없음, 규칙 Q4) |
+| `LQL-5002` | 서브쿼리에 `orderBy`는 있지만 `limit`이 없어 lambdaQL이 정렬을 제거할 때(정렬은 결과에 영향이 없음) |
 | `LQL-5003` | 외부 정렬(Spring `Sort`, `SortSpec.ofPath`)이 정렬 규칙에 없는 이름을 사용하고 모드가 `SortMode.INFO`(기본값, `INFO` 레벨로 기록)나 `SortMode.WARN`(`WARN` 레벨로 기록)일 때. 정렬은 실행됨. 엔티티와 이름마다 한 번 기록([4.10 정렬 정책](java/04-order-paging.md#sort-policy) 참고) |
 | `LQL-5004` | 클래스 파일에 프로시저 스텁의 인자 이름이 없고(`-parameters`, Kotlin `-java-parameters` 없이 컴파일, `@DbParam`도 없음) 이웃한 두 인자의 타입이 같을 때. 프로시저마다 한 번 `INFO` 레벨로 기록([8.4](java/08-procedures-functions.md#84-warning-argument-order) 참고) |
 | `LQL-5005` | 프로시저 메타데이터를 읽을 수 없을 때(예: 딕셔너리 뷰나 `information_schema`에 권한이 없어 조회 실패). 스텁을 대조하지 않고 인자 배치를 스텁에서 가져옴. 프로시저마다 한 번 `INFO` 레벨로 기록([8.4](java/08-procedures-functions.md#when-the-metadata-cannot-be-read) 참고) |

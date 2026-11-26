@@ -143,7 +143,7 @@ public class SelectQuery<T> {
 
     /**
      * Returns the first row, or empty if there is no row.
-     * Without {@code orderBy}, "first" means the row with the smallest id (S9), so the result is always the same.
+     * Without {@code orderBy} there is no order by, so "first" is any matching row (ROADMAP D73).
      * To choose the order, use {@code orderBy(...).first()}.
      *
      * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ResultQueryTest.java">ResultQueryTest</a>):
@@ -337,7 +337,8 @@ public class SelectQuery<T> {
 
     /**
      * Returns at most {@code count} rows, without your own sort.
-     * The rows are sorted by the id, so pages are stable (S9).
+     * Without {@code orderBy} there is no order by, so which rows come is up to the database; add {@code orderBy} for
+     * stable pages (ROADMAP D73).
      *
      * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SortQueryTest" region="page-only"}
@@ -352,7 +353,8 @@ public class SelectQuery<T> {
 
     /**
      * Skips the first {@code count} rows, without your own sort.
-     * The rows are sorted by the id, so pages are stable (S9).
+     * Without {@code orderBy} there is no order by, so which rows come is up to the database; add {@code orderBy} for
+     * stable pages (ROADMAP D73).
      *
      * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):
      * {@snippet class="org.lambdaql.query.SortQueryTest" region="page-only"}

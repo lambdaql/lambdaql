@@ -156,7 +156,7 @@ class DerivedQueryTest {
     @Test
     void rules() {
         // @start region="rules"
-        // J5: the row type must be a record or Kotlin data class (its components name the columns)
+        // the row type must be a record or Kotlin data class (its components name the columns)
         assertEquals("LQL-3064", assertThrows(LambdaQLException.class,
                 () -> qb.from(qb.from(Order.class).select(o -> o.getPrice()))).code());
         // @end

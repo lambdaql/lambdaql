@@ -245,7 +245,7 @@ class ProjectionTest {
     @Test
     void rules() {
         // @start region="rules"
-        // J3: a value without an aggregate must be a group key
+        // a value without an aggregate must be a group key
         LambdaQLException j3 = assertThrows(LambdaQLException.class, () -> qb.from(Order.class)
                 .groupBy(o -> o.getCustomer().getId())
                 .select(o -> new KeyCount(o.getCustomer().getId(), o.getStatus(), Agg.count())));
@@ -253,11 +253,11 @@ class ProjectionTest {
         // aggregates belong in having, not in where
         LambdaQLException where = assertThrows(LambdaQLException.class, () -> qb.from(Order.class).where(o -> Agg.count() > 1));
         assertEquals("LQL-3005", where.code());
-        // J7: with distinct, the sort key must be selected
+        // with distinct, the sort key must be selected
         LambdaQLException j7 = assertThrows(LambdaQLException.class, () -> qb.from(Order.class)
                 .orderBy(o -> asc(o.getId())).select(o -> o.getPrice()).distinct().toHql());
         assertEquals("LQL-3046", j7.code());
-        // J4: the group without orders gives NULL; a primitive argument cannot take it
+        // the group without orders gives NULL; a primitive argument cannot take it
         assertThrows(IllegalStateException.class, () -> qb.from(Order.class)
                 .where(o -> o.getStatus() == 9)
                 .select(o -> new Bad(null, Agg.sum(o.getPrice()))).toList());

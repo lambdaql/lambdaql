@@ -160,11 +160,11 @@ public class PlannedSqlTest {
         record("06-group-having", Kind.VALUES,
                 "select o.customer.id, count(*), sum(o.price) from Order o group by o.customer.id having sum(o.price) > 1000");
         // 6.7 Derived table. The manual shows a shape ("select ... from (...) r"); the column aliases are
-        // the components of record Stat (rule J5).
+        // the components of record Stat.
         record("06-derived", Kind.VALUES,
                 "select r.customerId, r.cnt, r.total from (select o.customer.id as customerId, count(*) as cnt,"
                         + " sum(o.price) as total from Order o group by o.customer.id) r where r.total > 100");
-        // 6.8 CTE. The manual shows a shape; the aliases are the components of record Stat (rule J5).
+        // 6.8 CTE. The manual shows a shape; the aliases are the components of record Stat.
         record("06-cte", Kind.VALUES,
                 "with t as (select o.customer.id as customerId, count(*) as cnt, sum(o.price) as total"
                         + " from Order o group by o.customer.id) select x.customerId, x.cnt, x.total from t x where x.total > 100");
@@ -181,7 +181,7 @@ public class PlannedSqlTest {
         // Change an association (foreign key). Customer.id is an int in the test entity.
         record("07-update-fk", Kind.DML, "update Order o set o.customer.id = :p1 where o.id = :p2", 1, 1L);
         record("07-update-fk-null", Kind.DML, "update Order o set o.customer = null where o.id = :p1", 1L);
-        // A value from another table (rule U9)
+        // A value from another table
         record("07-update-other-table", Kind.DML,
                 "update Order o set o.custName = (select c.name from Customer c where c.id = o.customer.id)");
 
@@ -208,7 +208,7 @@ public class PlannedSqlTest {
      */
     private void derivedExamples() {
         // 5.7 Top-1 scalar subquery. o.getId().equals(...) is "=". The correlation compares two nullable FKs
-        // (Long == Long), so it is null-safe (R2, Q5). Sort: desc is "nulls last", and the id tie-breaker is added (chapter 4).
+        // (Long == Long), so it is null-safe. Sort: desc is "nulls last", and the id tie-breaker is added (chapter 4).
         record("05-scalar-top1", Kind.ENTITY,
                 "select o from Order o where o.id = (select x.id from Order x where x.customer.id is not distinct from o.customer.id"
                         + " order by x.updateAt desc nulls last, x.id asc limit 1)");
@@ -218,7 +218,7 @@ public class PlannedSqlTest {
                 "with t (customerId, cnt, total) as (select o.customer.id, count(*), sum(o.price)"
                         + " from Order o group by o.customer.id) select x.customerId, x.cnt, x.total from t x where x.total > 100");
 
-        // 7.2 Values: null, date, boolean (now = 2026-01-01, id = 1). o.id is an @Id, so "=" (Q5).
+        // 7.2 Values: null, date, boolean (now = 2026-01-01, id = 1). o.id is an @Id, so "=".
         record("07-update-values", Kind.DML,
                 "update Order o set o.description = null, o.updateAt = :p1, o.active = true where o.id = :p2",
                 LocalDateTime.of(2026, 1, 1, 0, 0), 1L);

@@ -114,7 +114,7 @@ assertEquals("insert into Archive (id, price) values (:p1, (select sum(s1.price)
 <a id="generated-id"></a>
 ## 생성되는 id
 
-id가 IDENTITY나 SEQUENCE를 사용하면 id를 생략할 수 있습니다(규칙 U12).
+id가 IDENTITY나 SEQUENCE를 사용하면 id를 생략할 수 있습니다.
 첫 번째 예제의 `IdOrder` 줄이 이 경우에 해당합니다. `IdOrder`의 id는 IDENTITY 방식입니다.
 
 <a id="insert--select"></a>
@@ -128,7 +128,7 @@ ExecutableInsert<Archive> i = qb.insert(Archive.class)
         .from(Order.class)
         .where(o -> o.getStatus() == 1)
         .select((a, o) -> { a.setId(o.getId()); a.setPrice(o.getPrice()); a.setCustomerName(o.getCustomer().getName()); });
-// a path in the select list: left join, so orders without a customer stay (U10)
+// a path in the select list: left join, so orders without a customer stay
 assertEquals("insert into Archive (id, price, customerName) select e0.id, e0.price, j1.name"
         + " from Order e0 left join e0.customer j1 where e0.status = 1", i.toHql().get(0).hql());
 ```
@@ -145,7 +145,7 @@ left join customers c1_0 on c1_0.id=o1_0.customer_id
 where o1_0.status=1
 ```
 
-lambdaQL은 원본 경로에 명시적인 `left join`을 사용하므로 고객이 없는 주문도 빠지지 않습니다(규칙 U10). SQL은 세 데이터베이스에서 같습니다.
+lambdaQL은 원본 경로에 명시적인 `left join`을 사용하므로 고객이 없는 주문도 빠지지 않습니다. SQL은 세 데이터베이스에서 같습니다.
 
 setter가 없는 대상 엔티티에는 `Dml.value`를 씁니다. 첫 번째 인자는 대상 `a`의 getter 호출입니다.
 
@@ -207,7 +207,7 @@ group by o1_0.customer_id
 having count(*)>=2
 ```
 
-- 집계가 아닌 값은 모두 `groupBy` 키여야 합니다(규칙 J3). 그렇지 않으면 lambdaQL은 분석 시점에 `TranslationException`(`LQL-3035`)을 던집니다.
+- 집계가 아닌 값은 모두 `groupBy` 키여야 합니다. 그렇지 않으면 lambdaQL은 분석 시점에 `TranslationException`(`LQL-3035`)을 던집니다.
 - `where`에는 `Agg`를 쓸 수 없습니다. `having`을 사용하십시오.
 - 삽입된 `Summary` 행은 Java에서 같은 기준으로 그룹화한 값과 일치합니다.
 

@@ -179,7 +179,7 @@ class DmlQueryTest {
         assertEquals(List.of(30.0, 150.0, 5.0, 120.0), orders().stream().map(Order::getPrice).toList());
         assertEquals(4, all.execute());
         assertEquals(List.of(30.0, 0.0, 5.0, 0.0), orders().stream().map(Order::getPrice).toList());
-        // a subquery on the target table that does not use the outer row is read through a derived table (U22):
+        // a subquery on the target table that does not use the outer row is read through a derived table:
         // MySQL rejects reading the target table of an UPDATE (1093), and Hibernate 6.6 does not add the derived table
         seed();
         ExecutableUpdate<Order> avg = qb.update(Order.class).set((o, sub) -> o.setPrice(sub.from(Order.class).avg(x -> x.getPrice()))).all();
@@ -265,16 +265,16 @@ class DmlQueryTest {
         if (newStatus != null) u = u.set(o -> o.setStatus(newStatus));
         int changed = u.where(o -> o.getId() == id).execute();
 
-        // reading a column that an earlier assignment wrote is an error (U3): the databases disagree on its value
+        // reading a column that an earlier assignment wrote is an error: the databases disagree on its value
         assertThrows(LambdaQLException.class,
                 () -> qb.update(Order.class).set(o -> { o.setPrice(1); o.setTex((float) o.getPrice()); }));
-        // the same column twice is an error (U4), also across set() calls
+        // the same column twice is an error, also across set() calls
         assertThrows(LambdaQLException.class,
                 () -> qb.update(Order.class).set(o -> o.setStatus((short) 1)).set(o -> o.setStatus((short) 2)));
         // @end
         assertEquals(1, changed);
         assertEquals("checked", find(Order.class, id).getDescription());
-        // null into a column that can never be NULL (U6)
+        // null into a column that can never be NULL
         assertThrows(LambdaQLException.class,
                 () -> qb.update(Archive.class).set(a -> a.setId(null)).all());
     }
@@ -371,7 +371,7 @@ class DmlQueryTest {
                 .from(Order.class)
                 .where(o -> o.getStatus() == 1)
                 .select((a, o) -> { a.setId(o.getId()); a.setPrice(o.getPrice()); a.setCustomerName(o.getCustomer().getName()); });
-        // a path in the select list: left join, so orders without a customer stay (U10)
+        // a path in the select list: left join, so orders without a customer stay
         assertEquals("insert into Archive (id, price, customerName) select e0.id, e0.price, j1.name"
                 + " from Order e0 left join e0.customer j1 where e0.status = 1", i.toHql().get(0).hql());
         // @end
@@ -438,7 +438,7 @@ class DmlQueryTest {
         double avg = orders().stream().mapToDouble(Order::getPrice).average().orElseThrow();
         List<Long> below = ids(orders().stream().filter(o -> o.getPrice() < avg).toList());
         // @start region="delete-self-subquery"
-        // the subquery reads the target table: lambdaQL reads the matching ids through a derived table first (U17),
+        // the subquery reads the target table: lambdaQL reads the matching ids through a derived table first,
         // because MariaDB cannot delete from a table that a subquery reads (error 1093)
         ExecutableDelete<Order> d = qb.delete(Order.class)
                 .where((o, sub) -> o.getPrice() < sub.from(Order.class).avg(x -> x.getPrice()));

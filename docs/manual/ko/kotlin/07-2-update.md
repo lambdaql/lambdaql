@@ -57,7 +57,7 @@ assertEquals("update Order e0 set e0.description = null, e0.updateAt = :p1, e0.a
 
 `null`, boolean, enum 상수는 리터럴이 됩니다. enum 상수는 전체 클래스 이름(`org.lambdaql.query.Order$Kind.RUSH`)으로 씁니다.
 boolean 속성 `active`의 Java getter는 `isActive()`이므로 Kotlin에서는 `it.isActive`로 대입합니다.
-캡처 값은 같은 값을 두 번 사용하더라도 각각 **자체 파라미터**를 받습니다(규칙 U7).
+캡처 값은 같은 값을 두 번 사용하더라도 각각 **자체 파라미터**를 받습니다.
 
 예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-values`).
 
@@ -107,20 +107,20 @@ assertEquals("update Order e0 set e0.customer.id = :p1 where e0.id = :p2", fk.to
 // no customer
 val none = qb.update(Order::class.java).set { it.customer = null }.where { it.status.toInt() == 3 }
 assertEquals("update Order e0 set e0.customer = null where e0.status = 3", none.toHql().hql())
-// a captured entity: its @Id is bound (U11)
+// a captured entity: its @Id is bound
 val entity = qb.update(Order::class.java).set { it.customer = kim }.where { it.id == third }
 assertEquals("update Order e0 set e0.customer = :p1 where e0.id = :p2", entity.toHql().hql())
 ```
 
 연관 엔티티에서는 `@Id`(FK)만 설정할 수 있습니다.
-`it.customer?.name = x`는 오류(`LQL-3050`)입니다. 다른 테이블을 변경하게 되기 때문입니다(규칙 U6, [7.8](07-dml.md#rules-checked-at-analysis-time) 참고).
+`it.customer?.name = x`는 오류(`LQL-3050`)입니다. 다른 테이블을 변경하게 되기 때문입니다([7.8](07-dml.md#rules-checked-at-analysis-time) 참고).
 
 예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-fk`).
 
 <a id="a-value-from-another-table"></a>
 ## 다른 테이블의 값
 
-연관 경로로 값을 읽으십시오. lambdaQL은 이를 **상관 스칼라 서브쿼리**로 출력합니다(규칙 U9).
+연관 경로로 값을 읽으십시오. lambdaQL은 이를 **상관 스칼라 서브쿼리**로 출력합니다.
 `where`의 경로도 같은 형태의 서브쿼리가 됩니다.
 
 <!-- region: ManualKotlinDmlTest.kt#update-path -->
@@ -311,15 +311,15 @@ if (n == 0) throw OptimisticLockException()   // checking the result is your job
 
 같은 문장을 다시 실행하면 `v`가 이전 버전이므로 0행이 수정되고 `OptimisticLockException`이 발생합니다.
 
-`@Version` 속성에는 대입할 수 없습니다(규칙 U15). 대입하면 `LQL-3068`로 거부됩니다.
+`@Version` 속성에는 대입할 수 없습니다. 대입하면 `LQL-3068`로 거부됩니다.
 
 예제 코드: [`ManualKotlinDmlTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinDmlTest.kt)(`update-versioned`, `update-version-check`).
 
 <a id="many-set-calls-patch"></a>
 ## 여러 번의 `set()` 호출(PATCH)
 
-`set()`은 여러 번 호출할 수 있습니다. 모든 대입은 호출 순서대로 SET 목록 하나로 합쳐집니다(규칙 U14).
-규칙 U3과 U4는 여러 `set()` 호출 사이에도 적용됩니다.
+`set()`은 여러 번 호출할 수 있습니다. 모든 대입은 호출 순서대로 SET 목록 하나로 합쳐집니다.
+앞에서 대입한 컬럼을 다시 읽을 수 없다는 규칙과 같은 컬럼을 두 번 대입할 수 없다는 규칙은 여러 `set()` 호출 사이에도 적용됩니다.
 
 <!-- region: ManualKotlinDmlTest.kt#update-patch -->
 ```kotlin
@@ -330,12 +330,12 @@ var u = qb.update(Order::class.java).set { it.description = memo }
 if (newStatus != null) u = u.set { it.status = newStatus }
 val changed = u.where { it.id == id }.execute()
 
-// reading a column that an earlier assignment wrote is an error (U3)
+// reading a column that an earlier assignment wrote is an error
 val read = assertThrows(LambdaQLException::class.java) {
     qb.update(Order::class.java).set { it.price = 1.0; it.total = it.price }
 }
 assertEquals("LQL-3042", read.code())
-// the same column twice is an error (U4), also across set() calls
+// the same column twice is an error, also across set() calls
 val twice = assertThrows(LambdaQLException::class.java) {
     qb.update(Order::class.java).set { it.status = 1 }.set { it.status = 2 }
 }
@@ -349,17 +349,16 @@ assertEquals("LQL-3041", twice.code())
 <a id="update-all-rows-all"></a>
 ## 모든 행 수정: `all()`
 
-`where`가 없는 update는 `all()`을 명시해야 합니다. `where`나 `all()`이 없으면 코드가 **컴파일되지 않습니다**(규칙 U5).
+`where`가 없는 update는 `all()`을 명시해야 합니다.
 
 <!-- region: ManualKotlinDmlTest.kt#update-all -->
 ```kotlin
-// no where: all() is required, without it there is no execute() (U5)
+// no where: all() is required, without it there is no execute()
 val u = qb.update(Order::class.java).set { it.status = 0 }.all()
 assertEquals("update Order e0 set e0.status = 0", u.toHql().hql())
 val changed = u.execute()
 ```
 
-`qb.update(Order::class.java).set { it.status = 0 }.execute()`처럼 `all()` 없이 쓰면 `execute()`가 없으므로 컴파일 오류입니다.
 
 update에는 트랜잭션이 필요합니다([7.8](07-dml.md#transactions) 참고).
 

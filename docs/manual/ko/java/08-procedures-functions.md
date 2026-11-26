@@ -87,7 +87,7 @@ interface MathFns {
 아래 `call`, `exec`, `rules` 예제는 이 선언을 사용합니다.
 데이터베이스에는 대응하는 프로시저가 있어야 합니다. 예를 들어 MariaDB의 `SQ_PROC_CALC(IN p_cust INT, IN p_rate DOUBLE, OUT p_total DOUBLE)`는 고객의 `price` 합계에 `p_rate`를 곱해 `p_total`에 넣습니다.
 
-`calcWrong`은 규칙 PR2를 설명하려고 일부러 틀리게 선언한 메서드입니다([8.4](#84-warning-argument-order) 참고).
+`calcWrong`은 인자 순서 검사를 보여 주려고 일부러 틀리게 선언한 메서드입니다([8.4](#84-warning-argument-order) 참고).
 
 참고:
 
@@ -96,7 +96,7 @@ interface MathFns {
 - 값이 비어 있으면 이름은 메서드 이름에서 만듭니다: `calcTotal` → `CALC_TOTAL`.
 - `@SqlProcedure`에는 `pkg`(Oracle 패키지)도 있습니다: `@SqlProcedure(pkg = "SQ_PKG", value = "TWICE")`([8.4](#84-warning-argument-order) 참고).
 - 박싱 타입(`Double`, `Integer`)을 반환 타입으로 사용하십시오. 프로시저는 NULL을 반환할 수 있습니다.
-- 인터페이스와 결과 레코드는 DB 시그니처의 복사본입니다. 타입 안전성의 대가입니다. lambdaQL은 그 일부를 데이터베이스와 대조해 확인합니다(규칙 PR2).
+- 인터페이스와 결과 레코드는 DB 시그니처의 복사본입니다. 타입 안전성의 대가입니다. lambdaQL은 그 일부를 데이터베이스와 대조해 확인합니다.
 - 프로시저(추상 메서드)와 DB 함수(static 메서드)를 **같은 인터페이스**에 둘 수 있습니다.
 
 예제 코드: [`ManualJavaFunctionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaFunctionTest.java)(`declare-procs`).
@@ -131,7 +131,6 @@ qb.exec(OrderProcs.class, p -> p.purge(9)).execute();
 
 void에 `call`이 아니라 `exec`를 쓰는 이유는 무엇일까요?
 
-- Java에서 둘 다 `call`로 하면 모호한 오버로드가 됩니다(컴파일 오류).
 - `run`은 선택하지 않았습니다. Kotlin에 같은 이름의 표준 라이브러리 함수가 있어서, Kotlin 호출자가 오류 없이 실수로 그 함수를 호출할 수 있습니다.
 
 <a id="what-the-lambda-may-contain-rule-pr12"></a>
@@ -158,7 +157,7 @@ void에 `call`이 아니라 `exec`를 쓰는 이유는 무엇일까요?
 <a id="83-out-inout-and-result-sets"></a>
 ## 8.3 OUT, INOUT, 결과 집합
 
-반환 타입이 프로시저에 대응하는 방식(규칙 PR3, PR4, PR5):
+반환 타입이 프로시저에 대응하는 방식:
 
 | 프로시저에 있는 것 | 스텁 메서드의 반환 타입 |
 |---|---|
@@ -202,7 +201,7 @@ MariaDB와 Oracle은 `SELECT *`의 컬럼을 서로 다른 순서로 반환하�
 - Oracle 암시적 결과(`DBMS_SQL.RETURN_RESULT`)는 지원하지 않습니다. `SYS_REFCURSOR` OUT 파라미터를 사용하십시오.
 
 <a id="transactions-rule-pr9"></a>
-### 트랜잭션(규칙 PR9)
+### 트랜잭션
 
 - 프로시저 안의 DML은 호출한 트랜잭션의 일부입니다. 함께 롤백됩니다.
 - 호출 전에 lambdaQL은 영속성 컨텍스트를 flush합니다. 단, 트랜잭션이 활성 상태이고 변경 사항이 있을 때만입니다.
@@ -224,7 +223,7 @@ MariaDB와 Oracle은 `SELECT *`의 컬럼을 서로 다른 순서로 반환하�
 > [!WARNING]
 > **스텁 메서드 파라미터의 순서는 데이터베이스의 순서와 같아야 합니다.**
 
-lambdaQL은 인자를 **위치로** 바인딩합니다(규칙 PR2).
+lambdaQL은 인자를 **위치로** 바인딩합니다.
 Hibernate 6.6.5는 이름이 등록되어 있어도 위치로 바인딩합니다(실측, 7.4는 미측정).
 MariaDB와 H2 드라이버는 이름 있는 파라미터를 지원하지 않습니다.
 그래서 순서가 틀리면 **아무 오류 없이 잘못된 결과**를 얻을 수 있습니다.
@@ -245,7 +244,7 @@ MariaDB, Oracle:
 
 <!-- region: ProcedureTest.java#rules -->
 ```java
-// PR2: the stub is checked against the database parameters on the first call
+// the stub is checked against the database parameters on the first call
 assertEquals("LQL-4036", assertThrows(LambdaQLException.class,
         () -> qb.call(OrderProcs.class, p -> p.calcWrong(1)).execute()).code());
 // exec cannot drop OUT values
@@ -592,14 +591,14 @@ Double half = qb.call(() -> MathFns.half(price)).execute();
 
 인자 개수가 다르므로 `qb.call(OrderProcs.class, p -> ...)`와 충돌하지 않습니다.
 
-lambdaQL이 실행하는 방법(규칙 PR6):
+lambdaQL이 실행하는 방법:
 
 | 데이터베이스 | 경로 |
 |---|---|
 | Oracle | JDBC 함수 호출 `{? = call FN(?)}`. DML을 하는 함수와 커서를 반환하는 함수에도 동작합니다. |
 | MariaDB, H2 | HQL `select function('FN' as T, :p1)` |
 
-lambdaQL은 먼저 대기 중인 변경 사항을 flush합니다(PR9와 같음). 그래서 함수는 최신 변경 사항을 봅니다.
+lambdaQL은 먼저 대기 중인 변경 사항을 flush합니다(프로시저 호출과 같음). 그래서 함수는 최신 변경 사항을 봅니다.
 
 예제 코드: [`ProcedureTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ProcedureTest.java)(`function`).
 
@@ -697,10 +696,10 @@ qb.from(Order.class).where(o -> o.getCnt() * o.getStatus() > n).toHql();
 ```java
 // the body never runs in Java
 assertEquals("LQL-4034", assertThrows(DbOnlyException.class, () -> OrderFns.discount(1.0)).code());
-// FN2: a body that computes a value is rejected (Java and the database could give different values)
+// a body that computes a value is rejected (Java and the database could give different values)
 assertEquals("LQL-3052", assertThrows(LambdaQLException.class,
         () -> qb.from(Order.class).where(o -> BadFns.computes(o.getPrice()) > 1)).code());
-// FN8: a Hibernate built-in name would silently run the built-in function
+// a Hibernate built-in name would silently run the built-in function
 assertEquals("LQL-3054", assertThrows(LambdaQLException.class,
         () -> qb.from(Order.class).where(o -> BadFns.builtin(o.getPrice()) > 1)).code());
 // a function with its own SQL name must be registered

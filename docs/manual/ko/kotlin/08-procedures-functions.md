@@ -82,7 +82,7 @@ interface OrderProcs {
 - 값이 비어 있으면 이름은 함수 이름에서 만듭니다: `calcTotal` → `CALC_TOTAL`.
 - Oracle 패키지의 프로시저는 `pkg`로 지정합니다: `@SqlProcedure(pkg = "SQ_PKG", value = "TWICE")`([8.4](#84-warning-argument-order)의 `PkgProcs` 참고).
 - **nullable 반환 타입**(`Double?`)을 사용하십시오. 프로시저가 non-null 타입에 NULL을 반환하면 lambdaQL은 코드 `LQL-4039`가 붙은 `IllegalStateException`을 던집니다.
-- 인터페이스와 결과 데이터 클래스는 DB 시그니처의 복사본입니다. 타입 안전성을 위한 대가입니다. lambdaQL은 그 일부를 데이터베이스와 대조하여 검사합니다(규칙 PR2).
+- 인터페이스와 결과 데이터 클래스는 DB 시그니처의 복사본입니다. 타입 안전성을 위한 대가입니다. lambdaQL은 그 일부를 데이터베이스와 대조하여 검사합니다.
 - 프로시저(추상 함수)와 DB 함수(`companion object` 안)를 **같은 인터페이스**에 둘 수 있습니다.
 
 예제 코드: [`ManualKotlinProcedureTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinProcedureTest.kt)(`declare`).
@@ -113,7 +113,6 @@ qb.exec(OrderProcs::class.java) { it.purge(9) }.execute()
 
 결과가 없는 함수에는 왜 `call`이 아니라 `exec`을 쓸까요?
 
-- Java에서 둘 다 `call`이면 모호한 오버로드가 됩니다(컴파일 오류). 두 언어는 같은 API를 사용합니다.
 - `run`은 선택하지 않았습니다. Kotlin에서 인자를 빠뜨리면 `run { }`이 조용히 표준 라이브러리의 `run`이 됩니다.
 
 <a id="what-the-lambda-may-contain-rule-pr12"></a>
@@ -135,7 +134,7 @@ qb.exec(OrderProcs::class.java) { it.purge(9) }.execute()
 - OUT 파라미터가 있는 프로시저에 `exec`을 쓰면 오류입니다(`LQL-4037`). 실수로 OUT 값을 잃지 않도록 막습니다.
 - 파라미터의 데이터베이스 기본값은 사용할 수 없습니다. 모든 IN 파라미터를 전달하십시오.
 - IN 값으로 `null`을 쓰는 것은 괜찮습니다.
-- non-null 파라미터(`calc`의 `Int`, `Double`)와 nullable 파라미터(`stat`의 `Int?`) 모두 동작합니다(규칙 PR13).
+- non-null 파라미터(`calc`의 `Int`, `Double`)와 nullable 파라미터(`stat`의 `Int?`) 모두 동작합니다.
 
 `@SqlProcedure`가 없는 함수를 호출하면 lambdaQL이 람다 표현식을 읽을 때 오류가 납니다(`LQL-3060`). 데이터베이스를 조회하기 전이므로 H2에서도 확인합니다.
 
@@ -168,7 +167,7 @@ assertEquals("LQL-4037", assertThrows<LambdaQLException> {
 <a id="83-out-inout-and-result-sets"></a>
 ## 8.3 OUT, INOUT과 결과 집합
 
-반환 타입이 프로시저에 대응하는 방식(규칙 PR3, PR4, PR5):
+반환 타입이 프로시저에 대응하는 방식:
 
 | 프로시저에 있는 것 | 스텁 함수의 반환 타입 |
 |---|---|
@@ -215,7 +214,7 @@ MariaDB와 Oracle은 `SELECT *`의 컬럼을 서로 다른 순서로 반환하�
 - Oracle 암시적 결과(`DBMS_SQL.RETURN_RESULT`)는 지원하지 않습니다. `SYS_REFCURSOR` OUT 파라미터를 사용하십시오.
 
 <a id="transactions-rule-pr9"></a>
-### 트랜잭션(규칙 PR9)
+### 트랜잭션
 
 - 프로시저 안의 DML은 호출한 쪽 트랜잭션의 일부입니다. 함께 롤백됩니다.
 - 호출 전에 lambdaQL은 영속성 컨텍스트를 플러시합니다. 단, 트랜잭션이 활성 상태이고 변경이 있을 때만 플러시합니다.
@@ -239,7 +238,7 @@ MariaDB와 Oracle은 `SELECT *`의 컬럼을 서로 다른 순서로 반환하�
 > [!WARNING]
 > **스텁 함수 파라미터의 순서는 데이터베이스의 순서와 같아야 합니다.**
 
-lambdaQL은 인자를 **위치로** 바인딩합니다(규칙 PR2).
+lambdaQL은 인자를 **위치로** 바인딩합니다.
 Hibernate 6.6.5는 이름을 등록해도 위치로 바인딩합니다(실측, 7.4는 미측정).
 MariaDB와 H2 드라이버는 이름 있는 파라미터를 지원하지 않습니다.
 그래서 순서가 틀리면 **아무 오류 없이 잘못된 결과**를 얻을 수 있습니다.
@@ -417,7 +416,7 @@ lambdaQL은 `companion object` 함수에 붙은 어노테이션을 읽습니다.
 | Java 인터페이스 정적 메서드(Kotlin에서 호출) | 동작함 |
 | Kotlin 최상위 함수 | 동작함, **권장하지 않음**: import를 잊으면 같은 이름의 표준 라이브러리 함수(예: `maxOf`)가 조용히 사용될 수 있음 |
 | 함수 타입 값(`val fn: (Double?) -> Double?`) | 거부(`LQL-3008`) |
-| 기본 인자, `vararg`가 있는 `@SqlFunction` | 거부(FN9: 기본 인자는 `LQL-3056`, `vararg`는 `LQL-3057`) |
+| 기본 인자, `vararg`가 있는 `@SqlFunction` | 거부(기본 인자는 `LQL-3056`, `vararg`는 `LQL-3057`) |
 
 `object`, 최상위 함수, Java 정적 메서드는 같은 HQL을 만듭니다.
 
@@ -491,7 +490,7 @@ assertEquals("update Order e0 set e0.price = function('SQ_FN_DISCOUNT' as Double
 `lambdaql.functions.classes` 설정이 있으면 Hibernate는 등록하지 않은 함수에도 이름의 대소문자(`FN_DISCOUNT`)를 유지합니다(세 데이터베이스에서 관찰함, 원인은 아직 확인하지 않음).
 등록이 전혀 없으면 Hibernate가 이름을 소문자로 쓸 수 있습니다. 따옴표 없는 이름은 어느 쪽이든 동작합니다.
 
-`!!`는 컴파일러를 위한 것일 뿐입니다(함수가 `Double?`을 반환하므로). lambdaQL은 이를 건너뜁니다(규칙 FN6).
+`!!`는 컴파일러를 위한 것일 뿐입니다(함수가 `Double?`을 반환하므로). lambdaQL은 이를 건너뜁니다.
 
 <a id="how-lambdaql-renders-it"></a>
 ### lambdaQL이 출력하는 형태
@@ -558,14 +557,14 @@ val discounted: Double? = qb.call { OrderFns.discount(price) }.execute()
 
 인자 개수가 다르므로 `qb.call(OrderProcs::class.java) { ... }`와 충돌하지 않습니다.
 
-lambdaQL이 실행하는 방법(규칙 PR6):
+lambdaQL이 실행하는 방법:
 
 | 데이터베이스 | 경로 |
 |---|---|
 | Oracle | JDBC 함수 호출 `{? = call FN(?)}`. DML을 수행하는 함수와 커서를 반환하는 함수에도 동작함. |
 | MariaDB, H2 | HQL `select function('FN' as T, :p1)` |
 
-lambdaQL은 먼저 대기 중인 변경을 플러시하므로(PR9와 같음) 함수는 최신 변경을 봅니다.
+lambdaQL은 먼저 대기 중인 변경을 플러시하므로(프로시저 호출과 같음) 함수는 최신 변경을 봅니다.
 
 예제 코드: [`ManualKotlinFunctionTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt)(`call`).
 
@@ -709,7 +708,7 @@ assertEquals("LQL-3058", assertThrows<LambdaQLException> {
 }.code())
 ```
 
-내장 함수와 같은 이름(`LQL-3054`, FN8)과 대응하지 않는 반환 타입(`LQL-3055`, FN6)도 람다 표현식을 읽을 때 거부됩니다.
+내장 함수와 같은 이름(`LQL-3054`)과 대응하지 않는 반환 타입(`LQL-3055`)도 람다 표현식을 읽을 때 거부됩니다.
 
 예제 코드: [`ManualKotlinFunctionTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinFunctionTest.kt)(`bad-declare`, `rules`).
 

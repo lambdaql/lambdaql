@@ -92,7 +92,7 @@ Spring Boot를 사용하면 Boot 버전에 맞는 `lambdaql-spring-boot-starter-
 
 | 설정 | 할 일 | 이유 |
 |---|---|---|
-| `-Xsam-conversions` | 기본값(`indy`)을 유지하십시오. `-Xsam-conversions=class`를 설정하지 **마십시오**. | `class`로 설정하면 Kotlin은 직렬화 가능한 람다 표현식 대신 클래스를 만듭니다. lambdaQL은 이를 읽을 수 없습니다(제한 KC1). |
+| `-Xsam-conversions` | 기본값(`indy`)을 유지하십시오. `-Xsam-conversions=class`를 설정하지 **마십시오**. | `class`로 설정하면 Kotlin은 직렬화 가능한 람다 표현식 대신 클래스를 만듭니다. lambdaQL은 이를 읽을 수 없습니다. |
 | `-java-parameters` | 저장 프로시저를 호출한다면 권장합니다. | 그러면 lambdaQL이 파라미터 이름을 데이터베이스와 비교할 수 있습니다([8.4](08-procedures-functions.md#84-warning-argument-order) 참고). |
 | JPA 플러그인 | `kotlin("plugin.jpa")`와 all-open(또는 `kotlin("plugin.spring")`)을 사용하십시오. | JPA에는 인자 없는 생성자와 open 클래스가 필요합니다. Kotlin JPA 엔티티에서는 일반적인 설정입니다. |
 
@@ -182,7 +182,7 @@ Java 엔티티를 Kotlin에서 쓸 때 알아 둘 점입니다.
 |---|---|
 | 일반적인 public `var`나 `val` 속성을 사용하십시오. | lambdaQL은 getter를 읽고(`it.price`는 getter `getPrice()`) JPA 속성에 매핑합니다. |
 | NULL일 수 있는 컬럼에는 nullable 타입(`Double?`, `String?`)을 사용하십시오. | Kotlin의 non-null 타입은 데이터베이스에서 오는 NULL을 막지 못합니다. Hibernate는 검사 없이 컬럼 값을 필드에 씁니다. |
-| 쿼리에서 `@JvmField`, `internal` 속성, `value class` 속성, `@get:JvmName`을 사용하지 마십시오. | lambdaQL은 이들을 JPA 속성에 매핑할 수 없습니다(제한 KC15, KC16). |
+| 쿼리에서 `@JvmField`, `internal` 속성, `value class` 속성, `@get:JvmName`을 사용하지 마십시오. | lambdaQL은 이들을 JPA 속성에 매핑할 수 없습니다. |
 | `Boolean`, `Int`, `Long`, `Double`(nullable 아님)은 JVM 기본형입니다. | NULL을 담을 수 없습니다. lambdaQL은 이를 알고 더 단순한 SQL을 만들 수 있습니다. |
 
 <a id="create-a-querybuilder"></a>
@@ -398,10 +398,10 @@ val cheapest: Order? = byPrice.first().orElse(null)
 // first() reads one row like limit(1); paging adds the id as the last sort key
 assertEquals("select e0 from Order e0 order by e0.price asc, e0.id asc", byPrice.limit(1).toHql().hql())
 
-// without orderBy, "first" is the row with the smallest id
+// without orderBy there is no order by: "first" is any matching row
 val active = qb.from(Order::class.java).where { it.isActive }
 val firstActive: Order? = active.first().orElse(null)
-assertEquals("select e0 from Order e0 where e0.active = true order by e0.id asc", active.limit(1).toHql().hql())
+assertEquals("select e0 from Order e0 where e0.active = true", active.limit(1).toHql().hql())
 ```
 
 `first()`는 `limit(1)`과 같은 쿼리를 실행합니다. 그래서 예제는 `limit(1)`의 HQL로 `first()`의 HQL을 보여 줍니다.
@@ -585,8 +585,8 @@ assertEquals(2, tags.size)
 | 규칙 | 예 |
 |---|---|
 | 람다 표현식 리터럴을 전달하십시오. | `where { it.isActive }` |
-| 람다 표현식을 먼저 Kotlin 함수 타입에 저장하지 마십시오. | `val f: (Order) -> Boolean = { it.isActive }; where(f)`는 거부됩니다(KC4). |
-| 쿼리 람다 표현식을 `inline fun` 안에서 만들지 마십시오. | 거부됩니다(KC2). 헬퍼를 non-inline으로 만들거나, 호출하는 쪽에서 람다 표현식을 전달하십시오. |
+| 람다 표현식을 먼저 Kotlin 함수 타입에 저장하지 마십시오. | `val f: (Order) -> Boolean = { it.isActive }; where(f)`는 거부됩니다. |
+| 쿼리 람다 표현식을 `inline fun` 안에서 만들지 마십시오. | 거부됩니다. 헬퍼를 non-inline으로 만들거나, 호출하는 쪽에서 람다 표현식을 전달하십시오. |
 | 람다 표현식은 식 하나여야 합니다(조건, 정렬, 조회). | 람다 표현식 안의 반복문과 지역 `val`/`var`는 거부됩니다. |
 | 반드시 실행되어야 하는 코드를 람다 표현식에 넣지 마십시오. lambdaQL은 람다 표현식을 호출하지 않고 바이트 opcode를 분석합니다. | `println(...)`처럼 부수 효과가 있는 호출은 거부됩니다. |
 | Java 21~23에서 실행하면 새 JDK로 컴파일한 클래스에 맞는 ASM 버전이 필요합니다. | lambdaQL은 Java 21~23에서 ASM 9.11.1을 사용합니다(Java 28까지의 클래스 파일을 읽음). Java 24 이상에서는 실행 중인 JDK의 `java.lang.classfile`로 읽으므로 ASM 버전과 관계가 없습니다. |

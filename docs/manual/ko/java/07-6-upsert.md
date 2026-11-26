@@ -168,7 +168,7 @@ int n = qb.upsert(Archive.class)
 - 행에는 키 할당이 있어야 합니다. `upsert(X.class)`는 `@Id`를 키로 사용합니다.
 - 키는 엔티티 자신의 컬럼이어야 합니다. 연관 경로는 오류입니다.
 - `values(...)`의 값에서는 행을 읽을 수 없습니다(새 행이기 때문입니다). 기존 행은 `update(...)`에서만 읽습니다.
-- update와 insert의 할당 규칙을 적용합니다(U1, U3, U4, U6. [7.9](07-dml.md#79-all-rules-u1-to-u21-summary) 참고).
+- update와 insert의 할당 규칙을 적용합니다([7.9](07-dml.md#79-all-rules-u1-to-u21-summary) 참고).
 - `insert ... select`로 하는 업서트는 없습니다.
 - 다른 DML 문장과 마찬가지로 업서트에는 트랜잭션이 필요하고, 이미 로드된 엔티티에는 반영되지 않습니다([7.8](07-dml.md#transactions) 참고).
 

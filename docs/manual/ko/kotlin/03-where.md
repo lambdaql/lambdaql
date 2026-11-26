@@ -56,11 +56,12 @@ where o1_0.status=1 and o1_0.price>100.0
 
 <!-- region: KotlinSelectTest.kt#captured -->
 ```kotlin
+val min = 100.0
 val q = qb.from(Order::class.java).where { it.price > min && it.status.toInt() == 1 }
 assertEquals("select e0 from Order e0 where e0.price > :p1 and e0.status = 1", q.toHql().hql())
 ```
 
-`min`은 캡처한 지역 `val`(`100.0`)이므로 바인드 파라미터가 됩니다. `price`는 기본형 `double`이므로 `!!`가 필요 없습니다.
+`min`은 캡처한 지역 `val`이므로 바인드 파라미터가 됩니다. `price`는 기본형 `double`이므로 `!!`가 필요 없습니다.
 같은 쿼리를 Java로 쓴 예제는 [이 페이지의 Java 버전](../java/03-where.md)에 있습니다.
 
 `where()`는 여러 번 호출할 수 있습니다. 조건들은 `AND`로 결합됩니다.
@@ -212,7 +213,7 @@ assertEquals("select e0 from Order e0 where e0.status = 3 or e0.price > 200.0", 
 
 캡처 값과 상수만으로 값을 고르는 `if`(`it.status.toInt() == (if (flag) 1 else 2)`)는 쿼리를 실행할 때 Kotlin에서 계산해 바인드 파라미터로 넘깁니다.
 엔티티 값으로 값을 고르는 `if`와 `when`은 SQL `case when … end`가 됩니다([3.5.1](#351-values-chosen-by-a-condition) 참고).
-그 밖의 boolean `if (c) x else y`는 거부됩니다(제한 KC6).
+그 밖의 boolean `if (c) x else y`는 거부됩니다.
 
 <!-- region: ManualKotlinWhereTest.kt#value-before -->
 ```kotlin
@@ -284,7 +285,7 @@ assertEquals("update Order e0 set e0.price = case when e0.price > 100.0 then (e0
 - `case`는 분기를 위에서부터 차례로 검사합니다. 그래서 두 번째 이후 분기의 조건은 람다 표현식에 쓴 조건 그대로입니다.
 - `where`에서 비교하는 `case`는 행마다 계산되므로, 데이터베이스는 그 안의 컬럼 인덱스를 쓰지 못합니다. lambdaQL은 이때 `WARN` 수준으로 `LQL-5013`을 기록합니다.
 - 정렬 함수 체인 자체를 조건으로 고르는 형태(`if (flag) desc(o.price) else asc(o.id)`)는 거부됩니다(`LQL-2023`). 조건은 키 값 안에 쓰십시오.
-- 대상이 있는 `when (x)`는 [3.15](#315-when-kotlin-only)의 규칙을 따릅니다. `takeIf`는 지원하지 않습니다(KC6).
+- 대상이 있는 `when (x)`는 [3.15](#315-when-kotlin-only)의 규칙을 따릅니다. `takeIf`는 지원하지 않습니다.
 
 예제 코드: [`KotlinCaseWhenTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinCaseWhenTest.kt)(`case-where`, `case-when-select`, `case-group`, `case-sort`, `case-set`).
 
@@ -321,7 +322,7 @@ Kotlin 컴파일러는 바이트 opcode에 **숨겨진** null 검사를 추가�
 <a id="362--compares-values"></a>
 ### 3.6.2 `==`는 값을 비교
 
-Kotlin의 `==`는 원래 값을 비교합니다. lambdaQL에서는 `===`도 **값**을 비교합니다(규칙 R17).
+Kotlin의 `==`는 원래 값을 비교합니다. lambdaQL에서는 `===`도 **값**을 비교합니다.
 쿼리에는 객체 동일성이 없습니다. 값이 같은 서로 다른 두 `Long` 박스는 같습니다.
 
 <!-- region: ManualKotlinWhereTest.kt#captured-eq -->
@@ -499,7 +500,7 @@ assertEquals("select e0 from Coded e0 where e0.code = 'abc'", q.toHql().hql())
 |---|---|---|
 | `it.isActive` | `e0.active = true` | –(NULL이 아님) |
 | `it.vip == true` | `e0.vip = true` | 반환 안 됨 |
-| `it.vip != true` | `e0.vip <> true` | **반환 안 됨**(SQL 의미, . Kotlin이라면 반환) |
+| `it.vip != true` | `e0.vip <> true` | **반환 안 됨**(SQL 의미. Kotlin이라면 반환) |
 | `it.vip == false` | `e0.vip = false` | 반환 안 됨(NULL은 false가 아님) |
 | `it.vip ?: false` | `e0.vip is not null and e0.vip = true` | 반환 안 됨 |
 | `!(it.vip ?: false)` | `e0.vip is null or e0.vip = false` | **반환됨** |
@@ -508,7 +509,7 @@ assertEquals("select e0 from Coded e0 where e0.code = 'abc'", q.toHql().hql())
 
 - lambdaQL은 `is not true`나 `coalesce(flag, false)`를 사용하지 않습니다. Oracle에서 실패합니다(ORA-00932).
 - 더 큰 조건의 부정은 항상 `not (...)`로 씁니다. lambdaQL은 조건을 `(...) = false`나 `(...) is null`로 감싸지 않습니다. Oracle 23이 `WHERE`에서 이를 잘못 평가하기 때문입니다.
-- `it.vip ?: false`는 **조건 안에서는** 괜찮습니다. 값이나 정렬 키로 쓰면 거부됩니다(제한 KC21).
+- `it.vip ?: false`는 **조건 안에서는** 괜찮습니다. 값이나 정렬 키로 쓰면 거부됩니다.
 
 <!-- region: ManualKotlinWhereTest.kt#nullable-boolean -->
 ```kotlin
@@ -619,7 +620,7 @@ assertEquals("select e0 from Order e0 where e0.status in (:p1)", q.toHql().hql()
 | 빈 컬렉션 | `in`은 FALSE, `!in`은 TRUE(Hibernate는 `1=0` / `1=1`을 씀) |
 | 요소 1,500개 | H2, MariaDB, Oracle 23ai에서 문장 하나로 동작함(이전 Oracle 버전은 1,000개 제한이 있음. 미검증) |
 | 컬렉션이 엔티티 컬렉션: `item in it.items` | **거부됨**. `exists()` 서브쿼리를 사용하십시오([5. 서브쿼리](05-subquery.md)) |
-| 람다 표현식 안에서 만든 컬렉션: `it.status in listOf(1, 2)` | **거부됨**(KC8). 밖에서 만들어 캡처하십시오 |
+| 람다 표현식 안에서 만든 컬렉션: `it.status in listOf(1, 2)` | **거부됨**. 밖에서 만들어 캡처하십시오 |
 
 Kotlin에는 범위(`it.status in 1..5`)와 상수를 사용한 `when`도 있습니다. [3.14](#314-ranges-kotlin-only)와 [3.15](#315-when-kotlin-only)를 참고하십시오.
 
@@ -639,7 +640,7 @@ lambdaQL은 JPA Metamodel로 각 단계를 확인합니다.
 | 연관 자체를 `null`과 비교 | 외래 키 컬럼, 조인 없음 | `it.customer == null` -> `e0.customer is null` |
 | 컬렉션(`@OneToMany`, `@ManyToMany`) | **거부됨** | `it.items...` -> `exists()` 서브쿼리 사용 |
 
-**값 객체 전체의 비교.** 임베디드 값 객체(`@Embedded`) 전체를 같음으로 비교하면 lambdaQL은 컬럼마다 비교 하나로 펼칩니다(B6).
+**값 객체 전체의 비교.** 임베디드 값 객체(`@Embedded`) 전체를 같음으로 비교하면 lambdaQL은 컬럼마다 비교 하나로 펼칩니다.
 `it.address == addr`는 `e0.address.city = :p1 and e0.address.zip = :p2`가 됩니다.
 
 - 부정(`it.address != addr`)은 `e0.address.city <> :p1 or e0.address.zip <> :p2`입니다.
@@ -841,9 +842,9 @@ where o1_0.customer_id is null
 
 - 같은 경로는 별칭 하나를 받습니다. 이 별칭은 `where`, `orderBy`, `select`가 함께 사용합니다.
 - `it.customer?.id == 5L`은 외래 키 컬럼 `e0.customer.id`를 사용합니다. 조인이 필요 없습니다.
-- `orderBy`나 `select`에**만** 쓰인 경로는 `left join`이므로 그곳에서는 행을 잃지 않습니다(규칙 S8, J1). `!!`가 있어도 마찬가지입니다. 같은 경로를 `where`에서도 쓰면 `orderBy`와 `select`는 `where`의 조인을 사용합니다.
+- `orderBy`나 `select`에**만** 쓰인 경로는 `left join`이므로 그곳에서는 행을 잃지 않습니다. `!!`가 있어도 마찬가지입니다. 같은 경로를 `where`에서도 쓰면 `orderBy`와 `select`는 `where`의 조인을 사용합니다.
 - 이 조인 규칙은 조회, `count`, 서브쿼리, 조인 쿼리의 `where`에 적용합니다. 명시적 조인의 `on` 안의 경로는 지금처럼 `left join`입니다. 필수 연관(`optional = false`)은 항상 inner join입니다.
-- 연관을 엔티티 객체와 비교하지 말고(`it.customer == c`, 제한 KC13) id를 비교하십시오: `it.customer?.id == c.id`(여기서 `c`는 캡처한 객체).
+- 연관을 엔티티 객체와 비교하지 말고(`it.customer == c`) id를 비교하십시오: `it.customer?.id == c.id`(여기서 `c`는 캡처한 객체).
 
 예제 코드: [`KotlinQueryTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinQueryTest.kt)(`embedded-compare`, `safe-call-and`, `safe-call-or`, `safe-call-null`, `not-null-assert`, `safe-and-assert`), [`ManualKotlinStartTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinStartTest.kt)(`join-path`), [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`null-guard`, `no-customer`).
 
@@ -877,7 +878,7 @@ assertEquals("select e0 from Order e0 where e0.updateAt > :p1", call.toHql().hql
 | 바깥 클래스의 속성(`private`도 마찬가지) | 쿼리가 실행될 때마다 읽음 |
 | `companion object`의 `val`, 최상위 `val`, `object`의 `val` | 바인드 파라미터 |
 | `const val` | HQL에 리터럴로 씀 |
-| 람다 표현식 안에서 캡처 변수에 쓰기(`n++`) | **거부됨**(KC12) |
+| 람다 표현식 안에서 캡처 변수에 쓰기(`n++`) | **거부됨** |
 
 규칙:
 
@@ -918,23 +919,23 @@ lambdaQL은 분석에 실패하면 코드 `[LQL-xxxx]`와 소스 줄 번호가 �
 | 형태 | 예 | 해결 방법 |
 |---|---|---|
 | 지역 `val`/`var`, 반복문, 여러 문장이 있는 블록 | `{ val x = 1; it.status == x }` | 식 하나로 작성 |
-| 일반 `if (c) x else y`(KC6) | | [3.5](#35-and-or-not)의 허용된 형태 사용 |
+| 일반 `if (c) x else y` | | [3.5](#35-and-or-not)의 허용된 형태 사용 |
 | 중위 `and`, `or`, `xor` | `it.isActive and (it.price > 100.0)` | `&&`, `\|\|` 사용 |
-| 람다 표현식 안의 문자열 템플릿이나 `+`(KC17, `LQL-2007`) | `it.description == "A" + it.status` | 람다 표현식 전에 문자열을 만들어 캡처 |
-| 람다 표현식 안에서 만든 컬렉션(KC8) | `it.status in listOf(1, 2)` | 밖에서 만들어 캡처 |
+| 람다 표현식 안의 문자열 템플릿이나 `+`(`LQL-2007`) | `it.description == "A" + it.status` | 람다 표현식 전에 문자열을 만들어 캡처 |
+| 람다 표현식 안에서 만든 컬렉션 | `it.status in listOf(1, 2)` | 밖에서 만들어 캡처 |
 | 람다 표현식 안의 람다 표현식 | `ids.any { id -> id == it.id }` | `in`([3.9](#39-in-with-a-captured-collection))이나 서브쿼리 사용 |
-| Kotlin 문자열 함수와 다른 stdlib 함수(KC9, KC20, `LQL-3008`). `startsWith`, `endsWith`, `contains`는 지원([3.8](#38-strings)) | `it.description?.trim()`, `isBlank()`, `lowercase()` | 직접 비교 |
+| Kotlin 문자열 함수와 다른 stdlib 함수(`LQL-3008`). `startsWith`, `endsWith`, `contains`는 지원([3.8](#38-strings)) | `it.description?.trim()`, `isBlank()`, `lowercase()` | 직접 비교 |
 | `switch`로 컴파일되는 `when`(`LQL-2010`) | `when (it.status.toInt()) { 1, 2 -> true; else -> false }` | `\|\|`로 이은 비교([3.15](#315-when-kotlin-only)) |
 | 범위 객체가 필요한 범위(`LQL-3008`) | `it.customer?.grade in 1..5`, `LocalDateTime` 범위 | 두 비교로 작성([3.14](#314-ranges-kotlin-only)) |
-| 직접 만든 non-inline 확장 함수(KC11) | `it.isOpen()` | `inline fun`으로 만들거나 조건을 직접 작성 |
+| 직접 만든 non-inline 확장 함수 | `it.isOpen()` | `inline fun`으로 만들거나 조건을 직접 작성 |
 | 엔티티의 다른 메서드 | `it.calcSomething()` | 속성만 사용 |
 | 엔티티 컬렉션 경로 | `it.items.size > 0` | `exists()` 서브쿼리 |
-| 엔티티와 엔티티 비교(KC13) | `it.customer == c` | id 비교 |
+| 엔티티와 엔티티 비교 | `it.customer == c` | id 비교 |
 | 값 객체의 크기 비교, 다른 타입과의 비교(`LQL-3012`) | `it.address > a`(`Address`가 `Comparable`일 때) | 필드를 비교. `==`, `!=`는 지원 |
 | `NaN` / `Infinity` 캡처 값 | `it.price!! > Double.NaN` | NaN을 보내지 않음 |
-| `isNaN()`(KC14) | `it.price!!.isNaN()` | – |
-| 캡처 변수에 쓰기(KC12) | `{ n++; it.isActive }` | 람다 표현식 밖에서 계산 |
-| 익명 객체, 함수 타입 값(KC4, KC5) | `val f: (Order) -> Boolean`으로 `where(f)` | 람다 표현식 리터럴 전달 |
+| `isNaN()` | `it.price!!.isNaN()` | – |
+| 캡처 변수에 쓰기 | `{ n++; it.isActive }` | 람다 표현식 밖에서 계산 |
+| 익명 객체, 함수 타입 값 | `val f: (Order) -> Boolean`으로 `where(f)` | 람다 표현식 리터럴 전달 |
 
 예외 타입(모두 `LambdaQLException`을 상속):
 

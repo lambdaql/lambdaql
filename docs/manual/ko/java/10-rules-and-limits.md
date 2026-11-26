@@ -149,7 +149,7 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 |---|---|---|
 | `o.getId() == 10L`(언박싱, 한쪽이 기본형) | `e0.id = 10` | NULL: 행이 반환되지 않음 |
 | `o.getId() == p`(두 객체: `Long`, `String`, enum, ...) | `e0.id = :p1` | 컬럼이 NULL: 선택되지 않음. 캡처 값 `null`: 일치하는 행 없음(`= NULL`, `WARN` 수준 `LQL-4045`) |
-| `o.getDescription() != p` | `e0.description <> :p1` | 컬럼이 NULL: 선택되지 **않음**(SQL 의미, . Java라면 선택). 캡처 값 `null`: 일치하는 행 없음 |
+| `o.getDescription() != p` | `e0.description <> :p1` | 컬럼이 NULL: 선택되지 **않음**(SQL 의미. Java라면 선택). 캡처 값 `null`: 일치하는 행 없음 |
 | `o.getDescription() == o.getCustName()`(엔티티 값 두 개) | `e0.description = e0.custName` | 어느 한쪽이 NULL: 선택되지 않음. NULL과 NULL도 마찬가지(SQL 의미) |
 | `o.getDescription().equals(p)` | `e0.description = :p1` | description이 NULL: 행이 반환되지 않음 |
 | `Objects.equals(o.getDescription(), p)`, `"x".equals(o.getDescription())`, `Boolean.TRUE.equals(o.getActive())` | `==`와 같음 | `==`와 같음 |
@@ -168,7 +168,7 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 | `o.getCustomer() == null`, `o.getCustomer() != null` | `e0.customer is null`, `e0.customer is not null`(FK 컬럼, 조인 없음) | 고객이 없는 주문 / 고객이 있는 주문 |
 | `o.getCustomer().getId()` | `e0.customer.id`(FK 컬럼, 조인 없음) | 고객이 없으면 NULL |
 | `ids.contains(o.getId())` | `e0.id in (:p1)` | id가 NULL: 선택되지 않음 |
-| `!ids.contains(o.getId())` | `e0.id not in (:p1)`. NULL이 될 수 있는 컬럼도 같음 | NULL 값: 선택되지 **않음**(SQL 의미, . `DEBUG` 수준 `LQL-5009`. Java라면 선택) |
+| `!ids.contains(o.getId())` | `e0.id not in (:p1)`. NULL이 될 수 있는 컬럼도 같음 | NULL 값: 선택되지 **않음**(SQL 의미. `DEBUG` 수준 `LQL-5009`. Java라면 선택) |
 | `!...contains(x)`가 있는 서브쿼리 | `x not in (select ...)` | 서브쿼리에 NULL이 있으면 어떤 행도 선택되지 않음(SQL 의미) |
 | `Agg.sum`, `avg`, `min`, `max` | `sum(...)` ... | 행이 없거나 모든 값이 NULL이면 NULL |
 | `Agg.count()` | `count(*)` | 행이 없으면 0 |
@@ -268,11 +268,11 @@ lambdaQL은 많은 차이를 감춥니다. 알아야 하는 것도 있습니다.
 | NULL 위치, `DESC` | 마지막 | 마지막 | **처음** | 모든 DB에서 `DESC`는 NULLS LAST |
 | `NULLS FIRST/LAST` 문법 | 있음 | **없음**(문법 오류) | 있음 | Hibernate가 MariaDB에서 `CASE`로 흉내 냄: 정렬에 **인덱스를 쓰지 못함** |
 | 페이징 SQL | `offset ? rows fetch first ? rows only` | `limit ?,?` | `offset ? rows fetch first ? rows only` | Hibernate에 전달(`setFirstResult` / `setMaxResults`) |
-| 같은 값을 가진 행의 순서 | – | – | 무작위 | 페이징할 때 키에 id가 없으면 lambdaQL이 루트 `@Id asc`를 추가. 유일하고 NULL이 될 수 없는 키(`unique = true`이고 `nullable = false`, `@NaturalId`)가 있으면 추가하지 않음(A5) |
+| 같은 값을 가진 행의 순서 | – | – | 무작위 | 페이징할 때 키에 id가 없으면 lambdaQL이 루트 `@Id asc`를 추가. 유일하고 NULL이 될 수 없는 키(`unique = true`이고 `nullable = false`, `@NaturalId`)가 있으면 추가하지 않음 |
 | 문자열 순서 | 대소문자 구분 | `_ci` | `NLS_SORT`(JVM 로캘) | DB를 따름 |
 | `order by`의 암시적 경로 | inner join(행을 잃음) | 같음 | 같음 | lambdaQL은 `left join` 사용(필수 연관은 inner join, 또는 같은 경로의 `where` 조인) |
-| `order by`, `distinct`, `group by`의 `@Lob` 컬럼 | 동작 | 동작 | **ORA-22848 / ORA-22849** | 쿼리를 바꾸지 않고 `LQL-5010`을 `DEBUG` 수준으로 기록(B3) |
-| `@Enumerated(EnumType.STRING)` enum 컬럼의 정렬 | 이름 순 | 이름 순 | 이름 순 | 쿼리를 바꾸지 않고 `LQL-5011`을 `DEBUG` 수준으로 기록(B2). 선언 순서는 `ORDINAL` 매핑에서만 |
+| `order by`, `distinct`, `group by`의 `@Lob` 컬럼 | 동작 | 동작 | **ORA-22848 / ORA-22849** | 쿼리를 바꾸지 않고 `LQL-5010`을 `DEBUG` 수준으로 기록 |
+| `@Enumerated(EnumType.STRING)` enum 컬럼의 정렬 | 이름 순 | 이름 순 | 이름 순 | 쿼리를 바꾸지 않고 `LQL-5011`을 `DEBUG` 수준으로 기록. 선언 순서는 `ORDINAL` 매핑에서만 |
 
 lambdaQL은 NULL이 될 수 있는 모든 키에 대해 HQL에 `nulls first` / `nulls last`를 씁니다. 필수 연관만 거치고 NULL이 될 수 없는 경로에는 쓰지 않습니다. 데이터베이스 기본값과 같으면 Hibernate가 이를 뺍니다.
 기본값(`ASC` = NULLS FIRST, `DESC` = NULLS LAST)은 H2, MariaDB와 같으므로 그쪽에서는 추가 SQL이
@@ -306,11 +306,11 @@ lambdaQL은 NULL이 될 수 있는 모든 키에 대해 HQL에 `nulls first` / `
 
 | 항목 | 일어나는 일 | lambdaQL |
 |---|---|---|
-| `SET a = ..., b = a + 1`(설정한 뒤 컬럼을 읽음) | MariaDB는 **새** 값을, H2와 Oracle은 이전 값을 읽음 | 분석 시점에 오류(U3) |
-| DML 안의 연관 경로(`o.getCustomer().getName()`) | Hibernate가 DB마다 다른 조인을 만들고 고객이 없는 **행을 잃음** | lambdaQL은 상관 스칼라 서브쿼리를 씀(`where`와 SET). `where`에서 조회라면 inner join할 경로에는 `customer.id is not null`도 더함(`left join`할 경로에는 더하지 않음). 그래서 DML이 쿼리와 같은 행에 적용됨(U9) |
-| 같은 테이블에 대한 서브쿼리가 있는 `DELETE` | MariaDB 오류 1093 | 대상 id를 파생 테이블로 먼저 읽음: `d0.id in (select t.id from (select e0.id as id … where <condition>) t)`(U17). 상관 서브쿼리에도 동작하고 세 DB에서 같은 행을 삭제(실측). `update`는 감싸지 않음(MariaDB에서도 동작) |
-| STRING 컬럼과 ORDINAL 컬럼에 같은 enum 값을 한 번만 바인딩 | H2와 MariaDB는 **오류 없이 잘못된 값**을 저장 | 위치마다 파라미터 하나, 공유하지 않음(U7) |
-| `values(list, ...)`의 많은 행 | Oracle: 바인드 65,535개의 고정 제한(ORA-01745), 그보다 훨씬 전부터 매우 느림 | 문장당 값 500개 이하로 나누고, 모든 문장을 한 트랜잭션에서 실행(U13) |
+| `SET a = ..., b = a + 1`(설정한 뒤 컬럼을 읽음) | MariaDB는 **새** 값을, H2와 Oracle은 이전 값을 읽음 | 분석 시점에 오류 |
+| DML 안의 연관 경로(`o.getCustomer().getName()`) | Hibernate가 DB마다 다른 조인을 만들고 고객이 없는 **행을 잃음** | lambdaQL은 상관 스칼라 서브쿼리를 씀(`where`와 SET). `where`에서 조회라면 inner join할 경로에는 `customer.id is not null`도 더함(`left join`할 경로에는 더하지 않음). 그래서 DML이 쿼리와 같은 행에 적용됨 |
+| 같은 테이블에 대한 서브쿼리가 있는 `DELETE` | MariaDB 오류 1093 | 대상 id를 파생 테이블로 먼저 읽음: `d0.id in (select t.id from (select e0.id as id … where <condition>) t)`. 상관 서브쿼리에도 동작하고 세 DB에서 같은 행을 삭제(실측). `update`는 감싸지 않음(MariaDB에서도 동작) |
+| STRING 컬럼과 ORDINAL 컬럼에 같은 enum 값을 한 번만 바인딩 | H2와 MariaDB는 **오류 없이 잘못된 값**을 저장 | 위치마다 파라미터 하나, 공유하지 않음 |
+| `values(list, ...)`의 많은 행 | Oracle: 바인드 65,535개의 고정 제한(ORA-01745), 그보다 훨씬 전부터 매우 느림 | 문장당 값 500개 이하로 나누고, 모든 문장을 한 트랜잭션에서 실행 |
 | `order by ... limit`이 있는 `update` / `delete` | MariaDB는 `in` 서브쿼리의 `limit`(오류 1235)과 대상 테이블을 읽는 서브쿼리(오류 1093)를 거부 | `e0.id in (select t.id from (select x0.id as id ... order by ... limit n) t)`: 파생 테이블 `t`로 세 데이터베이스 모두에서 동작. 안쪽 select가 조회의 조인을 사용하므로 조회와 같은 행을 대상으로 함 |
 | `on conflict` / upsert | H2와 Oracle은 `merge`. MariaDB는 `insert ... on duplicate key update`이고, 수정된 행을 2로 셈. Hibernate의 `do nothing`은 H2와 Oracle에서 실패 | `upsert`와 `onConflict(...).update(...)`는 Hibernate의 형태를 사용. `ignore()`는 `insert ... select ... where not exists`로 씀. 행 수는 그대로 반환 |
 
@@ -330,7 +330,7 @@ H2에는 OUT 파라미터가 없으므로 프로시저 기능은 MariaDB나 Orac
 <a id="107-not-supported-and-what-to-write-instead"></a>
 ## 10.7 지원하지 않는 것과 대신 작성할 것
 
-lambdaQL은 이 목록의 형태에 대해 대부분 명확한 오류를 던집니다. 컴파일되지 않는 형태는 표에 따로 적었습니다.
+lambdaQL은 이 목록의 형태에 대해 대부분 명확한 오류를 던집니다.
 
 <a id="lambda-form-and-loading"></a>
 ### 람다 표현식 형태와 로딩
@@ -386,10 +386,8 @@ lambdaQL은 이 목록의 형태에 대해 대부분 명확한 오류를 던집�
 |---|---|
 | 정렬 람다 표현식 안의 조건이나 반복문(`if (x) asc(...)`) | 쿼리 두 개를 만들거나 `Direction`을 캡처 값으로 전달: `sort(o.getPrice(), dir)` |
 | 정렬 함수와 함께 쓴 `Direction` 인자(`orderBy(o -> desc(o.getPrice()), dir)`, `LQL-3069`) | `orderBy(o -> sort(o.getPrice(), dir))` 또는 키 하나: `orderBy(o -> o.getPrice(), dir)` |
-| `orderBy` 두 번, `orderBy` 뒤의 `where`, `limit` 뒤의 `orderBy` | 모든 키를 담은 `orderBy` 하나(이 형태들은 컴파일되지 않음) |
-| 정렬 키로 쓴 엔티티(`desc(o.getCustomer())`, 컴파일되지 않음) | 컬럼: `desc(o.getCustomer().getName())` |
 | 정렬 이름과 방향을 함께 담은 문자열 하나(`"price,desc_nulls_last"`) | 방향은 `Direction.parse(text)`, 이름은 `SortSpec.ofPath`. 이름은 정렬 정책이 검사([4.10](04-order-paging.md#sort-policy)) |
-| 조인 결과의 `distinct()`에서 조인한 엔티티의 컬럼이나 연관 경로로 정렬(J7, `LQL-3046`) | 주 엔티티 자신의 컬럼으로 정렬하거나 `exists` 서브쿼리 사용 |
+| 조인 결과의 `distinct()`에서 조인한 엔티티의 컬럼이나 연관 경로로 정렬(`LQL-3046`) | 주 엔티티 자신의 컬럼으로 정렬하거나 `exists` 서브쿼리 사용 |
 | `limit` / `offset`과 함께 쓴 컬렉션 fetch join | 먼저 페이징한 뒤 컬렉션을 로드 |
 | Spring `Sort`의 `ignoreCase()`([12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable)) | `ignoreCase()` 없는 정렬 |
 | 함수 키(`lower(name)`) | – |
@@ -417,7 +415,7 @@ lambdaQL은 이 목록의 형태에 대해 대부분 명확한 오류를 던집�
 
 | 지원하지 않음 | 대신 작성할 것 |
 |---|---|
-| `where` 없는 `update` / `delete` | `.all()`을 추가(없으면 `execute()`가 컴파일되지 않음) |
+| `where` 없는 `update` / `delete` | `.all()`을 추가 |
 | 같은 문장에서 설정한 뒤 컬럼을 읽기 | 의도적으로 이전 값을 사용하거나 update를 두 번 실행 |
 | 같은 컬럼을 두 번 설정 | 대입 하나 |
 | 조건부 값(`c ? a : b`, 토글 `!o.isActive()`) | `where`가 다른 update 두 개를 사용 |
@@ -426,7 +424,7 @@ lambdaQL은 이 목록의 형태에 대해 대부분 명확한 오류를 던집�
 | 필수 컬럼(`@Id`, `nullable = false`, 기본형)에 `null` 넣기 | – |
 | `@Version` 속성을 직접 쓰기 | lambdaQL이 대신 `update versioned`를 사용 |
 | 값 안의 문자열 연결 | – |
-| update나 delete의 명시적 조인 | 추가하지 않음. 연관 경로(U9)나 `sub` 사용 |
+| update나 delete의 명시적 조인 | 추가하지 않음. 연관 경로나 `sub` 사용 |
 | 명시적 조인이 있는 `insert ... select` | 다대일 경로를 사용 |
 | 동시 삽입에서 원자적인 `onConflict(...).ignore()` | 키 중복 오류를 처리(`ignore()`는 `not exists`를 사용. [7.6](07-6-upsert.md) 참고) |
 | `insert ... select`로 하는 업서트 | `values(list, ...)`로 행마다 업서트 |

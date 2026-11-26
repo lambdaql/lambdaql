@@ -1135,7 +1135,9 @@ public final class HqlRenderer {
 
     private List<String> orderBy(Class<?> root, List<SortBound> sorts, boolean paged) {
         List<String> out = new ArrayList<>();
-        String id = paged ? model.idName(root).orElse(null) : null;
+        // no orderBy: no order by at all; the order of the rows is the developer's choice (ROADMAP D73)
+        boolean sorted = sorts.stream().anyMatch(sort -> !sort.items().isEmpty());
+        String id = paged && sorted ? model.idName(root).orElse(null) : null;
         boolean hasId = false;
         for (SortBound sort : sorts) {
             captured = sort.captured();

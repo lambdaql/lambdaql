@@ -240,11 +240,10 @@ order by o1_0.status,o1_0.id
 limit ?,?
 
 -- @example page-only
--- HQL: select e0 from Order e0 where e0.active = true order by e0.id asc
+-- HQL: select e0 from Order e0 where e0.active = true
 select …
 from orders o1_0
 where o1_0.active=1
-order by o1_0.id
 limit ?
 
 -- @example sort-spec
@@ -274,11 +273,10 @@ order by o1_0.price,o1_0.id
 limit ?
 
 -- @example first#2
--- HQL: select e0 from Order e0 where e0.active = true order by e0.id asc
+-- HQL: select e0 from Order e0 where e0.active = true
 select …
 from orders o1_0
 where o1_0.active=1
-order by o1_0.id
 limit ?
 
 -- @example one

@@ -72,13 +72,12 @@ class ResultQueryTest {
         Optional<Order> cheapest = qb.from(Order.class)
                 .orderBy(o -> asc(o.getPrice()))
                 .first();
-        // without orderBy, "first" is the row with the smallest id
+        // without orderBy there is no order by: "first" is any matching row
         Optional<Order> firstActive = qb.from(Order.class).where(o -> o.isActive()).first();
         Optional<Order> none = qb.from(Order.class).where(o -> o.getStatus() == 9).first();
         // @end
         assertEquals(all.stream().min(Comparator.comparing(Order::getPrice)).orElseThrow().getId(), cheapest.orElseThrow().getId());
-        assertEquals(all.stream().filter(Order::isActive).map(Order::getId).min(Comparator.naturalOrder()).orElseThrow(),
-                firstActive.orElseThrow().getId());
+        assertTrue(firstActive.orElseThrow().isActive());
         assertTrue(none.isEmpty());
         // offset is kept: the second cheapest
         assertEquals(all.stream().sorted(Comparator.comparing(Order::getPrice)).skip(1).findFirst().orElseThrow().getId(),

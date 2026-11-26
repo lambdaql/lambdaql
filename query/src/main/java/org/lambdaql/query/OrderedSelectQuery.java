@@ -14,8 +14,8 @@ import java.util.SequencedSet;
  * <p>
  * Only paging and running are left here, so you cannot add {@code where} after the sort or sort twice
  * (ROADMAP S5; the compiler checks it).
- * When the query is paged and the sort keys do not contain the id, lambdaQL adds {@code id asc} as the last key
- * (S9), so rows do not move between pages. Paging values go to Hibernate
+ * When the query is sorted and paged and the sort keys do not contain the id, lambdaQL adds {@code id asc} as the last
+ * key (S9), so rows do not move between pages. Without {@code orderBy} there is no order by at all (D73). Paging values go to Hibernate
  * ({@code setFirstResult}/{@code setMaxResults}); they are not in the HQL text.
  *
  * <p>Example (from the test <a href="https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java">SortQueryTest</a>):

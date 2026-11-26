@@ -192,7 +192,7 @@ class JoinQueryTest {
                 .where((o, i) -> i.getQty() > 0)
                 .distinct();
         assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.id where e1.qty > 0", q.toHql().hql());
-        // a sort key must be a column of the main entity (J7)
+        // a sort key must be a column of the main entity
         OrderedJoinQuery<Order, Item> sorted = q.orderBy((o, i) -> desc(o.getPrice()));
         assertEquals("select distinct e0 from Order e0 join Item e1 on e1.order.id = e0.id where e1.qty > 0"
                 + " order by e0.price desc", sorted.toHql().hql());

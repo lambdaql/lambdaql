@@ -181,7 +181,7 @@ class KotlinQueryTest {
         assertEquals(expected.sortedWith(order), q.toList().sortedWith(order))
     }
 
-    // ------------------------------------------------------------------ safe call ?. and !! in where (D54)
+    // ------------------------------------------------------------------ safe call ?. and !! in where
 
     @Test
     fun safeCallOr() {

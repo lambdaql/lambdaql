@@ -183,7 +183,7 @@ public interface ManualMemberRepository extends JpaRepository<Member, Long>, Lam
 | `findSet(Where<T>)` | `SequencedSet<T>` | 조건에 맞는 모든 행을 Set으로 반환. 순서는 정해지지 않음(`findAll(Where<T>)`과 같음). `distinct` 없음. Set의 크기가 행 수보다 작으면 `IllegalStateException`([`toSet()`](02-getting-started.md#toset) 참고) |
 | `findSet(Where<T>, SortSpec<T>)` | `SequencedSet<T>` | 조건에 맞는 모든 행을 정렬 순서대로 Set으로 반환 |
 | `findSet(Where<T>, Sort)` | `SequencedSet<T>` | 위와 같음. Spring `Sort`로 정렬([12.5](#125-spring-sort-and-pageable) 참고) |
-| `findFirst(Where<T>)` | `Optional<T>` | 조건에 맞는 행 중 id가 가장 작은 행 |
+| `findFirst(Where<T>)` | `Optional<T>` | 조건에 맞는 행 중 하나. 정렬하지 않음 |
 | `findFirst(Where<T>, SortSpec<T>)` | `Optional<T>` | 지정한 순서의 첫 행. 한 행만 읽음 |
 | `findFirst(Where<T>, Sort)` | `Optional<T>` | Spring `Sort` 순서의 첫 행 |
 | `findOne(Where<T>)` | `Optional<T>` | 조건에 맞는 유일한 행. 2행 이상이면 `IncorrectResultSizeDataAccessException` |
@@ -194,7 +194,7 @@ public interface ManualMemberRepository extends JpaRepository<Member, Long>, Lam
 | `updateAll(Where<T>, Assign<T>)` | `int` | 조건에 맞는 모든 행을 수정. 조건이 먼저 옴. 트랜잭션 필요 |
 | `updateOne(Where<T>, Assign<T>)` | `int` | 조건에 맞는 유일한 행을 1행 보호를 적용해 수정. 0 또는 1 반환. 트랜잭션 필요 |
 | `insertOne(Assign<T>)` | `int` | 한 행 삽입. 1 반환. 트랜잭션 필요 |
-| `insertAll(Collection<L>, AssignEach<T, L>)` | `int` | 요소마다 한 행 삽입(문장당 값 500개 이하, 규칙 U13). 트랜잭션 필요 |
+| `insertAll(Collection<L>, AssignEach<T, L>)` | `int` | 요소마다 한 행 삽입(문장당 값 500개 이하). 트랜잭션 필요 |
 | `upsertOne(Assign<T>)` | `int` | 한 행 삽입. 같은 `@Id`의 행이 있으면 그 행을 수정. 데이터베이스가 보고한 행 수 반환. 트랜잭션 필요 |
 | `upsertAll(Collection<L>, AssignEach<T, L>)` | `int` | 요소마다 한 행 업서트(행마다 문장 하나). 트랜잭션 필요 |
 | `updateQuery()` | `UpdateQuery<T>` | 수정 시작: `updateQuery().set(...).where(...).execute()`([7.2](07-2-update.md) 참고). 트랜잭션 필요 |
@@ -323,7 +323,7 @@ assertThrows(org.springframework.dao.IncorrectResultSizeDataAccessException.clas
 | `deleteAll(Iterable)` | `CrudRepository` | 전달한 엔티티를 하나씩 삭제 | 실행 |
 | `deleteAll(Where<T>)` | `LambdaQlExecutor<T>` | SQL `delete` 문장 하나(벌크) | **실행하지 않음** |
 
-`deleteAll(where)`는 엔티티를 로드하지 않습니다. 다른 벌크 문장과 마찬가지로 이미 로드된 엔티티에는 반영되지 않습니다(규칙 U16).
+`deleteAll(where)`는 엔티티를 로드하지 않습니다. 다른 벌크 문장과 마찬가지로 이미 로드된 엔티티에는 반영되지 않습니다.
 
 많은 행을 빠르게 삭제할 때 사용하십시오. cascade나 `@PreRemove`가 필요하면 Spring Data의 메서드를 사용하십시오.
 
@@ -406,7 +406,7 @@ assertEquals("PropertyReferenceException", unknown.getClass().getSimpleName());
 
 - 페이지 번호는 Spring Data와 같이 0부터 시작합니다. lambdaQL은 `limit`과 `offset`으로 페이지를 읽습니다.
 - 전체 개수는 `count` 쿼리로 구합니다. 페이지만으로 전체 개수가 확정되면(예: 첫 페이지의 행 수가 페이지 크기보다 적은 경우) Spring은 count 쿼리를 생략합니다.
-- 정렬 키에 id가 없으면 lambdaQL이 id를 마지막 키로 추가하므로, 행이 페이지 사이에서 이동하지 않습니다([동순위 처리](04-order-paging.md#tie-breaker-automatic-id) 참고). 정렬이 없는 페이지는 id 순서입니다.
+- 정렬 키에 id가 없으면 lambdaQL이 id를 마지막 키로 추가하므로, 행이 페이지 사이에서 이동하지 않습니다([동순위 처리](04-order-paging.md#tie-breaker-automatic-id) 참고). 정렬이 없는 페이지에는 `order by`가 붙지 않으므로, 페이지를 안정적으로 나누려면 `Sort`를 지정하십시오.
 - `Pageable.unpaged()`는 모든 행을 한 페이지로 반환합니다.
 
 <!-- region: ExecutorTest.java#page -->
@@ -555,7 +555,7 @@ DML을 자체 트랜잭션에서 실행하는 빌더는 `new QueryBuilder(entity
 | Spring `Sort`의 `ignoreCase()` | `UnsupportedOperationException` |
 | `STRICT` 모드에서 정렬 정책이 허용하지 않는 정렬 이름([12.5](#sort-policy-with-spring)) | `SortNotAllowedException`(`LQL-4040`), 변환하지 않음 |
 | 리포지토리 호출(단축 메서드, 또는 default 메서드 안의 `execute()`)에서 트랜잭션 없이 수정, 삭제, 삽입, 업서트 실행 | `InvalidDataAccessApiUsageException`. Spring이 JPA `TransactionRequiredException`을 변환한 예외입니다. 리포지토리 메서드 밖(`QueryBuilder` 빈)에서는 JPA `TransactionRequiredException` |
-| 규칙(U1, U3, U4, U6)을 어긴 대입 람다 표현식 | `LambdaQLException`(예: `TranslationException`, `LQL-3042`). 변환하지 않음([7.8](07-dml.md#rules-checked-at-analysis-time) 참고) |
+| 규칙을 어긴 대입 람다 표현식 | `LambdaQLException`(예: `TranslationException`, `LQL-3042`). 변환하지 않음([7.8](07-dml.md#rules-checked-at-analysis-time) 참고) |
 
 `QueryBuilder` 빈(12.8)은 리포지토리가 아니므로 Spring의 예외 변환을 거치지 않습니다. 이 빈에서 `one()`과 `executeOne()`의 조건에 맞는 행이 2개 이상이면 `NonUniqueResultException`이 발생합니다.
 

@@ -45,10 +45,10 @@ where (select c1_0.name from customers c1_0 where c1_0.id=orders.customer_id) is
 MariaDB는 `delete o1_0 from orders o1_0`로 씁니다. H2와 Oracle은 `delete from orders o1_0`로 씁니다.
 
 두 번째 문장은 `qb.from(Order.class).where(o -> o.getCustomer().getName() == null)`이 반환하는 것과 **같은 행**, 즉 고객의 이름이 없는 주문을 삭제합니다.
-고객이 **없는** 주문은 이 조건에 맞지 않으므로 삭제되지 않습니다(규칙 U9). 조회에서도 이 경로는 inner join입니다.
+고객이 **없는** 주문은 이 조건에 맞지 않으므로 삭제되지 않습니다. 조회에서도 이 경로는 inner join입니다.
 고객이 없는 주문도 삭제하려면 null 가드(`o.getCustomer() == null || ...`)를 함께 쓰십시오. 조회와 마찬가지로 고객이 없는 주문도 대상이 됩니다.
 
-모든 행을 삭제할 때는 `all()`이 필요합니다(규칙 U5). `where`도 `all()`도 없으면 `execute()`가 없으므로 컴파일되지 않습니다.
+모든 행을 삭제할 때는 `all()`이 필요합니다.
 
 <!-- region: ManualJavaDmlTest.java#delete-all -->
 ```java
@@ -90,7 +90,7 @@ delete from orders
 where not exists(select 1 from items i1_0 where i1_0.order_id=orders.id)
 ```
 
-모든 JPA 벌크 문장과 마찬가지로, delete는 JPA `cascade`나 `orphanRemoval`을 실행하지 않고 이미 로드된 엔티티에도 반영되지 않습니다(규칙 U16).
+모든 JPA 벌크 문장과 마찬가지로, delete는 JPA `cascade`나 `orphanRemoval`을 실행하지 않고 이미 로드된 엔티티에도 반영되지 않습니다.
 delete에는 트랜잭션이 필요합니다([7.8](07-dml.md#transactions) 참고).
 
 예제 코드: [`DmlQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/DmlQueryTest.java)(`delete`), [`ManualJavaDmlTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaDmlTest.java)(`delete-all`, `delete-in`), [`SubqueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SubqueryTest.java)(`dml-subquery`).
@@ -99,7 +99,7 @@ delete에는 트랜잭션이 필요합니다([7.8](07-dml.md#transactions) 참�
 ## 같은 테이블을 읽는 서브쿼리
 
 `where`의 서브쿼리가 삭제 대상 엔티티(또는 같은 상속 계층의 엔티티)를 읽을 수 있습니다. 서브쿼리 자신의 `from`, 서브쿼리 안의 조인, U9의 상관 스칼라 서브쿼리가 이에 해당합니다.
-이때 lambdaQL은 먼저 대상 id를 파생 테이블로 읽고 그 id로 삭제합니다(규칙 U17).
+이때 lambdaQL은 먼저 대상 id를 파생 테이블로 읽고 그 id로 삭제합니다.
 
 ```
 delete from Order d0 where d0.id in (select t.id from (select e0.id as id from Order e0 where <condition>) t)
@@ -114,7 +114,7 @@ delete from Order d0 where d0.id in (select t.id from (select e0.id as id from O
 
 <!-- region: DmlQueryTest.java#delete-self-subquery -->
 ```java
-// the subquery reads the target table: lambdaQL reads the matching ids through a derived table first (U17),
+// the subquery reads the target table: lambdaQL reads the matching ids through a derived table first,
 // because MariaDB cannot delete from a table that a subquery reads (error 1093)
 ExecutableDelete<Order> d = qb.delete(Order.class)
         .where((o, sub) -> o.getPrice() < sub.from(Order.class).avg(x -> x.getPrice()));

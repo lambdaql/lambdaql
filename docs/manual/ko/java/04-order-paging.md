@@ -27,11 +27,7 @@ List<Order> rows = page.toList();
 ```
 
 - 정렬 함수는 `By`의 static 메서드입니다: `asc(key)`, `desc(key)`, `asc(key, Nulls.FIRST)`, `desc(key, Nulls.LAST)`, `sort(key, Direction)`.
-- 첫 호출은 `SortKeys`를 반환합니다. `SortKeys`에도 같은 메서드가 있으므로 `desc(o.getPrice()).asc(o.getId())`처럼 키를 이어 붙입니다.
-- 키와 방향을 함께 작성합니다. 둘의 순서가 어긋날 일이 없습니다.
 - lambdaQL은 정렬 람다 표현식을 호출하지 않고 바이트 opcode를 분석합니다. 정렬 함수는 순서를 기술할 뿐입니다. 정렬 람다 표현식 밖에서 호출하면 `IllegalStateException`(`LQL-4046`)이 발생합니다.
-
-`orderBy`의 람다 표현식은 `Comparable<?>`을 반환합니다. 키 하나(`o.getPrice()`)와 `SortKeys`가 모두 `Comparable`이므로 `orderBy` 하나가 두 형태를 받습니다. lambdaQL은 람다 표현식을 읽을 때 둘을 구분합니다.
 
 `assertEquals`의 문자열이 lambdaQL이 만드는 HQL입니다.
 이 장의 예제는 H2, MariaDB, Oracle에서 Java로 같은 정렬을 적용한 결과와 같은 순서로 행을 반환합니다.
@@ -78,7 +74,7 @@ order by o1_0.price desc,o1_0.id
 
 `Direction` 인자는 키 하나에만 씁니다. `orderBy(o -> desc(o.getPrice()), Direction.ASC)`처럼 정렬 함수와 `Direction` 인자를 함께 쓰면 `LQL-3069`로 거부됩니다. 방향을 인자로 받아야 한다면 `orderBy(o -> sort(o.getPrice(), direction))`를 쓰십시오.
 
-메서드 참조는 키 하나를 쓰는 곳이면 어디서나 쓸 수 있습니다. 메서드 참조는 `Order::getPrice`처럼 엔티티의 getter여야 합니다. static 메서드, 인자가 있는 메서드, 객체에 묶인 참조는 거부됩니다(규칙 S13).
+메서드 참조는 키 하나를 쓰는 곳이면 어디서나 쓸 수 있습니다. 메서드 참조는 `Order::getPrice`처럼 엔티티의 getter여야 합니다. static 메서드, 인자가 있는 메서드, 객체에 묶인 참조는 거부됩니다.
 
 예제 엔티티에서 `price`는 `double`이므로 `nulls` 부분이 없습니다:
 
@@ -121,10 +117,10 @@ order by o1_0.price desc
 |---|---|---|
 | `ASC` | 오름차순 | NULL이 **처음**(기본 정책) |
 | `DESC` | 내림차순 | NULL이 **마지막**(기본 정책) |
-| `ASC_NULLS_FIRST` | 오름차순 | NULL이 처음 |
+| `ASC_NULLS_FIRST` | 오름차순 | NULL이 처음. `ASC`와 같음 |
 | `ASC_NULLS_LAST` | 오름차순 | NULL이 마지막 |
 | `DESC_NULLS_FIRST` | 내림차순 | NULL이 처음 |
-| `DESC_NULLS_LAST` | 내림차순 | NULL이 마지막 |
+| `DESC_NULLS_LAST` | 내림차순 | NULL이 마지막. `DESC`와 같음 |
 
 `Direction`에는 도우미 메서드도 두 개 있습니다.
 
@@ -277,7 +273,7 @@ order by o1_0.description,o1_0.id
 
 `text`가 `"desc"`이면 HQL은 `... order by e0.description desc nulls last, e0.id asc`입니다.
 `text`가 `"asc_nulls_last"`이면 `... order by e0.description asc nulls last, e0.id asc`입니다.
-람다 표현식은 한 번만 분석합니다. `dir`은 쿼리를 실행할 때마다 읽습니다(규칙 S10). 방향이 `null`이면 쿼리를 실행할 때 예외가 발생합니다.
+람다 표현식은 한 번만 분석합니다. `dir`은 쿼리를 실행할 때마다 읽습니다. 방향이 `null`이면 쿼리를 실행할 때 예외가 발생합니다.
 
 예제 코드: [`SortQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SortQueryTest.java)(`sort-nulls`, `sort-dynamic`), [`ManualJavaSortTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaSortTest.java)(`sort-direction`).
 
@@ -330,11 +326,9 @@ MariaDB에는 `NULLS` 구문이 없으므로, 기본값이 아닌 위치는 Hibe
 | `@Enumerated(EnumType.STRING)` enum 컬럼 | 허용 | 이름 순으로 정렬됨(선언 순서가 아님). `DEBUG` 수준 `LQL-5011`, 아래 참고 |
 | 산술: `o.getPrice() * 2`, `+`, `-` | 허용 | 아래 예제 참고 |
 | 확대 변환(`short`에서 `long`으로 등) | 허용 | 변환 없이 컬럼으로 정렬. 아래 예제 참고 |
-| 엔티티: `desc(o.getCustomer())`, `orderBy(o -> o.getCustomer())` | **컴파일 오류** | 엔티티는 `Comparable`이 아님 |
 | 엔티티를 쓰지 않는 값: `asc(1)`, 캡처한 값 | **거부됨** | [4.6](#46-rules-for-the-lambda-body) 참고 |
 | 컬럼에 대한 함수: `lower(name)` | 지원하지 않음 | |
 
-키는 `Comparable`이어야 합니다. 박싱 타입(`Double`, `Integer`, `Long`), `String`, `java.time` 타입은 `Comparable`이므로 동작합니다. Java 컴파일러는 엔티티 키를 거부합니다.
 엔티티 클래스가 `Comparable`을 구현하더라도 lambdaQL은 람다 표현식을 읽을 때 그것을 키로 쓰지 못하게 거부합니다.
 
 산술 키는 식 그대로 정렬합니다. 확대 변환(`(long) o.getStatus()`)은 HQL에서 사라지고 컬럼으로 정렬합니다.
@@ -380,8 +374,8 @@ left join customers c1_0 on c1_0.id=o1_0.customer_id
 order by c1_0.name asc nulls first,o1_0.id
 ```
 
-**필수 연관은 inner join을 사용합니다.** `optional = false`로 매핑한 연관(예: `@ManyToOne(optional = false)`)은 대상이 항상 있으므로 inner join으로 행을 잃지 않습니다(A4).
-그래서 정렬이나 select에만 쓴 경로라도 이런 연관은 `join`을 사용합니다. 그 밖의 연관은 위처럼 `left join`을 사용합니다(규칙 S8, J1).
+**필수 연관은 inner join을 사용합니다.** `optional = false`로 매핑한 연관(예: `@ManyToOne(optional = false)`)은 대상이 항상 있으므로 inner join으로 행을 잃지 않습니다.
+그래서 정렬이나 select에만 쓴 경로라도 이런 연관은 `join`을 사용합니다. 그 밖의 연관은 위처럼 `left join`을 사용합니다.
 경로의 모든 연관 단계가 필수이고 값이 NULL이 될 수 없으면 정렬에 `nulls first/last`도 붙지 않습니다.
 
 예제 엔티티 `OrderLine`의 `@ManyToOne(optional = false) Order order`:
@@ -399,7 +393,7 @@ assertEquals("select e0 from Order e0 left join e0.customer j1 order by j1.name 
 ```
 
 **`@Lob` 컬럼의 정렬.** `@Lob` 컬럼을 `orderBy`, `distinct`, `groupBy`에 쓰면 H2와 MariaDB는 실행하지만 Oracle은 거부합니다(ORA-22848, ORA-22849, 실측). `=` 비교는 세 데이터베이스 모두에서 동작합니다.
-lambdaQL은 쿼리를 바꾸지 않고, 컬럼과 사용처마다 한 번 `LQL-5010`을 `DEBUG` 수준으로 기록합니다(B3).
+lambdaQL은 쿼리를 바꾸지 않고, 컬럼과 사용처마다 한 번 `LQL-5010`을 `DEBUG` 수준으로 기록합니다.
 
 `OrderLine.memo`는 `@Lob`:
 
@@ -412,7 +406,7 @@ qb.from(OrderLine.class).groupBy(l -> l.getMemo()).select(l -> l.getMemo()).toHq
 qb.from(OrderLine.class).select(l -> l.getMemo()).distinct().toHql();
 ```
 
-**`EnumType.STRING` enum의 정렬.** `@Enumerated(EnumType.STRING)`으로 매핑한 enum 컬럼은 데이터베이스가 상수 **이름**의 문자열 순서로 정렬합니다. Java의 enum 비교는 선언 순서를 따르므로 결과 순서가 다를 수 있습니다(B2).
+**`EnumType.STRING` enum의 정렬.** `@Enumerated(EnumType.STRING)`으로 매핑한 enum 컬럼은 데이터베이스가 상수 **이름**의 문자열 순서로 정렬합니다. Java의 enum 비교는 선언 순서를 따르므로 결과 순서가 다를 수 있습니다.
 lambdaQL은 쿼리를 바꾸지 않고, 컬럼마다 한 번 `LQL-5011`을 `DEBUG` 수준으로 기록합니다. `ORDINAL`(또는 `@Enumerated` 없음)은 선언 순서로 정렬하므로 기록하지 않습니다.
 
 <!-- region: MappingRulesTest.java#enum-string-sort -->
@@ -489,17 +483,8 @@ lambdaQL은 `orderBy`를 호출할 때 이를 확인하고 `LambdaQLException`�
 <a id="47-order-of-calls"></a>
 ## 4.7 호출 순서
 
-빌더 타입이 순서를 제어합니다. 순서가 틀리면 컴파일되지 않습니다.
-
-| 호출 | 허용 |
-|---|---|
-| `from(...).where(...).orderBy(...).limit(...).offset(...)` | 허용 |
-| `from(...).where(...).limit(...).offset(...)`(`orderBy` 없음) | 허용. 행은 id로 정렬됩니다([4.8](#48-paging) 참고) |
-| `orderBy(...)` 두 번 | 불가(컴파일 오류) |
-| `orderBy(...)` 뒤의 `where(...)` | 불가(컴파일 오류) |
-| `limit(...)` 뒤의 `orderBy(...)` | 불가(컴파일 오류) |
-
-`orderBy`, `limit`, `offset` 뒤의 쿼리 타입은 `OrderedSelectQuery`입니다. 여기에는 `limit`, `offset`, `toHql()`, `toList()`, `toSet()`, `first()`만 있습니다. `one()`, `count()`, `exists()`는 `orderBy`, `limit`, `offset` 전에만 있습니다([결과 가져오기](02-getting-started.md#getting-the-result) 참고).
+쿼리는 `from(...).where(...).orderBy(...).limit(...).offset(...)` 순서로 작성합니다.
+`orderBy` 없이 `limit`이나 `offset`만 쓰면 `order by`가 붙지 않습니다([4.8](#48-paging) 참고).
 
 <a id="48-paging"></a>
 ## 4.8 페이징
@@ -559,12 +544,13 @@ lambdaQL은 HQL에 `LIMIT`을 쓰지 않습니다. Hibernate가 데이터베이�
 | MariaDB | `limit ?, ?` |
 | Oracle | `offset ? rows fetch first ? rows only` |
 
-**`orderBy` 없는 페이징.** `orderBy` 없이 `limit`과 `offset`을 호출할 수 있습니다. 이때 lambdaQL은 행을 id로 정렬하므로 페이지가 안정적입니다.
+**`orderBy` 없는 페이징.** `orderBy` 없이 `limit`과 `offset`을 호출하면 `order by`를 붙이지 않습니다. 어떤 행이 어느 페이지에 오는지는 데이터베이스가 정합니다. 페이지를 안정적으로 나누려면 `orderBy`를 쓰십시오.
 
 <!-- region: SortQueryTest.java#page-only -->
 ```java
+// paging without orderBy: no order by, so which rows come is up to the database; use orderBy for stable pages
 RenderedQuery q = qb.from(Order.class).where(o -> o.isActive()).limit(2).toHql();
-assertEquals("select e0 from Order e0 where e0.active = true order by e0.id asc", q.hql());
+assertEquals("select e0 from Order e0 where e0.active = true", q.hql());
 ```
 
 **데이터베이스별 SQL**
@@ -589,24 +575,24 @@ limit ?
 **첫 행과 전체 수.**
 
 - `orderBy(...).first()`는 그 순서의 첫 행을 `Optional`로 반환합니다. 한 행만 읽습니다. `offset`은 유지됩니다: `orderBy(...).offset(1).first()`는 두 번째 행을 반환합니다.
-- `count()`는 where 단계(`orderBy`, `limit`, `offset` 전)에만 있으므로 항상 조건에 맞는 모든 행을 셉니다. 페이징 화면에서는 where 단계의 쿼리를 변수에 담아 두십시오. 그 변수에서 `count()`를 호출해 전체 수를 얻고, 이어서 `orderBy(...).limit(...).toList()`를 호출해 페이지를 얻습니다.
+- `count()`는 조건에 맞는 모든 행을 셉니다. 페이징 화면에서는 where 단계의 쿼리를 변수에 담아 두십시오. 그 변수에서 `count()`를 호출해 전체 수를 얻고, 이어서 `orderBy(...).limit(...).toList()`를 호출해 페이지를 얻습니다.
 
 자세한 내용은 [결과 가져오기](02-getting-started.md#getting-the-result)를 참고하십시오.
 
 <a id="tie-breaker-automatic-id"></a>
 ### 동순위 처리(자동 `id`)
 
-위 HQL을 보십시오. lambdaQL이 끝에 `e0.id asc`를 추가했습니다. 왜일까요?
+위 HQL의 끝에는 lambdaQL이 추가한 `e0.id asc`가 있습니다. 이유는 다음과 같습니다.
 
 - 여러 행이 같은 `status`나 `price`를 가질 수 있습니다. 데이터베이스는 그런 행을 **아무 순서로나** 반환할 수 있습니다. Oracle은 실제로 그렇게 합니다(측정함).
 - 그러면 2페이지와 3페이지에 같은 행이 두 번 나오거나 행이 빠질 수 있습니다.
 
-규칙: **페이징을 사용하고 정렬 키에 id가 없으면 lambdaQL은 루트 `@Id asc`를 마지막 키로 추가합니다.**
+규칙: **`orderBy`와 페이징을 함께 쓰고 정렬 키에 id가 없으면 lambdaQL은 루트 `@Id asc`를 마지막 키로 추가합니다.**
 
 - 한 번만 추가합니다. 키에 이미 id가 있으면(예: `desc(o.getId())`) 추가하지 않습니다.
-- 정렬 키에 주 엔티티의 유일하고 NULL이 될 수 없는 컬럼이 있으면 추가하지 않습니다(A5). `nullable = false`인 `@Column(unique = true)`, Hibernate `@NaturalId`, `@Id`가 이에 해당하며, 이 키만으로 모든 행의 순서가 정해지기 때문입니다.
+- 정렬 키에 주 엔티티의 유일하고 NULL이 될 수 없는 컬럼이 있으면 추가하지 않습니다. `nullable = false`인 `@Column(unique = true)`, Hibernate `@NaturalId`, `@Id`가 이에 해당하며, 이 키만으로 모든 행의 순서가 정해지기 때문입니다.
   NULL이 될 수 있는 유일 컬럼은 해당하지 않습니다. NULL은 여러 행에 있을 수 있기 때문입니다.
-- `limit`과 `offset`이 없으면 아무것도 추가하지 않습니다.
+- `orderBy`가 없거나 `limit`과 `offset`이 없으면 아무것도 추가하지 않습니다.
 - 명시적 조인(`join`, `leftJoin`, `crossJoin`)이 있으면 조인한 모든 엔티티의 id도 조인 순서대로 추가합니다([6.8](06-select-group.md#68-explicit-joins) 참고).
 
 `OrderLine.code`는 `@Column(unique = true, nullable = false)`:
@@ -730,7 +716,7 @@ H2와 MariaDB는 `desc`에서 이미 NULL을 나중에 두므로 추가 구문�
 - 그 밖의 경로는 오류입니다(spec을 `orderBy`에 전달할 때 `IllegalArgumentException`). 따라서 문자열이 다른 HQL로 변환되는 일은 없습니다.
 - 허용하는 이름은 persistence unit의 정렬 정책이 정합니다(아래 [정렬 정책](#sort-policy) 참고).
   정책도 `@Sortable` 필드도 없으면 영속 속성은 **어느 것이든** 받고, lambdaQL이 `LQL-5003`을 기록합니다(기본 레벨은 `INFO`).
-- 연관 경로는 정렬 람다 표현식과 마찬가지로 `left join`(필수 연관은 inner join)을 사용합니다(규칙 S8). `then()`으로 `ofPath` spec과 람다 표현식 spec을 연결할 수 있습니다.
+- 연관 경로는 정렬 람다 표현식과 마찬가지로 `left join`(필수 연관은 inner join)을 사용합니다. `then()`으로 `ofPath` spec과 람다 표현식 spec을 연결할 수 있습니다.
 
 <!-- region: SortQueryTest.java#sort-spec-path -->
 ```java
@@ -751,7 +737,7 @@ assertThrows(IllegalArgumentException.class,
 코드 밖에서 들어온 정렬 이름(요청 파라미터, Spring `Sort`나 `Pageable`)은 어느 영속 속성이든 가리킬 수 있습니다.
 **정렬 정책**은 허용하는 이름을 정합니다.
 
-- `SortRules<T>`는 엔티티 하나의 허용 이름 목록입니다. 각 열을 람다 표현식으로 지정하므로 컴파일러가 검사합니다.
+- `SortRules<T>`는 엔티티 하나의 허용 이름 목록입니다. 각 열을 람다 표현식으로 지정합니다.
 - `SortPolicy`는 엔티티별 규칙과 모드(`SortMode`)를 담습니다. 정책은 `EntityManagerFactory`, 곧 persistence unit마다 하나를 등록합니다. 그 팩토리를 쓰는 모든 `QueryBuilder`와 리포지토리가 이 정책을 사용합니다.
 - 엔티티 필드의 `@Sortable`로 코드 없이 규칙을 지정할 수 있습니다(아래 [`@Sortable` 규칙](#rules-from-sortable) 참고).
 
@@ -877,7 +863,7 @@ assertThrows(SortNotAllowedException.class,
 
 <a id="rules-as-strings"></a>
 **문자열 규칙.** `allowPath(String...)`와 `aliasPath(name, path)`는 속성 경로를 문자열로 받습니다. 설정 파일용이며, [12.5](12-spring-data-jpa.md#sort-policy-with-spring)의 Spring Boot 프로퍼티가 이 형태를 사용합니다.
-경로는 규칙을 처음 사용할 때 엔티티와 대조합니다. 코드에서는 컴파일러가 검사하는 람다 표현식 형태 `allow`와 `alias`를 쓰십시오.
+경로는 규칙을 처음 사용할 때 엔티티와 대조합니다. 코드에서는 람다 표현식 형태 `allow`와 `alias`를 쓰십시오.
 
 <!-- region: SortPolicyTest.java#string-paths -->
 ```java
@@ -911,17 +897,17 @@ assertThrows(SortNotAllowedException.class, () -> hql("description", Direction.A
 | # | 규칙 | 상태 |
 |---|---|---|
 | S1 | 정렬은 람다 표현식 하나입니다: 키 하나(`o -> o.getPrice()`, 선택적인 `Direction`) 또는 `By`의 함수로 만든 키(`o -> desc(...)`). 조인이면 `(o, c) -> ...` | 구현됨. 조인 형태 `(o, c) -> ...`도 구현됨 |
-| S2 | 키는 `Comparable`입니다. 엔티티는 키가 될 수 없습니다(컴파일 오류). 키는 엔티티를 사용해야 합니다 | 구현됨 |
+| S2 | 키는 엔티티의 값을 사용해야 합니다. 엔티티 자체는 키가 될 수 없습니다 | 구현됨 |
 | S3 | 방향은 `asc` / `desc`나 `sort(key, Direction)`으로 정합니다. `asc(key)`/`desc(key)`(`ASC`/`DESC`)는 NULL 정책을 사용하고, `asc(key, Nulls.X)`, `desc(key, Nulls.X)`, `*_NULLS_*`는 쓴 그대로 사용합니다 | 구현됨 |
 | S4 | 본문은 키 하나이거나 `By` 함수의 단순한 체인뿐입니다. 정렬 함수를 고르는 `if`와 삼항 연산자, 반복문은 안 됩니다. 키 값 안의 삼항 연산자는 `case when`이 됩니다 | 구현됨 |
-| S5 | `orderBy`는 쿼리당 한 번입니다. `orderBy` 뒤에 `where`는 안 됩니다. `limit` 뒤에 `orderBy`는 안 됩니다(컴파일 오류) | 구현됨 |
+| S5 | `orderBy`는 쿼리당 한 번입니다. `orderBy` 뒤에 `where`는 안 됩니다. `limit` 뒤에 `orderBy`는 안 됩니다 | 구현됨 |
 | S6 | `SortSpec`(`of`, `ofPath`, `then`, `reversed`, `orderBy(spec)`)으로 재사용합니다. 외부 문자열은 persistence unit의 정렬 정책(`SortRules`, `SortPolicy`, `SortMode`, [4.10](#sort-policy) 참고)이 검사합니다 | 구현됨 |
-| S7 | 키: 컬럼, to-one 경로, `+ - *`, 확대 변환. 값 분기는 안 됩니다 | 구현됨 |
+| S7 | 키: 컬럼, to-one 경로, `+ - *`, 확대 변환. 키 값 안의 삼항 연산자는 `case when`이 됩니다 | 구현됨 |
 | S8 | `orderBy`에만 쓰인 연관 경로는 `left join`을 사용하므로 연관이 없는 행도 유지됩니다. 필수 연관(`optional = false`)은 행을 잃지 않으므로 inner join입니다(A4). 같은 경로를 `where`에서 쓰면 정렬은 `where`의 조인을 사용합니다 | 구현됨 |
-| S9 | 페이징을 사용할 때 키에 id가 없으면 루트 `@Id asc`를 추가합니다. 키에 유일하고 NULL이 될 수 없는 컬럼(`unique = true`이고 `nullable = false`, `@NaturalId`)이 있으면 추가하지 않습니다(A5) | 구현됨(루트 id와 명시적으로 조인한 엔티티의 id) |
+| S9 | `orderBy`와 페이징을 함께 쓸 때 키에 id가 없으면 루트 `@Id asc`를 추가합니다. `orderBy`가 없으면 `order by`를 붙이지 않습니다. 키에 유일하고 NULL이 될 수 없는 컬럼(`unique = true`이고 `nullable = false`, `@NaturalId`)이 있으면 추가하지 않습니다(A5) | 구현됨(루트 id와 명시적으로 조인한 엔티티의 id) |
 | S10 | 분석 결과는 람다 표현식별로 캐시됩니다. 캡처한 `Direction`은 호출할 때마다 읽습니다 | 구현됨 |
 | S11 | Spring `Sort.Order`는 `Direction`에 1:1로 대응합니다(Spring 모듈, [12.5](12-spring-data-jpa.md#125-spring-sort-and-pageable) 참고). 속성 이름은 정렬 정책의 검사를 거치고, 별칭은 그대로 전달합니다 | Spring `Sort`는 구현됨(`ignoreCase`는 지원하지 않음). 정렬 정책과 함께 써도 동작함 |
-| S12 | 조인 쿼리도 같은 형태를 사용합니다: `(o, c) -> ...`, `(o, c, i) -> ...` | 구현됨([6.8](06-select-group.md#68-explicit-joins) 참고) |
+| S12 | 조인 쿼리도 같은 형태를 사용합니다: `(o, c) -> ...`부터 엔티티 10개까지 | 구현됨([6.8](06-select-group.md#68-explicit-joins) 참고) |
 | S13 | 메서드 참조는 모든 정렬 형태에서 키 하나로 쓸 수 있습니다. 컴파일은 되지만 의미가 틀린 메서드 참조는 거부됩니다([9. Java 노트](09-java-notes.md#99-method-references) 참고) | 구현됨(getter 참조) |
 | S14 | 서브쿼리 정렬: `limit`이 있으면 유지, 없으면 경고와 함께 제거. 데이터베이스별 차이는 lambdaQL이 처리합니다(5장 참고) | 구현됨 |
 

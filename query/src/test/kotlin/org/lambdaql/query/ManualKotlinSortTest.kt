@@ -11,6 +11,7 @@ import ch.qos.logback.core.read.ListAppender
 import jakarta.persistence.EntityManagerFactory
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -131,7 +132,7 @@ class ManualKotlinSortTest {
 
     @Test
     fun directionReadOnEveryRun() {
-        // one lambda, analysed once; the captured direction is read on every run (S10)
+        // one lambda, analysed once; the captured direction is read on every run
         assertEquals("select e0 from Order e0 order by e0.updateAt desc nulls last, e0.id asc", byDate(Direction.DESC).toHql().hql())
         assertEquals("select e0 from Order e0 order by e0.updateAt asc nulls last, e0.id asc",
             byDate(Direction.ASC_NULLS_LAST).toHql().hql())
@@ -271,11 +272,13 @@ class ManualKotlinSortTest {
     @Test
     fun pageOnly() {
         // @start region="page-only"
-        // paging without orderBy: the rows are sorted by id, so the pages are stable
+        // paging without orderBy: no order by, so which rows come is up to the database; use orderBy for stable pages
         val q = qb.from(Order::class.java).where { it.isActive }.limit(2)
-        assertEquals("select e0 from Order e0 where e0.active = true order by e0.id asc", q.toHql().hql())
+        assertEquals("select e0 from Order e0 where e0.active = true", q.toHql().hql())
         // @end
-        assertEquals(orders.filter { it.isActive }.map { it.id }.sortedBy { it }.take(2), ids(q.toList()))
+        val rows = ids(q.toList())
+        assertEquals(2, rows.size)
+        assertTrue(orders.filter { it.isActive }.map { it.id }.containsAll(rows))
     }
 
     @Test

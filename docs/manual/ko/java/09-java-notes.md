@@ -68,8 +68,8 @@ NULL에 대해 이것이 뜻하는 바:
 
 | Java 형태 | Java에서(실행한다면) | lambdaQL에서 |
 |---|---|---|
-| `o.getCnt() == 1`, cnt가 NULL | NullPointerException | SQL 의미: UNKNOWN, 행이 반환되지 않음(규칙 R1) |
-| `o.getTotal() > 100`, total이 NULL | NullPointerException | 행이 반환되지 않음(R1) |
+| `o.getCnt() == 1`, cnt가 NULL | NullPointerException | SQL 의미: UNKNOWN, 행이 반환되지 않음 |
+| `o.getTotal() > 100`, total이 NULL | NullPointerException | 행이 반환되지 않음 |
 | `!c.getVip()`(`Boolean`, 예제 엔티티 `Coded`), vip가 NULL | NullPointerException | 행이 반환되지 않음([3.6.3](03-where.md#363-write-your-null-checks-yourself) 참고) |
 | `o.getPrice() > p`, 캡처한 `Double p`가 `null` | NullPointerException | `e0.price > :p1`에 NULL 바인딩, 일치하는 행 없음(`DEBUG` 수준 `LQL-4045`) |
 | `i.getQty() == q`, `qty`는 `int`, 캡처한 `Integer q`가 `null` | NullPointerException | `i.qty = :p1`에 NULL 바인딩, 일치하는 행 없음(`DEBUG` 수준 `LQL-4045`) |
@@ -100,22 +100,22 @@ lambdaQL에서 두 객체 사이의 `==`는 **값 비교**입니다.
 엔티티 값과 캡처 값은 모두 SQL 의미를 따릅니다([3.6](03-where.md#36-null-rules) 참고).
 박싱 캐시(-128부터 127까지의 `Integer`와 `Long`)와 `new String(...)`은 상관없습니다.
 
-어떤 규칙이 적용되는지는 양쪽의 **Java 타입**에 따라 달라집니다.
+javac가 만드는 비교는 양쪽의 **Java 타입**에 따라 달라집니다.
 
-| 왼쪽 | 오른쪽 | javac가 만드는 것 | lambdaQL 규칙 | HQL |
-|---|---|---|---|---|
-| `Integer` 컬럼 | `int` 상수나 변수 | 언박싱, 숫자 비교 | R1, SQL 의미 | `e0.cnt = 1` |
-| `Integer` 컬럼 | `Integer` 변수 | 객체 비교 | R2 | `e0.cnt = :p1` |
-| `Long` `@Id` 컬럼 | `Long` 변수 | 객체 비교 | R2, 하지만 한쪽은 NULL이 될 수 없음 | `e0.id = :p1` |
-| `Long` 컬럼 | `long` 변수 | 언박싱 | R1 | `e0.id = :p1` |
-| `String` | `String` | 객체 비교 | R2 | `e0.description = :p1` |
-| `String` 컬럼 | `String` 컬럼 | 객체 비교 | R2, SQL 의미 | `e0.description = e0.custName`(어느 한쪽이 NULL이면 불일치) |
-| enum | enum | 객체 비교 | R2 | `x = :p1` |
-| `Boolean` 컬럼 | `Boolean.TRUE` | 객체 비교 | R2 | `e0.active = :p1` |
-| `Boolean` 컬럼 | `true` | 언박싱 | R1 | `e0.active = true` |
-| 값 객체(`@Embedded`) | 같은 타입의 캡처 값 객체 | `equals` / 객체 비교 | 컬럼마다 펼침(B6) | `e0.address.city = :p1 and e0.address.zip = :p2`([3.10](03-where.md#310-association-paths) 참고) |
-| 무엇이든 | `null` | null 검사 | R3 | `x is null` |
-| 엔티티 | 엔티티(`o.getCustomer() == c`) | 객체 비교 | **거부됨**(`LQL-3011`) | –(대신 id를 비교) |
+| 왼쪽 | 오른쪽 | javac가 만드는 것 | HQL |
+|---|---|---|---|
+| `Integer` 컬럼 | `int` 상수나 변수 | 언박싱, 숫자 비교 | `e0.cnt = 1` |
+| `Integer` 컬럼 | `Integer` 변수 | 객체 비교 | `e0.cnt = :p1` |
+| `Long` `@Id` 컬럼 | `Long` 변수 | 객체 비교 | `e0.id = :p1` |
+| `Long` 컬럼 | `long` 변수 | 언박싱 | `e0.id = :p1` |
+| `String` | `String` | 객체 비교 | `e0.description = :p1` |
+| `String` 컬럼 | `String` 컬럼 | 객체 비교 | `e0.description = e0.custName`(어느 한쪽이 NULL이면 불일치) |
+| enum | enum | 객체 비교 | `x = :p1` |
+| `Boolean` 컬럼 | `Boolean.TRUE` | 객체 비교 | `e0.active = :p1` |
+| `Boolean` 컬럼 | `true` | 언박싱 | `e0.active = true` |
+| 값 객체(`@Embedded`) | 같은 타입의 캡처 값 객체 | `equals` / 객체 비교 | `e0.address.city = :p1 and e0.address.zip = :p2`([3.10](03-where.md#310-association-paths) 참고) |
+| 무엇이든 | `null` | null 검사 | `x is null` |
+| 엔티티 | 엔티티(`o.getCustomer() == c`) | 객체 비교 | –(대신 id를 비교) |
 
 캡처 값과 비교할 때:
 
@@ -185,7 +185,7 @@ assertEquals("select e0 from Order e0 where e0.description = :p1", q.toHql().hql
 <a id="95-null-safe-helpers"></a>
 ## 9.5 null-safe 헬퍼
 
-다음 Java 헬퍼는 `==`와 같은 규칙, 즉 SQL 의미를 따릅니다(규칙 R5). 캡처 값 `null`은 어떤 행에도 일치하지 않습니다.
+다음 Java 헬퍼는 `==`와 같은 규칙, 즉 SQL 의미를 따릅니다. 캡처 값 `null`은 어떤 행에도 일치하지 않습니다.
 
 | Java | HQL | 참고 |
 |---|---|---|
@@ -218,7 +218,7 @@ assertEquals("select e0 from Order e0 where e0.cnt is null or e0.cnt <> 1", with
 JVM에는 `char`, `short`, `byte`, `boolean`을 위한 별도의 비교 명령어가 없습니다. javac는 이들을 `int`로 컴파일합니다.
 lambdaQL은 이를 알고 있습니다.
 
-- `long`, `int`, `short`, `byte`, `char`, `float`, `double` 값의 비교를 지원합니다(규칙 R1).
+- `long`, `int`, `short`, `byte`, `char`, `float`, `double` 값의 비교를 지원합니다.
 - 상수는 컬럼의 타입으로 변환됩니다. 예를 들어 `int` 상수 `10`은 `short` 컬럼에 대해 `short` 값이 됩니다.
 - `boolean` getter는 단독으로 조건이 됩니다: `o.isActive()`는 `e0.active = true`가 됩니다.
 - boolean 컬럼과 조건의 비교 `o.isActive() == (o.getStatus() > s)`에서 조건 쪽은 `case when`이 됩니다. 인덱스가 필요하면 `&&`와 `||`로 나누어 쓰십시오([3.7](03-where.md#37-boolean-columns) 참고).
@@ -302,7 +302,7 @@ assertEquals(q.toHql().hql(), qb.from(Order.class).where(o -> o.getStatus() == d
 | `where(Order::isActive)` | `where(o -> o.isActive())` | **거부됨**(`LQL-1009`). 람다 표현식을 사용하십시오 |
 | `orderBy(Order::getPrice)` | `orderBy(o -> o.getPrice())` | 구현됨 |
 | `orderBy(Order::getPrice, Direction.DESC)` | `orderBy(o -> o.getPrice(), Direction.DESC)` | 구현됨 |
-| `SortSpec.of(Order.class, Order::getPrice)` | `SortSpec.of(Order.class, o -> o.getPrice())` | 구현됨. 키 하나를 쓰는 정렬 형태에서는 어디서나 쓸 수 있음(규칙 S13) |
+| `SortSpec.of(Order.class, Order::getPrice)` | `SortSpec.of(Order.class, o -> o.getPrice())` | 구현됨. 키 하나를 쓰는 정렬 형태에서는 어디서나 쓸 수 있음 |
 
 lambdaQL은 메서드 참조를 로드할 때 그것을 감지합니다. 참조된 메서드의 본문은 읽지 않습니다. 정렬 키에서는 `o.getPrice()` 호출을 직접 만들고, 조건에서는 거부합니다.
 
@@ -316,7 +316,7 @@ assertEquals("LQL-1009", assertThrows(LambdaQLException.class,
         () -> qb.from(Order.class).where(Order::isActive)).code());
 ```
 
-어떤 메서드 참조는 컴파일되지만 의미가 잘못됩니다. lambdaQL은 이를 분석 시점에 거부합니다(규칙 S13).
+어떤 메서드 참조는 컴파일되지만 의미가 잘못됩니다. lambdaQL은 이를 분석 시점에 거부합니다.
 
 - 인자가 하나인 인스턴스 메서드를 인자가 둘인 람다 표현식으로 사용한 경우(두 번째 인자가 메서드 인자가 됨),
 - 인자가 둘인 static 메서드를 인자가 둘인 람다 표현식으로 사용한 경우.

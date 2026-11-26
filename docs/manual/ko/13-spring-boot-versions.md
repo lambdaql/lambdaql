@@ -84,7 +84,7 @@ Hibernate가 HQL을 SQL로 바꾸는 방식은 버전마다 조금 다릅니다.
 | UPDATE의 임베디드 열 | Oracle | `set o1_0.city=?,o1_0.zip=?` | `set city=?,zip=?` |
 | UPDATE에서 대상 테이블을 읽는 서브쿼리 | MySQL | Hibernate가 그대로 써서 MySQL 오류 1093 | Hibernate가 파생 테이블을 더함 |
 
-마지막 차이는 lambdaQL이 HQL 단계에서 처리합니다. UPDATE의 서브쿼리가 대상 테이블을 읽고 바깥 행을 쓰지 않으면 파생 테이블로 읽습니다(규칙 U22).
+마지막 차이는 lambdaQL이 HQL 단계에서 처리합니다. UPDATE의 서브쿼리가 대상 테이블을 읽고 바깥 행을 쓰지 않으면 파생 테이블로 읽습니다.
 그래서 두 버전 모두에서 같은 행을 수정합니다. 바깥 행을 읽는 상관 서브쿼리는 MySQL과 Hibernate 6.6의 조합에서 아직 오류 1093입니다.
 
 버전별 전체 SQL은 다음 위치에서 볼 수 있습니다.
