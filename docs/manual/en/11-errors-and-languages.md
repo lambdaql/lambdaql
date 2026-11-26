@@ -1,6 +1,9 @@
 <a id="11-errors-and-languages"></a>
 # 11. Errors and languages
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../ko/11-errors-and-languages.md) for the latest rules.
+
 [Manual home](README.md) | Tracks: [Java](java/README.md) | [Kotlin](kotlin/README.md) | Previous: 10. Rules and limits ([Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md)) | Next: 12. Spring Data JPA ([Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md))
 
 This page is for both languages. It shows code in separate **Java** and **Kotlin** sections.

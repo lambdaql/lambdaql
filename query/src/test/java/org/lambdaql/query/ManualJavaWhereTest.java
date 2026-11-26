@@ -231,14 +231,10 @@ class ManualJavaWhereTest {
     @Test
     void rejectedForms() {
         Customer c = new Customer(1, "Kim", null);
-        String code = "b";
         // @start region="rejected-forms"
-        // a String method on an entity value other than startsWith, endsWith and contains
+        // a String method that has no SQL function of the same meaning
         assertEquals("LQL-3008", assertThrows(LambdaQLException.class,
-                () -> qb.from(Order.class).where(o -> o.getDescription().trim().equals("a"))).code());
-        // string concatenation inside the lambda, even of captured values only
-        assertEquals("LQL-2007", assertThrows(LambdaQLException.class,
-                () -> qb.from(Order.class).where(o -> o.getDescription().equals("A" + code))).code());
+                () -> qb.from(Order.class).where(o -> o.getDescription().strip().equals("a"))).code());
         // an entity compared with an entity: compare the ids
         assertEquals("LQL-3011", assertThrows(LambdaQLException.class,
                 () -> qb.from(Order.class).where(o -> o.getCustomer() == c)).code());

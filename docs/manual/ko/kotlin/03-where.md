@@ -118,9 +118,21 @@ assertEquals("select e0 from Order e0 where e0.cnt > 1", q.toHql().hql())
 | `it.status != 1` | `e0.status <> 1` | NULL 행은 반환되지 않음([3.6](#36-null-rules) 참고) |
 | `it.price!! > p` | `e0.price > :p1` | `<`, `<=`, `>=`도 마찬가지 |
 | `it.updateAt!! > since` | `e0.updateAt > :p1` | Kotlin에서 날짜는 `<`, `>`로 비교 |
-| `it.updateAt!!.isAfter(since)` | `e0.updateAt > :p1` | `isBefore`는 `<` |
+| `it.updateAt!!.isAfter(since)` | `e0.updateAt > :p1` | `isBefore`는 `<`, `isEqual`은 `=` |
 | `it.description!! < "m"` | `e0.description < 'm'` | `BigDecimal`, `LocalDate`, `BigInteger`도 마찬가지 |
 | `it.status!!.compareTo(3) > 0` | `e0.status > 3` | `compareTo(..) op 0`은 `op`가 됨 |
+
+<!-- region: KotlinTimeCompareTest.kt#is-after -->
+```kotlin
+val after = qb.from(Order::class.java).where { it.updateAt!!.isAfter(since) }
+assertEquals("select e0 from Order e0 where e0.updateAt > :p1", after.toHql().hql())
+
+val before = qb.from(Order::class.java).where { it.updateAt!!.isBefore(since) }
+assertEquals("select e0 from Order e0 where e0.updateAt < :p1", before.toHql().hql())
+
+val same = qb.from(Order::class.java).where { it.updateAt!!.isEqual(since) }
+assertEquals("select e0 from Order e0 where e0.updateAt = :p1", same.toHql().hql())
+```
 
 nullable 컬럼과의 비교는 **SQL 의미**를 따릅니다.
 컬럼이 NULL인 행은 반환되지 않습니다.
@@ -162,7 +174,7 @@ assertEquals("select e0 from Order e0 where e0.cnt >= 2.5BD", captured.toHql().h
 **부동소수점:** `Float`/`Double` 컬럼에 대해 lambdaQL은 Kotlin과 비트 단위까지 같은 결과를 약속하지 않습니다.
 캡처한 `NaN`이나 `Infinity` 값은 쿼리가 실행될 때 거부됩니다.
 
-예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`whole-number`).
+예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`whole-number`), [`KotlinTimeCompareTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinTimeCompareTest.kt)(`is-after`).
 
 <a id="35-and-or-not"></a>
 ## 3.5 AND, OR, NOT
@@ -552,27 +564,140 @@ assertEquals("select e0 from Order e0 where lower(e0.description) like '%all%' e
 - `endsWith`와 `contains`는 패턴 앞이 `%`이므로 컬럼의 일반 인덱스를 쓰지 못합니다.
 - MariaDB와 MySQL은 기본 콜레이션에서 `like`가 대소문자를 구분하지 않습니다. 그래서 Kotlin의 `startsWith`와 결과가 다를 수 있습니다.
 - 검색어로 쓴 캡처 값이 `null`이면 오류입니다(`LQL-4047`).
-- `lowercase()`, `isBlank()`, `trim()` 같은 다른 문자열 함수는 지원하지 않습니다(`LQL-3008`).
-- 람다 표현식 안의 문자열 템플릿과 `+`는 거부됩니다(`LQL-2007`). 캡처 값만 쓰는 템플릿(`"$a-$b"`)도 마찬가지이므로 람다 표현식 전에 문자열을 만들어 캡처하십시오.
+- `lowercase()`, `trim()`, 문자열 템플릿 같은 함수는 SQL 함수가 됩니다([3.8.1](#381-string-functions)).
+- 같은 의미의 SQL 함수가 없는 함수(`padStart()` 등)는 거부됩니다(`LQL-3008`).
 
 <!-- region: ManualKotlinWhereTest.kt#string-rejected -->
 ```kotlin
-// string functions on a column other than startsWith, endsWith and contains are not translated
+// a string function that has no SQL function of the same meaning is not translated
 val f = assertThrows<LambdaQLException> {
-    qb.from(Order::class.java).where { it.description.lowercase() == "a" }.toHql()
+    qb.from(Order::class.java).where { it.description!!.padStart(5) == "a" }.toHql()
 }
 assertTrue(f.message!!.startsWith("[LQL-3008]"))
-
-// string building in the lambda is rejected: build the string before the lambda
-val a = "x"
-val b = "y"
-val t = assertThrows<LambdaQLException> {
-    qb.from(Order::class.java).where { "$a-$b" == it.description }.toHql()
-}
-assertTrue(t.message!!.startsWith("[LQL-2007]"))
 ```
 
 예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`string-rejected`), [`KotlinLikeTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinLikeTest.kt)(`like`).
+
+<a id="381-string-functions"></a>
+### 3.8.1 문자열 함수
+
+엔티티 값에 대한 문자열 함수는 HQL 표준 함수가 됩니다.
+
+<!-- region: KotlinStringFunctionTest.kt#lowercase -->
+```kotlin
+val q = qb.from(Order::class.java).where { it.description?.lowercase() == "park" }
+assertEquals("select e0 from Order e0 where lower(e0.description) = 'park'", q.toHql().hql())
+```
+
+| Kotlin | HQL |
+|---|---|
+| `lowercase()`, `uppercase()` | `lower(x)`, `upper(x)` |
+| `trim()` | `trim(x)` |
+| `length` | `length(x)` |
+| `isEmpty()` | `length(x) = 0` |
+| `isNullOrEmpty()` | `x is null or length(x) = 0` |
+| `isBlank()` | `length(trim(x)) = 0` |
+| `isNullOrBlank()` | `x is null or length(trim(x)) = 0` |
+| `equals(s, ignoreCase = true)` | `lower(x) = lower(s)` |
+| `substring(a)`, `substring(a, b)` | `substring(x, a + 1)`, `substring(x, a + 1, b - a)` |
+| `indexOf(s)` | `locate(s, x) - 1` |
+| `replace(a, b)` | `replace(x, a, b)` |
+| `+`, 문자열 템플릿 | `concat(...)` |
+
+<!-- region: KotlinStringFunctionTest.kt#trim-length -->
+```kotlin
+val trimmed = qb.from(Order::class.java).where { it.description?.trim() == "Kim" }
+assertEquals("select e0 from Order e0 where trim(e0.description) = 'Kim'", trimmed.toHql().hql())
+
+val longer = qb.from(Order::class.java).where { it.description!!.length > 3 }
+assertEquals("select e0 from Order e0 where length(e0.description) > 3", longer.toHql().hql())
+```
+
+<!-- region: KotlinStringFunctionTest.kt#empty-blank -->
+```kotlin
+val empty = qb.from(Order::class.java).where { it.description!!.isEmpty() }
+assertEquals("select e0 from Order e0 where length(e0.description) = 0", empty.toHql().hql())
+
+// isNullOrEmpty() is inline: a null check and a length check
+val nullOrEmpty = qb.from(Order::class.java).where { it.description.isNullOrEmpty() }
+assertEquals("select e0 from Order e0 where e0.description is null or length(e0.description) = 0", nullOrEmpty.toHql().hql())
+
+val blank = qb.from(Order::class.java).where { it.description!!.isBlank() }
+assertEquals("select e0 from Order e0 where length(trim(e0.description)) = 0", blank.toHql().hql())
+```
+
+<!-- region: KotlinStringFunctionTest.kt#ignore-case -->
+```kotlin
+val name = "KIM"
+val q = qb.from(Order::class.java).where { it.description.equals(name, ignoreCase = true) }
+assertEquals("select e0 from Order e0 where lower(e0.description) = lower(:p1)", q.toHql().hql())
+```
+
+Kotlin은 위치를 0부터, SQL은 1부터 셉니다. lambdaQL이 위치를 1씩 옮깁니다.
+
+<!-- region: KotlinStringFunctionTest.kt#substring-index-replace -->
+```kotlin
+val head = qb.from(Order::class.java).where { it.description!!.substring(0, 3) == "lee" }
+assertEquals("select e0 from Order e0 where substring(e0.description, 1, 3) = 'lee'", head.toHql().hql())
+
+val dash = qb.from(Order::class.java).where { it.description!!.indexOf("-") == 3 }
+assertEquals("select e0 from Order e0 where (locate('-', e0.description) - 1) = 3", dash.toHql().hql())
+
+val replaced = qb.from(Order::class.java).where { it.description!!.replace("-", "_") == "lee_01" }
+assertEquals("select e0 from Order e0 where replace(e0.description, '-', '_') = 'lee_01'", replaced.toHql().hql())
+```
+
+문자열 템플릿과 `+`는 `concat(...)`이 됩니다. 문자열이 아닌 값은 `str(x)`로 바꿉니다.
+
+<!-- region: KotlinStringFunctionTest.kt#template -->
+```kotlin
+val prefix = "A-"
+val q = qb.from(Order::class.java).where { "$prefix${it.description}!" == "A-PARK!" }
+assertEquals("select e0 from Order e0 where concat(:p1, e0.description, '!') = 'A-PARK!'", q.toHql().hql())
+
+val labels = qb.from(Order::class.java).where { it.status.toInt() == 2 }.select { it.description + "#" + it.status }
+assertEquals("select concat(e0.description, '#', str(e0.status)) from Order e0 where e0.status = 2", labels.toHql().hql())
+```
+
+캡처 값만 쓰는 템플릿은 Kotlin에서 문자열을 만들어 바인딩합니다.
+
+<!-- region: KotlinStringFunctionTest.kt#template-captured -->
+```kotlin
+// only captured values: the text is made in Kotlin and bound
+val q = qb.from(Order::class.java).where { "$a-$b" == it.description }
+assertEquals("select e0 from Order e0 where e0.description = :p1", q.toHql().hql())
+```
+
+문자열 함수는 `select`, 정렬 키, `set` 값에도 쓸 수 있습니다.
+
+<!-- region: KotlinStringFunctionTest.kt#select-sort-set -->
+```kotlin
+val upper = qb.from(Order::class.java).where { it.status.toInt() == 2 }.select { it.description?.uppercase() }
+assertEquals("select upper(e0.description) from Order e0 where e0.status = 2", upper.toHql().hql())
+
+val sorted = qb.from(Order::class.java).orderBy { asc(it.description?.length).asc(it.id) }
+assertEquals("select e0 from Order e0 order by length(e0.description) asc nulls first, e0.id asc", sorted.toHql().hql())
+
+val trim = qb.update(Order::class.java).set { it.description = it.description?.trim() }.all()
+assertEquals("update Order e0 set e0.description = trim(e0.description)", trim.toHql().hql())
+```
+
+Kotlin과 결과가 다른 경우:
+
+- 텍스트가 NULL이면 SQL 함수는 NULL을 냅니다. 그 행은 조건에 맞지 않습니다.
+- 템플릿이나 `+`에 NULL이 들어가면 Kotlin은 `"null"`을, SQL은 NULL을 냅니다. Oracle은 NULL을 빈 문자열처럼 이어 붙입니다.
+- `equals(s, ignoreCase = true)`에서 양쪽이 모두 `null`이면 Kotlin은 `true`이지만, SQL에서는 맞는 행이 없습니다.
+- `substring`의 범위가 텍스트 길이를 넘으면 Kotlin은 예외를 던지지만, SQL은 있는 만큼만 돌려줍니다.
+- Kotlin의 `trim()`과 `isBlank()`는 유니코드 공백 문자를 모두 지우지만, SQL `trim`은 공백만 지웁니다.
+- 길이는 Kotlin에서 UTF-16 단위이고, DB에서는 DB가 세는 문자 수입니다. 이모지 같은 보충 문자에서 값이 다를 수 있습니다.
+- 대소문자 변환과 비교는 DB 규칙과 콜레이션을 따릅니다.
+- Oracle은 `''`를 NULL로 저장하므로 Oracle에서 `isEmpty()`와 `isBlank()`에 맞는 행이 없습니다.
+
+`where`에서 컬럼을 함수로 감싸면 그 컬럼의 일반 인덱스를 쓸 수 없습니다.
+lambdaQL은 이 경우 `LQL-5001`을 `WARN` 수준으로 기록하고, `SargableMode.STRICT`에서는 분석을 실패시킵니다.
+Oracle과 PostgreSQL에 같은 식의 함수 기반 인덱스(`lower(description)`)가 있으면 기록하지 않습니다.
+
+예제 코드: [`KotlinStringFunctionTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinStringFunctionTest.kt)(`lowercase`, `trim-length`, `empty-blank`, `ignore-case`, `substring-index-replace`, `template`, `template-captured`, `select-sort-set`).
 
 <a id="39-in-with-a-captured-collection"></a>
 ## 3.9 캡처한 컬렉션을 사용한 IN
@@ -616,15 +741,40 @@ assertEquals("select e0 from Order e0 where e0.status in (:p1)", q.toHql().hql()
 | 경우 | 결과 |
 |---|---|
 | 컬렉션이 캡처한 `List`, `Set` 또는 다른 `Collection` | 지원 |
+| 캡처한 배열(`Array<Short>`, `IntArray` 등) | 지원 |
 | 컬렉션에 `null` 요소가 있음 | 쿼리가 실행될 때 예외 |
 | 빈 컬렉션 | `in`은 FALSE, `!in`은 TRUE(Hibernate는 `1=0` / `1=1`을 씀) |
 | 요소 1,500개 | H2, MariaDB, Oracle 23ai에서 문장 하나로 동작함(이전 Oracle 버전은 1,000개 제한이 있음. 미검증) |
 | 컬렉션이 엔티티 컬렉션: `item in it.items` | **거부됨**. `exists()` 서브쿼리를 사용하십시오([5. 서브쿼리](05-subquery.md)) |
-| 람다 표현식 안에서 만든 컬렉션: `it.status in listOf(1, 2)` | **거부됨**. 밖에서 만들어 캡처하십시오 |
+| 람다 표현식 안에서 만든 컬렉션과 배열: `it.cnt in listOf(1, 2)`, `setOf(...)`, `arrayOf(...)` | 지원. 캡처한 컬렉션처럼 쿼리가 실행될 때 Kotlin에서 만들어 바인딩 |
+
+람다 표현식 안에서 만든 컬렉션도 캡처한 컬렉션과 같은 SQL이 됩니다.
+
+<!-- region: KotlinInListTest.kt#in-made-in-lambda -->
+```kotlin
+// a collection made in the lambda is computed in Kotlin and bound like a captured collection
+val list = qb.from(Order::class.java).where { it.cnt in listOf(1, 2) }
+assertEquals("select e0 from Order e0 where e0.cnt in (:p1)", list.toHql().hql())
+
+val notIn = qb.from(Order::class.java).where { it.description !in setOf("a", "b") }
+assertEquals("select e0 from Order e0 where e0.description not in (:p1)", notIn.toHql().hql())
+```
+
+배열도 컬렉션처럼 씁니다.
+
+<!-- region: KotlinInListTest.kt#in-array -->
+```kotlin
+// an array works like a collection: captured, or made in the lambda
+val captured = qb.from(Order::class.java).where { it.status in codes }
+assertEquals("select e0 from Order e0 where e0.status in (:p1)", captured.toHql().hql())
+
+val made = qb.from(Order::class.java).where { it.description in arrayOf("a", "c") }
+assertEquals("select e0 from Order e0 where e0.description in (:p1)", made.toHql().hql())
+```
 
 Kotlin에는 범위(`it.status in 1..5`)와 상수를 사용한 `when`도 있습니다. [3.14](#314-ranges-kotlin-only)와 [3.15](#315-when-kotlin-only)를 참고하십시오.
 
-예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`in-ids`), [`KotlinSelectTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)(`in`).
+예제 코드: [`ManualKotlinWhereTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/ManualKotlinWhereTest.kt)(`in-ids`), [`KotlinSelectTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinSelectTest.kt)(`in`), [`KotlinInListTest.kt`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/kotlin/org/lambdaql/query/KotlinInListTest.kt)(`in-made-in-lambda`, `in-array`).
 
 <a id="310-association-paths"></a>
 ## 3.10 연관 경로
@@ -921,10 +1071,8 @@ lambdaQL은 분석에 실패하면 코드 `[LQL-xxxx]`와 소스 줄 번호가 �
 | 지역 `val`/`var`, 반복문, 여러 문장이 있는 블록 | `{ val x = 1; it.status == x }` | 식 하나로 작성 |
 | 일반 `if (c) x else y` | | [3.5](#35-and-or-not)의 허용된 형태 사용 |
 | 중위 `and`, `or`, `xor` | `it.isActive and (it.price > 100.0)` | `&&`, `\|\|` 사용 |
-| 람다 표현식 안의 문자열 템플릿이나 `+`(`LQL-2007`) | `it.description == "A" + it.status` | 람다 표현식 전에 문자열을 만들어 캡처 |
-| 람다 표현식 안에서 만든 컬렉션 | `it.status in listOf(1, 2)` | 밖에서 만들어 캡처 |
 | 람다 표현식 안의 람다 표현식 | `ids.any { id -> id == it.id }` | `in`([3.9](#39-in-with-a-captured-collection))이나 서브쿼리 사용 |
-| Kotlin 문자열 함수와 다른 stdlib 함수(`LQL-3008`). `startsWith`, `endsWith`, `contains`는 지원([3.8](#38-strings)) | `it.description?.trim()`, `isBlank()`, `lowercase()` | 직접 비교 |
+| 같은 의미의 SQL 함수가 없는 문자열 함수와 다른 stdlib 함수(`LQL-3008`). 지원하는 함수는 [3.8.1](#381-string-functions) | `it.description!!.padStart(5)`, `split(",")` | 직접 비교 |
 | `switch`로 컴파일되는 `when`(`LQL-2010`) | `when (it.status.toInt()) { 1, 2 -> true; else -> false }` | `\|\|`로 이은 비교([3.15](#315-when-kotlin-only)) |
 | 범위 객체가 필요한 범위(`LQL-3008`) | `it.customer?.grade in 1..5`, `LocalDateTime` 범위 | 두 비교로 작성([3.14](#314-ranges-kotlin-only)) |
 | 직접 만든 non-inline 확장 함수 | `it.isOpen()` | `inline fun`으로 만들거나 조건을 직접 작성 |

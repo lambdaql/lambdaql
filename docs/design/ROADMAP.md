@@ -624,6 +624,9 @@ lambdaql은 현재 캐시가 없으므로, 호출할 때마다 클래스 파일�
 | D71 | 명시적 조인 엔티티 수 | ① 3개까지 ② 10개까지 | **2026-11-25 작성자 결정: ②**(작성자 지시 "최대 10개 테이블 조인 지원"). 엔티티 수마다 람다 파라미터 수가 다르므로 타입을 생성한다: `SelectJoin3Query`~`SelectJoin10Query`, `OrderedJoin3Query`~`OrderedJoin10Query`(로컬 생성기 `.claude/tools/codegen/gen_joins.py`). 타입 변수 `T, U, V, W, X, Y, Z, A, B, C`, 람다 파라미터 이름 `o, c, i, e3…e9`. 3개짜리 타입은 다시 생성했고 공개 API는 그대로이며 4개로 넘어가는 `join`/`leftJoin`/`crossJoin`(엔티티·CTE·파생 테이블)만 늘었다. 분석기와 렌더러는 이미 루트 수에 제한이 없어 바꾸지 않았다. 서브쿼리 안 조인은 엔티티 2개 그대로. 실측 H2: 엔티티 10개(inner 8, left 1) 조인의 HQL, 조건, 정렬, select, 행 결과(Java·Kotlin) | 확정 |
 | D72 | 배포 자동화 | ① 손으로 실행(workflow_dispatch)만 ② `main`에서 `gradle.properties`가 바뀌면 자동 배포 | **2026-11-25 작성자 결정: ②**(작성자 지시 "버전 올리면 센트럴에도 배포", "배포 자동화도 해주었으면"). `publish.yml`이 `main` 푸시 중 `gradle.properties` 변경에 반응하고, 그 버전이 repo1.maven.org에 없을 때만 테스트·서명·업로드 후 `AUTOMATIC`으로 공개한다. 손 실행은 그대로(기본 `USER_MANAGED`). 저장소 Secrets 4개는 개발 PC에서 `bash .claude/tools/release/set-secrets.sh`로 등록(값을 출력하지 않음, GPG 암호는 숨김 입력). 자격 증명 전송이라 작성자가 직접 실행한다 | 확정 |
 | D73 | `orderBy` 없는 페이징과 `first()` | ① lambdaQL이 `order by e0.id`를 붙임(S9) ② `order by`를 붙이지 않음 | **2026-11-25 작성자 결정: ②**(작성자 판단 "orderBy가 없으면 order by 절을 안 붙이는 게 낫다, 개발자가 선택할 문제"). `orderBy` 없는 `limit`·`offset`·`first()`(엔티티·조인·값 쿼리, 서브쿼리의 `first()`·`limit`, Spring `findFirst(Where)`와 정렬 없는 `Pageable`)는 `order by` 없이 실행한다. `orderBy`가 있을 때 마지막 키로 id를 붙이는 S9는 그대로. DML의 `limit`(바꿀 행 고르기)은 계속 id 순서. 변경된 SQL 답안은 `page-only`, `first#2` 두 항목(H2 재생성, 나머지 DB는 같은 규칙으로 손으로 고침, 미검증). 실측 H2(547개 통과) | 확정 |
+| D74 | 엔티티 값에 대한 문자열 함수와 문자열 결합 | ① `LQL-3008`·`LQL-2007`로 거부(현행) ② Java `String`·Kotlin `StringsKt` 호출을 HQL 표준 함수로 번역 | **2026-11-26 작성자 결정: ②**(작성자 지시 "1, 2 단계 모두 구현"). 1단계: `toLowerCase`/`lowercase` → `lower`, `toUpperCase`/`uppercase` → `upper`, `trim` → `trim`, `length` → `length`, `isEmpty` → `length(x) = 0`, `isBlank` → `length(trim(x)) = 0`, `equalsIgnoreCase`/`equals(s, ignoreCase = true)` → `lower(x) = lower(s)`. 2단계: `substring(a[, b])` → `substring(x, a + 1[, b - a])`, `indexOf(s)` → `locate(s, x) - 1`, `replace(a, b)` → `replace(x, a, b)`, `+`·문자열 템플릿(`StringConcatFactory`)·`concat` → `concat(...)`(문자열이 아닌 값은 `str(x)`). IR은 새 노드 없이 `Expr.Func`의 `builtin()`(asType 없음)으로 표현해 기존 분기를 그대로 쓴다. 엔티티 값이 없는 식(`"lee-" + code`, `name.trim()`)은 지금처럼 Java에서 계산해 바인딩. Kotlin `indexOf`·`replace`는 `startIndex = 0`, `ignoreCase = false`일 때만 번역. `toLowerCase(Locale)`의 Locale은 무시. where에서 열을 감싸면 `LQL-5001`(WARN, STRICT는 실패), Oracle·PostgreSQL 함수 기반 인덱스 검사는 `@SqlFunction`과 같은 경로. `LQL-2007`은 삭제. 같은 의미의 SQL 함수가 없는 메서드(`strip`, `padStart`, `split`, `matches`)는 `LQL-3008` 유지. Java와 다른 점(NULL 전파, 0/1 기준 위치, `trim` 공백 범위, 길이 단위, Oracle `''`)은 매뉴얼 3.8.1에 기록. 실측 H2: where·select·정렬 키·set 값의 HQL과 행 결과(Java 13, Kotlin 8 테스트), 전체 568개 통과. 다른 DB는 미검증 | 확정 |
+| D75 | `java.time`의 `isAfter`·`isBefore`·`isEqual` | ① `LQL-3008`로 거부(현행, 매뉴얼은 `compareTo` 안내) ② 비교로 번역 | **2026-11-26 작성자 결정: ②**(작성자 지시 "LocalDateTime.isAfter/isBefore 은 지원"). 소유 클래스가 `java/time/`이고 boolean을 돌려주는 인자 하나짜리 `isAfter`·`isBefore`·`isEqual`에서 어느 한쪽이 엔티티 값이면 `>`·`<`·`=`로 바꾼다(`compareTo`와 같은 경로라 캡처 값 바인딩, `!` 반전, 값이 앞에 오는 형태가 그대로 동작). 엔티티 값이 없으면 지금처럼 Java에서 계산. NULL은 SQL 의미(맞는 행 없음). 실측 H2: Java 2, Kotlin 1 테스트의 HQL과 행 결과 | 확정 |
+| D76 | 람다 안에서 만든 컬렉션과 Kotlin 배열의 IN | ① 거부(매뉴얼 기술) ② 캡처한 컬렉션처럼 Java/Kotlin에서 만들어 바인딩 | **2026-11-26 작성자 결정: ②**(작성자 지시 "1~3 진행"). 실측 결과 "거부"는 일부만 맞았다: Java `List.of`·`Set.of`(원소 10개 이하, 고정 인자 메서드)는 이미 동작했고, 가변 인자(`Arrays.asList`, 원소 11개 이상 `List.of`, Kotlin `listOf`·`setOf`)는 디코더가 만든 `Expr.ArrayOf`를 `HostEvaluator`가 계산하지 못해 `LQL-3025`, Kotlin `x in arr`는 `ArraysKt.contains`를 인식하지 않아 `LQL-3008`이었다. `HostEvaluator`에 `ArrayOf` 계산(원소 타입 배열을 만들어 채움)을, `Normalizer`에 `ArraysKt.contains`(배열에 엔티티 값 없음) → `Pred.In`을 추가했다. 렌더러는 원래 배열을 펼쳐 바인딩했다. 분석 캐시와 무관하게 실행마다 계산. 원소는 컬럼 타입으로 바꿔 값 비교(Java의 `Short`·`Integer` `equals` 불일치와 다름). Kotlin `isNullOrBlank()`(D74로 동작)도 테스트로 확인해 KC8·KC9 삭제. 실측 H2: Java 3, Kotlin 2 테스트 | 확정 |
 | D8 | 라이선스와 특허 | (A/A'일 때) LGPL 의존 허용 여부. ExTree `LICENSE`(2.1)와 `pom.xml:30-35`(3.0) 불일치. FluentJPA `pom.xml:31-34`는 LGPL-3.0만 선언해 `LICENSE`(AGPL-3.0 소스 / LGPL-3.0 바이너리)와 불일치. FluentJPA `README.md:1`의 'Patent Pending' 표기는 (B) clean-room이라도 특허 여부 확인 필요 | 법무 확인 | D1과 함께 |
 
 ### 2.6 바이트코드 읽기 계층: ASM, `java.lang.classfile`, Babylon Code Reflection
@@ -2091,20 +2094,18 @@ D56에 따라 매뉴얼에서 뺀 항목이다. 각 항목의 거부 코드는 H
 
 **조건(`where`)**
 
-- 문자열 함수: `startsWith`, `endsWith`, `contains`는 D60에서 구현(2026-11-24). 남은 것: Kotlin `lowercase`, `length`, `isNullOrEmpty`, `isBlank`, `equals(ignoreCase)`와 Java `trim`, `toUpperCase` 등. 지금은 `LQL-3008`. 대소문자 무시 경로 표(D24)와 규칙 3(시작 시 메타데이터로 경로 선택)도 함께 뺐다
-- 문자열 연결, 엔티티끼리 비교(KC13), `CASE WHEN`(값 삼항 연산자, 값 `if`·`when`, `takeIf`: `LQL-2021`)
-- 두 boolean 식의 비교(D25) `o.isActive() == (o.getStatus() > s)`: Java·Kotlin 모두 `LQL-2021`
+- 문자열 함수: `startsWith`, `endsWith`, `contains`는 D60에서, `lower`·`upper`·`trim`·`length`·`substring`·`locate`·`replace`·`concat` 번역은 D74에서 구현(2026-11-26). 남은 것: 대소문자 무시 경로 표(D24)와 규칙 3(시작 시 메타데이터로 경로 선택)
+- 엔티티끼리 비교(KC13), `takeIf`(`LQL-2021`). 문자열 연결은 D74에서 구현(2026-11-26). 값 삼항 연산자와 값 `if`·`when`은 D62에서 `case when`으로 구현(2026-11-24)
+- 두 boolean 식의 비교(D25) `o.isActive() == (o.getStatus() > s)`: D62에서 `case when`으로 구현(2026-11-24)
 - 가드 아래 `/`, `%`, 캐스트 거부(D13, G10): 구현되지 않았다. 지금은 그대로 렌더링한다(`e0.qty <> 0 and (e0.price / e0.qty) > 2.0`)
-- `LocalDateTime.isAfter`/`isBefore`: `LQL-3008`. 매뉴얼은 `compareTo`를 쓴다
 - 조건의 메서드 참조 `where(Order::isActive)`(Java), Kotlin 속성 참조(R23): `LQL-1009`. 정렬 키의 getter 참조만 동작한다
 - Kotlin 범위: `in a..b`는 `between`이 아니라 비교 두 개(`1 <= x and x < 6`)로 렌더링한다(D21의 `BETWEEN` 번역은 미구현). nullable 대상(`it.customer?.grade in 1..5`)과 `LocalDate`·`LocalDateTime` 범위는 `LQL-3008`, `BigDecimal` 범위는 미검증
 - Kotlin `when (subject)`: `switch`로 컴파일되는 형태(Int 상수 2개 이상, String 상수 3개 이상)는 `LQL-2010`, enum 대상은 `LQL-2013`(IALOAD). D21의 `IN` 번역은 미구현
 - Kotlin 스코프 함수 `?.let`, `run`, `with`, `also`: `LQL-2013`(NOP). 직접 만든 `inline fun`은 동작한다
-- Kotlin 문자열 템플릿(캡처 값만, KC17): `LQL-2007`
 
 **정렬과 페이징**
 
-- 함수 키(`lower(name)`), 집계 별칭 정렬, 문자열 하나의 정렬 지정(`"price,desc_nulls_last"`, S11), `SortSpec`의 조인 형태(S6), 키셋 페이징
+- 집계 별칭 정렬(함수 키 `lower(name)`은 D74로 동작), 문자열 하나의 정렬 지정(`"price,desc_nulls_last"`, S11), `SortSpec`의 조인 형태(S6), 키셋 페이징
 - Kotlin 속성 참조 `orderBy(Order::price)`(S13)
 - 컬렉션 fetch join + 페이징 거부(S9)
 - MariaDB `lateral`을 `row_number()`로 바꾸는 재작성(S14, Q4). 결과가 틀린다는 이전 기록(2026-11-10)이 있으나 지금 테스트로 재현하지 않았다. 재현 테스트를 먼저 만들고, 재현되면 매뉴얼 제한 사항에 싣는다
@@ -2112,8 +2113,8 @@ D56에 따라 매뉴얼에서 뺀 항목이다. 각 항목의 거부 코드는 H
 
 **조회, 집계, DML**
 
-- 사용자 집계 함수와 윈도 함수(FN10), DML 안의 파생 테이블·CTE, insert 조인, 엔티티 4개 이상 조인(J8)
-- `set` 값의 조건(`if`, 조건부 값, 7.10)
+- 사용자 집계 함수와 윈도 함수(FN10), DML 안의 파생 테이블·CTE, insert 조인, 엔티티 11개 이상 조인(J8, 10개까지는 D71에서 구현)
+- `set` 값의 조건: 값을 고르는 `if`·삼항은 D62에서 구현. 대입 여부를 고르는 문장 `if`는 `LQL-2009`
 - Kotlin select에서 `?.` 뒤의 `?:`(`select { it.customer?.name ?: "none" }`): `LQL-2022`. 정렬 키의 엘비스는 동작하므로 일관성 검토가 필요하다
 
 **프로시저와 DB 함수**

@@ -308,6 +308,9 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 | 결과 함수 `count(컬럼)`, 엔티티 쿼리의 `distinct()`(`distinct().count(컬럼)`은 `count(distinct x)`), `count(o -> o)`는 `count(*)`(D69) | 2026-11-25 구현, H2 테스트 | 예(`KotlinCountColumnTest`) | D67 |
 | `toSet()` 크기 검사를 서로 다른 객체 수 기준으로(조인 반복은 하나로, `equals` 충돌만 예외). 조인 쿼리의 `count()`·`limit`은 SQL 행 기준 | 2026-11-25 구현, H2 테스트 | 예(`KotlinQueryTest`) | D68 |
 | `select`의 엔티티 값(`select(o -> o)`, `select((o, c) -> c)`, 엔티티를 담은 record·data class·`Pair`) | 2026-11-25 구현, H2 테스트 | 예(`KotlinSelectEntityTest`) | D70 |
+| 문자열 함수(`lower`, `upper`, `trim`, `length`, `substring`, `locate`, `replace`, `concat`)와 문자열 조건(`isEmpty`, `isBlank`, `equalsIgnoreCase`), 람다 안 문자열 `+`·템플릿 | 2026-11-26 구현, H2 테스트. 다른 DB 미검증 | 예(`StringFunctionTest`, `KotlinStringFunctionTest`) | D74 |
+| `java.time`의 `isAfter`·`isBefore`·`isEqual`을 `>`·`<`·`=`로 | 2026-11-26 구현, H2 테스트 | 예(`TimeCompareTest`, `KotlinTimeCompareTest`) | D75 |
+| 람다 안에서 만든 컬렉션(`List.of`, `Arrays.asList`, Kotlin `listOf`·`setOf`·`arrayOf`)과 Kotlin 배열의 `in` | 2026-11-26 구현, H2 테스트 | 예(`InListTest`, `KotlinInListTest`) | D76 |
 | 분석 캐시(EntityManagerFactory별 공유) | 구현됨 | – | D47 |
 | Spring Data JPA 모듈(`LambdaQlExecutor<T>`, `Sort`, `Pageable`, DML 단축 메서드, 자동 구성) | 구현됨, 다섯 DB·Spring Boot 3.5.16·4.1.2 테스트. DML에는 호출자 트랜잭션 필요 | 예(`spring-data-jpa/src/test/kotlin`, 2026-11-23) | D34, D39, M12 |
 
@@ -323,4 +326,4 @@ export LQL_DB_PASSWORD="$(docker inspect lql-oracle --format '{{range .Config.En
 | 복합 키 엔티티의 `limit`·`executeOne()` | 미구현 |
 | U11, U12 검사 | 미구현(U15 `@Version` 대입 거부는 2026-11-23 구현, `LQL-3068`) |
 | 그 밖의 미구현·미검증 항목 | ROADMAP 4장 "매뉴얼에서 옮긴 미구현·미검증 항목"(D56) |
-| Maven Central 배포 | 미배포 |
+| Maven Central 배포 | 0.0.1, 0.0.2 배포. `main`의 버전 변경 시 자동 배포(D72, 저장소 Secrets 등록 대기) |

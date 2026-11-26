@@ -319,7 +319,7 @@ class SelectQueryTest {
     void unsupportedCallIsRejected() {
         // @start region="rejected"
         assertThrows(LambdaQLException.class,
-                () -> qb.from(Order.class).where(o -> o.getDescription().trim().equals("a")));
+                () -> qb.from(Order.class).where(o -> o.getDescription().strip().equals("a")));
         // @end
     }
 

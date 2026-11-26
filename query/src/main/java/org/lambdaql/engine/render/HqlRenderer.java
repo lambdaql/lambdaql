@@ -1539,6 +1539,12 @@ public final class HqlRenderer {
                 default -> a.fn().name().toLowerCase(java.util.Locale.ROOT) + "(" + value(a.arg(), null) + ")";
             };
             // a database function: always function('<key>' as <type>, ...) (ROADMAP M11, D31)
+            // a standard HQL function from a String method: lower(e0.name), substring(e0.name, 1, 3) (ROADMAP D74)
+            case Expr.Func f when f.builtin() -> {
+                StringBuilder out = new StringBuilder(f.key()).append('(');
+                for (int k = 0; k < f.args().size(); k++) out.append(k == 0 ? "" : ", ").append(value(f.args().get(k), null));
+                yield out.append(')').toString();
+            }
             case Expr.Func f -> {
                 StringBuilder out = new StringBuilder("function('").append(f.key().replace("'", "''")).append("' as ").append(f.asType());
                 for (Expr arg : f.args()) out.append(", ").append(value(arg, null));

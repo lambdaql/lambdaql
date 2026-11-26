@@ -238,7 +238,7 @@ lambdaQL은 인덱스를 사용할 수 있는("SARGable") SQL을 만듭니다.
 
 Java와 Kotlin은 같은 분석 엔진을 사용합니다. 그러므로 의미가 같은 Kotlin 람다 표현식과 Java 람다 표현식은 같은 HQL을 만듭니다.
 예를 들어 Java의 `o.getPrice() > 100`과 Kotlin의 `it.price > 100.0`은 둘 다 `e0.price > 100.0`이 됩니다.
-다만 모든 문법을 쿼리로 변경할 수는 없습니다. 반복문, `switch`와 Kotlin의 대상이 있는 `when (x)`, 컬럼에 대한 대부분의 문자열 함수(`trim()` 등) 같은 문법을 쓰면 lambdaQL은 쿼리를 실행하기 전에 오류를 냅니다.
+다만 모든 문법을 쿼리로 변경할 수는 없습니다. 반복문, `switch`와 Kotlin의 대상이 있는 `when (x)`, 같은 의미의 SQL 함수가 없는 문자열 함수(`strip()` 등) 같은 문법을 쓰면 lambdaQL은 쿼리를 실행하기 전에 오류를 냅니다.
 언어별 차이는 9장([Java 노트](java/09-java-notes.md) | [Kotlin 노트](kotlin/09-kotlin-notes.md))을 참고하십시오.
 
 <a id="fail-loudly"></a>

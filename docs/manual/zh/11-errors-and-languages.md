@@ -1,6 +1,9 @@
 <a id="11-errors-and-languages"></a>
 # 11. 错误与语言
 
+> [!IMPORTANT]
+> 本页比韩文手册旧。最新规则请参见[韩文页面](../ko/11-errors-and-languages.md)。
+
 [手册首页](README.md) | 路线：[Java](java/README.md) | [Kotlin](kotlin/README.md) | 上一章：10. 规则与限制（[Java](java/10-rules-and-limits.md) | [Kotlin](kotlin/10-rules-and-limits.md)） | 下一章：12. Spring Data JPA（[Java](java/12-spring-data-jpa.md) | [Kotlin](kotlin/12-spring-data-jpa.md)）
 
 本页适用于两种语言。代码分别展示在 **Java** 和 **Kotlin** 两个小节中。

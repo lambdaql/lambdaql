@@ -67,9 +67,29 @@ public final class HostEvaluator {
             case Expr.NewObject n -> construct(n, captured);
             case Expr.SafeNav n -> eval(n.value(), captured);
             case Expr.ArrayLength a -> java.lang.reflect.Array.getLength(eval(a.array(), captured));
+            // an array made in the lambda: the varargs of Kotlin listOf(1, 2), Arrays.asList(a, b) (ROADMAP D76)
+            case Expr.ArrayOf a -> newArray(a, captured);
             case Expr.Choose c -> holds(c.cond(), captured) ? eval(c.whenTrue(), captured) : eval(c.whenFalse(), captured);
             default -> throw LqlMessage.HOST_NOT_EVALUABLE.exception(e);
         };
+    }
+
+    /**
+     * Makes an array of the element type and fills it; an element that was never stored stays null.
+     *
+     * <p>Example: {@code array[Integer.valueOf(1), Integer.valueOf(2)]} gives {@code new Integer[]{1, 2}}.
+     *
+     * @param a        the array node
+     * @param captured the captured values
+     * @return the array
+     */
+    private Object newArray(Expr.ArrayOf a, Object[] captured) {
+        Object array = java.lang.reflect.Array.newInstance(classOf(a.type().getElementType()), a.items().size());
+        for (int k = 0; k < a.items().size(); k++) {
+            Expr item = a.items().get(k);
+            if (item != null) java.lang.reflect.Array.set(array, k, eval(item, captured));
+        }
+        return array;
     }
 
     private Object evalCase(Expr.Case c, Object[] captured) {

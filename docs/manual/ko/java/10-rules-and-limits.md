@@ -207,7 +207,8 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 
 그 밖의 규칙:
 
-- `x.compareTo(y) > 0`, `isBefore`, `isAfter`는 `x > y` 등이 됩니다.
+- `x.compareTo(y) > 0`, `isBefore`, `isAfter`, `isEqual`은 `x > y` 등이 됩니다.
+- 엔티티 값에 대한 `String` 메서드는 HQL 표준 함수가 됩니다: `toLowerCase()`는 `lower(x)`, `substring(a, b)`는 `substring(x, a + 1, b - a)`, `+`는 `concat(...)`([3.8.1](03-where.md#381-string-functions)).
 - 람다 표현식에 직접 쓴 상수(컴파일 시점 `static final` 상수 포함)는 리터럴입니다: `o.getPrice() > 100`은 `e0.price > 100.0`, `"O'Brien"`은 `'O''Brien'`. 캡처 값과 계산한 값(`new BigDecimal("1.5")`)은 바인드 파라미터입니다. 예외: 정수 컬럼과 비교하는 소수 캡처 값은 소수 리터럴(`2.5BD`).
 - javac는 가끔 `!`의 위치를 옮깁니다(드 모르간, 이중 부정). 그래도 결과는 바뀌지 않습니다.
   lambdaQL은 각 조건을 정확히 한 번씩 유지하며 논리를 "단순화"하지 않습니다.
@@ -250,7 +251,8 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 | `BigDecimal` 나눗셈과 함수 결과 | Java 스케일 규칙 | DB가 스케일을 정함(예: 함수 결과에 대해 H2는 1, MariaDB와 Oracle은 0) | 문서화함 |
 | 유니코드 대소문자 무시(`ſ`, `İ`) | Java 규칙 | DB 콜레이션 | DB를 따름 |
 | 문자열 길이 | UTF-16 단위 | H2는 UTF-16 단위, MariaDB는 코드 포인트 | 문서화함 |
-| NULL과 문자열 연결 | `"null"` 텍스트 | NULL(Oracle: `NULL \|\| 'x'`는 `'x'`) | 람다 표현식 안의 문자열 연결은 거부됨(`LQL-2007`) |
+| NULL과 문자열 연결 | `"null"` 텍스트 | NULL(Oracle: `NULL \|\| 'x'`는 `'x'`) | DB를 따름. 캡처 값만 이어 붙이면 Java에서 계산 |
+| 문자열 위치 | 0부터 셈. `indexOf`는 없으면 -1 | 1부터 셈. `locate`는 없으면 0 | 위치를 1씩 옮김(`substring(x, a + 1)`, `locate(s, x) - 1`) |
 | 람다 표현식 안의 `LocalDateTime.now()` | 앱 시각 | – | **앱 시각**으로 바인딩. DB 시각(`current_timestamp`)은 지원하지 않음 |
 | `Set`의 같은 요소 | `equals` / `hashCode`가 결정 | 기본 키로 행을 구분 | Set의 크기가 행 수보다 작으면 `toSet()`과 `findSet()`이 `IllegalStateException`을 던짐(엔티티의 `equals` / `hashCode`가 서로 다른 행을 같다고 판단하거나 `@Id`가 유일하지 않은 경우, 예: 뷰). `toList()` 사용 |
 
@@ -356,12 +358,10 @@ lambdaQL은 이 목록의 형태에 대해 대부분 명확한 오류를 던집�
 | 값 객체(`@Embedded`)의 크기 비교, 다른 타입과의 비교(`LQL-3012`) | 필드를 비교. 같은 타입과의 같음 비교(`equals`, `==`, `!=`, `null`)는 지원 |
 | 컬렉션 경로(`c.getOrders()...`, `@OneToMany`, `@ManyToMany`, `LQL-3010`) | `exists()` 서브쿼리나 조인 |
 | `c.getOrders().contains(x)` | `exists()` 서브쿼리 |
-| 람다 표현식 안에서 만든 컬렉션(`List.of(1, 2)`) | 밖에서 만들어 캡처. (`groupBy` 키는 예외) |
 | 캡처한 컬렉션의 `null` 요소 | null을 제거. NULL 행을 원하면 `\|\| x == null`을 추가 |
 | 캡처한 `NaN` / `Infinity` | 쿼리 전에 값을 확인 |
 | `isNaN()` | – |
 | 엔티티 값에 대한 그 밖의 메서드 호출(`o.items(...)`, 직접 만든 메서드) | 컬럼으로 조건을 작성 |
-| 문자열 연결(`o.getDescription() + "_x"`, `"A" + code`도) | 문자열은 람다 표현식 밖에서 만듦(`LQL-2007`) |
 | 람다 표현식 안의 스트림과 다른 람다 표현식 | 캡처한 컬렉션의 `contains`나 서브쿼리 |
 
 <a id="functions-and-strings"></a>
@@ -369,7 +369,7 @@ lambdaQL은 이 목록의 형태에 대해 대부분 명확한 오류를 던집�
 
 | 지원하지 않음 | 대신 작성할 것 |
 |---|---|
-| 엔티티 값에 대한 Java `String` 메서드(`trim`, `toUpperCase` 등, `LQL-3008`). `startsWith`, `endsWith`, `contains`는 `like`로 지원 | – |
+| 같은 의미의 SQL 함수가 없는 Java `String` 메서드(`strip`, `matches`, `charAt` 등, `LQL-3008`). 지원하는 메서드는 [3.8.1](03-where.md#381-string-functions) | – |
 | 날짜 함수(`YEAR(col) == 2024`) | 범위: `o.getUpdateAt() >= from && o.getUpdateAt() < to` |
 | 제네릭 반환 타입(`<X> X nvl(X, X)`), 엔티티, 컬렉션, `void`를 반환하는 `@SqlFunction` | 다음 중 하나: `Double`, `Integer`, `Long`, `BigDecimal`, `String`, `LocalDate`, `LocalDateTime`, `Boolean` |
 | Hibernate 내장 함수(`COALESCE`, `ROUND`, `SYSDATE`, ...)와 이름이 같은 `@SqlFunction` | 접두사나 스키마 이름(`PUBLIC.SQ_FN`) 사용 |
@@ -423,7 +423,6 @@ lambdaQL은 이 목록의 형태에 대해 대부분 명확한 오류를 던집�
 | 연관의 `@Id`가 아닌 속성 설정(`o.getCustomer().setName(x)`) | `Customer`를 직접 수정 |
 | 필수 컬럼(`@Id`, `nullable = false`, 기본형)에 `null` 넣기 | – |
 | `@Version` 속성을 직접 쓰기 | lambdaQL이 대신 `update versioned`를 사용 |
-| 값 안의 문자열 연결 | – |
 | update나 delete의 명시적 조인 | 추가하지 않음. 연관 경로나 `sub` 사용 |
 | 명시적 조인이 있는 `insert ... select` | 다대일 경로를 사용 |
 | 동시 삽입에서 원자적인 `onConflict(...).ignore()` | 키 중복 오류를 처리(`ignore()`는 `not exists`를 사용. [7.6](07-6-upsert.md) 참고) |

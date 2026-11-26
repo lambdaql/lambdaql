@@ -1,6 +1,9 @@
 <a id="9-kotlin-notes"></a>
 # 9. Kotlin notes
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/09-kotlin-notes.md) for the latest rules.
+
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [8. Procedures and DB functions](08-procedures-functions.md) | Next: [10. Rules and limits](10-rules-and-limits.md) | [Java version of this page: 9. Java notes](../java/09-java-notes.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)

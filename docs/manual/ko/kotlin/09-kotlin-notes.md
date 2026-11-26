@@ -399,15 +399,17 @@ NULL 행을 원하면 `it.cnt == null || it.cnt !in 1..5`라고 쓰십시오.
 ## 9.7 문자열
 
 엔티티 값에 대한 `startsWith`, `endsWith`, `contains`(`ignoreCase` 포함)는 `like`가 됩니다([3.8](03-where.md#38-strings)).
-다른 문자열 함수는 lambdaQL이 람다 표현식을 읽을 때 `TranslationException`(`LQL-3008`)으로 거부합니다. `lowercase`, `length`, `isNullOrEmpty`, `isBlank`, `equals(s, ignoreCase = true)`가 이에 해당합니다.
-조건은 값을 직접 비교하는 형태로 쓰십시오.
+`lowercase`, `trim`, `length`, `isNullOrEmpty`, `isBlank`, `equals(s, ignoreCase = true)`, `substring`, 문자열 템플릿은 SQL 함수가 됩니다([3.8.1](03-where.md#381-string-functions)).
+같은 의미의 SQL 함수가 없는 함수(`padStart`, `split` 등)는 lambdaQL이 람다 표현식을 읽을 때 `TranslationException`(`LQL-3008`)으로 거부합니다.
 
 | Kotlin | lambdaQL |
 |---|---|
 | `it.description.equals(text)` | `==`와 같음: `e0.description = :p1` |
 | `(it.description ?: "") == "x"` | `coalesce(e0.description, '') = 'x'`([9.5](#-elvis)) |
-| 위의 문자열 함수 | 거부됨(`LQL-3008`) |
-| 문자열 결합과 템플릿(`"${it.description}-x"`, `"$a-$b" == it.description`, `it.description + "x"`) | 거부됨(`LQL-2007`). 캡처 값만 쓰는 템플릿도 거부되므로 문자열은 람다 표현식 밖에서 만들어 캡처 |
+| `it.description?.lowercase() == "x"` | `lower(e0.description) = 'x'` |
+| 문자열 결합과 템플릿(`"${it.description}-x"`, `it.description + "x"`) | `concat(e0.description, '-x')` |
+| 캡처 값만 쓰는 템플릿(`"$a-$b" == it.description`) | Kotlin에서 문자열을 만들어 바인딩: `e0.description = :p1` |
+| `padStart`, `split` 같은 함수 | 거부됨(`LQL-3008`) |
 
 <a id="98-captured-values"></a>
 ## 9.8 캡처 값
@@ -526,7 +528,7 @@ assertEquals("select e0 from Order e0 where e0.status = 1", inline.toHql().hql()
 | `BigDecimal` `/` | 지원(Kotlin은 `divide(x, HALF_EVEN)` 사용). 결과 스케일은 DB를 따름. 다른 `divide` 형태는 거부됨 |
 | `in a..b`, `until`, `..<` | 지원([9.6](#96-in-ranges-and-when)) |
 | `x in list`, `x !in list` | 지원([9.6](#96-in-ranges-and-when)) |
-| 문자열 `+`, 문자열 템플릿 | **거부됨**(`LQL-2007`). 참고: NULL에 대해 Kotlin은 `"null"`을, SQL은 NULL을 냄 |
+| 문자열 `+`, 문자열 템플릿 | 지원, `concat(...)`으로 출력([3.8.1](03-where.md#381-string-functions)). 참고: NULL에 대해 Kotlin은 `"null"`을, SQL은 NULL을 냄 |
 | boolean 중위 함수 `and`, `or`, `xor` | **거부됨**(`LQL-2013`). `&&`와 `\|\|`를 사용(단락 평가를 함. `and`/`or`는 하지 않음) |
 | 캡처한 배열에 대한 `arr[0]` | 캡처 값으로 취급하거나 명확한 오류 |
 | 엔티티 경로에 대한 `it.tags["k"]`, `it.lines[0]` | **거부됨** |
@@ -679,8 +681,8 @@ KC1 ~ KC5는 람다 표현식을 로드할 때 발견됩니다. 이 경우 lambd
 | KC5 | `object : ...`(객체 식), `Serializable`이 아닌 함수형 인터페이스 | 직렬화 가능한 람다 표현식이 아님 | 람다 표현식 리터럴 |
 | KC6 | `takeIf`, 일반적인 boolean `if (a) x else y` | 지원하지 않음(`LQL-2021`). 값을 고르는 `if`/`when`은 지원(캡처 값만 쓰면 바인드 파라미터, 엔티티 값을 쓰면 `case when`) | `&&` / `\|\|` |
 | KC7 | *(D25로 삭제됨)* | – | – |
-| KC8 | 람다 표현식 안의 `in listOf(1, 2, 3)`이나 `setOf(...)` | 람다 표현식 안에서 만든 컬렉션 | 밖에서 `val ids = listOf(1, 2, 3)`, 그다음 `it.id in ids` |
-| KC9 | `isBlank()`, `isNullOrBlank()` | 유니코드 공백에는 이식 가능한 SQL 형태가 없음 | 직접 비교 |
+| KC8 | *(D76으로 삭제됨)* | – | – |
+| KC9 | *(D74로 삭제됨)* | – | – |
 | KC10 | *(D21로 삭제됨)* | – | – |
 | KC11 | 직접 만든 inline이 아닌 확장 함수나 확장 속성, 엔티티 `operator` 함수 | lambdaQL은 호출 안을 볼 수 없음 | `inline fun`으로 만들거나 조건을 직접 작성 |
 | KC12 | 캡처 변수에 대한 `n++` | 람다 표현식이 변수에 씀 | 람다 표현식 밖에서 값을 계산 |
@@ -688,10 +690,10 @@ KC1 ~ KC5는 람다 표현식을 로드할 때 발견됩니다. 이 경우 lambd
 | KC14 | `isNaN()` | 지원하지 않음 | NaN을 저장하지 말 것. [10.5](10-rules-and-limits.md#105-kotlin-and-sql-differences) 참고 |
 | KC15 | `@JvmField` 엔티티 속성 | getter가 아닌 필드 접근 | 일반 `var` / `val` |
 | KC16 | 변형된 getter 이름: `internal` 속성, `value class`, `@get:JvmName` | getter를 JPA 속성에 매핑할 수 없음 | public 일반 속성 |
-| KC17 | 문자열 템플릿 안의 엔티티 값 | 문자열 결합은 지원하지 않음(`LQL-2007`) | 컬럼을 따로 비교 |
+| KC17 | 같은 의미의 SQL 함수가 없는 문자열 함수(`padStart`, `split`, `matches`) | 지원하지 않음(`LQL-3008`) | 지원하는 함수([3.8.1](03-where.md#381-string-functions))로 조건을 작성 |
 | KC18 | Java 합성 속성 참조 `JOrder::price` | Kotlin 컴파일 오류 | 람다 표현식 `{ it.price }` |
 | KC19 | `Order::price.getter` 및 다른 `kotlin-reflect` API | `kotlin-reflect`를 사용하지 않음 | 람다 표현식 `{ it.price }` |
-| KC20 | 컬럼에 대한 다른 stdlib 함수(`coerceAtLeast`, `trim`, `toLocalDate`, ...) | 허용 목록에 없음(`LQL-3008`) | `@SqlFunction`을 사용한 DB 함수 |
+| KC20 | 컬럼에 대한 다른 stdlib 함수(`coerceAtLeast`, `toLocalDate`, ...) | 허용 목록에 없음(`LQL-3008`) | `@SqlFunction`을 사용한 DB 함수 |
 | KC21 | 값이나 정렬 키로 쓰는 boolean 엘비스(`{ it.vip ?: false }`) | boolean에 대한 `coalesce`는 Oracle에서 실패함(ORA-00932) | NULL 위치를 지정하여 `{ it.vip }`로 정렬. 조건에서는 `it.vip ?: false`도 괜찮음 |
 
 <a id="915-where-lambdaql-differs-from-running-kotlin-code"></a>

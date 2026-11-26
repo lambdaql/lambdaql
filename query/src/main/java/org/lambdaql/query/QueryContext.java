@@ -142,7 +142,7 @@ public final class QueryContext {
      */
     private <X> X checked(X analyzed) {
         for (Expr.Func f : org.lambdaql.engine.sem.SqlFunctions.calls(analyzed)) {
-            if (org.lambdaql.engine.sem.SqlFunctions.isRegistered(f.key())) continue;
+            if (f.builtin() || org.lambdaql.engine.sem.SqlFunctions.isRegistered(f.key())) continue;
             if (!f.sql().equals(f.key())) throw LqlMessage.FUNCTION_NOT_REGISTERED.exception(f.key());
             if (HibernateFunctions.isKnown(factory(), f.key())) throw LqlMessage.FUNCTION_BUILTIN_NAME.exception(f.key());
         }

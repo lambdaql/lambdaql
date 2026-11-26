@@ -1,6 +1,9 @@
 <a id="10-rules-and-limits-kotlin"></a>
 # 10. Rules and limits (Kotlin)
 
+> [!IMPORTANT]
+> This page is older than the Korean manual. See the [Korean page](../../ko/kotlin/10-rules-and-limits.md) for the latest rules.
+
 [Kotlin track](README.md) | [Manual home](../README.md) | Previous: [9. Kotlin notes](09-kotlin-notes.md) | Next: [11. Errors and languages](../11-errors-and-languages.md) | [Java version of this page](../java/10-rules-and-limits.md)
 
 Common pages: [1. Overview](../01-overview.md) · [11. Errors and languages](../11-errors-and-languages.md)

@@ -309,19 +309,11 @@ class ManualKotlinWhereTest {
     @Test
     fun stringRejected() {
         // @start region="string-rejected"
-        // string functions on a column other than startsWith, endsWith and contains are not translated
+        // a string function that has no SQL function of the same meaning is not translated
         val f = assertThrows<LambdaQLException> {
-            qb.from(Order::class.java).where { it.description.lowercase() == "a" }.toHql()
+            qb.from(Order::class.java).where { it.description!!.padStart(5) == "a" }.toHql()
         }
         assertTrue(f.message!!.startsWith("[LQL-3008]"))
-
-        // string building in the lambda is rejected: build the string before the lambda
-        val a = "x"
-        val b = "y"
-        val t = assertThrows<LambdaQLException> {
-            qb.from(Order::class.java).where { "$a-$b" == it.description }.toHql()
-        }
-        assertTrue(t.message!!.startsWith("[LQL-2007]"))
         // @end
     }
 

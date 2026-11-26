@@ -409,7 +409,7 @@ lambdaQL은 **SLF4J API**로 로그를 남깁니다.
 | 코드 | 발생 조건 |
 |---|---|
 | `LQL-4045` | `=`·`<>`(`==`, `!=`, `equals`, `Objects.equals`)의 캡처 값이 `null`이라 맞는 행이 없을 때(SQL 의미). 실행할 때만 알 수 있음. `WARN` 레벨로 기록. 크기 비교처럼 자기 기본형 언박싱(`min.doubleValue()`)을 거친 경우에는 `DEBUG` 레벨. NULL을 찾으려면 `x == null`(3.6 참고: [Java](java/03-where.md#36-null-rules) \| [Kotlin](kotlin/03-where.md#36-null-rules)) |
-| `LQL-5001` | 조건에서 DB 함수가 열을 감쌀 때(`OrderFns.discount(o.getPrice()) > 10`, 열에 적용한 Boolean 함수, `IN`이나 `IS NULL` 안의 함수). 일반 인덱스를 쓸 수 없음. `where` 람다 표현식마다 한 번 `WARN` 레벨로 기록. Oracle이나 PostgreSQL에서 같은 식의 함수 기반(식) 인덱스가 있으면 기록하지 않음([8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) 참고) |
+| `LQL-5001` | 조건에서 DB 함수가 열을 감쌀 때(`OrderFns.discount(o.getPrice()) > 10`, 열에 적용한 Boolean 함수, `IN`이나 `IS NULL` 안의 함수, `String` 메서드에서 온 `lower(e0.description)` 같은 표준 함수). 일반 인덱스를 쓸 수 없음. `where` 람다 표현식마다 한 번 `WARN` 레벨로 기록. Oracle이나 PostgreSQL에서 같은 식의 함수 기반(식) 인덱스가 있으면 기록하지 않음([8.9](java/08-procedures-functions.md#89-warning-functions-on-columns-and-indexes-sargable) 참고) |
 | `LQL-5002` | 서브쿼리에 `orderBy`는 있지만 `limit`이 없어 lambdaQL이 정렬을 제거할 때(정렬은 결과에 영향이 없음) |
 | `LQL-5003` | 외부 정렬(Spring `Sort`, `SortSpec.ofPath`)이 정렬 규칙에 없는 이름을 사용하고 모드가 `SortMode.INFO`(기본값, `INFO` 레벨로 기록)나 `SortMode.WARN`(`WARN` 레벨로 기록)일 때. 정렬은 실행됨. 엔티티와 이름마다 한 번 기록([4.10 정렬 정책](java/04-order-paging.md#sort-policy) 참고) |
 | `LQL-5004` | 클래스 파일에 프로시저 스텁의 인자 이름이 없고(`-parameters`, Kotlin `-java-parameters` 없이 컴파일, `@DbParam`도 없음) 이웃한 두 인자의 타입이 같을 때. 프로시저마다 한 번 `INFO` 레벨로 기록([8.4](java/08-procedures-functions.md#84-warning-argument-order) 참고) |

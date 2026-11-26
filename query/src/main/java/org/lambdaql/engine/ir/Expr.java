@@ -629,6 +629,32 @@ public sealed interface Expr permits
             args = List.copyOf(args);
         }
 
+        /**
+         * Makes a call of a standard HQL function, such as {@code lower} or {@code substring} (ROADMAP D74).
+         * It has no {@code asType} and is written as {@code name(args...)}, not with {@code function(...)}.
+         *
+         * <p>Example: {@code Func.builtin("lower", List.of(column), STRING)} is written as {@code lower(e0.name)}.
+         *
+         * @param name the HQL function name
+         * @param args the normalized arguments
+         * @param type the JVM type of the result
+         * @return the call
+         */
+        public static Func builtin(String name, List<Expr> args, Type type) {
+            return new Func(name, name, null, args, type);
+        }
+
+        /**
+         * Checks if this is a standard HQL function made by {@link #builtin}, not a {@code @SqlFunction} call.
+         *
+         * <p>Example: {@code Func.builtin("lower", args, STRING).builtin()} is {@code true}.
+         *
+         * @return {@code true} for a standard HQL function
+         */
+        public boolean builtin() {
+            return asType == null;
+        }
+
         @Override
         public String toString() {
             return key + args;

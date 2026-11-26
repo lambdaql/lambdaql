@@ -352,6 +352,10 @@ public final class Decoder implements Opcodes {
                 case INVOKEVIRTUAL, INVOKEINTERFACE, INVOKESTATIC, INVOKESPECIAL -> invoke((MethodInsnNode) n, stack, line);
                 case INVOKEDYNAMIC -> {
                     InvokeDynamicInsnNode indy = (InvokeDynamicInsnNode) n;
+                    if (indy.bsm.getOwner().equals("java/lang/invoke/StringConcatFactory")) {
+                        stack.add(concat(indy, stack, line));      // a + b and string templates (ROADMAP D74)
+                        break;
+                    }
                     if (!indy.bsm.getOwner().equals("java/lang/invoke/LambdaMetafactory")) throw indyError(indy, line);
                     // an inner lambda (for example the where lambda of a subquery): keep its body handle and captured values
                     Handle impl = (Handle) indy.bsmArgs[1];
@@ -1127,8 +1131,64 @@ public final class Decoder implements Opcodes {
      */
     private LambdaQLException indyError(InvokeDynamicInsnNode n, int line) {
         Handle bsm = n.bsm;
-        if (bsm.getOwner().equals("java/lang/invoke/StringConcatFactory")) return error(line, LqlMessage.STRING_CONCAT_NOT_SUPPORTED);
         return error(line, LqlMessage.INVOKEDYNAMIC_NOT_SUPPORTED, bsm.getOwner() + "." + bsm.getName());
+    }
+
+    /**
+     * Reads a string concatenation ({@code a + b}, Kotlin {@code "$a-$b"}) compiled to
+     * {@code StringConcatFactory.makeConcatWithConstants} (ROADMAP D74). The result is a chain of
+     * {@code String.concat} calls; each value is wrapped in {@code String.valueOf}, so a part computed in Java gives
+     * {@code "null"} for null like Java does. In the recipe, {@code \u0001} is the next value from the stack and
+     * {@code \u0002} the next extra constant; other characters are text.
+     *
+     * <p>Example: {@code "A-" + code} becomes {@code "A-".concat(String.valueOf(code))}.
+     *
+     * @param n     the instruction
+     * @param stack the value stack; the values are popped
+     * @param line  source line, for errors
+     * @return the concatenation
+     */
+    private Expr concat(InvokeDynamicInsnNode n, List<Object> stack, int line) {
+        Type[] types = Type.getArgumentTypes(n.desc);
+        Expr[] values = new Expr[types.length];
+        for (int k = types.length - 1; k >= 0; k--) values[k] = popExpr(stack, line);
+        // makeConcat (no recipe) is the same as a recipe with one \u0001 per value
+        String recipe = n.name.equals("makeConcatWithConstants") ? (String) n.bsmArgs[0] : "\u0001".repeat(types.length);
+        List<Expr> pieces = new ArrayList<>();
+        StringBuilder text = new StringBuilder();
+        int next = 0, extra = 1;
+        for (char ch : recipe.toCharArray()) {
+            if (ch == '\u0001' || ch == '\u0002') {
+                if (!text.isEmpty()) pieces.add(new Expr.Const(text.toString(), STRING_TYPE));
+                text.setLength(0);
+                if (ch == '\u0001') pieces.add(stringOf(values[next], types[next++]));
+                else pieces.add(new Expr.Const(String.valueOf(n.bsmArgs[extra++]), STRING_TYPE));
+            } else {
+                text.append(ch);
+            }
+        }
+        if (!text.isEmpty()) pieces.add(new Expr.Const(text.toString(), STRING_TYPE));
+        if (pieces.isEmpty()) return new Expr.Const("", STRING_TYPE);
+        Expr out = pieces.get(0);
+        MethodRef concat = new MethodRef("java/lang/String", "concat", "(Ljava/lang/String;)Ljava/lang/String;", false, false);
+        for (int k = 1; k < pieces.size(); k++) out = new Expr.Invoke(out, concat, List.of(pieces.get(k)));
+        return out;
+    }
+
+    private static final Type STRING_TYPE = Type.getType(String.class);
+
+    /** {@code String.valueOf(x)} with the overload javac would pick for the value type. */
+    private static Expr stringOf(Expr value, Type type) {
+        String arg = switch (type.getSort()) {
+            case Type.BOOLEAN -> "Z";
+            case Type.CHAR -> "C";
+            case Type.BYTE, Type.SHORT, Type.INT -> "I";
+            case Type.LONG -> "J";
+            case Type.FLOAT -> "F";
+            case Type.DOUBLE -> "D";
+            default -> "Ljava/lang/Object;";
+        };
+        return new Expr.Invoke(null, new MethodRef("java/lang/String", "valueOf", "(" + arg + ")Ljava/lang/String;", true, false), List.of(value));
     }
 
     /**

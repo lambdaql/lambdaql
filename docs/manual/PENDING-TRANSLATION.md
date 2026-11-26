@@ -16,13 +16,29 @@
 
 | 언어 | 상태 |
 |---|---|
-| 영어(`en`) | 2026-11-25 반영 완료 |
-| 일본어(`ja`) | 2026-11-25 반영 완료 |
-| 중국어(`zh`) | 2026-11-25 반영 완료 |
+| 영어(`en`) | 2026-11-25 반영 완료. D74·D75·D76 대기 |
+| 일본어(`ja`) | 2026-11-25 반영 완료. D74·D75·D76 대기 |
+| 중국어(`zh`) | 2026-11-25 반영 완료. D74·D75·D76 대기 |
 
 세 번역본 모두 34쪽 전체를 한국어 원본에 맞췄습니다. 검사는 `python3 .claude/tools/docs/check_translation.py <언어>`(문제 0)입니다.
 이전 대기 항목(D48~D51 등)은 모두 반영되어 지웠습니다. 내용은 git 기록에 있습니다.
 앞으로 한국어 원본이 바뀌면 이 문서에 다시 항목을 적습니다.
+
+## D74 문자열 함수, D75 날짜 비교 메서드, D76 람다 안 컬렉션의 IN(2026-11-26, 세 번역본 대기)
+
+엔티티 값에 대한 문자열 함수와 문자열 결합을 지원하면서 바뀐 한국어 원본입니다.
+
+1. Java·Kotlin 03장: 3.8의 문자열 함수 안내 문장 교체, 새 절 3.8.1 "문자열 함수"(예제, 대응 표, Java·Kotlin과 다른 점, 인덱스 경고), 3.12 캡처 값 규칙의 `trim` 문장(Java), 3.13 거부 표의 문자열 행
+2. Java 07장: 7.7의 문자열 연결 행, 7.10의 문자열 연결 행 삭제. Kotlin 07장: 지원하지 않는 표의 문자열 템플릿 행 삭제
+3. Java 09장: 9.4의 문자열 메서드·`+` 문장, `lower(...)`·`upper(...)` 행. Kotlin 09장: 9.7 문단과 표, 연산자 표의 문자열 `+` 행, KC17과 KC20
+4. Java·Kotlin 10장: 그 밖의 규칙(Java), R21(Kotlin), Java·SQL 차이 표의 문자열 연결 행과 새 "문자열 위치" 행, 지원하지 않는 표의 문자열 행
+5. 01장 "Java와 Kotlin"의 문자열 함수 예, 11장 `LQL-5001` 설명
+
+D75(`isAfter`·`isBefore`·`isEqual`)로 바뀐 곳: Java 03장 3.4 표와 새 예제, Kotlin 03장 3.4 표와 새 예제, Java 09장 연산자 표의 `compareTo` 행, Java·Kotlin 10장 그 밖의 규칙.
+
+D76(람다 안에서 만든 컬렉션의 IN)으로 바뀐 곳: Java·Kotlin 03장 3.9 표와 새 예제(Kotlin은 배열 행과 예제 추가), Kotlin 03장 3.13 거부 표의 컬렉션 행 삭제, Kotlin 3.8.1 표의 `isNullOrBlank()` 행, Java 06장 `groupBy` 키 목록 아래 문장 삭제, Java 09장 연산자 표의 `List.of(...)` 행, Kotlin 09장 KC8·KC9 삭제 표기, Java·Kotlin 10장 지원하지 않는 표의 컬렉션 행 삭제.
+
+코드 블록은 새 테스트 구간(`StringFunctionTest`, `KotlinStringFunctionTest`, `TimeCompareTest`, `KotlinTimeCompareTest`, `InListTest`, `KotlinInListTest`)과 바뀐 구간(`ManualJavaWhereTest#rejected-forms`, `ManualKotlinWhereTest#string-rejected`)입니다.
 
 ## D56 이후 한국어 원본 변경 반영(2026-11-25 네 언어에 반영 완료)
 

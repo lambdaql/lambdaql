@@ -28,6 +28,8 @@ import java.util.Set;
  *   <li>{@code equals}, {@code Objects.equals} and Kotlin {@code Intrinsics.areEqual} become null-safe compares.</li>
  *   <li>{@code a.compareTo(b) > 0} and Kotlin {@code Intrinsics.compare(a, b) > 0} become {@code a > b}.</li>
  *   <li>{@code ids.contains(o.getId())} (captured collection) becomes {@link Pred.In} (ROADMAP D29).</li>
+ *   <li>String methods on an entity value become standard HQL functions: {@code o.getName().toLowerCase()} becomes
+ *       {@code lower(e0.name)}, {@code a + b} becomes {@code concat(a, b)} (ROADMAP D74).</li>
  * </ul>
  * Anything else that uses the entity is rejected with a clear error.
  *
@@ -320,7 +322,7 @@ public final class Normalizer {
     private Pred truth(Expr e) {
         if (e instanceof Expr.Invoke inv) {
             MethodRef m = inv.method();
-            // sub.from(X)...select(...).contains(x): x in (subquery); !contains becomes NOT EXISTS when rendered (Q2)
+            // sub.from(X)...select(...).contains(x): x in (subquery); !contains stays NOT IN with the SQL meaning (Q2)
             if (m.owner().equals(VALUES) && m.name().equals("contains") && inv.receiver() instanceof Expr.Invoke values) {
                 return new Pred.In(done(value(inv.args().get(0))), subquery(values, Expr.Subquery.Kind.VALUES));
             }
@@ -349,10 +351,201 @@ public final class Normalizer {
                     && !usesEntity(inv.args().get(0))) {
                 return new Pred.In(done(value(inv.args().get(1))), host(inv.args().get(0), Collection.class, true));
             }
+            // Kotlin x in arr: ArraysKt.contains(arr, x) with an array that has no entity value (ROADMAP D76)
+            if (m.isStatic() && m.is("kotlin/collections/ArraysKt", "contains") && inv.args().size() == 2
+                    && !usesEntity(inv.args().get(0))) {
+                return new Pred.In(done(value(inv.args().get(1))), host(inv.args().get(0), Object.class, true));
+            }
+            // a.isAfter(b), a.isBefore(b), a.isEqual(b) on java.time values: a > b, a < b, a = b (ROADMAP D75)
+            if (!m.isStatic() && inv.args().size() == 1 && m.owner().startsWith("java/time/")
+                    && m.returnType() == Type.BOOLEAN_TYPE && (usesEntity(inv.receiver()) || usesEntity(inv.args().get(0)))) {
+                CmpOp op = switch (m.name()) {
+                    case "isAfter" -> CmpOp.GT;
+                    case "isBefore" -> CmpOp.LT;
+                    case "isEqual" -> CmpOp.EQ;
+                    default -> null;
+                };
+                if (op != null) return cmp(op, inv.receiver(), inv.args().get(0), false);
+            }
             Pred like = like(inv);
             if (like != null) return like;
+            Pred test = stringTest(inv);
+            if (test != null) return test;
         }
         return new Pred.Truth(done(value(e)));
+    }
+
+    // ------------------------------------------------------------------ string functions (ROADMAP D74)
+
+    private static final Type STRING = Type.getType(String.class);
+    private static final String KOTLIN_STRINGS = "kotlin/text/StringsKt";
+
+    /**
+     * Reads a String method on an entity value as a standard HQL function.
+     * Positions are moved by one, because Java counts from 0 and SQL counts from 1.
+     * <ul>
+     *   <li>{@code toLowerCase()}, Kotlin {@code lowercase()}: {@code lower(x)}; {@code toUpperCase()}: {@code upper(x)}</li>
+     *   <li>{@code trim()}: {@code trim(x)}; {@code length()}: {@code length(x)}</li>
+     *   <li>{@code substring(a)}: {@code substring(x, a + 1)}; {@code substring(a, b)}: {@code substring(x, a + 1, b - a)}</li>
+     *   <li>{@code indexOf(s)}: {@code locate(s, x) - 1}; {@code replace(a, b)}: {@code replace(x, a, b)}</li>
+     *   <li>{@code +}, string templates and {@code concat}: {@code concat(...)}</li>
+     * </ul>
+     *
+     * <p>Example: {@code o.getName().substring(0, 3)} becomes {@code substring(e0.name, 1, 3)}.
+     *
+     * @param inv a call that uses an entity value
+     * @return the function call, or {@code null} if the call is not one of these methods
+     */
+    private Expr stringFunction(Expr.Invoke inv) {
+        MethodRef m = inv.method();
+        List<Expr> a = inv.args();
+        String d = m.descriptor();
+        if (!m.isStatic() && inv.receiver() != null
+                && (m.owner().equals("java/lang/String") || m.owner().equals("java/lang/CharSequence"))) {
+            Expr x = inv.receiver();
+            return switch (m.name()) {
+                // the Locale argument of toLowerCase(Locale) is not used: the database has its own rules
+                case "toLowerCase" -> fn("lower", STRING, x);
+                case "toUpperCase" -> fn("upper", STRING, x);
+                case "trim" -> d.equals("()Ljava/lang/String;") ? fn("trim", STRING, x) : null;
+                case "length" -> fn("length", Type.INT_TYPE, x);
+                case "substring" -> {
+                    if (d.equals("(I)Ljava/lang/String;")) yield fn("substring", STRING, x, plusOne(a.get(0)));
+                    if (!d.equals("(II)Ljava/lang/String;")) yield null;
+                    yield Expr.Func.builtin("substring", List.of(done(value(x)), plusOne(a.get(0)), difference(a.get(1), a.get(0))), STRING);
+                }
+                case "indexOf" -> d.equals("(Ljava/lang/String;)I") ? locate(a.get(0), x) : null;
+                case "replace" -> d.equals("(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;")
+                        ? fn("replace", STRING, x, a.get(0), a.get(1)) : null;
+                case "concat" -> concat(List.of(x, a.get(0)));
+                case "toString" -> done(value(x));
+                default -> null;
+            };
+        }
+        // Kotlin trim() is StringsKt.trim(CharSequence).toString(): toString() of a text value is the value itself
+        if (!m.isStatic() && inv.receiver() != null && m.is("java/lang/Object", "toString") && isText(inv.receiver().type())) {
+            return done(value(inv.receiver()));
+        }
+        // a piece of a + concatenation (see Decoder): String.valueOf(x)
+        if (m.isStatic() && m.is("java/lang/String", "valueOf") && a.size() == 1) return textOf(a.get(0));
+        if (m.isStatic() && m.owner().startsWith(KOTLIN_STRINGS)) {
+            String base = m.name().endsWith("$default") ? m.name().substring(0, m.name().length() - "$default".length()) : m.name();
+            Type[] t = Type.getArgumentTypes(d);
+            return switch (base) {
+                case "trim" -> t.length == 1 && isText(t[0]) && isText(m.returnType()) ? fn("trim", STRING, a.get(0)) : null;
+                // indexOf(s, startIndex = 0, ignoreCase = false)
+                case "indexOf" -> t.length >= 4 && t[1].equals(STRING) && isConstant(a.get(2), 0) && isConstant(a.get(3), 0)
+                        ? locate(a.get(1), a.get(0)) : null;
+                // replace(old, new, ignoreCase = false)
+                case "replace" -> t.length >= 4 && t[1].equals(STRING) && t[2].equals(STRING) && isConstant(a.get(3), 0)
+                        ? fn("replace", STRING, a.get(0), a.get(1), a.get(2)) : null;
+                default -> null;
+            };
+        }
+        return null;
+    }
+
+    /**
+     * Reads a String test on an entity value as a condition.
+     * <ul>
+     *   <li>{@code isEmpty()}: {@code length(x) = 0}</li>
+     *   <li>{@code isBlank()}, Kotlin {@code isBlank()}: {@code length(trim(x)) = 0}</li>
+     *   <li>{@code equalsIgnoreCase(s)}, Kotlin {@code equals(s, ignoreCase = true)}: {@code lower(x) = lower(s)}</li>
+     * </ul>
+     *
+     * <p>Example: {@code o.getName().equalsIgnoreCase(name)} becomes {@code lower(e0.name) = lower(:p1)}.
+     *
+     * @param inv a boolean call
+     * @return the condition, or {@code null} if the call is not one of these tests
+     */
+    private Pred stringTest(Expr.Invoke inv) {
+        MethodRef m = inv.method();
+        List<Expr> a = inv.args();
+        Expr zero = new Expr.Const(0, Type.INT_TYPE);
+        if (!m.isStatic() && inv.receiver() != null && m.owner().equals("java/lang/String")) {
+            Expr x = inv.receiver();
+            return switch (m.name()) {
+                case "isEmpty" -> new Pred.Cmp(CmpOp.EQ, fn("length", Type.INT_TYPE, x), zero, false);
+                case "isBlank" -> new Pred.Cmp(CmpOp.EQ, Expr.Func.builtin("length", List.of(fn("trim", STRING, x)), Type.INT_TYPE), zero, false);
+                case "equalsIgnoreCase" -> new Pred.Cmp(CmpOp.EQ, fn("lower", STRING, x), fn("lower", STRING, a.get(0)), false);
+                default -> null;
+            };
+        }
+        if (m.isStatic() && m.owner().startsWith(KOTLIN_STRINGS)) {
+            String base = m.name().endsWith("$default") ? m.name().substring(0, m.name().length() - "$default".length()) : m.name();
+            Type[] t = Type.getArgumentTypes(m.descriptor());
+            if (base.equals("isBlank") && t.length == 1 && isText(t[0])) {
+                return new Pred.Cmp(CmpOp.EQ, Expr.Func.builtin("length", List.of(fn("trim", STRING, a.get(0))), Type.INT_TYPE), zero, false);
+            }
+            // equals(other, ignoreCase): the flag must be written in the lambda
+            if (base.equals("equals") && t.length >= 3 && t[0].equals(STRING) && t[1].equals(STRING)) {
+                if (isConstant(a.get(2), 0)) return eq(done(value(a.get(0))), done(value(a.get(1))));
+                if (isConstant(a.get(2), 1)) {
+                    return new Pred.Cmp(CmpOp.EQ, fn("lower", STRING, a.get(0)), fn("lower", STRING, a.get(1)), false);
+                }
+            }
+        }
+        return null;
+    }
+
+    /** A standard HQL function of normalized arguments. */
+    private Expr.Func fn(String name, Type type, Expr... args) {
+        List<Expr> out = new ArrayList<>();
+        for (Expr arg : args) out.add(done(value(arg)));
+        return Expr.Func.builtin(name, out, type);
+    }
+
+    /** Java {@code x.indexOf(s)} counts from 0 and gives -1 when not found; SQL {@code locate} counts from 1 and gives 0. */
+    private Expr locate(Expr search, Expr x) {
+        return new Expr.Arith(org.lambdaql.engine.ir.ArithOp.SUB, fn("locate", Type.INT_TYPE, search, x),
+                new Expr.Const(1, Type.INT_TYPE), Type.INT_TYPE);
+    }
+
+    /** A Java position (from 0) as an SQL position (from 1): a constant is moved here, other values get {@code + 1}. */
+    private Expr plusOne(Expr index) {
+        Expr v = done(value(index));
+        if (v instanceof Expr.Const c && c.value() instanceof Integer i) return new Expr.Const(i + 1, Type.INT_TYPE);
+        return new Expr.Arith(org.lambdaql.engine.ir.ArithOp.ADD, v, new Expr.Const(1, Type.INT_TYPE), Type.INT_TYPE);
+    }
+
+    /** {@code end - begin}, the length of {@code substring(begin, end)}; computed here when both are constants. */
+    private Expr difference(Expr end, Expr begin) {
+        Expr e = done(value(end)), b = done(value(begin));
+        if (e instanceof Expr.Const ce && ce.value() instanceof Integer ie && b instanceof Expr.Const cb && cb.value() instanceof Integer ib) {
+            return new Expr.Const(ie - ib, Type.INT_TYPE);
+        }
+        return new Expr.Arith(org.lambdaql.engine.ir.ArithOp.SUB, e, b, Type.INT_TYPE);
+    }
+
+    /**
+     * Joins pieces into one {@code concat(...)}; a piece that is itself a concatenation is opened,
+     * so {@code a + b + c} gives {@code concat(a, b, c)}.
+     */
+    private Expr concat(List<Expr> pieces) {
+        List<Expr> out = new ArrayList<>();
+        for (Expr piece : pieces) {
+            Expr v = done(value(piece));
+            if (v instanceof Expr.Func f && f.builtin() && f.key().equals("concat")) out.addAll(f.args());
+            else out.add(v);
+        }
+        return Expr.Func.builtin("concat", out, STRING);
+    }
+
+    /**
+     * An entity value in a concatenation as text: text stays as it is, other values are converted with {@code str(x)}.
+     * A piece without an entity value never comes here: it is computed in Java with {@code String.valueOf}.
+     */
+    private Expr textOf(Expr x) {
+        Expr v = done(value(x));
+        return isText(v.type()) ? v : Expr.Func.builtin("str", List.of(v), STRING);
+    }
+
+    /** Checks if a value is the int constant {@code n} ({@code false} and {@code true} are 0 and 1 in bytecode). */
+    private static boolean isConstant(Expr e, int n) {
+        Expr x = e;
+        while (x instanceof Expr.Convert c) x = c.operand();
+        if (x instanceof Expr.Const c && c.value() instanceof Integer i) return i == n;
+        return x instanceof Expr.Const c && c.value() instanceof Boolean b && b == (n == 1);
     }
 
     /**
@@ -571,6 +764,9 @@ public final class Normalizer {
             SqlFunctions.Info f = dbFn.get();
             return new Done(new Expr.Func(f.key(), f.sql(), f.asType(), args, Type.getType(f.method().getReturnType())));
         }
+        // String methods on an entity value: lower, upper, trim, length, substring, locate, replace, concat (D74)
+        Expr text = stringFunction(inv);
+        if (text != null) return new Done(text);
         // Agg.count(), Agg.sum(x) ...: aggregate functions (ROADMAP M9, D27)
         if (m.isStatic() && m.owner().equals("org/lambdaql/Agg")) {
             if (!aggregates) throw error(LqlMessage.AGG_IN_WHERE, m.name());

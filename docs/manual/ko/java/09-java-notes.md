@@ -170,8 +170,8 @@ assertEquals("select e0 from Order e0 where e0.cnt is null", nullCnt.toHql().hql
 - `==`, `equals`, `Objects.equals`는 NULL에 대해 같게 동작합니다. 컬럼이 NULL이거나 `p`가 `null`이면 일치하는 행이 없습니다. NULL 행을 원하면 `o.getDescription() == null`을 직접 쓰십시오.
 - 비교는 Java가 아니라 **데이터베이스 콜레이션**을 따릅니다. MariaDB `_ci` 콜레이션은 대소문자와 끝의 공백을 무시합니다. Oracle은 `''`를 NULL로 저장합니다.
 - 람다 표현식에 직접 쓴 문자열 상수는 HQL 리터럴이 되고, 작은따옴표는 escape됩니다(`'O''Brien'`). 캡처한 문자열은 항상 바인드 파라미터입니다([3.3](03-where.md#33-basic-form) 참고).
-- 컬럼에 대한 `startsWith`, `endsWith`, `contains`는 `like`가 됩니다([3.8](03-where.md#38-strings)). `trim`, `toUpperCase` 같은 다른 문자열 메서드는 지원하지 않습니다(`LQL-3008`).
-- 람다 표현식 안의 문자열 `+`는 거부됩니다(`LQL-2007`). 캡처 값만 있어도 마찬가지입니다(javac는 `+`를 `invokedynamic`으로 컴파일함). 문자열은 람다 표현식 전에 만드십시오.
+- 컬럼에 대한 `startsWith`, `endsWith`, `contains`는 `like`가 됩니다([3.8](03-where.md#38-strings)). `trim`, `toUpperCase`, `substring` 같은 메서드는 SQL 함수가 됩니다([3.8.1](03-where.md#381-string-functions)).
+- 람다 표현식 안의 문자열 `+`는 `concat(...)`이 됩니다. 캡처 값만 이어 붙이면 Java에서 문자열을 만들어 바인딩합니다. 아래처럼 람다 표현식 밖에서 만들어도 결과는 같습니다.
 
 <!-- region: ManualJavaNotesTest.java#string-outside -->
 ```java
@@ -341,7 +341,7 @@ lambdaQL의 static 헬퍼 클래스 `By`(정렬 함수), `Agg`(집계), `Dml`(�
 | Q 클래스, `Order_.price` | getter: `o.getPrice()` |
 | `count()`, `sum(...)`, ... | `Agg.count()`, `Agg.sum(...)` ([6](06-select-group.md)) |
 | `coalesce(a, b)` | `set` 값 안의 `Objects.requireNonNullElse(a, b)` |
-| `like(...)`, `lower(...)`, `upper(...)` | 지원하지 않음(컬럼에 대한 문자열 함수) |
+| `like(...)`, `lower(...)`, `upper(...)` | `startsWith`, `toLowerCase()`, `toUpperCase()` 같은 `String` 메서드 ([3.8.1](03-where.md#381-string-functions)) |
 | `currentTimestamp()` | `LocalDateTime.now()`. 애플리케이션에서 계산되어 바인딩됨 |
 | 엔티티 값에 대한 직접 만든 static 유틸리티 메서드 | **거부됨**. 단, `@SqlFunction`을 붙인 DB 함수는 예외 ([8](08-procedures-functions.md)) |
 
@@ -372,8 +372,8 @@ assertEquals("LQL-3008", assertThrows(LambdaQLException.class,
 | 삼항 연산자 `c ? x : y` | `c ? x : false`, `c ? true : x`, `c ? false : true`만 ([3.5](03-where.md#35-and-or-not)) |
 | boolean에 대한 `&`, `\|`, `^` | 거부됨. `&&`, `\|\|`를 사용하십시오 |
 | 스트림, 중첩 람다 표현식(`sub` 서브쿼리 제외) | 거부됨 |
-| 람다 표현식 안의 `List.of(...)` | 거부됨. `groupBy` 키로 쓰는 경우는 예외 |
-| `compareTo(...) < 0` | `<`, `>`가 됨. `LocalDateTime`의 `isBefore`, `isAfter`는 거부됨(`LQL-3008`) |
+| 람다 표현식 안의 `List.of(...)`, `Arrays.asList(...)` | `contains`의 수신 객체로 쓰면 Java에서 만들어 바인딩(`in (:p1)`). `groupBy`에서는 키 목록 |
+| `compareTo(...) < 0` | `<`, `>`가 됨. `java.time`의 `isBefore`, `isAfter`, `isEqual`도 `<`, `>`, `=`가 됨 |
 | `captured.length`(캡처 값의 배열) | Java에서 계산됨 |
 | 레코드 | 결과 타입(`select`)으로, 그리고 파생 테이블과 CTE의 행 타입으로(`r.total()`로 읽음) |
 | `var` | 빌더 변수에 사용할 수 있음. 타입은 `SelectQuery<T>`, `OrderedSelectQuery<T>`, `ValueQuery<R>` 등 |

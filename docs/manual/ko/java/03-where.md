@@ -152,8 +152,23 @@ where o1_0.kind='RUSH'
 | `o.getStatus() == 1` | `e0.status = 1` | |
 | `o.getStatus() != 1` | `e0.status <> 1` | |
 | `o.getPrice() > p` | `e0.price > :p1` | `<`, `<=`, `>=`도 마찬가지 |
-| `o.getUpdateAt().compareTo(since) > 0` | `e0.updateAt > :p1` | 날짜와 시간도 `compareTo`로 비교. `isAfter`, `isBefore`는 지원하지 않음(`LQL-3008`) |
+| `o.getUpdateAt().compareTo(since) > 0` | `e0.updateAt > :p1` | 날짜와 시간도 `compareTo`로 비교 |
+| `o.getUpdateAt().isAfter(since)` | `e0.updateAt > :p1` | `isBefore`는 `<`, `isEqual`은 `=` |
 | `o.getDescription().compareTo("m") < 0` | `e0.description < 'm'` | `compareTo(..) op 0`은 `op`가 됨 |
+
+<!-- region: TimeCompareTest.java#is-after -->
+```java
+SelectQuery<Order> after = qb.from(Order.class).where(o -> o.getUpdateAt().isAfter(since));
+assertEquals("select e0 from Order e0 where e0.updateAt > :p1", after.toHql().hql());
+
+SelectQuery<Order> before = qb.from(Order.class).where(o -> o.getUpdateAt().isBefore(since));
+assertEquals("select e0 from Order e0 where e0.updateAt < :p1", before.toHql().hql());
+
+SelectQuery<Order> same = qb.from(Order.class).where(o -> o.getUpdateAt().isEqual(since));
+assertEquals("select e0 from Order e0 where e0.updateAt = :p1", same.toHql().hql());
+```
+
+`isAfter`, `isBefore`, `isEqual`은 `java.time`의 날짜와 시간 타입(`LocalDate`, `LocalDateTime`, `OffsetDateTime`, `Instant` 등)에서 비교가 됩니다.
 
 숫자와의 비교(`== 1`이나 `> 100.0`처럼 한쪽이 기본형)는 **SQL 의미**를 따릅니다.
 컬럼이 NULL인 행은 반환되지 않습니다.
@@ -199,7 +214,7 @@ assertEquals("select e0 from Order e0 where e0.cnt in (2.5BD, 3.0BD)", in.hql())
 **부동소수점:** `float`/`double` 컬럼에 대해 lambdaQL은 Java와 비트 단위까지 같은 결과를 약속하지 않습니다.
 캡처한 `NaN`이나 `Infinity` 값은 쿼리가 실행될 때 거부됩니다.
 
-예제 코드: [`SqlMeaningTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)(`whole-number`).
+예제 코드: [`SqlMeaningTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SqlMeaningTest.java)(`whole-number`), [`TimeCompareTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/TimeCompareTest.java)(`is-after`).
 
 <a id="35-and-or-not"></a>
 ## 3.5 AND, OR, NOT
@@ -675,17 +690,14 @@ assertEquals("select e0 from Order e0 where e0.description like '%all' escape '!
 - `endsWith`와 `contains`는 패턴 앞이 `%`이므로 컬럼의 일반 인덱스를 쓰지 못합니다.
 - MariaDB와 MySQL은 기본 콜레이션에서 `like`가 대소문자를 구분하지 않습니다. 그래서 Java의 `startsWith`와 결과가 다를 수 있습니다.
 - 검색어로 쓴 캡처 값이 `null`이면 오류입니다(`LQL-4047`).
-- `trim()`, `toUpperCase()` 같은 다른 문자열 메서드는 지원하지 않습니다(`LQL-3008`).
-- 람다 표현식 안의 문자열 `+`는 거부됩니다(`LQL-2007`). 캡처 값만 이어 붙이는 경우도 마찬가지입니다. 문자열은 람다 표현식 전에 만드십시오.
+- `trim()`, `toLowerCase()`, 문자열 `+` 같은 메서드는 SQL 함수가 됩니다([3.8.1](#381-string-functions)).
+- 같은 의미의 SQL 함수가 없는 메서드(`strip()` 등)는 거부됩니다(`LQL-3008`).
 
 <!-- region: ManualJavaWhereTest.java#rejected-forms -->
 ```java
-// a String method on an entity value other than startsWith, endsWith and contains
+// a String method that has no SQL function of the same meaning
 assertEquals("LQL-3008", assertThrows(LambdaQLException.class,
-        () -> qb.from(Order.class).where(o -> o.getDescription().trim().equals("a"))).code());
-// string concatenation inside the lambda, even of captured values only
-assertEquals("LQL-2007", assertThrows(LambdaQLException.class,
-        () -> qb.from(Order.class).where(o -> o.getDescription().equals("A" + code))).code());
+        () -> qb.from(Order.class).where(o -> o.getDescription().strip().equals("a"))).code());
 // an entity compared with an entity: compare the ids
 assertEquals("LQL-3011", assertThrows(LambdaQLException.class,
         () -> qb.from(Order.class).where(o -> o.getCustomer() == c)).code());
@@ -697,6 +709,130 @@ assertEquals("LQL-2013", assertThrows(LambdaQLException.class,
 ```
 
 예제 코드: [`SelectQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)(`string-literal`), [`ManualJavaWhereTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/ManualJavaWhereTest.java)(`rejected-forms`), [`LikeTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/LikeTest.java)(`like`).
+
+<a id="381-string-functions"></a>
+### 3.8.1 문자열 함수
+
+엔티티 값에 대한 문자열 메서드는 HQL 표준 함수가 됩니다.
+
+<!-- region: StringFunctionTest.java#lower -->
+```java
+SelectQuery<Order> q = qb.from(Order.class).where(o -> o.getDescription().toLowerCase().equals("park"));
+assertEquals("select e0 from Order e0 where lower(e0.description) = 'park'", q.toHql().hql());
+```
+
+| Java | HQL |
+|---|---|
+| `toLowerCase()`, `toUpperCase()` | `lower(x)`, `upper(x)` |
+| `trim()` | `trim(x)` |
+| `length()` | `length(x)` |
+| `isEmpty()` | `length(x) = 0` |
+| `isBlank()` | `length(trim(x)) = 0` |
+| `equalsIgnoreCase(s)` | `lower(x) = lower(s)` |
+| `substring(a)`, `substring(a, b)` | `substring(x, a + 1)`, `substring(x, a + 1, b - a)` |
+| `indexOf(s)` | `locate(s, x) - 1` |
+| `replace(a, b)` | `replace(x, a, b)` |
+| `+`, `concat(s)` | `concat(...)` |
+
+<!-- region: StringFunctionTest.java#trim-length -->
+```java
+SelectQuery<Order> trimmed = qb.from(Order.class).where(o -> o.getDescription().trim().equals("Kim"));
+assertEquals("select e0 from Order e0 where trim(e0.description) = 'Kim'", trimmed.toHql().hql());
+
+SelectQuery<Order> longer = qb.from(Order.class).where(o -> o.getDescription().length() > 3);
+assertEquals("select e0 from Order e0 where length(e0.description) > 3", longer.toHql().hql());
+```
+
+<!-- region: StringFunctionTest.java#empty-blank -->
+```java
+SelectQuery<Order> empty = qb.from(Order.class).where(o -> o.getDescription().isEmpty());
+assertEquals("select e0 from Order e0 where length(e0.description) = 0", empty.toHql().hql());
+
+SelectQuery<Order> blank = qb.from(Order.class).where(o -> o.getDescription().isBlank());
+assertEquals("select e0 from Order e0 where length(trim(e0.description)) = 0", blank.toHql().hql());
+```
+
+<!-- region: StringFunctionTest.java#ignore-case -->
+```java
+String name = "KIM";
+SelectQuery<Order> q = qb.from(Order.class).where(o -> o.getDescription().equalsIgnoreCase(name));
+assertEquals("select e0 from Order e0 where lower(e0.description) = lower(:p1)", q.toHql().hql());
+```
+
+Java는 위치를 0부터, SQL은 1부터 셉니다. lambdaQL이 위치를 1씩 옮깁니다.
+
+<!-- region: StringFunctionTest.java#substring -->
+```java
+// Java counts from 0, SQL from 1: substring(0, 3) is the first three characters
+SelectQuery<Order> q = qb.from(Order.class).where(o -> o.getDescription().substring(0, 3).equals("lee"));
+assertEquals("select e0 from Order e0 where substring(e0.description, 1, 3) = 'lee'", q.toHql().hql());
+```
+
+<!-- region: StringFunctionTest.java#index-of -->
+```java
+// Java gives -1 when not found and SQL locate gives 0, so 1 is taken away
+SelectQuery<Order> q = qb.from(Order.class).where(o -> o.getDescription().indexOf("-") == 3);
+assertEquals("select e0 from Order e0 where (locate('-', e0.description) - 1) = 3", q.toHql().hql());
+```
+
+<!-- region: StringFunctionTest.java#replace -->
+```java
+SelectQuery<Order> q = qb.from(Order.class).where(o -> o.getDescription().replace("-", "_").equals("lee_01"));
+assertEquals("select e0 from Order e0 where replace(e0.description, '-', '_') = 'lee_01'", q.toHql().hql());
+```
+
+문자열 `+`는 `concat(...)`이 됩니다. 문자열이 아닌 값은 `str(x)`로 바꿉니다.
+
+<!-- region: StringFunctionTest.java#concat -->
+```java
+String prefix = "A-";
+SelectQuery<Order> q = qb.from(Order.class).where(o -> (prefix + o.getDescription() + "!").equals("A-PARK!"));
+assertEquals("select e0 from Order e0 where concat(:p1, e0.description, '!') = 'A-PARK!'", q.toHql().hql());
+
+// a number is converted with str()
+ValueQuery<String> labels = qb.from(Order.class).where(o -> o.getStatus() == 2).select(o -> o.getDescription() + "#" + o.getStatus());
+assertEquals("select concat(e0.description, '#', str(e0.status)) from Order e0 where e0.status = 2", labels.toHql().hql());
+```
+
+캡처 값만 이어 붙이면 Java에서 문자열을 만들어 바인딩합니다.
+
+<!-- region: StringFunctionTest.java#concat-captured -->
+```java
+// only captured values: the text is made in Java and bound
+String code = "01";
+SelectQuery<Order> q = qb.from(Order.class).where(o -> o.getDescription().equals("lee-" + code));
+assertEquals("select e0 from Order e0 where e0.description = :p1", q.toHql().hql());
+```
+
+문자열 함수는 `select`, 정렬 키, `set` 값에도 쓸 수 있습니다.
+
+<!-- region: StringFunctionTest.java#select-sort-set -->
+```java
+ValueQuery<String> upper = qb.from(Order.class).where(o -> o.getStatus() == 2).select(o -> o.getDescription().toUpperCase());
+assertEquals("select upper(e0.description) from Order e0 where e0.status = 2", upper.toHql().hql());
+
+OrderedSelectQuery<Order> sorted = qb.from(Order.class).orderBy(o -> asc(o.getDescription().length()).asc(o.getId()));
+assertEquals("select e0 from Order e0 order by length(e0.description) asc nulls first, e0.id asc", sorted.toHql().hql());
+
+ExecutableUpdate<Order> trim = qb.update(Order.class).set(o -> o.setDescription(o.getDescription().trim())).all();
+assertEquals("update Order e0 set e0.description = trim(e0.description)", trim.toHql().hql());
+```
+
+Java와 결과가 다른 경우:
+
+- 텍스트가 NULL이면 Java는 `NullPointerException`을 던지지만, SQL 함수는 NULL을 냅니다. 그 행은 조건에 맞지 않습니다.
+- `+`로 NULL을 이어 붙이면 Java는 `"null"`을, SQL은 NULL을 냅니다. Oracle은 NULL을 빈 문자열처럼 이어 붙입니다.
+- `substring`의 범위가 텍스트 길이를 넘으면 Java는 예외를 던지지만, SQL은 있는 만큼만 돌려줍니다.
+- Java의 `trim()`은 코드 32 이하의 모든 문자를 지우지만, SQL `trim`은 공백만 지웁니다.
+- 길이는 Java에서 UTF-16 단위이고, DB에서는 DB가 세는 문자 수입니다. 이모지 같은 보충 문자에서 값이 다를 수 있습니다.
+- `toLowerCase(Locale)`의 `Locale`은 쓰이지 않습니다. 대소문자 변환과 비교는 DB 규칙과 콜레이션을 따릅니다.
+- Oracle은 `''`를 NULL로 저장하므로 Oracle에서 `isEmpty()`와 `isBlank()`에 맞는 행이 없습니다.
+
+`where`에서 컬럼을 함수로 감싸면 그 컬럼의 일반 인덱스를 쓸 수 없습니다.
+lambdaQL은 이 경우 `LQL-5001`을 `WARN` 수준으로 기록하고, `SargableMode.STRICT`에서는 분석을 실패시킵니다.
+Oracle과 PostgreSQL에 같은 식의 함수 기반 인덱스(`lower(description)`)가 있으면 기록하지 않습니다.
+
+예제 코드: [`StringFunctionTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/StringFunctionTest.java)(`lower`, `trim-length`, `empty-blank`, `ignore-case`, `substring`, `index-of`, `replace`, `concat`, `concat-captured`, `select-sort-set`).
 
 <a id="39-in-with-a-captured-collection"></a>
 ## 3.9 캡처한 컬렉션을 사용한 IN
@@ -763,9 +899,23 @@ where o1_0.description not in (?,?)
 | 빈 컬렉션 | `contains`는 FALSE, `!contains`는 TRUE(Hibernate는 `1=0` / `1=1`을 씀) |
 | 요소 1,500개 | H2, MariaDB, Oracle 23ai에서 문장 하나로 동작함(이전 Oracle 버전에는 1,000개 제한이 있음. 이전 버전에서는 미확인) |
 | 수신 객체가 엔티티 컬렉션: `c.getOrders().contains(order)` | **거부됨**. `exists` 서브쿼리를 사용하십시오([5. 서브쿼리](05-subquery.md)) |
-| 람다 표현식 안에서 만든 컬렉션: `List.of(1, 2).contains(o.getStatus())` | **거부됨**. 밖에서 만들어 캡처하십시오 |
+| 람다 표현식 안에서 만든 컬렉션: `List.of(1, 2).contains(o.getCnt())`, `Arrays.asList(...)` | 지원. 캡처한 컬렉션처럼 쿼리가 실행될 때 Java에서 만들어 바인딩 |
 
-예제 코드: [`SelectQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)(`in`, `not-in`).
+람다 표현식 안에서 만든 컬렉션도 캡처한 컬렉션과 같은 SQL이 됩니다.
+
+<!-- region: InListTest.java#in-made-in-lambda -->
+```java
+// a collection made in the lambda is computed in Java and bound like a captured collection
+SelectQuery<Order> listOf = qb.from(Order.class).where(o -> List.of(1, 2).contains(o.getCnt()));
+assertEquals("select e0 from Order e0 where e0.cnt in (:p1)", listOf.toHql().hql());
+
+SelectQuery<Order> asList = qb.from(Order.class).where(o -> Arrays.asList("a", "b").contains(o.getDescription()));
+assertEquals("select e0 from Order e0 where e0.description in (:p1)", asList.toHql().hql());
+```
+
+원소는 컬럼 타입으로 바꿔 값으로 비교합니다. 예를 들어 `short` 컬럼에 대한 `List.of(1, 2).contains(o.getStatus())`는 `status in (1, 2)`가 됩니다. Java에서는 `Short`와 `Integer`가 `equals`로 같지 않아 항상 false입니다.
+
+예제 코드: [`SelectQueryTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/SelectQueryTest.java)(`in`, `not-in`), [`InListTest.java`](https://github.com/lambdaql/lambdaql/blob/main/query/src/test/java/org/lambdaql/query/InListTest.java)(`in-made-in-lambda`).
 
 <a id="310-association-paths"></a>
 ## 3.10 연관 경로
@@ -950,7 +1100,7 @@ assertEquals("select e0 from Order e0 where e0.updateAt > :p1 and e0.status = :p
 - 엔티티를 사용하지 않는 부분은 **쿼리가 실행될 때마다** Java에서 계산합니다. 그 결과가 바인드 파라미터가 됩니다.
 - 컴파일 시점 상수(`static final int MAX = 5;`)는 캡처 값이 아닙니다. javac가 람다 표현식 안에 값을 복사하므로 `5`처럼 리터럴이 됩니다([3.3](#33-basic-form) 참고).
 - 람다 표현식은 한 번 분석되고 결과는 캐시됩니다. 새 캡처 값은 호출할 때마다 읽습니다.
-- 엔티티 부분만 SQL이 됩니다. `form.text().trim()`은 Java에서 계산합니다. 엔티티 값에 대한 `o.getDescription().trim()`은 거부됩니다(`LQL-3008`).
+- 엔티티 부분만 SQL이 됩니다. `form.text().trim()`은 Java에서 계산하고, 엔티티 값에 대한 `o.getDescription().trim()`은 SQL `trim(e0.description)`이 됩니다([3.8.1](#381-string-functions)).
 - Java에서 캡처한 지역 변수는 사실상 final이어야 합니다. 값이 바뀐다면 람다 표현식 전에 새 변수에 계산해 두십시오.
 - 필드를 사용하는 람다 표현식은 `this`를 캡처합니다. [9.8](09-java-notes.md#98-lambdas-in-instance-methods-capture-this)을 참고하십시오.
 
@@ -988,9 +1138,8 @@ lambdaQL은 분석에 실패하면 코드 `[LQL-xxxx]`와 소스 줄 번호가 �
 | 블록 람다 표현식 안의 반복문, `switch`, 지역 변수 | `o -> { int x = 1; return ...; }` | 식 하나로 작성 |
 | 일반 boolean 삼항 연산자 | `c ? x : y` | [3.5](#35-and-or-not)의 허용된 형태 사용 |
 | 단락 평가를 하지 않는 연산자(`LQL-2013`) | `a & b`, `a \| b`, `a ^ b` | `&&`, `\|\|` 사용 |
-| 문자열 `+`(`LQL-2007`) | `o.getDescription().equals("A" + code)` | 람다 표현식 전에 문자열을 만듦 |
 | 람다 표현식 안의 람다 표현식이나 스트림 | `o -> list.stream().anyMatch(...)` | `contains`([3.9](#39-in-with-a-captured-collection))나 서브쿼리 사용 |
-| 엔티티 값에 대한 문자열 메서드(`LQL-3008`) | `o.getDescription().trim()` (`startsWith`, `endsWith`, `contains`는 지원, [3.8](#38-strings)) | 지원하지 않음 |
+| 같은 의미의 SQL 함수가 없는 문자열 메서드(`LQL-3008`) | `o.getDescription().strip()` (지원하는 메서드는 [3.8.1](#381-string-functions)) | 지원하지 않음 |
 | 엔티티의 다른 메서드 | `o.calcSomething()` | getter만 사용 |
 | 엔티티 컬렉션 경로 | `c.getOrders().size() > 0`(`Customer.orders`) | `exists` 서브쿼리 |
 | 엔티티와 엔티티 비교(`LQL-3011`) | `o.getCustomer() == c` | id 비교 |

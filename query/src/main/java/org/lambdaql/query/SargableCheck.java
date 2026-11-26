@@ -220,7 +220,8 @@ final class SargableCheck {
     private static void side(Expr self, Expr other, Map<Integer, Class<?>> roots, List<Finding> out) {
         columnFunctions(self, roots, out);
         subqueries(self, roots, out);
-        if (self instanceof Expr.Func f && columns(f).isEmpty() && other instanceof Expr.Column c) {
+        // a standard HQL function is not a stored function: there is nothing to look up for it
+        if (self instanceof Expr.Func f && !f.builtin() && columns(f).isEmpty() && other instanceof Expr.Column c) {
             out.add(new Finding(f, c, roots.get(c.root()), false));
         }
     }

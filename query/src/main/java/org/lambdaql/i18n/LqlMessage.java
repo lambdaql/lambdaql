@@ -71,9 +71,6 @@ public enum LqlMessage {
     /** LQL-2006: A value can be stored in an array only at a constant index. */
     ARRAY_INDEX_NOT_CONSTANT("LQL-2006", 0),
 
-    /** LQL-2007: String concatenation (+) is not supported yet. Build the string outside the lambda and capture it. */
-    STRING_CONCAT_NOT_SUPPORTED("LQL-2007", 0),
-
     /** LQL-2008: This invokedynamic is not supported: &#123;0&#125; */
     INVOKEDYNAMIC_NOT_SUPPORTED("LQL-2008", 1),
 

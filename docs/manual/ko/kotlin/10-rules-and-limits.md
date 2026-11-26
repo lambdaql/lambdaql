@@ -215,7 +215,7 @@ persistence unit마다 `SargablePolicy.register(emf, SargableMode.STRICT)`로 �
 | R18 | 범위 `in a..b`, `until`, `..<`, `!in` | `a <= x and x < b + 1`(상수), `:p1 <= x and x <= :p2`(캡처 값), `a > x or x >= b + 1`(`!in`). 자동 null 가드 없음 |
 | R19 | 컬렉션 `x in c`, `x !in c`(캡처한 `c`) | `x in (:p)`, `x not in (:p)`(SQL 의미). null 요소: 오류. 빈 컬렉션: FALSE / TRUE |
 | R20 | `true`/`false`로 끝나는 분기를 가진 대상 없는 `when { }` | 조건의 `OR`. 대상이 있는 `when (subject)`는 거부(`LQL-2010`) |
-| R21 | Kotlin 문자열 함수 | `startsWith`, `endsWith`, `contains`(`ignoreCase` 포함)는 `like`. `equals(ignoreCase)`, `lowercase`, `length`, `isNullOrEmpty`는 거부(`LQL-3008`). `equals(text)`는 `==`와 같음 |
+| R21 | Kotlin 문자열 함수 | `startsWith`, `endsWith`, `contains`(`ignoreCase` 포함)는 `like`. `lowercase`, `trim`, `length`, `substring`, `indexOf`, `replace`, 템플릿은 HQL 표준 함수(위치는 1씩 옮김). `isEmpty`, `isNullOrEmpty`, `isBlank`, `equals(ignoreCase = true)`는 조건. `equals(text)`는 `==`와 같음 |
 | R22 | Kotlin 호스트 값(캡처한 `var`, private 속성, `companion` 값) | 실행할 때마다 읽음. 쓰기는 거부됨 |
 | R23 | 속성 참조 `Order::price` | 조건에서는 거부(`LQL-1009`). 람다 표현식 `{ it.price }`를 사용하십시오 |
 | R24 | 연관 경로(`it.customer?.name`, `it.customer!!.name`, Java 엔티티의 `it.customer.name`) | 컬럼. to-one 연관: where, order by, select가 함께 사용하는 별칭. `where`에서는 연관이 없는 행이 조건에 맞을 수 있으면 `left join`, 맞을 수 없으면 inner join(`!!`나 표시 없이 지난 비교는 연관이 있는 행에서만 참, `?.`와 `!!`를 섞어 써도 됨), order by나 select에만 쓰면 `left join`(필수 연관 `optional = false`는 inner join, A4). 임베디드: 같은 테이블. 대상의 `@Id`로 끝나거나 연관을 `null`과 비교: 외래 키 컬럼, 조인 없음. 컬렉션: 오류 |
@@ -224,7 +224,7 @@ Java 전용 규칙 R4(엔티티 값에 대한 `equals`)와 R5(Java null-safe 헬
 
 그 밖의 규칙:
 
-- `x.compareTo(y) > 0`은 `x > y`가 됩니다. `isBefore`, `isAfter`는 거부됩니다(`LQL-3008`).
+- `x.compareTo(y) > 0`은 `x > y`가 됩니다. `isBefore`, `isAfter`, `isEqual`도 `<`, `>`, `=`가 됩니다.
 - 람다 표현식에 직접 쓴 상수(`const val` 포함)는 리터럴입니다: `it.price > 100.0`은 `e0.price > 100.0`, `"O'Brien"`은 `'O''Brien'`. 캡처 값과 계산한 값(`BigDecimal("1.5")`)은 바인드 파라미터입니다. 예외: 정수 컬럼과 비교하는 소수 캡처 값은 소수 리터럴(`2.5BD`).
 - 컴파일러는 가끔 `!`의 위치를 옮깁니다(드 모르간, 이중 부정). 그래도 결과는 바뀌지 않습니다.
   lambdaQL은 각 조건을 정확히 한 번씩 유지하며, 작성한 논리를 "단순화"하지 않습니다.
@@ -262,7 +262,8 @@ Java 전용 규칙 R4(엔티티 값에 대한 `equals`)와 R5(Java null-safe 헬
 | `BigDecimal` 나눗셈과 함수 결과 | Kotlin 스케일 규칙(`HALF_EVEN`) | 스케일은 DB가 결정(예: 함수 결과에 대해 H2는 1, MariaDB와 Oracle은 0) | 문서화 |
 | 유니코드 대소문자 무시(`ſ`, `İ`) | Kotlin 규칙 | DB 콜레이션 | DB를 따름 |
 | 문자열 길이 | UTF-16 단위 | H2는 UTF-16 단위, MariaDB는 코드 포인트 | 문서화 |
-| NULL이 들어간 문자열 템플릿 | `"null"` 텍스트 | NULL(Oracle: `NULL \|\| 'x'`는 `'x'`) | 문자열 결합은 거부(`LQL-2007`) |
+| NULL이 들어간 문자열 템플릿 | `"null"` 텍스트 | NULL(Oracle: `NULL \|\| 'x'`는 `'x'`) | DB를 따름. 캡처 값만 쓰는 템플릿은 Kotlin에서 계산 |
+| 문자열 위치 | 0부터 셈. `indexOf`는 없으면 -1 | 1부터 셈. `locate`는 없으면 0 | 위치를 1씩 옮김(`substring(x, a + 1)`, `locate(s, x) - 1`) |
 | nullable 범위 대상 | false. `!in`은 true | 반환 안 됨. `!in`에서도 마찬가지 | SQL 의미 |
 | non-null 타입 `String` | null이 아님 | 컬럼은 NULL일 수 있음 | lambdaQL은 JPA 메타데이터를 사용 |
 | 람다 표현식 안의 `LocalDateTime.now()` | 애플리케이션 시간 | – | **애플리케이션 시간**으로 바인딩. DB 시간(`current_timestamp`)은 지원하지 않음 |
@@ -372,13 +373,11 @@ lambdaQL은 이 목록의 모든 형태에 대해 명확한 오류를 던집니�
 | 값 객체(`@Embedded`)의 크기 비교, 다른 타입과의 비교(`LQL-3012`) | 필드를 비교. 같은 타입과의 `==`, `!=`, `null` 비교는 지원 |
 | 컬렉션 경로(`it.items...`, `@OneToMany`, `@ManyToMany`) | `exists()` 서브쿼리 또는 조인 |
 | `item in it.items` | `exists()` 서브쿼리 |
-| 람다 표현식 안에서 만든 컬렉션(`listOf(1, 2)`, `setOf(...)`) | 밖에서 만들어 캡처. (`groupBy` 키는 예외) |
 | 범위의 `step` | 비교 두 개 또는 캡처한 컬렉션 |
 | 캡처한 컬렉션 안의 `null` 요소 | null을 제거. NULL 행이 필요하면 `\|\| it.x == null`을 추가 |
 | 캡처한 `NaN` / `Infinity` | 쿼리 전에 값을 검사 |
 | `isNaN()` | – |
 | 엔티티 값에 대한 그 밖의 함수 호출(직접 만든 non-inline 함수, `operator` 함수) | 속성으로 조건을 작성하거나 함수를 `inline`으로 만듦 |
-| 문자열 템플릿이나 `+`(`LQL-2007`) | 문자열은 람다 표현식 밖에서 만들어 캡처 |
 | 엔티티 경로에 대한 `it.tags["k"]`, `it.lines[0]` | – |
 
 <a id="functions-and-strings"></a>
@@ -386,8 +385,8 @@ lambdaQL은 이 목록의 모든 형태에 대해 명확한 오류를 던집니�
 
 | 지원하지 않음 | 대신 작성할 것 |
 |---|---|
-| 엔티티 값에 대한 문자열 함수: `lowercase`, `length`, `isNullOrEmpty`, `isBlank`, `equals(s, ignoreCase = true)`(`LQL-3008`) | 직접 비교. `startsWith`, `endsWith`, `contains`는 지원 |
-| 컬럼에 대한 `trim`, `coerceAtLeast`, `toLocalDate` 및 그 밖의 stdlib 함수 | 직접 비교 또는 DB 함수(`@SqlFunction`) |
+| 같은 의미의 SQL 함수가 없는 문자열 함수(`padStart`, `split`, `LQL-3008`). 지원하는 함수는 [3.8.1](03-where.md#381-string-functions) | 직접 비교 |
+| 컬럼에 대한 `coerceAtLeast`, `toLocalDate` 및 그 밖의 stdlib 함수 | 직접 비교 또는 DB 함수(`@SqlFunction`) |
 | 날짜 함수(`YEAR(col) == 2024`) | 범위: `it.updateAt!! >= from && it.updateAt!! < to` |
 | 제네릭 반환 타입(`fun <X> nvl(a: X, b: X): X`), 엔티티, 컬렉션, `Unit`을 반환하는 `@SqlFunction` | 다음 중 하나: `Double`, `Integer`(`Int`), `Long`, `BigDecimal`, `String`, `LocalDate`, `LocalDateTime`, `Boolean` |
 | Hibernate 내장 함수와 이름이 같은 `@SqlFunction`(`COALESCE`, `ROUND`, `SYSDATE`, ...) | 접두사나 스키마 이름을 사용(`PUBLIC.SQ_FN`) |
@@ -444,7 +443,6 @@ lambdaQL은 이 목록의 모든 형태에 대해 명확한 오류를 던집니�
 | 연관의 `@Id`가 아닌 속성을 설정(`it.customer?.name = x`) | `Customer`를 직접 수정 |
 | 선택적이지 않은 컬럼(`@Id`, `nullable = false`, 기본형)에 `null` | – |
 | `@Version` 속성을 직접 쓰기 | lambdaQL이 대신 `update versioned`를 사용 |
-| 값 안의 문자열 템플릿(`LQL-2007`) | 문자열은 람다 표현식 밖에서 만들어 캡처 |
 | update나 delete의 명시적 조인 | 추가하지 않음. 연관 경로나 `sub` 사용 |
 | 명시적 조인이 있는 `insert ... select` | 다대일 경로를 사용 |
 | 동시 삽입에서 원자적인 `onConflict { ... }.ignore()` | 키 중복 오류를 처리(`ignore()`는 `not exists`를 사용. [7.6](07-6-upsert.md) 참고) |
